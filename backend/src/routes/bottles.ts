@@ -1,0 +1,101 @@
+import { Router, Response } from 'express';
+import { PrismaClient } from '@prisma/client';
+import { AuthRequest } from '../middleware/auth';
+
+const router = Router();
+const prisma = new PrismaClient();
+
+router.get('/', async (req: AuthRequest, res: Response) => {
+  try {
+    const { categoryId, type } = req.query;
+    const where: any = {};
+    if (categoryId) where.categoryId = parseInt(categoryId as string);
+    if (type) where.category = { type: type as string };
+
+    const bottles = await prisma.bottle.findMany({
+      where,
+      include: { category: true },
+      orderBy: [{ category: { name: 'asc' } }, { name: 'asc' }],
+    });
+    res.json(bottles);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: req.t('errors.serverError') });
+  }
+});
+
+router.get('/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const bottle = await prisma.bottle.findUnique({
+      where: { id: parseInt(String(req.params.id)) },
+      include: { category: true },
+    });
+    if (!bottle) {
+      res.status(404).json({ error: req.t('errors.notFound') });
+      return;
+    }
+    res.json(bottle);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: req.t('errors.serverError') });
+  }
+});
+
+router.post('/', async (req: AuthRequest, res: Response) => {
+  try {
+    const { name, categoryId, purchasePrice, capacityMl, remainingPercent, openedAt } = req.body;
+    if (!name || !categoryId || !capacityMl) {
+      res.status(400).json({ error: req.t('errors.validationError') });
+      return;
+    }
+    const bottle = await prisma.bottle.create({
+      data: {
+        name,
+        categoryId,
+        purchasePrice: purchasePrice || null,
+        capacityMl,
+        remainingPercent: remainingPercent ?? 100,
+        openedAt: openedAt ? new Date(openedAt) : null,
+      },
+      include: { category: true },
+    });
+    res.status(201).json(bottle);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: req.t('errors.serverError') });
+  }
+});
+
+router.put('/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const { name, categoryId, purchasePrice, capacityMl, remainingPercent, openedAt } = req.body;
+    const bottle = await prisma.bottle.update({
+      where: { id: parseInt(String(req.params.id)) },
+      data: {
+        ...(name && { name }),
+        ...(categoryId && { categoryId }),
+        ...(purchasePrice !== undefined && { purchasePrice }),
+        ...(capacityMl && { capacityMl }),
+        ...(remainingPercent !== undefined && { remainingPercent }),
+        ...(openedAt !== undefined && { openedAt: openedAt ? new Date(openedAt) : null }),
+      },
+      include: { category: true },
+    });
+    res.json(bottle);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: req.t('errors.serverError') });
+  }
+});
+
+router.delete('/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    await prisma.bottle.delete({ where: { id: parseInt(String(req.params.id)) } });
+    res.json({ message: req.t('bottles.deleted') });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: req.t('errors.cannotDelete') });
+  }
+});
+
+export default router;

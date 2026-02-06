@@ -1,0 +1,46 @@
+{
+  "errors": {
+    "notFound": "Resource not found",
+    "unauthorized": "Unauthorized",
+    "invalidCredentials": "Invalid email or password",
+    "serverError": "Internal server error",
+    "validationError": "Validation error",
+    "duplicateEntry": "This entry already exists",
+    "cannotDelete": "Cannot delete: resource is in use"
+  },
+  "auth": {
+    "loginSuccess": "Login successful",
+    "logoutSuccess": "Logout successful"
+  },
+  "categories": {
+    "created": "Category created successfully",
+    "updated": "Category updated successfully",
+    "deleted": "Category deleted successfully"
+  },
+  "bottles": {
+    "created": "Bottle created successfully",
+    "updated": "Bottle updated successfully",
+    "deleted": "Bottle deleted successfully"
+  },
+  "ingredients": {
+    "created": "Ingredient created successfully",
+    "updated": "Ingredient updated successfully",
+    "deleted": "Ingredient deleted successfully"
+  },
+  "units": {
+    "created": "Unit created successfully",
+    "updated": "Unit updated successfully",
+    "deleted": "Unit deleted successfully"
+  },
+  "cocktails": {
+    "created": "Cocktail created successfully",
+    "updated": "Cocktail updated successfully",
+    "deleted": "Cocktail deleted successfully",
+    "imageUploaded": "Image uploaded successfully"
+  },
+  "menus": {
+    "created": "Menu created successfully",
+    "updated": "Menu updated successfully",
+    "deleted": "Menu deleted successfully"
+  }
+}

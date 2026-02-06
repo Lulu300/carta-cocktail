@@ -1,0 +1,46 @@
+{
+  "errors": {
+    "notFound": "Ressource introuvable",
+    "unauthorized": "Non autorisé",
+    "invalidCredentials": "Email ou mot de passe invalide",
+    "serverError": "Erreur interne du serveur",
+    "validationError": "Erreur de validation",
+    "duplicateEntry": "Cette entrée existe déjà",
+    "cannotDelete": "Impossible de supprimer : ressource utilisée"
+  },
+  "auth": {
+    "loginSuccess": "Connexion réussie",
+    "logoutSuccess": "Déconnexion réussie"
+  },
+  "categories": {
+    "created": "Catégorie créée avec succès",
+    "updated": "Catégorie mise à jour avec succès",
+    "deleted": "Catégorie supprimée avec succès"
+  },
+  "bottles": {
+    "created": "Bouteille créée avec succès",
+    "updated": "Bouteille mise à jour avec succès",
+    "deleted": "Bouteille supprimée avec succès"
+  },
+  "ingredients": {
+    "created": "Ingrédient créé avec succès",
+    "updated": "Ingrédient mis à jour avec succès",
+    "deleted": "Ingrédient supprimé avec succès"
+  },
+  "units": {
+    "created": "Unité créée avec succès",
+    "updated": "Unité mise à jour avec succès",
+    "deleted": "Unité supprimée avec succès"
+  },
+  "cocktails": {
+    "created": "Cocktail créé avec succès",
+    "updated": "Cocktail mis à jour avec succès",
+    "deleted": "Cocktail supprimé avec succès",
+    "imageUploaded": "Image téléchargée avec succès"
+  },
+  "menus": {
+    "created": "Carte créée avec succès",
+    "updated": "Carte mise à jour avec succès",
+    "deleted": "Carte supprimée avec succès"
+  }
+}

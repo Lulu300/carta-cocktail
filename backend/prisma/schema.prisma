@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+model Category {
+  id           Int      @id @default(autoincrement())
+  name         String
+  type         String   // SPIRIT or SYRUP
+  desiredStock Int      @default(1)
+  createdAt    DateTime @default(now())
+
+  bottles             Bottle[]
+  cocktailIngredients CocktailIngredient[]
+}
+
+model Bottle {
+  id               Int       @id @default(autoincrement())
+  name             String
+  categoryId       Int
+  category         Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  purchasePrice    Float?
+  capacityMl       Int
+  remainingPercent Int       @default(100)
+  openedAt         DateTime?
+  createdAt        DateTime  @default(now())
+
+  cocktailIngredients CocktailIngredient[]
+  preferredFor        CocktailPreferredBottle[]
+}
+
+model Ingredient {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  cocktailIngredients CocktailIngredient[]
+}
+
+model Unit {
+  id           Int    @id @default(autoincrement())
+  name         String
+  abbreviation String
+
+  cocktailIngredients CocktailIngredient[]
+}
+
+model Cocktail {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  notes       String?
+  imagePath   String?
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ingredients  CocktailIngredient[]
+  instructions CocktailInstruction[]
+  menuCocktails MenuCocktail[]
+}
+
+model CocktailIngredient {
+  id         Int      @id @default(autoincrement())
+  cocktailId Int
+  cocktail   Cocktail @relation(fields: [cocktailId], references: [id], onDelete: Cascade)
+  quantity   Float
+  unitId     Int
+  unit       Unit     @relation(fields: [unitId], references: [id])
+  sourceType String   // BOTTLE, CATEGORY, INGREDIENT
+  bottleId   Int?
+  bottle     Bottle?  @relation(fields: [bottleId], references: [id])
+  categoryId Int?
+  category   Category? @relation(fields: [categoryId], references: [id])
+  ingredientId Int?
+  ingredient   Ingredient? @relation(fields: [ingredientId], references: [id])
+  position   Int      @default(0)
+
+  preferredBottles CocktailPreferredBottle[]
+}
+
+model CocktailPreferredBottle {
+  id                   Int                @id @default(autoincrement())
+  cocktailIngredientId Int
+  cocktailIngredient   CocktailIngredient @relation(fields: [cocktailIngredientId], references: [id], onDelete: Cascade)
+  bottleId             Int
+  bottle               Bottle             @relation(fields: [bottleId], references: [id])
+
+  @@unique([cocktailIngredientId, bottleId])
+}
+
+model CocktailInstruction {
+  id         Int      @id @default(autoincrement())
+  cocktailId Int
+  cocktail   Cocktail @relation(fields: [cocktailId], references: [id], onDelete: Cascade)
+  stepNumber Int
+  text       String
+}
+
+model Menu {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  slug        String   @unique
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  cocktails MenuCocktail[]
+}
+
+model MenuCocktail {
+  id         Int      @id @default(autoincrement())
+  menuId     Int
+  menu       Menu     @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  cocktailId Int
+  cocktail   Cocktail @relation(fields: [cocktailId], references: [id], onDelete: Cascade)
+  position   Int      @default(0)
+  isHidden   Boolean  @default(false)
+
+  @@unique([menuId, cocktailId])
+}

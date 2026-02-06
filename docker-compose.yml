@@ -1,0 +1,31 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - DATABASE_URL=file:/app/data/carta_cocktail.db
+      - JWT_SECRET=${JWT_SECRET:-change-me-to-a-random-secret}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@carta.local}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - PORT=3001
+    volumes:
+      - db-data:/app/data
+      - uploads:/app/uploads
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  db-data:
+  uploads:

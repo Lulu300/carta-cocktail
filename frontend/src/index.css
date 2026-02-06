@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap');
+
+@theme {
+  --font-sans: 'Inter', sans-serif;
+  --font-serif: 'Playfair Display', serif;
+}
+
+/* Print styles for recipe card (bristol format ~10x15cm) */
+@media print {
+  @page {
+    size: 15cm 10cm;
+    margin: 0.5cm;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 10pt;
+  }
+
+  header, nav, .print\\:hidden {
+    display: none !important;
+  }
+
+  #recipe-card {
+    border: 1px solid #ccc !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: white !important;
+    color: black !important;
+    break-inside: avoid;
+  }
+
+  #recipe-card img {
+    max-height: 4cm;
+    object-fit: cover;
+  }
+
+  #recipe-card h1 {
+    color: black !important;
+    font-size: 16pt;
+  }
+
+  #recipe-card h2 {
+    color: #333 !important;
+    font-size: 11pt;
+  }
+}

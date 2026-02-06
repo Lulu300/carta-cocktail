@@ -1,0 +1,112 @@
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { menus as api } from '../../services/api';
+import type { Menu } from '../../types';
+
+export default function MenusPage() {
+  const { t } = useTranslation();
+  const [items, setItems] = useState<Menu[]>([]);
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState({ name: '', slug: '', description: '', isPublic: false });
+
+  const load = () => api.list().then(setItems);
+  useEffect(() => { load(); }, []);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await api.create(form);
+    setShowModal(false);
+    setForm({ name: '', slug: '', description: '', isPublic: false });
+    load();
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm(t('menus.confirmDelete'))) return;
+    await api.delete(id);
+    load();
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold font-serif text-amber-400">{t('menus.title')}</h1>
+        <button onClick={() => setShowModal(true)} className="bg-amber-400 hover:bg-amber-500 text-[#0f0f1a] font-semibold px-4 py-2 rounded-lg">
+          {t('menus.add')}
+        </button>
+      </div>
+
+      <div className="bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-[#0f0f1a]">
+            <tr>
+              <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('menus.name')}</th>
+              <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('menus.slug')}</th>
+              <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('menus.isPublic')}</th>
+              <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('menus.cocktailCount')}</th>
+              <th className="text-right px-6 py-3 text-sm text-gray-400 font-medium">{t('common.actions')}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-800">
+            {items.map((item) => (
+              <tr key={item.id} className="hover:bg-gray-800/50">
+                <td className="px-6 py-4 font-medium">{item.name}</td>
+                <td className="px-6 py-4 text-gray-400">/menu/{item.slug}</td>
+                <td className="px-6 py-4">
+                  {item.isPublic ? (
+                    <span className="bg-green-500/20 text-green-400 px-2 py-0.5 rounded text-xs font-medium">{t('common.yes')}</span>
+                  ) : (
+                    <span className="bg-gray-500/20 text-gray-400 px-2 py-0.5 rounded text-xs font-medium">{t('common.no')}</span>
+                  )}
+                </td>
+                <td className="px-6 py-4">{item._count?.cocktails ?? 0}</td>
+                <td className="px-6 py-4 text-right space-x-2">
+                  <Link to={`/admin/menus/${item.id}`} className="text-amber-400 hover:text-amber-300 text-sm">{t('common.edit')}</Link>
+                  {item.isPublic && (
+                    <a href={`/menu/${item.slug}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 text-sm">🔗</a>
+                  )}
+                  <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 text-sm">{t('common.delete')}</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {items.length === 0 && <div className="text-center py-8 text-gray-500">{t('common.noResults')}</div>}
+      </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <form onSubmit={handleCreate} className="bg-[#1a1a2e] border border-gray-800 rounded-xl p-6 w-full max-w-md space-y-4">
+            <h2 className="text-lg font-semibold">{t('menus.add')}</h2>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">{t('menus.name')}</label>
+              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required
+                className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">{t('menus.slug')}</label>
+              <input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') })} required
+                className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">{t('menus.description')}</label>
+              <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2}
+                className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400 resize-none" />
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="text-sm text-gray-400">{t('menus.isPublic')}</label>
+              <button type="button" onClick={() => setForm({ ...form, isPublic: !form.isPublic })}
+                className={`w-12 h-6 rounded-full transition-colors ${form.isPublic ? 'bg-green-500' : 'bg-gray-600'}`}>
+                <div className={`w-5 h-5 bg-white rounded-full transition-transform ${form.isPublic ? 'translate-x-6' : 'translate-x-0.5'}`} />
+              </button>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-400 hover:text-white">{t('common.cancel')}</button>
+              <button type="submit" className="bg-amber-400 hover:bg-amber-500 text-[#0f0f1a] font-semibold px-4 py-2 rounded-lg">{t('common.save')}</button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
