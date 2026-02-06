@@ -143,7 +143,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
         ...(name && { name }),
         ...(description !== undefined && { description }),
         ...(notes !== undefined && { notes }),
-        ...(tags !== undefined && { tags: Array.isArray(tags) ? tags.join(',') : (tags || '') }),
+        tags: Array.isArray(tags) ? tags.join(',') : (tags ?? ''),
         ...(isAvailable !== undefined && { isAvailable }),
         ingredients: ingredients
           ? {
