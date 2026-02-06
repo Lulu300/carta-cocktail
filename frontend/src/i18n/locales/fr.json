@@ -15,6 +15,11 @@
     "login": "Connexion",
     "language": "Langue"
   },
+  "home": {
+    "subtitle": "Découvrez nos cartes de cocktails",
+    "noMenus": "Aucune carte disponible pour le moment",
+    "cocktailCount": "cocktails"
+  },
   "auth": {
     "login": "Connexion",
     "email": "Email",

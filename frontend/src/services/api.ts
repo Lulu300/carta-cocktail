@@ -137,6 +137,7 @@ export const menus = {
 
 // Public
 export const publicApi = {
+  listMenus: () => request<Menu[]>('/public/menus'),
   getMenu: (slug: string) => request<Menu>(`/public/menus/${slug}`),
   getCocktail: (id: number) => request<Cocktail>(`/public/cocktails/${id}`),
 };

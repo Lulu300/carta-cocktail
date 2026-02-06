@@ -4,6 +4,23 @@ import { PrismaClient } from '@prisma/client';
 const router = Router();
 const prisma = new PrismaClient();
 
+// List all public menus
+router.get('/menus', async (req: Request, res: Response) => {
+  try {
+    const menus = await prisma.menu.findMany({
+      where: { isPublic: true },
+      include: {
+        _count: { select: { cocktails: true } },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+    res.json(menus);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: req.t('errors.serverError') });
+  }
+});
+
 // Get public menu by slug
 router.get('/menus/:slug', async (req: Request, res: Response) => {
   try {

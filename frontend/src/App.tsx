@@ -13,6 +13,7 @@ import CocktailFormPage from './pages/admin/CocktailFormPage';
 import MenusPage from './pages/admin/MenusPage';
 import MenuEditPage from './pages/admin/MenuEditPage';
 import ShortagesPage from './pages/admin/ShortagesPage';
+import HomePage from './pages/public/HomePage';
 import MenuPublicPage from './pages/public/MenuPublicPage';
 import CocktailPublicPage from './pages/public/CocktailPublicPage';
 
@@ -28,6 +29,7 @@ export default function App() {
     <Routes>
       {/* Public routes */}
       <Route element={<PublicLayout />}>
+        <Route path="/" element={<HomePage />} />
         <Route path="/menu/:slug" element={<MenuPublicPage />} />
         <Route path="/menu/:slug/cocktail/:id" element={<CocktailPublicPage />} />
       </Route>
@@ -57,9 +59,8 @@ export default function App() {
         <Route path="shortages" element={<ShortagesPage />} />
       </Route>
 
-      {/* Default redirect */}
-      <Route path="/" element={<Navigate to="/login" />} />
-      <Route path="*" element={<Navigate to="/login" />} />
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
 }

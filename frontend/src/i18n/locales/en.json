@@ -15,6 +15,11 @@
     "login": "Login",
     "language": "Language"
   },
+  "home": {
+    "subtitle": "Discover our cocktail menus",
+    "noMenus": "No menus available at the moment",
+    "cocktailCount": "cocktails"
+  },
   "auth": {
     "login": "Login",
     "email": "Email",
