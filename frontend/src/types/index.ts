@@ -74,6 +74,7 @@ export interface Cocktail {
   description: string | null;
   notes: string | null;
   imagePath: string | null;
+  tags: string;
   isAvailable: boolean;
   createdAt: string;
   updatedAt: string;
@@ -130,6 +131,7 @@ export interface CocktailInput {
   name: string;
   description?: string;
   notes?: string;
+  tags?: string[];
   isAvailable?: boolean;
   ingredients?: CocktailIngredientInput[];
   instructions?: { text: string }[];

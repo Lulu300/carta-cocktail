@@ -119,6 +119,8 @@
     "quantity": "Qty",
     "unit": "Unit",
     "preferredBottles": "Preferred Bottles",
+    "tags": "Tags",
+    "tagsPlaceholder": "Separate with commas (e.g. classic, fruity, tiki)",
     "confirmDelete": "Delete this cocktail?",
     "created": "Cocktail created",
     "updated": "Cocktail updated",

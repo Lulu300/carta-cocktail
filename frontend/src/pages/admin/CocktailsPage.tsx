@@ -42,7 +42,14 @@ export default function CocktailsPage() {
                   {item.isAvailable ? t('cocktails.available') : t('cocktails.unavailable')}
                 </span>
               </div>
-              {item.description && <p className="text-sm text-gray-400 line-clamp-2 mb-3">{item.description}</p>}
+              {item.description && <p className="text-sm text-gray-400 line-clamp-2 mb-2">{item.description}</p>}
+              {item.tags && (
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {item.tags.split(',').map((tag, i) => (
+                    <span key={i} className="bg-amber-400/10 text-amber-400 text-xs px-2 py-0.5 rounded-full">{tag.trim()}</span>
+                  ))}
+                </div>
+              )}
               <div className="flex gap-2">
                 <Link to={`/admin/cocktails/${item.id}`} className="text-amber-400 hover:text-amber-300 text-sm">{t('common.edit')}</Link>
                 <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 text-sm">{t('common.delete')}</button>

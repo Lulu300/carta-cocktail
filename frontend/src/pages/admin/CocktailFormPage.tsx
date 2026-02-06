@@ -29,6 +29,7 @@ export default function CocktailFormPage() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [notes, setNotes] = useState('');
+  const [tagsInput, setTagsInput] = useState('');
   const [isAvailable, setIsAvailable] = useState(true);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -62,6 +63,7 @@ export default function CocktailFormPage() {
         setName(c.name);
         setDescription(c.description || '');
         setNotes(c.notes || '');
+        setTagsInput(c.tags || '');
         setIsAvailable(c.isAvailable);
         if (c.imagePath) setImagePreview(`/uploads/${c.imagePath}`);
         if (c.ingredients) {
@@ -133,6 +135,7 @@ export default function CocktailFormPage() {
       name,
       description: description || undefined,
       notes: notes || undefined,
+      tags: tagsInput.split(',').map((t) => t.trim()).filter(Boolean),
       isAvailable,
       ingredients: ingredientRows.map((r): CocktailIngredientInput => ({
         sourceType: r.sourceType,
@@ -186,6 +189,19 @@ export default function CocktailFormPage() {
             <label className="block text-sm text-gray-400 mb-1">{t('cocktails.notes')}</label>
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
               className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400 resize-none" />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">{t('cocktails.tags')}</label>
+            <input value={tagsInput} onChange={(e) => setTagsInput(e.target.value)}
+              placeholder={t('cocktails.tagsPlaceholder')}
+              className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400" />
+            {tagsInput && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {tagsInput.split(',').map((t) => t.trim()).filter(Boolean).map((tag, i) => (
+                  <span key={i} className="bg-amber-400/10 text-amber-400 text-xs px-2 py-0.5 rounded-full">{tag}</span>
+                ))}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <label className="text-sm text-gray-400">{t('cocktails.available')}</label>

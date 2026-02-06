@@ -119,6 +119,8 @@
     "quantity": "Qté",
     "unit": "Unité",
     "preferredBottles": "Bouteilles favorites",
+    "tags": "Tags",
+    "tagsPlaceholder": "Séparer par des virgules (ex: classique, fruité, tiki)",
     "confirmDelete": "Supprimer ce cocktail ?",
     "created": "Cocktail créé",
     "updated": "Cocktail mis à jour",

@@ -83,7 +83,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 // Create cocktail
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
-    const { name, description, notes, isAvailable, ingredients, instructions } = req.body;
+    const { name, description, notes, tags, isAvailable, ingredients, instructions } = req.body;
     if (!name) {
       res.status(400).json({ error: req.t('errors.validationError') });
       return;
@@ -94,6 +94,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
         name,
         description: description || null,
         notes: notes || null,
+        tags: Array.isArray(tags) ? tags.join(',') : (tags || ''),
         isAvailable: isAvailable ?? true,
         ingredients: {
           create: (ingredients || []).map((ing: any, index: number) => ({
@@ -130,7 +131,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const id = parseInt(String(req.params.id));
-    const { name, description, notes, isAvailable, ingredients, instructions } = req.body;
+    const { name, description, notes, tags, isAvailable, ingredients, instructions } = req.body;
 
     // Delete existing ingredients and instructions to recreate
     await prisma.cocktailIngredient.deleteMany({ where: { cocktailId: id } });
@@ -142,6 +143,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
         ...(name && { name }),
         ...(description !== undefined && { description }),
         ...(notes !== undefined && { notes }),
+        ...(tags !== undefined && { tags: Array.isArray(tags) ? tags.join(',') : (tags || '') }),
         ...(isAvailable !== undefined && { isAvailable }),
         ingredients: ingredients
           ? {

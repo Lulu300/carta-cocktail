@@ -62,6 +62,7 @@ model Cocktail {
   description String?
   notes       String?
   imagePath   String?
+  tags        String   @default("")
   isAvailable Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
