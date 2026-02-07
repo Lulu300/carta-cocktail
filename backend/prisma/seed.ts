@@ -20,17 +20,17 @@ async function main() {
   if (existingUnits === 0) {
     await prisma.unit.createMany({
       data: [
-        { name: 'Centilitre', abbreviation: 'cl' },
-        { name: 'Millilitre', abbreviation: 'ml' },
-        { name: 'Once (US)', abbreviation: 'oz' },
-        { name: 'Pièce', abbreviation: 'pce' },
-        { name: 'Trait', abbreviation: 'trait' },
-        { name: 'Cuillère à café', abbreviation: 'cc' },
-        { name: 'Cuillère à soupe', abbreviation: 'cs' },
-        { name: 'Dash', abbreviation: 'dash' },
-        { name: 'Feuille', abbreviation: 'feuille' },
-        { name: 'Tranche', abbreviation: 'tranche' },
-        { name: 'Zeste', abbreviation: 'zeste' },
+        { name: 'Centilitre', abbreviation: 'cl', conversionFactorToMl: 10 },
+        { name: 'Millilitre', abbreviation: 'ml', conversionFactorToMl: 1 },
+        { name: 'Once (US)', abbreviation: 'oz', conversionFactorToMl: 29.5735 },
+        { name: 'Pièce', abbreviation: 'pce', conversionFactorToMl: null },
+        { name: 'Trait', abbreviation: 'trait', conversionFactorToMl: 0.6 },
+        { name: 'Cuillère à café', abbreviation: 'cc', conversionFactorToMl: 5 },
+        { name: 'Cuillère à soupe', abbreviation: 'cs', conversionFactorToMl: 15 },
+        { name: 'Dash', abbreviation: 'dash', conversionFactorToMl: 0.6 },
+        { name: 'Feuille', abbreviation: 'feuille', conversionFactorToMl: null },
+        { name: 'Tranche', abbreviation: 'tranche', conversionFactorToMl: null },
+        { name: 'Zeste', abbreviation: 'zeste', conversionFactorToMl: null },
       ],
     });
   }

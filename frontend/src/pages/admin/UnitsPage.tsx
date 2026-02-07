@@ -8,18 +8,31 @@ export default function UnitsPage() {
   const [items, setItems] = useState<Unit[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Unit | null>(null);
-  const [form, setForm] = useState({ name: '', abbreviation: '' });
+  const [form, setForm] = useState({ name: '', abbreviation: '', conversionFactorToMl: '' });
 
   const load = () => api.list().then(setItems);
   useEffect(() => { load(); }, []);
 
-  const openCreate = () => { setEditing(null); setForm({ name: '', abbreviation: '' }); setShowModal(true); };
-  const openEdit = (item: Unit) => { setEditing(item); setForm({ name: item.name, abbreviation: item.abbreviation }); setShowModal(true); };
+  const openCreate = () => { setEditing(null); setForm({ name: '', abbreviation: '', conversionFactorToMl: '' }); setShowModal(true); };
+  const openEdit = (item: Unit) => {
+    setEditing(item);
+    setForm({
+      name: item.name,
+      abbreviation: item.abbreviation,
+      conversionFactorToMl: item.conversionFactorToMl !== null ? String(item.conversionFactorToMl) : '',
+    });
+    setShowModal(true);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editing) { await api.update(editing.id, form); }
-    else { await api.create(form); }
+    const data = {
+      name: form.name,
+      abbreviation: form.abbreviation,
+      conversionFactorToMl: form.conversionFactorToMl === '' ? null : parseFloat(form.conversionFactorToMl),
+    };
+    if (editing) { await api.update(editing.id, data); }
+    else { await api.create(data); }
     setShowModal(false);
     load();
   };
@@ -42,6 +55,7 @@ export default function UnitsPage() {
             <tr>
               <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('units.name')}</th>
               <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('units.abbreviation')}</th>
+              <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">Facteur de conversion (ml)</th>
               <th className="text-right px-6 py-3 text-sm text-gray-400 font-medium">{t('common.actions')}</th>
             </tr>
           </thead>
@@ -50,6 +64,13 @@ export default function UnitsPage() {
               <tr key={item.id} className="hover:bg-gray-800/50">
                 <td className="px-6 py-4 font-medium">{item.name}</td>
                 <td className="px-6 py-4 text-gray-400">{item.abbreviation}</td>
+                <td className="px-6 py-4 text-gray-400">
+                  {item.conversionFactorToMl !== null ? (
+                    <span>1 {item.abbreviation} = {item.conversionFactorToMl} ml</span>
+                  ) : (
+                    <span className="text-gray-600 italic">Non convertible</span>
+                  )}
+                </td>
                 <td className="px-6 py-4 text-right space-x-2">
                   <button onClick={() => openEdit(item)} className="text-amber-400 hover:text-amber-300 text-sm">{t('common.edit')}</button>
                   <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 text-sm">{t('common.delete')}</button>
@@ -71,6 +92,18 @@ export default function UnitsPage() {
             <div>
               <label className="block text-sm text-gray-400 mb-1">{t('units.abbreviation')}</label>
               <input value={form.abbreviation} onChange={(e) => setForm({ ...form, abbreviation: e.target.value })} required className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Facteur de conversion vers ml</label>
+              <input
+                type="number"
+                step="any"
+                value={form.conversionFactorToMl}
+                onChange={(e) => setForm({ ...form, conversionFactorToMl: e.target.value })}
+                placeholder="Laisser vide si non convertible"
+                className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400"
+              />
+              <p className="text-xs text-gray-500 mt-1">Ex: 1 cl = 10 ml, donc facteur = 10. Laisser vide pour les unités de pièce.</p>
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-400 hover:text-white">{t('common.cancel')}</button>

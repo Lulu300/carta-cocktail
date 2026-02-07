@@ -51,9 +51,10 @@ model Ingredient {
 }
 
 model Unit {
-  id           Int    @id @default(autoincrement())
-  name         String
-  abbreviation String
+  id                   Int    @id @default(autoincrement())
+  name                 String
+  abbreviation         String
+  conversionFactorToMl Float? // Factor to convert this unit to ml (null = non-convertible)
 
   cocktailIngredients CocktailIngredient[]
 }

@@ -33,12 +33,18 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
-    const { name, abbreviation } = req.body;
+    const { name, abbreviation, conversionFactorToMl } = req.body;
     if (!name || !abbreviation) {
       res.status(400).json({ error: req.t('errors.validationError') });
       return;
     }
-    const unit = await prisma.unit.create({ data: { name, abbreviation } });
+    const unit = await prisma.unit.create({
+      data: {
+        name,
+        abbreviation,
+        conversionFactorToMl: conversionFactorToMl !== undefined ? conversionFactorToMl : null,
+      },
+    });
     res.status(201).json(unit);
   } catch (error) {
     console.error(error);
@@ -48,13 +54,15 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const { name, abbreviation } = req.body;
+    const { name, abbreviation, conversionFactorToMl } = req.body;
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (abbreviation !== undefined) updateData.abbreviation = abbreviation;
+    if (conversionFactorToMl !== undefined) updateData.conversionFactorToMl = conversionFactorToMl;
+
     const unit = await prisma.unit.update({
       where: { id: parseInt(String(req.params.id)) },
-      data: {
-        ...(name && { name }),
-        ...(abbreviation && { abbreviation }),
-      },
+      data: updateData,
     });
     res.json(unit);
   } catch (error) {

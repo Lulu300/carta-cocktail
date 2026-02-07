@@ -37,6 +37,7 @@ export interface Unit {
   id: number;
   name: string;
   abbreviation: string;
+  conversionFactorToMl: number | null;
 }
 
 export interface CocktailIngredient {
