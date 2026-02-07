@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const menus = await prisma.menu.findMany({
-      include: { _count: { select: { cocktails: true } } },
+      include: { _count: { select: { cocktails: true, bottles: true } } },
       orderBy: { createdAt: 'desc' },
     });
     res.json(menus);

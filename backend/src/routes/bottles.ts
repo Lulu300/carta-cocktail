@@ -5,6 +5,65 @@ import { AuthRequest } from '../middleware/auth';
 const router = Router();
 const prisma = new PrismaClient();
 
+// Helper function to auto-sync bottle menus when bottle flags change
+async function syncBottleMenus(bottleId: number, isApero: boolean, isDigestif: boolean) {
+  // Get apero and digestif menus
+  const aperoMenu = await prisma.menu.findUnique({ where: { slug: 'aperitifs' } });
+  const digestifMenu = await prisma.menu.findUnique({ where: { slug: 'digestifs' } });
+
+  // Sync apero menu
+  if (aperoMenu) {
+    const existsInApero = await prisma.menuBottle.findFirst({
+      where: { menuId: aperoMenu.id, bottleId },
+    });
+
+    if (isApero && !existsInApero) {
+      // Add to apero menu
+      const maxPosition = await prisma.menuBottle.findFirst({
+        where: { menuId: aperoMenu.id },
+        orderBy: { position: 'desc' },
+      });
+      await prisma.menuBottle.create({
+        data: {
+          menuId: aperoMenu.id,
+          bottleId,
+          position: (maxPosition?.position ?? -1) + 1,
+          isHidden: false,
+        },
+      });
+    } else if (!isApero && existsInApero) {
+      // Remove from apero menu
+      await prisma.menuBottle.delete({ where: { id: existsInApero.id } });
+    }
+  }
+
+  // Sync digestif menu
+  if (digestifMenu) {
+    const existsInDigestif = await prisma.menuBottle.findFirst({
+      where: { menuId: digestifMenu.id, bottleId },
+    });
+
+    if (isDigestif && !existsInDigestif) {
+      // Add to digestif menu
+      const maxPosition = await prisma.menuBottle.findFirst({
+        where: { menuId: digestifMenu.id },
+        orderBy: { position: 'desc' },
+      });
+      await prisma.menuBottle.create({
+        data: {
+          menuId: digestifMenu.id,
+          bottleId,
+          position: (maxPosition?.position ?? -1) + 1,
+          isHidden: false,
+        },
+      });
+    } else if (!isDigestif && existsInDigestif) {
+      // Remove from digestif menu
+      await prisma.menuBottle.delete({ where: { id: existsInDigestif.id } });
+    }
+  }
+}
+
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const { categoryId, type } = req.query;
@@ -62,6 +121,10 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       },
       include: { category: true },
     });
+
+    // Auto-sync bottle menus
+    await syncBottleMenus(bottle.id, bottle.isApero, bottle.isDigestif);
+
     res.status(201).json(bottle);
   } catch (error) {
     console.error(error);
@@ -87,6 +150,12 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
       },
       include: { category: true },
     });
+
+    // Auto-sync bottle menus if flags changed
+    if (isApero !== undefined || isDigestif !== undefined) {
+      await syncBottleMenus(bottle.id, bottle.isApero, bottle.isDigestif);
+    }
+
     res.json(bottle);
   } catch (error) {
     console.error(error);
