@@ -25,6 +25,9 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
     const menu = await prisma.menu.findUnique({
       where: { id: parseInt(String(req.params.id)) },
       include: {
+        sections: {
+          orderBy: { position: 'asc' },
+        },
         cocktails: {
           include: {
             cocktail: {

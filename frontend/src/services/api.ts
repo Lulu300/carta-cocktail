@@ -1,5 +1,5 @@
 import type {
-  Category, Bottle, Ingredient, Unit, Cocktail, Menu, MenuBottle, Shortage,
+  Category, Bottle, Ingredient, Unit, Cocktail, Menu, MenuBottle, MenuSection, Shortage,
   CocktailInput, MenuInput, CocktailAvailability,
 } from '../types';
 
@@ -141,12 +141,28 @@ export const menuBottles = {
   listByMenu: (menuId: number) => request<MenuBottle[]>(`/menu-bottles/menu/${menuId}`),
   create: (data: { menuId: number; bottleId: number; position?: number; isHidden?: boolean }) =>
     request<MenuBottle>('/menu-bottles', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: number, data: { position?: number; isHidden?: boolean }) =>
+  update: (id: number, data: { position?: number; isHidden?: boolean; menuSectionId?: number | null }) =>
     request<MenuBottle>(`/menu-bottles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: number) =>
     request<{ message: string }>(`/menu-bottles/${id}`, { method: 'DELETE' }),
   sync: (menuId: number) =>
     request<{ message: string; added: number; removed: number }>(`/menu-bottles/menu/${menuId}/sync`, { method: 'POST' }),
+};
+
+// Menu Sections
+export const menuSections = {
+  listByMenu: (menuId: number) => request<MenuSection[]>(`/menu-sections/menu/${menuId}/sections`),
+  create: (menuId: number, data: { name: string }) =>
+    request<MenuSection>(`/menu-sections/menu/${menuId}/sections`, { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: number, data: { name?: string; position?: number }) =>
+    request<MenuSection>(`/menu-sections/sections/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: number) =>
+    request<{ message: string }>(`/menu-sections/sections/${id}`, { method: 'DELETE' }),
+  reorder: (menuId: number, sectionIds: number[]) =>
+    request<{ message: string }>(`/menu-sections/menu/${menuId}/sections/reorder`, {
+      method: 'POST',
+      body: JSON.stringify({ sectionIds }),
+    }),
 };
 
 // Public

@@ -128,28 +128,44 @@ model Menu {
 
   cocktails MenuCocktail[]
   bottles   MenuBottle[]
+  sections  MenuSection[]
 }
 
 model MenuCocktail {
-  id         Int      @id @default(autoincrement())
-  menuId     Int
-  menu       Menu     @relation(fields: [menuId], references: [id], onDelete: Cascade)
-  cocktailId Int
-  cocktail   Cocktail @relation(fields: [cocktailId], references: [id], onDelete: Cascade)
-  position   Int      @default(0)
-  isHidden   Boolean  @default(false)
+  id            Int          @id @default(autoincrement())
+  menuId        Int
+  menu          Menu         @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  cocktailId    Int
+  cocktail      Cocktail     @relation(fields: [cocktailId], references: [id], onDelete: Cascade)
+  menuSectionId Int?
+  menuSection   MenuSection? @relation(fields: [menuSectionId], references: [id], onDelete: SetNull)
+  position      Int          @default(0)
+  isHidden      Boolean      @default(false)
 
   @@unique([menuId, cocktailId])
 }
 
 model MenuBottle {
-  id       Int     @id @default(autoincrement())
-  menuId   Int
-  menu     Menu    @relation(fields: [menuId], references: [id], onDelete: Cascade)
-  bottleId Int
-  bottle   Bottle  @relation(fields: [bottleId], references: [id], onDelete: Cascade)
-  position Int     @default(0)
-  isHidden Boolean @default(false)
+  id            Int          @id @default(autoincrement())
+  menuId        Int
+  menu          Menu         @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  bottleId      Int
+  bottle        Bottle       @relation(fields: [bottleId], references: [id], onDelete: Cascade)
+  menuSectionId Int?
+  menuSection   MenuSection? @relation(fields: [menuSectionId], references: [id], onDelete: SetNull)
+  position      Int          @default(0)
+  isHidden      Boolean      @default(false)
 
   @@unique([menuId, bottleId])
+}
+
+model MenuSection {
+  id        Int      @id @default(autoincrement())
+  menuId    Int
+  menu      Menu     @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  name      String
+  position  Int      @default(0)
+
+  cocktails MenuCocktail[]
+  bottles   MenuBottle[]
 }

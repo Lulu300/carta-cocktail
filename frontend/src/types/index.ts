@@ -88,11 +88,19 @@ export interface Cocktail {
   instructions?: CocktailInstruction[];
 }
 
+export interface MenuSection {
+  id: number;
+  menuId: number;
+  name: string;
+  position: number;
+}
+
 export interface MenuCocktail {
   id: number;
   menuId: number;
   cocktailId: number;
   cocktail?: Cocktail;
+  menuSectionId: number | null;
   position: number;
   isHidden: boolean;
 }
@@ -102,6 +110,7 @@ export interface MenuBottle {
   menuId: number;
   bottleId: number;
   bottle?: Bottle;
+  menuSectionId: number | null;
   position: number;
   isHidden: boolean;
 }
@@ -115,6 +124,7 @@ export interface Menu {
   isPublic: boolean;
   createdAt: string;
   updatedAt: string;
+  sections?: MenuSection[];
   cocktails?: MenuCocktail[];
   bottles?: MenuBottle[];
   _count?: { cocktails: number; bottles: number };

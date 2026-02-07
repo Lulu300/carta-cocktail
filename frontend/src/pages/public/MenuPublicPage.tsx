@@ -33,18 +33,57 @@ export default function MenuPublicPage() {
   }
 
   const isBottleMenu = menu.type === 'APEROS' || menu.type === 'DIGESTIFS';
+  const hasSections = (menu.sections && menu.sections.length > 0) || false;
 
-  // Group bottles by category for bottle menus
-  const bottlesByCategory = isBottleMenu
-    ? (menu.bottles || [])
-        .filter((mb) => !mb.isHidden)
-        .reduce((acc, mb) => {
-          const categoryName = mb.bottle?.category?.name || 'Autres';
-          if (!acc[categoryName]) acc[categoryName] = [];
-          acc[categoryName].push(mb);
-          return acc;
-        }, {} as Record<string, typeof menu.bottles>)
-    : {};
+  // Group bottles/cocktails by section OR by default grouping
+  const itemsBySection: Record<string, any[]> = {};
+
+  if (isBottleMenu) {
+    const visibleBottles = (menu.bottles || []).filter((mb) => !mb.isHidden);
+
+    if (hasSections) {
+      // Group by custom sections
+      const noSectionBottles = visibleBottles.filter(mb => !mb.menuSectionId);
+      if (noSectionBottles.length > 0) {
+        itemsBySection['__no_section__'] = noSectionBottles;
+      }
+      menu.sections?.forEach(section => {
+        const sectionBottles = visibleBottles.filter(mb => mb.menuSectionId === section.id);
+        if (sectionBottles.length > 0) {
+          itemsBySection[`section_${section.id}`] = sectionBottles;
+        }
+      });
+    } else {
+      // Default: Group by category
+      visibleBottles.forEach(mb => {
+        const categoryName = mb.bottle?.category?.name || 'Autres';
+        if (!itemsBySection[categoryName]) {
+          itemsBySection[categoryName] = [];
+        }
+        itemsBySection[categoryName].push(mb);
+      });
+    }
+  } else {
+    // Cocktail menus
+    const visibleCocktails = (menu.cocktails || []).filter((mc) => !mc.isHidden);
+
+    if (hasSections) {
+      // Group by custom sections
+      const noSectionCocktails = visibleCocktails.filter(mc => !mc.menuSectionId);
+      if (noSectionCocktails.length > 0) {
+        itemsBySection['__no_section__'] = noSectionCocktails;
+      }
+      menu.sections?.forEach(section => {
+        const sectionCocktails = visibleCocktails.filter(mc => mc.menuSectionId === section.id);
+        if (sectionCocktails.length > 0) {
+          itemsBySection[`section_${section.id}`] = sectionCocktails;
+        }
+      });
+    } else {
+      // Default: No grouping, all in one list
+      itemsBySection['__all__'] = visibleCocktails;
+    }
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -53,132 +92,266 @@ export default function MenuPublicPage() {
         {menu.description && <p className="text-gray-400 text-lg">{menu.description}</p>}
       </div>
 
-      {isBottleMenu ? (
-        // Bottle menu display (list format)
-        <div className="space-y-8">
-          {Object.entries(bottlesByCategory)
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([categoryName, bottles]) => (
-              <div key={categoryName} className="bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden">
-                <div className="bg-[#0f0f1a] px-6 py-3 border-b border-gray-800">
-                  <h2 className="text-lg font-serif font-bold text-amber-400">{categoryName}</h2>
-                </div>
-                <div className="divide-y divide-gray-800">
-                  {bottles
-                    .sort((a, b) => (a.bottle?.name || '').localeCompare(b.bottle?.name || ''))
-                    .map((mb) => {
-                      const bottle = mb.bottle!;
-                      const isAvailable = bottle.remainingPercent > 0;
-
-                      return (
-                        <div
-                          key={mb.id}
-                          className={`px-6 py-4 flex items-center justify-between ${
-                            !isAvailable ? 'opacity-50' : ''
-                          }`}
-                        >
-                          <div className="flex-1">
-                            <h3 className="text-lg font-medium text-white">{bottle.name}</h3>
-                            <div className="flex items-center gap-3 mt-1 text-sm text-gray-400">
-                              {bottle.alcoholPercentage && (
-                                <span>{bottle.alcoholPercentage}% vol.</span>
-                              )}
-                              {user && (
-                                <>
-                                  <span>•</span>
-                                  <span>{bottle.capacityMl} ml</span>
-                                  <span>•</span>
-                                  <span className={bottle.remainingPercent > 50 ? 'text-green-400' : bottle.remainingPercent > 20 ? 'text-yellow-400' : 'text-red-400'}>
-                                    {bottle.remainingPercent}% restant
-                                  </span>
-                                  {bottle.openedAt && (
-                                    <>
-                                      <span>•</span>
-                                      <span className="text-orange-400">Ouvert</span>
-                                    </>
-                                  )}
-                                </>
-                              )}
+      {/* Render sections/groups */}
+      <div className={isBottleMenu ? "space-y-8" : hasSections ? "space-y-10" : ""}>
+        {hasSections ? (
+          // Custom sections
+          <>
+            {/* No section items */}
+            {itemsBySection['__no_section__'] && (
+              <div>
+                <h2 className="text-2xl font-serif font-bold text-gray-400 mb-4">Sans section</h2>
+                {isBottleMenu ? (
+                  <div className="bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden">
+                    <div className="divide-y divide-gray-800">
+                      {itemsBySection['__no_section__'].map((mb: any) => {
+                        const bottle = mb.bottle!;
+                        const isAvailable = bottle.remainingPercent > 0;
+                        return (
+                          <div key={mb.id} className={`px-6 py-4 flex items-center justify-between ${!isAvailable ? 'opacity-50' : ''}`}>
+                            <div className="flex-1">
+                              <h3 className="text-lg font-medium text-white">{bottle.name}</h3>
+                              <div className="flex items-center gap-3 mt-1 text-sm text-gray-400">
+                                {bottle.alcoholPercentage && <span>{bottle.alcoholPercentage}% vol.</span>}
+                                {user && (
+                                  <>
+                                    <span>•</span>
+                                    <span>{bottle.capacityMl} ml</span>
+                                    <span>•</span>
+                                    <span className={bottle.remainingPercent > 50 ? 'text-green-400' : bottle.remainingPercent > 20 ? 'text-yellow-400' : 'text-red-400'}>
+                                      {bottle.remainingPercent}% restant
+                                    </span>
+                                    {bottle.openedAt && (<><span>•</span><span className="text-orange-400">Ouvert</span></>)}
+                                  </>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                          <div>
                             {!user && (
-                              <span className={`px-3 py-1.5 rounded text-sm font-medium ${
-                                isAvailable
-                                  ? 'bg-green-500/20 text-green-400'
-                                  : 'bg-red-500/20 text-red-400'
-                              }`}>
+                              <span className={`px-3 py-1.5 rounded text-sm font-medium ${isAvailable ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                                 {isAvailable ? 'Disponible' : 'Indisponible'}
                               </span>
                             )}
                           </div>
-                        </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {itemsBySection['__no_section__'].map((mc: any) => {
+                      const cocktail = mc.cocktail!;
+                      const isUnavailable = !cocktail.isAvailable;
+                      return (
+                        <Link key={mc.id} to={`/menu/${slug}/cocktail/${cocktail.id}`}
+                          className={`group bg-[#1a1a2e] border rounded-xl overflow-hidden transition-all duration-300 ${isUnavailable ? 'border-gray-800 opacity-50 grayscale cursor-default' : 'border-gray-800 hover:border-amber-400/50 hover:shadow-lg hover:shadow-amber-400/5'}`}
+                          onClick={(e) => isUnavailable && e.preventDefault()}>
+                          <div className="aspect-video bg-[#0f0f1a] flex items-center justify-center overflow-hidden">
+                            {cocktail.imagePath ? (
+                              <img src={`/uploads/${cocktail.imagePath}`} alt={cocktail.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                            ) : (
+                              <span className="text-5xl">🍸</span>
+                            )}
+                          </div>
+                          <div className="p-5">
+                            <div className="flex items-center justify-between mb-2">
+                              <h2 className="text-xl font-serif font-bold text-white group-hover:text-amber-400 transition-colors">{cocktail.name}</h2>
+                              {isUnavailable && <span className="text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded">{t('public.unavailable')}</span>}
+                            </div>
+                            {cocktail.description && <p className="text-gray-400 text-sm line-clamp-2">{cocktail.description}</p>}
+                            {cocktail.ingredients && cocktail.ingredients.length > 0 && (
+                              <div className="mt-3 flex flex-wrap gap-1.5">
+                                {cocktail.ingredients.map((ing) => (
+                                  <span key={ing.id} className="text-xs bg-[#0f0f1a] text-gray-400 px-2 py-1 rounded">
+                                    {ing.bottle?.name || ing.category?.name || ing.ingredient?.name}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </Link>
                       );
                     })}
-                </div>
+                  </div>
+                )}
               </div>
-            ))}
-        </div>
-      ) : (
-        // Cocktail menu display (grid format)
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {menu.cocktails
-            ?.filter((mc) => !mc.isHidden)
-            .map((mc) => {
-              const cocktail = mc.cocktail!;
-              const isUnavailable = !cocktail.isAvailable;
+            )}
+
+            {/* Actual sections */}
+            {menu.sections?.map(section => {
+              const sectionItems = itemsBySection[`section_${section.id}`];
+              if (!sectionItems || sectionItems.length === 0) return null;
 
               return (
-                <Link
-                  key={mc.id}
-                  to={`/menu/${slug}/cocktail/${cocktail.id}`}
-                  className={`group bg-[#1a1a2e] border rounded-xl overflow-hidden transition-all duration-300 ${
-                    isUnavailable
-                      ? 'border-gray-800 opacity-50 grayscale cursor-default'
-                      : 'border-gray-800 hover:border-amber-400/50 hover:shadow-lg hover:shadow-amber-400/5'
-                  }`}
-                  onClick={(e) => isUnavailable && e.preventDefault()}
-                >
-                  <div className="aspect-video bg-[#0f0f1a] flex items-center justify-center overflow-hidden">
-                    {cocktail.imagePath ? (
-                      <img
-                        src={`/uploads/${cocktail.imagePath}`}
-                        alt={cocktail.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                    ) : (
-                      <span className="text-5xl">🍸</span>
-                    )}
-                  </div>
-                  <div className="p-5">
-                    <div className="flex items-center justify-between mb-2">
-                      <h2 className="text-xl font-serif font-bold text-white group-hover:text-amber-400 transition-colors">
-                        {cocktail.name}
-                      </h2>
-                      {isUnavailable && (
-                        <span className="text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded">
-                          {t('public.unavailable')}
-                        </span>
-                      )}
-                    </div>
-                    {cocktail.description && (
-                      <p className="text-gray-400 text-sm line-clamp-2">{cocktail.description}</p>
-                    )}
-                    {cocktail.ingredients && cocktail.ingredients.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        {cocktail.ingredients.map((ing) => (
-                          <span key={ing.id} className="text-xs bg-[#0f0f1a] text-gray-400 px-2 py-1 rounded">
-                            {ing.bottle?.name || ing.category?.name || ing.ingredient?.name}
-                          </span>
-                        ))}
+                <div key={section.id}>
+                  <h2 className="text-2xl font-serif font-bold text-amber-400 mb-4">{section.name}</h2>
+                  {isBottleMenu ? (
+                    <div className="bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden">
+                      <div className="divide-y divide-gray-800">
+                        {sectionItems.map((mb: any) => {
+                          const bottle = mb.bottle!;
+                          const isAvailable = bottle.remainingPercent > 0;
+                          return (
+                            <div key={mb.id} className={`px-6 py-4 flex items-center justify-between ${!isAvailable ? 'opacity-50' : ''}`}>
+                              <div className="flex-1">
+                                <h3 className="text-lg font-medium text-white">{bottle.name}</h3>
+                                <div className="flex items-center gap-3 mt-1 text-sm text-gray-400">
+                                  {bottle.alcoholPercentage && <span>{bottle.alcoholPercentage}% vol.</span>}
+                                  {user && (
+                                    <>
+                                      <span>•</span>
+                                      <span>{bottle.capacityMl} ml</span>
+                                      <span>•</span>
+                                      <span className={bottle.remainingPercent > 50 ? 'text-green-400' : bottle.remainingPercent > 20 ? 'text-yellow-400' : 'text-red-400'}>
+                                        {bottle.remainingPercent}% restant
+                                      </span>
+                                      {bottle.openedAt && (<><span>•</span><span className="text-orange-400">Ouvert</span></>)}
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              {!user && (
+                                <span className={`px-3 py-1.5 rounded text-sm font-medium ${isAvailable ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                                  {isAvailable ? 'Disponible' : 'Indisponible'}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
-                    )}
-                  </div>
-                </Link>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {sectionItems.map((mc: any) => {
+                        const cocktail = mc.cocktail!;
+                        const isUnavailable = !cocktail.isAvailable;
+                        return (
+                          <Link key={mc.id} to={`/menu/${slug}/cocktail/${cocktail.id}`}
+                            className={`group bg-[#1a1a2e] border rounded-xl overflow-hidden transition-all duration-300 ${isUnavailable ? 'border-gray-800 opacity-50 grayscale cursor-default' : 'border-gray-800 hover:border-amber-400/50 hover:shadow-lg hover:shadow-amber-400/5'}`}
+                            onClick={(e) => isUnavailable && e.preventDefault()}>
+                            <div className="aspect-video bg-[#0f0f1a] flex items-center justify-center overflow-hidden">
+                              {cocktail.imagePath ? (
+                                <img src={`/uploads/${cocktail.imagePath}`} alt={cocktail.name}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                              ) : (
+                                <span className="text-5xl">🍸</span>
+                              )}
+                            </div>
+                            <div className="p-5">
+                              <div className="flex items-center justify-between mb-2">
+                                <h2 className="text-xl font-serif font-bold text-white group-hover:text-amber-400 transition-colors">{cocktail.name}</h2>
+                                {isUnavailable && <span className="text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded">{t('public.unavailable')}</span>}
+                              </div>
+                              {cocktail.description && <p className="text-gray-400 text-sm line-clamp-2">{cocktail.description}</p>}
+                              {cocktail.ingredients && cocktail.ingredients.length > 0 && (
+                                <div className="mt-3 flex flex-wrap gap-1.5">
+                                  {cocktail.ingredients.map((ing) => (
+                                    <span key={ing.id} className="text-xs bg-[#0f0f1a] text-gray-400 px-2 py-1 rounded">
+                                      {ing.bottle?.name || ing.category?.name || ing.ingredient?.name}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               );
             })}
-        </div>
-      )}
+          </>
+        ) : (
+          // Default grouping
+          <>
+            {isBottleMenu ? (
+              // Bottles grouped by category
+              Object.entries(itemsBySection)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([categoryName, bottles]) => (
+                  <div key={categoryName} className="bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden">
+                    <div className="bg-[#0f0f1a] px-6 py-3 border-b border-gray-800">
+                      <h2 className="text-lg font-serif font-bold text-amber-400">{categoryName}</h2>
+                    </div>
+                    <div className="divide-y divide-gray-800">
+                      {bottles
+                        .sort((a: any, b: any) => (a.bottle?.name || '').localeCompare(b.bottle?.name || ''))
+                        .map((mb: any) => {
+                          const bottle = mb.bottle!;
+                          const isAvailable = bottle.remainingPercent > 0;
+                          return (
+                            <div key={mb.id} className={`px-6 py-4 flex items-center justify-between ${!isAvailable ? 'opacity-50' : ''}`}>
+                              <div className="flex-1">
+                                <h3 className="text-lg font-medium text-white">{bottle.name}</h3>
+                                <div className="flex items-center gap-3 mt-1 text-sm text-gray-400">
+                                  {bottle.alcoholPercentage && <span>{bottle.alcoholPercentage}% vol.</span>}
+                                  {user && (
+                                    <>
+                                      <span>•</span>
+                                      <span>{bottle.capacityMl} ml</span>
+                                      <span>•</span>
+                                      <span className={bottle.remainingPercent > 50 ? 'text-green-400' : bottle.remainingPercent > 20 ? 'text-yellow-400' : 'text-red-400'}>
+                                        {bottle.remainingPercent}% restant
+                                      </span>
+                                      {bottle.openedAt && (<><span>•</span><span className="text-orange-400">Ouvert</span></>)}
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              {!user && (
+                                <span className={`px-3 py-1.5 rounded text-sm font-medium ${isAvailable ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                                  {isAvailable ? 'Disponible' : 'Indisponible'}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                ))
+            ) : (
+              // Cocktails without grouping
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {itemsBySection['__all__']?.map((mc: any) => {
+                  const cocktail = mc.cocktail!;
+                  const isUnavailable = !cocktail.isAvailable;
+                  return (
+                    <Link key={mc.id} to={`/menu/${slug}/cocktail/${cocktail.id}`}
+                      className={`group bg-[#1a1a2e] border rounded-xl overflow-hidden transition-all duration-300 ${isUnavailable ? 'border-gray-800 opacity-50 grayscale cursor-default' : 'border-gray-800 hover:border-amber-400/50 hover:shadow-lg hover:shadow-amber-400/5'}`}
+                      onClick={(e) => isUnavailable && e.preventDefault()}>
+                      <div className="aspect-video bg-[#0f0f1a] flex items-center justify-center overflow-hidden">
+                        {cocktail.imagePath ? (
+                          <img src={`/uploads/${cocktail.imagePath}`} alt={cocktail.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                        ) : (
+                          <span className="text-5xl">🍸</span>
+                        )}
+                      </div>
+                      <div className="p-5">
+                        <div className="flex items-center justify-between mb-2">
+                          <h2 className="text-xl font-serif font-bold text-white group-hover:text-amber-400 transition-colors">{cocktail.name}</h2>
+                          {isUnavailable && <span className="text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded">{t('public.unavailable')}</span>}
+                        </div>
+                        {cocktail.description && <p className="text-gray-400 text-sm line-clamp-2">{cocktail.description}</p>}
+                        {cocktail.ingredients && cocktail.ingredients.length > 0 && (
+                          <div className="mt-3 flex flex-wrap gap-1.5">
+                            {cocktail.ingredients.map((ing) => (
+                              <span key={ing.id} className="text-xs bg-[#0f0f1a] text-gray-400 px-2 py-1 rounded">
+                                {ing.bottle?.name || ing.category?.name || ing.ingredient?.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
