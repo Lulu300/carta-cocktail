@@ -35,6 +35,31 @@ async function main() {
     });
   }
 
+  // Create default bottle menus (always present, not deletable)
+  await prisma.menu.upsert({
+    where: { slug: 'aperitifs' },
+    update: {},
+    create: {
+      name: 'Apéritifs',
+      slug: 'aperitifs',
+      type: 'APEROS',
+      description: 'Carte des apéritifs disponibles',
+      isPublic: false,
+    },
+  });
+
+  await prisma.menu.upsert({
+    where: { slug: 'digestifs' },
+    update: {},
+    create: {
+      name: 'Digestifs',
+      slug: 'digestifs',
+      type: 'DIGESTIFS',
+      description: 'Carte des digestifs disponibles',
+      isPublic: false,
+    },
+  });
+
   console.log('Seed completed successfully');
 }
 

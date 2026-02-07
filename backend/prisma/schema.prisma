@@ -34,10 +34,14 @@ model Bottle {
   capacityMl       Int
   remainingPercent Int       @default(100)
   openedAt         DateTime?
+  alcoholPercentage Float?   // Optional alcohol percentage
+  isApero          Boolean   @default(false) // Usable as apéritif
+  isDigestif       Boolean   @default(false) // Usable as digestif
   createdAt        DateTime  @default(now())
 
   cocktailIngredients CocktailIngredient[]
   preferredFor        CocktailPreferredBottle[]
+  menuBottles         MenuBottle[]
 }
 
 model Ingredient {
@@ -117,11 +121,13 @@ model Menu {
   name        String
   description String?
   slug        String   @unique
+  type        String   @default("COCKTAILS") // COCKTAILS, APEROS, DIGESTIFS
   isPublic    Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   cocktails MenuCocktail[]
+  bottles   MenuBottle[]
 }
 
 model MenuCocktail {
@@ -134,4 +140,16 @@ model MenuCocktail {
   isHidden   Boolean  @default(false)
 
   @@unique([menuId, cocktailId])
+}
+
+model MenuBottle {
+  id       Int     @id @default(autoincrement())
+  menuId   Int
+  menu     Menu    @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  bottleId Int
+  bottle   Bottle  @relation(fields: [bottleId], references: [id], onDelete: Cascade)
+  position Int     @default(0)
+  isHidden Boolean @default(false)
+
+  @@unique([menuId, bottleId])
 }
