@@ -220,7 +220,7 @@ export async function calculateCocktailAvailability(
   for (const ingAvail of ingredientAvailabilities) {
     if (!ingAvail.isAvailable) {
       isAvailable = false;
-      missingIngredients.push(ingAvail.reason || ingAvail.name);
+      missingIngredients.push(ingAvail.name);
     } else if (ingAvail.availableCount !== null) {
       // Has a limited count
       maxServings = Math.min(maxServings, ingAvail.availableCount);

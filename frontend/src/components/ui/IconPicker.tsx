@@ -6,16 +6,26 @@ interface IconPickerProps {
 }
 
 const commonEmojis = [
-  // Fruits
-  '🍋', '🍊', '🍒', '🍓', '🍑', '🍇', '🍉', '🍌', '🥭', '🍍', '🥥', '🫐', '🍈', '🥝',
-  // Vegetables & Herbs
-  '🌿', '🍃', '🌱', '🥒', '🌶️', '🫑', '🥕', '🧄', '🧅', '🌽',
-  // Drinks & Liquids
-  '🥃', '🍸', '🍹', '🍷', '🍾', '🥂', '🍺', '🍻', '☕', '🍵', '🧃', '🥤', '🧋', '🫖',
-  // Sweeteners & Additives
-  '🍯', '🧂', '🧊', '🍬', '🍭',
-  // Misc
-  '⭐', '✨', '🔥', '💧', '🌸', '🌺', '🥄',
+  // Agrumes / Citrus
+  '🍋', '🍊', '🍐', '🥝', '🫒',
+  // Fruits rouges / Berries
+  '🍒', '🍓', '🫐', '🍇',
+  // Fruits tropicaux / Tropical
+  '🍍', '🥭', '🥥', '🍌', '🍑', '🍉', '🍈',
+  // Herbes & Épices / Herbs & Spices
+  '🌿', '🍃', '🌱', '🧄', '🧅', '🌶️',
+  // Légumes
+  '🥒', '🫑', '🥕', '🌽', '🍅',
+  // Boissons / Drinks
+  '🥃', '🍸', '🍹', '🍷', '🍾', '🥂', '🍺', '🍻',
+  // Café & Thé
+  '☕', '🍵', '🧋', '🫖',
+  // Autres boissons
+  '🧃', '🥤', '🧊',
+  // Sucres & Additifs / Sweeteners
+  '🍯', '🧂', '🍬', '🍭', '🧈',
+  // Décorations / Garnishes
+  '⭐', '✨', '🌸', '🌺', '🥄', '🔥', '💧',
 ];
 
 export default function IconPicker({ value, onChange }: IconPickerProps) {
@@ -34,7 +44,7 @@ export default function IconPicker({ value, onChange }: IconPickerProps) {
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-8 gap-2">
+      <div className="grid grid-cols-10 gap-2">
         {commonEmojis.map((emoji) => (
           <button
             key={emoji}
