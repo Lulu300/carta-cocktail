@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { publicApi } from '../../services/api';
 import type { Cocktail } from '../../types';
+import UnitConverter from '../../components/ui/UnitConverter';
 
 export default function CocktailPublicPage() {
   const { t } = useTranslation();
@@ -83,7 +84,7 @@ export default function CocktailPublicPage() {
                   <li key={ing.id} className="flex items-center gap-3">
                     <span className="w-1.5 h-1.5 bg-amber-400 print:bg-gray-800 rounded-full flex-shrink-0" />
                     <span className="text-gray-300 print:text-black">
-                      <span className="font-medium">{ing.quantity} {ing.unit?.abbreviation}</span>
+                      <UnitConverter quantity={ing.quantity} unit={ing.unit?.abbreviation || ''} />
                       {' '}
                       <span>{ingredientName(ing)}</span>
                     </span>

@@ -7,13 +7,18 @@ const UNIT_TO_ML: Record<string, number> = {
   'ml': 1,
   'cl': 10,
   'oz': 29.5735, // US fluid ounce
-  'cc': 1, // cubic centimeter = ml
-  'cs': 5, // cuillère à soupe (tablespoon) ≈ 15ml, but we use 5ml for bartending teaspoon
+  'cc': 5, // cuillère à café (teaspoon) ≈ 5ml
+  'cs': 15, // cuillère à soupe (tablespoon) ≈ 15ml
   'cuillère à café': 5,
+  'cuillère à soupe': 15,
   'dash': 0.6, // bartender's dash ≈ 0.6ml
   'trait': 0.6,
   'pièce': 0, // pieces are counted, not measured
   'piece': 0,
+  'pce': 0,
+  'feuille': 0,
+  'tranche': 0,
+  'zeste': 0,
 };
 
 interface IngredientAvailability {

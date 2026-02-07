@@ -22,6 +22,7 @@ async function main() {
       data: [
         { name: 'Centilitre', abbreviation: 'cl' },
         { name: 'Millilitre', abbreviation: 'ml' },
+        { name: 'Once (US)', abbreviation: 'oz' },
         { name: 'Pièce', abbreviation: 'pce' },
         { name: 'Trait', abbreviation: 'trait' },
         { name: 'Cuillère à café', abbreviation: 'cc' },
