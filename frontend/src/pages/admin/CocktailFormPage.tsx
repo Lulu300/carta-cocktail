@@ -131,11 +131,12 @@ export default function CocktailFormPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const tagsArray = tagsInput.split(',').map((t) => t.trim()).filter(Boolean);
     const data = {
       name,
       description: description || undefined,
       notes: notes || undefined,
-      tags: tagsInput.split(',').map((t) => t.trim()).filter(Boolean),
+      tags: tagsArray,
       isAvailable,
       ingredients: ingredientRows.map((r): CocktailIngredientInput => ({
         sourceType: r.sourceType,
