@@ -86,9 +86,15 @@ export default function MenusPage() {
                   </td>
                   <td className="px-6 py-4 text-right space-x-2">
                     <Link to={editLink} className="text-amber-400 hover:text-amber-300 text-sm">{t('common.edit')}</Link>
-                    {item.isPublic && (
-                      <a href={`/menu/${item.slug}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 text-sm">🔗</a>
-                    )}
+                    <a
+                      href={`/menu/${item.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-400 hover:text-blue-300 text-sm"
+                      title={item.isPublic ? 'Voir la carte publique' : 'Prévisualiser (admin)'}
+                    >
+                      {item.isPublic ? '🔗' : '👁'}
+                    </a>
                     {!isDefaultMenu && (
                       <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 text-sm">{t('common.delete')}</button>
                     )}
