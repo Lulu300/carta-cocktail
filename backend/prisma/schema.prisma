@@ -41,9 +41,11 @@ model Bottle {
 }
 
 model Ingredient {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  createdAt DateTime @default(now())
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  icon        String?
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
 
   cocktailIngredients CocktailIngredient[]
 }

@@ -15,6 +15,23 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   }
 });
 
+router.post('/bulk-availability', async (req: AuthRequest, res: Response) => {
+  try {
+    const { available } = req.body;
+    if (typeof available !== 'boolean') {
+      res.status(400).json({ error: req.t('errors.validationError') });
+      return;
+    }
+    const result = await prisma.ingredient.updateMany({
+      data: { isAvailable: available },
+    });
+    res.json({ updated: result.count });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: req.t('errors.serverError') });
+  }
+});
+
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const ingredient = await prisma.ingredient.findUnique({
@@ -33,12 +50,17 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
-    const { name } = req.body;
+    const { name, icon } = req.body;
     if (!name) {
       res.status(400).json({ error: req.t('errors.validationError') });
       return;
     }
-    const ingredient = await prisma.ingredient.create({ data: { name } });
+    const ingredient = await prisma.ingredient.create({
+      data: {
+        name,
+        icon: icon || null,
+      },
+    });
     res.status(201).json(ingredient);
   } catch (error: any) {
     if (error.code === 'P2002') {
@@ -52,10 +74,15 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const { name } = req.body;
+    const { name, icon, isAvailable } = req.body;
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (icon !== undefined) updateData.icon = icon;
+    if (isAvailable !== undefined) updateData.isAvailable = isAvailable;
+
     const ingredient = await prisma.ingredient.update({
       where: { id: parseInt(String(req.params.id)) },
-      data: { name },
+      data: updateData,
     });
     res.json(ingredient);
   } catch (error: any) {

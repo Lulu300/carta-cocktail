@@ -28,6 +28,8 @@ export interface Bottle {
 export interface Ingredient {
   id: number;
   name: string;
+  icon: string | null;
+  isAvailable: boolean;
   createdAt: string;
 }
 
@@ -147,4 +149,26 @@ export interface MenuInput {
     position?: number;
     isHidden?: boolean;
   }[];
+}
+
+// Availability types
+export interface IngredientAvailability {
+  cocktailIngredientId: number;
+  sourceType: string;
+  name: string;
+  icon: string | null;
+  quantity: number;
+  unit: string;
+  isAvailable: boolean;
+  availableCount: number | null;
+  reason?: string;
+}
+
+export interface CocktailAvailability {
+  cocktailId: number;
+  isAvailable: boolean;
+  maxServings: number;
+  ingredients: IngredientAvailability[];
+  missingIngredients: string[];
+  lowStockWarnings: string[];
 }

@@ -1,6 +1,6 @@
 import type {
   Category, Bottle, Ingredient, Unit, Cocktail, Menu, Shortage,
-  CocktailInput, MenuInput,
+  CocktailInput, MenuInput, CocktailAvailability,
 } from '../types';
 
 const API_BASE = '/api';
@@ -82,12 +82,14 @@ export const bottles = {
 export const ingredients = {
   list: () => request<Ingredient[]>('/ingredients'),
   get: (id: number) => request<Ingredient>(`/ingredients/${id}`),
-  create: (data: { name: string }) =>
+  create: (data: { name: string; icon?: string | null }) =>
     request<Ingredient>('/ingredients', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: number, data: { name: string }) =>
+  update: (id: number, data: { name?: string; icon?: string | null; isAvailable?: boolean }) =>
     request<Ingredient>(`/ingredients/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: number) =>
     request<{ message: string }>(`/ingredients/${id}`, { method: 'DELETE' }),
+  bulkAvailability: (data: { available: boolean }) =>
+    request<{ updated: number }>('/ingredients/bulk-availability', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // Units
@@ -144,4 +146,10 @@ export const publicApi = {
 // Shortages
 export const shortages = {
   list: () => request<Shortage[]>('/shortages'),
+};
+
+// Availability
+export const availability = {
+  getCocktail: (id: number) => request<CocktailAvailability>(`/availability/cocktails/${id}`),
+  getAllCocktails: () => request<Record<number, CocktailAvailability>>('/availability/cocktails'),
 };
