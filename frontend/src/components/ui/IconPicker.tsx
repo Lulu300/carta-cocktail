@@ -7,25 +7,31 @@ interface IconPickerProps {
 
 const commonEmojis = [
   // Agrumes / Citrus
-  '🍋', '🍊', '🍐', '🥝', '🫒',
+  '🍋', '🟡', '🍊', '🟠',
   // Fruits rouges / Berries
   '🍒', '🍓', '🫐', '🍇',
   // Fruits tropicaux / Tropical
-  '🍍', '🥭', '🥥', '🍌', '🍑', '🍉', '🍈',
-  // Herbes & Épices / Herbs & Spices
-  '🌿', '🍃', '🌱', '🧄', '🧅', '🌶️',
-  // Légumes
-  '🥒', '🫑', '🥕', '🌽', '🍅',
-  // Boissons / Drinks
-  '🥃', '🍸', '🍹', '🍷', '🍾', '🥂', '🍺', '🍻',
-  // Café & Thé
-  '☕', '🍵', '🧋', '🫖',
-  // Autres boissons
-  '🧃', '🥤', '🧊',
-  // Sucres & Additifs / Sweeteners
-  '🍯', '🧂', '🍬', '🍭', '🧈',
-  // Décorations / Garnishes
-  '⭐', '✨', '🌸', '🌺', '🥄', '🔥', '💧',
+  '🍍', '🥭', '🥥', '🍌', '🍑', '🍉', '🍈', '🥝',
+  // Fruits à pépins / Stone fruits
+  '🍎', '🍏', '🍐', '🍅',
+  // Herbes aromatiques / Aromatic herbs
+  '🌿', '🍃', '🌱', '🪴',
+  // Légumes / Vegetables
+  '🥒', '🌶️', '🫑', '🥕', '🧅', '🧄', '🌽',
+  // Épices & Aromates / Spices
+  '🫚', '⭐',
+  // Sucreries & Sirops / Sweeteners & Syrups
+  '🍯', '🧂', '🧊', '🍬',
+  // Produits laitiers / Dairy
+  '🥛', '🧈', '🥚',
+  // Noix & Graines / Nuts & Seeds
+  '🥜', '🌰',
+  // Olives & Fruits secs
+  '🫒',
+  // Fleurs & Déco naturelle / Flowers & Natural garnish
+  '🌸', '🌺', '🌹', '🏵️',
+  // Autres / Other
+  '💧', '☕',
 ];
 
 export default function IconPicker({ value, onChange }: IconPickerProps) {
@@ -44,19 +50,25 @@ export default function IconPicker({ value, onChange }: IconPickerProps) {
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-10 gap-2">
-        {commonEmojis.map((emoji) => (
+      {/* Helper text */}
+      <div className="text-xs text-gray-500">
+        Sélectionne un emoji pour représenter cet ingrédient
+      </div>
+
+      <div className="grid grid-cols-10 gap-2 max-h-64 overflow-y-auto p-2 bg-[#0f0f1a]/50 rounded-lg">
+        {commonEmojis.map((emoji, idx) => (
           <button
-            key={emoji}
+            key={`${emoji}-${idx}`}
             type="button"
             onClick={() => handleEmojiClick(emoji)}
             className={`
               text-2xl p-2 rounded-lg border transition-all
               ${value === emoji
-                ? 'border-amber-400 bg-amber-400/10 scale-110'
-                : 'border-gray-700 bg-[#0f0f1a] hover:border-amber-400/50 hover:bg-amber-400/5'
+                ? 'border-amber-400 bg-amber-400/10 scale-110 shadow-lg shadow-amber-400/20'
+                : 'border-gray-700 bg-[#1a1a2e] hover:border-amber-400/50 hover:bg-amber-400/5'
               }
             `}
+            title={emoji}
           >
             {emoji}
           </button>
