@@ -13,6 +13,7 @@ import ingredientRoutes from './routes/ingredients';
 import unitRoutes from './routes/units';
 import cocktailRoutes from './routes/cocktails';
 import menuRoutes from './routes/menus';
+import menuBottleRoutes from './routes/menuBottles';
 import publicRoutes from './routes/public';
 import shortageRoutes from './routes/shortages';
 import availabilityRoutes from './routes/availability';
@@ -40,6 +41,7 @@ app.use('/api/ingredients', authMiddleware, ingredientRoutes);
 app.use('/api/units', authMiddleware, unitRoutes);
 app.use('/api/cocktails', authMiddleware, cocktailRoutes);
 app.use('/api/menus', authMiddleware, menuRoutes);
+app.use('/api/menu-bottles', authMiddleware, menuBottleRoutes);
 app.use('/api/shortages', authMiddleware, shortageRoutes);
 app.use('/api/availability', authMiddleware, availabilityRoutes);
 

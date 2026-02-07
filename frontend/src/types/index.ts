@@ -22,6 +22,9 @@ export interface Bottle {
   capacityMl: number;
   remainingPercent: number;
   openedAt: string | null;
+  alcoholPercentage: number | null;
+  isApero: boolean;
+  isDigestif: boolean;
   createdAt: string;
 }
 
@@ -94,16 +97,27 @@ export interface MenuCocktail {
   isHidden: boolean;
 }
 
+export interface MenuBottle {
+  id: number;
+  menuId: number;
+  bottleId: number;
+  bottle?: Bottle;
+  position: number;
+  isHidden: boolean;
+}
+
 export interface Menu {
   id: number;
   name: string;
   description: string | null;
   slug: string;
+  type: 'COCKTAILS' | 'APEROS' | 'DIGESTIFS';
   isPublic: boolean;
   createdAt: string;
   updatedAt: string;
   cocktails?: MenuCocktail[];
-  _count?: { cocktails: number };
+  bottles?: MenuBottle[];
+  _count?: { cocktails: number; bottles: number };
 }
 
 export interface Shortage {
@@ -144,9 +158,15 @@ export interface MenuInput {
   name: string;
   description?: string;
   slug: string;
+  type?: 'COCKTAILS' | 'APEROS' | 'DIGESTIFS';
   isPublic?: boolean;
   cocktails?: {
     cocktailId: number;
+    position?: number;
+    isHidden?: boolean;
+  }[];
+  bottles?: {
+    bottleId: number;
     position?: number;
     isHidden?: boolean;
   }[];

@@ -41,34 +41,61 @@ export default function MenusPage() {
           <thead className="bg-[#0f0f1a]">
             <tr>
               <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('menus.name')}</th>
+              <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">Type</th>
               <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('menus.slug')}</th>
               <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('menus.isPublic')}</th>
-              <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('menus.cocktailCount')}</th>
+              <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">Contenu</th>
               <th className="text-right px-6 py-3 text-sm text-gray-400 font-medium">{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-800">
-            {items.map((item) => (
-              <tr key={item.id} className="hover:bg-gray-800/50">
-                <td className="px-6 py-4 font-medium">{item.name}</td>
-                <td className="px-6 py-4 text-gray-400">/menu/{item.slug}</td>
-                <td className="px-6 py-4">
-                  {item.isPublic ? (
-                    <span className="bg-green-500/20 text-green-400 px-2 py-0.5 rounded text-xs font-medium">{t('common.yes')}</span>
-                  ) : (
-                    <span className="bg-gray-500/20 text-gray-400 px-2 py-0.5 rounded text-xs font-medium">{t('common.no')}</span>
-                  )}
-                </td>
-                <td className="px-6 py-4">{item._count?.cocktails ?? 0}</td>
-                <td className="px-6 py-4 text-right space-x-2">
-                  <Link to={`/admin/menus/${item.id}`} className="text-amber-400 hover:text-amber-300 text-sm">{t('common.edit')}</Link>
-                  {item.isPublic && (
-                    <a href={`/menu/${item.slug}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 text-sm">🔗</a>
-                  )}
-                  <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 text-sm">{t('common.delete')}</button>
-                </td>
-              </tr>
-            ))}
+            {items.map((item) => {
+              const isDefaultMenu = item.slug === 'aperitifs' || item.slug === 'digestifs';
+              const isBottleMenu = item.type === 'APEROS' || item.type === 'DIGESTIFS';
+              const editLink = isBottleMenu ? `/admin/menus/${item.id}/bottles` : `/admin/menus/${item.id}`;
+
+              return (
+                <tr key={item.id} className="hover:bg-gray-800/50">
+                  <td className="px-6 py-4 font-medium">
+                    {item.name}
+                    {isDefaultMenu && <span className="ml-2 text-xs text-gray-500">(par défaut)</span>}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                      item.type === 'COCKTAILS' ? 'bg-purple-500/20 text-purple-400' :
+                      item.type === 'APEROS' ? 'bg-amber-500/20 text-amber-400' :
+                      'bg-orange-500/20 text-orange-400'
+                    }`}>
+                      {item.type === 'COCKTAILS' ? 'Cocktails' :
+                       item.type === 'APEROS' ? 'Apéritifs' : 'Digestifs'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-gray-400">/menu/{item.slug}</td>
+                  <td className="px-6 py-4">
+                    {item.isPublic ? (
+                      <span className="bg-green-500/20 text-green-400 px-2 py-0.5 rounded text-xs font-medium">{t('common.yes')}</span>
+                    ) : (
+                      <span className="bg-gray-500/20 text-gray-400 px-2 py-0.5 rounded text-xs font-medium">{t('common.no')}</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-gray-400">
+                    {isBottleMenu
+                      ? `${item._count?.bottles ?? 0} bouteille(s)`
+                      : `${item._count?.cocktails ?? 0} cocktail(s)`
+                    }
+                  </td>
+                  <td className="px-6 py-4 text-right space-x-2">
+                    <Link to={editLink} className="text-amber-400 hover:text-amber-300 text-sm">{t('common.edit')}</Link>
+                    {item.isPublic && (
+                      <a href={`/menu/${item.slug}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 text-sm">🔗</a>
+                    )}
+                    {!isDefaultMenu && (
+                      <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 text-sm">{t('common.delete')}</button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         {items.length === 0 && <div className="text-center py-8 text-gray-500">{t('common.noResults')}</div>}

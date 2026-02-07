@@ -43,7 +43,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
-    const { name, categoryId, purchasePrice, capacityMl, remainingPercent, openedAt } = req.body;
+    const { name, categoryId, purchasePrice, capacityMl, remainingPercent, openedAt, alcoholPercentage, isApero, isDigestif } = req.body;
     if (!name || !categoryId || !capacityMl) {
       res.status(400).json({ error: req.t('errors.validationError') });
       return;
@@ -56,6 +56,9 @@ router.post('/', async (req: AuthRequest, res: Response) => {
         capacityMl,
         remainingPercent: remainingPercent ?? 100,
         openedAt: openedAt ? new Date(openedAt) : null,
+        alcoholPercentage: alcoholPercentage || null,
+        isApero: isApero ?? false,
+        isDigestif: isDigestif ?? false,
       },
       include: { category: true },
     });
@@ -68,7 +71,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const { name, categoryId, purchasePrice, capacityMl, remainingPercent, openedAt } = req.body;
+    const { name, categoryId, purchasePrice, capacityMl, remainingPercent, openedAt, alcoholPercentage, isApero, isDigestif } = req.body;
     const bottle = await prisma.bottle.update({
       where: { id: parseInt(String(req.params.id)) },
       data: {
@@ -78,6 +81,9 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
         ...(capacityMl && { capacityMl }),
         ...(remainingPercent !== undefined && { remainingPercent }),
         ...(openedAt !== undefined && { openedAt: openedAt ? new Date(openedAt) : null }),
+        ...(alcoholPercentage !== undefined && { alcoholPercentage }),
+        ...(isApero !== undefined && { isApero }),
+        ...(isDigestif !== undefined && { isDigestif }),
       },
       include: { category: true },
     });

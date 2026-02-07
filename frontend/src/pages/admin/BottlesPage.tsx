@@ -12,7 +12,8 @@ export default function BottlesPage() {
   const [editing, setEditing] = useState<Bottle | null>(null);
   const [form, setForm] = useState({
     name: '', categoryId: 0, purchasePrice: '', capacityMl: 700,
-    remainingPercent: 100, openedAt: '',
+    remainingPercent: 100, openedAt: '', alcoholPercentage: '',
+    isApero: false, isDigestif: false,
   });
 
   const load = () => {
@@ -24,7 +25,7 @@ export default function BottlesPage() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: '', categoryId: cats[0]?.id || 0, purchasePrice: '', capacityMl: 700, remainingPercent: 100, openedAt: '' });
+    setForm({ name: '', categoryId: cats[0]?.id || 0, purchasePrice: '', capacityMl: 700, remainingPercent: 100, openedAt: '', alcoholPercentage: '', isApero: false, isDigestif: false });
     setShowModal(true);
   };
 
@@ -37,6 +38,9 @@ export default function BottlesPage() {
       capacityMl: item.capacityMl,
       remainingPercent: item.remainingPercent,
       openedAt: item.openedAt ? item.openedAt.split('T')[0] : '',
+      alcoholPercentage: item.alcoholPercentage?.toString() || '',
+      isApero: item.isApero,
+      isDigestif: item.isDigestif,
     });
     setShowModal(true);
   };
@@ -50,6 +54,9 @@ export default function BottlesPage() {
       capacityMl: form.capacityMl,
       remainingPercent: form.remainingPercent,
       openedAt: form.openedAt || null,
+      alcoholPercentage: form.alcoholPercentage ? parseFloat(form.alcoholPercentage) : null,
+      isApero: form.isApero,
+      isDigestif: form.isDigestif,
     };
     if (editing) {
       await api.update(editing.id, data);
@@ -165,6 +172,21 @@ export default function BottlesPage() {
             <div>
               <label className="block text-sm text-gray-400 mb-1">{t('bottles.openedAt')}</label>
               <input type="date" value={form.openedAt} onChange={(e) => setForm({ ...form, openedAt: e.target.value })} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Alcool % (vol.)</label>
+              <input type="number" step="0.1" min="0" max="100" value={form.alcoholPercentage} onChange={(e) => setForm({ ...form, alcoholPercentage: e.target.value })} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400" placeholder="Ex: 40" />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm text-gray-400 mb-2">Utilisation</label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={form.isApero} onChange={(e) => setForm({ ...form, isApero: e.target.checked })} className="w-4 h-4 rounded bg-[#0f0f1a] border-gray-700 text-amber-400 focus:ring-amber-400 focus:ring-offset-0" />
+                <span className="text-sm">Utilisable comme apéritif</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={form.isDigestif} onChange={(e) => setForm({ ...form, isDigestif: e.target.checked })} className="w-4 h-4 rounded bg-[#0f0f1a] border-gray-700 text-amber-400 focus:ring-amber-400 focus:ring-offset-0" />
+                <span className="text-sm">Utilisable comme digestif</span>
+              </label>
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-400 hover:text-white">{t('common.cancel')}</button>

@@ -19,7 +19,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Get one menu with cocktails
+// Get one menu with cocktails and bottles
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const menu = await prisma.menu.findUnique({
@@ -34,6 +34,14 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
                   orderBy: { position: 'asc' },
                 },
               },
+            },
+          },
+          orderBy: { position: 'asc' },
+        },
+        bottles: {
+          include: {
+            bottle: {
+              include: { category: true },
             },
           },
           orderBy: { position: 'asc' },
@@ -54,7 +62,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 // Create menu
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
-    const { name, description, slug, isPublic } = req.body;
+    const { name, description, slug, isPublic, type } = req.body;
     if (!name || !slug) {
       res.status(400).json({ error: req.t('errors.validationError') });
       return;
@@ -65,6 +73,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
         description: description || null,
         slug: slug.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
         isPublic: isPublic ?? false,
+        type: type || 'COCKTAILS',
       },
     });
     res.status(201).json(menu);
@@ -81,7 +90,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 // Update menu
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const { name, description, slug, isPublic, cocktails } = req.body;
+    const { name, description, slug, isPublic, type, cocktails, bottles } = req.body;
 
     // If cocktails array provided, update the associations
     if (cocktails) {
@@ -96,6 +105,19 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
       });
     }
 
+    // If bottles array provided, update the associations
+    if (bottles) {
+      await prisma.menuBottle.deleteMany({ where: { menuId: parseInt(String(req.params.id)) } });
+      await prisma.menuBottle.createMany({
+        data: bottles.map((b: any, index: number) => ({
+          menuId: parseInt(String(req.params.id)),
+          bottleId: b.bottleId,
+          position: b.position ?? index,
+          isHidden: b.isHidden ?? false,
+        })),
+      });
+    }
+
     const menu = await prisma.menu.update({
       where: { id: parseInt(String(req.params.id)) },
       data: {
@@ -103,10 +125,15 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
         ...(description !== undefined && { description }),
         ...(slug && { slug: slug.toLowerCase().replace(/[^a-z0-9-]/g, '-') }),
         ...(isPublic !== undefined && { isPublic }),
+        ...(type && { type }),
       },
       include: {
         cocktails: {
           include: { cocktail: true },
+          orderBy: { position: 'asc' },
+        },
+        bottles: {
+          include: { bottle: { include: { category: true } } },
           orderBy: { position: 'asc' },
         },
       },
@@ -122,9 +149,24 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Delete menu
+// Delete menu (prevent deletion of default apero/digestif menus)
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
+    const menu = await prisma.menu.findUnique({
+      where: { id: parseInt(String(req.params.id)) },
+    });
+
+    if (!menu) {
+      res.status(404).json({ error: req.t('errors.notFound') });
+      return;
+    }
+
+    // Prevent deletion of default menus
+    if (menu.slug === 'aperitifs' || menu.slug === 'digestifs') {
+      res.status(403).json({ error: req.t('errors.cannotDeleteDefaultMenu') });
+      return;
+    }
+
     await prisma.menu.delete({ where: { id: parseInt(String(req.params.id)) } });
     res.json({ message: req.t('menus.deleted') });
   } catch (error) {

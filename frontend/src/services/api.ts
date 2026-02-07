@@ -1,5 +1,5 @@
 import type {
-  Category, Bottle, Ingredient, Unit, Cocktail, Menu, Shortage,
+  Category, Bottle, Ingredient, Unit, Cocktail, Menu, MenuBottle, Shortage,
   CocktailInput, MenuInput, CocktailAvailability,
 } from '../types';
 
@@ -134,6 +134,19 @@ export const menus = {
     request<Menu>(`/menus/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: number) =>
     request<{ message: string }>(`/menus/${id}`, { method: 'DELETE' }),
+};
+
+// Menu Bottles
+export const menuBottles = {
+  listByMenu: (menuId: number) => request<MenuBottle[]>(`/menu-bottles/menu/${menuId}`),
+  create: (data: { menuId: number; bottleId: number; position?: number; isHidden?: boolean }) =>
+    request<MenuBottle>('/menu-bottles', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: number, data: { position?: number; isHidden?: boolean }) =>
+    request<MenuBottle>(`/menu-bottles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: number) =>
+    request<{ message: string }>(`/menu-bottles/${id}`, { method: 'DELETE' }),
+  sync: (menuId: number) =>
+    request<{ message: string; added: number; removed: number }>(`/menu-bottles/menu/${menuId}/sync`, { method: 'POST' }),
 };
 
 // Public

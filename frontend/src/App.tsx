@@ -12,6 +12,7 @@ import CocktailsPage from './pages/admin/CocktailsPage';
 import CocktailFormPage from './pages/admin/CocktailFormPage';
 import MenusPage from './pages/admin/MenusPage';
 import MenuEditPage from './pages/admin/MenuEditPage';
+import MenuBottleEditPage from './pages/admin/MenuBottleEditPage';
 import ShortagesPage from './pages/admin/ShortagesPage';
 import HomePage from './pages/public/HomePage';
 import MenuPublicPage from './pages/public/MenuPublicPage';
@@ -56,6 +57,7 @@ export default function App() {
         <Route path="cocktails/:id" element={<CocktailFormPage />} />
         <Route path="menus" element={<MenusPage />} />
         <Route path="menus/:id" element={<MenuEditPage />} />
+        <Route path="menus/:id/bottles" element={<MenuBottleEditPage />} />
         <Route path="shortages" element={<ShortagesPage />} />
       </Route>
 
