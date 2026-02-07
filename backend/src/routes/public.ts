@@ -10,7 +10,7 @@ router.get('/menus', async (req: Request, res: Response) => {
     const menus = await prisma.menu.findMany({
       where: { isPublic: true },
       include: {
-        _count: { select: { cocktails: true } },
+        _count: { select: { cocktails: true, bottles: true } },
       },
       orderBy: { updatedAt: 'desc' },
     });
@@ -21,7 +21,7 @@ router.get('/menus', async (req: Request, res: Response) => {
   }
 });
 
-// Get public menu by slug
+// Get public menu by slug (or admin preview)
 router.get('/menus/:slug', async (req: Request, res: Response) => {
   try {
     const menu = await prisma.menu.findUnique({
@@ -40,10 +40,28 @@ router.get('/menus/:slug', async (req: Request, res: Response) => {
           },
           orderBy: { position: 'asc' },
         },
+        bottles: {
+          include: {
+            bottle: {
+              include: { category: true },
+            },
+          },
+          orderBy: { position: 'asc' },
+        },
       },
     });
 
-    if (!menu || !menu.isPublic) {
+    if (!menu) {
+      res.status(404).json({ error: req.t('errors.notFound') });
+      return;
+    }
+
+    // Check if user is authenticated (admin) via Authorization header
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    const isAdmin = !!token; // If there's a token, user is logged in (admin)
+
+    // Allow if public OR if admin
+    if (!menu.isPublic && !isAdmin) {
       res.status(404).json({ error: req.t('errors.notFound') });
       return;
     }
