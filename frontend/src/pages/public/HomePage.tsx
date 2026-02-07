@@ -38,30 +38,36 @@ export default function HomePage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {menus.map((menu) => (
-            <Link
-              key={menu.id}
-              to={`/menu/${menu.slug}`}
-              className="group bg-[#1a1a2e] border border-gray-800 rounded-xl p-6 hover:border-amber-400/50 transition-all hover:shadow-lg hover:shadow-amber-400/5"
-            >
-              <h2 className="text-xl font-bold font-serif text-white group-hover:text-amber-400 transition-colors mb-2">
-                {menu.name}
-              </h2>
-              {menu.description && (
-                <p className="text-gray-400 text-sm mb-4 line-clamp-2">
-                  {menu.description}
-                </p>
-              )}
-              <div className="flex items-center justify-between text-xs text-gray-500">
-                <span>
-                  {menu._count?.cocktails ?? 0} {t('home.cocktailCount')}
-                </span>
-                <span className="text-amber-400 group-hover:translate-x-1 transition-transform">
-                  &rarr;
-                </span>
-              </div>
-            </Link>
-          ))}
+          {menus.map((menu) => {
+            const isBottleMenu = menu.type === 'APEROS' || menu.type === 'DIGESTIFS';
+            const count = isBottleMenu ? (menu._count?.bottles ?? 0) : (menu._count?.cocktails ?? 0);
+            const countLabel = isBottleMenu ? 'bouteille(s)' : t('home.cocktailCount');
+
+            return (
+              <Link
+                key={menu.id}
+                to={`/menu/${menu.slug}`}
+                className="group bg-[#1a1a2e] border border-gray-800 rounded-xl p-6 hover:border-amber-400/50 transition-all hover:shadow-lg hover:shadow-amber-400/5"
+              >
+                <h2 className="text-xl font-bold font-serif text-white group-hover:text-amber-400 transition-colors mb-2">
+                  {menu.name}
+                </h2>
+                {menu.description && (
+                  <p className="text-gray-400 text-sm mb-4 line-clamp-2">
+                    {menu.description}
+                  </p>
+                )}
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span>
+                    {count} {countLabel}
+                  </span>
+                  <span className="text-amber-400 group-hover:translate-x-1 transition-transform">
+                    &rarr;
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
