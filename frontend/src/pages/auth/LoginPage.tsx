@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
+import LanguageSelector from '../../components/ui/LanguageSelector';
 
 export default function LoginPage() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { login } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
@@ -77,14 +78,8 @@ export default function LoginPage() {
             {loading ? t('common.loading') : t('auth.loginButton')}
           </button>
 
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={() => i18n.changeLanguage(i18n.language === 'fr' ? 'en' : 'fr')}
-              className="text-sm text-gray-500 hover:text-gray-300"
-            >
-              {i18n.language === 'fr' ? 'English' : 'Français'}
-            </button>
+          <div className="flex justify-center">
+            <LanguageSelector />
           </div>
         </form>
       </div>

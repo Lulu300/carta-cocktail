@@ -1,14 +1,11 @@
 import { Outlet, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
+import LanguageSelector from '../ui/LanguageSelector';
 
 export default function PublicLayout() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { user } = useAuth();
-
-  const toggleLang = () => {
-    i18n.changeLanguage(i18n.language === 'fr' ? 'en' : 'fr');
-  };
 
   return (
     <div className="min-h-screen bg-[#0f0f1a] text-gray-100">
@@ -17,12 +14,7 @@ export default function PublicLayout() {
           Carta Cocktail
         </Link>
         <div className="flex items-center gap-3">
-          <button
-            onClick={toggleLang}
-            className="text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors"
-          >
-            {i18n.language === 'fr' ? 'EN' : 'FR'}
-          </button>
+          <LanguageSelector />
           {user ? (
             <Link
               to="/admin"

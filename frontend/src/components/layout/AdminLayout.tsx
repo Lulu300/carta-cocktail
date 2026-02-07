@@ -3,6 +3,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { shortages as shortagesApi } from '../../services/api';
+import LanguageSelector from '../ui/LanguageSelector';
 
 const navItems = [
   { path: '/admin', key: 'dashboard', icon: '📊' },
@@ -16,7 +17,7 @@ const navItems = [
 ];
 
 export default function AdminLayout() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -30,10 +31,6 @@ export default function AdminLayout() {
   const handleLogout = () => {
     logout();
     navigate('/login');
-  };
-
-  const toggleLang = () => {
-    i18n.changeLanguage(i18n.language === 'fr' ? 'en' : 'fr');
   };
 
   return (
@@ -109,12 +106,7 @@ export default function AdminLayout() {
                 <span>{t('dashboard.shortageAlert', { count: shortageCount })}</span>
               </Link>
             )}
-            <button
-              onClick={toggleLang}
-              className="text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors"
-            >
-              {i18n.language === 'fr' ? 'EN' : 'FR'}
-            </button>
+            <LanguageSelector />
             <button
               onClick={handleLogout}
               className="text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors"
