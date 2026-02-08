@@ -60,6 +60,13 @@ async function main() {
     },
   });
 
+  // Create default site settings
+  await prisma.siteSettings.upsert({
+    where: { id: 1 },
+    update: {},
+    create: { id: 1, siteName: 'Carta Cocktail', siteIcon: '' },
+  });
+
   console.log('Seed completed successfully');
 }
 

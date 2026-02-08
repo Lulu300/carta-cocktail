@@ -42,5 +42,11 @@
     "created": "Menu created successfully",
     "updated": "Menu updated successfully",
     "deleted": "Menu deleted successfully"
+  },
+  "settings": {
+    "updated": "Settings updated successfully",
+    "profileUpdated": "Profile updated successfully",
+    "currentPasswordRequired": "Current password is required",
+    "currentPasswordInvalid": "Current password is incorrect"
   }
 }

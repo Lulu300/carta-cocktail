@@ -195,6 +195,12 @@ export interface IngredientAvailability {
   reason?: string;
 }
 
+export interface SiteSettings {
+  id?: number;
+  siteName: string;
+  siteIcon: string;
+}
+
 export interface CocktailAvailability {
   cocktailId: number;
   isAvailable: boolean;

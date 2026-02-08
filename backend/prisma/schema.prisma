@@ -169,3 +169,9 @@ model MenuSection {
   cocktails MenuCocktail[]
   bottles   MenuBottle[]
 }
+
+model SiteSettings {
+  id       Int    @id @default(1)
+  siteName String @default("Carta Cocktail")
+  siteIcon String @default("")
+}

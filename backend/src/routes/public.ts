@@ -76,6 +76,22 @@ router.get('/menus/:slug', async (req: Request, res: Response) => {
   }
 });
 
+// Get site settings (public)
+router.get('/settings', async (req: Request, res: Response) => {
+  try {
+    let settings = await prisma.siteSettings.findUnique({ where: { id: 1 } });
+    if (!settings) {
+      settings = await prisma.siteSettings.create({
+        data: { id: 1, siteName: 'Carta Cocktail', siteIcon: '' },
+      });
+    }
+    res.json({ siteName: settings.siteName, siteIcon: settings.siteIcon });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: req.t('errors.serverError') });
+  }
+});
+
 // Get public cocktail detail
 router.get('/cocktails/:id', async (req: Request, res: Response) => {
   try {

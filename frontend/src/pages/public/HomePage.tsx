@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { publicApi } from '../../services/api';
+import { useSiteSettings } from '../../contexts/SiteSettingsContext';
 import type { Menu } from '../../types';
 
 export default function HomePage() {
   const { t } = useTranslation();
+  const { siteSettings } = useSiteSettings();
   const [menus, setMenus] = useState<Menu[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -27,7 +29,8 @@ export default function HomePage() {
     <div className="max-w-4xl mx-auto px-6 py-12">
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold font-serif text-amber-400 mb-3">
-          {t('app.name')}
+          {siteSettings.siteIcon && <span className="mr-2">{siteSettings.siteIcon}</span>}
+          {siteSettings.siteName}
         </h1>
         <p className="text-gray-400 text-lg">{t('home.subtitle')}</p>
       </div>

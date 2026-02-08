@@ -42,5 +42,11 @@
     "created": "Carte créée avec succès",
     "updated": "Carte mise à jour avec succès",
     "deleted": "Carte supprimée avec succès"
+  },
+  "settings": {
+    "updated": "Paramètres mis à jour avec succès",
+    "profileUpdated": "Profil mis à jour avec succès",
+    "currentPasswordRequired": "Le mot de passe actuel est requis",
+    "currentPasswordInvalid": "Le mot de passe actuel est incorrect"
   }
 }

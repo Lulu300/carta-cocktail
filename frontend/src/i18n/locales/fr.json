@@ -11,6 +11,7 @@
     "cocktails": "Cocktails",
     "menus": "Cartes",
     "shortages": "Pénuries",
+    "settings": "Paramètres",
     "logout": "Déconnexion",
     "login": "Connexion",
     "language": "Langue"
@@ -164,6 +165,24 @@
     "instructions": "Préparation",
     "print": "Imprimer",
     "back": "Retour à la carte"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "siteConfig": "Configuration du site",
+    "siteName": "Nom du site",
+    "siteIcon": "Icône du site",
+    "siteIconHint": "Choisissez un emoji comme icône du site, ou laissez vide",
+    "siteUpdated": "Paramètres du site mis à jour",
+    "profileConfig": "Profil administrateur",
+    "email": "Adresse email",
+    "currentPassword": "Mot de passe actuel",
+    "currentPasswordPlaceholder": "Requis pour changer le mot de passe",
+    "newPassword": "Nouveau mot de passe",
+    "newPasswordPlaceholder": "Laisser vide pour ne pas changer",
+    "confirmPassword": "Confirmer le mot de passe",
+    "confirmPasswordPlaceholder": "Retaper le nouveau mot de passe",
+    "profileUpdated": "Profil mis à jour",
+    "passwordMismatch": "Les mots de passe ne correspondent pas"
   },
   "common": {
     "save": "Enregistrer",

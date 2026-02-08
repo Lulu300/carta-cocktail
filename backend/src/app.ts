@@ -18,6 +18,7 @@ import menuSectionRoutes from './routes/menuSections';
 import publicRoutes from './routes/public';
 import shortageRoutes from './routes/shortages';
 import availabilityRoutes from './routes/availability';
+import settingsRoutes from './routes/settings';
 
 const app = express();
 
@@ -46,5 +47,6 @@ app.use('/api/menu-bottles', authMiddleware, menuBottleRoutes);
 app.use('/api/menu-sections', authMiddleware, menuSectionRoutes);
 app.use('/api/shortages', authMiddleware, shortageRoutes);
 app.use('/api/availability', authMiddleware, availabilityRoutes);
+app.use('/api/settings', authMiddleware, settingsRoutes);
 
 export default app;

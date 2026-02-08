@@ -11,6 +11,7 @@
     "cocktails": "Cocktails",
     "menus": "Menus",
     "shortages": "Shortages",
+    "settings": "Settings",
     "logout": "Logout",
     "login": "Login",
     "language": "Language"
@@ -164,6 +165,24 @@
     "instructions": "Preparation",
     "print": "Print",
     "back": "Back to menu"
+  },
+  "settings": {
+    "title": "Settings",
+    "siteConfig": "Site Configuration",
+    "siteName": "Site Name",
+    "siteIcon": "Site Icon",
+    "siteIconHint": "Choose an emoji as the site icon, or leave empty",
+    "siteUpdated": "Site settings updated",
+    "profileConfig": "Admin Profile",
+    "email": "Email Address",
+    "currentPassword": "Current Password",
+    "currentPasswordPlaceholder": "Required to change password",
+    "newPassword": "New Password",
+    "newPasswordPlaceholder": "Leave blank to keep current",
+    "confirmPassword": "Confirm Password",
+    "confirmPasswordPlaceholder": "Retype new password",
+    "profileUpdated": "Profile updated",
+    "passwordMismatch": "Passwords do not match"
   },
   "common": {
     "save": "Save",

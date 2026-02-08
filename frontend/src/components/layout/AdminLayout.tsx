@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSiteSettings } from '../../contexts/SiteSettingsContext';
 import { shortages as shortagesApi } from '../../services/api';
 import LanguageSelector from '../ui/LanguageSelector';
 
@@ -14,11 +15,13 @@ const navItems = [
   { path: '/admin/cocktails', key: 'cocktails', icon: '🍸' },
   { path: '/admin/menus', key: 'menus', icon: '📋' },
   { path: '/admin/shortages', key: 'shortages', icon: '⚠️' },
+  { path: '/admin/settings', key: 'settings', icon: '⚙️' },
 ];
 
 export default function AdminLayout() {
   const { t } = useTranslation();
   const { logout } = useAuth();
+  const { siteSettings } = useSiteSettings();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -43,7 +46,8 @@ export default function AdminLayout() {
       >
         <div className="p-6 border-b border-gray-800">
           <Link to="/admin" className="text-xl font-bold text-amber-400 font-serif">
-            Carta Cocktail
+            {siteSettings.siteIcon && <span className="mr-1">{siteSettings.siteIcon}</span>}
+            {siteSettings.siteName}
           </Link>
         </div>
         <nav className="p-4 space-y-1">

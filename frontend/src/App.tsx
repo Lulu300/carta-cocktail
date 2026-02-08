@@ -14,6 +14,7 @@ import MenusPage from './pages/admin/MenusPage';
 import MenuEditPage from './pages/admin/MenuEditPage';
 import MenuBottleEditPage from './pages/admin/MenuBottleEditPage';
 import ShortagesPage from './pages/admin/ShortagesPage';
+import SettingsPage from './pages/admin/SettingsPage';
 import HomePage from './pages/public/HomePage';
 import MenuPublicPage from './pages/public/MenuPublicPage';
 import CocktailPublicPage from './pages/public/CocktailPublicPage';
@@ -59,6 +60,7 @@ export default function App() {
         <Route path="menus/:id" element={<MenuEditPage />} />
         <Route path="menus/:id/bottles" element={<MenuBottleEditPage />} />
         <Route path="shortages" element={<ShortagesPage />} />
+        <Route path="settings" element={<SettingsPage />} />
       </Route>
 
       {/* Fallback */}

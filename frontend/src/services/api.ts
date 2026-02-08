@@ -1,6 +1,6 @@
 import type {
   Category, Bottle, Ingredient, Unit, Cocktail, Menu, MenuBottle, MenuSection, Shortage,
-  CocktailInput, MenuInput, CocktailAvailability,
+  CocktailInput, MenuInput, CocktailAvailability, SiteSettings,
 } from '../types';
 
 const API_BASE = '/api';
@@ -170,6 +170,7 @@ export const publicApi = {
   listMenus: () => request<Menu[]>('/public/menus'),
   getMenu: (slug: string) => request<Menu>(`/public/menus/${slug}`),
   getCocktail: (id: number) => request<Cocktail>(`/public/cocktails/${id}`),
+  getSettings: () => request<SiteSettings>('/public/settings'),
 };
 
 // Shortages
@@ -181,4 +182,13 @@ export const shortages = {
 export const availability = {
   getCocktail: (id: number) => request<CocktailAvailability>(`/availability/cocktails/${id}`),
   getAllCocktails: () => request<Record<number, CocktailAvailability>>('/availability/cocktails'),
+};
+
+// Settings (admin)
+export const settings = {
+  get: () => request<SiteSettings>('/settings'),
+  update: (data: { siteName: string; siteIcon: string }) =>
+    request<SiteSettings>('/settings', { method: 'PUT', body: JSON.stringify(data) }),
+  updateProfile: (data: { email?: string; currentPassword?: string; newPassword?: string }) =>
+    request<{ id: number; email: string }>('/settings/profile', { method: 'PUT', body: JSON.stringify(data) }),
 };

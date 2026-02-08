@@ -5,13 +5,16 @@ import './index.css';
 import './i18n';
 import App from './App';
 import { AuthProvider } from './contexts/AuthContext';
+import { SiteSettingsProvider } from './contexts/SiteSettingsContext';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
+      <SiteSettingsProvider>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </SiteSettingsProvider>
     </BrowserRouter>
   </StrictMode>,
 );
