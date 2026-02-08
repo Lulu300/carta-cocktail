@@ -59,12 +59,13 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 // Update menu bottle (position or visibility)
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const { position, isHidden } = req.body;
+    const { position, isHidden, menuSectionId } = req.body;
     const menuBottle = await prisma.menuBottle.update({
       where: { id: parseInt(String(req.params.id)) },
       data: {
         ...(position !== undefined && { position }),
         ...(isHidden !== undefined && { isHidden }),
+        ...(menuSectionId !== undefined && { menuSectionId }),
       },
       include: {
         bottle: {

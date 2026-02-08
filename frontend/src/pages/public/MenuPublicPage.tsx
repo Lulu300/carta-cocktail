@@ -11,6 +11,7 @@ export default function MenuPublicPage() {
   const { user } = useAuth();
   const [menu, setMenu] = useState<Menu | null>(null);
   const [error, setError] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (!slug) return;
@@ -35,11 +36,33 @@ export default function MenuPublicPage() {
   const isBottleMenu = menu.type === 'APEROS' || menu.type === 'DIGESTIFS';
   const hasSections = (menu.sections && menu.sections.length > 0) || false;
 
+  // Filter function for search
+  const matchesSearch = (item: any) => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+
+    if (isBottleMenu) {
+      const bottle = item.bottle;
+      return (
+        bottle?.name?.toLowerCase().includes(query) ||
+        bottle?.category?.name?.toLowerCase().includes(query)
+      );
+    } else {
+      const cocktail = item.cocktail;
+      const tags = cocktail?.tags ? cocktail.tags.split(',').map((t: string) => t.trim().toLowerCase()) : [];
+      return (
+        cocktail?.name?.toLowerCase().includes(query) ||
+        cocktail?.description?.toLowerCase().includes(query) ||
+        tags.some((tag: string) => tag.includes(query))
+      );
+    }
+  };
+
   // Group bottles/cocktails by section OR by default grouping
   const itemsBySection: Record<string, any[]> = {};
 
   if (isBottleMenu) {
-    const visibleBottles = (menu.bottles || []).filter((mb) => !mb.isHidden);
+    const visibleBottles = (menu.bottles || []).filter((mb) => !mb.isHidden && matchesSearch(mb));
 
     if (hasSections) {
       // Group by custom sections
@@ -65,7 +88,7 @@ export default function MenuPublicPage() {
     }
   } else {
     // Cocktail menus
-    const visibleCocktails = (menu.cocktails || []).filter((mc) => !mc.isHidden);
+    const visibleCocktails = (menu.cocktails || []).filter((mc) => !mc.isHidden && matchesSearch(mc));
 
     if (hasSections) {
       // Group by custom sections
@@ -87,9 +110,43 @@ export default function MenuPublicPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="text-center mb-12">
+      <div className="text-center mb-8">
         <h1 className="text-4xl font-bold font-serif text-amber-400 mb-3">{menu.name}</h1>
         {menu.description && <p className="text-gray-400 text-lg">{menu.description}</p>}
+      </div>
+
+      {/* Search bar */}
+      <div className="mb-8">
+        <div className="relative">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={isBottleMenu ? "Rechercher une bouteille..." : "Rechercher par nom ou tag..."}
+            className="w-full bg-[#1a1a2e] border border-gray-700 rounded-lg pl-10 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-amber-400 transition-colors"
+          />
+          <svg
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Render sections/groups */}
@@ -159,8 +216,17 @@ export default function MenuPublicPage() {
                               {isUnavailable && <span className="text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded">{t('public.unavailable')}</span>}
                             </div>
                             {cocktail.description && <p className="text-gray-400 text-sm line-clamp-2">{cocktail.description}</p>}
+                            {cocktail.tags && cocktail.tags.trim() && (
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                {cocktail.tags.split(',').map((tag, idx) => (
+                                  <span key={idx} className="text-xs bg-amber-400/10 text-amber-400 px-2 py-0.5 rounded border border-amber-400/20">
+                                    #{tag.trim()}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                             {cocktail.ingredients && cocktail.ingredients.length > 0 && (
-                              <div className="mt-3 flex flex-wrap gap-1.5">
+                              <div className="mt-2 flex flex-wrap gap-1.5">
                                 {cocktail.ingredients.map((ing) => (
                                   <span key={ing.id} className="text-xs bg-[#0f0f1a] text-gray-400 px-2 py-1 rounded">
                                     {ing.bottle?.name || ing.category?.name || ing.ingredient?.name}
@@ -243,6 +309,15 @@ export default function MenuPublicPage() {
                                 {isUnavailable && <span className="text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded">{t('public.unavailable')}</span>}
                               </div>
                               {cocktail.description && <p className="text-gray-400 text-sm line-clamp-2">{cocktail.description}</p>}
+                              {cocktail.tags && cocktail.tags.trim() && (
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                  {cocktail.tags.split(',').map((tag, idx) => (
+                                    <span key={idx} className="text-xs bg-amber-400/10 text-amber-400 px-2 py-0.5 rounded border border-amber-400/20">
+                                      #{tag.trim()}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                               {cocktail.ingredients && cocktail.ingredients.length > 0 && (
                                 <div className="mt-3 flex flex-wrap gap-1.5">
                                   {cocktail.ingredients.map((ing) => (
@@ -334,6 +409,15 @@ export default function MenuPublicPage() {
                           {isUnavailable && <span className="text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded">{t('public.unavailable')}</span>}
                         </div>
                         {cocktail.description && <p className="text-gray-400 text-sm line-clamp-2">{cocktail.description}</p>}
+                        {cocktail.tags && cocktail.tags.trim() && (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {cocktail.tags.split(',').map((tag, idx) => (
+                              <span key={idx} className="text-xs bg-amber-400/10 text-amber-400 px-2 py-0.5 rounded border border-amber-400/20">
+                                #{tag.trim()}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                         {cocktail.ingredients && cocktail.ingredients.length > 0 && (
                           <div className="mt-3 flex flex-wrap gap-1.5">
                             {cocktail.ingredients.map((ing) => (
