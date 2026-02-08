@@ -1,35 +1,44 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { units as api } from '../../services/api';
 import type { Unit } from '../../types';
 
 export default function UnitsPage() {
   const { t } = useTranslation();
+  const localize = useLocalizedName();
   const [items, setItems] = useState<Unit[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Unit | null>(null);
-  const [form, setForm] = useState({ name: '', abbreviation: '', conversionFactorToMl: '' });
+  const [form, setForm] = useState({ name: '', abbreviation: '', conversionFactorToMl: '', nameFr: '', nameEn: '' });
+  const [showTranslations, setShowTranslations] = useState(false);
 
   const load = () => api.list().then(setItems);
   useEffect(() => { load(); }, []);
 
-  const openCreate = () => { setEditing(null); setForm({ name: '', abbreviation: '', conversionFactorToMl: '' }); setShowModal(true); };
+  const openCreate = () => { setEditing(null); setForm({ name: '', abbreviation: '', conversionFactorToMl: '', nameFr: '', nameEn: '' }); setShowTranslations(false); setShowModal(true); };
   const openEdit = (item: Unit) => {
     setEditing(item);
     setForm({
       name: item.name,
       abbreviation: item.abbreviation,
       conversionFactorToMl: item.conversionFactorToMl !== null ? String(item.conversionFactorToMl) : '',
+      nameFr: item.nameTranslations?.fr || '',
+      nameEn: item.nameTranslations?.en || '',
     });
     setShowModal(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const nameTranslations: Record<string, string> = {};
+    if (form.nameFr.trim()) nameTranslations.fr = form.nameFr.trim();
+    if (form.nameEn.trim()) nameTranslations.en = form.nameEn.trim();
     const data = {
       name: form.name,
       abbreviation: form.abbreviation,
       conversionFactorToMl: form.conversionFactorToMl === '' ? null : parseFloat(form.conversionFactorToMl),
+      nameTranslations: Object.keys(nameTranslations).length > 0 ? nameTranslations : null,
     };
     if (editing) { await api.update(editing.id, data); }
     else { await api.create(data); }
@@ -62,7 +71,7 @@ export default function UnitsPage() {
           <tbody className="divide-y divide-gray-800">
             {items.map((item) => (
               <tr key={item.id} className="hover:bg-gray-800/50">
-                <td className="px-6 py-4 font-medium">{item.name}</td>
+                <td className="px-6 py-4 font-medium">{localize(item)}</td>
                 <td className="px-6 py-4 text-gray-400">{item.abbreviation}</td>
                 <td className="px-6 py-4 text-gray-400">
                   {item.conversionFactorToMl !== null ? (
@@ -98,6 +107,27 @@ export default function UnitsPage() {
             <div>
               <label className="block text-sm text-gray-400 mb-1">{t('units.name')}</label>
               <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400" />
+            </div>
+            <div className="border border-gray-700 rounded-lg p-3 space-y-2">
+              <button type="button" onClick={() => setShowTranslations(!showTranslations)}
+                className="text-sm text-gray-400 flex items-center gap-2 w-full text-left">
+                <svg className={`w-3 h-3 transition-transform ${showTranslations ? 'rotate-90' : ''}`} fill="currentColor" viewBox="0 0 20 20"><path d="M6 6L14 10L6 14V6Z"/></svg>
+                {t('common.translations')}
+              </button>
+              {showTranslations && (
+                <div className="space-y-2 pt-1">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Français</label>
+                    <input value={form.nameFr} onChange={(e) => setForm({ ...form, nameFr: e.target.value })}
+                      placeholder={form.name || '...'} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">English</label>
+                    <input value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })}
+                      placeholder={form.name || '...'} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400" />
+                  </div>
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-sm text-gray-400 mb-1">{t('units.abbreviation')}</label>

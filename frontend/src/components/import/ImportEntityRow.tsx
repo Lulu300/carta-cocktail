@@ -47,12 +47,14 @@ export default function ImportEntityRow({
           name: entity.ref.name,
           abbreviation: entity.ref.abbreviation,
           conversionFactorToMl: entity.ref.conversionFactorToMl ?? null,
+          nameTranslations: entity.ref.nameTranslations || null,
         };
       case 'category':
         return {
           name: entity.ref.name,
           type: entity.ref.type || 'SPIRIT',
           desiredStock: entity.ref.desiredStock || 1,
+          nameTranslations: entity.ref.nameTranslations || null,
         };
       case 'bottle':
         return {
@@ -65,6 +67,7 @@ export default function ImportEntityRow({
         return {
           name: entity.ref.name,
           icon: entity.ref.icon || null,
+          nameTranslations: entity.ref.nameTranslations || null,
         };
       default:
         return entity.ref;

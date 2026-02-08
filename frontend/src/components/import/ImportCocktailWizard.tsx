@@ -34,7 +34,7 @@ function buildAutoResolutions(result: ImportPreviewResponse): Record<string, Rec
     } else {
       autoResolutions.units[key] = {
         action: 'create',
-        data: { name: entity.ref.name, abbreviation: entity.ref.abbreviation, conversionFactorToMl: entity.ref.conversionFactorToMl ?? null },
+        data: { name: entity.ref.name, abbreviation: entity.ref.abbreviation, conversionFactorToMl: entity.ref.conversionFactorToMl ?? null, nameTranslations: entity.ref.nameTranslations || null },
       };
     }
   }
@@ -46,7 +46,7 @@ function buildAutoResolutions(result: ImportPreviewResponse): Record<string, Rec
     } else {
       autoResolutions.categories[key] = {
         action: 'create',
-        data: { name: entity.ref.name, type: entity.ref.type || 'SPIRIT', desiredStock: entity.ref.desiredStock || 1 },
+        data: { name: entity.ref.name, type: entity.ref.type || 'SPIRIT', desiredStock: entity.ref.desiredStock || 1, nameTranslations: entity.ref.nameTranslations || null },
       };
     }
   }
@@ -70,7 +70,7 @@ function buildAutoResolutions(result: ImportPreviewResponse): Record<string, Rec
     } else {
       autoResolutions.ingredients[key] = {
         action: 'create',
-        data: { name: entity.ref.name, icon: entity.ref.icon || null },
+        data: { name: entity.ref.name, icon: entity.ref.icon || null, nameTranslations: entity.ref.nameTranslations || null },
       };
     }
   }

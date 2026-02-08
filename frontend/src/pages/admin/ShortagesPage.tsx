@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { shortages as api } from '../../services/api';
 import type { Shortage } from '../../types';
 
 export default function ShortagesPage() {
   const { t } = useTranslation();
+  const localize = useLocalizedName();
   const [items, setItems] = useState<Shortage[]>([]);
 
   useEffect(() => { api.list().then(setItems); }, []);
@@ -21,7 +23,7 @@ export default function ShortagesPage() {
           {items.map((item) => (
             <div key={item.category.id} className="bg-[#1a1a2e] border border-red-500/30 rounded-xl p-6">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-lg">{item.category.name}</h3>
+                <h3 className="font-semibold text-lg">{localize(item.category)}</h3>
                 <span className={`px-2 py-1 rounded text-xs font-medium ${item.category.type === 'SPIRIT' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'}`}>
                   {t(`categories.${item.category.type.toLowerCase()}`)}
                 </span>

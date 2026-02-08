@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useLocalizedName } from '../../hooks/useLocalizedName';
 import {
   cocktails as cocktailsApi,
   categories as categoriesApi,
@@ -22,6 +23,7 @@ interface IngredientRow {
 
 export default function CocktailFormPage() {
   const { t } = useTranslation();
+  const localize = useLocalizedName();
   const { id } = useParams();
   const navigate = useNavigate();
   const isEdit = !!id;
@@ -274,7 +276,7 @@ export default function CocktailFormPage() {
                       className="flex-1 bg-[#1a1a2e] border border-gray-700 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400">
                       <option value="">--</option>
                       {allBottles.filter((b) => b.remainingPercent > 0).map((b) => (
-                        <option key={b.id} value={b.id}>{b.name} ({b.category?.name})</option>
+                        <option key={b.id} value={b.id}>{b.name} ({b.category ? localize(b.category) : ''})</option>
                       ))}
                     </select>
                   )}
@@ -284,7 +286,7 @@ export default function CocktailFormPage() {
                       className="flex-1 bg-[#1a1a2e] border border-gray-700 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400">
                       <option value="">--</option>
                       {allCategories.map((c) => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
+                        <option key={c.id} value={c.id}>{localize(c)}</option>
                       ))}
                     </select>
                   )}
@@ -294,7 +296,7 @@ export default function CocktailFormPage() {
                       className="flex-1 bg-[#1a1a2e] border border-gray-700 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400">
                       <option value="">--</option>
                       {allIngredients.map((i) => (
-                        <option key={i.id} value={i.id}>{i.name}</option>
+                        <option key={i.id} value={i.id}>{localize(i)}</option>
                       ))}
                     </select>
                   )}

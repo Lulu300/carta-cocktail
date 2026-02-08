@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { bottles as api, categories as categoriesApi } from '../../services/api';
 import type { Bottle, Category } from '../../types';
 
 export default function BottlesPage() {
   const { t } = useTranslation();
+  const localize = useLocalizedName();
   const [items, setItems] = useState<Bottle[]>([]);
   const [cats, setCats] = useState<Category[]>([]);
   const [filter, setFilter] = useState<string>('');
@@ -114,7 +116,7 @@ export default function BottlesPage() {
             {items.map((item) => (
               <tr key={item.id} className="hover:bg-gray-800/50">
                 <td className="px-6 py-4 font-medium">{item.name}</td>
-                <td className="px-6 py-4 text-gray-400">{item.category?.name}</td>
+                <td className="px-6 py-4 text-gray-400">{item.category ? localize(item.category) : ''}</td>
                 <td className="px-6 py-4">{item.capacityMl} ml</td>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
@@ -162,7 +164,7 @@ export default function BottlesPage() {
             <div>
               <label className="block text-sm text-gray-400 mb-1">{t('bottles.category')}</label>
               <select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: parseInt(e.target.value) })} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400">
-                {cats.map((c) => <option key={c.id} value={c.id}>{c.name} ({t(`categories.${c.type.toLowerCase()}`)})</option>)}
+                {cats.map((c) => <option key={c.id} value={c.id}>{localize(c)} ({t(`categories.${c.type.toLowerCase()}`)})</option>)}
               </select>
             </div>
             <div className="grid grid-cols-2 gap-4">

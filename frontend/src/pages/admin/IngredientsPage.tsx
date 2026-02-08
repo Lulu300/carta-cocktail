@@ -1,16 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { ingredients as api } from '../../services/api';
 import type { Ingredient } from '../../types';
 import IconPicker from '../../components/ui/IconPicker';
 
 export default function IngredientsPage() {
   const { t } = useTranslation();
+  const localize = useLocalizedName();
   const [items, setItems] = useState<Ingredient[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Ingredient | null>(null);
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('');
+  const [nameFr, setNameFr] = useState('');
+  const [nameEn, setNameEn] = useState('');
+  const [showTranslations, setShowTranslations] = useState(false);
   const [filter, setFilter] = useState<'all' | 'available' | 'unavailable'>('all');
 
   const load = () => api.list().then(setItems);
@@ -20,6 +25,9 @@ export default function IngredientsPage() {
     setEditing(null);
     setName('');
     setIcon('');
+    setNameFr('');
+    setNameEn('');
+    setShowTranslations(false);
     setShowModal(true);
   };
 
@@ -27,12 +35,21 @@ export default function IngredientsPage() {
     setEditing(item);
     setName(item.name);
     setIcon(item.icon || '');
+    setNameFr(item.nameTranslations?.fr || '');
+    setNameEn(item.nameTranslations?.en || '');
     setShowModal(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const data = { name, icon: icon || null };
+    const nameTranslations: Record<string, string> = {};
+    if (nameFr.trim()) nameTranslations.fr = nameFr.trim();
+    if (nameEn.trim()) nameTranslations.en = nameEn.trim();
+    const data = {
+      name,
+      icon: icon || null,
+      nameTranslations: Object.keys(nameTranslations).length > 0 ? nameTranslations : null,
+    };
     if (editing) {
       await api.update(editing.id, data);
     } else {
@@ -136,7 +153,7 @@ export default function IngredientsPage() {
 
               {/* Name */}
               <div className="text-center mb-3">
-                <p className="font-medium text-white truncate">{item.name}</p>
+                <p className="font-medium text-white truncate">{localize(item)}</p>
                 <p className="text-xs text-gray-500 mt-1">
                   {item.isAvailable ? t('cocktails.available') : t('cocktails.unavailable')}
                 </p>
@@ -189,6 +206,28 @@ export default function IngredientsPage() {
                 required
                 className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400"
               />
+            </div>
+
+            <div className="border border-gray-700 rounded-lg p-3 space-y-2">
+              <button type="button" onClick={() => setShowTranslations(!showTranslations)}
+                className="text-sm text-gray-400 flex items-center gap-2 w-full text-left">
+                <svg className={`w-3 h-3 transition-transform ${showTranslations ? 'rotate-90' : ''}`} fill="currentColor" viewBox="0 0 20 20"><path d="M6 6L14 10L6 14V6Z"/></svg>
+                {t('common.translations')}
+              </button>
+              {showTranslations && (
+                <div className="space-y-2 pt-1">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Français</label>
+                    <input value={nameFr} onChange={(e) => setNameFr(e.target.value)}
+                      placeholder={name || '...'} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">English</label>
+                    <input value={nameEn} onChange={(e) => setNameEn(e.target.value)}
+                      placeholder={name || '...'} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400" />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>
