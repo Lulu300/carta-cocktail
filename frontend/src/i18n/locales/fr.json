@@ -180,7 +180,8 @@
       "skipRecipe": "Passer ce cocktail",
       "zipNoRecipes": "Aucun fichier JSON trouvé dans le ZIP",
       "zipNoValidRecipes": "Aucune recette valide trouvée dans le ZIP",
-      "zipReadError": "Impossible de lire le fichier ZIP"
+      "zipReadError": "Impossible de lire le fichier ZIP",
+      "desiredStock": "Stock désiré (nb de bouteilles scellées)"
     }
   },
   "menus": {

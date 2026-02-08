@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { EntityResolutionAction, ImportEntityResolution } from '../../types';
+import IconPicker from '../ui/IconPicker';
 
 interface ImportEntityRowProps {
   entity: ImportEntityResolution;
@@ -193,6 +194,18 @@ export default function ImportEntityRow({
                     <option value="SPIRIT">{t('categories.spirit')}</option>
                     <option value="SYRUP">{t('categories.syrup')}</option>
                   </select>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">
+                      {t('cocktails.importWizard.desiredStock')}
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={resolution?.data?.desiredStock ?? entity.ref.desiredStock ?? 1}
+                      onChange={(e) => updateCreateData('desiredStock', parseInt(e.target.value) || 0)}
+                      className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
                 </>
               )}
               {entityType === 'bottle' && (
@@ -220,11 +233,9 @@ export default function ImportEntityRow({
                     placeholder={t('ingredients.name')}
                     className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400"
                   />
-                  <input
+                  <IconPicker
                     value={resolution?.data?.icon || entity.ref.icon || ''}
-                    onChange={(e) => updateCreateData('icon', e.target.value || null)}
-                    placeholder="Icon (emoji)"
-                    className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400"
+                    onChange={(icon) => updateCreateData('icon', icon || null)}
                   />
                 </>
               )}

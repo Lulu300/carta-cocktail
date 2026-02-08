@@ -180,7 +180,8 @@
       "skipRecipe": "Skip this cocktail",
       "zipNoRecipes": "No JSON files found in the ZIP",
       "zipNoValidRecipes": "No valid recipes found in the ZIP",
-      "zipReadError": "Unable to read ZIP file"
+      "zipReadError": "Unable to read ZIP file",
+      "desiredStock": "Desired stock (sealed bottles)"
     }
   },
   "menus": {
