@@ -1,5 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { parseNameTranslations } from '../utils/translations';
+
+const parseNT = (val: any) => {
+  if (typeof val === 'string') { try { return JSON.parse(val); } catch { return null; } }
+  return val || null;
+};
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -69,7 +75,7 @@ router.get('/menus/:slug', async (req: Request, res: Response) => {
       return;
     }
 
-    res.json(menu);
+    res.json(parseNameTranslations(menu));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: req.t('errors.serverError') });
@@ -131,20 +137,36 @@ router.get('/cocktails/:id/export', async (req: Request, res: Response) => {
           let sourceDetail: any = {};
           if (ing.sourceType === 'BOTTLE' && ing.bottle) {
             sourceName = ing.bottle.name;
-            sourceDetail = { categoryName: ing.bottle.category?.name || '', categoryType: ing.bottle.category?.type || 'SPIRIT' };
+            sourceDetail = {
+              categoryName: ing.bottle.category?.name || '',
+              categoryType: ing.bottle.category?.type || 'SPIRIT',
+              categoryNameTranslations: parseNT(ing.bottle.category?.nameTranslations),
+            };
           } else if (ing.sourceType === 'CATEGORY' && ing.category) {
             sourceName = ing.category.name;
-            sourceDetail = { type: ing.category.type, desiredStock: ing.category.desiredStock };
+            sourceDetail = {
+              type: ing.category.type,
+              desiredStock: ing.category.desiredStock,
+              nameTranslations: parseNT(ing.category.nameTranslations),
+            };
           } else if (ing.sourceType === 'INGREDIENT' && ing.ingredient) {
             sourceName = ing.ingredient.name;
-            sourceDetail = { icon: ing.ingredient.icon || null };
+            sourceDetail = {
+              icon: ing.ingredient.icon || null,
+              nameTranslations: parseNT(ing.ingredient.nameTranslations),
+            };
           }
           return {
             sourceType: ing.sourceType,
             sourceName,
             sourceDetail,
             quantity: ing.quantity,
-            unit: ing.unit ? { name: ing.unit.name, abbreviation: ing.unit.abbreviation, conversionFactorToMl: ing.unit.conversionFactorToMl } : null,
+            unit: ing.unit ? {
+              name: ing.unit.name,
+              abbreviation: ing.unit.abbreviation,
+              conversionFactorToMl: ing.unit.conversionFactorToMl,
+              nameTranslations: parseNT(ing.unit.nameTranslations),
+            } : null,
             position: ing.position,
             preferredBottles: (ing.preferredBottles || []).map((pb: any) => ({
               name: pb.bottle?.name || '',
@@ -189,7 +211,7 @@ router.get('/cocktails/:id', async (req: Request, res: Response) => {
       return;
     }
 
-    res.json(cocktail);
+    res.json(parseNameTranslations(cocktail));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: req.t('errors.serverError') });

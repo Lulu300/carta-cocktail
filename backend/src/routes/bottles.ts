@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middleware/auth';
+import { parseNameTranslations } from '../utils/translations';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -76,7 +77,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       include: { category: true },
       orderBy: [{ category: { name: 'asc' } }, { name: 'asc' }],
     });
-    res.json(bottles);
+    res.json(parseNameTranslations(bottles));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: req.t('errors.serverError') });
@@ -93,7 +94,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
       res.status(404).json({ error: req.t('errors.notFound') });
       return;
     }
-    res.json(bottle);
+    res.json(parseNameTranslations(bottle));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: req.t('errors.serverError') });
@@ -125,7 +126,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     // Auto-sync bottle menus
     await syncBottleMenus(bottle.id, bottle.isApero, bottle.isDigestif);
 
-    res.status(201).json(bottle);
+    res.status(201).json(parseNameTranslations(bottle));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: req.t('errors.serverError') });
@@ -156,7 +157,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
       await syncBottleMenus(bottle.id, bottle.isApero, bottle.isDigestif);
     }
 
-    res.json(bottle);
+    res.json(parseNameTranslations(bottle));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: req.t('errors.serverError') });

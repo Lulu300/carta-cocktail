@@ -5,6 +5,12 @@ import path from 'path';
 import fs from 'fs';
 import { AuthRequest } from '../middleware/auth';
 import { config } from '../config';
+import { parseNameTranslations } from '../utils/translations';
+
+const parseNT = (val: any) => {
+  if (typeof val === 'string') { try { return JSON.parse(val); } catch { return null; } }
+  return val || null;
+};
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -67,17 +73,20 @@ function buildExportPayload(cocktail: any) {
           sourceDetail = {
             categoryName: ing.bottle.category?.name || '',
             categoryType: ing.bottle.category?.type || 'SPIRIT',
+            categoryNameTranslations: parseNT(ing.bottle.category?.nameTranslations),
           };
         } else if (ing.sourceType === 'CATEGORY' && ing.category) {
           sourceName = ing.category.name;
           sourceDetail = {
             type: ing.category.type,
             desiredStock: ing.category.desiredStock,
+            nameTranslations: parseNT(ing.category.nameTranslations),
           };
         } else if (ing.sourceType === 'INGREDIENT' && ing.ingredient) {
           sourceName = ing.ingredient.name;
           sourceDetail = {
             icon: ing.ingredient.icon || null,
+            nameTranslations: parseNT(ing.ingredient.nameTranslations),
           };
         }
 
@@ -91,6 +100,7 @@ function buildExportPayload(cocktail: any) {
                 name: ing.unit.name,
                 abbreviation: ing.unit.abbreviation,
                 conversionFactorToMl: ing.unit.conversionFactorToMl,
+                nameTranslations: parseNT(ing.unit.nameTranslations),
               }
             : null,
           position: ing.position,
@@ -154,7 +164,10 @@ router.post('/import/preview', async (req: AuthRequest, res: Response) => {
 
     for (const ing of recipe.ingredients || []) {
       if (ing.unit) {
-        unitRefs.set(ing.unit.abbreviation.toLowerCase(), ing.unit);
+        unitRefs.set(ing.unit.abbreviation.toLowerCase(), {
+          ...ing.unit,
+          nameTranslations: ing.unit.nameTranslations || null,
+        });
       }
       if (ing.sourceType === 'BOTTLE') {
         bottleRefs.set(ing.sourceName.toLowerCase(), {
@@ -170,6 +183,7 @@ router.post('/import/preview', async (req: AuthRequest, res: Response) => {
               name: ing.sourceDetail.categoryName,
               type: ing.sourceDetail.categoryType || 'SPIRIT',
               desiredStock: 1,
+              nameTranslations: ing.sourceDetail.categoryNameTranslations || null,
             });
           }
         }
@@ -178,11 +192,13 @@ router.post('/import/preview', async (req: AuthRequest, res: Response) => {
           name: ing.sourceName,
           type: ing.sourceDetail?.type || 'SPIRIT',
           desiredStock: ing.sourceDetail?.desiredStock || 1,
+          nameTranslations: ing.sourceDetail?.nameTranslations || null,
         });
       } else if (ing.sourceType === 'INGREDIENT') {
         ingredientRefs.set(ing.sourceName.toLowerCase(), {
           name: ing.sourceName,
           icon: ing.sourceDetail?.icon || null,
+          nameTranslations: ing.sourceDetail?.nameTranslations || null,
         });
       }
 
@@ -269,7 +285,8 @@ router.post('/import/confirm', async (req: AuthRequest, res: Response) => {
         if (r.action === 'use_existing' && r.existingId) {
           unitMap.set(key.toLowerCase(), r.existingId);
         } else if (r.action === 'create' && r.data) {
-          const created = await tx.unit.create({ data: r.data });
+          const { nameTranslations, ...rest } = r.data;
+          const created = await tx.unit.create({ data: { ...rest, nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null } });
           unitMap.set(key.toLowerCase(), created.id);
         }
       }
@@ -281,7 +298,8 @@ router.post('/import/confirm', async (req: AuthRequest, res: Response) => {
         if (r.action === 'use_existing' && r.existingId) {
           categoryMap.set(key.toLowerCase(), r.existingId);
         } else if (r.action === 'create' && r.data) {
-          const created = await tx.category.create({ data: r.data });
+          const { nameTranslations, ...rest } = r.data;
+          const created = await tx.category.create({ data: { ...rest, nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null } });
           categoryMap.set(key.toLowerCase(), created.id);
         }
       }
@@ -314,7 +332,8 @@ router.post('/import/confirm', async (req: AuthRequest, res: Response) => {
         if (r.action === 'use_existing' && r.existingId) {
           ingredientMap.set(key.toLowerCase(), r.existingId);
         } else if (r.action === 'create' && r.data) {
-          const created = await tx.ingredient.create({ data: r.data });
+          const { nameTranslations, ...rest } = r.data;
+          const created = await tx.ingredient.create({ data: { ...rest, nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null } });
           ingredientMap.set(key.toLowerCase(), created.id);
         }
       }
@@ -385,7 +404,7 @@ router.post('/import/confirm', async (req: AuthRequest, res: Response) => {
       return cocktail;
     });
 
-    res.status(201).json(result);
+    res.status(201).json(parseNameTranslations(result));
   } catch (error: any) {
     console.error(error);
     if (error.code === 'P2002') {
@@ -403,7 +422,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       include: cocktailIncludes,
       orderBy: { name: 'asc' },
     });
-    res.json(cocktails);
+    res.json(parseNameTranslations(cocktails));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: req.t('errors.serverError') });
@@ -421,7 +440,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
       res.status(404).json({ error: req.t('errors.notFound') });
       return;
     }
-    res.json(cocktail);
+    res.json(parseNameTranslations(cocktail));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: req.t('errors.serverError') });
@@ -469,7 +488,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       include: cocktailIncludes,
     });
 
-    res.status(201).json(cocktail);
+    res.status(201).json(parseNameTranslations(cocktail));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: req.t('errors.serverError') });
@@ -523,7 +542,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
       include: cocktailIncludes,
     });
 
-    res.json(cocktail);
+    res.json(parseNameTranslations(cocktail));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: req.t('errors.serverError') });

@@ -15,11 +15,12 @@ model User {
 }
 
 model Category {
-  id           Int      @id @default(autoincrement())
-  name         String
-  type         String   // SPIRIT or SYRUP
-  desiredStock Int      @default(1)
-  createdAt    DateTime @default(now())
+  id               Int      @id @default(autoincrement())
+  name             String
+  nameTranslations String?  // JSON: {"fr": "...", "en": "..."}
+  type             String   // SPIRIT or SYRUP
+  desiredStock     Int      @default(1)
+  createdAt        DateTime @default(now())
 
   bottles             Bottle[]
   cocktailIngredients CocktailIngredient[]
@@ -45,20 +46,22 @@ model Bottle {
 }
 
 model Ingredient {
-  id          Int      @id @default(autoincrement())
-  name        String   @unique
-  icon        String?
-  isAvailable Boolean  @default(true)
-  createdAt   DateTime @default(now())
+  id               Int      @id @default(autoincrement())
+  name             String   @unique
+  nameTranslations String?  // JSON: {"fr": "...", "en": "..."}
+  icon             String?
+  isAvailable      Boolean  @default(true)
+  createdAt        DateTime @default(now())
 
   cocktailIngredients CocktailIngredient[]
 }
 
 model Unit {
-  id                   Int    @id @default(autoincrement())
+  id                   Int     @id @default(autoincrement())
   name                 String
+  nameTranslations     String? // JSON: {"fr": "...", "en": "..."}
   abbreviation         String
-  conversionFactorToMl Float? // Factor to convert this unit to ml (null = non-convertible)
+  conversionFactorToMl Float?  // Factor to convert this unit to ml (null = non-convertible)
 
   cocktailIngredients CocktailIngredient[]
 }
