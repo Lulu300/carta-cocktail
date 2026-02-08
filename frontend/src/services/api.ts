@@ -83,9 +83,9 @@ export const bottles = {
 export const ingredients = {
   list: () => request<Ingredient[]>('/ingredients'),
   get: (id: number) => request<Ingredient>(`/ingredients/${id}`),
-  create: (data: { name: string; icon?: string | null }) =>
+  create: (data: { name: string; icon?: string | null; nameTranslations?: Record<string, string> | null }) =>
     request<Ingredient>('/ingredients', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: number, data: { name?: string; icon?: string | null; isAvailable?: boolean }) =>
+  update: (id: number, data: { name?: string; icon?: string | null; isAvailable?: boolean; nameTranslations?: Record<string, string> | null }) =>
     request<Ingredient>(`/ingredients/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: number) =>
     request<{ message: string }>(`/ingredients/${id}`, { method: 'DELETE' }),
@@ -97,9 +97,9 @@ export const ingredients = {
 export const units = {
   list: () => request<Unit[]>('/units'),
   get: (id: number) => request<Unit>(`/units/${id}`),
-  create: (data: { name: string; abbreviation: string }) =>
+  create: (data: { name: string; abbreviation: string; conversionFactorToMl?: number | null; nameTranslations?: Record<string, string> | null }) =>
     request<Unit>('/units', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: number, data: { name: string; abbreviation: string }) =>
+  update: (id: number, data: Partial<Unit>) =>
     request<Unit>(`/units/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: number) =>
     request<{ message: string }>(`/units/${id}`, { method: 'DELETE' }),

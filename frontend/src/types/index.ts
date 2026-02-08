@@ -6,6 +6,7 @@ export interface User {
 export interface Category {
   id: number;
   name: string;
+  nameTranslations?: Record<string, string> | null;
   type: 'SPIRIT' | 'SYRUP';
   desiredStock: number;
   createdAt: string;
@@ -31,6 +32,7 @@ export interface Bottle {
 export interface Ingredient {
   id: number;
   name: string;
+  nameTranslations?: Record<string, string> | null;
   icon: string | null;
   isAvailable: boolean;
   createdAt: string;
@@ -39,6 +41,7 @@ export interface Ingredient {
 export interface Unit {
   id: number;
   name: string;
+  nameTranslations?: Record<string, string> | null;
   abbreviation: string;
   conversionFactorToMl: number | null;
 }
@@ -134,6 +137,7 @@ export interface Shortage {
   category: {
     id: number;
     name: string;
+    nameTranslations?: Record<string, string> | null;
     type: string;
     desiredStock: number;
   };

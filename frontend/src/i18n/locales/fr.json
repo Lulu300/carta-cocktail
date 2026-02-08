@@ -254,6 +254,8 @@
     "error": "Une erreur est survenue",
     "success": "Succès",
     "yes": "Oui",
-    "no": "Non"
+    "no": "Non",
+    "translations": "Traductions",
+    "translationHint": "Optionnel : fournir des noms traduits pour chaque langue"
   }
 }
