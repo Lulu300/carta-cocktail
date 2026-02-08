@@ -52,10 +52,10 @@ export default function CocktailPublicPage() {
       )}
 
       {/* Recipe card - printable */}
-      <div className="bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden print:border-gray-300 print:bg-white print:text-black print:rounded-none" id="recipe-card">
+      <div className="bg-[#1a1a2e] border border-gray-800 rounded-xl print:border-gray-300 print:bg-white print:text-black print:rounded-none" id="recipe-card">
         {/* Image */}
         {cocktail.imagePath && (
-          <div className="aspect-video overflow-hidden">
+          <div className="aspect-video overflow-hidden rounded-t-xl">
             <img
               src={`/uploads/${cocktail.imagePath}`}
               alt={cocktail.name}
