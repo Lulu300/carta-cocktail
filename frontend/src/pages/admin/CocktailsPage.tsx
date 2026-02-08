@@ -4,12 +4,14 @@ import { useTranslation } from 'react-i18next';
 import { cocktails as api, availability as availabilityApi } from '../../services/api';
 import type { Cocktail, CocktailAvailability } from '../../types';
 import ExportCocktailButton from '../../components/ui/ExportCocktailButton';
+import ImportCocktailWizard from '../../components/import/ImportCocktailWizard';
 
 export default function CocktailsPage() {
   const { t } = useTranslation();
   const [items, setItems] = useState<Cocktail[]>([]);
   const [availabilities, setAvailabilities] = useState<Record<number, CocktailAvailability>>({});
   const [loadingAvailability, setLoadingAvailability] = useState(true);
+  const [showImport, setShowImport] = useState(false);
 
   const load = () => api.list().then(setItems);
 
@@ -64,9 +66,17 @@ export default function CocktailsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold font-serif text-amber-400">{t('cocktails.title')}</h1>
-        <Link to="/admin/cocktails/new" className="bg-amber-400 hover:bg-amber-500 text-[#0f0f1a] font-semibold px-4 py-2 rounded-lg transition-colors">
-          {t('cocktails.add')}
-        </Link>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowImport(true)}
+            className="border border-amber-400/30 text-amber-400 hover:bg-amber-400/10 font-semibold px-4 py-2 rounded-lg transition-colors"
+          >
+            {t('cocktails.import')}
+          </button>
+          <Link to="/admin/cocktails/new" className="bg-amber-400 hover:bg-amber-500 text-[#0f0f1a] font-semibold px-4 py-2 rounded-lg transition-colors">
+            {t('cocktails.add')}
+          </Link>
+        </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {items.map((item) => {
@@ -137,6 +147,10 @@ export default function CocktailsPage() {
         })}
       </div>
       {items.length === 0 && <div className="text-center py-12 text-gray-500">{t('common.noResults')}</div>}
+
+      {showImport && (
+        <ImportCocktailWizard onClose={() => { setShowImport(false); load(); loadAvailability(); }} />
+      )}
     </div>
   );
 }
