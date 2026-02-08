@@ -1,40 +1,94 @@
 import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import JSZip from 'jszip';
 import type { CocktailExportFormat } from '../../types';
 
 interface ImportStepUploadProps {
   onRecipeLoaded: (recipe: CocktailExportFormat) => void;
+  onBatchLoaded: (recipes: CocktailExportFormat[]) => void;
   error: string | null;
   setError: (error: string | null) => void;
   recipe: CocktailExportFormat | null;
+  recipes: CocktailExportFormat[];
   isLoading: boolean;
   onNext: () => void;
 }
 
-export default function ImportStepUpload({ onRecipeLoaded, error, setError, recipe, isLoading, onNext }: ImportStepUploadProps) {
+export default function ImportStepUpload({ onRecipeLoaded, onBatchLoaded, error, setError, recipe, recipes, isLoading, onNext }: ImportStepUploadProps) {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = (file: File) => {
-    setError(null);
+  const validateRecipe = (data: unknown): data is CocktailExportFormat => {
+    if (!data || typeof data !== 'object') return false;
+    const d = data as Record<string, unknown>;
+    return d.version === 1 && !!(d.cocktail as Record<string, unknown>)?.name;
+  };
+
+  const handleJsonFile = (file: File) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
         const data = JSON.parse(e.target?.result as string);
-        if (!data.version || !data.cocktail?.name) {
+        if (!validateRecipe(data)) {
           setError(t('cocktails.importWizard.invalidFile'));
           return;
         }
-        if (data.version !== 1) {
-          setError(t('cocktails.importWizard.invalidVersion'));
-          return;
-        }
-        onRecipeLoaded(data as CocktailExportFormat);
+        onRecipeLoaded(data);
       } catch {
         setError(t('cocktails.importWizard.invalidFile'));
       }
     };
     reader.readAsText(file);
+  };
+
+  const handleZipFile = async (file: File) => {
+    try {
+      const zip = await JSZip.loadAsync(file);
+      const jsonFiles = Object.keys(zip.files).filter(
+        (name) => name.endsWith('.json') && !zip.files[name].dir,
+      );
+
+      if (jsonFiles.length === 0) {
+        setError(t('cocktails.importWizard.zipNoRecipes'));
+        return;
+      }
+
+      const validRecipes: CocktailExportFormat[] = [];
+
+      for (const name of jsonFiles) {
+        const content = await zip.files[name].async('text');
+        try {
+          const data = JSON.parse(content);
+          if (validateRecipe(data)) {
+            validRecipes.push(data);
+          }
+        } catch {
+          // Skip invalid JSON files
+        }
+      }
+
+      if (validRecipes.length === 0) {
+        setError(t('cocktails.importWizard.zipNoValidRecipes'));
+        return;
+      }
+
+      if (validRecipes.length === 1) {
+        onRecipeLoaded(validRecipes[0]);
+      } else {
+        onBatchLoaded(validRecipes);
+      }
+    } catch {
+      setError(t('cocktails.importWizard.zipReadError'));
+    }
+  };
+
+  const handleFile = (file: File) => {
+    setError(null);
+    if (file.name.endsWith('.zip')) {
+      handleZipFile(file);
+    } else {
+      handleJsonFile(file);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -47,6 +101,9 @@ export default function ImportStepUpload({ onRecipeLoaded, error, setError, reci
     const file = e.target.files?.[0];
     if (file) handleFile(file);
   };
+
+  const isBatch = recipes.length > 1;
+  const showPreview = isBatch || recipe;
 
   return (
     <div className="space-y-6">
@@ -62,7 +119,7 @@ export default function ImportStepUpload({ onRecipeLoaded, error, setError, reci
         <input
           ref={fileInputRef}
           type="file"
-          accept=".json"
+          accept=".json,.zip"
           onChange={handleFileInput}
           className="hidden"
         />
@@ -74,8 +131,28 @@ export default function ImportStepUpload({ onRecipeLoaded, error, setError, reci
         </div>
       )}
 
-      {/* Preview */}
-      {recipe && (
+      {/* Batch preview */}
+      {isBatch && (
+        <div className="bg-[#0f0f1a] border border-gray-700 rounded-xl p-5 space-y-3">
+          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+            {t('cocktails.importWizard.batchPreview', { count: recipes.length })}
+          </h3>
+          <ul className="space-y-1.5">
+            {recipes.map((r, i) => (
+              <li key={i} className="text-sm text-gray-300 flex items-center gap-2">
+                <span className="text-amber-400 font-mono text-xs w-5 text-right">#{i + 1}</span>
+                <span className="font-serif">{r.cocktail.name}</span>
+                <span className="text-gray-500 text-xs">
+                  ({t('cocktails.importWizard.ingredientCount', { count: r.cocktail.ingredients?.length || 0 })})
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Single recipe preview */}
+      {!isBatch && recipe && (
         <div className="bg-[#0f0f1a] border border-gray-700 rounded-xl p-5 space-y-3">
           <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
             {t('cocktails.importWizard.preview')}
@@ -101,7 +178,7 @@ export default function ImportStepUpload({ onRecipeLoaded, error, setError, reci
       )}
 
       {/* Next button */}
-      {recipe && (
+      {showPreview && (
         <div className="flex justify-end">
           <button
             onClick={onNext}

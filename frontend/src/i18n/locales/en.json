@@ -141,7 +141,7 @@
     "exportZip": "Export ZIP ({{count}})",
     "importWizard": {
       "title": "Import a recipe",
-      "dropzone": "Drop a JSON file here or click to browse",
+      "dropzone": "Drop a JSON or ZIP file here or click to browse",
       "invalidFile": "Invalid JSON file",
       "invalidVersion": "Unsupported format version",
       "preview": "Preview",
@@ -171,7 +171,16 @@
       "next": "Next",
       "back": "Back",
       "close": "Close",
-      "noDependencies": "No dependencies to resolve"
+      "noDependencies": "No dependencies to resolve",
+      "batchPreview": "{{count}} cocktails found in ZIP",
+      "batchProgress": "Importing {{current}} of {{total}}: {{name}}",
+      "batchComplete": "Batch import complete",
+      "batchSummaryCount": "{{success}} of {{total}} imported successfully",
+      "batchItemError": "Error importing \"{{name}}\"",
+      "skipRecipe": "Skip this cocktail",
+      "zipNoRecipes": "No JSON files found in the ZIP",
+      "zipNoValidRecipes": "No valid recipes found in the ZIP",
+      "zipReadError": "Unable to read ZIP file"
     }
   },
   "menus": {
