@@ -201,6 +201,55 @@ export interface SiteSettings {
   siteIcon: string;
 }
 
+// Export/Import types
+export interface CocktailExportFormat {
+  version: number;
+  exportedAt: string;
+  cocktail: {
+    name: string;
+    description: string | null;
+    notes: string | null;
+    tags: string[];
+    ingredients: ExportIngredient[];
+    instructions: { stepNumber: number; text: string }[];
+  };
+}
+
+export interface ExportIngredient {
+  sourceType: 'BOTTLE' | 'CATEGORY' | 'INGREDIENT';
+  sourceName: string;
+  sourceDetail: Record<string, any>;
+  quantity: number;
+  unit: { name: string; abbreviation: string; conversionFactorToMl: number | null } | null;
+  position: number;
+  preferredBottles: { name: string; categoryName: string }[];
+}
+
+export interface ImportPreviewResponse {
+  cocktail: {
+    name: string;
+    description: string | null;
+    tags: string[];
+    alreadyExists: boolean;
+  };
+  units: ImportEntityResolution[];
+  categories: ImportEntityResolution[];
+  bottles: ImportEntityResolution[];
+  ingredients: ImportEntityResolution[];
+}
+
+export interface ImportEntityResolution {
+  ref: Record<string, any>;
+  existingMatch: { id: number; name: string; [key: string]: any } | null;
+  status: 'matched' | 'missing';
+}
+
+export interface EntityResolutionAction {
+  action: 'use_existing' | 'create' | 'skip';
+  existingId?: number;
+  data?: Record<string, any>;
+}
+
 export interface CocktailAvailability {
   cocktailId: number;
   isAvailable: boolean;

@@ -92,6 +92,79 @@ router.get('/settings', async (req: Request, res: Response) => {
   }
 });
 
+// Export public cocktail as JSON
+router.get('/cocktails/:id/export', async (req: Request, res: Response) => {
+  try {
+    const cocktail = await prisma.cocktail.findUnique({
+      where: { id: parseInt(String(req.params.id)) },
+      include: {
+        ingredients: {
+          include: {
+            unit: true,
+            bottle: { include: { category: true } },
+            category: true,
+            ingredient: true,
+            preferredBottles: { include: { bottle: { include: { category: true } } } },
+          },
+          orderBy: { position: 'asc' },
+        },
+        instructions: { orderBy: { stepNumber: 'asc' } },
+      },
+    });
+
+    if (!cocktail) {
+      res.status(404).json({ error: req.t('errors.notFound') });
+      return;
+    }
+
+    // Build export payload (same logic as admin export)
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      cocktail: {
+        name: cocktail.name,
+        description: cocktail.description || null,
+        notes: cocktail.notes || null,
+        tags: cocktail.tags ? cocktail.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [],
+        ingredients: (cocktail.ingredients || []).map((ing: any) => {
+          let sourceName = '';
+          let sourceDetail: any = {};
+          if (ing.sourceType === 'BOTTLE' && ing.bottle) {
+            sourceName = ing.bottle.name;
+            sourceDetail = { categoryName: ing.bottle.category?.name || '', categoryType: ing.bottle.category?.type || 'SPIRIT' };
+          } else if (ing.sourceType === 'CATEGORY' && ing.category) {
+            sourceName = ing.category.name;
+            sourceDetail = { type: ing.category.type, desiredStock: ing.category.desiredStock };
+          } else if (ing.sourceType === 'INGREDIENT' && ing.ingredient) {
+            sourceName = ing.ingredient.name;
+            sourceDetail = { icon: ing.ingredient.icon || null };
+          }
+          return {
+            sourceType: ing.sourceType,
+            sourceName,
+            sourceDetail,
+            quantity: ing.quantity,
+            unit: ing.unit ? { name: ing.unit.name, abbreviation: ing.unit.abbreviation, conversionFactorToMl: ing.unit.conversionFactorToMl } : null,
+            position: ing.position,
+            preferredBottles: (ing.preferredBottles || []).map((pb: any) => ({
+              name: pb.bottle?.name || '',
+              categoryName: pb.bottle?.category?.name || ing.category?.name || '',
+            })),
+          };
+        }),
+        instructions: (cocktail.instructions || []).map((inst: any) => ({ stepNumber: inst.stepNumber, text: inst.text })),
+      },
+    };
+
+    const slug = cocktail.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    res.setHeader('Content-Disposition', `attachment; filename="cocktail-${slug}.json"`);
+    res.json(payload);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: req.t('errors.serverError') });
+  }
+});
+
 // Get public cocktail detail
 router.get('/cocktails/:id', async (req: Request, res: Response) => {
   try {

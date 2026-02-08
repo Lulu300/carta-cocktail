@@ -1,6 +1,7 @@
 import type {
   Category, Bottle, Ingredient, Unit, Cocktail, Menu, MenuBottle, MenuSection, Shortage,
   CocktailInput, MenuInput, CocktailAvailability, SiteSettings,
+  CocktailExportFormat, ImportPreviewResponse, EntityResolutionAction,
 } from '../types';
 
 const API_BASE = '/api';
@@ -122,6 +123,18 @@ export const cocktails = {
       body: formData,
     });
   },
+  exportRecipe: (id: number) =>
+    request<CocktailExportFormat>(`/cocktails/${id}/export`),
+  importPreview: (data: CocktailExportFormat) =>
+    request<ImportPreviewResponse>('/cocktails/import/preview', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  importConfirm: (data: { recipe: CocktailExportFormat; resolutions: Record<string, Record<string, EntityResolutionAction>> }) =>
+    request<Cocktail>('/cocktails/import/confirm', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };
 
 // Menus
@@ -170,6 +183,8 @@ export const publicApi = {
   listMenus: () => request<Menu[]>('/public/menus'),
   getMenu: (slug: string) => request<Menu>(`/public/menus/${slug}`),
   getCocktail: (id: number) => request<Cocktail>(`/public/cocktails/${id}`),
+  exportCocktail: (id: number) =>
+    request<CocktailExportFormat>(`/public/cocktails/${id}/export`),
   getSettings: () => request<SiteSettings>('/public/settings'),
 };
 
