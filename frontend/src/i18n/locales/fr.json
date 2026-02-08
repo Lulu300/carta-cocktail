@@ -83,6 +83,13 @@
     "edit": "Modifier l'ingrédient",
     "name": "Nom",
     "confirmDelete": "Supprimer cet ingrédient ?",
+    "allAvailable": "Tous disponibles",
+    "allUnavailable": "Tous indisponibles",
+    "filter": {
+      "all": "Tous",
+      "available": "Disponibles",
+      "unavailable": "Indisponibles"
+    },
     "created": "Ingrédient créé",
     "updated": "Ingrédient mis à jour",
     "deleted": "Ingrédient supprimé"

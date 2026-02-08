@@ -1,13 +1,13 @@
 import { Router, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { AuthRequest } from '../middleware/auth';
 import bcrypt from 'bcryptjs';
+import { AuthRequest } from '../middleware/auth';
 
 const router = Router();
 const prisma = new PrismaClient();
 
 // Get site settings
-router.get('/site', async (req: AuthRequest, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     let settings = await prisma.siteSettings.findUnique({ where: { id: 1 } });
     if (!settings) {
@@ -21,7 +21,7 @@ router.get('/site', async (req: AuthRequest, res: Response) => {
 });
 
 // Update site settings
-router.put('/site', async (req: AuthRequest, res: Response) => {
+router.put('/', async (req: AuthRequest, res: Response) => {
   try {
     const { siteName, siteIcon } = req.body;
     const settings = await prisma.siteSettings.upsert({

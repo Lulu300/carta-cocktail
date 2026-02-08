@@ -83,6 +83,13 @@
     "edit": "Edit Ingredient",
     "name": "Name",
     "confirmDelete": "Delete this ingredient?",
+    "allAvailable": "All available",
+    "allUnavailable": "All unavailable",
+    "filter": {
+      "all": "All",
+      "available": "Available",
+      "unavailable": "Unavailable"
+    },
     "created": "Ingredient created",
     "updated": "Ingredient updated",
     "deleted": "Ingredient deleted"

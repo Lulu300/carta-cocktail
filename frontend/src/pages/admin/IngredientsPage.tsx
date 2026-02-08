@@ -11,6 +11,7 @@ export default function IngredientsPage() {
   const [editing, setEditing] = useState<Ingredient | null>(null);
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('');
+  const [filter, setFilter] = useState<'all' | 'available' | 'unavailable'>('all');
 
   const load = () => api.list().then(setItems);
   useEffect(() => { load(); }, []);
@@ -66,13 +67,13 @@ export default function IngredientsPage() {
             onClick={() => setAllAvailability(true)}
             className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg text-sm"
           >
-            Tous disponibles
+            {t('ingredients.allAvailable')}
           </button>
           <button
             onClick={() => setAllAvailability(false)}
             className="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg text-sm"
           >
-            Tous indisponibles
+            {t('ingredients.allUnavailable')}
           </button>
           <button
             onClick={openCreate}
@@ -83,13 +84,37 @@ export default function IngredientsPage() {
         </div>
       </div>
 
-      {items.length === 0 ? (
+      {/* Availability filter */}
+      <div className="flex gap-2 mb-4">
+        {(['all', 'available', 'unavailable'] as const).map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+              filter === f
+                ? 'bg-amber-400/10 text-amber-400 border border-amber-400/50'
+                : 'text-gray-400 border border-gray-700 hover:border-gray-500'
+            }`}
+          >
+            {t(`ingredients.filter.${f}`)}
+            {f !== 'all' && (
+              <span className="ml-1.5 text-xs opacity-70">
+                ({items.filter((i) => f === 'available' ? i.isAvailable : !i.isAvailable).length})
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {(() => {
+        const filtered = filter === 'all' ? items : items.filter((i) => filter === 'available' ? i.isAvailable : !i.isAvailable);
+        return filtered.length === 0 ? (
         <div className="text-center py-12 text-gray-500">
           {t('common.noResults')}
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {items.map((item) => (
+          {filtered.map((item) => (
             <div
               key={item.id}
               className={`
@@ -113,7 +138,7 @@ export default function IngredientsPage() {
               <div className="text-center mb-3">
                 <p className="font-medium text-white truncate">{item.name}</p>
                 <p className="text-xs text-gray-500 mt-1">
-                  {item.isAvailable ? 'Disponible' : 'Indisponible'}
+                  {item.isAvailable ? t('cocktails.available') : t('cocktails.unavailable')}
                 </p>
               </div>
 
@@ -135,7 +160,8 @@ export default function IngredientsPage() {
             </div>
           ))}
         </div>
-      )}
+      );
+      })()}
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
