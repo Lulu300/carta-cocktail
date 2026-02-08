@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { publicApi } from '../../services/api';
 import type { Cocktail } from '../../types';
 import UnitConverter from '../../components/ui/UnitConverter';
+import ExportCocktailButton from '../../components/ui/ExportCocktailButton';
 
 export default function CocktailPublicPage() {
   const { t } = useTranslation();
@@ -118,8 +119,14 @@ export default function CocktailPublicPage() {
         </div>
       </div>
 
-      {/* Print button */}
-      <div className="flex justify-center mt-6 print:hidden">
+      {/* Action buttons */}
+      <div className="flex justify-center gap-3 mt-6 print:hidden">
+        <ExportCocktailButton
+          cocktailId={cocktail.id}
+          cocktailName={cocktail.name}
+          isPublic
+          className="border border-amber-400/30 text-amber-400 hover:bg-amber-400/10 font-semibold px-6 py-2.5 rounded-lg transition-colors"
+        />
         <button
           onClick={() => window.print()}
           className="bg-amber-400 hover:bg-amber-500 text-[#0f0f1a] font-semibold px-6 py-2.5 rounded-lg transition-colors"

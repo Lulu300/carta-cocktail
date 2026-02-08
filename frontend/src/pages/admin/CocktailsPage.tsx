@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { cocktails as api, availability as availabilityApi } from '../../services/api';
 import type { Cocktail, CocktailAvailability } from '../../types';
+import ExportCocktailButton from '../../components/ui/ExportCocktailButton';
 
 export default function CocktailsPage() {
   const { t } = useTranslation();
@@ -127,6 +128,7 @@ export default function CocktailsPage() {
 
                 <div className="flex gap-2 pt-2 border-t border-gray-800">
                   <Link to={`/admin/cocktails/${item.id}`} className="text-amber-400 hover:text-amber-300 text-sm">{t('common.edit')}</Link>
+                  <ExportCocktailButton cocktailId={item.id} cocktailName={item.name} />
                   <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 text-sm">{t('common.delete')}</button>
                 </div>
               </div>
