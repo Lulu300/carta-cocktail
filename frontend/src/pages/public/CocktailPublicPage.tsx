@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { publicApi } from '../../services/api';
 import type { Cocktail } from '../../types';
 import UnitConverter from '../../components/ui/UnitConverter';
@@ -8,6 +9,7 @@ import ExportCocktailButton from '../../components/ui/ExportCocktailButton';
 
 export default function CocktailPublicPage() {
   const { t } = useTranslation();
+  const localize = useLocalizedName();
   const { id, slug } = useParams();
   const navigate = useNavigate();
   const [cocktail, setCocktail] = useState<Cocktail | null>(null);
@@ -35,8 +37,8 @@ export default function CocktailPublicPage() {
 
   const ingredientName = (ing: any) => {
     if (ing.bottle) return ing.bottle.name;
-    if (ing.category) return ing.category.name;
-    if (ing.ingredient) return ing.ingredient.name;
+    if (ing.category) return localize(ing.category);
+    if (ing.ingredient) return localize(ing.ingredient);
     return '?';
   };
 

@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { useAuth } from '../../contexts/AuthContext';
 import { publicApi, availability } from '../../services/api';
 import type { Menu, CocktailAvailability } from '../../types';
 
 export default function MenuPublicPage() {
   const { t } = useTranslation();
+  const localize = useLocalizedName();
   const { slug } = useParams();
   const { user } = useAuth();
   const [menu, setMenu] = useState<Menu | null>(null);
@@ -58,7 +60,7 @@ export default function MenuPublicPage() {
       const bottle = item.bottle;
       return (
         bottle?.name?.toLowerCase().includes(query) ||
-        bottle?.category?.name?.toLowerCase().includes(query)
+        (bottle?.category ? localize(bottle.category).toLowerCase().includes(query) : false)
       );
     } else {
       const cocktail = item.cocktail;
@@ -97,7 +99,7 @@ export default function MenuPublicPage() {
     } else {
       // Default: Group by category
       visibleBottles.forEach(mb => {
-        const categoryName = mb.bottle?.category?.name || 'Autres';
+        const categoryName = mb.bottle?.category ? localize(mb.bottle.category) : 'Autres';
         if (!itemsBySection[categoryName]) {
           itemsBySection[categoryName] = [];
         }
@@ -259,7 +261,7 @@ export default function MenuPublicPage() {
                               <div className="mt-2 flex flex-wrap gap-1.5">
                                 {cocktail.ingredients.map((ing) => (
                                   <span key={ing.id} className="text-xs bg-[#0f0f1a] text-gray-400 px-2 py-1 rounded">
-                                    {ing.bottle?.name || ing.category?.name || ing.ingredient?.name}
+                                    {ing.bottle?.name || (ing.category ? localize(ing.category) : null) || (ing.ingredient ? localize(ing.ingredient) : null)}
                                   </span>
                                 ))}
                               </div>
@@ -364,7 +366,7 @@ export default function MenuPublicPage() {
                                 <div className="mt-3 flex flex-wrap gap-1.5">
                                   {cocktail.ingredients.map((ing) => (
                                     <span key={ing.id} className="text-xs bg-[#0f0f1a] text-gray-400 px-2 py-1 rounded">
-                                      {ing.bottle?.name || ing.category?.name || ing.ingredient?.name}
+                                      {ing.bottle?.name || (ing.category ? localize(ing.category) : null) || (ing.ingredient ? localize(ing.ingredient) : null)}
                                     </span>
                                   ))}
                                 </div>
@@ -476,7 +478,7 @@ export default function MenuPublicPage() {
                           <div className="mt-3 flex flex-wrap gap-1.5">
                             {cocktail.ingredients.map((ing) => (
                               <span key={ing.id} className="text-xs bg-[#0f0f1a] text-gray-400 px-2 py-1 rounded">
-                                {ing.bottle?.name || ing.category?.name || ing.ingredient?.name}
+                                {ing.bottle?.name || (ing.category ? localize(ing.category) : null) || (ing.ingredient ? localize(ing.ingredient) : null)}
                               </span>
                             ))}
                           </div>
