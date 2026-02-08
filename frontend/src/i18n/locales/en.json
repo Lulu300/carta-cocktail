@@ -136,6 +136,9 @@
     "step": "Step {{number}}",
     "export": "Export",
     "import": "Import",
+    "selectAll": "Select all",
+    "batchExport": "Batch export",
+    "exportZip": "Export ZIP ({{count}})",
     "importWizard": {
       "title": "Import a recipe",
       "dropzone": "Drop a JSON file here or click to browse",
