@@ -51,6 +51,8 @@ async function main() {
       nameTranslations: JSON.stringify({ fr: 'Branche', en: 'Branch' }) },
     { name: 'Écorce', abbreviation: 'écorce', conversionFactorToMl: null,
       nameTranslations: JSON.stringify({ fr: 'Écorce', en: 'Peel' }) },
+    { name: 'Tasse', abbreviation: 'tasse', conversionFactorToMl: 250,
+      nameTranslations: JSON.stringify({ fr: 'Tasse', en: 'Cup' }) },
   ];
   for (const unit of defaultUnits) {
     const existing = await prisma.unit.findFirst({ where: { abbreviation: unit.abbreviation } });

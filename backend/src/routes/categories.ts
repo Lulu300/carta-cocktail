@@ -20,6 +20,20 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// List distinct category types
+router.get('/types', async (_req: AuthRequest, res: Response) => {
+  try {
+    const categories = await prisma.category.findMany({ select: { type: true }, distinct: ['type'] });
+    const dbTypes = categories.map(c => c.type);
+    const defaults = ['SPIRIT', 'SYRUP', 'SOFT'];
+    const allTypes = [...new Set([...defaults, ...dbTypes])];
+    res.json(allTypes);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Get one category
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
@@ -42,7 +56,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
     const { name, type, desiredStock, nameTranslations } = req.body;
-    if (!name || !type || !['SPIRIT', 'SYRUP'].includes(type)) {
+    if (!name || !type) {
       res.status(400).json({ error: req.t('errors.validationError') });
       return;
     }
@@ -69,7 +83,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
       where: { id: parseInt(String(req.params.id)) },
       data: {
         ...(name && { name }),
-        ...(type && ['SPIRIT', 'SYRUP'].includes(type) && { type }),
+        ...(type && { type }),
         ...(desiredStock !== undefined && { desiredStock }),
         ...(nameTranslations !== undefined && { nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null }),
       },
