@@ -59,6 +59,7 @@ export const categories = {
     request<Category>(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: number) =>
     request<{ message: string }>(`/categories/${id}`, { method: 'DELETE' }),
+  types: () => request<string[]>('/categories/types'),
 };
 
 // Bottles

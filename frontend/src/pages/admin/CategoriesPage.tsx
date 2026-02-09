@@ -4,30 +4,51 @@ import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { categories as api } from '../../services/api';
 import type { Category } from '../../types';
 
+const typeBadgeClass = (type: string) => {
+  switch (type) {
+    case 'SPIRIT': return 'bg-blue-500/20 text-blue-400';
+    case 'SYRUP': return 'bg-purple-500/20 text-purple-400';
+    case 'SOFT': return 'bg-green-500/20 text-green-400';
+    default: return 'bg-gray-500/20 text-gray-400';
+  }
+};
+
 export default function CategoriesPage() {
   const { t } = useTranslation();
   const localize = useLocalizedName();
   const [items, setItems] = useState<Category[]>([]);
+  const [knownTypes, setKnownTypes] = useState<string[]>(['SPIRIT', 'SYRUP', 'SOFT']);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
-  const [form, setForm] = useState({ name: '', type: 'SPIRIT' as 'SPIRIT' | 'SYRUP', desiredStock: 1, nameFr: '', nameEn: '' });
+  const [form, setForm] = useState({ name: '', type: 'SPIRIT', customType: '', desiredStock: 1, nameFr: '', nameEn: '' });
   const [showTranslations, setShowTranslations] = useState(false);
 
+  const typeLabel = (type: string) => {
+    const key = `categories.${type.toLowerCase()}`;
+    const translated = t(key);
+    return translated === key ? type : translated;
+  };
+
   const load = () => api.list().then(setItems);
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    api.types().then(setKnownTypes);
+  }, []);
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: '', type: 'SPIRIT', desiredStock: 1, nameFr: '', nameEn: '' });
+    setForm({ name: '', type: 'SPIRIT', customType: '', desiredStock: 1, nameFr: '', nameEn: '' });
     setShowTranslations(false);
     setShowModal(true);
   };
 
   const openEdit = (item: Category) => {
     setEditing(item);
+    const isKnown = knownTypes.includes(item.type);
     setForm({
       name: item.name,
-      type: item.type,
+      type: isKnown ? item.type : '__OTHER__',
+      customType: isKnown ? '' : item.type,
       desiredStock: item.desiredStock,
       nameFr: item.nameTranslations?.fr || '',
       nameEn: item.nameTranslations?.en || '',
@@ -35,14 +56,21 @@ export default function CategoriesPage() {
     setShowModal(true);
   };
 
+  const getEffectiveType = () => {
+    if (form.type === '__OTHER__') return form.customType.trim().toUpperCase();
+    return form.type;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const effectiveType = getEffectiveType();
+    if (!effectiveType) return;
     const nameTranslations: Record<string, string> = {};
     if (form.nameFr.trim()) nameTranslations.fr = form.nameFr.trim();
     if (form.nameEn.trim()) nameTranslations.en = form.nameEn.trim();
     const data = {
       name: form.name,
-      type: form.type,
+      type: effectiveType,
       desiredStock: form.desiredStock,
       nameTranslations: Object.keys(nameTranslations).length > 0 ? nameTranslations : null,
     };
@@ -53,6 +81,7 @@ export default function CategoriesPage() {
     }
     setShowModal(false);
     load();
+    api.types().then(setKnownTypes);
   };
 
   const handleDelete = async (id: number) => {
@@ -86,8 +115,8 @@ export default function CategoriesPage() {
               <tr key={item.id} className="hover:bg-gray-800/50">
                 <td className="px-6 py-4 font-medium">{localize(item)}</td>
                 <td className="px-6 py-4">
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${item.type === 'SPIRIT' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'}`}>
-                    {t(`categories.${item.type.toLowerCase()}`)}
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${typeBadgeClass(item.type)}`}>
+                    {typeLabel(item.type)}
                   </span>
                 </td>
                 <td className="px-6 py-4">{item.desiredStock}</td>
@@ -130,7 +159,7 @@ export default function CategoriesPage() {
               {showTranslations && (
                 <div className="space-y-2 pt-1">
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Français</label>
+                    <label className="block text-xs text-gray-500 mb-1">Fran&#231;ais</label>
                     <input value={form.nameFr} onChange={(e) => setForm({ ...form, nameFr: e.target.value })}
                       placeholder={form.name || '...'} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400" />
                   </div>
@@ -144,10 +173,21 @@ export default function CategoriesPage() {
             </div>
             <div>
               <label className="block text-sm text-gray-400 mb-1">{t('categories.type')}</label>
-              <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as 'SPIRIT' | 'SYRUP' })} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400">
-                <option value="SPIRIT">{t('categories.spirit')}</option>
-                <option value="SYRUP">{t('categories.syrup')}</option>
+              <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value, customType: '' })} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400">
+                {knownTypes.map((tp) => (
+                  <option key={tp} value={tp}>{typeLabel(tp)}</option>
+                ))}
+                <option value="__OTHER__">{t('categories.otherType')}</option>
               </select>
+              {form.type === '__OTHER__' && (
+                <input
+                  value={form.customType}
+                  onChange={(e) => setForm({ ...form, customType: e.target.value })}
+                  placeholder={t('categories.customType')}
+                  required
+                  className="w-full mt-2 bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400"
+                />
+              )}
             </div>
             <div>
               <label className="block text-sm text-gray-400 mb-1">{t('categories.desiredStock')}</label>

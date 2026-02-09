@@ -7,7 +7,7 @@ export interface Category {
   id: number;
   name: string;
   nameTranslations?: Record<string, string> | null;
-  type: 'SPIRIT' | 'SYRUP';
+  type: string;
   desiredStock: number;
   createdAt: string;
   _count?: { bottles: number };

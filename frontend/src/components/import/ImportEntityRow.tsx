@@ -193,6 +193,7 @@ export default function ImportEntityRow({
                   >
                     <option value="SPIRIT">{t('categories.spirit')}</option>
                     <option value="SYRUP">{t('categories.syrup')}</option>
+                    <option value="SOFT">{t('categories.soft')}</option>
                   </select>
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">
