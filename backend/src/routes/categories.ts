@@ -6,6 +6,24 @@ import { parseNameTranslations } from '../utils/translations';
 const router = Router();
 const prisma = new PrismaClient();
 
+// Helper: enrich categories with their CategoryType metadata
+async function enrichWithCategoryType(categories: any[]) {
+  const categoryTypes = await prisma.categoryType.findMany();
+  const typeMap = new Map(categoryTypes.map(ct => [ct.name, ct]));
+  return categories.map(c => ({
+    ...c,
+    categoryType: typeMap.get(c.type) || null,
+  }));
+}
+
+// Helper: auto-create CategoryType if it doesn't exist
+async function ensureCategoryType(type: string) {
+  const existing = await prisma.categoryType.findUnique({ where: { name: type } });
+  if (!existing) {
+    await prisma.categoryType.create({ data: { name: type, color: 'gray' } });
+  }
+}
+
 // List all categories
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
@@ -13,24 +31,11 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       include: { _count: { select: { bottles: true } } },
       orderBy: { name: 'asc' },
     });
-    res.json(parseNameTranslations(categories));
+    const enriched = await enrichWithCategoryType(categories);
+    res.json(parseNameTranslations(enriched));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: req.t('errors.serverError') });
-  }
-});
-
-// List distinct category types
-router.get('/types', async (_req: AuthRequest, res: Response) => {
-  try {
-    const categories = await prisma.category.findMany({ select: { type: true }, distinct: ['type'] });
-    const dbTypes = categories.map(c => c.type);
-    const defaults = ['SPIRIT', 'SYRUP', 'SOFT'];
-    const allTypes = [...new Set([...defaults, ...dbTypes])];
-    res.json(allTypes);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -45,7 +50,8 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
       res.status(404).json({ error: req.t('errors.notFound') });
       return;
     }
-    res.json(parseNameTranslations(category));
+    const [enriched] = await enrichWithCategoryType([category]);
+    res.json(parseNameTranslations(enriched));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: req.t('errors.serverError') });
@@ -60,6 +66,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       res.status(400).json({ error: req.t('errors.validationError') });
       return;
     }
+    await ensureCategoryType(type);
     const category = await prisma.category.create({
       data: {
         name,
@@ -79,6 +86,9 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { name, type, desiredStock, nameTranslations } = req.body;
+    if (type) {
+      await ensureCategoryType(type);
+    }
     const category = await prisma.category.update({
       where: { id: parseInt(String(req.params.id)) },
       data: {

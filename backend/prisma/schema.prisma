@@ -14,6 +14,12 @@ model User {
   createdAt    DateTime @default(now())
 }
 
+model CategoryType {
+  name             String  @id
+  nameTranslations String?
+  color            String  @default("gray")
+}
+
 model Category {
   id               Int      @id @default(autoincrement())
   name             String

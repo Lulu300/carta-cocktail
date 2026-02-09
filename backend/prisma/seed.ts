@@ -15,6 +15,32 @@ async function main() {
     },
   });
 
+  // Seed default CategoryTypes
+  const defaultCategoryTypes = [
+    { name: 'SPIRIT', nameTranslations: JSON.stringify({ fr: 'Alcool', en: 'Spirit' }), color: 'blue' },
+    { name: 'SYRUP', nameTranslations: JSON.stringify({ fr: 'Sirop', en: 'Syrup' }), color: 'purple' },
+    { name: 'SOFT', nameTranslations: JSON.stringify({ fr: 'Sans alcool', en: 'Non-alcoholic' }), color: 'green' },
+  ];
+  for (const ct of defaultCategoryTypes) {
+    await prisma.categoryType.upsert({
+      where: { name: ct.name },
+      update: {},
+      create: ct,
+    });
+  }
+  // Sync: auto-create CategoryType for any existing custom types in categories
+  const existingCatTypes = await prisma.category.findMany({
+    select: { type: true },
+    distinct: ['type'],
+  });
+  for (const { type } of existingCatTypes) {
+    await prisma.categoryType.upsert({
+      where: { name: type },
+      update: {},
+      create: { name: type, color: 'gray' },
+    });
+  }
+
   // Ensure all default units exist (upsert each one)
   const defaultUnits = [
     { name: 'Centilitre', abbreviation: 'cl', conversionFactorToMl: 10,

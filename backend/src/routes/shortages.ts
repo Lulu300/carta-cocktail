@@ -14,6 +14,10 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       },
     });
 
+    // Load category types for enrichment
+    const categoryTypes = await prisma.categoryType.findMany();
+    const typeMap = new Map(categoryTypes.map(ct => [ct.name, ct]));
+
     const shortages = categories
       .map((category) => {
         // Count sealed (unopened) bottles with remaining > 0
@@ -30,6 +34,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
             name: category.name,
             nameTranslations: category.nameTranslations,
             type: category.type,
+            categoryType: typeMap.get(category.type) || null,
             desiredStock: category.desiredStock,
           }),
           sealedCount,

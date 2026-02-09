@@ -298,6 +298,12 @@ router.post('/import/confirm', async (req: AuthRequest, res: Response) => {
         if (r.action === 'use_existing' && r.existingId) {
           categoryMap.set(key.toLowerCase(), r.existingId);
         } else if (r.action === 'create' && r.data) {
+          // Auto-create CategoryType if missing
+          const typeValue = r.data.type || 'SPIRIT';
+          const existingType = await tx.categoryType.findUnique({ where: { name: typeValue } });
+          if (!existingType) {
+            await tx.categoryType.create({ data: { name: typeValue, color: 'gray' } });
+          }
           const { nameTranslations, ...rest } = r.data;
           const created = await tx.category.create({ data: { ...rest, nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null } });
           categoryMap.set(key.toLowerCase(), created.id);

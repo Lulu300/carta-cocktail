@@ -8,6 +8,7 @@ import { i18nMiddleware } from './i18n';
 import { authMiddleware } from './middleware/auth';
 import authRoutes from './routes/auth';
 import categoryRoutes from './routes/categories';
+import categoryTypeRoutes from './routes/categoryTypes';
 import bottleRoutes from './routes/bottles';
 import ingredientRoutes from './routes/ingredients';
 import unitRoutes from './routes/units';
@@ -37,6 +38,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/public', publicRoutes);
 
 // Protected routes
+app.use('/api/category-types', authMiddleware, categoryTypeRoutes);
 app.use('/api/categories', authMiddleware, categoryRoutes);
 app.use('/api/bottles', authMiddleware, bottleRoutes);
 app.use('/api/ingredients', authMiddleware, ingredientRoutes);

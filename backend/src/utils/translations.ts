@@ -17,7 +17,7 @@ export function parseNameTranslations(obj: any): any {
     }
     // Recurse into known relation fields
     for (const key of [
-      'unit', 'category', 'ingredient', 'bottle', 'bottles',
+      'unit', 'category', 'categoryType', 'ingredient', 'bottle', 'bottles',
       'ingredients', 'cocktail', 'cocktails', 'preferredBottles',
     ]) {
       if (obj[key]) {
