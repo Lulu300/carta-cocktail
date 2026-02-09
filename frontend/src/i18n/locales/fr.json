@@ -47,9 +47,6 @@
     "edit": "Modifier la catégorie",
     "name": "Nom",
     "type": "Type",
-    "spirit": "Alcool",
-    "syrup": "Sirop",
-    "soft": "Sans alcool",
     "otherType": "Autre...",
     "customType": "Type personnalisé",
     "desiredStock": "Stock souhaité",
@@ -58,6 +55,16 @@
     "created": "Catégorie créée",
     "updated": "Catégorie mise à jour",
     "deleted": "Catégorie supprimée"
+  },
+  "categoryTypes": {
+    "manage": "Gérer les types",
+    "title": "Types de catégories",
+    "add": "Ajouter un type",
+    "edit": "Modifier le type",
+    "name": "Nom du type",
+    "color": "Couleur",
+    "confirmDelete": "Supprimer ce type ?",
+    "cannotDelete": "Ce type est utilisé par des catégories et ne peut pas être supprimé."
   },
   "bottles": {
     "title": "Bouteilles",

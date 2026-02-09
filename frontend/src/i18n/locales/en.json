@@ -47,9 +47,6 @@
     "edit": "Edit Category",
     "name": "Name",
     "type": "Type",
-    "spirit": "Spirit",
-    "syrup": "Syrup",
-    "soft": "Non-alcoholic",
     "otherType": "Other...",
     "customType": "Custom type",
     "desiredStock": "Desired Stock",
@@ -58,6 +55,16 @@
     "created": "Category created",
     "updated": "Category updated",
     "deleted": "Category deleted"
+  },
+  "categoryTypes": {
+    "manage": "Manage Types",
+    "title": "Category Types",
+    "add": "Add Type",
+    "edit": "Edit Type",
+    "name": "Type Name",
+    "color": "Color",
+    "confirmDelete": "Delete this type?",
+    "cannotDelete": "This type is used by categories and cannot be deleted."
   },
   "bottles": {
     "title": "Bottles",

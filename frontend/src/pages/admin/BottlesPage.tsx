@@ -92,11 +92,12 @@ export default function BottlesPage() {
 
       <div className="flex gap-2 mb-4 flex-wrap">
         {['', ...[...new Set(cats.map(c => c.type))]].map((f) => {
-          const typeLabel = (type: string) => { const key = `categories.${type.toLowerCase()}`; const translated = t(key); return translated === key ? type : translated; };
+          const ct = cats.find(c => c.type === f)?.categoryType;
+          const label = f ? (ct ? localize(ct) : f) : t('bottles.all');
           return (
             <button key={f} onClick={() => setFilter(f)}
               className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${filter === f ? 'bg-amber-400 text-[#0f0f1a] font-semibold' : 'bg-[#1a1a2e] text-gray-400 hover:text-white border border-gray-800'}`}>
-              {f ? typeLabel(f) : t('bottles.all')}
+              {label}
             </button>
           );
         })}
@@ -167,7 +168,10 @@ export default function BottlesPage() {
             <div>
               <label className="block text-sm text-gray-400 mb-1">{t('bottles.category')}</label>
               <select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: parseInt(e.target.value) })} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400">
-                {cats.map((c) => { const key = `categories.${c.type.toLowerCase()}`; const tl = t(key); return <option key={c.id} value={c.id}>{localize(c)} ({tl === key ? c.type : tl})</option>; })}
+                {cats.map((c) => {
+                  const typeLabel = c.categoryType ? localize(c.categoryType) : c.type;
+                  return <option key={c.id} value={c.id}>{localize(c)} ({typeLabel})</option>;
+                })}
               </select>
             </div>
             <div className="grid grid-cols-2 gap-4">

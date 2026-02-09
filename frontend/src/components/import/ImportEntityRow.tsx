@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { EntityResolutionAction, ImportEntityResolution } from '../../types';
+import type { EntityResolutionAction, ImportEntityResolution, CategoryType } from '../../types';
 import IconPicker from '../ui/IconPicker';
 
 interface ImportEntityRowProps {
@@ -10,6 +10,7 @@ interface ImportEntityRowProps {
   resolution: EntityResolutionAction | undefined;
   onChange: (resolution: EntityResolutionAction) => void;
   allowSkip?: boolean;
+  categoryTypes?: CategoryType[];
 }
 
 export default function ImportEntityRow({
@@ -19,6 +20,7 @@ export default function ImportEntityRow({
   resolution,
   onChange,
   allowSkip,
+  categoryTypes,
 }: ImportEntityRowProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(entity.status === 'missing');
@@ -191,9 +193,9 @@ export default function ImportEntityRow({
                     onChange={(e) => updateCreateData('type', e.target.value)}
                     className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400"
                   >
-                    <option value="SPIRIT">{t('categories.spirit')}</option>
-                    <option value="SYRUP">{t('categories.syrup')}</option>
-                    <option value="SOFT">{t('categories.soft')}</option>
+                    {(categoryTypes || []).map(ct => (
+                      <option key={ct.name} value={ct.name}>{ct.nameTranslations?.fr || ct.nameTranslations?.en || ct.name}</option>
+                    ))}
                   </select>
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">

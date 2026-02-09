@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { shortages as api } from '../../services/api';
 import type { Shortage } from '../../types';
+import { getBadgeClasses } from '../../utils/colors';
 
 export default function ShortagesPage() {
   const { t } = useTranslation();
@@ -24,13 +25,8 @@ export default function ShortagesPage() {
             <div key={item.category.id} className="bg-[#1a1a2e] border border-red-500/30 rounded-xl p-6">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-lg">{localize(item.category)}</h3>
-                <span className={`px-2 py-1 rounded text-xs font-medium ${
-                  item.category.type === 'SPIRIT' ? 'bg-blue-500/20 text-blue-400'
-                    : item.category.type === 'SYRUP' ? 'bg-purple-500/20 text-purple-400'
-                    : item.category.type === 'SOFT' ? 'bg-green-500/20 text-green-400'
-                    : 'bg-gray-500/20 text-gray-400'
-                }`}>
-                  {(() => { const key = `categories.${item.category.type.toLowerCase()}`; const tl = t(key); return tl === key ? item.category.type : tl; })()}
+                <span className={`px-2 py-1 rounded text-xs font-medium ${getBadgeClasses(item.category.categoryType?.color)}`}>
+                  {item.category.categoryType ? localize(item.category.categoryType) : item.category.type}
                 </span>
               </div>
               <div className="space-y-2 text-sm">

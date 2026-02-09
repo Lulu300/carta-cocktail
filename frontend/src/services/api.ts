@@ -1,5 +1,5 @@
 import type {
-  Category, Bottle, Ingredient, Unit, Cocktail, Menu, MenuBottle, MenuSection, Shortage,
+  Category, CategoryType, Bottle, Ingredient, Unit, Cocktail, Menu, MenuBottle, MenuSection, Shortage,
   CocktailInput, MenuInput, CocktailAvailability, SiteSettings,
   CocktailExportFormat, ImportPreviewResponse, EntityResolutionAction,
 } from '../types';
@@ -49,6 +49,17 @@ export const auth = {
   me: () => request<{ id: number; email: string }>('/auth/me'),
 };
 
+// Category Types
+export const categoryTypes = {
+  list: () => request<CategoryType[]>('/category-types'),
+  create: (data: { name: string; nameTranslations?: Record<string, string> | null; color?: string }) =>
+    request<CategoryType>('/category-types', { method: 'POST', body: JSON.stringify(data) }),
+  update: (name: string, data: { nameTranslations?: Record<string, string> | null; color?: string }) =>
+    request<CategoryType>(`/category-types/${encodeURIComponent(name)}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (name: string) =>
+    request<{ message: string }>(`/category-types/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+};
+
 // Categories
 export const categories = {
   list: () => request<Category[]>('/categories'),
@@ -59,7 +70,6 @@ export const categories = {
     request<Category>(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: number) =>
     request<{ message: string }>(`/categories/${id}`, { method: 'DELETE' }),
-  types: () => request<string[]>('/categories/types'),
 };
 
 // Bottles

@@ -3,11 +3,19 @@ export interface User {
   email: string;
 }
 
+export interface CategoryType {
+  name: string;
+  nameTranslations?: Record<string, string> | null;
+  color: string;
+  _count?: { categories: number };
+}
+
 export interface Category {
   id: number;
   name: string;
   nameTranslations?: Record<string, string> | null;
   type: string;
+  categoryType?: CategoryType | null;
   desiredStock: number;
   createdAt: string;
   _count?: { bottles: number };
@@ -139,6 +147,7 @@ export interface Shortage {
     name: string;
     nameTranslations?: Record<string, string> | null;
     type: string;
+    categoryType?: CategoryType | null;
     desiredStock: number;
   };
   sealedCount: number;

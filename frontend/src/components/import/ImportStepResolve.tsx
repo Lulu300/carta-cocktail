@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { categories as categoriesApi, bottles as bottlesApi, ingredients as ingredientsApi, units as unitsApi } from '../../services/api';
-import type { ImportPreviewResponse, EntityResolutionAction, Category, Bottle, Ingredient, Unit } from '../../types';
+import { categories as categoriesApi, bottles as bottlesApi, ingredients as ingredientsApi, units as unitsApi, categoryTypes as ctApi } from '../../services/api';
+import type { ImportPreviewResponse, EntityResolutionAction, Category, CategoryType, Bottle, Ingredient, Unit } from '../../types';
 import ImportEntityRow from './ImportEntityRow';
 
 interface ImportStepResolveProps {
@@ -18,12 +18,14 @@ export default function ImportStepResolve({ preview, resolutions, setResolutions
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [allBottles, setAllBottles] = useState<Bottle[]>([]);
   const [allIngredients, setAllIngredients] = useState<Ingredient[]>([]);
+  const [allCategoryTypes, setAllCategoryTypes] = useState<CategoryType[]>([]);
 
   useEffect(() => {
     unitsApi.list().then(setAllUnits);
     categoriesApi.list().then(setAllCategories);
     bottlesApi.list().then(setAllBottles);
     ingredientsApi.list().then(setAllIngredients);
+    ctApi.list().then(setAllCategoryTypes);
   }, []);
 
   const updateResolution = (type: string, key: string, resolution: EntityResolutionAction) => {
@@ -65,6 +67,7 @@ export default function ImportStepResolve({ preview, resolutions, setResolutions
     type: 'units' | 'categories' | 'bottles' | 'ingredients',
     existingOptions: { id: number; name: string; [key: string]: any }[],
     allowSkip?: boolean,
+    categoryTypes?: CategoryType[],
   ) => {
     if (entities.length === 0) return null;
     return (
@@ -84,6 +87,7 @@ export default function ImportStepResolve({ preview, resolutions, setResolutions
                 resolution={resolutions[type]?.[key]}
                 onChange={(r) => updateResolution(type, key, r)}
                 allowSkip={allowSkip}
+                categoryTypes={categoryTypes}
               />
             );
           })}
@@ -122,7 +126,7 @@ export default function ImportStepResolve({ preview, resolutions, setResolutions
       {/* Entity sections */}
       <div className="space-y-6 max-h-[50vh] overflow-y-auto pr-1">
         {renderSection(t('cocktails.importWizard.units'), preview.units, 'units', allUnits)}
-        {renderSection(t('cocktails.importWizard.categories'), preview.categories, 'categories', allCategories)}
+        {renderSection(t('cocktails.importWizard.categories'), preview.categories, 'categories', allCategories, false, allCategoryTypes)}
         {renderSection(t('cocktails.importWizard.bottles'), preview.bottles, 'bottles', allBottles, true)}
         {renderSection(t('cocktails.importWizard.ingredients'), preview.ingredients, 'ingredients', allIngredients)}
       </div>
