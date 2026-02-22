@@ -19,18 +19,19 @@ export default function ImportStepConfirm({ preview, resolutions, isLoading, onB
   const processSection = (type: string, label: string, entities: ImportPreviewResponse['units']) => {
     for (const entity of entities) {
       const key = type === 'units'
-        ? entity.ref.abbreviation?.toLowerCase()
-        : entity.ref.name?.toLowerCase();
+        ? (entity.ref.abbreviation?.toLowerCase() || entity.ref.name?.toLowerCase() || '')
+        : (entity.ref.name?.toLowerCase() || '');
       const resolution = resolutions[type]?.[key];
+      const refName = entity.ref.name || '';
 
       if (resolution?.action === 'create') {
-        entitiesToCreate.push({ type: label, name: resolution.data?.name || entity.ref.name });
+        entitiesToCreate.push({ type: label, name: resolution.data?.name || refName });
       } else if (resolution?.action === 'skip') {
-        entitiesSkipped.push({ type: label, name: entity.ref.name });
+        entitiesSkipped.push({ type: label, name: refName });
       } else if (entity.status === 'matched' || resolution?.action === 'use_existing') {
         entitiesMapped.push({
           type: label,
-          name: entity.ref.name,
+          name: refName,
           mappedTo: entity.existingMatch?.name || '?',
         });
       }

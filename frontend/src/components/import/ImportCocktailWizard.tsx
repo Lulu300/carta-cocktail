@@ -28,7 +28,7 @@ function buildAutoResolutions(result: ImportPreviewResponse): Record<string, Rec
   };
 
   for (const entity of result.units) {
-    const key = entity.ref.abbreviation?.toLowerCase() || entity.ref.name?.toLowerCase();
+    const key = entity.ref.abbreviation?.toLowerCase() || entity.ref.name?.toLowerCase() || '';
     if (entity.status === 'matched' && entity.existingMatch) {
       autoResolutions.units[key] = { action: 'use_existing', existingId: entity.existingMatch.id };
     } else {
@@ -40,7 +40,7 @@ function buildAutoResolutions(result: ImportPreviewResponse): Record<string, Rec
   }
 
   for (const entity of result.categories) {
-    const key = entity.ref.name?.toLowerCase();
+    const key = entity.ref.name?.toLowerCase() || '';
     if (entity.status === 'matched' && entity.existingMatch) {
       autoResolutions.categories[key] = { action: 'use_existing', existingId: entity.existingMatch.id };
     } else {
@@ -52,7 +52,7 @@ function buildAutoResolutions(result: ImportPreviewResponse): Record<string, Rec
   }
 
   for (const entity of result.bottles) {
-    const key = entity.ref.name?.toLowerCase();
+    const key = entity.ref.name?.toLowerCase() || '';
     if (entity.status === 'matched' && entity.existingMatch) {
       autoResolutions.bottles[key] = { action: 'use_existing', existingId: entity.existingMatch.id };
     } else {
@@ -64,7 +64,7 @@ function buildAutoResolutions(result: ImportPreviewResponse): Record<string, Rec
   }
 
   for (const entity of result.ingredients) {
-    const key = entity.ref.name?.toLowerCase();
+    const key = entity.ref.name?.toLowerCase() || '';
     if (entity.status === 'matched' && entity.existingMatch) {
       autoResolutions.ingredients[key] = { action: 'use_existing', existingId: entity.existingMatch.id };
     } else {

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { categories as categoriesApi, bottles as bottlesApi, ingredients as ingredientsApi, units as unitsApi, categoryTypes as ctApi } from '../../services/api';
-import type { ImportPreviewResponse, EntityResolutionAction, Category, CategoryType, Bottle, Ingredient, Unit } from '../../types';
+import type { ImportPreviewResponse, ImportEntityResolution, EntityResolutionAction, Category, CategoryType, Bottle, Ingredient, Unit } from '../../types';
 import ImportEntityRow from './ImportEntityRow';
 
 interface ImportStepResolveProps {
@@ -38,9 +38,9 @@ export default function ImportStepResolve({ preview, resolutions, setResolutions
     });
   };
 
-  const getKey = (entity: ImportEntityResolution, type: string) => {
-    if (type === 'units') return entity.ref.abbreviation?.toLowerCase() || entity.ref.name?.toLowerCase();
-    return entity.ref.name?.toLowerCase();
+  const getKey = (entity: ImportEntityResolution, type: string): string => {
+    if (type === 'units') return entity.ref.abbreviation?.toLowerCase() || entity.ref.name?.toLowerCase() || '';
+    return entity.ref.name?.toLowerCase() || '';
   };
 
   // Check if all missing entities have resolutions
