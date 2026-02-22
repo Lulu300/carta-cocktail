@@ -6,7 +6,8 @@
     "serverError": "Erreur interne du serveur",
     "validationError": "Erreur de validation",
     "duplicateEntry": "Cette entrée existe déjà",
-    "cannotDelete": "Impossible de supprimer : ressource utilisée"
+    "cannotDelete": "Impossible de supprimer : ressource utilisée",
+    "invalidBackup": "Fichier de sauvegarde invalide"
   },
   "auth": {
     "loginSuccess": "Connexion réussie",

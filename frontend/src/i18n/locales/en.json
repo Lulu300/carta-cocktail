@@ -255,7 +255,21 @@
     "confirmPassword": "Confirm Password",
     "confirmPasswordPlaceholder": "Retype new password",
     "profileUpdated": "Profile updated",
-    "passwordMismatch": "Passwords do not match"
+    "passwordMismatch": "Passwords do not match",
+    "backup": {
+      "title": "Backup & Restore",
+      "description": "Export a complete backup of your database and images, or restore from a previous backup.",
+      "export": "Export Backup",
+      "exporting": "Exporting...",
+      "import": "Restore Backup",
+      "importing": "Restoring...",
+      "selectFile": "Select ZIP file",
+      "confirmRestore": "This will replace ALL current data (database and images). This action cannot be undone. Continue?",
+      "exportSuccess": "Backup exported successfully",
+      "importSuccess": "Backup restored successfully. The page will reload.",
+      "invalidBackup": "Invalid backup file",
+      "fileSelected": "File: {{name}}"
+    }
   },
   "common": {
     "save": "Save",
