@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { cocktails as api, availability as availabilityApi } from '../../services/api';
@@ -6,6 +6,8 @@ import type { Cocktail, CocktailAvailability } from '../../types';
 import ExportCocktailButton from '../../components/ui/ExportCocktailButton';
 import ImportCocktailWizard from '../../components/import/ImportCocktailWizard';
 import { exportCocktailsAsZip } from '../../services/exportZip';
+import SearchInput from '../../components/ui/SearchInput';
+import MultiSelectDropdown from '../../components/ui/MultiSelectDropdown';
 
 export default function CocktailsPage() {
   const { t } = useTranslation();
@@ -16,6 +18,32 @@ export default function CocktailsPage() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [isExporting, setIsExporting] = useState(false);
+  const [search, setSearch] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+
+  const tagOptions = useMemo(() => {
+    const tagSet = new Set<string>();
+    items.forEach((item) => {
+      if (item.tags) {
+        item.tags.split(',').forEach((tag) => {
+          const trimmed = tag.trim();
+          if (trimmed) tagSet.add(trimmed);
+        });
+      }
+    });
+    return [...tagSet].sort().map((tag) => ({ value: tag, label: tag }));
+  }, [items]);
+
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      if (search.trim() && !item.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (selectedTags.length > 0) {
+        const itemTags = item.tags ? item.tags.split(',').map((t) => t.trim().toLowerCase()) : [];
+        if (!selectedTags.some((st) => itemTags.includes(st.toLowerCase()))) return false;
+      }
+      return true;
+    });
+  }, [items, search, selectedTags]);
 
   const load = () => api.list().then(setItems);
 
@@ -155,8 +183,20 @@ export default function CocktailsPage() {
           )}
         </div>
       </div>
+
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <SearchInput value={search} onChange={setSearch} className="sm:w-64" />
+        <MultiSelectDropdown
+          options={tagOptions}
+          selected={selectedTags}
+          onChange={setSelectedTags}
+          placeholder={t('cocktails.filterByTags')}
+          className="sm:w-64"
+        />
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {items.map((item) => {
+        {filteredItems.map((item) => {
           const avail = availabilities[item.id];
           const isSelected = selectedIds.has(item.id);
           return (
@@ -256,7 +296,7 @@ export default function CocktailsPage() {
           );
         })}
       </div>
-      {items.length === 0 && <div className="text-center py-12 text-gray-500">{t('common.noResults')}</div>}
+      {filteredItems.length === 0 && <div className="text-center py-12 text-gray-500">{t('common.noResults')}</div>}
 
       {showImport && (
         <ImportCocktailWizard onClose={() => { setShowImport(false); load(); loadAvailability(); }} />

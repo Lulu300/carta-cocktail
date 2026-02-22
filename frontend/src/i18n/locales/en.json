@@ -89,7 +89,8 @@
     "location": "Location",
     "locationPlaceholder": "E.g.: Top shelf, Main bar...",
     "activeTitle": "Available bottles",
-    "historyTitle": "History (empty)"
+    "historyTitle": "History (empty)",
+    "filterByLocation": "Filter by location"
   },
   "ingredients": {
     "title": "Ingredients",
@@ -152,6 +153,7 @@
     "import": "Import",
     "selectAll": "Select all",
     "batchExport": "Batch export",
+    "filterByTags": "Filter by tags",
     "exportZip": "Export ZIP ({{count}})",
     "importWizard": {
       "title": "Import a recipe",
@@ -271,6 +273,7 @@
     "yes": "Yes",
     "no": "No",
     "translations": "Translations",
-    "translationHint": "Optional: provide translated names for each language"
+    "translationHint": "Optional: provide translated names for each language",
+    "selected": "{{count}} selected"
   }
 }

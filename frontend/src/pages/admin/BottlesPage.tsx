@@ -1,15 +1,20 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { bottles as api, categories as categoriesApi } from '../../services/api';
 import type { Bottle, Category } from '../../types';
+import SearchInput from '../../components/ui/SearchInput';
+import MultiSelectDropdown from '../../components/ui/MultiSelectDropdown';
+import LocationAutocomplete from '../../components/ui/LocationAutocomplete';
 
 export default function BottlesPage() {
   const { t } = useTranslation();
   const localize = useLocalizedName();
   const [items, setItems] = useState<Bottle[]>([]);
   const [cats, setCats] = useState<Category[]>([]);
-  const [filter, setFilter] = useState<string>('');
+  const [search, setSearch] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [locationFilter, setLocationFilter] = useState('');
   const [showHistory, setShowHistory] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Bottle | null>(null);
@@ -19,12 +24,28 @@ export default function BottlesPage() {
     location: '', isApero: false, isDigestif: false,
   });
 
-  const load = useCallback(() => {
-    const params = filter ? { type: filter } : undefined;
-    api.list(params).then(setItems);
-  }, [filter]);
+  const load = () => api.list().then(setItems);
   useEffect(() => { categoriesApi.list().then(setCats); }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, []);
+
+  const categoryOptions = useMemo(() =>
+    cats.map((c) => ({ value: String(c.id), label: localize(c) })),
+    [cats, localize]
+  );
+
+  const uniqueLocations = useMemo(() =>
+    [...new Set(items.map((b) => b.location).filter((loc): loc is string => !!loc))].sort(),
+    [items]
+  );
+
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      if (search.trim() && !item.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (selectedCategories.length > 0 && !selectedCategories.includes(String(item.categoryId))) return false;
+      if (locationFilter.trim() && (!item.location || !item.location.toLowerCase().includes(locationFilter.toLowerCase()))) return false;
+      return true;
+    });
+  }, [items, search, selectedCategories, locationFilter]);
 
   const openCreate = () => {
     setEditing(null);
@@ -93,23 +114,28 @@ export default function BottlesPage() {
         </button>
       </div>
 
-      <div className="flex gap-2 mb-4 flex-wrap">
-        {['', ...[...new Set(cats.map(c => c.type))]].map((f) => {
-          const ct = cats.find(c => c.type === f)?.categoryType;
-          const label = f ? (ct ? localize(ct) : f) : t('bottles.all');
-          return (
-            <button key={f} onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${filter === f ? 'bg-amber-400 text-[#0f0f1a] font-semibold' : 'bg-[#1a1a2e] text-gray-400 hover:text-white border border-gray-800'}`}>
-              {label}
-            </button>
-          );
-        })}
+      <div className="flex flex-col lg:flex-row gap-3 mb-4">
+        <SearchInput value={search} onChange={setSearch} className="lg:w-64" />
+        <MultiSelectDropdown
+          options={categoryOptions}
+          selected={selectedCategories}
+          onChange={setSelectedCategories}
+          placeholder={t('bottles.filterByCategory')}
+          className="lg:w-64"
+        />
+        <LocationAutocomplete
+          value={locationFilter}
+          onChange={setLocationFilter}
+          locations={uniqueLocations}
+          placeholder={t('bottles.filterByLocation')}
+          className="lg:w-64"
+        />
       </div>
 
       {/* Active bottles */}
       {(() => {
-        const activeItems = items.filter(i => i.remainingPercent > 0);
-        const historyItems = items.filter(i => i.remainingPercent === 0);
+        const activeItems = filteredItems.filter(i => i.remainingPercent > 0);
+        const historyItems = filteredItems.filter(i => i.remainingPercent === 0);
         return (
           <>
             <div className="bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden">

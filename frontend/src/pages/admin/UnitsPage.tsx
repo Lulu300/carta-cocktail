@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { units as api } from '../../services/api';
 import type { Unit } from '../../types';
+import SearchInput from '../../components/ui/SearchInput';
 
 export default function UnitsPage() {
   const { t } = useTranslation();
@@ -12,6 +13,16 @@ export default function UnitsPage() {
   const [editing, setEditing] = useState<Unit | null>(null);
   const [form, setForm] = useState({ name: '', abbreviation: '', conversionFactorToMl: '', nameFr: '', nameEn: '' });
   const [showTranslations, setShowTranslations] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const filteredItems = useMemo(() => {
+    if (!search.trim()) return items;
+    const lower = search.toLowerCase();
+    return items.filter((item) =>
+      localize(item).toLowerCase().includes(lower) ||
+      item.abbreviation.toLowerCase().includes(lower)
+    );
+  }, [items, search, localize]);
 
   const load = () => api.list().then(setItems);
   useEffect(() => { load(); }, []);
@@ -58,6 +69,7 @@ export default function UnitsPage() {
         <h1 className="text-2xl font-bold font-serif text-amber-400">{t('units.title')}</h1>
         <button onClick={openCreate} className="bg-amber-400 hover:bg-amber-500 text-[#0f0f1a] font-semibold px-4 py-2 rounded-lg">{t('units.add')}</button>
       </div>
+      <SearchInput value={search} onChange={setSearch} className="max-w-sm mb-4" />
       <div className="bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden">
         <table className="w-full">
           <thead className="bg-[#0f0f1a]">
@@ -69,7 +81,7 @@ export default function UnitsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-800">
-            {items.map((item) => (
+            {filteredItems.map((item) => (
               <tr key={item.id} className="hover:bg-gray-800/50">
                 <td className="px-6 py-4 font-medium">{localize(item)}</td>
                 <td className="px-6 py-4 text-gray-400">{item.abbreviation}</td>
@@ -98,7 +110,7 @@ export default function UnitsPage() {
             ))}
           </tbody>
         </table>
-        {items.length === 0 && <div className="text-center py-8 text-gray-500">{t('common.noResults')}</div>}
+        {filteredItems.length === 0 && <div className="text-center py-8 text-gray-500">{t('common.noResults')}</div>}
       </div>
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">

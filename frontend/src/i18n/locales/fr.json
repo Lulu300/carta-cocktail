@@ -89,7 +89,8 @@
     "location": "Localisation",
     "locationPlaceholder": "Ex: Étagère du haut, Bar principal...",
     "activeTitle": "Bouteilles disponibles",
-    "historyTitle": "Historique (vides)"
+    "historyTitle": "Historique (vides)",
+    "filterByLocation": "Filtrer par localisation"
   },
   "ingredients": {
     "title": "Ingrédients",
@@ -152,6 +153,7 @@
     "import": "Importer",
     "selectAll": "Tout sélectionner",
     "batchExport": "Exporter en lot",
+    "filterByTags": "Filtrer par tags",
     "exportZip": "Exporter ZIP ({{count}})",
     "importWizard": {
       "title": "Importer une recette",
@@ -271,6 +273,7 @@
     "yes": "Oui",
     "no": "Non",
     "translations": "Traductions",
-    "translationHint": "Optionnel : fournir des noms traduits pour chaque langue"
+    "translationHint": "Optionnel : fournir des noms traduits pour chaque langue",
+    "selected": "{{count}} sélectionné(s)"
   }
 }
