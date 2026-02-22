@@ -85,7 +85,9 @@
     "deleted": "Bouteille supprimée",
     "filterByCategory": "Filtrer par catégorie",
     "filterByType": "Filtrer par type",
-    "all": "Tous"
+    "all": "Tous",
+    "location": "Localisation",
+    "locationPlaceholder": "Ex: Étagère du haut, Bar principal..."
   },
   "ingredients": {
     "title": "Ingrédients",

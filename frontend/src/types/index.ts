@@ -32,6 +32,7 @@ export interface Bottle {
   remainingPercent: number;
   openedAt: string | null;
   alcoholPercentage: number | null;
+  location: string | null;
   isApero: boolean;
   isDigestif: boolean;
   createdAt: string;

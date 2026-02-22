@@ -27,6 +27,11 @@ export default function ImportEntityRow({
 
   const action = resolution?.action || (entity.status === 'matched' ? 'use_existing' : 'create');
 
+  // For bottles, filter existing options to only show bottles from the same category
+  const filteredOptions = entityType === 'bottle' && entity.ref.categoryName
+    ? existingOptions.filter((opt: any) => opt.category?.name?.toLowerCase() === entity.ref.categoryName.toLowerCase())
+    : existingOptions;
+
   const getDisplayName = () => {
     if (entityType === 'unit') return `${entity.ref.name} (${entity.ref.abbreviation})`;
     return entity.ref.name;
@@ -34,7 +39,7 @@ export default function ImportEntityRow({
 
   const handleActionChange = (newAction: 'use_existing' | 'create' | 'skip') => {
     if (newAction === 'use_existing') {
-      const matchId = entity.existingMatch?.id || existingOptions[0]?.id;
+      const matchId = entity.existingMatch?.id || filteredOptions[0]?.id;
       onChange({ action: 'use_existing', existingId: matchId });
     } else if (newAction === 'create') {
       onChange({ action: 'create', data: buildDefaultCreateData() });
@@ -153,7 +158,7 @@ export default function ImportEntityRow({
               onChange={(e) => onChange({ action: 'use_existing', existingId: parseInt(e.target.value) })}
               className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400"
             >
-              {existingOptions.map((opt) => (
+              {filteredOptions.map((opt) => (
                 <option key={opt.id} value={opt.id}>
                   {entityType === 'unit' ? `${opt.name} (${opt.abbreviation})` : opt.name}
                 </option>

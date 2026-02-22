@@ -15,7 +15,7 @@ export default function BottlesPage() {
   const [form, setForm] = useState({
     name: '', categoryId: 0, purchasePrice: '', capacityMl: 700,
     remainingPercent: 100, openedAt: '', alcoholPercentage: '',
-    isApero: false, isDigestif: false,
+    location: '', isApero: false, isDigestif: false,
   });
 
   const load = () => {
@@ -27,7 +27,7 @@ export default function BottlesPage() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: '', categoryId: cats[0]?.id || 0, purchasePrice: '', capacityMl: 700, remainingPercent: 100, openedAt: '', alcoholPercentage: '', isApero: false, isDigestif: false });
+    setForm({ name: '', categoryId: cats[0]?.id || 0, purchasePrice: '', capacityMl: 700, remainingPercent: 100, openedAt: '', alcoholPercentage: '', location: '', isApero: false, isDigestif: false });
     setShowModal(true);
   };
 
@@ -41,6 +41,7 @@ export default function BottlesPage() {
       remainingPercent: item.remainingPercent,
       openedAt: item.openedAt ? item.openedAt.split('T')[0] : '',
       alcoholPercentage: item.alcoholPercentage?.toString() || '',
+      location: item.location || '',
       isApero: item.isApero,
       isDigestif: item.isDigestif,
     });
@@ -57,6 +58,7 @@ export default function BottlesPage() {
       remainingPercent: form.remainingPercent,
       openedAt: form.openedAt || null,
       alcoholPercentage: form.alcoholPercentage ? parseFloat(form.alcoholPercentage) : null,
+      location: form.location || null,
       isApero: form.isApero,
       isDigestif: form.isDigestif,
     };
@@ -195,6 +197,10 @@ export default function BottlesPage() {
             <div>
               <label className="block text-sm text-gray-400 mb-1">Alcool % (vol.)</label>
               <input type="number" step="0.1" min="0" max="100" value={form.alcoholPercentage} onChange={(e) => setForm({ ...form, alcoholPercentage: e.target.value })} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400" placeholder="Ex: 40" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">{t('bottles.location')}</label>
+              <input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400" placeholder={t('bottles.locationPlaceholder')} />
             </div>
             <div className="space-y-2">
               <label className="block text-sm text-gray-400 mb-2">Utilisation</label>

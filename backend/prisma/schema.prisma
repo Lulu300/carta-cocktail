@@ -42,6 +42,7 @@ model Bottle {
   remainingPercent Int       @default(100)
   openedAt         DateTime?
   alcoholPercentage Float?   // Optional alcohol percentage
+  location         String?   // Optional free-text storage location
   isApero          Boolean   @default(false) // Usable as apéritif
   isDigestif       Boolean   @default(false) // Usable as digestif
   createdAt        DateTime  @default(now())

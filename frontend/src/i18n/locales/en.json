@@ -85,7 +85,9 @@
     "deleted": "Bottle deleted",
     "filterByCategory": "Filter by category",
     "filterByType": "Filter by type",
-    "all": "All"
+    "all": "All",
+    "location": "Location",
+    "locationPlaceholder": "E.g.: Top shelf, Main bar..."
   },
   "ingredients": {
     "title": "Ingredients",
