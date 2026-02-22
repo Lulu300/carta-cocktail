@@ -20,6 +20,7 @@ import publicRoutes from './routes/public';
 import shortageRoutes from './routes/shortages';
 import availabilityRoutes from './routes/availability';
 import settingsRoutes from './routes/settings';
+import backupRoutes from './routes/backup';
 
 const app = express();
 
@@ -50,5 +51,6 @@ app.use('/api/menu-sections', authMiddleware, menuSectionRoutes);
 app.use('/api/shortages', authMiddleware, shortageRoutes);
 app.use('/api/availability', authMiddleware, availabilityRoutes);
 app.use('/api/settings', authMiddleware, settingsRoutes);
+app.use('/api/backup', authMiddleware, backupRoutes);
 
 export default app;

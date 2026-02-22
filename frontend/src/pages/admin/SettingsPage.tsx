@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { settings as settingsApi } from '../../services/api';
+import { settings as settingsApi, backup as backupApi } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteSettings } from '../../contexts/SiteSettingsContext';
 
@@ -28,6 +28,14 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [profileMessage, setProfileMessage] = useState('');
   const [profileError, setProfileError] = useState('');
+
+  // Backup settings
+  const [backupFile, setBackupFile] = useState<File | null>(null);
+  const [backupExporting, setBackupExporting] = useState(false);
+  const [backupImporting, setBackupImporting] = useState(false);
+  const [backupMessage, setBackupMessage] = useState('');
+  const [backupError, setBackupError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     settingsApi.get().then((data) => {
@@ -80,6 +88,40 @@ export default function SettingsPage() {
       setConfirmPassword('');
     } catch (err: unknown) {
       setProfileError(err instanceof Error ? err.message : t('common.error'));
+    }
+  };
+
+  const handleBackupExport = async () => {
+    setBackupMessage('');
+    setBackupError('');
+    setBackupExporting(true);
+    try {
+      await backupApi.exportBackup();
+      setBackupMessage(t('settings.backup.exportSuccess'));
+    } catch (err: unknown) {
+      setBackupError(err instanceof Error ? err.message : t('common.error'));
+    } finally {
+      setBackupExporting(false);
+    }
+  };
+
+  const handleBackupImport = async () => {
+    if (!backupFile) return;
+    if (!confirm(t('settings.backup.confirmRestore'))) return;
+
+    setBackupMessage('');
+    setBackupError('');
+    setBackupImporting(true);
+    try {
+      await backupApi.importBackup(backupFile);
+      setBackupMessage(t('settings.backup.importSuccess'));
+      setBackupFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (err: unknown) {
+      setBackupError(err instanceof Error ? err.message : t('common.error'));
+    } finally {
+      setBackupImporting(false);
     }
   };
 
@@ -141,7 +183,7 @@ export default function SettingsPage() {
       </form>
 
       {/* Profile Settings */}
-      <form onSubmit={handleProfileSave} className="bg-[#1a1a2e] border border-gray-800 rounded-xl p-6">
+      <form onSubmit={handleProfileSave} className="bg-[#1a1a2e] border border-gray-800 rounded-xl p-6 mb-8">
         <h2 className="text-lg font-semibold text-white mb-4">{t('settings.profileConfig')}</h2>
 
         <div className="space-y-4">
@@ -202,6 +244,72 @@ export default function SettingsPage() {
           {t('common.save')}
         </button>
       </form>
+
+      {/* Backup & Restore */}
+      <div className="bg-[#1a1a2e] border border-gray-800 rounded-xl p-6">
+        <h2 className="text-lg font-semibold text-white mb-2">{t('settings.backup.title')}</h2>
+        <p className="text-sm text-gray-400 mb-6">{t('settings.backup.description')}</p>
+
+        <div className="space-y-4">
+          {/* Export */}
+          <div>
+            <button
+              onClick={handleBackupExport}
+              disabled={backupExporting}
+              className="bg-amber-400 text-black font-medium px-6 py-2.5 rounded-lg hover:bg-amber-300 transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              {backupExporting ? t('settings.backup.exporting') : t('settings.backup.export')}
+            </button>
+          </div>
+
+          <hr className="border-gray-800" />
+
+          {/* Import */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={backupImporting}
+                className="border border-gray-600 text-gray-300 hover:text-white hover:border-gray-400 font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                {t('settings.backup.selectFile')}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".zip"
+                onChange={(e) => setBackupFile(e.target.files?.[0] || null)}
+                className="hidden"
+              />
+              {backupFile && (
+                <span className="text-sm text-gray-400">
+                  {t('settings.backup.fileSelected', { name: backupFile.name })}
+                </span>
+              )}
+            </div>
+
+            {backupFile && (
+              <button
+                onClick={handleBackupImport}
+                disabled={backupImporting}
+                className="bg-red-600 hover:bg-red-700 text-white font-medium px-6 py-2.5 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {backupImporting ? t('settings.backup.importing') : t('settings.backup.import')}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {backupMessage && <p className="mt-4 text-sm text-green-400">{backupMessage}</p>}
+        {backupError && <p className="mt-4 text-sm text-red-400">{backupError}</p>}
+      </div>
     </div>
   );
 }
