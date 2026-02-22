@@ -87,7 +87,9 @@
     "filterByType": "Filtrer par type",
     "all": "Tous",
     "location": "Localisation",
-    "locationPlaceholder": "Ex: Étagère du haut, Bar principal..."
+    "locationPlaceholder": "Ex: Étagère du haut, Bar principal...",
+    "activeTitle": "Bouteilles disponibles",
+    "historyTitle": "Historique (vides)"
   },
   "ingredients": {
     "title": "Ingrédients",
