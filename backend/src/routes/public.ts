@@ -50,6 +50,9 @@ router.get('/menus/:slug', async (req: Request, res: Response) => {
           orderBy: { position: 'asc' },
         },
         bottles: {
+          where: {
+            bottle: { remainingPercent: { gt: 0 } },
+          },
           include: {
             bottle: {
               include: { category: true },

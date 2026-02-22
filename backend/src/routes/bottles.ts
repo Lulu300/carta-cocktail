@@ -8,6 +8,10 @@ const prisma = new PrismaClient();
 
 // Helper function to auto-sync bottle menus when bottle flags change
 async function syncBottleMenus(bottleId: number, isApero: boolean, isDigestif: boolean) {
+  // Fetch bottle to check if empty
+  const bottle = await prisma.bottle.findUnique({ where: { id: bottleId }, select: { remainingPercent: true } });
+  const isEmpty = !bottle || bottle.remainingPercent === 0;
+
   // Get apero and digestif menus
   const aperoMenu = await prisma.menu.findUnique({ where: { slug: 'aperitifs' } });
   const digestifMenu = await prisma.menu.findUnique({ where: { slug: 'digestifs' } });
@@ -18,8 +22,8 @@ async function syncBottleMenus(bottleId: number, isApero: boolean, isDigestif: b
       where: { menuId: aperoMenu.id, bottleId },
     });
 
-    if (isApero && !existsInApero) {
-      // Add to apero menu
+    if (isApero && !existsInApero && !isEmpty) {
+      // Add to apero menu (only non-empty bottles)
       const maxPosition = await prisma.menuBottle.findFirst({
         where: { menuId: aperoMenu.id },
         orderBy: { position: 'desc' },
@@ -32,7 +36,7 @@ async function syncBottleMenus(bottleId: number, isApero: boolean, isDigestif: b
           isHidden: false,
         },
       });
-    } else if (!isApero && existsInApero) {
+    } else if ((!isApero || isEmpty) && existsInApero) {
       // Remove from apero menu
       await prisma.menuBottle.delete({ where: { id: existsInApero.id } });
     }
@@ -44,8 +48,8 @@ async function syncBottleMenus(bottleId: number, isApero: boolean, isDigestif: b
       where: { menuId: digestifMenu.id, bottleId },
     });
 
-    if (isDigestif && !existsInDigestif) {
-      // Add to digestif menu
+    if (isDigestif && !existsInDigestif && !isEmpty) {
+      // Add to digestif menu (only non-empty bottles)
       const maxPosition = await prisma.menuBottle.findFirst({
         where: { menuId: digestifMenu.id },
         orderBy: { position: 'desc' },
@@ -58,7 +62,7 @@ async function syncBottleMenus(bottleId: number, isApero: boolean, isDigestif: b
           isHidden: false,
         },
       });
-    } else if (!isDigestif && existsInDigestif) {
+    } else if ((!isDigestif || isEmpty) && existsInDigestif) {
       // Remove from digestif menu
       await prisma.menuBottle.delete({ where: { id: existsInDigestif.id } });
     }

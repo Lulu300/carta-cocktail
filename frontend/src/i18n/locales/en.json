@@ -87,7 +87,9 @@
     "filterByType": "Filter by type",
     "all": "All",
     "location": "Location",
-    "locationPlaceholder": "E.g.: Top shelf, Main bar..."
+    "locationPlaceholder": "E.g.: Top shelf, Main bar...",
+    "activeTitle": "Available bottles",
+    "historyTitle": "History (empty)"
   },
   "ingredients": {
     "title": "Ingredients",
