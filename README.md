@@ -56,6 +56,26 @@ npm run dev
 
 Default admin credentials: `admin@carta.local` / `admin123`
 
+### Running Tests
+
+Tests are **required** to pass for CI. Every pull request and push to `main`/`develop` runs the full test suite.
+
+```bash
+# Backend tests (integration tests with real SQLite test database)
+cd backend
+npm test              # run once
+npm run test:watch    # watch mode
+npm run test:coverage # with coverage report
+
+# Frontend tests (unit tests with jsdom)
+cd frontend
+npm test              # run once
+npm run test:watch    # watch mode
+npm run test:coverage # with coverage report
+```
+
+The backend tests use a dedicated `test.db` SQLite database, created and destroyed automatically. No manual setup needed.
+
 ### Docker
 
 ```bash
@@ -121,7 +141,8 @@ This project uses a **feature branch** workflow:
 - TypeScript type checking
 - ESLint (frontend)
 - Build verification
-- Tests
+- Tests (must pass to merge)
+- Coverage report (uploaded as artifact)
 
 **Release** runs on version tags (`v*`):
 - Builds Docker images (backend + frontend)
