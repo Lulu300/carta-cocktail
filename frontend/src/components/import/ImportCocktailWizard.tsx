@@ -119,8 +119,8 @@ export default function ImportCocktailWizard({ onClose }: ImportCocktailWizardPr
       setPreview(result);
       setResolutions(buildAutoResolutions(result));
       setStep('resolve');
-    } catch (err: any) {
-      setError(err.message || t('common.error'));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : t('common.error'));
     } finally {
       setIsLoading(false);
     }
@@ -165,8 +165,8 @@ export default function ImportCocktailWizard({ onClose }: ImportCocktailWizardPr
       } else {
         setStep('success');
       }
-    } catch (err: any) {
-      setError(err.message || t('common.error'));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : t('common.error'));
       if (isBatch) {
         setImportResults((prev) => [...prev, { name: recipe.cocktail.name, success: false }]);
         setStep('error');

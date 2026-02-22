@@ -138,7 +138,7 @@ export default function CategoriesPage() {
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <h1 className="text-2xl font-bold font-serif text-amber-400">{t('categories.title')}</h1>
-          <button onClick={() => { setEditingType(null); setTypeForm({ name: '', color: 'gray', nameFr: '', nameEn: '' }); setShowManageTypes(true); }}
+          <button onClick={openCreateType}
             className="text-sm text-gray-400 hover:text-amber-400 transition-colors border border-gray-700 hover:border-amber-400/50 rounded-lg px-3 py-1.5">
             {t('categoryTypes.manage')}
           </button>

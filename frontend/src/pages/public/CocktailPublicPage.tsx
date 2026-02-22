@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { publicApi } from '../../services/api';
-import type { Cocktail } from '../../types';
+import type { Cocktail, CocktailIngredient } from '../../types';
 import UnitConverter from '../../components/ui/UnitConverter';
 import ExportCocktailButton from '../../components/ui/ExportCocktailButton';
 
@@ -35,7 +35,7 @@ export default function CocktailPublicPage() {
     return <div className="text-center py-12 text-gray-500">{t('common.loading')}</div>;
   }
 
-  const ingredientName = (ing: any) => {
+  const ingredientName = (ing: CocktailIngredient) => {
     if (ing.bottle) return ing.bottle.name;
     if (ing.category) return localize(ing.category);
     if (ing.ingredient) return localize(ing.ingredient);

@@ -23,13 +23,6 @@ export default function UnitConverter({ quantity, unit: unitAbbr }: UnitConverte
   // Find the current unit object
   const currentUnit = units.find(u => u.abbreviation === unitAbbr);
 
-  // Set initial selected unit when units are loaded
-  useEffect(() => {
-    if (currentUnit && !selectedUnit) {
-      setSelectedUnit(currentUnit);
-    }
-  }, [currentUnit, selectedUnit]);
-
   const canConvert = currentUnit && isConvertible(currentUnit);
 
   useEffect(() => {
@@ -71,7 +64,7 @@ export default function UnitConverter({ quantity, unit: unitAbbr }: UnitConverte
     setIsOpen(false);
   };
 
-  const isChanged = selectedUnit?.id !== currentUnit.id;
+  const isChanged = selectedUnit !== null && selectedUnit.id !== currentUnit.id;
   const displayUnit = selectedUnit || currentUnit;
 
   return (

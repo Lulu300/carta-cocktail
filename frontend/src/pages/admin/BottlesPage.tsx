@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { bottles as api, categories as categoriesApi } from '../../services/api';
@@ -18,12 +18,12 @@ export default function BottlesPage() {
     location: '', isApero: false, isDigestif: false,
   });
 
-  const load = () => {
+  const load = useCallback(() => {
     const params = filter ? { type: filter } : undefined;
     api.list(params).then(setItems);
-  };
+  }, [filter]);
   useEffect(() => { categoriesApi.list().then(setCats); }, []);
-  useEffect(() => { load(); }, [filter]);
+  useEffect(() => { load(); }, [load]);
 
   const openCreate = () => {
     setEditing(null);

@@ -232,7 +232,7 @@ export interface CocktailExportFormat {
 export interface ExportIngredient {
   sourceType: 'BOTTLE' | 'CATEGORY' | 'INGREDIENT';
   sourceName: string;
-  sourceDetail: Record<string, any>;
+  sourceDetail: Record<string, unknown>;
   quantity: number;
   unit: { name: string; abbreviation: string; conversionFactorToMl: number | null } | null;
   position: number;
@@ -252,16 +252,29 @@ export interface ImportPreviewResponse {
   ingredients: ImportEntityResolution[];
 }
 
+export interface ImportEntityRef {
+  name?: string;
+  abbreviation?: string;
+  conversionFactorToMl?: number | null;
+  nameTranslations?: Record<string, string> | null;
+  type?: string;
+  desiredStock?: number;
+  categoryName?: string;
+  capacityMl?: number;
+  remainingPercent?: number;
+  icon?: string | null;
+}
+
 export interface ImportEntityResolution {
-  ref: Record<string, any>;
-  existingMatch: { id: number; name: string; [key: string]: any } | null;
+  ref: ImportEntityRef;
+  existingMatch: { id: number; name: string } | null;
   status: 'matched' | 'missing';
 }
 
 export interface EntityResolutionAction {
   action: 'use_existing' | 'create' | 'skip';
   existingId?: number;
-  data?: Record<string, any>;
+  data?: ImportEntityRef;
 }
 
 export interface CocktailAvailability {

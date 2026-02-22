@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { EntityResolutionAction, ImportEntityResolution, CategoryType } from '../../types';
+import type { EntityResolutionAction, ImportEntityResolution, ImportEntityRef, CategoryType } from '../../types';
 import IconPicker from '../ui/IconPicker';
 
 interface ImportEntityRowProps {
   entity: ImportEntityResolution;
   entityType: 'unit' | 'category' | 'bottle' | 'ingredient';
-  existingOptions: { id: number; name: string; [key: string]: any }[];
+  existingOptions: Array<{ id: number; name: string; abbreviation?: string; category?: { name?: string } }>;
   resolution: EntityResolutionAction | undefined;
   onChange: (resolution: EntityResolutionAction) => void;
   allowSkip?: boolean;
@@ -29,7 +29,7 @@ export default function ImportEntityRow({
 
   // For bottles, filter existing options to only show bottles from the same category
   const filteredOptions = entityType === 'bottle' && entity.ref.categoryName
-    ? existingOptions.filter((opt: any) => opt.category?.name?.toLowerCase() === entity.ref.categoryName.toLowerCase())
+    ? existingOptions.filter((opt) => opt.category?.name?.toLowerCase() === entity.ref.categoryName?.toLowerCase())
     : existingOptions;
 
   const getDisplayName = () => {
@@ -82,10 +82,10 @@ export default function ImportEntityRow({
     }
   };
 
-  const updateCreateData = (field: string, value: any) => {
+  const updateCreateData = (field: string, value: string | number | null) => {
     onChange({
       action: 'create',
-      data: { ...(resolution?.data || buildDefaultCreateData()), [field]: value },
+      data: { ...(resolution?.data || buildDefaultCreateData()), [field]: value } as ImportEntityRef,
     });
   };
 

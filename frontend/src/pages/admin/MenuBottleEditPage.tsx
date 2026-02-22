@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { menus as menusApi, menuBottles as menuBottlesApi, menuSections } from '../../services/api';
@@ -21,7 +21,7 @@ export default function MenuBottleEditPage() {
   const [editingSectionId, setEditingSectionId] = useState<number | null>(null);
   const [editingSectionName, setEditingSectionName] = useState('');
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!id) return;
     const m = await menusApi.get(parseInt(id));
     setMenu(m);
@@ -30,11 +30,11 @@ export default function MenuBottleEditPage() {
     setIsPublic(m.isPublic);
     setSections(m.sections || []);
     setMenuBottles(m.bottles || []);
-  };
+  }, [id]);
 
   useEffect(() => {
     load();
-  }, [id]);
+  }, [load]);
 
   const handleSync = async () => {
     if (!id) return;

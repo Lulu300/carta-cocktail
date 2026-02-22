@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { useAuth } from '../../contexts/AuthContext';
 import { publicApi, availability } from '../../services/api';
-import type { Menu, CocktailAvailability } from '../../types';
+import type { Menu, MenuBottle, MenuCocktail, CocktailAvailability } from '../../types';
 
 export default function MenuPublicPage() {
   const { t } = useTranslation();
@@ -52,18 +52,18 @@ export default function MenuPublicPage() {
   const hasSections = (menu.sections && menu.sections.length > 0) || false;
 
   // Filter function for search
-  const matchesSearch = (item: any) => {
+  const matchesSearch = (item: MenuBottle | MenuCocktail) => {
     if (!searchQuery.trim()) return true;
     const query = searchQuery.toLowerCase();
 
     if (isBottleMenu) {
-      const bottle = item.bottle;
+      const bottle = (item as MenuBottle).bottle;
       return (
         bottle?.name?.toLowerCase().includes(query) ||
         (bottle?.category ? localize(bottle.category).toLowerCase().includes(query) : false)
       );
     } else {
-      const cocktail = item.cocktail;
+      const cocktail = (item as MenuCocktail).cocktail;
       const tags = cocktail?.tags ? cocktail.tags.split(',').map((t: string) => t.trim().toLowerCase()) : [];
       return (
         cocktail?.name?.toLowerCase().includes(query) ||
@@ -79,7 +79,7 @@ export default function MenuPublicPage() {
   };
 
   // Group bottles/cocktails by section OR by default grouping
-  const itemsBySection: Record<string, any[]> = {};
+  const itemsBySection: Record<string, (MenuBottle | MenuCocktail)[]> = {};
 
   if (isBottleMenu) {
     const visibleBottles = (menu.bottles || []).filter((mb) => !mb.isHidden && matchesSearch(mb));
@@ -181,7 +181,7 @@ export default function MenuPublicPage() {
                 {isBottleMenu ? (
                   <div className="bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden">
                     <div className="divide-y divide-gray-800">
-                      {itemsBySection['__no_section__'].map((mb: any) => {
+                      {(itemsBySection['__no_section__'] as MenuBottle[]).map((mb) => {
                         const bottle = mb.bottle!;
                         const isAvailable = bottle.remainingPercent > 0;
                         return (
@@ -215,7 +215,7 @@ export default function MenuPublicPage() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {itemsBySection['__no_section__'].map((mc: any) => {
+                    {(itemsBySection['__no_section__'] as MenuCocktail[]).map((mc) => {
                       const cocktail = mc.cocktail!;
                       const isUnavailable = !cocktail.isAvailable;
                       const avail = user ? getAvailability(cocktail.id) : undefined;
@@ -286,7 +286,7 @@ export default function MenuPublicPage() {
                   {isBottleMenu ? (
                     <div className="bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden">
                       <div className="divide-y divide-gray-800">
-                        {sectionItems.map((mb: any) => {
+                        {(sectionItems as MenuBottle[]).map((mb) => {
                           const bottle = mb.bottle!;
                           const isAvailable = bottle.remainingPercent > 0;
                           return (
@@ -320,7 +320,7 @@ export default function MenuPublicPage() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {sectionItems.map((mc: any) => {
+                      {(sectionItems as MenuCocktail[]).map((mc) => {
                         const cocktail = mc.cocktail!;
                         const isUnavailable = !cocktail.isAvailable;
                         const avail = user ? getAvailability(cocktail.id) : undefined;
@@ -394,9 +394,9 @@ export default function MenuPublicPage() {
                       <h2 className="text-lg font-serif font-bold text-amber-400">{categoryName}</h2>
                     </div>
                     <div className="divide-y divide-gray-800">
-                      {bottles
-                        .sort((a: any, b: any) => (a.bottle?.name || '').localeCompare(b.bottle?.name || ''))
-                        .map((mb: any) => {
+                      {(bottles as MenuBottle[])
+                        .sort((a, b) => (a.bottle?.name || '').localeCompare(b.bottle?.name || ''))
+                        .map((mb) => {
                           const bottle = mb.bottle!;
                           const isAvailable = bottle.remainingPercent > 0;
                           return (
@@ -432,7 +432,7 @@ export default function MenuPublicPage() {
             ) : (
               // Cocktails without grouping
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {itemsBySection['__all__']?.map((mc: any) => {
+                {(itemsBySection['__all__'] as MenuCocktail[])?.map((mc) => {
                   const cocktail = mc.cocktail!;
                   const isUnavailable = !cocktail.isAvailable;
                   const avail = user ? getAvailability(cocktail.id) : undefined;

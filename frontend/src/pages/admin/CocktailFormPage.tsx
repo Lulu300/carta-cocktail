@@ -264,7 +264,7 @@ export default function CocktailFormPage() {
             {ingredientRows.map((row, idx) => (
               <div key={idx} className="bg-[#0f0f1a] rounded-lg p-3 space-y-2">
                 <div className="flex gap-2 items-center">
-                  <select value={row.sourceType} onChange={(e) => updateIngredient(idx, { sourceType: e.target.value as any })}
+                  <select value={row.sourceType} onChange={(e) => updateIngredient(idx, { sourceType: e.target.value as 'BOTTLE' | 'CATEGORY' | 'INGREDIENT' })}
                     className="bg-[#1a1a2e] border border-gray-700 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400">
                     <option value="BOTTLE">{t('cocktails.specificBottle')}</option>
                     <option value="CATEGORY">{t('cocktails.categoryType')}</option>

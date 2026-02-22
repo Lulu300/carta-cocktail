@@ -27,8 +27,10 @@ export function SiteSettingsProvider({ children }: { children: React.ReactNode }
   }, []);
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    publicApi.getSettings()
+      .then(setSiteSettings)
+      .catch(() => {});
+  }, []);
 
   // Update document title and favicon when settings change
   useEffect(() => {
@@ -54,6 +56,7 @@ export function SiteSettingsProvider({ children }: { children: React.ReactNode }
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useSiteSettings() {
   return useContext(SiteSettingsContext);
 }

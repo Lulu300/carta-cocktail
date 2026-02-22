@@ -38,7 +38,7 @@ export default function ImportStepResolve({ preview, resolutions, setResolutions
     });
   };
 
-  const getKey = (entity: { ref: Record<string, any> }, type: string) => {
+  const getKey = (entity: ImportEntityResolution, type: string) => {
     if (type === 'units') return entity.ref.abbreviation?.toLowerCase() || entity.ref.name?.toLowerCase();
     return entity.ref.name?.toLowerCase();
   };
@@ -65,7 +65,7 @@ export default function ImportStepResolve({ preview, resolutions, setResolutions
     title: string,
     entities: ImportPreviewResponse['units'],
     type: 'units' | 'categories' | 'bottles' | 'ingredients',
-    existingOptions: { id: number; name: string; [key: string]: any }[],
+    existingOptions: Array<{ id: number; name: string; abbreviation?: string; category?: { name?: string } }>,
     allowSkip?: boolean,
     categoryTypes?: CategoryType[],
   ) => {

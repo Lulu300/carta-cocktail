@@ -38,6 +38,7 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (user) setEmail(user.email);
   }, [user]);
 
@@ -49,8 +50,8 @@ export default function SettingsPage() {
       await settingsApi.update({ siteName, siteIcon });
       setSiteMessage(t('settings.siteUpdated'));
       await refreshSiteSettings();
-    } catch (err: any) {
-      setSiteError(err.message || t('common.error'));
+    } catch (err: unknown) {
+      setSiteError(err instanceof Error ? err.message : t('common.error'));
     }
   };
 
@@ -77,8 +78,8 @@ export default function SettingsPage() {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-    } catch (err: any) {
-      setProfileError(err.message || t('common.error'));
+    } catch (err: unknown) {
+      setProfileError(err instanceof Error ? err.message : t('common.error'));
     }
   };
 
