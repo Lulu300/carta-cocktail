@@ -16,6 +16,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -34,9 +36,26 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Tests
-        run: npm test
-        continue-on-error: true
+      - name: Tests with coverage
+        run: npm run test:coverage
+        env:
+          DATABASE_URL: file:./prisma/test.db
+          JWT_SECRET: test-secret
+          ADMIN_EMAIL: admin@test.local
+          ADMIN_PASSWORD: testpass123
+          NODE_ENV: test
+
+      - name: Delta coverage check (80%)
+        if: github.event_name == 'pull_request'
+        run: node ../.github/scripts/delta-coverage.mjs coverage/coverage-final.json 80 origin/${{ github.base_ref }}
+
+      - name: Upload backend coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage/
+          retention-days: 7
 
   frontend:
     name: Frontend
@@ -47,6 +66,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -65,6 +86,17 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Tests
-        run: npm test
-        continue-on-error: true
+      - name: Tests with coverage
+        run: npm run test:coverage
+
+      - name: Delta coverage check (80%)
+        if: github.event_name == 'pull_request'
+        run: node ../.github/scripts/delta-coverage.mjs coverage/coverage-final.json 80 origin/${{ github.base_ref }}
+
+      - name: Upload frontend coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/
+          retention-days: 7
