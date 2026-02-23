@@ -1,8 +1,6 @@
 services:
   carta-cocktail-backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: ghcr.io/lulu300/carta-cocktail/backend:latest
     ports:
       - "3001:3001"
     environment:
@@ -17,9 +15,7 @@ services:
     restart: unless-stopped
 
   carta-cocktail-frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: ghcr.io/lulu300/carta-cocktail/frontend:latest
     ports:
       - "80:80"
     environment:
