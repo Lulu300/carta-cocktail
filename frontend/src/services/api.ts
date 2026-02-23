@@ -218,3 +218,42 @@ export const settings = {
   updateProfile: (data: { email?: string; currentPassword?: string; newPassword?: string }) =>
     request<{ id: number; email: string }>('/settings/profile', { method: 'PUT', body: JSON.stringify(data) }),
 };
+
+// Backup
+export const backup = {
+  exportBackup: async () => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_BASE}/backup/export`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const disposition = res.headers.get('Content-Disposition') || '';
+    const match = disposition.match(/filename=(.+)/);
+    const filename = match ? match[1] : `backup-${new Date().toISOString().slice(0, 10)}.zip`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+  importBackup: async (file: File) => {
+    const token = localStorage.getItem('token');
+    const formData = new FormData();
+    formData.append('backup', file);
+    const res = await fetch(`${API_BASE}/backup/import`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+    return res.json();
+  },
+};

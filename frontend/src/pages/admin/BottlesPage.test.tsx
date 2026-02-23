@@ -12,6 +12,18 @@ vi.mock('../../hooks/useLocalizedName', () => ({
   useLocalizedName: () => (entity: { name: string }) => entity.name,
 }));
 
+vi.mock('../../components/ui/MultiSelectDropdown', () => ({
+  default: ({ placeholder }: { onChange: (v: string[]) => void; placeholder: string }) => (
+    <div data-testid="multi-select">{placeholder}</div>
+  ),
+}));
+
+vi.mock('../../components/ui/LocationAutocomplete', () => ({
+  default: ({ onChange, placeholder }: { onChange: (v: string) => void; placeholder: string }) => (
+    <input data-testid="location-autocomplete" placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
+  ),
+}));
+
 import { bottles as api, categories as categoriesApi } from '../../services/api';
 
 const mockApiList = vi.mocked(api.list);
@@ -153,5 +165,130 @@ describe('BottlesPage', () => {
     // Hendricks has remainingPercent=20 -> red
     const redBar = document.querySelector('.bg-red-500');
     expect(redBar).not.toBeNull();
+  });
+
+  it('submits create form with correct data', async () => {
+    const user = userEvent.setup();
+    render(<BottlesPage />);
+    await waitFor(() => {
+      expect(screen.getByText('bottles.add')).toBeInTheDocument();
+    });
+    await user.click(screen.getByText('bottles.add'));
+
+    // The modal form's name input has the required attribute
+    const form = document.querySelector('form')!;
+    const nameInput = form.querySelector('input[required]') as HTMLInputElement;
+    await user.type(nameInput, 'New Whisky');
+
+    await user.click(screen.getByText('common.save'));
+    await waitFor(() => {
+      expect(mockApiCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'New Whisky' })
+      );
+    });
+  });
+
+  it('submits edit form and calls api.update', async () => {
+    const user = userEvent.setup();
+    render(<BottlesPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Absolut')).toBeInTheDocument();
+    });
+    const editButtons = screen.getAllByTitle('common.edit');
+    await user.click(editButtons[0]);
+
+    const nameInput = screen.getByDisplayValue('Absolut');
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Absolut Elyx');
+
+    await user.click(screen.getByText('common.save'));
+    await waitFor(() => {
+      expect(mockApiUpdate).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ name: 'Absolut Elyx' })
+      );
+    });
+  });
+
+  it('does not call delete when confirm returns false', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<BottlesPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Absolut')).toBeInTheDocument();
+    });
+    const deleteButtons = screen.getAllByTitle('common.delete');
+    await user.click(deleteButtons[0]);
+    expect(window.confirm).toHaveBeenCalled();
+    expect(mockApiDelete).not.toHaveBeenCalled();
+  });
+
+  it('filters by search term', async () => {
+    const user = userEvent.setup();
+    render(<BottlesPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Absolut')).toBeInTheDocument();
+      expect(screen.getByText('Hendricks')).toBeInTheDocument();
+    });
+    // Use placeholder to distinguish search input from location autocomplete
+    const searchInput = screen.getByPlaceholderText('common.search');
+    await user.type(searchInput, 'Absolut');
+    expect(screen.getByText('Absolut')).toBeInTheDocument();
+    expect(screen.queryByText('Hendricks')).not.toBeInTheDocument();
+  });
+
+  it('shows price "-" for bottle with null price', async () => {
+    render(<BottlesPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Hendricks')).toBeInTheDocument();
+    });
+    // Hendricks has purchasePrice: null -> should show '-'
+    // Absolut has 25 -> '25 €'
+    expect(screen.getByText('25 €')).toBeInTheDocument();
+    // The '-' for null price
+    const dashes = screen.getAllByText('-');
+    expect(dashes.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('shows "bottles.opened" badge for opened bottle and "bottles.unopened" for sealed', async () => {
+    render(<BottlesPage />);
+    await waitFor(() => {
+      expect(screen.getByText('bottles.opened')).toBeInTheDocument();
+      expect(screen.getByText('bottles.unopened')).toBeInTheDocument();
+    });
+  });
+
+  it('shows isApero and isDigestif checkboxes in create modal', async () => {
+    const user = userEvent.setup();
+    render(<BottlesPage />);
+    await waitFor(() => {
+      expect(screen.getByText('bottles.add')).toBeInTheDocument();
+    });
+    await user.click(screen.getByText('bottles.add'));
+
+    const checkboxes = screen.getAllByRole('checkbox');
+    // Two checkboxes: isApero and isDigestif
+    expect(checkboxes.length).toBeGreaterThanOrEqual(2);
+
+    // Toggle isApero (first checkbox)
+    await user.click(checkboxes[0]);
+    expect((checkboxes[0] as HTMLInputElement).checked).toBe(true);
+  });
+
+  it('pre-fills isApero=true in edit modal for Hendricks', async () => {
+    const user = userEvent.setup();
+    render(<BottlesPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Hendricks')).toBeInTheDocument();
+    });
+    const editButtons = screen.getAllByTitle('common.edit');
+    // Hendricks is the second bottle (index 1)
+    await user.click(editButtons[1]);
+
+    const checkboxes = screen.getAllByRole('checkbox');
+    // Hendricks has isApero=true
+    expect((checkboxes[0] as HTMLInputElement).checked).toBe(true);
+    // isDigestif=false
+    expect((checkboxes[1] as HTMLInputElement).checked).toBe(false);
   });
 });

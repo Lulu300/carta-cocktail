@@ -4,6 +4,7 @@ import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { ingredients as api } from '../../services/api';
 import type { Ingredient } from '../../types';
 import IconPicker from '../../components/ui/IconPicker';
+import SearchInput from '../../components/ui/SearchInput';
 
 export default function IngredientsPage() {
   const { t } = useTranslation();
@@ -17,6 +18,7 @@ export default function IngredientsPage() {
   const [nameEn, setNameEn] = useState('');
   const [showTranslations, setShowTranslations] = useState(false);
   const [filter, setFilter] = useState<'all' | 'available' | 'unavailable'>('all');
+  const [search, setSearch] = useState('');
 
   const load = () => api.list().then(setItems);
   useEffect(() => { load(); }, []);
@@ -101,8 +103,10 @@ export default function IngredientsPage() {
         </div>
       </div>
 
-      {/* Availability filter */}
-      <div className="flex gap-2 mb-4">
+      {/* Search and availability filter */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <SearchInput value={search} onChange={setSearch} className="sm:max-w-sm" />
+        <div className="flex gap-2">
         {(['all', 'available', 'unavailable'] as const).map((f) => (
           <button
             key={f}
@@ -121,10 +125,18 @@ export default function IngredientsPage() {
             )}
           </button>
         ))}
+        </div>
       </div>
 
       {(() => {
-        const filtered = filter === 'all' ? items : items.filter((i) => filter === 'available' ? i.isAvailable : !i.isAvailable);
+        const filtered = items.filter((i) => {
+          if (filter === 'available' && !i.isAvailable) return false;
+          if (filter === 'unavailable' && i.isAvailable) return false;
+          if (search.trim()) {
+            if (!localize(i).toLowerCase().includes(search.toLowerCase())) return false;
+          }
+          return true;
+        });
         return filtered.length === 0 ? (
         <div className="text-center py-12 text-gray-500">
           {t('common.noResults')}

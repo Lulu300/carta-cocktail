@@ -1,15 +1,21 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { bottles as api, categories as categoriesApi } from '../../services/api';
 import type { Bottle, Category } from '../../types';
+import SearchInput from '../../components/ui/SearchInput';
+import MultiSelectDropdown from '../../components/ui/MultiSelectDropdown';
+import LocationAutocomplete from '../../components/ui/LocationAutocomplete';
 
 export default function BottlesPage() {
   const { t } = useTranslation();
   const localize = useLocalizedName();
   const [items, setItems] = useState<Bottle[]>([]);
   const [cats, setCats] = useState<Category[]>([]);
-  const [filter, setFilter] = useState<string>('');
+  const [search, setSearch] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [locationFilter, setLocationFilter] = useState('');
+  const [showHistory, setShowHistory] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Bottle | null>(null);
   const [form, setForm] = useState({
@@ -18,12 +24,28 @@ export default function BottlesPage() {
     location: '', isApero: false, isDigestif: false,
   });
 
-  const load = useCallback(() => {
-    const params = filter ? { type: filter } : undefined;
-    api.list(params).then(setItems);
-  }, [filter]);
+  const load = () => api.list().then(setItems);
   useEffect(() => { categoriesApi.list().then(setCats); }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, []);
+
+  const categoryOptions = useMemo(() =>
+    cats.map((c) => ({ value: String(c.id), label: localize(c) })),
+    [cats, localize]
+  );
+
+  const uniqueLocations = useMemo(() =>
+    [...new Set(items.map((b) => b.location).filter((loc): loc is string => !!loc))].sort(),
+    [items]
+  );
+
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      if (search.trim() && !item.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (selectedCategories.length > 0 && !selectedCategories.includes(String(item.categoryId))) return false;
+      if (locationFilter.trim() && (!item.location || !item.location.toLowerCase().includes(locationFilter.toLowerCase()))) return false;
+      return true;
+    });
+  }, [items, search, selectedCategories, locationFilter]);
 
   const openCreate = () => {
     setEditing(null);
@@ -92,72 +114,147 @@ export default function BottlesPage() {
         </button>
       </div>
 
-      <div className="flex gap-2 mb-4 flex-wrap">
-        {['', ...[...new Set(cats.map(c => c.type))]].map((f) => {
-          const ct = cats.find(c => c.type === f)?.categoryType;
-          const label = f ? (ct ? localize(ct) : f) : t('bottles.all');
-          return (
-            <button key={f} onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${filter === f ? 'bg-amber-400 text-[#0f0f1a] font-semibold' : 'bg-[#1a1a2e] text-gray-400 hover:text-white border border-gray-800'}`}>
-              {label}
-            </button>
-          );
-        })}
+      <div className="flex flex-col lg:flex-row gap-3 mb-4">
+        <SearchInput value={search} onChange={setSearch} className="lg:w-64" />
+        <MultiSelectDropdown
+          options={categoryOptions}
+          selected={selectedCategories}
+          onChange={setSelectedCategories}
+          placeholder={t('bottles.filterByCategory')}
+          className="lg:w-64"
+        />
+        <LocationAutocomplete
+          value={locationFilter}
+          onChange={setLocationFilter}
+          locations={uniqueLocations}
+          placeholder={t('bottles.filterByLocation')}
+          className="lg:w-64"
+        />
       </div>
 
-      <div className="bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-[#0f0f1a]">
-            <tr>
-              <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('bottles.name')}</th>
-              <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('bottles.category')}</th>
-              <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('bottles.capacityMl')}</th>
-              <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('bottles.remainingPercent')}</th>
-              <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('bottles.openedAt')}</th>
-              <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('bottles.purchasePrice')}</th>
-              <th className="text-right px-6 py-3 text-sm text-gray-400 font-medium">{t('common.actions')}</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-800">
-            {items.map((item) => (
-              <tr key={item.id} className="hover:bg-gray-800/50">
-                <td className="px-6 py-4 font-medium">{item.name}</td>
-                <td className="px-6 py-4 text-gray-400">{item.category ? localize(item.category) : ''}</td>
-                <td className="px-6 py-4">{item.capacityMl} ml</td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
-                      <div className={`h-full ${remainingColor(item.remainingPercent)} rounded-full`} style={{ width: `${item.remainingPercent}%` }} />
-                    </div>
-                    <span className="text-sm">{item.remainingPercent}%</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${item.openedAt ? 'bg-orange-500/20 text-orange-400' : 'bg-green-500/20 text-green-400'}`}>
-                    {item.openedAt ? t('bottles.opened') : t('bottles.unopened')}
+      {/* Active bottles */}
+      {(() => {
+        const activeItems = filteredItems.filter(i => i.remainingPercent > 0);
+        const historyItems = filteredItems.filter(i => i.remainingPercent === 0);
+        return (
+          <>
+            <div className="bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden">
+              <div className="bg-[#0f0f1a] px-6 py-3 border-b border-gray-800 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+                  {t('bottles.activeTitle')} ({activeItems.length})
+                </h2>
+              </div>
+              <table className="w-full">
+                <thead className="bg-[#0f0f1a]">
+                  <tr>
+                    <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('bottles.name')}</th>
+                    <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('bottles.category')}</th>
+                    <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('bottles.capacityMl')}</th>
+                    <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('bottles.remainingPercent')}</th>
+                    <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('bottles.openedAt')}</th>
+                    <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('bottles.purchasePrice')}</th>
+                    <th className="text-right px-6 py-3 text-sm text-gray-400 font-medium">{t('common.actions')}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800">
+                  {activeItems.map((item) => (
+                    <tr key={item.id} className="hover:bg-gray-800/50">
+                      <td className="px-6 py-4 font-medium">{item.name}</td>
+                      <td className="px-6 py-4 text-gray-400">{item.category ? localize(item.category) : ''}</td>
+                      <td className="px-6 py-4">{item.capacityMl} ml</td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
+                            <div className={`h-full ${remainingColor(item.remainingPercent)} rounded-full`} style={{ width: `${item.remainingPercent}%` }} />
+                          </div>
+                          <span className="text-sm">{item.remainingPercent}%</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${item.openedAt ? 'bg-orange-500/20 text-orange-400' : 'bg-green-500/20 text-green-400'}`}>
+                          {item.openedAt ? t('bottles.opened') : t('bottles.unopened')}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-gray-400">{item.purchasePrice ? `${item.purchasePrice} €` : '-'}</td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-3">
+                          <button onClick={() => openEdit(item)} className="text-amber-400 hover:text-amber-300 transition-colors" title={t('common.edit')}>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 transition-colors" title={t('common.delete')}>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {activeItems.length === 0 && <div className="text-center py-8 text-gray-500">{t('common.noResults')}</div>}
+            </div>
+
+            {/* History (empty bottles) */}
+            {historyItems.length > 0 && (
+              <div className="mt-6">
+                <button
+                  onClick={() => setShowHistory(!showHistory)}
+                  className="flex items-center gap-2 text-gray-500 hover:text-gray-300 transition-colors mb-3"
+                >
+                  <svg className={`w-4 h-4 transition-transform ${showHistory ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                  <span className="text-sm font-semibold uppercase tracking-wider">
+                    {t('bottles.historyTitle')} ({historyItems.length})
                   </span>
-                </td>
-                <td className="px-6 py-4 text-gray-400">{item.purchasePrice ? `${item.purchasePrice} €` : '-'}</td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex items-center justify-end gap-3">
-                    <button onClick={() => openEdit(item)} className="text-amber-400 hover:text-amber-300 transition-colors" title={t('common.edit')}>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                    </button>
-                    <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 transition-colors" title={t('common.delete')}>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
+                </button>
+                {showHistory && (
+                  <div className="bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden opacity-60">
+                    <table className="w-full">
+                      <thead className="bg-[#0f0f1a]">
+                        <tr>
+                          <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('bottles.name')}</th>
+                          <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('bottles.category')}</th>
+                          <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('bottles.capacityMl')}</th>
+                          <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('bottles.purchasePrice')}</th>
+                          <th className="text-right px-6 py-3 text-sm text-gray-400 font-medium">{t('common.actions')}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-800">
+                        {historyItems.map((item) => (
+                          <tr key={item.id} className="hover:bg-gray-800/50">
+                            <td className="px-6 py-4 font-medium text-gray-500">{item.name}</td>
+                            <td className="px-6 py-4 text-gray-500">{item.category ? localize(item.category) : ''}</td>
+                            <td className="px-6 py-4 text-gray-500">{item.capacityMl} ml</td>
+                            <td className="px-6 py-4 text-gray-500">{item.purchasePrice ? `${item.purchasePrice} €` : '-'}</td>
+                            <td className="px-6 py-4 text-right">
+                              <div className="flex items-center justify-end gap-3">
+                                <button onClick={() => openEdit(item)} className="text-amber-400 hover:text-amber-300 transition-colors" title={t('common.edit')}>
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                </button>
+                                <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 transition-colors" title={t('common.delete')}>
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {items.length === 0 && <div className="text-center py-8 text-gray-500">{t('common.noResults')}</div>}
-      </div>
+                )}
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">

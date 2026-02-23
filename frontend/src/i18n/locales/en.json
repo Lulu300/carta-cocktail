@@ -87,7 +87,10 @@
     "filterByType": "Filter by type",
     "all": "All",
     "location": "Location",
-    "locationPlaceholder": "E.g.: Top shelf, Main bar..."
+    "locationPlaceholder": "E.g.: Top shelf, Main bar...",
+    "activeTitle": "Available bottles",
+    "historyTitle": "History (empty)",
+    "filterByLocation": "Filter by location"
   },
   "ingredients": {
     "title": "Ingredients",
@@ -150,6 +153,7 @@
     "import": "Import",
     "selectAll": "Select all",
     "batchExport": "Batch export",
+    "filterByTags": "Filter by tags",
     "exportZip": "Export ZIP ({{count}})",
     "importWizard": {
       "title": "Import a recipe",
@@ -251,7 +255,21 @@
     "confirmPassword": "Confirm Password",
     "confirmPasswordPlaceholder": "Retype new password",
     "profileUpdated": "Profile updated",
-    "passwordMismatch": "Passwords do not match"
+    "passwordMismatch": "Passwords do not match",
+    "backup": {
+      "title": "Backup & Restore",
+      "description": "Export a complete backup of your database and images, or restore from a previous backup.",
+      "export": "Export Backup",
+      "exporting": "Exporting...",
+      "import": "Restore Backup",
+      "importing": "Restoring...",
+      "selectFile": "Select ZIP file",
+      "confirmRestore": "This will replace ALL current data (database and images). This action cannot be undone. Continue?",
+      "exportSuccess": "Backup exported successfully",
+      "importSuccess": "Backup restored successfully. The page will reload.",
+      "invalidBackup": "Invalid backup file",
+      "fileSelected": "File: {{name}}"
+    }
   },
   "common": {
     "save": "Save",
@@ -269,6 +287,7 @@
     "yes": "Yes",
     "no": "No",
     "translations": "Translations",
-    "translationHint": "Optional: provide translated names for each language"
+    "translationHint": "Optional: provide translated names for each language",
+    "selected": "{{count}} selected"
   }
 }

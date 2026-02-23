@@ -6,7 +6,8 @@
     "serverError": "Internal server error",
     "validationError": "Validation error",
     "duplicateEntry": "This entry already exists",
-    "cannotDelete": "Cannot delete: resource is in use"
+    "cannotDelete": "Cannot delete: resource is in use",
+    "invalidBackup": "Invalid backup file"
   },
   "auth": {
     "loginSuccess": "Login successful",

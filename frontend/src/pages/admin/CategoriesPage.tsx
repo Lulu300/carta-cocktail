@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { categories as api, categoryTypes as ctApi } from '../../services/api';
 import type { Category, CategoryType } from '../../types';
 import { getBadgeClasses, CATEGORY_TYPE_COLORS, COLOR_DOT_CLASSES } from '../../utils/colors';
+import SearchInput from '../../components/ui/SearchInput';
 
 export default function CategoriesPage() {
   const { t } = useTranslation();
@@ -18,6 +19,13 @@ export default function CategoriesPage() {
   const [editingType, setEditingType] = useState<CategoryType | null>(null);
   const [typeForm, setTypeForm] = useState({ name: '', color: 'gray', nameFr: '', nameEn: '' });
   const [showTypeTranslations, setShowTypeTranslations] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const filteredItems = useMemo(() => {
+    if (!search.trim()) return items;
+    const lower = search.toLowerCase();
+    return items.filter((item) => localize(item).toLowerCase().includes(lower));
+  }, [items, search, localize]);
 
   const typeLabel = (type: string) => {
     const ct = catTypes.find(ct => ct.name === type);
@@ -148,6 +156,8 @@ export default function CategoriesPage() {
         </button>
       </div>
 
+      <SearchInput value={search} onChange={setSearch} className="max-w-sm mb-4" />
+
       <div className="bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden">
         <table className="w-full">
           <thead className="bg-[#0f0f1a]">
@@ -160,7 +170,7 @@ export default function CategoriesPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-800">
-            {items.map((item) => (
+            {filteredItems.map((item) => (
               <tr key={item.id} className="hover:bg-gray-800/50">
                 <td className="px-6 py-4 font-medium">{localize(item)}</td>
                 <td className="px-6 py-4">
@@ -188,7 +198,7 @@ export default function CategoriesPage() {
             ))}
           </tbody>
         </table>
-        {items.length === 0 && <div className="text-center py-8 text-gray-500">{t('common.noResults')}</div>}
+        {filteredItems.length === 0 && <div className="text-center py-8 text-gray-500">{t('common.noResults')}</div>}
       </div>
 
       {/* Category create/edit modal */}

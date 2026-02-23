@@ -87,7 +87,10 @@
     "filterByType": "Filtrer par type",
     "all": "Tous",
     "location": "Localisation",
-    "locationPlaceholder": "Ex: Étagère du haut, Bar principal..."
+    "locationPlaceholder": "Ex: Étagère du haut, Bar principal...",
+    "activeTitle": "Bouteilles disponibles",
+    "historyTitle": "Historique (vides)",
+    "filterByLocation": "Filtrer par localisation"
   },
   "ingredients": {
     "title": "Ingrédients",
@@ -150,6 +153,7 @@
     "import": "Importer",
     "selectAll": "Tout sélectionner",
     "batchExport": "Exporter en lot",
+    "filterByTags": "Filtrer par tags",
     "exportZip": "Exporter ZIP ({{count}})",
     "importWizard": {
       "title": "Importer une recette",
@@ -251,7 +255,21 @@
     "confirmPassword": "Confirmer le mot de passe",
     "confirmPasswordPlaceholder": "Retaper le nouveau mot de passe",
     "profileUpdated": "Profil mis à jour",
-    "passwordMismatch": "Les mots de passe ne correspondent pas"
+    "passwordMismatch": "Les mots de passe ne correspondent pas",
+    "backup": {
+      "title": "Sauvegarde & Restauration",
+      "description": "Exportez une sauvegarde complète de votre base de données et images, ou restaurez depuis une sauvegarde précédente.",
+      "export": "Exporter la sauvegarde",
+      "exporting": "Export en cours...",
+      "import": "Restaurer une sauvegarde",
+      "importing": "Restauration en cours...",
+      "selectFile": "Sélectionner un fichier ZIP",
+      "confirmRestore": "Cela remplacera TOUTES les données actuelles (base de données et images). Cette action est irréversible. Continuer ?",
+      "exportSuccess": "Sauvegarde exportée avec succès",
+      "importSuccess": "Sauvegarde restaurée avec succès. La page va se recharger.",
+      "invalidBackup": "Fichier de sauvegarde invalide",
+      "fileSelected": "Fichier : {{name}}"
+    }
   },
   "common": {
     "save": "Enregistrer",
@@ -269,6 +287,7 @@
     "yes": "Oui",
     "no": "Non",
     "translations": "Traductions",
-    "translationHint": "Optionnel : fournir des noms traduits pour chaque langue"
+    "translationHint": "Optionnel : fournir des noms traduits pour chaque langue",
+    "selected": "{{count}} sélectionné(s)"
   }
 }

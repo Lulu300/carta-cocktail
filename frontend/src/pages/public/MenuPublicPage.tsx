@@ -183,9 +183,8 @@ export default function MenuPublicPage() {
                     <div className="divide-y divide-gray-800">
                       {(itemsBySection['__no_section__'] as MenuBottle[]).map((mb) => {
                         const bottle = mb.bottle!;
-                        const isAvailable = bottle.remainingPercent > 0;
                         return (
-                          <div key={mb.id} className={`px-6 py-4 flex items-center justify-between ${!isAvailable ? 'opacity-50' : ''}`}>
+                          <div key={mb.id} className="px-6 py-4 flex items-center justify-between">
                             <div className="flex-1">
                               <h3 className="text-lg font-medium text-white">{bottle.name}</h3>
                               <div className="flex items-center gap-3 mt-1 text-sm text-gray-400">
@@ -203,11 +202,11 @@ export default function MenuPublicPage() {
                                 )}
                               </div>
                             </div>
-                            {!user && (
-                              <span className={`px-3 py-1.5 rounded text-sm font-medium ${isAvailable ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                                {isAvailable ? 'Disponible' : 'Indisponible'}
-                              </span>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {bottle.location && (
+                                <span className="bg-gray-700/50 text-gray-400 text-xs px-2 py-0.5 rounded">{bottle.location}</span>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
@@ -288,9 +287,8 @@ export default function MenuPublicPage() {
                       <div className="divide-y divide-gray-800">
                         {(sectionItems as MenuBottle[]).map((mb) => {
                           const bottle = mb.bottle!;
-                          const isAvailable = bottle.remainingPercent > 0;
                           return (
-                            <div key={mb.id} className={`px-6 py-4 flex items-center justify-between ${!isAvailable ? 'opacity-50' : ''}`}>
+                            <div key={mb.id} className="px-6 py-4 flex items-center justify-between">
                               <div className="flex-1">
                                 <h3 className="text-lg font-medium text-white">{bottle.name}</h3>
                                 <div className="flex items-center gap-3 mt-1 text-sm text-gray-400">
@@ -308,11 +306,11 @@ export default function MenuPublicPage() {
                                   )}
                                 </div>
                               </div>
-                              {!user && (
-                                <span className={`px-3 py-1.5 rounded text-sm font-medium ${isAvailable ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                                  {isAvailable ? 'Disponible' : 'Indisponible'}
-                                </span>
-                              )}
+                              <div className="flex items-center gap-2">
+                                {bottle.location && (
+                                  <span className="bg-gray-700/50 text-gray-400 text-xs px-2 py-0.5 rounded">{bottle.location}</span>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
@@ -398,9 +396,8 @@ export default function MenuPublicPage() {
                         .sort((a, b) => (a.bottle?.name || '').localeCompare(b.bottle?.name || ''))
                         .map((mb) => {
                           const bottle = mb.bottle!;
-                          const isAvailable = bottle.remainingPercent > 0;
                           return (
-                            <div key={mb.id} className={`px-6 py-4 flex items-center justify-between ${!isAvailable ? 'opacity-50' : ''}`}>
+                            <div key={mb.id} className="px-6 py-4 flex items-center justify-between">
                               <div className="flex-1">
                                 <h3 className="text-lg font-medium text-white">{bottle.name}</h3>
                                 <div className="flex items-center gap-3 mt-1 text-sm text-gray-400">
@@ -418,11 +415,11 @@ export default function MenuPublicPage() {
                                   )}
                                 </div>
                               </div>
-                              {!user && (
-                                <span className={`px-3 py-1.5 rounded text-sm font-medium ${isAvailable ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                                  {isAvailable ? 'Disponible' : 'Indisponible'}
-                                </span>
-                              )}
+                              <div className="flex items-center gap-2">
+                                {bottle.location && (
+                                  <span className="bg-gray-700/50 text-gray-400 text-xs px-2 py-0.5 rounded">{bottle.location}</span>
+                                )}
+                              </div>
                             </div>
                           );
                         })}

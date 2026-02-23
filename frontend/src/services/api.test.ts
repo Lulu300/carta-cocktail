@@ -394,3 +394,121 @@ describe('categoryTypes API', () => {
     expect(mockFetch.mock.calls[3][1].method).toBe('DELETE');
   });
 });
+
+describe('backup API', () => {
+  it('exportBackup triggers download on success with Content-Disposition filename', async () => {
+    localStorage.setItem('token', 'tok');
+    const fakeBlob = new Blob(['zip-data'], { type: 'application/zip' });
+    const mockHeaders = new Map([['content-disposition', 'attachment; filename=backup-2024-01-01.zip']]);
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      blob: () => Promise.resolve(fakeBlob),
+      headers: {
+        get: (key: string) => mockHeaders.get(key.toLowerCase()) ?? null,
+      },
+    });
+
+    const mockClick = vi.fn();
+    const mockAnchor = { click: mockClick, href: '', download: '' };
+    vi.spyOn(document, 'createElement').mockReturnValue(mockAnchor as unknown as HTMLElement);
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fake-url');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+
+    const api = await getApi();
+    await api.backup.exportBackup();
+
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/backup/export');
+    expect(mockFetch.mock.calls[0][1].headers).toEqual({ Authorization: 'Bearer tok' });
+    expect(URL.createObjectURL).toHaveBeenCalledWith(fakeBlob);
+    expect(mockAnchor.download).toBe('backup-2024-01-01.zip');
+    expect(mockClick).toHaveBeenCalled();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:fake-url');
+  });
+
+  it('exportBackup uses fallback filename when no Content-Disposition header', async () => {
+    const fakeBlob = new Blob(['zip'], { type: 'application/zip' });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      blob: () => Promise.resolve(fakeBlob),
+      headers: { get: () => null },
+    });
+
+    const mockClick = vi.fn();
+    const mockAnchor = { click: mockClick, href: '', download: '' };
+    vi.spyOn(document, 'createElement').mockReturnValue(mockAnchor as unknown as HTMLElement);
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fake-url');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+
+    const api = await getApi();
+    await api.backup.exportBackup();
+
+    // Fallback filename matches pattern backup-YYYY-MM-DD.zip
+    expect(mockAnchor.download).toMatch(/^backup-\d{4}-\d{2}-\d{2}\.zip$/);
+    expect(mockClick).toHaveBeenCalled();
+  });
+
+  it('exportBackup throws error when response is not ok', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({ error: 'Server error' }),
+    });
+
+    const api = await getApi();
+    await expect(api.backup.exportBackup()).rejects.toThrow('Server error');
+  });
+
+  it('exportBackup throws HTTP status when error response has no message', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      json: () => Promise.reject(new Error('not json')),
+    });
+
+    const api = await getApi();
+    await expect(api.backup.exportBackup()).rejects.toThrow('HTTP 503');
+  });
+
+  it('importBackup sends FormData and returns json on success', async () => {
+    localStorage.setItem('token', 'tok');
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ imported: true }),
+    });
+
+    const api = await getApi();
+    const file = new File(['backup-content'], 'backup.zip', { type: 'application/zip' });
+    const result = await api.backup.importBackup(file);
+
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/backup/import');
+    const [, opts] = mockFetch.mock.calls[0];
+    expect(opts.method).toBe('POST');
+    expect(opts.body).toBeInstanceOf(FormData);
+    expect(opts.headers).toEqual({ Authorization: 'Bearer tok' });
+    expect(result).toEqual({ imported: true });
+  });
+
+  it('importBackup throws error when response is not ok', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: () => Promise.resolve({ error: 'Invalid backup file' }),
+    });
+
+    const api = await getApi();
+    const file = new File(['bad'], 'bad.zip', { type: 'application/zip' });
+    await expect(api.backup.importBackup(file)).rejects.toThrow('Invalid backup file');
+  });
+
+  it('importBackup throws HTTP status when error response has no message', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 422,
+      json: () => Promise.reject(new Error('not json')),
+    });
+
+    const api = await getApi();
+    const file = new File(['x'], 'x.zip', { type: 'application/zip' });
+    await expect(api.backup.importBackup(file)).rejects.toThrow('HTTP 422');
+  });
+});

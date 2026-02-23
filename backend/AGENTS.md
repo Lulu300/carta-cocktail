@@ -9,12 +9,32 @@ Express 5 REST API with Prisma 6 ORM, SQLite database, JWT authentication, and i
 Before committing any change:
 
 1. Create a branch from `develop` (`feature/xxx` or `fix/xxx`)
-2. Ensure TypeScript compiles: `npx tsc --noEmit`
-3. Ensure build passes: `npm run build`
-4. Run tests: `npm test`
-5. Commit, push, open PR to `develop`
+2. **Add or update tests** for any new or modified feature (see Testing section below)
+3. Ensure TypeScript compiles: `npx tsc --noEmit`
+4. Ensure build passes: `npm run build`
+5. Run tests: `npm test`
+6. **Verify coverage thresholds are met**: `npm test -- --coverage`
+7. Commit, push, open PR to `develop`
 
-CI runs automatically on PRs: prisma generate → tsc → build → test.
+CI runs automatically on PRs: prisma generate → tsc → build → test → coverage check.
+
+## Testing Requirements
+
+**Every new feature or bug fix MUST include integration tests.** A PR will not pass CI until:
+
+1. **Tests are written** covering all new/modified routes, services, and utilities
+2. **All tests pass**: `npm test`
+3. **Global coverage thresholds are met** (60% minimum):
+   - Statements >= 60%, Branches >= 60%, Functions >= 60%, Lines >= 60%
+4. **Delta coverage on PRs** (80% minimum): at least 80% of new/modified lines must be covered
+
+### Test conventions
+
+- Test files live next to their source: `routes/bottles.test.ts`, `services/availabilityService.test.ts`
+- Use the shared helpers from `src/test/helpers.ts` (DB lifecycle, auth, seed factories)
+- Each test file follows: `setupTestDatabase()` in `beforeAll`, `cleanDatabase() + seedRequiredData()` in `beforeEach`, `teardownTestDatabase()` in `afterAll`
+- Tests run against a real SQLite test DB (`prisma/test.db`), not mocks
+- Run with coverage locally: `npm test -- --coverage`
 
 ## Structure
 
