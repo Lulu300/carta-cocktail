@@ -35,7 +35,7 @@ A cocktail menu management system with admin panel and public-facing menu displa
 
 ```bash
 # Clone
-git clone https://github.com/<your-org>/carta-cocktail.git
+git clone https://github.com/lulu300/carta-cocktail.git
 cd carta-cocktail
 
 # Backend
@@ -76,14 +76,39 @@ npm run test:coverage # with coverage report
 
 The backend tests use a dedicated `test.db` SQLite database, created and destroyed automatically. No manual setup needed.
 
-### Docker
+### Docker (local build)
 
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
 - Frontend: `http://localhost` (port 80)
 - Backend API: `http://localhost:3001`
+
+### Docker (production with pre-built images)
+
+Use `docker-compose.prod.yml` to deploy with pre-built images from GitHub Container Registry:
+
+```bash
+# Pull and start
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+Configure via environment variables or a `.env` file alongside the compose file:
+
+```bash
+JWT_SECRET=your-random-secret
+ADMIN_EMAIL=admin@yourbar.com
+ADMIN_PASSWORD=your-secure-password
+```
+
+To pin a specific version instead of `latest`, edit the image tags in `docker-compose.prod.yml`:
+
+```yaml
+image: ghcr.io/lulu300/carta-cocktail/backend:1.0.0
+image: ghcr.io/lulu300/carta-cocktail/frontend:1.0.0
+```
 
 ## Project Structure
 
@@ -110,7 +135,8 @@ carta-cocktail/
 │   │   └── types/          # TypeScript interfaces
 │   └── nginx.conf          # Production reverse proxy
 ├── .github/workflows/      # CI + Release pipelines
-├── docker-compose.yml
+├── docker-compose.yml          # Local build
+├── docker-compose.prod.yml     # Production (ghcr.io images)
 └── .env.example
 ```
 
@@ -123,6 +149,7 @@ carta-cocktail/
 | `ADMIN_EMAIL` | Admin login email | `admin@carta.local` |
 | `ADMIN_PASSWORD` | Admin login password | `admin123` |
 | `PORT` | Backend port | `3001` |
+| `BACKEND_HOST` | Backend hostname for nginx proxy (frontend container) | `backend` |
 
 ## Git Workflow
 
@@ -152,8 +179,8 @@ This project uses a **feature branch** workflow:
 ### Pulling release images
 
 ```bash
-docker pull ghcr.io/<your-org>/carta-cocktail/backend:1.0.0
-docker pull ghcr.io/<your-org>/carta-cocktail/frontend:1.0.0
+docker pull ghcr.io/lulu300/carta-cocktail/backend:1.0.0
+docker pull ghcr.io/lulu300/carta-cocktail/frontend:1.0.0
 ```
 
 ## API Overview
