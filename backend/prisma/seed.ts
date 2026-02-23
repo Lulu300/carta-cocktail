@@ -4,16 +4,20 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
-  // Create admin user
+  // Create or update admin user
+  const adminEmail = process.env.ADMIN_EMAIL || 'admin@carta.local';
   const passwordHash = await bcrypt.hash(process.env.ADMIN_PASSWORD || 'admin123', 10);
-  await prisma.user.upsert({
-    where: { email: process.env.ADMIN_EMAIL || 'admin@carta.local' },
-    update: {},
-    create: {
-      email: process.env.ADMIN_EMAIL || 'admin@carta.local',
-      passwordHash,
-    },
-  });
+  const existingAdmin = await prisma.user.findFirst();
+  if (existingAdmin) {
+    await prisma.user.update({
+      where: { id: existingAdmin.id },
+      data: { email: adminEmail, passwordHash },
+    });
+  } else {
+    await prisma.user.create({
+      data: { email: adminEmail, passwordHash },
+    });
+  }
 
   // Seed default CategoryTypes
   const defaultCategoryTypes = [
