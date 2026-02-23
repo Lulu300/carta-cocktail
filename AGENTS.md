@@ -26,12 +26,29 @@ Carta Cocktail is a cocktail menu management system with an admin panel and publ
 For every change:
 1. Create a branch from `develop` (`feature/xxx`, `fix/xxx`)
 2. Make changes
-3. Ensure lint and tests pass: `cd frontend && npm run lint && npm test` / `cd backend && npm test`
-4. Ensure TypeScript compiles: `cd frontend && npx tsc --noEmit` / `cd backend && npx tsc --noEmit`
-5. Commit and push the branch
-6. Open a PR to `develop` — CI runs automatically
-7. Once `develop` is stable, merge to `main`
-8. Tag `main` for release: `git tag v1.0.0 && git push --tags`
+3. **Add or update tests** for any new or modified feature (see Testing section below)
+4. Ensure lint and tests pass: `cd frontend && npm run lint && npm test` / `cd backend && npm test`
+5. Ensure TypeScript compiles: `cd frontend && npx tsc --noEmit` / `cd backend && npx tsc --noEmit`
+6. **Verify coverage thresholds are met** (see Testing section below)
+7. Commit and push the branch
+8. Open a PR to `develop` — CI runs automatically
+9. Once `develop` is stable, merge to `main`
+10. Tag `main` for release: `git tag v1.0.0 && git push --tags`
+
+## Testing Requirements
+
+**Every new feature or bug fix MUST include tests.** A PR will not be considered ready for review until:
+
+1. **Tests are written** covering the new/modified behavior (backend integration tests and/or frontend unit/integration tests)
+2. **All tests pass**: `cd backend && npm test` and `cd frontend && npm test`
+3. **Global coverage thresholds are met** (60% minimum on all metrics):
+   - Statements >= 60%
+   - Branches >= 60%
+   - Functions >= 60%
+   - Lines >= 60%
+4. **Delta coverage on PRs** (80% minimum): at least 80% of new/modified lines must be covered by tests
+
+Coverage is enforced automatically by CI. Run `npm test -- --coverage` in either package to check locally.
 
 ## CI/CD (GitHub Actions)
 

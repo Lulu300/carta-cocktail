@@ -121,4 +121,136 @@ describe('IngredientsPage', () => {
       expect(mockApiDelete).toHaveBeenCalledWith(1);
     });
   });
+
+  it('opens edit modal pre-filled with ingredient data', async () => {
+    const user = userEvent.setup();
+    render(<IngredientsPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Lime')).toBeInTheDocument();
+    });
+    const editButtons = screen.getAllByTitle('common.edit');
+    await user.click(editButtons[0]);
+    expect(screen.getByText('ingredients.edit')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Lime')).toBeInTheDocument();
+  });
+
+  it('submits update when editing an ingredient', async () => {
+    const user = userEvent.setup();
+    render(<IngredientsPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Lime')).toBeInTheDocument();
+    });
+    const editButtons = screen.getAllByTitle('common.edit');
+    await user.click(editButtons[0]);
+    const nameInput = screen.getByDisplayValue('Lime');
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Lemon');
+    await user.click(screen.getByText('common.save'));
+    await waitFor(() => {
+      expect(mockApiUpdate).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ name: 'Lemon' })
+      );
+    });
+  });
+
+  it('submits create form with filled name', async () => {
+    const user = userEvent.setup();
+    render(<IngredientsPage />);
+    await waitFor(() => {
+      expect(screen.getByText('ingredients.add')).toBeInTheDocument();
+    });
+    await user.click(screen.getByText('ingredients.add'));
+    // The modal form contains the name input; find it via the form element
+    const form = document.querySelector('form')!;
+    const nameInput = form.querySelector('input[required]') as HTMLInputElement;
+    await user.type(nameInput, 'Mint');
+    await user.click(screen.getByText('common.save'));
+    await waitFor(() => {
+      expect(mockApiCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Mint' })
+      );
+    });
+  });
+
+  it('does not call delete when confirm returns false', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<IngredientsPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Lime')).toBeInTheDocument();
+    });
+    const deleteButtons = screen.getAllByTitle('common.delete');
+    await user.click(deleteButtons[0]);
+    expect(window.confirm).toHaveBeenCalled();
+    expect(mockApiDelete).not.toHaveBeenCalled();
+  });
+
+  it('calls bulkAvailability with false when clicking "all unavailable" button', async () => {
+    const user = userEvent.setup();
+    render(<IngredientsPage />);
+    await waitFor(() => {
+      expect(screen.getByText('ingredients.allUnavailable')).toBeInTheDocument();
+    });
+    await user.click(screen.getByText('ingredients.allUnavailable'));
+    await waitFor(() => {
+      expect(mockApiBulkAvailability).toHaveBeenCalledWith({ available: false });
+    });
+  });
+
+  it('filters by available when clicking available filter', async () => {
+    const user = userEvent.setup();
+    render(<IngredientsPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Lime')).toBeInTheDocument();
+      expect(screen.getByText('Sugar')).toBeInTheDocument();
+    });
+    await user.click(screen.getByText('ingredients.filter.available'));
+    // Only Lime (isAvailable=true) should be visible
+    expect(screen.getByText('Lime')).toBeInTheDocument();
+    expect(screen.queryByText('Sugar')).not.toBeInTheDocument();
+  });
+
+  it('filters by unavailable when clicking unavailable filter', async () => {
+    const user = userEvent.setup();
+    render(<IngredientsPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Lime')).toBeInTheDocument();
+      expect(screen.getByText('Sugar')).toBeInTheDocument();
+    });
+    await user.click(screen.getByText('ingredients.filter.unavailable'));
+    // Only Sugar (isAvailable=false) should be visible
+    expect(screen.getByText('Sugar')).toBeInTheDocument();
+    expect(screen.queryByText('Lime')).not.toBeInTheDocument();
+  });
+
+  it('filters by search term', async () => {
+    const user = userEvent.setup();
+    render(<IngredientsPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Lime')).toBeInTheDocument();
+      expect(screen.getByText('Sugar')).toBeInTheDocument();
+    });
+    const searchInput = screen.getByRole('textbox');
+    await user.type(searchInput, 'Lime');
+    expect(screen.getByText('Lime')).toBeInTheDocument();
+    expect(screen.queryByText('Sugar')).not.toBeInTheDocument();
+  });
+
+  it('calls update when clicking ingredient card to toggle availability', async () => {
+    const user = userEvent.setup();
+    render(<IngredientsPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Lime')).toBeInTheDocument();
+    });
+    // Clicking the card (not buttons) triggers toggleAvailability
+    // Find the card by its text, then click the card container
+    const limeCard = screen.getByText('Lime').closest('div[class*="relative"]');
+    if (limeCard) {
+      await user.click(limeCard);
+      await waitFor(() => {
+        expect(mockApiUpdate).toHaveBeenCalledWith(1, { isAvailable: false });
+      });
+    }
+  });
 });

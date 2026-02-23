@@ -9,13 +9,34 @@ React 19 SPA with Vite 7, TailwindCSS 4, React Router 7, and react-i18next. Dark
 Before committing any change:
 
 1. Create a branch from `develop` (`feature/xxx` or `fix/xxx`)
-2. Ensure TypeScript compiles: `npx tsc --noEmit`
-3. Ensure lint passes: `npm run lint`
-4. Ensure build passes: `npm run build`
-5. Run tests: `npm test`
-6. Commit, push, open PR to `develop`
+2. **Add or update tests** for any new or modified feature (see Testing section below)
+3. Ensure TypeScript compiles: `npx tsc --noEmit`
+4. Ensure lint passes: `npm run lint`
+5. Ensure build passes: `npm run build`
+6. Run tests: `npm test`
+7. **Verify coverage thresholds are met**: `npm test -- --coverage`
+8. Commit, push, open PR to `develop`
 
-CI runs automatically on PRs: tsc → lint → build → test.
+CI runs automatically on PRs: tsc → lint → build → test → coverage check.
+
+## Testing Requirements
+
+**Every new feature or bug fix MUST include tests.** A PR will not pass CI until:
+
+1. **Tests are written** covering all new/modified components, hooks, utils, and services
+2. **All tests pass**: `npm test`
+3. **Global coverage thresholds are met** (60% minimum):
+   - Statements >= 60%, Branches >= 60%, Functions >= 60%, Lines >= 60%
+4. **Delta coverage on PRs** (80% minimum): at least 80% of new/modified lines must be covered
+
+### Test conventions
+
+- Test files live next to their source: `utils/colors.test.ts`, `pages/admin/BottlesPage.test.tsx`
+- Use the shared test utilities from `src/test/test-utils.tsx` (custom render with BrowserRouter)
+- Setup file `src/test/setup.ts` provides jest-dom matchers, i18n mock, and matchMedia mock
+- Environment: jsdom via Vitest
+- API calls are mocked (no real backend needed)
+- Run with coverage locally: `npm test -- --coverage`
 
 ## Structure
 
