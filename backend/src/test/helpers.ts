@@ -129,6 +129,7 @@ export async function seedCategory(overrides: Partial<{
   name: string;
   type: string;
   desiredStock: number;
+  minimumPercent: number;
   nameTranslations: string | null;
 }> = {}) {
   return prisma.category.create({
@@ -136,6 +137,7 @@ export async function seedCategory(overrides: Partial<{
       name: overrides.name ?? 'Test Category',
       type: overrides.type ?? 'SPIRIT',
       desiredStock: overrides.desiredStock ?? 1,
+      minimumPercent: overrides.minimumPercent ?? 30,
       nameTranslations: overrides.nameTranslations ?? null,
     },
   });

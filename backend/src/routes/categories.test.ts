@@ -71,12 +71,20 @@ describe('POST /api/categories', () => {
     expect(res.status).toBe(400);
   });
 
-  it('should create with default desiredStock=1', async () => {
+  it('should create with default desiredStock=1 and minimumPercent=30', async () => {
     const res = await request.post('/api/categories').set(authHeader())
       .send({ name: 'Gin', type: 'SPIRIT' });
     expect(res.status).toBe(201);
     expect(res.body.name).toBe('Gin');
     expect(res.body.desiredStock).toBe(1);
+    expect(res.body.minimumPercent).toBe(30);
+  });
+
+  it('should create with custom minimumPercent', async () => {
+    const res = await request.post('/api/categories').set(authHeader())
+      .send({ name: 'Rum', type: 'SPIRIT', minimumPercent: 50 });
+    expect(res.status).toBe(201);
+    expect(res.body.minimumPercent).toBe(50);
   });
 
   it('should auto-create CategoryType if it does not exist', async () => {
@@ -110,6 +118,14 @@ describe('PUT /api/categories/:id', () => {
       .send({ desiredStock: 5 });
     expect(res.status).toBe(200);
     expect(res.body.desiredStock).toBe(5);
+  });
+
+  it('should update minimumPercent', async () => {
+    const cat = await seedCategory();
+    const res = await request.put(`/api/categories/${cat.id}`).set(authHeader())
+      .send({ minimumPercent: 50 });
+    expect(res.status).toBe(200);
+    expect(res.body.minimumPercent).toBe(50);
   });
 });
 

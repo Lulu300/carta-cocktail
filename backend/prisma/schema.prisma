@@ -26,6 +26,7 @@ model Category {
   nameTranslations String?  // JSON: {"fr": "...", "en": "..."}
   type             String   // SPIRIT or SYRUP
   desiredStock     Int      @default(1)
+  minimumPercent   Int      @default(30)
   createdAt        DateTime @default(now())
 
   bottles             Bottle[]

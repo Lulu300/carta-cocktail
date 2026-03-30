@@ -20,7 +20,8 @@ export default function MultiSelectDropdown({
 }: MultiSelectDropdownProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const ref = useClickOutside<HTMLDivElement>(useCallback(() => setOpen(false), []));
+  const [filterText, setFilterText] = useState('');
+  const ref = useClickOutside<HTMLDivElement>(useCallback(() => { setOpen(false); setFilterText(''); }, []));
 
   const toggle = (value: string) => {
     onChange(
@@ -69,22 +70,36 @@ export default function MultiSelectDropdown({
       )}
 
       {open && (
-        <div className="absolute z-30 mt-1 w-full bg-[#1a1a2e] border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto py-1">
-          {options.map((opt) => (
-            <label key={opt.value}
-              className="flex items-center gap-2 px-3 py-2 hover:bg-gray-800/50 cursor-pointer text-sm">
-              <input
-                type="checkbox"
-                checked={selected.includes(opt.value)}
-                onChange={() => toggle(opt.value)}
-                className="w-4 h-4 rounded bg-[#0f0f1a] border-gray-700 text-amber-400 accent-amber-400"
-              />
-              <span className="text-gray-300">{opt.label}</span>
-            </label>
-          ))}
-          {options.length === 0 && (
-            <div className="px-3 py-2 text-sm text-gray-500">-</div>
-          )}
+        <div className="absolute z-30 mt-1 w-full bg-[#1a1a2e] border border-gray-700 rounded-lg shadow-lg max-h-72 overflow-hidden">
+          <div className="p-2 border-b border-gray-700">
+            <input
+              type="text"
+              value={filterText}
+              onChange={(e) => setFilterText(e.target.value)}
+              placeholder={t('common.search')}
+              className="w-full bg-[#0f0f1a] border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400"
+              autoFocus
+            />
+          </div>
+          <div className="overflow-y-auto max-h-56 py-1">
+            {options
+              .filter((opt) => !filterText || opt.label.toLowerCase().includes(filterText.toLowerCase()))
+              .map((opt) => (
+                <label key={opt.value}
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-800/50 cursor-pointer text-sm">
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(opt.value)}
+                    onChange={() => toggle(opt.value)}
+                    className="w-4 h-4 rounded bg-[#0f0f1a] border-gray-700 text-amber-400 accent-amber-400"
+                  />
+                  <span className="text-gray-300">{opt.label}</span>
+                </label>
+              ))}
+            {options.filter((opt) => !filterText || opt.label.toLowerCase().includes(filterText.toLowerCase())).length === 0 && (
+              <div className="px-3 py-2 text-sm text-gray-500">{t('common.noResults')}</div>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -19,17 +19,17 @@ const mockList = vi.mocked(api.list);
 
 const mockShortages = [
   {
-    category: { id: 1, name: 'Vodka', type: 'SPIRIT', categoryType: { name: 'SPIRIT', color: 'blue' }, desiredStock: 3 },
-    sealedCount: 1,
-    totalUsable: 2,
-    deficit: 2,
+    category: { id: 1, name: 'Vodka', type: 'SPIRIT', categoryType: { name: 'SPIRIT', color: 'blue' }, desiredStock: 3, minimumPercent: 30 },
+    totalPercent: 100,
+    requiredPercent: 230,
+    totalUsable: 1,
     isShortage: true,
   },
   {
-    category: { id: 2, name: 'Gin', type: 'SPIRIT', categoryType: { name: 'SPIRIT', color: 'blue' }, desiredStock: 2 },
-    sealedCount: 0,
+    category: { id: 2, name: 'Gin', type: 'SPIRIT', categoryType: { name: 'SPIRIT', color: 'blue' }, desiredStock: 1, minimumPercent: 30 },
+    totalPercent: 20,
+    requiredPercent: 30,
     totalUsable: 1,
-    deficit: 2,
     isShortage: true,
   },
 ];
@@ -53,23 +53,32 @@ describe('ShortagesPage', () => {
     });
   });
 
-  it('should show deficit values', async () => {
+  it('should show current stock and required threshold', async () => {
     render(<ShortagesPage />);
     await waitFor(() => {
-      // Both shortages have deficit=2, so there are two "-2" spans
-      const deficits = screen.getAllByText('-2');
-      expect(deficits.length).toBe(2);
+      const currentLabels = screen.getAllByText('shortages.currentStock');
+      expect(currentLabels.length).toBe(2);
+      const requiredLabels = screen.getAllByText('shortages.required');
+      expect(requiredLabels.length).toBe(2);
     });
   });
 
-  it('should show sealed and desired counts', async () => {
+  it('should show deficit values', async () => {
     render(<ShortagesPage />);
     await waitFor(() => {
-      // Check that shortage details are shown
-      const sealedLabels = screen.getAllByText('shortages.sealed');
-      expect(sealedLabels.length).toBe(2);
-      const desiredLabels = screen.getAllByText('shortages.desired');
-      expect(desiredLabels.length).toBe(2);
+      // Vodka: 230 - 100 = 130%, Gin: 30 - 20 = 10%
+      expect(screen.getByText('-130%')).toBeInTheDocument();
+      expect(screen.getByText('-10%')).toBeInTheDocument();
+    });
+  });
+
+  it('should show threshold info', async () => {
+    render(<ShortagesPage />);
+    await waitFor(() => {
+      const thresholdLabels = screen.getAllByText('shortages.threshold');
+      expect(thresholdLabels.length).toBe(2);
+      const thresholdValues = screen.getAllByText('30%');
+      expect(thresholdValues.length).toBeGreaterThanOrEqual(2);
     });
   });
 

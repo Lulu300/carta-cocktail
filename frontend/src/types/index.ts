@@ -17,6 +17,7 @@ export interface Category {
   type: string;
   categoryType?: CategoryType | null;
   desiredStock: number;
+  minimumPercent: number;
   createdAt: string;
   _count?: { bottles: number };
   bottles?: Bottle[];
@@ -150,10 +151,11 @@ export interface Shortage {
     type: string;
     categoryType?: CategoryType | null;
     desiredStock: number;
+    minimumPercent: number;
   };
-  sealedCount: number;
+  totalPercent: number;
+  requiredPercent: number;
   totalUsable: number;
-  deficit: number;
   isShortage: boolean;
 }
 

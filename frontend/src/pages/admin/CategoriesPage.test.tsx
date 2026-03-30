@@ -30,8 +30,8 @@ const mockCtApiUpdate = vi.mocked(ctApi.update);
 const mockCtApiDelete = vi.mocked(ctApi.delete);
 
 const mockCategories = [
-  { id: 1, name: 'Vodka', type: 'SPIRIT', categoryType: { name: 'SPIRIT', color: 'blue', nameTranslations: null }, desiredStock: 2, _count: { bottles: 3 } },
-  { id: 2, name: 'Grenadine', type: 'SYRUP', categoryType: { name: 'SYRUP', color: 'red', nameTranslations: null }, desiredStock: 1, _count: { bottles: 1 } },
+  { id: 1, name: 'Vodka', type: 'SPIRIT', categoryType: { name: 'SPIRIT', color: 'blue', nameTranslations: null }, desiredStock: 2, minimumPercent: 30, _count: { bottles: 3 } },
+  { id: 2, name: 'Grenadine', type: 'SYRUP', categoryType: { name: 'SYRUP', color: 'red', nameTranslations: null }, desiredStock: 1, minimumPercent: 30, _count: { bottles: 1 } },
 ];
 const mockCatTypes = [
   { name: 'SPIRIT', color: 'blue', nameTranslations: null, _count: { categories: 1 } },
@@ -87,7 +87,7 @@ describe('CategoriesPage', () => {
     await user.click(screen.getByText('categories.add'));
 
     expect(screen.getByText('categories.add', { selector: 'h2' })).toBeInTheDocument();
-    expect(screen.getByRole('combobox')).toBeInTheDocument();
+    expect(screen.getAllByRole('combobox').length).toBeGreaterThanOrEqual(1);
   });
 
   it('opens edit modal with pre-filled data when edit button is clicked', async () => {
@@ -171,6 +171,7 @@ describe('CategoriesPage', () => {
         name: 'Rum',
         type: 'SPIRIT',
         desiredStock: 3,
+        minimumPercent: 30,
         nameTranslations: null,
       });
     });
@@ -195,6 +196,7 @@ describe('CategoriesPage', () => {
         name: 'Gin',
         type: 'SPIRIT',
         desiredStock: 2,
+        minimumPercent: 30,
         nameTranslations: null,
       });
     });
@@ -207,7 +209,8 @@ describe('CategoriesPage', () => {
 
     await user.click(screen.getByText('categories.add'));
 
-    const typeSelect = screen.getByRole('combobox');
+    const modal = screen.getByText('categories.add', { selector: 'h2' }).closest('form')!;
+    const typeSelect = within(modal).getByRole('combobox');
     await user.selectOptions(typeSelect, '__OTHER__');
 
     expect(screen.getByPlaceholderText('categories.customType')).toBeInTheDocument();
@@ -225,7 +228,8 @@ describe('CategoriesPage', () => {
     await user.clear(nameInput);
     await user.type(nameInput, 'Tonic');
 
-    const typeSelect = screen.getByRole('combobox');
+    const modal = screen.getByText('categories.add', { selector: 'h2' }).closest('form')!;
+    const typeSelect = within(modal).getByRole('combobox');
     await user.selectOptions(typeSelect, '__OTHER__');
 
     const customTypeInput = screen.getByPlaceholderText('categories.customType');
@@ -238,6 +242,7 @@ describe('CategoriesPage', () => {
         name: 'Tonic',
         type: 'MIXER',
         desiredStock: 1,
+        minimumPercent: 30,
         nameTranslations: null,
       });
     });
@@ -245,7 +250,7 @@ describe('CategoriesPage', () => {
 
   it('opens edit modal with __OTHER__ type when category type is not in catTypes', async () => {
     const unknownTypeCategory = [
-      { id: 3, name: 'Water', type: 'UNKNOWN', categoryType: { name: 'UNKNOWN', color: 'gray', nameTranslations: null }, desiredStock: 1, _count: { bottles: 0 } },
+      { id: 3, name: 'Water', type: 'UNKNOWN', categoryType: { name: 'UNKNOWN', color: 'gray', nameTranslations: null }, desiredStock: 1, minimumPercent: 30, _count: { bottles: 0 } },
     ];
     mockApiList.mockResolvedValue(unknownTypeCategory as never);
 
@@ -257,7 +262,8 @@ describe('CategoriesPage', () => {
     await user.click(editButtons[0]);
 
     // Should select __OTHER__ since UNKNOWN is not in catTypes
-    const typeSelect = screen.getByRole('combobox') as HTMLSelectElement;
+    const editModal = screen.getByText('categories.edit').closest('form')!;
+    const typeSelect = within(editModal).getByRole('combobox') as HTMLSelectElement;
     expect(typeSelect.value).toBe('__OTHER__');
     expect(screen.getByPlaceholderText('categories.customType')).toHaveValue('UNKNOWN');
   });

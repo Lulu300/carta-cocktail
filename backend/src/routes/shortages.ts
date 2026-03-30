@@ -20,13 +20,15 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
     const shortages = categories
       .map((category) => {
-        // Count sealed (unopened) bottles with remaining > 0
-        const sealedCount = category.bottles.filter(
-          (b) => !b.openedAt && b.remainingPercent > 0
-        ).length;
+        // Sum all remaining percentages (each bottle = max 100%)
+        const totalPercent = category.bottles.reduce(
+          (sum, b) => sum + b.remainingPercent, 0
+        );
         const totalUsable = category.bottles.filter(
           (b) => b.remainingPercent > 0
         ).length;
+        // Threshold: (desiredStock - 1) * 100 + minimumPercent
+        const requiredPercent = (category.desiredStock - 1) * 100 + category.minimumPercent;
 
         return {
           category: parseNameTranslations({
@@ -36,11 +38,12 @@ router.get('/', async (req: AuthRequest, res: Response) => {
             type: category.type,
             categoryType: typeMap.get(category.type) || null,
             desiredStock: category.desiredStock,
+            minimumPercent: category.minimumPercent,
           }),
-          sealedCount,
+          totalPercent,
+          requiredPercent,
           totalUsable,
-          deficit: Math.max(0, category.desiredStock - sealedCount),
-          isShortage: sealedCount < category.desiredStock,
+          isShortage: totalPercent < requiredPercent,
         };
       })
       .filter((s) => s.isShortage);

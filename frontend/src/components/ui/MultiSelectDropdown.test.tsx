@@ -123,7 +123,7 @@ describe('MultiSelectDropdown', () => {
     expect(onChange).toHaveBeenCalledWith(['b']);
   });
 
-  it('shows "-" placeholder when options array is empty and dropdown is open', async () => {
+  it('shows "common.noResults" when options array is empty and dropdown is open', async () => {
     const user = userEvent.setup();
     render(
       <MultiSelectDropdown
@@ -134,7 +134,7 @@ describe('MultiSelectDropdown', () => {
       />
     );
     await user.click(screen.getByRole('button'));
-    expect(screen.getByText('-')).toBeInTheDocument();
+    expect(screen.getByText('common.noResults')).toBeInTheDocument();
   });
 
   it('shows value as fallback label when selected value not in options', () => {

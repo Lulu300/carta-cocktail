@@ -1,10 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
+import { useSort } from '../../hooks/useSort';
+import { usePagination } from '../../hooks/usePagination';
 import { ingredients as api } from '../../services/api';
 import type { Ingredient } from '../../types';
 import IconPicker from '../../components/ui/IconPicker';
 import SearchInput from '../../components/ui/SearchInput';
+import Pagination from '../../components/ui/Pagination';
 
 export default function IngredientsPage() {
   const { t } = useTranslation();
@@ -22,6 +25,18 @@ export default function IngredientsPage() {
 
   const load = () => api.list().then(setItems);
   useEffect(() => { load(); }, []);
+
+  const filteredItems = useMemo(() => {
+    return items.filter((i) => {
+      if (filter === 'available' && !i.isAvailable) return false;
+      if (filter === 'unavailable' && i.isAvailable) return false;
+      if (search.trim() && !localize(i).toLowerCase().includes(search.toLowerCase())) return false;
+      return true;
+    });
+  }, [items, filter, search, localize]);
+
+  const { sortedItems } = useSort<Ingredient>(filteredItems, 'name');
+  const { paginatedItems, page, pageSize, totalPages, totalItems, setPage, setPageSize } = usePagination(sortedItems);
 
   const openCreate = () => {
     setEditing(null);
@@ -128,75 +143,70 @@ export default function IngredientsPage() {
         </div>
       </div>
 
-      {(() => {
-        const filtered = items.filter((i) => {
-          if (filter === 'available' && !i.isAvailable) return false;
-          if (filter === 'unavailable' && i.isAvailable) return false;
-          if (search.trim()) {
-            if (!localize(i).toLowerCase().includes(search.toLowerCase())) return false;
-          }
-          return true;
-        });
-        return filtered.length === 0 ? (
+      {filteredItems.length === 0 ? (
         <div className="text-center py-12 text-gray-500">
           {t('common.noResults')}
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {filtered.map((item) => (
-            <div
-              key={item.id}
-              className={`
-                relative bg-[#1a1a2e] border rounded-xl p-4 transition-all cursor-pointer
-                ${item.isAvailable
-                  ? 'border-gray-800 hover:border-amber-400/50'
-                  : 'border-red-400/30 opacity-60 hover:border-red-400/70'
-                }
-              `}
-              onClick={() => toggleAvailability(item)}
-            >
-              {/* Availability indicator */}
-              <div className={`absolute top-2 right-2 w-3 h-3 rounded-full ${item.isAvailable ? 'bg-green-400' : 'bg-red-400'}`} />
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {paginatedItems.map((item) => (
+              <div
+                key={item.id}
+                className={`
+                  relative bg-[#1a1a2e] border rounded-xl p-4 transition-all cursor-pointer
+                  ${item.isAvailable
+                    ? 'border-gray-800 hover:border-amber-400/50'
+                    : 'border-red-400/30 opacity-60 hover:border-red-400/70'
+                  }
+                `}
+                onClick={() => toggleAvailability(item)}
+              >
+                {/* Availability indicator */}
+                <div className={`absolute top-2 right-2 w-3 h-3 rounded-full ${item.isAvailable ? 'bg-green-400' : 'bg-red-400'}`} />
 
-              {/* Icon */}
-              <div className="text-4xl mb-3 text-center h-12 flex items-center justify-center">
-                {item.icon || '📦'}
-              </div>
+                {/* Icon */}
+                <div className="text-4xl mb-3 text-center h-12 flex items-center justify-center">
+                  {item.icon || '📦'}
+                </div>
 
-              {/* Name */}
-              <div className="text-center mb-3">
-                <p className="font-medium text-white truncate">{localize(item)}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {item.isAvailable ? t('cocktails.available') : t('cocktails.unavailable')}
-                </p>
-              </div>
+                {/* Name */}
+                <div className="text-center mb-3">
+                  <p className="font-medium text-white truncate">{localize(item)}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {item.isAvailable ? t('cocktails.available') : t('cocktails.unavailable')}
+                  </p>
+                </div>
 
-              {/* Action buttons */}
-              <div className="flex justify-center gap-3 pt-2 border-t border-gray-800">
-                <button
-                  onClick={(e) => { e.stopPropagation(); openEdit(item); }}
-                  className="text-amber-400 hover:text-amber-300 transition-colors p-1"
-                  title={t('common.edit')}
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
-                  className="text-red-400 hover:text-red-300 transition-colors p-1"
-                  title={t('common.delete')}
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
+                {/* Action buttons */}
+                <div className="flex justify-center gap-3 pt-2 border-t border-gray-800">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); openEdit(item); }}
+                    className="text-amber-400 hover:text-amber-300 transition-colors p-1"
+                    title={t('common.edit')}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
+                    className="text-red-400 hover:text-red-300 transition-colors p-1"
+                    title={t('common.delete')}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      );
-      })()}
+            ))}
+          </div>
+          <div className="mt-4 bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden">
+            <Pagination page={page} totalPages={totalPages} pageSize={pageSize} totalItems={totalItems} onPageChange={setPage} onPageSizeChange={setPageSize} />
+          </div>
+        </>
+      )}
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">

@@ -1,10 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
+import { useSort } from '../../hooks/useSort';
+import { usePagination } from '../../hooks/usePagination';
 import { categories as api, categoryTypes as ctApi } from '../../services/api';
 import type { Category, CategoryType } from '../../types';
 import { getBadgeClasses, CATEGORY_TYPE_COLORS, COLOR_DOT_CLASSES } from '../../utils/colors';
 import SearchInput from '../../components/ui/SearchInput';
+import SortableHeader from '../../components/ui/SortableHeader';
+import Pagination from '../../components/ui/Pagination';
 
 export default function CategoriesPage() {
   const { t } = useTranslation();
@@ -13,7 +17,7 @@ export default function CategoriesPage() {
   const [catTypes, setCatTypes] = useState<CategoryType[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
-  const [form, setForm] = useState({ name: '', type: 'SPIRIT', customType: '', desiredStock: 1, nameFr: '', nameEn: '' });
+  const [form, setForm] = useState({ name: '', type: 'SPIRIT', customType: '', desiredStock: 1, minimumPercent: 30, nameFr: '', nameEn: '' });
   const [showTranslations, setShowTranslations] = useState(false);
   const [showManageTypes, setShowManageTypes] = useState(false);
   const [editingType, setEditingType] = useState<CategoryType | null>(null);
@@ -27,6 +31,9 @@ export default function CategoriesPage() {
     return items.filter((item) => localize(item).toLowerCase().includes(lower));
   }, [items, search, localize]);
 
+  const { sortedItems, sortKey, sortDirection, toggleSort } = useSort<Category>(filteredItems);
+  const { paginatedItems, page, pageSize, totalPages, totalItems, setPage, setPageSize } = usePagination(sortedItems);
+
   const typeLabel = (type: string) => {
     const ct = catTypes.find(ct => ct.name === type);
     if (ct) return localize(ct);
@@ -39,7 +46,7 @@ export default function CategoriesPage() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: '', type: catTypes[0]?.name || 'SPIRIT', customType: '', desiredStock: 1, nameFr: '', nameEn: '' });
+    setForm({ name: '', type: catTypes[0]?.name || 'SPIRIT', customType: '', desiredStock: 1, minimumPercent: 30, nameFr: '', nameEn: '' });
     setShowTranslations(false);
     setShowModal(true);
   };
@@ -52,6 +59,7 @@ export default function CategoriesPage() {
       type: isKnown ? item.type : '__OTHER__',
       customType: isKnown ? '' : item.type,
       desiredStock: item.desiredStock,
+      minimumPercent: item.minimumPercent,
       nameFr: item.nameTranslations?.fr || '',
       nameEn: item.nameTranslations?.en || '',
     });
@@ -74,6 +82,7 @@ export default function CategoriesPage() {
       name: form.name,
       type: effectiveType,
       desiredStock: form.desiredStock,
+      minimumPercent: form.minimumPercent,
       nameTranslations: Object.keys(nameTranslations).length > 0 ? nameTranslations : null,
     };
     if (editing) {
@@ -162,15 +171,16 @@ export default function CategoriesPage() {
         <table className="w-full">
           <thead className="bg-[#0f0f1a]">
             <tr>
-              <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('categories.name')}</th>
-              <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('categories.type')}</th>
-              <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('categories.desiredStock')}</th>
-              <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('categories.bottleCount')}</th>
+              <SortableHeader label={t('categories.name')} sortKey="name" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+              <SortableHeader label={t('categories.type')} sortKey="type" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+              <SortableHeader label={t('categories.desiredStock')} sortKey="desiredStock" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+              <SortableHeader label={t('categories.minimumPercent')} sortKey="minimumPercent" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+              <SortableHeader label={t('categories.bottleCount')} sortKey="_count.bottles" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
               <th className="text-right px-6 py-3 text-sm text-gray-400 font-medium">{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-800">
-            {filteredItems.map((item) => (
+            {paginatedItems.map((item) => (
               <tr key={item.id} className="hover:bg-gray-800/50">
                 <td className="px-6 py-4 font-medium">{localize(item)}</td>
                 <td className="px-6 py-4">
@@ -179,6 +189,7 @@ export default function CategoriesPage() {
                   </span>
                 </td>
                 <td className="px-6 py-4">{item.desiredStock}</td>
+                <td className="px-6 py-4">{item.minimumPercent}%</td>
                 <td className="px-6 py-4">{item._count?.bottles ?? 0}</td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex items-center justify-end gap-3">
@@ -199,6 +210,7 @@ export default function CategoriesPage() {
           </tbody>
         </table>
         {filteredItems.length === 0 && <div className="text-center py-8 text-gray-500">{t('common.noResults')}</div>}
+        <Pagination page={page} totalPages={totalPages} pageSize={pageSize} totalItems={totalItems} onPageChange={setPage} onPageSizeChange={setPageSize} />
       </div>
 
       {/* Category create/edit modal */}
@@ -252,6 +264,11 @@ export default function CategoriesPage() {
             <div>
               <label className="block text-sm text-gray-400 mb-1">{t('categories.desiredStock')}</label>
               <input type="number" min="0" value={form.desiredStock} onChange={(e) => setForm({ ...form, desiredStock: parseInt(e.target.value) || 0 })} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">{t('categories.minimumPercent')}: {form.minimumPercent}%</label>
+              <input type="range" min="0" max="100" value={form.minimumPercent} onChange={(e) => setForm({ ...form, minimumPercent: parseInt(e.target.value) })} className="w-full accent-amber-400" />
+              <p className="text-xs text-gray-500 mt-1">{t('shortages.threshold')}</p>
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-400 hover:text-white">{t('common.cancel')}</button>

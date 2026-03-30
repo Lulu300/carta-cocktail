@@ -1,17 +1,32 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useSort } from '../../hooks/useSort';
+import { usePagination } from '../../hooks/usePagination';
 import { menus as api } from '../../services/api';
 import type { Menu } from '../../types';
+import SortableHeader from '../../components/ui/SortableHeader';
+import Pagination from '../../components/ui/Pagination';
+import SearchInput from '../../components/ui/SearchInput';
 
 export default function MenusPage() {
   const { t } = useTranslation();
   const [items, setItems] = useState<Menu[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: '', slug: '', description: '', isPublic: false });
+  const [search, setSearch] = useState('');
 
   const load = () => api.list().then(setItems);
   useEffect(() => { load(); }, []);
+
+  const filteredItems = useMemo(() => {
+    if (!search.trim()) return items;
+    const lower = search.toLowerCase();
+    return items.filter((item) => item.name.toLowerCase().includes(lower) || item.slug.toLowerCase().includes(lower));
+  }, [items, search]);
+
+  const { sortedItems, sortKey, sortDirection, toggleSort } = useSort<Menu>(filteredItems);
+  const { paginatedItems, page, pageSize, totalPages, totalItems, setPage, setPageSize } = usePagination(sortedItems);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,20 +51,22 @@ export default function MenusPage() {
         </button>
       </div>
 
+      <SearchInput value={search} onChange={setSearch} className="max-w-sm mb-4" />
+
       <div className="bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden">
         <table className="w-full">
           <thead className="bg-[#0f0f1a]">
             <tr>
-              <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('menus.name')}</th>
-              <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">Type</th>
-              <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('menus.slug')}</th>
-              <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('menus.isPublic')}</th>
+              <SortableHeader label={t('menus.name')} sortKey="name" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+              <SortableHeader label="Type" sortKey="type" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+              <SortableHeader label={t('menus.slug')} sortKey="slug" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+              <SortableHeader label={t('menus.isPublic')} sortKey="isPublic" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
               <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">Contenu</th>
               <th className="text-right px-6 py-3 text-sm text-gray-400 font-medium">{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-800">
-            {items.map((item) => {
+            {paginatedItems.map((item) => {
               const isDefaultMenu = item.slug === 'aperitifs' || item.slug === 'digestifs';
               const isBottleMenu = item.type === 'APEROS' || item.type === 'DIGESTIFS';
               const editLink = isBottleMenu ? `/admin/menus/${item.id}/bottles` : `/admin/menus/${item.id}`;
@@ -113,7 +130,8 @@ export default function MenusPage() {
             })}
           </tbody>
         </table>
-        {items.length === 0 && <div className="text-center py-8 text-gray-500">{t('common.noResults')}</div>}
+        {filteredItems.length === 0 && <div className="text-center py-8 text-gray-500">{t('common.noResults')}</div>}
+        <Pagination page={page} totalPages={totalPages} pageSize={pageSize} totalItems={totalItems} onPageChange={setPage} onPageSizeChange={setPageSize} />
       </div>
 
       {showModal && (
