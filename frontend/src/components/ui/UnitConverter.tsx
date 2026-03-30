@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { units as unitsApi } from '../../services/api';
+import { publicApi } from '../../services/api';
 import { isConvertible, getAllConversions } from '../../utils/unitConverter';
 import type { Unit } from '../../types';
 
@@ -17,7 +17,7 @@ export default function UnitConverter({ quantity, unit: unitAbbr }: UnitConverte
 
   // Fetch units on mount
   useEffect(() => {
-    unitsApi.list().then(setUnits);
+    publicApi.listUnits().then(setUnits).catch(() => {});
   }, []);
 
   // Find the current unit object

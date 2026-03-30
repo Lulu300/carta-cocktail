@@ -190,6 +190,17 @@ router.get('/cocktails/:id/export', async (req: Request, res: Response) => {
   }
 });
 
+// List all units (public, needed for unit conversion on public pages)
+router.get('/units', async (req: Request, res: Response) => {
+  try {
+    const units = await prisma.unit.findMany({ orderBy: { name: 'asc' } });
+    res.json(units);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: req.t('errors.serverError') });
+  }
+});
+
 // Get public cocktail detail
 router.get('/cocktails/:id', async (req: Request, res: Response) => {
   try {
