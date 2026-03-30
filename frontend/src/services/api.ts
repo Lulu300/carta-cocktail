@@ -197,6 +197,7 @@ export const publicApi = {
   exportCocktail: (id: number) =>
     request<CocktailExportFormat>(`/public/cocktails/${id}/export`),
   getSettings: () => request<SiteSettings>('/public/settings'),
+  listUnits: () => request<Unit[]>('/public/units'),
 };
 
 // Shortages
