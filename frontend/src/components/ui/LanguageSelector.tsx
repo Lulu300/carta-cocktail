@@ -23,7 +23,7 @@ function FlagGB({ className }: { className?: string }) {
   );
 }
 
-const flagComponents: Record<string, React.FC<{ className?: string }>> = {
+const flagComponents: Record<string, ({ className }: { className?: string }) => React.JSX.Element> = {
   fr: FlagFR,
   en: FlagGB,
 };
