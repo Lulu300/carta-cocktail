@@ -50,6 +50,7 @@
     "otherType": "Autre...",
     "customType": "Type personnalisé",
     "desiredStock": "Stock souhaité",
+    "minimumPercent": "Seuil d'alerte (%)",
     "bottleCount": "Bouteilles",
     "confirmDelete": "Supprimer cette catégorie ? Toutes les bouteilles associées seront aussi supprimées.",
     "created": "Catégorie créée",
@@ -224,10 +225,12 @@
     "noShortages": "Tous les niveaux de stock sont suffisants !",
     "category": "Catégorie",
     "type": "Type",
-    "sealed": "Bouteilles scellées",
+    "currentStock": "Stock actuel",
+    "required": "Seuil requis",
     "desired": "Stock souhaité",
     "deficit": "Déficit",
-    "totalUsable": "Total utilisable"
+    "totalUsable": "Bouteilles utilisables",
+    "threshold": "Seuil d'alerte"
   },
   "public": {
     "menuNotFound": "Carte introuvable",
@@ -289,5 +292,9 @@
     "translations": "Traductions",
     "translationHint": "Optionnel : fournir des noms traduits pour chaque langue",
     "selected": "{{count}} sélectionné(s)"
+  },
+  "pagination": {
+    "showing": "{{start}}-{{end}} sur {{total}}",
+    "page": "page"
   }
 }

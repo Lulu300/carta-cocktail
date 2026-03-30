@@ -61,7 +61,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 // Create category
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
-    const { name, type, desiredStock, nameTranslations } = req.body;
+    const { name, type, desiredStock, minimumPercent, nameTranslations } = req.body;
     if (!name || !type) {
       res.status(400).json({ error: req.t('errors.validationError') });
       return;
@@ -72,6 +72,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
         name,
         type,
         desiredStock: desiredStock || 1,
+        minimumPercent: minimumPercent !== undefined ? minimumPercent : 30,
         nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null,
       },
     });
@@ -85,7 +86,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 // Update category
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const { name, type, desiredStock, nameTranslations } = req.body;
+    const { name, type, desiredStock, minimumPercent, nameTranslations } = req.body;
     if (type) {
       await ensureCategoryType(type);
     }
@@ -95,6 +96,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
         ...(name && { name }),
         ...(type && { type }),
         ...(desiredStock !== undefined && { desiredStock }),
+        ...(minimumPercent !== undefined && { minimumPercent }),
         ...(nameTranslations !== undefined && { nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null }),
       },
     });
