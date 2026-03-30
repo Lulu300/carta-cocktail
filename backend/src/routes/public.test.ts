@@ -65,6 +65,24 @@ describe('GET /api/public/settings', () => {
   });
 });
 
+describe('GET /api/public/units', () => {
+  it('should return units without auth', async () => {
+    await seedUnit({ name: 'Centilitre', abbreviation: 'cl' });
+    await seedUnit({ name: 'Millilitre', abbreviation: 'ml' });
+    const res = await request.get('/api/public/units');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(2);
+    expect(res.body[0].name).toBe('Centilitre');
+    expect(res.body[1].name).toBe('Millilitre');
+  });
+
+  it('should return empty array when no units exist', async () => {
+    const res = await request.get('/api/public/units');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
+});
+
 describe('GET /api/public/cocktails/:id', () => {
   it('should return 404 for non-existent cocktail', async () => {
     const res = await request.get('/api/public/cocktails/9999');
