@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useSort } from '../../hooks/useSort';
+import { usePagination } from '../../hooks/usePagination';
 import { cocktails as api, availability as availabilityApi } from '../../services/api';
 import type { Cocktail, CocktailAvailability } from '../../types';
 import ExportCocktailButton from '../../components/ui/ExportCocktailButton';
@@ -8,6 +10,7 @@ import ImportCocktailWizard from '../../components/import/ImportCocktailWizard';
 import { exportCocktailsAsZip } from '../../services/exportZip';
 import SearchInput from '../../components/ui/SearchInput';
 import MultiSelectDropdown from '../../components/ui/MultiSelectDropdown';
+import Pagination from '../../components/ui/Pagination';
 
 export default function CocktailsPage() {
   const { t } = useTranslation();
@@ -44,6 +47,9 @@ export default function CocktailsPage() {
       return true;
     });
   }, [items, search, selectedTags]);
+
+  const { sortedItems } = useSort<Cocktail>(filteredItems, 'name');
+  const { paginatedItems, page, pageSize, totalPages, totalItems, setPage, setPageSize } = usePagination(sortedItems);
 
   const load = () => api.list().then(setItems);
 
@@ -196,7 +202,7 @@ export default function CocktailsPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filteredItems.map((item) => {
+        {paginatedItems.map((item) => {
           const avail = availabilities[item.id];
           const isSelected = selectedIds.has(item.id);
           return (
@@ -297,6 +303,11 @@ export default function CocktailsPage() {
         })}
       </div>
       {filteredItems.length === 0 && <div className="text-center py-12 text-gray-500">{t('common.noResults')}</div>}
+      {filteredItems.length > 0 && (
+        <div className="mt-4 bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden">
+          <Pagination page={page} totalPages={totalPages} pageSize={pageSize} totalItems={totalItems} onPageChange={setPage} onPageSizeChange={setPageSize} />
+        </div>
+      )}
 
       {showImport && (
         <ImportCocktailWizard onClose={() => { setShowImport(false); load(); loadAvailability(); }} />

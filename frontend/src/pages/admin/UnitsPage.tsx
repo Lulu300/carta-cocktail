@@ -1,9 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
+import { useSort } from '../../hooks/useSort';
+import { usePagination } from '../../hooks/usePagination';
 import { units as api } from '../../services/api';
 import type { Unit } from '../../types';
 import SearchInput from '../../components/ui/SearchInput';
+import SortableHeader from '../../components/ui/SortableHeader';
+import Pagination from '../../components/ui/Pagination';
 
 export default function UnitsPage() {
   const { t } = useTranslation();
@@ -23,6 +27,9 @@ export default function UnitsPage() {
       item.abbreviation.toLowerCase().includes(lower)
     );
   }, [items, search, localize]);
+
+  const { sortedItems, sortKey, sortDirection, toggleSort } = useSort<Unit>(filteredItems);
+  const { paginatedItems, page, pageSize, totalPages, totalItems, setPage, setPageSize } = usePagination(sortedItems);
 
   const load = () => api.list().then(setItems);
   useEffect(() => { load(); }, []);
@@ -74,14 +81,14 @@ export default function UnitsPage() {
         <table className="w-full">
           <thead className="bg-[#0f0f1a]">
             <tr>
-              <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('units.name')}</th>
-              <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('units.abbreviation')}</th>
-              <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">Facteur de conversion (ml)</th>
+              <SortableHeader label={t('units.name')} sortKey="name" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+              <SortableHeader label={t('units.abbreviation')} sortKey="abbreviation" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+              <SortableHeader label="Facteur de conversion (ml)" sortKey="conversionFactorToMl" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
               <th className="text-right px-6 py-3 text-sm text-gray-400 font-medium">{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-800">
-            {filteredItems.map((item) => (
+            {paginatedItems.map((item) => (
               <tr key={item.id} className="hover:bg-gray-800/50">
                 <td className="px-6 py-4 font-medium">{localize(item)}</td>
                 <td className="px-6 py-4 text-gray-400">{item.abbreviation}</td>
@@ -111,6 +118,7 @@ export default function UnitsPage() {
           </tbody>
         </table>
         {filteredItems.length === 0 && <div className="text-center py-8 text-gray-500">{t('common.noResults')}</div>}
+        <Pagination page={page} totalPages={totalPages} pageSize={pageSize} totalItems={totalItems} onPageChange={setPage} onPageSizeChange={setPageSize} />
       </div>
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">

@@ -50,6 +50,7 @@
     "otherType": "Other...",
     "customType": "Custom type",
     "desiredStock": "Desired Stock",
+    "minimumPercent": "Alert threshold (%)",
     "bottleCount": "Bottles",
     "confirmDelete": "Delete this category? All associated bottles will also be deleted.",
     "created": "Category created",
@@ -224,10 +225,12 @@
     "noShortages": "All stock levels are sufficient!",
     "category": "Category",
     "type": "Type",
-    "sealed": "Sealed Bottles",
+    "currentStock": "Current stock",
+    "required": "Required threshold",
     "desired": "Desired Stock",
     "deficit": "Deficit",
-    "totalUsable": "Total Usable"
+    "totalUsable": "Usable bottles",
+    "threshold": "Alert threshold"
   },
   "public": {
     "menuNotFound": "Menu not found",
@@ -289,5 +292,9 @@
     "translations": "Translations",
     "translationHint": "Optional: provide translated names for each language",
     "selected": "{{count}} selected"
+  },
+  "pagination": {
+    "showing": "{{start}}-{{end}} of {{total}}",
+    "page": "page"
   }
 }
