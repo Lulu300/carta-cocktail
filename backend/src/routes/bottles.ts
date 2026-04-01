@@ -107,31 +107,39 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
-    const { name, categoryId, purchasePrice, capacityMl, remainingPercent, openedAt, alcoholPercentage, location, isApero, isDigestif } = req.body;
+    const { name, categoryId, purchasePrice, capacityMl, remainingPercent, openedAt, alcoholPercentage, location, isApero, isDigestif, quantity } = req.body;
     if (!name || !categoryId || !capacityMl) {
       res.status(400).json({ error: req.t('errors.validationError') });
       return;
     }
-    const bottle = await prisma.bottle.create({
-      data: {
-        name,
-        categoryId,
-        purchasePrice: purchasePrice || null,
-        capacityMl,
-        remainingPercent: remainingPercent ?? 100,
-        openedAt: openedAt ? new Date(openedAt) : null,
-        alcoholPercentage: alcoholPercentage || null,
-        location: location || null,
-        isApero: isApero ?? false,
-        isDigestif: isDigestif ?? false,
-      },
-      include: { category: true },
-    });
 
-    // Auto-sync bottle menus
-    await syncBottleMenus(bottle.id, bottle.isApero, bottle.isDigestif);
+    const count = Math.min(Math.max(1, parseInt(quantity) || 1), 50);
+    const data = {
+      name,
+      categoryId,
+      purchasePrice: purchasePrice || null,
+      capacityMl,
+      remainingPercent: remainingPercent ?? 100,
+      openedAt: openedAt ? new Date(openedAt) : null,
+      alcoholPercentage: alcoholPercentage || null,
+      location: location || null,
+      isApero: isApero ?? false,
+      isDigestif: isDigestif ?? false,
+    };
 
-    res.status(201).json(parseNameTranslations(bottle));
+    if (count === 1) {
+      const bottle = await prisma.bottle.create({ data, include: { category: true } });
+      await syncBottleMenus(bottle.id, bottle.isApero, bottle.isDigestif);
+      res.status(201).json(parseNameTranslations(bottle));
+    } else {
+      const bottles = [];
+      for (let i = 0; i < count; i++) {
+        const bottle = await prisma.bottle.create({ data, include: { category: true } });
+        await syncBottleMenus(bottle.id, bottle.isApero, bottle.isDigestif);
+        bottles.push(bottle);
+      }
+      res.status(201).json(parseNameTranslations(bottles));
+    }
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: req.t('errors.serverError') });
