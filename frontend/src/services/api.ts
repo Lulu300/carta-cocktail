@@ -82,8 +82,8 @@ export const bottles = {
     return request<Bottle[]>(`/bottles${query ? `?${query}` : ''}`);
   },
   get: (id: number) => request<Bottle>(`/bottles/${id}`),
-  create: (data: Partial<Bottle>) =>
-    request<Bottle>('/bottles', { method: 'POST', body: JSON.stringify(data) }),
+  create: (data: Partial<Bottle> & { quantity?: number }) =>
+    request<Bottle | Bottle[]>('/bottles', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: Partial<Bottle>) =>
     request<Bottle>(`/bottles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: number) =>

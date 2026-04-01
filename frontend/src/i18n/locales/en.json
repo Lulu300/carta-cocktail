@@ -91,7 +91,11 @@
     "locationPlaceholder": "E.g.: Top shelf, Main bar...",
     "activeTitle": "Available bottles",
     "historyTitle": "History (empty)",
-    "filterByLocation": "Filter by location"
+    "filterByLocation": "Filter by location",
+    "quantity": "Quantity",
+    "quantityHint": "{{count}} identical bottles will be created",
+    "saveDuplicate": "Save and duplicate",
+    "showAllLocations": "Show all locations"
   },
   "ingredients": {
     "title": "Ingredients",

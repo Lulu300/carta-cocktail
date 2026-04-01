@@ -11,6 +11,44 @@ import LocationAutocomplete from '../../components/ui/LocationAutocomplete';
 import SortableHeader from '../../components/ui/SortableHeader';
 import Pagination from '../../components/ui/Pagination';
 
+interface BottleGroup {
+  key: string;
+  name: string;
+  capacityMl: number;
+  categoryId: number;
+  alcoholPercentage: number | null;
+  category?: Category;
+  bottles: Bottle[];
+}
+
+function groupBottles(bottles: Bottle[]): (Bottle | BottleGroup)[] {
+  const groups = new Map<string, BottleGroup>();
+  const singles: Bottle[] = [];
+
+  for (const bottle of bottles) {
+    const key = `${bottle.name.toLowerCase()}|${bottle.capacityMl}|${bottle.categoryId}|${bottle.alcoholPercentage ?? ''}`;
+    if (!groups.has(key)) {
+      groups.set(key, { key, name: bottle.name, capacityMl: bottle.capacityMl, categoryId: bottle.categoryId, alcoholPercentage: bottle.alcoholPercentage, category: bottle.category, bottles: [] });
+    }
+    groups.get(key)!.bottles.push(bottle);
+  }
+
+  const result: (Bottle | BottleGroup)[] = [];
+  for (const group of groups.values()) {
+    if (group.bottles.length === 1) {
+      singles.push(group.bottles[0]);
+      result.push(group.bottles[0]);
+    } else {
+      result.push(group);
+    }
+  }
+  return result;
+}
+
+function isGroup(item: Bottle | BottleGroup): item is BottleGroup {
+  return 'bottles' in item && Array.isArray((item as BottleGroup).bottles) && 'key' in item;
+}
+
 export default function BottlesPage() {
   const { t } = useTranslation();
   const localize = useLocalizedName();
@@ -23,6 +61,8 @@ export default function BottlesPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Bottle | null>(null);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [quantity, setQuantity] = useState(1);
   const [form, setForm] = useState({
     name: '', categoryId: 0, purchasePrice: '', capacityMl: 700,
     remainingPercent: 100, openedAt: '', alcoholPercentage: '',
@@ -56,10 +96,20 @@ export default function BottlesPage() {
   const historyItems = useMemo(() => filteredItems.filter(i => i.remainingPercent === 0), [filteredItems]);
 
   const { sortedItems: sortedActive, sortKey, sortDirection, toggleSort } = useSort<Bottle>(activeItems);
-  const { paginatedItems, page, pageSize, totalPages, totalItems, setPage, setPageSize } = usePagination(sortedActive);
+  const groupedItems = useMemo(() => groupBottles(sortedActive), [sortedActive]);
+  const { paginatedItems: paginatedGroups, page, pageSize, totalPages, totalItems, setPage, setPageSize } = usePagination(groupedItems);
+
+  const toggleGroup = (key: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
 
   const openCreate = () => {
     setEditing(null);
+    setQuantity(1);
     setForm({ name: '', categoryId: cats[0]?.id || 0, purchasePrice: '', capacityMl: 700, remainingPercent: 100, openedAt: '', alcoholPercentage: '', location: '', isApero: false, isDigestif: false });
     setShowModal(true);
   };
@@ -81,7 +131,7 @@ export default function BottlesPage() {
     setShowModal(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, duplicate = false) => {
     e.preventDefault();
     const data = {
       name: form.name,
@@ -97,10 +147,15 @@ export default function BottlesPage() {
     };
     if (editing) {
       await api.update(editing.id, data);
+      setShowModal(false);
     } else {
-      await api.create(data);
+      await api.create({ ...data, quantity });
+      if (duplicate) {
+        setQuantity(1);
+      } else {
+        setShowModal(false);
+      }
     }
-    setShowModal(false);
     load();
   };
 
@@ -114,6 +169,81 @@ export default function BottlesPage() {
     if (pct > 50) return 'bg-green-500';
     if (pct > 20) return 'bg-yellow-500';
     return 'bg-red-500';
+  };
+
+  const renderBottleRow = (item: Bottle, indented = false) => (
+    <tr key={item.id} className={`hover:bg-gray-800/50 ${indented ? 'bg-gray-900/30' : ''}`}>
+      <td className={`py-4 font-medium ${indented ? 'px-12' : 'px-6'}`}>
+        {indented && <span className="text-gray-600 mr-2">└</span>}
+        {item.name}
+      </td>
+      <td className="px-6 py-4 text-gray-400">{item.category ? localize(item.category) : ''}</td>
+      <td className="px-6 py-4">{item.capacityMl} ml</td>
+      <td className="px-6 py-4">
+        <div className="flex items-center gap-2">
+          <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
+            <div className={`h-full ${remainingColor(item.remainingPercent)} rounded-full`} style={{ width: `${item.remainingPercent}%` }} />
+          </div>
+          <span className="text-sm">{item.remainingPercent}%</span>
+        </div>
+      </td>
+      <td className="px-6 py-4 text-gray-400">{item.alcoholPercentage ? `${item.alcoholPercentage}%` : '-'}</td>
+      <td className="px-6 py-4">
+        <span className={`px-2 py-1 rounded text-xs font-medium ${item.openedAt ? 'bg-orange-500/20 text-orange-400' : 'bg-green-500/20 text-green-400'}`}>
+          {item.openedAt ? t('bottles.opened') : t('bottles.unopened')}
+        </span>
+      </td>
+      <td className="px-6 py-4 text-gray-400">{item.purchasePrice ? `${item.purchasePrice} €` : '-'}</td>
+      <td className="px-6 py-4 text-right">
+        <div className="flex items-center justify-end gap-3">
+          <button onClick={() => openEdit(item)} className="text-amber-400 hover:text-amber-300 transition-colors" title={t('common.edit')}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </button>
+          <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 transition-colors" title={t('common.delete')}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+
+  const renderGroupRow = (group: BottleGroup) => {
+    const expanded = expandedGroups.has(group.key);
+    const avgRemaining = Math.round(group.bottles.reduce((s, b) => s + b.remainingPercent, 0) / group.bottles.length);
+    return (
+      <>
+        <tr key={group.key} className="hover:bg-gray-800/50 cursor-pointer" onClick={() => toggleGroup(group.key)}>
+          <td className="px-6 py-4 font-medium">
+            <div className="flex items-center gap-2">
+              <svg className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              {group.name}
+              <span className="bg-amber-400/20 text-amber-400 text-xs font-bold px-2 py-0.5 rounded-full">x{group.bottles.length}</span>
+            </div>
+          </td>
+          <td className="px-6 py-4 text-gray-400">{group.category ? localize(group.category) : ''}</td>
+          <td className="px-6 py-4">{group.capacityMl} ml</td>
+          <td className="px-6 py-4">
+            <div className="flex items-center gap-2">
+              <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
+                <div className={`h-full ${remainingColor(avgRemaining)} rounded-full`} style={{ width: `${avgRemaining}%` }} />
+              </div>
+              <span className="text-sm text-gray-400">~{avgRemaining}%</span>
+            </div>
+          </td>
+          <td className="px-6 py-4 text-gray-400">{group.alcoholPercentage ? `${group.alcoholPercentage}%` : '-'}</td>
+          <td className="px-6 py-4 text-gray-400">-</td>
+          <td className="px-6 py-4 text-gray-400">-</td>
+          <td className="px-6 py-4"></td>
+        </tr>
+        {expanded && group.bottles.map((b) => renderBottleRow(b, true))}
+      </>
+    );
   };
 
   return (
@@ -158,47 +288,16 @@ export default function BottlesPage() {
               <SortableHeader label={t('bottles.category')} sortKey="category.name" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
               <SortableHeader label={t('bottles.capacityMl')} sortKey="capacityMl" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
               <SortableHeader label={t('bottles.remainingPercent')} sortKey="remainingPercent" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
+              <SortableHeader label="Alcool" sortKey="alcoholPercentage" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
               <SortableHeader label={t('bottles.openedAt')} sortKey="openedAt" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
               <SortableHeader label={t('bottles.purchasePrice')} sortKey="purchasePrice" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
               <th className="text-right px-6 py-3 text-sm text-gray-400 font-medium">{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-800">
-            {paginatedItems.map((item) => (
-              <tr key={item.id} className="hover:bg-gray-800/50">
-                <td className="px-6 py-4 font-medium">{item.name}</td>
-                <td className="px-6 py-4 text-gray-400">{item.category ? localize(item.category) : ''}</td>
-                <td className="px-6 py-4">{item.capacityMl} ml</td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
-                      <div className={`h-full ${remainingColor(item.remainingPercent)} rounded-full`} style={{ width: `${item.remainingPercent}%` }} />
-                    </div>
-                    <span className="text-sm">{item.remainingPercent}%</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${item.openedAt ? 'bg-orange-500/20 text-orange-400' : 'bg-green-500/20 text-green-400'}`}>
-                    {item.openedAt ? t('bottles.opened') : t('bottles.unopened')}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-gray-400">{item.purchasePrice ? `${item.purchasePrice} €` : '-'}</td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex items-center justify-end gap-3">
-                    <button onClick={() => openEdit(item)} className="text-amber-400 hover:text-amber-300 transition-colors" title={t('common.edit')}>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                    </button>
-                    <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 transition-colors" title={t('common.delete')}>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {paginatedGroups.map((item) =>
+              isGroup(item) ? renderGroupRow(item) : renderBottleRow(item)
+            )}
           </tbody>
         </table>
         {activeItems.length === 0 && <div className="text-center py-8 text-gray-500">{t('common.noResults')}</div>}
@@ -263,7 +362,7 @@ export default function BottlesPage() {
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <form onSubmit={handleSubmit} className="bg-[#1a1a2e] border border-gray-800 rounded-xl p-6 w-full max-w-md space-y-4">
+          <form onSubmit={(e) => handleSubmit(e)} className="bg-[#1a1a2e] border border-gray-800 rounded-xl p-6 w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-semibold">{editing ? t('bottles.edit') : t('bottles.add')}</h2>
             <div>
               <label className="block text-sm text-gray-400 mb-1">{t('bottles.name')}</label>
@@ -315,8 +414,21 @@ export default function BottlesPage() {
                 <span className="text-sm">Utilisable comme digestif</span>
               </label>
             </div>
+            {/* Quantity (create mode only) */}
+            {!editing && (
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">{t('bottles.quantity')}</label>
+                <input type="number" min="1" max="50" value={quantity} onChange={(e) => setQuantity(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400" />
+                {quantity > 1 && <p className="text-xs text-gray-500 mt-1">{t('bottles.quantityHint', { count: quantity })}</p>}
+              </div>
+            )}
             <div className="flex justify-end gap-3 pt-2">
               <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-400 hover:text-white">{t('common.cancel')}</button>
+              {!editing && (
+                <button type="button" onClick={(e) => handleSubmit(e as unknown as React.FormEvent, true)} className="border border-amber-400/30 text-amber-400 hover:bg-amber-400/10 font-semibold px-4 py-2 rounded-lg transition-colors">
+                  {t('bottles.saveDuplicate')}
+                </button>
+              )}
               <button type="submit" className="bg-amber-400 hover:bg-amber-500 text-[#0f0f1a] font-semibold px-4 py-2 rounded-lg">{t('common.save')}</button>
             </div>
           </form>

@@ -6,6 +6,42 @@ import { useAuth } from '../../contexts/AuthContext';
 import { publicApi, availability } from '../../services/api';
 import type { Menu, MenuBottle, MenuCocktail, CocktailAvailability } from '../../types';
 
+interface BottleGroupEntry {
+  name: string;
+  capacityMl: number;
+  categoryId: number;
+  alcoholPercentage: number | null;
+  count: number;
+  locations: { name: string; count: number }[];
+  menuBottles: MenuBottle[];
+}
+
+function groupMenuBottles(bottles: MenuBottle[]): BottleGroupEntry[] {
+  const groups = new Map<string, BottleGroupEntry>();
+  for (const mb of bottles) {
+    const b = mb.bottle!;
+    const key = `${b.name.toLowerCase()}|${b.capacityMl}|${b.categoryId}|${b.alcoholPercentage ?? ''}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        name: b.name, capacityMl: b.capacityMl, categoryId: b.categoryId,
+        alcoholPercentage: b.alcoholPercentage, count: 0, locations: [], menuBottles: [],
+      });
+    }
+    const g = groups.get(key)!;
+    g.count++;
+    g.menuBottles.push(mb);
+    if (b.location) {
+      const loc = g.locations.find(l => l.name.toLowerCase() === b.location!.toLowerCase());
+      if (loc) loc.count++; else g.locations.push({ name: b.location, count: 1 });
+    }
+  }
+  // Sort locations by count descending
+  for (const g of groups.values()) {
+    g.locations.sort((a, b) => b.count - a.count);
+  }
+  return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export default function MenuPublicPage() {
   const { t } = useTranslation();
   const localize = useLocalizedName();
@@ -15,6 +51,7 @@ export default function MenuPublicPage() {
   const [error, setError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [availabilities, setAvailabilities] = useState<CocktailAvailability[]>([]);
+  const [locationsModal, setLocationsModal] = useState<BottleGroupEntry | null>(null);
 
   useEffect(() => {
     if (!slug) return;
@@ -76,6 +113,50 @@ export default function MenuPublicPage() {
   // Helper to get availability for a cocktail
   const getAvailability = (cocktailId: number): CocktailAvailability | undefined => {
     return availabilities.find(a => a.cocktailId === cocktailId);
+  };
+
+  const MAX_VISIBLE_LOCATIONS = 3;
+
+  const renderGroupedBottles = (bottles: MenuBottle[]) => {
+    const groups = groupMenuBottles(bottles);
+    return groups.map((group) => (
+      <div key={`${group.name}|${group.capacityMl}|${group.categoryId}`} className="px-6 py-4 flex items-center justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-medium text-white">{group.name}</h3>
+            {user && group.count > 1 && (
+              <span className="bg-amber-400/20 text-amber-400 text-xs font-bold px-2 py-0.5 rounded-full">x{group.count}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-3 mt-1 text-sm text-gray-400">
+            {group.alcoholPercentage && <span>{group.alcoholPercentage}% vol.</span>}
+            {user && (
+              <>
+                <span>•</span>
+                <span>{group.capacityMl} ml</span>
+              </>
+            )}
+          </div>
+        </div>
+        {user && group.locations.length > 0 && (
+          <div className="flex items-center gap-1 flex-wrap justify-end max-w-xs">
+            {group.locations.slice(0, MAX_VISIBLE_LOCATIONS).map((loc) => (
+              <span key={loc.name} className="bg-gray-700/50 text-gray-400 text-xs px-2 py-0.5 rounded">
+                {loc.name}{group.count > 1 && ` (${loc.count})`}
+              </span>
+            ))}
+            {group.locations.length > MAX_VISIBLE_LOCATIONS && (
+              <button
+                onClick={() => setLocationsModal(group)}
+                className="text-amber-400 hover:text-amber-300 text-xs px-1"
+              >
+                +{group.locations.length - MAX_VISIBLE_LOCATIONS}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    ));
   };
 
   // Group bottles/cocktails by section OR by default grouping
@@ -181,35 +262,7 @@ export default function MenuPublicPage() {
                 {isBottleMenu ? (
                   <div className="bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden">
                     <div className="divide-y divide-gray-800">
-                      {(itemsBySection['__no_section__'] as MenuBottle[]).map((mb) => {
-                        const bottle = mb.bottle!;
-                        return (
-                          <div key={mb.id} className="px-6 py-4 flex items-center justify-between">
-                            <div className="flex-1">
-                              <h3 className="text-lg font-medium text-white">{bottle.name}</h3>
-                              <div className="flex items-center gap-3 mt-1 text-sm text-gray-400">
-                                {bottle.alcoholPercentage && <span>{bottle.alcoholPercentage}% vol.</span>}
-                                {user && (
-                                  <>
-                                    <span>•</span>
-                                    <span>{bottle.capacityMl} ml</span>
-                                    <span>•</span>
-                                    <span className={bottle.remainingPercent > 50 ? 'text-green-400' : bottle.remainingPercent > 20 ? 'text-yellow-400' : 'text-red-400'}>
-                                      {bottle.remainingPercent}% restant
-                                    </span>
-                                    {bottle.openedAt && (<><span>•</span><span className="text-orange-400">Ouvert</span></>)}
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {bottle.location && (
-                                <span className="bg-gray-700/50 text-gray-400 text-xs px-2 py-0.5 rounded">{bottle.location}</span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
+                      {renderGroupedBottles(itemsBySection['__no_section__'] as MenuBottle[])}
                     </div>
                   </div>
                 ) : (
@@ -285,35 +338,7 @@ export default function MenuPublicPage() {
                   {isBottleMenu ? (
                     <div className="bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden">
                       <div className="divide-y divide-gray-800">
-                        {(sectionItems as MenuBottle[]).map((mb) => {
-                          const bottle = mb.bottle!;
-                          return (
-                            <div key={mb.id} className="px-6 py-4 flex items-center justify-between">
-                              <div className="flex-1">
-                                <h3 className="text-lg font-medium text-white">{bottle.name}</h3>
-                                <div className="flex items-center gap-3 mt-1 text-sm text-gray-400">
-                                  {bottle.alcoholPercentage && <span>{bottle.alcoholPercentage}% vol.</span>}
-                                  {user && (
-                                    <>
-                                      <span>•</span>
-                                      <span>{bottle.capacityMl} ml</span>
-                                      <span>•</span>
-                                      <span className={bottle.remainingPercent > 50 ? 'text-green-400' : bottle.remainingPercent > 20 ? 'text-yellow-400' : 'text-red-400'}>
-                                        {bottle.remainingPercent}% restant
-                                      </span>
-                                      {bottle.openedAt && (<><span>•</span><span className="text-orange-400">Ouvert</span></>)}
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {bottle.location && (
-                                  <span className="bg-gray-700/50 text-gray-400 text-xs px-2 py-0.5 rounded">{bottle.location}</span>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
+                        {renderGroupedBottles(sectionItems as MenuBottle[])}
                       </div>
                     </div>
                   ) : (
@@ -392,37 +417,7 @@ export default function MenuPublicPage() {
                       <h2 className="text-lg font-serif font-bold text-amber-400">{categoryName}</h2>
                     </div>
                     <div className="divide-y divide-gray-800">
-                      {(bottles as MenuBottle[])
-                        .sort((a, b) => (a.bottle?.name || '').localeCompare(b.bottle?.name || ''))
-                        .map((mb) => {
-                          const bottle = mb.bottle!;
-                          return (
-                            <div key={mb.id} className="px-6 py-4 flex items-center justify-between">
-                              <div className="flex-1">
-                                <h3 className="text-lg font-medium text-white">{bottle.name}</h3>
-                                <div className="flex items-center gap-3 mt-1 text-sm text-gray-400">
-                                  {bottle.alcoholPercentage && <span>{bottle.alcoholPercentage}% vol.</span>}
-                                  {user && (
-                                    <>
-                                      <span>•</span>
-                                      <span>{bottle.capacityMl} ml</span>
-                                      <span>•</span>
-                                      <span className={bottle.remainingPercent > 50 ? 'text-green-400' : bottle.remainingPercent > 20 ? 'text-yellow-400' : 'text-red-400'}>
-                                        {bottle.remainingPercent}% restant
-                                      </span>
-                                      {bottle.openedAt && (<><span>•</span><span className="text-orange-400">Ouvert</span></>)}
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {bottle.location && (
-                                  <span className="bg-gray-700/50 text-gray-400 text-xs px-2 py-0.5 rounded">{bottle.location}</span>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
+                      {renderGroupedBottles(bottles as MenuBottle[])}
                     </div>
                   </div>
                 ))
@@ -489,6 +484,30 @@ export default function MenuPublicPage() {
           </>
         )}
       </div>
+
+      {/* Locations modal */}
+      {locationsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setLocationsModal(null)}>
+          <div className="bg-[#1a1a2e] border border-gray-800 rounded-xl p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-lg">{locationsModal.name}</h3>
+              <button onClick={() => setLocationsModal(null)} className="text-gray-400 hover:text-white">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="space-y-2">
+              {locationsModal.locations.map((loc) => (
+                <div key={loc.name} className="flex items-center justify-between px-3 py-2 bg-[#0f0f1a] rounded-lg">
+                  <span className="text-gray-300">{loc.name}</span>
+                  <span className="text-amber-400 font-medium">{loc.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

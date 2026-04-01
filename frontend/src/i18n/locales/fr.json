@@ -91,7 +91,11 @@
     "locationPlaceholder": "Ex: Étagère du haut, Bar principal...",
     "activeTitle": "Bouteilles disponibles",
     "historyTitle": "Historique (vides)",
-    "filterByLocation": "Filtrer par localisation"
+    "filterByLocation": "Filtrer par localisation",
+    "quantity": "Quantité",
+    "quantityHint": "{{count}} bouteilles identiques seront créées",
+    "saveDuplicate": "Enregistrer et dupliquer",
+    "showAllLocations": "Voir toutes les localisations"
   },
   "ingredients": {
     "title": "Ingrédients",
