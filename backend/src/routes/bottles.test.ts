@@ -117,6 +117,49 @@ describe('POST /api/bottles', () => {
   });
 });
 
+describe('POST /api/bottles (batch)', () => {
+  it('should create multiple bottles when quantity > 1', async () => {
+    const cat = await seedCategory();
+    const res = await request.post('/api/bottles').set(authHeader())
+      .send({ name: 'Beer', categoryId: cat.id, capacityMl: 330, quantity: 3 });
+    expect(res.status).toBe(201);
+    expect(res.body).toHaveLength(3);
+    expect(res.body[0].name).toBe('Beer');
+    expect(res.body[1].name).toBe('Beer');
+    expect(res.body[2].name).toBe('Beer');
+  });
+
+  it('should return single bottle (not array) when quantity is 1', async () => {
+    const cat = await seedCategory();
+    const res = await request.post('/api/bottles').set(authHeader())
+      .send({ name: 'Wine', categoryId: cat.id, capacityMl: 750, quantity: 1 });
+    expect(res.status).toBe(201);
+    expect(res.body.name).toBe('Wine');
+    expect(Array.isArray(res.body)).toBe(false);
+  });
+
+  it('should cap quantity at 50', async () => {
+    const cat = await seedCategory();
+    const res = await request.post('/api/bottles').set(authHeader())
+      .send({ name: 'Shot', categoryId: cat.id, capacityMl: 50, quantity: 100 });
+    expect(res.status).toBe(201);
+    expect(res.body).toHaveLength(50);
+  });
+
+  it('should auto-sync menus for all batch-created bottles', async () => {
+    const cat = await seedCategory();
+    const res = await request.post('/api/bottles').set(authHeader())
+      .send({ name: 'Aperol', categoryId: cat.id, capacityMl: 700, isApero: true, quantity: 3 });
+    expect(res.status).toBe(201);
+
+    const aperoMenu = await prisma.menu.findUnique({ where: { slug: 'aperitifs' } });
+    const menuBottles = await prisma.menuBottle.findMany({
+      where: { menuId: aperoMenu!.id },
+    });
+    expect(menuBottles).toHaveLength(3);
+  });
+});
+
 describe('PUT /api/bottles/:id', () => {
   it('should update bottle fields', async () => {
     const bottle = await seedBottle({ name: 'Old Name' });

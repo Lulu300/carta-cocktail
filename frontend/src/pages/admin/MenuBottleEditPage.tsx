@@ -1,8 +1,51 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { menus as menusApi, menuBottles as menuBottlesApi, menuSections } from '../../services/api';
 import type { Menu, MenuBottle, MenuSection } from '../../types';
+
+interface BottleGroup {
+  key: string;
+  name: string;
+  categoryName: string;
+  alcoholPercentage: number | null;
+  capacityMl: number;
+  count: number;
+  menuBottles: MenuBottle[];
+  isHidden: boolean;
+  menuSectionId: number | null;
+}
+
+function groupMenuBottlesForEdit(bottles: MenuBottle[]): BottleGroup[] {
+  const groups = new Map<string, BottleGroup>();
+  const order: string[] = [];
+
+  for (const mb of bottles) {
+    const b = mb.bottle!;
+    const key = `${b.name.toLowerCase()}|${b.capacityMl}|${b.categoryId}|${b.alcoholPercentage ?? ''}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        name: b.name,
+        categoryName: b.category?.name || '',
+        alcoholPercentage: b.alcoholPercentage,
+        capacityMl: b.capacityMl,
+        count: 0,
+        menuBottles: [],
+        isHidden: mb.isHidden,
+        menuSectionId: mb.menuSectionId,
+      });
+      order.push(key);
+    }
+    const g = groups.get(key)!;
+    g.count++;
+    g.menuBottles.push(mb);
+    // Group is visible if any bottle is visible
+    if (!mb.isHidden) g.isHidden = false;
+  }
+
+  return order.map(k => groups.get(k)!);
+}
 
 export default function MenuBottleEditPage() {
   const { t } = useTranslation();
@@ -14,7 +57,7 @@ export default function MenuBottleEditPage() {
   const [description, setDescription] = useState('');
   const [isPublic, setIsPublic] = useState(false);
   const [sections, setSections] = useState<MenuSection[]>([]);
-  const [menuBottles, setMenuBottles] = useState<MenuBottle[]>([]);
+  const [menuBottlesList, setMenuBottlesList] = useState<MenuBottle[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [showSectionModal, setShowSectionModal] = useState(false);
   const [newSectionName, setNewSectionName] = useState('');
@@ -29,12 +72,26 @@ export default function MenuBottleEditPage() {
     setDescription(m.description || '');
     setIsPublic(m.isPublic);
     setSections(m.sections || []);
-    setMenuBottles(m.bottles || []);
+    setMenuBottlesList(m.bottles || []);
   }, [id]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
+
+  // Group bottles by section, then within each section group identical bottles
+  const groupedBySection = useMemo(() => {
+    const result: Record<string, BottleGroup[]> = {};
+    const noSection = menuBottlesList.filter(mb => mb.menuSectionId === null);
+    if (noSection.length > 0) {
+      result['__no_section__'] = groupMenuBottlesForEdit(noSection);
+    }
+    sections.forEach(section => {
+      const sectionBottles = menuBottlesList.filter(mb => mb.menuSectionId === section.id);
+      if (sectionBottles.length > 0) {
+        result[`section_${section.id}`] = groupMenuBottlesForEdit(sectionBottles);
+      }
+    });
+    return result;
+  }, [menuBottlesList, sections]);
 
   const handleSync = async () => {
     if (!id) return;
@@ -49,20 +106,58 @@ export default function MenuBottleEditPage() {
     }
   };
 
-  const toggleHidden = async (menuBottleId: number) => {
-    const mb = menuBottles.find((m) => m.id === menuBottleId);
-    if (!mb) return;
-    await menuBottlesApi.update(menuBottleId, { isHidden: !mb.isHidden });
-    setMenuBottles(menuBottles.map((m) =>
-      m.id === menuBottleId ? { ...m, isHidden: !m.isHidden } : m
+  const toggleGroupHidden = async (group: BottleGroup) => {
+    const newHidden = !group.isHidden;
+    await Promise.all(group.menuBottles.map(mb => menuBottlesApi.update(mb.id, { isHidden: newHidden })));
+    setMenuBottlesList(menuBottlesList.map(mb =>
+      group.menuBottles.some(gmb => gmb.id === mb.id) ? { ...mb, isHidden: newHidden } : mb
     ));
   };
 
-  const changeBottleSection = async (menuBottleId: number, sectionId: number | null) => {
-    await menuBottlesApi.update(menuBottleId, { menuSectionId: sectionId });
-    setMenuBottles(menuBottles.map((m) =>
-      m.id === menuBottleId ? { ...m, menuSectionId: sectionId } : m
+  const changeGroupSection = async (group: BottleGroup, sectionId: number | null) => {
+    await Promise.all(group.menuBottles.map(mb => menuBottlesApi.update(mb.id, { menuSectionId: sectionId })));
+    setMenuBottlesList(menuBottlesList.map(mb =>
+      group.menuBottles.some(gmb => gmb.id === mb.id) ? { ...mb, menuSectionId: sectionId } : mb
     ));
+  };
+
+  const moveGroupUp = async (sectionId: number | null, groupIndex: number) => {
+    const sectionKey = sectionId === null ? '__no_section__' : `section_${sectionId}`;
+    const groups = groupedBySection[sectionKey];
+    if (!groups || groupIndex === 0) return;
+
+    // Swap positions between all bottles of adjacent groups
+    const groupA = groups[groupIndex - 1];
+    const groupB = groups[groupIndex];
+    const updates: Promise<unknown>[] = [];
+    let pos = 0;
+    for (const g of groups) {
+      const src = g === groupA ? groupB : g === groupB ? groupA : g;
+      for (const mb of src.menuBottles) {
+        updates.push(menuBottlesApi.update(mb.id, { position: pos++ }));
+      }
+    }
+    await Promise.all(updates);
+    await load();
+  };
+
+  const moveGroupDown = async (sectionId: number | null, groupIndex: number) => {
+    const sectionKey = sectionId === null ? '__no_section__' : `section_${sectionId}`;
+    const groups = groupedBySection[sectionKey];
+    if (!groups || groupIndex >= groups.length - 1) return;
+
+    const groupA = groups[groupIndex];
+    const groupB = groups[groupIndex + 1];
+    const updates: Promise<unknown>[] = [];
+    let pos = 0;
+    for (const g of groups) {
+      const src = g === groupA ? groupB : g === groupB ? groupA : g;
+      for (const mb of src.menuBottles) {
+        updates.push(menuBottlesApi.update(mb.id, { position: pos++ }));
+      }
+    }
+    await Promise.all(updates);
+    await load();
   };
 
   const createSection = async () => {
@@ -90,80 +185,71 @@ export default function MenuBottleEditPage() {
     if (!confirm('Supprimer cette section ? Les bouteilles seront déplacées dans "Sans section".')) return;
     await menuSections.delete(sectionId);
     setSections(sections.filter(s => s.id !== sectionId));
-    // Move bottles from this section to null
     await Promise.all(
-      menuBottles
+      menuBottlesList
         .filter(mb => mb.menuSectionId === sectionId)
         .map(mb => menuBottlesApi.update(mb.id, { menuSectionId: null }))
     );
-    setMenuBottles(menuBottles.map(mb =>
+    setMenuBottlesList(menuBottlesList.map(mb =>
       mb.menuSectionId === sectionId ? { ...mb, menuSectionId: null } : mb
     ));
   };
 
-  const moveUp = async (sectionId: number | null, index: number) => {
-    const sectionBottles = menuBottles.filter(mb => mb.menuSectionId === sectionId);
-    if (index === 0) return;
-
-    const items = [...sectionBottles];
-    [items[index - 1], items[index]] = [items[index], items[index - 1]];
-
-    // Update positions in database
-    await Promise.all([
-      menuBottlesApi.update(items[index].id, { position: index }),
-      menuBottlesApi.update(items[index - 1].id, { position: index - 1 }),
-    ]);
-
-    // Reconstruct full list
-    const otherBottles = menuBottles.filter(mb => mb.menuSectionId !== sectionId);
-    setMenuBottles([...otherBottles, ...items]);
-  };
-
-  const moveDown = async (sectionId: number | null, index: number, total: number) => {
-    const sectionBottles = menuBottles.filter(mb => mb.menuSectionId === sectionId);
-    if (index === total - 1) return;
-
-    const items = [...sectionBottles];
-    [items[index], items[index + 1]] = [items[index + 1], items[index]];
-
-    // Update positions in database
-    await Promise.all([
-      menuBottlesApi.update(items[index].id, { position: index }),
-      menuBottlesApi.update(items[index + 1].id, { position: index + 1 }),
-    ]);
-
-    // Reconstruct full list
-    const otherBottles = menuBottles.filter(mb => mb.menuSectionId !== sectionId);
-    setMenuBottles([...otherBottles, ...items]);
-  };
-
   const handleSave = async () => {
     if (!id) return;
-    await menusApi.update(parseInt(id), {
-      name,
-      description,
-      isPublic,
-    });
+    await menusApi.update(parseInt(id), { name, description, isPublic });
     navigate('/admin/menus');
   };
 
   if (!menu) return <div className="text-center py-12 text-gray-500">{t('common.loading')}</div>;
 
-  // Check if it's a default menu (not deletable)
   const isDefaultMenu = menu.slug === 'aperitifs' || menu.slug === 'digestifs';
 
-  // Group bottles by section
-  const bottlesBySection: Record<string, MenuBottle[]> = {};
-  const noSectionBottles = menuBottles.filter(mb => mb.menuSectionId === null);
-  if (noSectionBottles.length > 0) {
-    bottlesBySection['__no_section__'] = noSectionBottles;
-  }
-  sections.forEach(section => {
-    const sectionBottles = menuBottles.filter(mb => mb.menuSectionId === section.id);
-    if (sectionBottles.length > 0) {
-      bottlesBySection[`section_${section.id}`] = sectionBottles;
-    }
-  });
+  const renderGroupRow = (group: BottleGroup, sectionId: number | null, idx: number, total: number) => (
+    <div
+      key={group.key}
+      className={`flex items-center gap-3 p-3 rounded-lg border ${group.isHidden ? 'border-gray-700 bg-[#0f0f1a] opacity-50' : 'border-gray-700 bg-[#0f0f1a]'}`}
+    >
+      <div className="flex flex-col gap-0.5">
+        <button onClick={() => moveGroupUp(sectionId, idx)} disabled={idx === 0}
+          className="text-gray-500 hover:text-white text-xs disabled:opacity-30">▲</button>
+        <button onClick={() => moveGroupDown(sectionId, idx)}
+          disabled={idx === total - 1}
+          className="text-gray-500 hover:text-white text-xs disabled:opacity-30">▼</button>
+      </div>
+      <div className="flex-1">
+        <div className="flex items-center gap-2">
+          <span className="font-medium">{group.name}</span>
+          {group.count > 1 && (
+            <span className="bg-amber-400/20 text-amber-400 text-xs font-bold px-2 py-0.5 rounded-full">x{group.count}</span>
+          )}
+        </div>
+        <div className="text-xs text-gray-500">{group.categoryName}</div>
+      </div>
+      <div className="flex items-center gap-2">
+        {sections.length > 0 && (
+          <select
+            value={group.menuSectionId ?? ''}
+            onChange={(e) => changeGroupSection(group, e.target.value ? parseInt(e.target.value) : null)}
+            className="text-xs bg-[#1a1a2e] border border-gray-700 rounded px-2 py-1 text-white focus:outline-none focus:border-amber-400">
+            <option value="">Sans section</option>
+            {sections.map(s => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        )}
+        {group.alcoholPercentage && (
+          <span className="text-xs text-gray-400">{group.alcoholPercentage}% vol.</span>
+        )}
+        <button
+          onClick={() => toggleGroupHidden(group)}
+          className={`text-xs px-2 py-1 rounded ${group.isHidden ? 'bg-gray-600 text-gray-300' : 'bg-green-500/20 text-green-400'}`}
+        >
+          {group.isHidden ? t('menus.hidden') : t('menus.visible')}
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -269,108 +355,33 @@ export default function MenuBottleEditPage() {
           </p>
         </div>
 
-        {menuBottles.length === 0 ? (
+        {menuBottlesList.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             Aucune bouteille. Ajoutez des bouteilles avec le flag "{menu.type === 'APEROS' ? 'apéritif' : 'digestif'}" puis synchronisez.
           </div>
         ) : (
           <div className="space-y-6">
-            {/* No section bottles */}
-            {bottlesBySection['__no_section__'] && (
+            {groupedBySection['__no_section__'] && (
               <div>
                 <h3 className="text-sm font-semibold text-gray-400 mb-2">Sans section</h3>
                 <div className="space-y-2">
-                  {bottlesBySection['__no_section__'].map((mb, idx) => (
-                    <div
-                      key={mb.id}
-                      className={`flex items-center gap-3 p-3 rounded-lg border ${mb.isHidden ? 'border-gray-700 bg-[#0f0f1a] opacity-50' : 'border-gray-700 bg-[#0f0f1a]'}`}
-                    >
-                      <div className="flex flex-col gap-0.5">
-                        <button onClick={() => moveUp(null, idx)} disabled={idx === 0}
-                          className="text-gray-500 hover:text-white text-xs disabled:opacity-30">▲</button>
-                        <button onClick={() => moveDown(null, idx, bottlesBySection['__no_section__'].length)}
-                          disabled={idx === bottlesBySection['__no_section__'].length - 1}
-                          className="text-gray-500 hover:text-white text-xs disabled:opacity-30">▼</button>
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-medium">{mb.bottle?.name || `Bouteille #${mb.bottleId}`}</div>
-                        <div className="text-xs text-gray-500">{mb.bottle?.category?.name}</div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {sections.length > 0 && (
-                          <select
-                            value={mb.menuSectionId ?? ''}
-                            onChange={(e) => changeBottleSection(mb.id, e.target.value ? parseInt(e.target.value) : null)}
-                            className="text-xs bg-[#1a1a2e] border border-gray-700 rounded px-2 py-1 text-white focus:outline-none focus:border-amber-400">
-                            <option value="">Sans section</option>
-                            {sections.map(s => (
-                              <option key={s.id} value={s.id}>{s.name}</option>
-                            ))}
-                          </select>
-                        )}
-                        {mb.bottle?.alcoholPercentage && (
-                          <span className="text-xs text-gray-400">{mb.bottle.alcoholPercentage}% vol.</span>
-                        )}
-                        <button
-                          onClick={() => toggleHidden(mb.id)}
-                          className={`text-xs px-2 py-1 rounded ${mb.isHidden ? 'bg-gray-600 text-gray-300' : 'bg-green-500/20 text-green-400'}`}
-                        >
-                          {mb.isHidden ? t('menus.hidden') : t('menus.visible')}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                  {groupedBySection['__no_section__'].map((group, idx) =>
+                    renderGroupRow(group, null, idx, groupedBySection['__no_section__'].length)
+                  )}
                 </div>
               </div>
             )}
 
-            {/* Sectioned bottles */}
             {sections.map(section => {
-              const sectionBottles = bottlesBySection[`section_${section.id}`];
-              if (!sectionBottles) return null;
-
+              const sectionGroups = groupedBySection[`section_${section.id}`];
+              if (!sectionGroups) return null;
               return (
                 <div key={section.id}>
                   <h3 className="text-sm font-semibold text-amber-400 mb-2">{section.name}</h3>
                   <div className="space-y-2">
-                    {sectionBottles.map((mb, idx) => (
-                      <div
-                        key={mb.id}
-                        className={`flex items-center gap-3 p-3 rounded-lg border ${mb.isHidden ? 'border-gray-700 bg-[#0f0f1a] opacity-50' : 'border-gray-700 bg-[#0f0f1a]'}`}
-                      >
-                        <div className="flex flex-col gap-0.5">
-                          <button onClick={() => moveUp(section.id, idx)} disabled={idx === 0}
-                            className="text-gray-500 hover:text-white text-xs disabled:opacity-30">▲</button>
-                          <button onClick={() => moveDown(section.id, idx, sectionBottles.length)}
-                            disabled={idx === sectionBottles.length - 1}
-                            className="text-gray-500 hover:text-white text-xs disabled:opacity-30">▼</button>
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium">{mb.bottle?.name || `Bouteille #${mb.bottleId}`}</div>
-                          <div className="text-xs text-gray-500">{mb.bottle?.category?.name}</div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <select
-                            value={mb.menuSectionId ?? ''}
-                            onChange={(e) => changeBottleSection(mb.id, e.target.value ? parseInt(e.target.value) : null)}
-                            className="text-xs bg-[#1a1a2e] border border-gray-700 rounded px-2 py-1 text-white focus:outline-none focus:border-amber-400">
-                            <option value="">Sans section</option>
-                            {sections.map(s => (
-                              <option key={s.id} value={s.id}>{s.name}</option>
-                            ))}
-                          </select>
-                          {mb.bottle?.alcoholPercentage && (
-                            <span className="text-xs text-gray-400">{mb.bottle.alcoholPercentage}% vol.</span>
-                          )}
-                          <button
-                            onClick={() => toggleHidden(mb.id)}
-                            className={`text-xs px-2 py-1 rounded ${mb.isHidden ? 'bg-gray-600 text-gray-300' : 'bg-green-500/20 text-green-400'}`}
-                          >
-                            {mb.isHidden ? t('menus.hidden') : t('menus.visible')}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                    {sectionGroups.map((group, idx) =>
+                      renderGroupRow(group, section.id, idx, sectionGroups.length)
+                    )}
                   </div>
                 </div>
               );
