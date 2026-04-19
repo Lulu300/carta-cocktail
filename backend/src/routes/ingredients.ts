@@ -89,6 +89,10 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
     });
     res.json(parseNameTranslations(ingredient));
   } catch (error: any) {
+    if (error.code === 'P2025') {
+      res.status(404).json({ error: req.t('errors.notFound') });
+      return;
+    }
     if (error.code === 'P2002') {
       res.status(409).json({ error: req.t('errors.duplicateEntry') });
       return;
@@ -102,7 +106,11 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
     await prisma.ingredient.delete({ where: { id: parseInt(String(req.params.id)) } });
     res.json({ message: req.t('ingredients.deleted') });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === 'P2025') {
+      res.status(404).json({ error: req.t('errors.notFound') });
+      return;
+    }
     console.error(error);
     res.status(500).json({ error: req.t('errors.cannotDelete') });
   }

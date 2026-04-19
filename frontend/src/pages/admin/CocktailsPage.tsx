@@ -11,6 +11,7 @@ import { exportCocktailsAsZip } from '../../services/exportZip';
 import SearchInput from '../../components/ui/SearchInput';
 import MultiSelectDropdown from '../../components/ui/MultiSelectDropdown';
 import Pagination from '../../components/ui/Pagination';
+import { getUploadUrl } from '../../utils/uploads';
 
 export default function CocktailsPage() {
   const { t } = useTranslation();
@@ -23,6 +24,7 @@ export default function CocktailsPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   const tagOptions = useMemo(() => {
     const tagSet = new Set<string>();
@@ -126,6 +128,34 @@ export default function CocktailsPage() {
     );
   };
 
+  const renderWarnings = (avail?: CocktailAvailability) => {
+    if (!avail || loadingAvailability) return null;
+
+    return (
+      <>
+        {avail.lowStockWarnings.length > 0 && (
+          <div className="mb-2 p-2 bg-orange-500/10 border border-orange-500/20 rounded text-xs text-orange-400">
+            <div className="font-medium mb-1">⚠️ Stock faible</div>
+            {avail.lowStockWarnings.slice(0, 2).map((warn, i) => (
+              <div key={i} className="text-orange-300/80">{warn}</div>
+            ))}
+          </div>
+        )}
+        {avail.missingIngredients.length > 0 && (
+          <div className="mb-2 p-2 bg-red-500/10 border border-red-500/20 rounded text-xs text-red-400">
+            <div className="font-medium mb-1">❌ Manquant</div>
+            {avail.missingIngredients.slice(0, 2).map((miss, i) => (
+              <div key={i} className="text-red-300/80 truncate">{miss}</div>
+            ))}
+            {avail.missingIngredients.length > 2 && (
+              <div className="text-red-300/60">+{avail.missingIngredients.length - 2} autre(s)</div>
+            )}
+          </div>
+        )}
+      </>
+    );
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -190,118 +220,210 @@ export default function CocktailsPage() {
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <SearchInput value={search} onChange={setSearch} className="sm:w-64" />
-        <MultiSelectDropdown
-          options={tagOptions}
-          selected={selectedTags}
-          onChange={setSelectedTags}
-          placeholder={t('cocktails.filterByTags')}
-          className="sm:w-64"
-        />
+      <div className="flex flex-col lg:flex-row gap-3 mb-4 lg:items-center">
+        <div className="flex flex-col sm:flex-row gap-3 flex-1">
+          <SearchInput value={search} onChange={setSearch} className="sm:w-64" />
+          <MultiSelectDropdown
+            options={tagOptions}
+            selected={selectedTags}
+            onChange={setSelectedTags}
+            placeholder={t('cocktails.filterByTags')}
+            className="sm:w-64"
+          />
+        </div>
+
+        <div className="inline-flex rounded-lg border border-gray-700 bg-[#1a1a2e] p-1 self-start">
+          <button
+            type="button"
+            onClick={() => setViewMode('grid')}
+            aria-pressed={viewMode === 'grid'}
+            className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+              viewMode === 'grid'
+                ? 'bg-amber-400 text-[#0f0f1a] font-semibold'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            {t('cocktails.viewGrid')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('list')}
+            aria-pressed={viewMode === 'list'}
+            className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+              viewMode === 'list'
+                ? 'bg-amber-400 text-[#0f0f1a] font-semibold'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            {t('cocktails.viewList')}
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {paginatedItems.map((item) => {
-          const avail = availabilities[item.id];
-          const isSelected = selectedIds.has(item.id);
-          return (
-            <div
-              key={item.id}
-              className={`bg-[#1a1a2e] border rounded-xl overflow-hidden transition-colors ${
-                selectionMode
-                  ? isSelected
-                    ? 'border-amber-400 ring-1 ring-amber-400/30'
-                    : 'border-gray-800 hover:border-gray-600 cursor-pointer'
-                  : 'border-gray-800 hover:border-amber-400/30'
-              }`}
-              onClick={selectionMode ? () => toggleSelection(item.id) : undefined}
-            >
-              <div className="aspect-video bg-[#0f0f1a] flex items-center justify-center relative">
-                {item.imagePath ? (
-                  <img src={`/uploads/${item.imagePath}`} alt={item.name} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-4xl">🍸</span>
-                )}
-                {/* Selection checkbox */}
-                {selectionMode && (
-                  <div className="absolute top-2 left-2 z-10">
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => toggleSelection(item.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="w-5 h-5 rounded bg-[#0f0f1a] border-gray-700 text-amber-400 accent-amber-400 cursor-pointer"
-                    />
-                  </div>
-                )}
-                {/* Availability badge overlay */}
-                {avail && !loadingAvailability && (
-                  <div className="absolute top-2 right-2">
-                    {getAvailabilityBadge(item.id)}
-                  </div>
-                )}
-              </div>
-              <div className="p-4">
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className="font-semibold flex-1">{item.name}</h3>
+      {viewMode === 'grid' ? (
+        <div data-testid="cocktails-grid-view" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {paginatedItems.map((item) => {
+            const avail = availabilities[item.id];
+            const isSelected = selectedIds.has(item.id);
+            const imageUrl = getUploadUrl(item.imagePath);
+
+            return (
+              <div
+                key={item.id}
+                className={`bg-[#1a1a2e] border rounded-xl overflow-hidden transition-colors ${
+                  selectionMode
+                    ? isSelected
+                      ? 'border-amber-400 ring-1 ring-amber-400/30'
+                      : 'border-gray-800 hover:border-gray-600 cursor-pointer'
+                    : 'border-gray-800 hover:border-amber-400/30'
+                }`}
+                onClick={selectionMode ? () => toggleSelection(item.id) : undefined}
+              >
+                <div className="aspect-video bg-[#0f0f1a] flex items-center justify-center relative">
+                  {imageUrl ? (
+                    <img src={imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-4xl">🍸</span>
+                  )}
+                  {selectionMode && (
+                    <div className="absolute top-2 left-2 z-10">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelection(item.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-5 h-5 rounded bg-[#0f0f1a] border-gray-700 text-amber-400 accent-amber-400 cursor-pointer"
+                      />
+                    </div>
+                  )}
+                  {avail && !loadingAvailability && (
+                    <div className="absolute top-2 right-2">
+                      {getAvailabilityBadge(item.id)}
+                    </div>
+                  )}
                 </div>
-
-                {item.description && <p className="text-sm text-gray-400 line-clamp-2 mb-2">{item.description}</p>}
-
-                {item.tags && (
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    {item.tags.split(',').map((tag, i) => (
-                      <span key={i} className="bg-amber-400/10 text-amber-400 text-xs px-2 py-0.5 rounded-full">{tag.trim()}</span>
-                    ))}
+                <div className="p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-semibold flex-1">{item.name}</h3>
                   </div>
-                )}
 
-                {/* Stock warnings */}
-                {avail && !loadingAvailability && (
-                  <>
-                    {avail.lowStockWarnings.length > 0 && (
-                      <div className="mb-2 p-2 bg-orange-500/10 border border-orange-500/20 rounded text-xs text-orange-400">
-                        <div className="font-medium mb-1">⚠️ Stock faible</div>
-                        {avail.lowStockWarnings.slice(0, 2).map((warn, i) => (
-                          <div key={i} className="text-orange-300/80">{warn}</div>
-                        ))}
-                      </div>
-                    )}
-                    {avail.missingIngredients.length > 0 && (
-                      <div className="mb-2 p-2 bg-red-500/10 border border-red-500/20 rounded text-xs text-red-400">
-                        <div className="font-medium mb-1">❌ Manquant</div>
-                        {avail.missingIngredients.slice(0, 2).map((miss, i) => (
-                          <div key={i} className="text-red-300/80 truncate">{miss}</div>
-                        ))}
-                        {avail.missingIngredients.length > 2 && (
-                          <div className="text-red-300/60">+{avail.missingIngredients.length - 2} autre(s)</div>
-                        )}
-                      </div>
-                    )}
-                  </>
-                )}
+                  {item.description && <p className="text-sm text-gray-400 line-clamp-2 mb-2">{item.description}</p>}
 
-                {!selectionMode && (
-                  <div className="flex justify-center gap-3 pt-2 border-t border-gray-800">
-                    <Link to={`/admin/cocktails/${item.id}`} className="text-amber-400 hover:text-amber-300 transition-colors p-1" title={t('common.edit')}>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                    </Link>
-                    <ExportCocktailButton cocktailId={item.id} cocktailName={item.name} />
-                    <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 transition-colors p-1" title={t('common.delete')}>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
-                )}
+                  {item.tags && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {item.tags.split(',').map((tag, i) => (
+                        <span key={i} className="bg-amber-400/10 text-amber-400 text-xs px-2 py-0.5 rounded-full">{tag.trim()}</span>
+                      ))}
+                    </div>
+                  )}
+
+                  {renderWarnings(avail)}
+
+                  {!selectionMode && (
+                    <div className="flex justify-center gap-3 pt-2 border-t border-gray-800">
+                      <Link to={`/admin/cocktails/${item.id}`} className="text-amber-400 hover:text-amber-300 transition-colors p-1" title={t('common.edit')}>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </Link>
+                      <ExportCocktailButton cocktailId={item.id} cocktailName={item.name} />
+                      <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 transition-colors p-1" title={t('common.delete')}>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div data-testid="cocktails-list-view" className="bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden">
+          {paginatedItems.map((item, index) => {
+            const avail = availabilities[item.id];
+            const isSelected = selectedIds.has(item.id);
+            const imageUrl = getUploadUrl(item.imagePath);
+
+            return (
+              <div
+                key={item.id}
+                className={`p-4 transition-colors ${
+                  index > 0 ? 'border-t border-gray-800' : ''
+                } ${
+                  selectionMode
+                    ? isSelected
+                      ? 'bg-amber-400/10 border-amber-400/20 cursor-pointer'
+                      : 'hover:bg-white/2 cursor-pointer'
+                    : ''
+                }`}
+                onClick={selectionMode ? () => toggleSelection(item.id) : undefined}
+              >
+                <div className="flex flex-col gap-4 md:flex-row md:items-start">
+                  <div className="flex items-start gap-4 flex-1 min-w-0">
+                    {selectionMode && (
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelection(item.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="mt-1 w-5 h-5 rounded bg-[#0f0f1a] border-gray-700 text-amber-400 accent-amber-400 cursor-pointer"
+                      />
+                    )}
+
+                    <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-[#0f0f1a] flex items-center justify-center">
+                      {imageUrl ? (
+                        <img src={imageUrl} alt={item.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-3xl">🍸</span>
+                      )}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                        <div className="min-w-0">
+                          <h3 className="font-semibold text-lg truncate">{item.name}</h3>
+                          {item.description && (
+                            <p className="mt-1 text-sm text-gray-400">{item.description}</p>
+                          )}
+                        </div>
+                        <div className="shrink-0">{getAvailabilityBadge(item.id)}</div>
+                      </div>
+
+                      {item.tags && (
+                        <div className="mt-3 flex flex-wrap gap-1">
+                          {item.tags.split(',').map((tag, i) => (
+                            <span key={i} className="bg-amber-400/10 text-amber-400 text-xs px-2 py-0.5 rounded-full">{tag.trim()}</span>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="mt-3">{renderWarnings(avail)}</div>
+                    </div>
+                  </div>
+
+                  {!selectionMode && (
+                    <div className="flex items-center justify-end gap-3 md:pl-4">
+                      <Link to={`/admin/cocktails/${item.id}`} className="text-amber-400 hover:text-amber-300 transition-colors p-1" title={t('common.edit')}>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </Link>
+                      <ExportCocktailButton cocktailId={item.id} cocktailName={item.name} />
+                      <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 transition-colors p-1" title={t('common.delete')}>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
       {filteredItems.length === 0 && <div className="text-center py-12 text-gray-500">{t('common.noResults')}</div>}
       {filteredItems.length > 0 && (
         <div className="mt-4 bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden">
