@@ -2,16 +2,19 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
+import { useAuth } from '../../contexts/AuthContext';
 import { publicApi } from '../../services/api';
 import type { Cocktail, CocktailIngredient } from '../../types';
 import UnitConverter from '../../components/ui/UnitConverter';
 import ExportCocktailButton from '../../components/ui/ExportCocktailButton';
+import { getUploadUrl } from '../../utils/uploads';
 
 export default function CocktailPublicPage() {
   const { t } = useTranslation();
   const localize = useLocalizedName();
   const { id, slug } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [cocktail, setCocktail] = useState<Cocktail | null>(null);
   const [error, setError] = useState(false);
 
@@ -42,6 +45,8 @@ export default function CocktailPublicPage() {
     return '?';
   };
 
+  const imageUrl = getUploadUrl(cocktail.imagePath);
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
       {/* Back button */}
@@ -57,10 +62,10 @@ export default function CocktailPublicPage() {
       {/* Recipe card - printable */}
       <div className="bg-[#1a1a2e] border border-gray-800 rounded-xl print:border-gray-300 print:bg-white print:text-black print:rounded-none" id="recipe-card">
         {/* Image */}
-        {cocktail.imagePath && (
+        {imageUrl && (
           <div className="aspect-video overflow-hidden rounded-t-xl">
             <img
-              src={`/uploads/${cocktail.imagePath}`}
+              src={imageUrl}
               alt={cocktail.name}
               className="w-full h-full object-cover"
             />
@@ -76,6 +81,15 @@ export default function CocktailPublicPage() {
             <p className="text-gray-400 print:text-gray-600 text-lg mb-6 italic">{cocktail.description}</p>
           )}
 
+          {user && cocktail.notes && (
+            <div className="mb-6 rounded-xl border border-amber-400/20 bg-amber-400/5 p-4 print:border-gray-300 print:bg-gray-50">
+              <h2 className="text-lg font-serif font-bold text-amber-400/80 print:text-gray-800 mb-2 uppercase tracking-wider text-sm">
+                {t('cocktails.notes')}
+              </h2>
+              <p className="text-sm leading-6 text-gray-300 print:text-black whitespace-pre-wrap">{cocktail.notes}</p>
+            </div>
+          )}
+
           {/* Ingredients */}
           {cocktail.ingredients && cocktail.ingredients.length > 0 && (
             <div className="mb-6">
@@ -84,13 +98,31 @@ export default function CocktailPublicPage() {
               </h2>
               <ul className="space-y-2">
                 {cocktail.ingredients.map((ing) => (
-                  <li key={ing.id} className="flex items-center gap-3">
-                    <span className="w-1.5 h-1.5 bg-amber-400 print:bg-gray-800 rounded-full flex-shrink-0" />
-                    <span className="text-gray-300 print:text-black">
-                      <UnitConverter quantity={ing.quantity} unit={ing.unit?.abbreviation || ''} />
-                      {' '}
-                      <span>{ingredientName(ing)}</span>
-                    </span>
+                  <li key={ing.id} className="rounded-lg border border-transparent print:border-none">
+                    <div className="flex items-center gap-3">
+                      <span className="w-1.5 h-1.5 bg-amber-400 print:bg-gray-800 rounded-full flex-shrink-0" />
+                      <span className="text-gray-300 print:text-black">
+                        <UnitConverter quantity={ing.quantity} unit={ing.unit?.abbreviation || ''} />
+                        {' '}
+                        <span>{ingredientName(ing)}</span>
+                      </span>
+                    </div>
+
+                    {user && ing.preferredBottles && ing.preferredBottles.length > 0 && (
+                      <div className="ml-6 mt-2 flex flex-wrap gap-2">
+                        <span className="text-xs font-medium uppercase tracking-wider text-gray-500 print:text-gray-600">
+                          {t('cocktails.preferredBottles')}
+                        </span>
+                        {ing.preferredBottles.map((preferredBottle) => (
+                          <span
+                            key={preferredBottle.id}
+                            className="rounded-full border border-amber-400/20 bg-amber-400/10 px-2.5 py-1 text-xs text-amber-200 print:border-gray-300 print:bg-gray-100 print:text-gray-800"
+                          >
+                            {preferredBottle.bottle?.name || ''}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>

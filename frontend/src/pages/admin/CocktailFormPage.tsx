@@ -10,6 +10,7 @@ import {
   units as unitsApi,
 } from '../../services/api';
 import type { Category, Bottle, Ingredient, Unit, CocktailIngredientInput } from '../../types';
+import { getUploadUrl } from '../../utils/uploads';
 
 interface IngredientRow {
   sourceType: 'BOTTLE' | 'CATEGORY' | 'INGREDIENT';
@@ -67,7 +68,7 @@ export default function CocktailFormPage() {
         setNotes(c.notes || '');
         setTagsInput(c.tags || '');
         setIsAvailable(c.isAvailable);
-        if (c.imagePath) setImagePreview(`/uploads/${c.imagePath}`);
+        if (c.imagePath) setImagePreview(getUploadUrl(c.imagePath));
         if (c.ingredients) {
           setIngredientRows(c.ingredients.map((ing) => ({
             sourceType: ing.sourceType,
@@ -263,9 +264,12 @@ export default function CocktailFormPage() {
           <div className="space-y-3">
             {ingredientRows.map((row, idx) => (
               <div key={idx} className="bg-[#0f0f1a] rounded-lg p-3 space-y-2">
-                <div className="flex gap-2 items-center">
+                <div
+                  data-testid={`ingredient-fields-${idx}`}
+                  className="grid gap-2 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.6fr)_5.5rem_5.5rem_auto] md:items-center"
+                >
                   <select value={row.sourceType} onChange={(e) => updateIngredient(idx, { sourceType: e.target.value as 'BOTTLE' | 'CATEGORY' | 'INGREDIENT' })}
-                    className="bg-[#1a1a2e] border border-gray-700 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400">
+                    className="w-full min-w-0 bg-[#1a1a2e] border border-gray-700 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400">
                     <option value="BOTTLE">{t('cocktails.specificBottle')}</option>
                     <option value="CATEGORY">{t('cocktails.categoryType')}</option>
                     <option value="INGREDIENT">{t('cocktails.freeIngredient')}</option>
@@ -273,7 +277,7 @@ export default function CocktailFormPage() {
 
                   {row.sourceType === 'BOTTLE' && (
                     <select value={row.bottleId || ''} onChange={(e) => updateIngredient(idx, { bottleId: parseInt(e.target.value) })}
-                      className="flex-1 bg-[#1a1a2e] border border-gray-700 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400">
+                      className="w-full min-w-0 bg-[#1a1a2e] border border-gray-700 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400">
                       <option value="">--</option>
                       {allBottles.filter((b) => b.remainingPercent > 0).map((b) => (
                         <option key={b.id} value={b.id}>{b.name} ({b.category ? localize(b.category) : ''})</option>
@@ -283,7 +287,7 @@ export default function CocktailFormPage() {
 
                   {row.sourceType === 'CATEGORY' && (
                     <select value={row.categoryId || ''} onChange={(e) => updateIngredient(idx, { categoryId: parseInt(e.target.value) })}
-                      className="flex-1 bg-[#1a1a2e] border border-gray-700 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400">
+                      className="w-full min-w-0 bg-[#1a1a2e] border border-gray-700 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400">
                       <option value="">--</option>
                       {allCategories.map((c) => (
                         <option key={c.id} value={c.id}>{localize(c)}</option>
@@ -293,7 +297,7 @@ export default function CocktailFormPage() {
 
                   {row.sourceType === 'INGREDIENT' && (
                     <select value={row.ingredientId || ''} onChange={(e) => updateIngredient(idx, { ingredientId: parseInt(e.target.value) })}
-                      className="flex-1 bg-[#1a1a2e] border border-gray-700 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400">
+                      className="w-full min-w-0 bg-[#1a1a2e] border border-gray-700 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400">
                       <option value="">--</option>
                       {allIngredients.map((i) => (
                         <option key={i.id} value={i.id}>{localize(i)}</option>
@@ -303,17 +307,17 @@ export default function CocktailFormPage() {
 
                   <input type="number" step="0.1" min="0" value={row.quantity}
                     onChange={(e) => updateIngredient(idx, { quantity: parseFloat(e.target.value) || 0 })}
-                    className="w-20 bg-[#1a1a2e] border border-gray-700 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400"
+                    className="w-full min-w-0 bg-[#1a1a2e] border border-gray-700 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400"
                     placeholder={t('cocktails.quantity')} />
 
                   <select value={row.unitId} onChange={(e) => updateIngredient(idx, { unitId: parseInt(e.target.value) })}
-                    className="bg-[#1a1a2e] border border-gray-700 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400">
+                    className="w-full min-w-0 bg-[#1a1a2e] border border-gray-700 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400">
                     {allUnits.map((u) => (
                       <option key={u.id} value={u.id}>{u.abbreviation}</option>
                     ))}
                   </select>
 
-                  <button type="button" onClick={() => removeIngredient(idx)} className="text-red-400 hover:text-red-300 text-sm px-1">✕</button>
+                  <button type="button" onClick={() => removeIngredient(idx)} className="justify-self-end text-red-400 hover:text-red-300 text-sm px-1">✕</button>
                 </div>
 
                 {row.sourceType === 'CATEGORY' && row.categoryId && (

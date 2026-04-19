@@ -82,6 +82,10 @@ describe('CocktailsPage', () => {
   it('renders title and action buttons', async () => {
     render(<CocktailsPage />);
 
+    await waitFor(() => {
+      expect(screen.getByText('Mojito')).toBeInTheDocument();
+    });
+
     expect(screen.getByText('cocktails.title')).toBeInTheDocument();
     expect(screen.getByText('cocktails.batchExport')).toBeInTheDocument();
     expect(screen.getByText('cocktails.import')).toBeInTheDocument();
@@ -99,6 +103,28 @@ describe('CocktailsPage', () => {
     expect(screen.getByText('Classic')).toBeInTheDocument();
     expect(screen.getByText('rum')).toBeInTheDocument();
     expect(screen.getByText('lime')).toBeInTheDocument();
+    expect(screen.getByTestId('cocktails-grid-view')).toBeInTheDocument();
+  });
+
+  it('switches between grid and list views', async () => {
+    const user = userEvent.setup();
+    render(<CocktailsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Mojito')).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId('cocktails-grid-view')).toBeInTheDocument();
+    expect(screen.queryByTestId('cocktails-list-view')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'cocktails.viewList' }));
+
+    expect(screen.getByTestId('cocktails-list-view')).toBeInTheDocument();
+    expect(screen.queryByTestId('cocktails-grid-view')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'cocktails.viewGrid' }));
+
+    expect(screen.getByTestId('cocktails-grid-view')).toBeInTheDocument();
   });
 
   it('shows noResults when empty', async () => {

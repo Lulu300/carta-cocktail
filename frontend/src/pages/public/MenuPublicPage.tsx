@@ -5,6 +5,7 @@ import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { useAuth } from '../../contexts/AuthContext';
 import { publicApi, availability } from '../../services/api';
 import type { Menu, MenuBottle, MenuCocktail, CocktailAvailability } from '../../types';
+import { getUploadUrl } from '../../utils/uploads';
 
 export default function MenuPublicPage() {
   const { t } = useTranslation();
@@ -224,7 +225,7 @@ export default function MenuPublicPage() {
                           onClick={(e) => isUnavailable && e.preventDefault()}>
                           <div className="aspect-video bg-[#0f0f1a] flex items-center justify-center overflow-hidden">
                             {cocktail.imagePath ? (
-                              <img src={`/uploads/${cocktail.imagePath}`} alt={cocktail.name}
+                              <img src={getUploadUrl(cocktail.imagePath) || undefined} alt={cocktail.name}
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                             ) : (
                               <span className="text-5xl">🍸</span>
@@ -328,7 +329,7 @@ export default function MenuPublicPage() {
                             onClick={(e) => isUnavailable && e.preventDefault()}>
                             <div className="aspect-video bg-[#0f0f1a] flex items-center justify-center overflow-hidden">
                               {cocktail.imagePath ? (
-                                <img src={`/uploads/${cocktail.imagePath}`} alt={cocktail.name}
+                                <img src={getUploadUrl(cocktail.imagePath) || undefined} alt={cocktail.name}
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                               ) : (
                                 <span className="text-5xl">🍸</span>
@@ -439,7 +440,7 @@ export default function MenuPublicPage() {
                       onClick={(e) => isUnavailable && e.preventDefault()}>
                       <div className="aspect-video bg-[#0f0f1a] flex items-center justify-center overflow-hidden">
                         {cocktail.imagePath ? (
-                          <img src={`/uploads/${cocktail.imagePath}`} alt={cocktail.name}
+                          <img src={getUploadUrl(cocktail.imagePath) || undefined} alt={cocktail.name}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                         ) : (
                           <span className="text-5xl">🍸</span>
