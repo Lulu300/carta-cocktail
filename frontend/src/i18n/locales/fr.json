@@ -160,6 +160,8 @@
     "batchExport": "Exporter en lot",
     "filterByTags": "Filtrer par tags",
     "exportZip": "Exporter ZIP ({{count}})",
+    "viewGrid": "Vue grille",
+    "viewList": "Vue liste",
     "importWizard": {
       "title": "Importer une recette",
       "dropzone": "Glissez un fichier JSON ou ZIP ici ou cliquez pour parcourir",

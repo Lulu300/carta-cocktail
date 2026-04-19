@@ -64,6 +64,12 @@ describe('POST /api/ingredients', () => {
 });
 
 describe('PUT /api/ingredients/:id', () => {
+  it('should return 404 for non-existent ingredient', async () => {
+    const res = await request.put('/api/ingredients/9999').set(authHeader())
+      .send({ name: 'New' });
+    expect(res.status).toBe(404);
+  });
+
   it('should update ingredient name', async () => {
     const ing = await seedIngredient({ name: 'Old' });
     const res = await request.put(`/api/ingredients/${ing.id}`).set(authHeader())
@@ -121,6 +127,11 @@ describe('POST /api/ingredients/bulk-availability', () => {
 });
 
 describe('DELETE /api/ingredients/:id', () => {
+  it('should return 404 for non-existent ingredient', async () => {
+    const res = await request.delete('/api/ingredients/9999').set(authHeader());
+    expect(res.status).toBe(404);
+  });
+
   it('should delete an ingredient', async () => {
     const ing = await seedIngredient({ name: 'Basil' });
     const res = await request.delete(`/api/ingredients/${ing.id}`).set(authHeader());

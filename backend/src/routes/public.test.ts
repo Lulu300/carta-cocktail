@@ -254,7 +254,7 @@ describe('GET /api/public/cocktails/:id - rich data with all source types', () =
       },
     });
 
-    await prisma.cocktailIngredient.create({
+    const categoryIngredient = await prisma.cocktailIngredient.create({
       data: {
         cocktailId: cocktail.id,
         sourceType: 'CATEGORY',
@@ -262,6 +262,13 @@ describe('GET /api/public/cocktails/:id - rich data with all source types', () =
         quantity: 1,
         unitId: unit.id,
         position: 1,
+      },
+    });
+
+    await prisma.cocktailPreferredBottle.create({
+      data: {
+        cocktailIngredientId: categoryIngredient.id,
+        bottleId: bottle.id,
       },
     });
 
@@ -290,6 +297,8 @@ describe('GET /api/public/cocktails/:id - rich data with all source types', () =
     const categoryIng = ingredients.find((i: any) => i.sourceType === 'CATEGORY');
     expect(categoryIng).toBeDefined();
     expect(categoryIng.category.name).toBe('Gin');
+    expect(categoryIng.preferredBottles).toHaveLength(1);
+    expect(categoryIng.preferredBottles[0].bottle.name).toBe('Hendricks');
 
     const ingredientIng = ingredients.find((i: any) => i.sourceType === 'INGREDIENT');
     expect(ingredientIng).toBeDefined();

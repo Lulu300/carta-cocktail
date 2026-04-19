@@ -213,6 +213,7 @@ router.get('/cocktails/:id', async (req: Request, res: Response) => {
             bottle: { include: { category: true } },
             category: true,
             ingredient: true,
+            preferredBottles: { include: { bottle: { include: { category: true } } } },
           },
           orderBy: { position: 'asc' },
         },
