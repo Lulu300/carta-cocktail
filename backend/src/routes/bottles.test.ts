@@ -210,3 +210,157 @@ describe('DELETE /api/bottles/:id', () => {
     expect(check).toBeNull();
   });
 });
+
+describe('GET /api/bottles/export', () => {
+  it('should return 401 without auth', async () => {
+    const res = await request.get('/api/bottles/export');
+    expect(res.status).toBe(401);
+  });
+
+  it('should return 400 for unsupported format', async () => {
+    const res = await request.get('/api/bottles/export?format=xml').set(authHeader());
+    expect(res.status).toBe(400);
+  });
+
+  it('should default to JSON when no format is given', async () => {
+    const res = await request.get('/api/bottles/export').set(authHeader());
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ version: 1, bottles: [], categories: [] });
+    expect(res.body.exportedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(res.headers['content-disposition']).toMatch(/bottles-\d{4}-\d{2}-\d{2}\.json/);
+  });
+
+  it('should export a single bottle as JSON with its category', async () => {
+    const cat = await seedCategory({ name: 'Rhum', type: 'SPIRIT', desiredStock: 2, minimumPercent: 25 });
+    await seedBottle({ name: 'Havana Club 7', categoryId: cat.id, capacityMl: 700, remainingPercent: 80 });
+
+    const res = await request.get('/api/bottles/export?format=json').set(authHeader());
+    expect(res.status).toBe(200);
+    expect(res.body.version).toBe(1);
+    expect(res.body.categories).toHaveLength(1);
+    expect(res.body.categories[0]).toMatchObject({
+      name: 'Rhum', type: 'SPIRIT', desiredStock: 2, minimumPercent: 25,
+    });
+    expect(res.body.bottles).toHaveLength(1);
+    expect(res.body.bottles[0]).toMatchObject({
+      name: 'Havana Club 7', categoryName: 'Rhum',
+      capacityMl: 700, remainingPercent: 80, quantity: 1,
+    });
+  });
+
+  it('should aggregate identical bottles into a single row with quantity', async () => {
+    const cat = await seedCategory({ name: 'Beer' });
+    await seedBottle({ name: 'Heineken', categoryId: cat.id, capacityMl: 330, remainingPercent: 100 });
+    await seedBottle({ name: 'Heineken', categoryId: cat.id, capacityMl: 330, remainingPercent: 100 });
+    await seedBottle({ name: 'Heineken', categoryId: cat.id, capacityMl: 330, remainingPercent: 100 });
+
+    const res = await request.get('/api/bottles/export').set(authHeader());
+    expect(res.body.bottles).toHaveLength(1);
+    expect(res.body.bottles[0].quantity).toBe(3);
+    expect(res.body.bottles[0].name).toBe('Heineken');
+  });
+
+  it('should not aggregate bottles with different remainingPercent', async () => {
+    const cat = await seedCategory({ name: 'Whisky' });
+    await seedBottle({ name: 'Jack', categoryId: cat.id, capacityMl: 700, remainingPercent: 100 });
+    await seedBottle({ name: 'Jack', categoryId: cat.id, capacityMl: 700, remainingPercent: 50 });
+
+    const res = await request.get('/api/bottles/export').set(authHeader());
+    expect(res.body.bottles).toHaveLength(2);
+    const sorted = [...res.body.bottles].sort((a: any, b: any) => b.remainingPercent - a.remainingPercent);
+    expect(sorted[0].remainingPercent).toBe(100);
+    expect(sorted[0].quantity).toBe(1);
+    expect(sorted[1].remainingPercent).toBe(50);
+    expect(sorted[1].quantity).toBe(1);
+  });
+
+  it('should include parsed nameTranslations on categories', async () => {
+    const cat = await seedCategory({
+      name: 'Rhum',
+      nameTranslations: JSON.stringify({ fr: 'Rhum', en: 'Rum' }),
+    });
+    await seedBottle({ categoryId: cat.id });
+
+    const res = await request.get('/api/bottles/export').set(authHeader());
+    expect(res.body.categories[0].nameTranslations).toEqual({ fr: 'Rhum', en: 'Rum' });
+  });
+
+  it('should filter by categoryId', async () => {
+    const cat1 = await seedCategory({ name: 'Gin' });
+    const cat2 = await seedCategory({ name: 'Vodka' });
+    await seedBottle({ name: 'Bombay', categoryId: cat1.id });
+    await seedBottle({ name: 'Absolut', categoryId: cat2.id });
+
+    const res = await request.get(`/api/bottles/export?categoryId=${cat1.id}`).set(authHeader());
+    expect(res.body.bottles).toHaveLength(1);
+    expect(res.body.bottles[0].name).toBe('Bombay');
+    expect(res.body.categories).toHaveLength(1);
+  });
+
+  it('should filter by category type', async () => {
+    const spirit = await seedCategory({ name: 'Rum', type: 'SPIRIT' });
+    const syrup = await seedCategory({ name: 'Grenadine', type: 'SYRUP' });
+    await seedBottle({ name: 'Havana', categoryId: spirit.id });
+    await seedBottle({ name: 'Monin', categoryId: syrup.id });
+
+    const res = await request.get('/api/bottles/export?type=SYRUP').set(authHeader());
+    expect(res.body.bottles).toHaveLength(1);
+    expect(res.body.bottles[0].name).toBe('Monin');
+  });
+
+  it('should filter by search on bottle name', async () => {
+    const cat = await seedCategory();
+    await seedBottle({ name: 'Bombay Sapphire', categoryId: cat.id });
+    await seedBottle({ name: 'Hendricks', categoryId: cat.id });
+
+    const res = await request.get('/api/bottles/export?search=bombay').set(authHeader());
+    expect(res.body.bottles).toHaveLength(1);
+    expect(res.body.bottles[0].name).toBe('Bombay Sapphire');
+  });
+
+  it('should export as CSV with correct headers and content', async () => {
+    const cat = await seedCategory({ name: 'Rhum', type: 'SPIRIT' });
+    await seedBottle({
+      name: 'Havana', categoryId: cat.id, capacityMl: 700,
+      remainingPercent: 90, isApero: true,
+    });
+
+    const res = await request.get('/api/bottles/export?format=csv').set(authHeader());
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/text\/csv/);
+    expect(res.headers['content-disposition']).toMatch(/bottles-\d{4}-\d{2}-\d{2}\.csv/);
+
+    const lines = res.text.trim().split('\n');
+    expect(lines[0]).toBe(
+      'name,categoryName,categoryType,capacityMl,quantity,remainingPercent,alcoholPercentage,purchasePrice,location,openedAt,isApero,isDigestif'
+    );
+    expect(lines[1]).toContain('Havana,Rhum,SPIRIT,700,1,90');
+    expect(lines[1]).toContain('true');
+  });
+
+  it('should escape CSV fields containing commas or quotes', async () => {
+    const cat = await seedCategory({ name: 'Wine' });
+    await seedBottle({
+      name: 'Château "Margaux", 2015',
+      categoryId: cat.id,
+      capacityMl: 750,
+      location: 'Cave, étagère 3',
+    });
+
+    const res = await request.get('/api/bottles/export?format=csv').set(authHeader());
+    const lines = res.text.trim().split('\n');
+    expect(lines[1]).toContain('"Château ""Margaux"", 2015"');
+    expect(lines[1]).toContain('"Cave, étagère 3"');
+  });
+
+  it('should aggregate identical bottles in CSV output', async () => {
+    const cat = await seedCategory({ name: 'Beer' });
+    await seedBottle({ name: 'Heineken', categoryId: cat.id, capacityMl: 330 });
+    await seedBottle({ name: 'Heineken', categoryId: cat.id, capacityMl: 330 });
+
+    const res = await request.get('/api/bottles/export?format=csv').set(authHeader());
+    const lines = res.text.trim().split('\n');
+    expect(lines).toHaveLength(2); // header + 1 row
+    expect(lines[1]).toContain('Heineken,Beer,SPIRIT,330,2,');
+  });
+});

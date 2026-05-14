@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middleware/auth';
 import { parseNameTranslations } from '../utils/translations';
+import { buildExportPayload, buildCsvPayload } from '../utils/bottlesExport';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -82,6 +83,46 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       orderBy: [{ category: { name: 'asc' } }, { name: 'asc' }],
     });
     res.json(parseNameTranslations(bottles));
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: req.t('errors.serverError') });
+  }
+});
+
+router.get('/export', async (req: AuthRequest, res: Response) => {
+  try {
+    const { categoryId, type, location, search, format } = req.query;
+    const fmt = (typeof format === 'string' ? format : 'json').toLowerCase();
+    if (fmt !== 'json' && fmt !== 'csv') {
+      res.status(400).json({ error: req.t('errors.validationError') });
+      return;
+    }
+
+    const where: any = {};
+    if (categoryId) where.categoryId = parseInt(String(categoryId));
+    if (type) where.category = { type: String(type) };
+    if (location) where.location = { contains: String(location) };
+    if (search) where.name = { contains: String(search) };
+
+    const bottles = await prisma.bottle.findMany({
+      where,
+      include: { category: true },
+      orderBy: [{ category: { name: 'asc' } }, { name: 'asc' }],
+    });
+
+    const date = new Date().toISOString().slice(0, 10);
+
+    if (fmt === 'csv') {
+      const csv = buildCsvPayload(bottles);
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="bottles-${date}.csv"`);
+      res.send(csv);
+      return;
+    }
+
+    const payload = buildExportPayload(bottles);
+    res.setHeader('Content-Disposition', `attachment; filename="bottles-${date}.json"`);
+    res.json(payload);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: req.t('errors.serverError') });
