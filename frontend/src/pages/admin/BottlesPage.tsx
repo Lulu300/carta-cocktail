@@ -10,6 +10,7 @@ import CategoryFilterInput from '../../components/ui/CategoryFilterInput';
 import LocationAutocomplete from '../../components/ui/LocationAutocomplete';
 import SortableHeader from '../../components/ui/SortableHeader';
 import Pagination from '../../components/ui/Pagination';
+import ImportBottlesWizard from '../../components/import/ImportBottlesWizard';
 
 interface BottleGroup {
   key: string;
@@ -63,6 +64,23 @@ export default function BottlesPage() {
   const [editing, setEditing] = useState<Bottle | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [quantity, setQuantity] = useState(1);
+  const [showImportWizard, setShowImportWizard] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const handleExport = async (format: 'json' | 'csv') => {
+    setShowExportMenu(false);
+    setExportError(null);
+    try {
+      await api.exportFile(format, {
+        categoryId: selectedCategoryId ?? undefined,
+        search: search.trim() || undefined,
+        location: locationFilter.trim() || undefined,
+      });
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : t('common.error'));
+    }
+  };
   const [form, setForm] = useState({
     name: '', categoryId: 0, purchasePrice: '', capacityMl: 700,
     remainingPercent: 100, openedAt: '', alcoholPercentage: '',
@@ -248,12 +266,50 @@ export default function BottlesPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <h1 className="text-2xl font-bold font-serif text-amber-400">{t('bottles.title')}</h1>
-        <button onClick={openCreate} className="bg-amber-400 hover:bg-amber-500 text-[#0f0f1a] font-semibold px-4 py-2 rounded-lg transition-colors">
-          {t('bottles.add')}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowImportWizard(true)}
+            className="border border-amber-400/30 text-amber-400 hover:bg-amber-400/10 font-semibold px-4 py-2 rounded-lg transition-colors"
+          >
+            {t('bottles.import')}
+          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowExportMenu((v) => !v)}
+              className="border border-amber-400/30 text-amber-400 hover:bg-amber-400/10 font-semibold px-4 py-2 rounded-lg transition-colors"
+            >
+              {t('bottles.export')}
+            </button>
+            {showExportMenu && (
+              <div className="absolute right-0 mt-1 bg-[#1a1a2e] border border-gray-700 rounded-lg shadow-lg z-20 min-w-[140px]">
+                <button
+                  onClick={() => handleExport('json')}
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-amber-400/10 hover:text-amber-400"
+                >
+                  {t('bottles.exportJson')}
+                </button>
+                <button
+                  onClick={() => handleExport('csv')}
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-amber-400/10 hover:text-amber-400"
+                >
+                  {t('bottles.exportCsv')}
+                </button>
+              </div>
+            )}
+          </div>
+          <button onClick={openCreate} className="bg-amber-400 hover:bg-amber-500 text-[#0f0f1a] font-semibold px-4 py-2 rounded-lg transition-colors">
+            {t('bottles.add')}
+          </button>
+        </div>
       </div>
+
+      {exportError && (
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg p-3 text-sm mb-4">
+          {exportError}
+        </div>
+      )}
 
       <div className="flex flex-col lg:flex-row gap-3 mb-4">
         <SearchInput value={search} onChange={setSearch} className="lg:w-64" />
@@ -433,6 +489,13 @@ export default function BottlesPage() {
             </div>
           </form>
         </div>
+      )}
+
+      {showImportWizard && (
+        <ImportBottlesWizard
+          onClose={() => setShowImportWizard(false)}
+          onImported={load}
+        />
       )}
     </div>
   );

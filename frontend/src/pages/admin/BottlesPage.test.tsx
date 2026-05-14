@@ -4,8 +4,25 @@ import userEvent from '@testing-library/user-event';
 import BottlesPage from './BottlesPage';
 
 vi.mock('../../services/api', () => ({
-  bottles: { list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
+  bottles: {
+    list: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    exportFile: vi.fn(),
+    importPreview: vi.fn(),
+    importConfirm: vi.fn(),
+  },
   categories: { list: vi.fn() },
+  categoryTypes: { list: vi.fn().mockResolvedValue([]) },
+}));
+
+vi.mock('../../components/import/ImportBottlesWizard', () => ({
+  default: ({ onClose }: { onClose: () => void }) => (
+    <div data-testid="import-wizard">
+      <button onClick={onClose}>close-wizard</button>
+    </div>
+  ),
 }));
 
 vi.mock('../../hooks/useLocalizedName', () => ({
@@ -290,5 +307,81 @@ describe('BottlesPage', () => {
     expect((checkboxes[0] as HTMLInputElement).checked).toBe(true);
     // isDigestif=false
     expect((checkboxes[1] as HTMLInputElement).checked).toBe(false);
+  });
+
+  it('renders import and export buttons in the header', async () => {
+    render(<BottlesPage />);
+    await waitFor(() => {
+      expect(screen.getByText('bottles.import')).toBeInTheDocument();
+      expect(screen.getByText('bottles.export')).toBeInTheDocument();
+    });
+  });
+
+  it('opens the import wizard when clicking the import button', async () => {
+    const user = userEvent.setup();
+    render(<BottlesPage />);
+    await waitFor(() => expect(screen.getByText('bottles.import')).toBeInTheDocument());
+
+    expect(screen.queryByTestId('import-wizard')).not.toBeInTheDocument();
+    await user.click(screen.getByText('bottles.import'));
+    expect(screen.getByTestId('import-wizard')).toBeInTheDocument();
+
+    await user.click(screen.getByText('close-wizard'));
+    await waitFor(() => {
+      expect(screen.queryByTestId('import-wizard')).not.toBeInTheDocument();
+    });
+  });
+
+  it('shows export format options when clicking the export button', async () => {
+    const user = userEvent.setup();
+    render(<BottlesPage />);
+    await waitFor(() => expect(screen.getByText('bottles.export')).toBeInTheDocument());
+
+    expect(screen.queryByText('bottles.exportJson')).not.toBeInTheDocument();
+    await user.click(screen.getByText('bottles.export'));
+    expect(screen.getByText('bottles.exportJson')).toBeInTheDocument();
+    expect(screen.getByText('bottles.exportCsv')).toBeInTheDocument();
+  });
+
+  it('calls api.exportFile with format=json when JSON option clicked', async () => {
+    const user = userEvent.setup();
+    const mockExport = vi.mocked(api.exportFile).mockResolvedValue(undefined);
+    render(<BottlesPage />);
+    await waitFor(() => expect(screen.getByText('bottles.export')).toBeInTheDocument());
+
+    await user.click(screen.getByText('bottles.export'));
+    await user.click(screen.getByText('bottles.exportJson'));
+
+    await waitFor(() => {
+      expect(mockExport).toHaveBeenCalledWith('json', expect.any(Object));
+    });
+  });
+
+  it('calls api.exportFile with format=csv when CSV option clicked', async () => {
+    const user = userEvent.setup();
+    const mockExport = vi.mocked(api.exportFile).mockResolvedValue(undefined);
+    render(<BottlesPage />);
+    await waitFor(() => expect(screen.getByText('bottles.export')).toBeInTheDocument());
+
+    await user.click(screen.getByText('bottles.export'));
+    await user.click(screen.getByText('bottles.exportCsv'));
+
+    await waitFor(() => {
+      expect(mockExport).toHaveBeenCalledWith('csv', expect.any(Object));
+    });
+  });
+
+  it('shows an inline error if export fails', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.exportFile).mockRejectedValue(new Error('Network down'));
+    render(<BottlesPage />);
+    await waitFor(() => expect(screen.getByText('bottles.export')).toBeInTheDocument());
+
+    await user.click(screen.getByText('bottles.export'));
+    await user.click(screen.getByText('bottles.exportJson'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Network down')).toBeInTheDocument();
+    });
   });
 });
