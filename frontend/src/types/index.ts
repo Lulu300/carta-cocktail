@@ -287,3 +287,86 @@ export interface CocktailAvailability {
   missingIngredients: string[];
   lowStockWarnings: string[];
 }
+
+// Bottle import/export types
+export interface BottleImportCategoryRecord {
+  name: string;
+  type: string;
+  desiredStock: number;
+  minimumPercent: number;
+  nameTranslations: Record<string, string> | null;
+}
+
+export interface BottleImportRecord {
+  name: string;
+  categoryName: string;
+  capacityMl: number;
+  remainingPercent: number;
+  alcoholPercentage: number | null;
+  purchasePrice: number | null;
+  location: string | null;
+  openedAt: string | null;
+  isApero: boolean;
+  isDigestif: boolean;
+  quantity: number;
+}
+
+export interface BottleImportPayload {
+  version: number;
+  categories: BottleImportCategoryRecord[];
+  bottles: BottleImportRecord[];
+}
+
+export interface BottleCategoryPreview {
+  ref: BottleImportCategoryRecord;
+  existingMatch: { id: number; name: string; type: string; desiredStock: number } | null;
+  status: 'matched' | 'missing';
+}
+
+export interface BottleDuplicateEntry {
+  id: number;
+  name: string;
+  capacityMl: number;
+  categoryName: string;
+  remainingPercent: number;
+}
+
+export interface BottleRowPreview {
+  ref: BottleImportRecord;
+  needsCategory: boolean;
+  potentialDuplicates: BottleDuplicateEntry[];
+}
+
+export interface BottleImportPreviewResponse {
+  payload: BottleImportPayload;
+  categories: BottleCategoryPreview[];
+  bottles: BottleRowPreview[];
+}
+
+export type BottleCategoryResolution =
+  | { action: 'use_existing'; existingId: number }
+  | {
+      action: 'create';
+      data: {
+        name: string;
+        type: string;
+        desiredStock: number;
+        minimumPercent: number;
+        nameTranslations?: Record<string, string> | null;
+      };
+    };
+
+export type BottleRowResolution =
+  | { action: 'import'; categoryName?: string }
+  | { action: 'skip' };
+
+export interface BottleImportResolutions {
+  categories: Record<string, BottleCategoryResolution>;
+  bottles: Record<string, BottleRowResolution>;
+}
+
+export interface BottleImportConfirmResponse {
+  created: { bottles: number };
+  duplicatesCreated: number;
+  skippedNoCategory: number;
+}
