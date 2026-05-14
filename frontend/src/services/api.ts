@@ -2,6 +2,8 @@ import type {
   Category, CategoryType, Bottle, Ingredient, Unit, Cocktail, Menu, MenuBottle, MenuSection, Shortage,
   CocktailInput, MenuInput, CocktailAvailability, SiteSettings,
   CocktailExportFormat, ImportPreviewResponse, EntityResolutionAction,
+  BottleImportPayload, BottleImportPreviewResponse, BottleImportResolutions,
+  BottleImportConfirmResponse,
 } from '../types';
 
 const API_BASE = '/api';
@@ -88,6 +90,48 @@ export const bottles = {
     request<Bottle>(`/bottles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: number) =>
     request<{ message: string }>(`/bottles/${id}`, { method: 'DELETE' }),
+  exportFile: async (
+    format: 'json' | 'csv',
+    filters?: { categoryId?: number; type?: string; search?: string; location?: string }
+  ) => {
+    const token = localStorage.getItem('token');
+    const searchParams = new URLSearchParams({ format });
+    if (filters?.categoryId) searchParams.set('categoryId', String(filters.categoryId));
+    if (filters?.type) searchParams.set('type', filters.type);
+    if (filters?.search) searchParams.set('search', filters.search);
+    if (filters?.location) searchParams.set('location', filters.location);
+    const res = await fetch(`${API_BASE}/bottles/export?${searchParams.toString()}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const disposition = res.headers.get('Content-Disposition') || '';
+    const match = disposition.match(/filename="?([^";]+)"?/);
+    const fallback = `bottles-${new Date().toISOString().slice(0, 10)}.${format}`;
+    const filename = match ? match[1] : fallback;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+  importPreview: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return request<BottleImportPreviewResponse>('/bottles/import/preview', {
+      method: 'POST',
+      body: formData,
+    });
+  },
+  importConfirm: (data: { payload: BottleImportPayload; resolutions: BottleImportResolutions }) =>
+    request<BottleImportConfirmResponse>('/bottles/import/confirm', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };
 
 // Ingredients
