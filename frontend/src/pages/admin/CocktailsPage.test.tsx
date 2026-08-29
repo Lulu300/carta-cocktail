@@ -33,7 +33,7 @@ const mockCocktails = [
     id: 1,
     name: 'Mojito',
     description: 'Classic',
-    notes: null,
+    notes: 'Jus de citron frais',
     imagePath: null,
     tags: 'rum,lime',
     isAvailable: true,
@@ -125,6 +125,17 @@ describe('CocktailsPage', () => {
     await user.click(screen.getByRole('button', { name: 'cocktails.viewGrid' }));
 
     expect(screen.getByTestId('cocktails-grid-view')).toBeInTheDocument();
+  });
+
+  it('matches multiple search terms across recipe fields', async () => {
+    const user = userEvent.setup();
+    render(<CocktailsPage />);
+
+    const search = await screen.findByPlaceholderText('common.search');
+    await user.type(search, 'rum citron');
+
+    expect(screen.getByText('Mojito')).toBeInTheDocument();
+    expect(screen.queryByText('Negroni')).not.toBeInTheDocument();
   });
 
   it('shows noResults when empty', async () => {
