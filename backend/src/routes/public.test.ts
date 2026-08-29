@@ -309,9 +309,18 @@ describe('GET /api/public/cocktails/:id - rich data with all source types', () =
 describe('GET /api/public/menus/:slug - menu with cocktails and bottles', () => {
   it('should return public menu with cocktails and bottles populated', async () => {
     const category = await seedCategory({ name: 'Whisky', type: 'SPIRIT' });
-    const bottle = await seedBottle({ name: 'Laphroaig 10', categoryId: category.id, isApero: true });
+    const bottle = await seedBottle({
+      name: 'Laphroaig 10',
+      categoryId: category.id,
+      isApero: true,
+      alcoholPercentage: 40,
+      location: 'B57',
+    });
     const cocktail = await prisma.cocktail.create({
       data: { name: 'Scotch Sour', tags: '' },
+    });
+    await prisma.cocktailInstruction.create({
+      data: { cocktailId: cocktail.id, stepNumber: 1, text: 'Shake with ice' },
     });
 
     const menu = await prisma.menu.create({
@@ -331,8 +340,11 @@ describe('GET /api/public/menus/:slug - menu with cocktails and bottles', () => 
     expect(res.body.name).toBe('Whisky Bar');
     expect(res.body.cocktails).toHaveLength(1);
     expect(res.body.cocktails[0].cocktail.name).toBe('Scotch Sour');
+    expect(res.body.cocktails[0].cocktail.instructions[0].text).toBe('Shake with ice');
     expect(res.body.bottles).toHaveLength(1);
     expect(res.body.bottles[0].bottle.name).toBe('Laphroaig 10');
     expect(res.body.bottles[0].bottle.category.name).toBe('Whisky');
+    expect(res.body.bottles[0].bottle.alcoholPercentage).toBe(40);
+    expect(res.body.bottles[0].bottle.location).toBe('B57');
   });
 });

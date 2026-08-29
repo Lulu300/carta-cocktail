@@ -44,6 +44,7 @@ router.get('/menus/:slug', async (req: Request, res: Response) => {
                   include: { unit: true, bottle: true, category: true, ingredient: true },
                   orderBy: { position: 'asc' },
                 },
+                instructions: { orderBy: { stepNumber: 'asc' } },
               },
             },
           },

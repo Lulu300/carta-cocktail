@@ -12,9 +12,12 @@ import SearchInput from '../../components/ui/SearchInput';
 import MultiSelectDropdown from '../../components/ui/MultiSelectDropdown';
 import Pagination from '../../components/ui/Pagination';
 import { getUploadUrl } from '../../utils/uploads';
+import { useLocalizedName } from '../../hooks/useLocalizedName';
+import { matchesCocktailSearch } from '../../utils/cocktailSearch';
 
 export default function CocktailsPage() {
   const { t } = useTranslation();
+  const localize = useLocalizedName();
   const [items, setItems] = useState<Cocktail[]>([]);
   const [availabilities, setAvailabilities] = useState<Record<number, CocktailAvailability>>({});
   const [loadingAvailability, setLoadingAvailability] = useState(true);
@@ -41,14 +44,14 @@ export default function CocktailsPage() {
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
-      if (search.trim() && !item.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (!matchesCocktailSearch(item, search, localize)) return false;
       if (selectedTags.length > 0) {
         const itemTags = item.tags ? item.tags.split(',').map((t) => t.trim().toLowerCase()) : [];
         if (!selectedTags.some((st) => itemTags.includes(st.toLowerCase()))) return false;
       }
       return true;
     });
-  }, [items, search, selectedTags]);
+  }, [items, search, selectedTags, localize]);
 
   const { sortedItems } = useSort<Cocktail>(filteredItems, 'name');
   const { paginatedItems, page, pageSize, totalPages, totalItems, setPage, setPageSize } = usePagination(sortedItems);
