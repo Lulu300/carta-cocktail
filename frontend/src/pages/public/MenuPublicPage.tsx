@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { useAuth } from '../../contexts/AuthContext';
 import { publicApi, availability } from '../../services/api';
 import type { Menu, MenuBottle, MenuCocktail, CocktailAvailability } from '../../types';
-import { getUploadUrl } from '../../utils/uploads';
+import { matchesCocktailSearch } from '../../utils/cocktailSearch';
+import PublicCocktailItem from './PublicCocktailItem';
 
 interface BottleGroupEntry {
   name: string;
@@ -51,6 +52,7 @@ export default function MenuPublicPage() {
   const [menu, setMenu] = useState<Menu | null>(null);
   const [error, setError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [availabilities, setAvailabilities] = useState<CocktailAvailability[]>([]);
   const [locationsModal, setLocationsModal] = useState<BottleGroupEntry | null>(null);
 
@@ -102,12 +104,7 @@ export default function MenuPublicPage() {
       );
     } else {
       const cocktail = (item as MenuCocktail).cocktail;
-      const tags = cocktail?.tags ? cocktail.tags.split(',').map((t: string) => t.trim().toLowerCase()) : [];
-      return (
-        cocktail?.name?.toLowerCase().includes(query) ||
-        cocktail?.description?.toLowerCase().includes(query) ||
-        tags.some((tag: string) => tag.includes(query))
-      );
+      return cocktail ? matchesCocktailSearch(cocktail, searchQuery, localize) : false;
     }
   };
 
@@ -130,7 +127,7 @@ export default function MenuPublicPage() {
             )}
           </div>
           <div className="flex items-center gap-3 mt-1 text-sm text-gray-400">
-            {group.alcoholPercentage && <span>{group.alcoholPercentage}% vol.</span>}
+            {group.alcoholPercentage !== null && <span>{group.alcoholPercentage}% vol.</span>}
             {user && (
               <>
                 <span>•</span>
@@ -139,7 +136,7 @@ export default function MenuPublicPage() {
             )}
           </div>
         </div>
-        {user && group.locations.length > 0 && (
+        {group.locations.length > 0 && (
           <div className="flex items-center gap-1 flex-wrap justify-end max-w-xs">
             {group.locations.slice(0, MAX_VISIBLE_LOCATIONS).map((loc) => (
               <span key={loc.name} className="bg-gray-700/50 text-gray-400 text-xs px-2 py-0.5 rounded">
@@ -159,6 +156,27 @@ export default function MenuPublicPage() {
       </div>
     ));
   };
+
+  const renderCocktails = (cocktails: MenuCocktail[]) => (
+    <div
+      data-testid={`public-cocktails-${viewMode}-view`}
+      className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-6' : 'space-y-3'}
+    >
+      {cocktails.map((menuCocktail) => {
+        const cocktail = menuCocktail.cocktail!;
+        return (
+          <PublicCocktailItem
+            key={menuCocktail.id}
+            menuCocktail={menuCocktail}
+            menuSlug={slug || ''}
+            viewMode={viewMode}
+            availability={user ? getAvailability(cocktail.id) : undefined}
+            showAvailability={Boolean(user)}
+          />
+        );
+      })}
+    </div>
+  );
 
   // Group bottles/cocktails by section OR by default grouping
   const itemsBySection: Record<string, (MenuBottle | MenuCocktail)[]> = {};
@@ -181,7 +199,7 @@ export default function MenuPublicPage() {
     } else {
       // Default: Group by category
       visibleBottles.forEach(mb => {
-        const categoryName = mb.bottle?.category ? localize(mb.bottle.category) : 'Autres';
+        const categoryName = mb.bottle?.category ? localize(mb.bottle.category) : t('public.other');
         if (!itemsBySection[categoryName]) {
           itemsBySection[categoryName] = [];
         }
@@ -217,14 +235,13 @@ export default function MenuPublicPage() {
         {menu.description && <p className="text-gray-400 text-lg">{menu.description}</p>}
       </div>
 
-      {/* Search bar */}
-      <div className="mb-8">
-        <div className="relative">
+      <div className="flex flex-col sm:flex-row gap-3 mb-8 sm:items-center">
+        <div className="relative flex-1">
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={isBottleMenu ? "Rechercher une bouteille..." : "Rechercher par nom ou tag..."}
+            placeholder={t(isBottleMenu ? 'public.bottleSearchPlaceholder' : 'public.cocktailSearchPlaceholder')}
             className="w-full bg-[#1a1a2e] border border-gray-700 rounded-lg pl-10 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-amber-400 transition-colors"
           />
           <svg
@@ -242,13 +259,44 @@ export default function MenuPublicPage() {
           </svg>
           {searchQuery && (
             <button
+              type="button"
               onClick={() => setSearchQuery('')}
+              aria-label={t('public.clearSearch')}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
             >
               ✕
             </button>
           )}
         </div>
+
+        {!isBottleMenu && (
+          <div className="inline-flex rounded-lg border border-gray-700 bg-[#1a1a2e] p-1 self-start">
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              aria-pressed={viewMode === 'grid'}
+              className={`rounded-md px-3 py-2 text-sm transition-colors ${
+                viewMode === 'grid'
+                  ? 'bg-amber-400 text-[#0f0f1a] font-semibold'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              {t('cocktails.viewGrid')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              aria-pressed={viewMode === 'list'}
+              className={`rounded-md px-3 py-2 text-sm transition-colors ${
+                viewMode === 'list'
+                  ? 'bg-amber-400 text-[#0f0f1a] font-semibold'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              {t('cocktails.viewList')}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Render sections/groups */}
@@ -259,72 +307,14 @@ export default function MenuPublicPage() {
             {/* No section items */}
             {itemsBySection['__no_section__'] && (
               <div>
-                <h2 className="text-2xl font-serif font-bold text-gray-400 mb-4">Sans section</h2>
+                <h2 className="text-2xl font-serif font-bold text-gray-400 mb-4">{t('public.withoutSection')}</h2>
                 {isBottleMenu ? (
                   <div className="bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden">
                     <div className="divide-y divide-gray-800">
                       {renderGroupedBottles(itemsBySection['__no_section__'] as MenuBottle[])}
                     </div>
                   </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {(itemsBySection['__no_section__'] as MenuCocktail[]).map((mc) => {
-                      const cocktail = mc.cocktail!;
-                      const isUnavailable = !cocktail.isAvailable;
-                      const avail = user ? getAvailability(cocktail.id) : undefined;
-                      return (
-                        <Link key={mc.id} to={`/menu/${slug}/cocktail/${cocktail.id}`}
-                          className={`group bg-[#1a1a2e] border rounded-xl overflow-hidden transition-all duration-300 ${isUnavailable ? 'border-gray-800 opacity-50 grayscale cursor-default' : 'border-gray-800 hover:border-amber-400/50 hover:shadow-lg hover:shadow-amber-400/5'}`}
-                          onClick={(e) => isUnavailable && e.preventDefault()}>
-                          <div className="aspect-video bg-[#0f0f1a] flex items-center justify-center overflow-hidden">
-                            {cocktail.imagePath ? (
-                              <img src={getUploadUrl(cocktail.imagePath) || undefined} alt={cocktail.name}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                            ) : (
-                              <span className="text-5xl">🍸</span>
-                            )}
-                          </div>
-                          <div className="p-5">
-                            <div className="flex items-center justify-between mb-2">
-                              <h2 className="text-xl font-serif font-bold text-white group-hover:text-amber-400 transition-colors">{cocktail.name}</h2>
-                              <div className="flex items-center gap-2">
-                                {user && avail && (
-                                  <span className={`text-xs px-2 py-1 rounded font-medium ${
-                                    avail.maxServings === 0 ? 'bg-red-500/20 text-red-400' :
-                                    avail.maxServings < 3 ? 'bg-yellow-500/20 text-yellow-400' :
-                                    'bg-green-500/20 text-green-400'
-                                  }`}>
-                                    {avail.maxServings} dose{avail.maxServings > 1 ? 's' : ''}
-                                  </span>
-                                )}
-                                {isUnavailable && <span className="text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded">{t('public.unavailable')}</span>}
-                              </div>
-                            </div>
-                            {cocktail.description && <p className="text-gray-400 text-sm line-clamp-2">{cocktail.description}</p>}
-                            {cocktail.tags && cocktail.tags.trim() && (
-                              <div className="mt-2 flex flex-wrap gap-1.5">
-                                {cocktail.tags.split(',').map((tag, idx) => (
-                                  <span key={idx} className="text-xs bg-amber-400/10 text-amber-400 px-2 py-0.5 rounded border border-amber-400/20">
-                                    #{tag.trim()}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                            {cocktail.ingredients && cocktail.ingredients.length > 0 && (
-                              <div className="mt-2 flex flex-wrap gap-1.5">
-                                {cocktail.ingredients.map((ing) => (
-                                  <span key={ing.id} className="text-xs bg-[#0f0f1a] text-gray-400 px-2 py-1 rounded">
-                                    {ing.bottle?.name || (ing.category ? localize(ing.category) : null) || (ing.ingredient ? localize(ing.ingredient) : null)}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
+                ) : renderCocktails(itemsBySection['__no_section__'] as MenuCocktail[])}
               </div>
             )}
 
@@ -342,65 +332,7 @@ export default function MenuPublicPage() {
                         {renderGroupedBottles(sectionItems as MenuBottle[])}
                       </div>
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {(sectionItems as MenuCocktail[]).map((mc) => {
-                        const cocktail = mc.cocktail!;
-                        const isUnavailable = !cocktail.isAvailable;
-                        const avail = user ? getAvailability(cocktail.id) : undefined;
-                        return (
-                          <Link key={mc.id} to={`/menu/${slug}/cocktail/${cocktail.id}`}
-                            className={`group bg-[#1a1a2e] border rounded-xl overflow-hidden transition-all duration-300 ${isUnavailable ? 'border-gray-800 opacity-50 grayscale cursor-default' : 'border-gray-800 hover:border-amber-400/50 hover:shadow-lg hover:shadow-amber-400/5'}`}
-                            onClick={(e) => isUnavailable && e.preventDefault()}>
-                            <div className="aspect-video bg-[#0f0f1a] flex items-center justify-center overflow-hidden">
-                              {cocktail.imagePath ? (
-                                <img src={getUploadUrl(cocktail.imagePath) || undefined} alt={cocktail.name}
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                              ) : (
-                                <span className="text-5xl">🍸</span>
-                              )}
-                            </div>
-                            <div className="p-5">
-                              <div className="flex items-center justify-between mb-2">
-                                <h2 className="text-xl font-serif font-bold text-white group-hover:text-amber-400 transition-colors">{cocktail.name}</h2>
-                                <div className="flex items-center gap-2">
-                                  {user && avail && (
-                                    <span className={`text-xs px-2 py-1 rounded font-medium ${
-                                      avail.maxServings === 0 ? 'bg-red-500/20 text-red-400' :
-                                      avail.maxServings < 3 ? 'bg-yellow-500/20 text-yellow-400' :
-                                      'bg-green-500/20 text-green-400'
-                                    }`}>
-                                      {avail.maxServings} dose{avail.maxServings > 1 ? 's' : ''}
-                                    </span>
-                                  )}
-                                  {isUnavailable && <span className="text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded">{t('public.unavailable')}</span>}
-                                </div>
-                              </div>
-                              {cocktail.description && <p className="text-gray-400 text-sm line-clamp-2">{cocktail.description}</p>}
-                              {cocktail.tags && cocktail.tags.trim() && (
-                                <div className="mt-2 flex flex-wrap gap-1.5">
-                                  {cocktail.tags.split(',').map((tag, idx) => (
-                                    <span key={idx} className="text-xs bg-amber-400/10 text-amber-400 px-2 py-0.5 rounded border border-amber-400/20">
-                                      #{tag.trim()}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-                              {cocktail.ingredients && cocktail.ingredients.length > 0 && (
-                                <div className="mt-3 flex flex-wrap gap-1.5">
-                                  {cocktail.ingredients.map((ing) => (
-                                    <span key={ing.id} className="text-xs bg-[#0f0f1a] text-gray-400 px-2 py-1 rounded">
-                                      {ing.bottle?.name || (ing.category ? localize(ing.category) : null) || (ing.ingredient ? localize(ing.ingredient) : null)}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  )}
+                  ) : renderCocktails(sectionItems as MenuCocktail[])}
                 </div>
               );
             })}
@@ -422,66 +354,7 @@ export default function MenuPublicPage() {
                     </div>
                   </div>
                 ))
-            ) : (
-              // Cocktails without grouping
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {(itemsBySection['__all__'] as MenuCocktail[])?.map((mc) => {
-                  const cocktail = mc.cocktail!;
-                  const isUnavailable = !cocktail.isAvailable;
-                  const avail = user ? getAvailability(cocktail.id) : undefined;
-                  return (
-                    <Link key={mc.id} to={`/menu/${slug}/cocktail/${cocktail.id}`}
-                      className={`group bg-[#1a1a2e] border rounded-xl overflow-hidden transition-all duration-300 ${isUnavailable ? 'border-gray-800 opacity-50 grayscale cursor-default' : 'border-gray-800 hover:border-amber-400/50 hover:shadow-lg hover:shadow-amber-400/5'}`}
-                      onClick={(e) => isUnavailable && e.preventDefault()}>
-                      <div className="aspect-video bg-[#0f0f1a] flex items-center justify-center overflow-hidden">
-                        {cocktail.imagePath ? (
-                          <img src={getUploadUrl(cocktail.imagePath) || undefined} alt={cocktail.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                        ) : (
-                          <span className="text-5xl">🍸</span>
-                        )}
-                      </div>
-                      <div className="p-5">
-                        <div className="flex items-center justify-between mb-2">
-                          <h2 className="text-xl font-serif font-bold text-white group-hover:text-amber-400 transition-colors">{cocktail.name}</h2>
-                          <div className="flex items-center gap-2">
-                            {user && avail && (
-                              <span className={`text-xs px-2 py-1 rounded font-medium ${
-                                avail.maxServings === 0 ? 'bg-red-500/20 text-red-400' :
-                                avail.maxServings < 3 ? 'bg-yellow-500/20 text-yellow-400' :
-                                'bg-green-500/20 text-green-400'
-                              }`}>
-                                {avail.maxServings} dose{avail.maxServings > 1 ? 's' : ''}
-                              </span>
-                            )}
-                            {isUnavailable && <span className="text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded">{t('public.unavailable')}</span>}
-                          </div>
-                        </div>
-                        {cocktail.description && <p className="text-gray-400 text-sm line-clamp-2">{cocktail.description}</p>}
-                        {cocktail.tags && cocktail.tags.trim() && (
-                          <div className="mt-2 flex flex-wrap gap-1.5">
-                            {cocktail.tags.split(',').map((tag, idx) => (
-                              <span key={idx} className="text-xs bg-amber-400/10 text-amber-400 px-2 py-0.5 rounded border border-amber-400/20">
-                                #{tag.trim()}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        {cocktail.ingredients && cocktail.ingredients.length > 0 && (
-                          <div className="mt-3 flex flex-wrap gap-1.5">
-                            {cocktail.ingredients.map((ing) => (
-                              <span key={ing.id} className="text-xs bg-[#0f0f1a] text-gray-400 px-2 py-1 rounded">
-                                {ing.bottle?.name || (ing.category ? localize(ing.category) : null) || (ing.ingredient ? localize(ing.ingredient) : null)}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
+            ) : renderCocktails((itemsBySection['__all__'] as MenuCocktail[]) || [])}
           </>
         )}
       </div>
