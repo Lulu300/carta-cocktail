@@ -1,23 +1,15 @@
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
+import dotenv from 'dotenv';
+import path from 'path';
+import { ensureAdmin } from '../src/bootstrap/ensureAdmin';
+
+// The seed runs on its own (npm run db:seed), outside the app that loads backend/.env
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const prisma = new PrismaClient();
 
 async function main() {
-  // Create or update admin user
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@carta.local';
-  const passwordHash = await bcrypt.hash(process.env.ADMIN_PASSWORD || 'admin123', 10);
-  const existingAdmin = await prisma.user.findFirst();
-  if (existingAdmin) {
-    await prisma.user.update({
-      where: { id: existingAdmin.id },
-      data: { email: adminEmail, passwordHash },
-    });
-  } else {
-    await prisma.user.create({
-      data: { email: adminEmail, passwordHash },
-    });
-  }
+  await ensureAdmin(prisma);
 
   // Seed default CategoryTypes
   const defaultCategoryTypes = [

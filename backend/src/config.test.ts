@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import path from 'path';
-import { resolveUploadDir } from './config';
+import { assertJwtSecret, resolveUploadDir } from './config';
 
 describe('resolveUploadDir', () => {
   it('should use UPLOAD_DIR when it is an absolute path', () => {
@@ -21,5 +21,32 @@ describe('resolveUploadDir', () => {
 
   it('should fall back to the default when UPLOAD_DIR is empty', () => {
     expect(resolveUploadDir({ UPLOAD_DIR: '' })).toBe(resolveUploadDir({}));
+  });
+});
+
+describe('assertJwtSecret', () => {
+  const strongSecret = '0123456789abcdef'.repeat(4);
+  const rejectedSecrets: Array<[string, string | undefined]> = [
+    ['undefined', undefined],
+    ['an empty string', ''],
+    ['a 31-character string', 'x'.repeat(31)],
+    ['the old compose default', 'change-me-to-a-random-secret'],
+    ['the old config default', 'default-secret'],
+  ];
+
+  describe.each(['production', undefined])('with NODE_ENV=%s', (nodeEnv) => {
+    it.each(rejectedSecrets)('should reject %s', (_label, secret) => {
+      expect(() => assertJwtSecret(secret, nodeEnv)).toThrow(
+        'JWT_SECRET must be set to a random value of at least 32 characters (openssl rand -hex 32)',
+      );
+    });
+
+    it('should accept a 64-character hex secret', () => {
+      expect(assertJwtSecret(strongSecret, nodeEnv)).toBe(strongSecret);
+    });
+  });
+
+  it.each(rejectedSecrets)('should not reject %s when NODE_ENV is test', (_label, secret) => {
+    expect(() => assertJwtSecret(secret, 'test')).not.toThrow();
   });
 });
