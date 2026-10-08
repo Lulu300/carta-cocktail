@@ -1,14 +1,14 @@
 ---
 id: D-01
-title: "Image backend : multi-stage, non-root, sans devDependencies, .dockerignore"
+title: "Image backend : multi-stage, non-root, sans devDependencies"
 phase: D
 lane: infra
 criticite: moyenne
 effort: M
 status: todo
 owner: agent
-depends_on: [B-01, C-01]
-touches: [backend/Dockerfile, backend/.dockerignore, frontend/.dockerignore, backend/package.json, backend/docker-entrypoint.sh]
+depends_on: [B-01, C-01, D-10]
+touches: [backend/Dockerfile, backend/package.json, backend/docker-entrypoint.sh]
 sources: ["07-devops-history.md §2.5", "07-devops-history.md §2.6", "03-security.md §11"]
 branch:
 pr:
@@ -25,7 +25,7 @@ L'image backend publiée sur ghcr.io est celle qui tourne sur le NAS. Elle embar
 - `backend/package.json:36` et `:49` : `@prisma/client` et `prisma` sont en devDependencies alors que le runtime les utilise (16 fichiers de `src/` importent `@prisma/client`, la CLI sert à `migrate deploy`). `npm ci --omit=dev` casserait l'application.
 - `backend/package.json:14` : le seed est lancé par `tsx prisma/seed.ts`. `tsx` est une devDependency, et `tsc` ne compile pas `prisma/seed.ts` (`tsconfig.json:7,17` : `rootDir ./src`, `include src/**/*`).
 - `backend/package.json:48,51` : `nodemon` et `ts-node` ne sont utilisés nulle part (`dev` utilise `tsx watch`).
-- Aucun `.dockerignore` (ni racine, ni `backend/`, ni `frontend/`). En local, `backend/` contient `node_modules/` (darwin), `.env`, `dist/`, `coverage/`, `.omc/`, `prisma/carta_cocktail.db`, `prisma/dev.db`, `prisma/prisma/test.db`. Tout part dans le contexte de build.
+- Aucun `.dockerignore` (ni racine, ni `backend/`, ni `frontend/`) : traité par D-10. En local, `backend/` contient `node_modules/` (darwin), `.env`, `dist/`, `coverage/`, `.omc/`, `prisma/carta_cocktail.db`, `prisma/dev.db`, `prisma/prisma/test.db`. Tout part dans le contexte de build.
 - `tsconfig.json:17` inclut `src/**/*`, donc les `*.test.ts` et `src/test/` sont compilés dans `dist/` de l'image.
 
 ## Ce qu'il faut faire
@@ -36,23 +36,8 @@ L'image backend publiée sur ghcr.io est celle qui tourne sur le NAS. Elle embar
    - supprimer `nodemon` et `ts-node` ;
    - ajouter `"build:seed": "tsc prisma/seed.ts --outDir dist/seed --module commonjs --target ES2022 --esModuleInterop --skipLibCheck"` ;
    - régénérer le lockfile avec `npm install` (pas de montée de version).
-3. Créer `backend/.dockerignore` :
-   ```
-   node_modules
-   dist
-   coverage
-   .env*
-   *.db
-   *.db-journal
-   prisma/prisma
-   .omc
-   .DS_Store
-   **/*.test.ts
-   src/test
-   vitest.config.ts
-   ```
-4. Créer `frontend/.dockerignore` : `node_modules`, `dist`, `coverage`, `.env*`, `.omc`, `.DS_Store`. Ne pas exclure les tests : `tsc -b` les compile et un import manquant casserait le build.
-5. Réécrire `backend/Dockerfile` en multi-stage. Garder des tags littéraux dans les `FROM` (Dependabot ne met pas à jour un tag construit avec `ARG`, cf. D-06) :
+3. Les `.dockerignore` backend et frontend viennent de D-10 (dépendance). Ne les modifier que si le multi-stage a besoin d'un chemin qu'ils excluent ; dans ce cas, ajouter `backend/.dockerignore` à `touches` et le noter au Journal.
+4. Réécrire `backend/Dockerfile` en multi-stage. Garder des tags littéraux dans les `FROM` (Dependabot ne met pas à jour un tag construit avec `ARG`, cf. D-06) :
    ```dockerfile
    FROM node:24-alpine AS deps
    WORKDIR /app
@@ -88,7 +73,7 @@ L'image backend publiée sur ghcr.io est celle qui tourne sur le NAS. Elle embar
    ENTRYPOINT ["/sbin/tini", "--", "/app/docker-entrypoint.sh"]
    CMD ["node", "dist/index.js"]
    ```
-6. Adapter `backend/docker-entrypoint.sh` (créé par C-01) : en tête, si le script tourne en root, corriger les droits des volumes puis se relancer en `node` ; à la fin, `exec "$@"`. Remplacer `npm run db:seed` par `node dist/seed/seed.js`.
+5. Adapter `backend/docker-entrypoint.sh` (créé par C-01) : en tête, si le script tourne en root, corriger les droits des volumes puis se relancer en `node` ; à la fin, `exec "$@"`. Remplacer `npm run db:seed` par `node dist/seed/seed.js`.
    ```sh
    #!/bin/sh
    set -eu
@@ -102,7 +87,7 @@ L'image backend publiée sur ghcr.io est celle qui tourne sur le NAS. Elle embar
    node dist/seed/seed.js
    exec "$@"
    ```
-7. Mesurer la taille avant et après (`docker image ls`) et la noter dans la PR.
+6. Mesurer la taille avant et après (`docker image ls`) et la noter dans la PR.
 
 ## Critères d'acceptation
 
@@ -124,8 +109,8 @@ L'image backend publiée sur ghcr.io est celle qui tourne sur le NAS. Elle embar
 
 ## Points d'attention
 
-- **`.dockerignore` plus urgent depuis A-04** (relevé en revue). Le README fait maintenant créer `backend/.env` avec un vrai `JWT_SECRET` et un vrai `ADMIN_PASSWORD`. Un `docker compose up --build` local (contexte `./backend`) le copie dans l'image par `COPY . .`, et `config.ts` le charge au démarrage (`path.resolve(__dirname, '../.env')`, soit `/app/.env`) : les secrets sont figés dans une couche de l'image et servent de valeurs par défaut silencieuses si le compose ne les fournit pas. Les images publiées par `release.yml` partent d'un checkout propre et ne sont pas touchées. Si D-01 attend encore B-01 et C-01, livrer d'abord les étapes 3 et 4 (les deux `.dockerignore`, sans autre changement) dans une petite PR séparée, qui ne dépend de rien.
-- Volumes existants. Les fichiers de `db-data` et `uploads` appartiennent à root sur les installations actuelles. Un `USER node` sec rendrait la base en lecture seule au premier démarrage. Le `su-exec` de l'étape 6 corrige les droits puis abandonne root. Variante plus stricte à valider avec l'humain : `USER node` dans le Dockerfile et une commande `chown` manuelle documentée dans D-09. Conséquence de la variante su-exec : le conteneur démarre en root quelques millisecondes.
+- Les `.dockerignore` sont sortis dans D-10 (relevé en revue de la phase A) : depuis A-04, un `backend/.env` avec de vrais secrets est copié par `COPY . .` dans une couche de l'image locale, d'où il peut fuir (`docker history`, `docker save`, push) : c'est le risque réel. Le chargement de ce `/app/.env` par `config.ts` ne sert de repli qu'avec un compose personnalisé ou un simple `docker run` ; les compose du dépôt définissent toujours `JWT_SECRET` et `ADMIN_PASSWORD`, que dotenv n'écrase pas. D-10 ne dépend de rien et passe avant cette tâche.
+- Volumes existants. Les fichiers de `db-data` et `uploads` appartiennent à root sur les installations actuelles. Un `USER node` sec rendrait la base en lecture seule au premier démarrage. Le `su-exec` de l'étape 5 corrige les droits puis abandonne root. Variante plus stricte à valider avec l'humain : `USER node` dans le Dockerfile et une commande `chown` manuelle documentée dans D-09. Conséquence de la variante su-exec : le conteneur démarre en root quelques millisecondes.
 - Prisma sur Alpine. Si `prisma generate` ou le démarrage signalent une version de libssl introuvable, ajouter `openssl` à l'`apk add`. C-15 (Prisma 7) changera le générateur : relire ce Dockerfile à ce moment-là.
 - `morgan('dev')` (`app.ts:30`) reste actif en production. Le passage à un format adapté est dans D-03, qui touche `app.ts`.
 - Conflits : B-01, C-01, D-05 et C-15 modifient aussi `backend/Dockerfile`. Rebaser juste avant le merge.
@@ -134,4 +119,4 @@ L'image backend publiée sur ghcr.io est celle qui tourne sur le NAS. Elle embar
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
-- 2026-10-08 : suivi des revues de la phase A. Point d'attention ajouté : `.dockerignore` plus urgent depuis A-04 (`backend/.env` avec de vrais secrets copié dans l'image locale par `COPY . .`), livrable à part avant le reste de la tâche.
+- 2026-10-09 : suivi des revues de la phase A (PR #37). Étapes 3 et 4 (`.dockerignore`) déplacées dans la nouvelle tâche D-10, plus urgente depuis A-04 ; étape 3 remplacée par un renvoi, étapes suivantes renumérotées ; D-10 ajoutée à `depends_on`, les deux fichiers retirés de `touches` et du titre.

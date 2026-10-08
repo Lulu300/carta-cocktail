@@ -6,7 +6,7 @@ lane: backend
 criticite: moyenne
 effort: M
 status: todo
-owner: agent
+owner: mixed
 depends_on: [C-03]
 touches: [backend/src/services/menuSyncService.ts, backend/src/routes/bottles.ts, backend/src/routes/menuBottles.ts, backend/src/routes/menus.ts, backend/src/i18n/]
 sources: ["01-backend-routes.md §H3", "02-backend-data-perf.md §3.5"]
@@ -92,4 +92,4 @@ Les menus « Apéritifs » et « Digestifs » reflètent les bouteilles marquée
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
-- 2026-10-08 : suivi des revues de la phase A. Constat ajouté (type `APEROS`/`DIGESTIFS` encore attribuable à un menu ordinaire après A-02), étape 6 et décision à prendre dans les Points d'attention : réserver ces types aux menus système ou l'accepter explicitement.
+- 2026-10-08 : suivi des revues de la phase A. Constat ajouté (type `APEROS`/`DIGESTIFS` encore attribuable à un menu ordinaire après A-02), étape 6 et décision à prendre dans les Points d'attention : réserver ces types aux menus système ou l'accepter explicitement. `owner: mixed` : la décision humaine précède le code.

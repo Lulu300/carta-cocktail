@@ -8,7 +8,7 @@ effort: M
 status: todo
 owner: agent
 depends_on: [C-01, C-03]
-touches: [backend/src/bootstrap/ensureAdmin.ts, backend/src/routes/auth.ts, backend/src/middleware/auth.ts, backend/src/routes/settings.ts, backend/src/app.ts, backend/src/config.ts, backend/prisma/schema.prisma, backend/prisma/migrations/, backend/package.json, backend/package-lock.json, backend/src/test/helpers.ts, backend/src/i18n/, frontend/src/pages/admin/SettingsPage.tsx]
+touches: [backend/src/bootstrap/, backend/src/routes/auth.ts, backend/src/middleware/auth.ts, backend/src/routes/settings.ts, backend/src/app.ts, backend/src/config.ts, backend/prisma/schema.prisma, backend/prisma/migrations/, backend/package.json, backend/package-lock.json, backend/src/test/helpers.ts, backend/src/i18n/, frontend/src/pages/admin/SettingsPage.tsx]
 sources: ["03-security.md §4", "03-security.md §7", "03-security.md §12", "03-security.md §15", "04-tests.md §6"]
 branch:
 pr:
@@ -52,7 +52,7 @@ L'admin est exposé sur Internet en même temps que la carte publique. Rien ne l
 4. Profil (`PUT /api/settings/profile`) :
    - `currentPassword` obligatoire dès que `email` ou `newPassword` change ; mot de passe faux → le statut fixé par A-10 ;
    - `email` au format valide (`errors.invalidEmail`) ; `newPassword` d'au moins 12 caractères (`errors.passwordTooShort`) ;
-   - une seule règle de mot de passe : exporter le coût bcrypt et la longueur minimale depuis un seul endroit (par exemple `hashPassword()` et `MIN_PASSWORD_LENGTH` dans `bootstrap/ensureAdmin.ts` ou un petit module voisin), utilisés par `ensureAdmin` et par `PUT /profile`. Plus de `bcrypt.hash(…, 10)` ni de `12` recopié dans `settings.ts` ;
+   - une seule règle de mot de passe : exporter le coût bcrypt et la longueur minimale depuis un seul endroit (par exemple `hashPassword()` et `MIN_PASSWORD_LENGTH` dans `src/bootstrap/password.ts`), utilisés par `ensureAdmin` et par `PUT /profile`. Plus de `bcrypt.hash(…, 10)` ni de `12` recopié dans `settings.ts`. L'exception `NODE_ENV=test` reste propre à `ensureAdmin` (le `ADMIN_PASSWORD` fixe de la suite de tests est court) ; `PUT /profile` applique la longueur minimale sans exception, et les tests de `settings.test.ts` passent à des mots de passe d'au moins 12 caractères (`newpass123`, `newpass456` aujourd'hui) ;
    - si le mot de passe change : incrémenter `tokenVersion` et renvoyer un nouveau token, `{ id, email, token }`.
 5. `frontend/src/pages/admin/SettingsPage.tsx:84` : si la réponse contient `token`, le stocker comme au login, pour ne pas déconnecter l'admin qui vient de changer son mot de passe.
 6. `app.ts` : `cors({ origin: config.corsOrigin || false })` (`CORS_ORIGIN`, vide par défaut : l'app est same-origin derrière nginx et derrière le proxy Vite en dev) ; `morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev')`.
@@ -96,4 +96,5 @@ L'admin est exposé sur Internet en même temps que la carte publique. Rien ne l
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
-- 2026-10-08 : suivi des revues de la phase A. Alignement de `PUT /settings/profile` (coût bcrypt 10, sans minimum) sur `ensureAdmin` (coût 12, 12 caractères) via une règle partagée ; `backend/src/bootstrap/ensureAdmin.ts` ajouté à `touches`. La note d'A-10 sur `.catch(logout)` dans `AuthContext` est bien présente dans les Points d'attention.
+- 2026-10-08 : suivi des revues de la phase A. Alignement de `PUT /settings/profile` (coût bcrypt 10, sans minimum) sur `ensureAdmin` (coût 12, 12 caractères) via une règle partagée ; `backend/src/bootstrap/` ajouté à `touches`. La note d'A-10 sur `.catch(logout)` dans `AuthContext` est bien présente dans les Points d'attention.
+- 2026-10-09 : revue de la PR #37. `touches` élargi au dossier `backend/src/bootstrap/` (module partagé du mot de passe) ; l'exception `NODE_ENV=test` reste propre à `ensureAdmin`, et les tests de `settings.test.ts` passent à des mots de passe d'au moins 12 caractères.

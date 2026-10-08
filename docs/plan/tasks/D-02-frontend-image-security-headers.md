@@ -54,7 +54,7 @@ nginx sert le HTML de l'admin et de la carte publique. helmet ne protège que le
      location ^~ /uploads/ { proxy_pass $backend; ... }
      ```
      Les trois `location` passent à la variable, y compris `= /api/backup/import` (A-06), dont la version actuelle répète l'URI (`.../api/backup/import`). Avec une variable, nginx ne réécrit pas l'URI : il ne faut donc mettre aucun chemin après `$backend`, sinon toutes les requêtes de la `location` partent vers ce chemin exact ;
-   - si une `location` regex (`~`) est ajoutée, passer `location /assets/` en `location ^~ /assets/` : une regex l'emporte sur un préfixe simple et pourrait capter les fichiers du build, qui perdraient leur `Cache-Control`.
+   - si une `location` regex (`~`) est ajoutée, passer `location /assets/` en `location ^~ /assets/` : une regex l'emporte sur un préfixe simple et pourrait capter les fichiers du build, qui perdraient leur `Cache-Control` ;
    - laisser HSTS commenté, avec une note : à activer seulement si le TLS est terminé en amont (D-09 le documente).
 4. `frontend/Dockerfile`, stage final :
    ```dockerfile

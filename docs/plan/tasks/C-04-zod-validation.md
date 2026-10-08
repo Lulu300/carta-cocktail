@@ -113,4 +113,4 @@ Aucune route ne valide ses entrées. Un mauvais type finit en erreur Prisma (500
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
-- 2026-10-08 : suivi des revues de la phase A. Numéros de ligne de `cocktails.ts`, périmés depuis A-03, remplacés par les noms de fonction et de handler (`mapInstruction`, `mapIngredient`, `POST /import/confirm`).
+- 2026-10-08 : suivi des revues de la phase A. Références à `cocktails.ts` passées des numéros de ligne aux noms de fonction et de handler (`mapInstruction`, `mapIngredient`, `POST /import/confirm`) pour résister aux prochaines modifications. Seules celles de `mapInstruction` et `mapIngredient` (`:490,543`, `:477,528`) étaient périmées depuis A-03 ; celles de l'import étaient encore justes.
