@@ -4,32 +4,63 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    # nginx defaults to 1 MB. Must cover the backend upload limits:
+    # cocktail image 5 MB, bottle import 10 MB (backup restore has its own location).
+    client_max_body_size 20m;
+
+    # nginx:alpine ships with gzip disabled. Proxied API responses are compressed too.
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/csv text/javascript application/javascript application/json image/svg+xml;
+
+    # Declared once here: proxy_set_header is inherited by every proxied location
+    # as long as that location does not define its own.
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # Backup restore: large archive, streamed to the backend instead of buffered on disk.
+    # Keep the size in line with the multer limit in backend/src/routes/backup.ts (500 MB).
+    location = /api/backup/import {
+        client_max_body_size 512m;
+        proxy_request_buffering off;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_pass http://${BACKEND_HOST}:3001/api/backup/import;
+    }
+
     # API proxy
     location /api/ {
         proxy_pass http://${BACKEND_HOST}:3001/api/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    # Uploads proxy
+    # Uploaded photos: file names are unique per upload, so a long cache is safe.
+    # Express sends its own Cache-Control (max-age=0); hide it to avoid two headers.
     location ^~ /uploads/ {
         proxy_pass http://${BACKEND_HOST}:3001/uploads/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_hide_header Cache-Control;
+        add_header Cache-Control "public, max-age=2592000";
+    }
+
+    # Vite build output: file names contain a content hash, so they never change.
+    location /assets/ {
+        try_files $uri =404;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    # The SPA shell must be revalidated on every load, otherwise a browser can keep
+    # an old index.html that references assets removed by a new deployment.
+    # SPA routes reach this location through the try_files fallback below.
+    location = /index.html {
+        add_header Cache-Control "no-cache";
     }
 
     # SPA fallback
     location / {
         try_files $uri $uri/ /index.html;
-    }
-
-    # Cache static assets
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|webp|woff|woff2)$ {
-        expires 1y;
-        add_header Cache-Control "public, immutable";
     }
 }

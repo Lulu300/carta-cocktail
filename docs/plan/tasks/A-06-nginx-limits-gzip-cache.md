@@ -5,13 +5,13 @@ phase: A
 lane: infra
 criticite: haute
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: []
 touches: [frontend/nginx.conf.template, frontend/nginx.conf]
 sources: ["07-devops-history.md §2.4", "06-frontend-ux-perf.md §1", "03-security.md §6"]
-branch:
-pr:
+branch: fix/A-06-nginx-limits-gzip-cache
+pr: 31
 ---
 
 ## Contexte
@@ -93,15 +93,15 @@ Hors périmètre : en-têtes de sécurité, `server_tokens off`, image non-root 
 
 ## Critères d'acceptation
 
-- [ ] `nginx -t` passe sur le template rendu.
-- [ ] Upload d'une photo de 3 à 4 Mo via l'UI en Docker : succès, plus de 413.
-- [ ] Import d'un fichier de bouteilles de 5 Mo : pas de 413.
-- [ ] Restauration d'un backup de 100 Mo : pas de 413.
-- [ ] `/assets/*.js` servi avec `Content-Encoding: gzip` et `Cache-Control: public, max-age=31536000, immutable`.
-- [ ] `/` et `/menu/<slug>` servis avec `Cache-Control: no-cache`.
-- [ ] `/uploads/<photo>` servi avec une seule ligne `Cache-Control: public, max-age=2592000`.
-- [ ] Les réponses JSON de plus de 1 Ko sous `/api/` sont compressées.
-- [ ] `frontend/nginx.conf` supprimé.
+- [x] `nginx -t` passe sur le template rendu.
+- [x] Upload d'une photo de 3 à 4 Mo via l'UI en Docker : succès, plus de 413.
+- [x] Import d'un fichier de bouteilles de 5 Mo : pas de 413.
+- [x] Restauration d'un backup de 100 Mo : pas de 413.
+- [x] `/assets/*.js` servi avec `Content-Encoding: gzip` et `Cache-Control: public, max-age=31536000, immutable`.
+- [x] `/` et `/menu/<slug>` servis avec `Cache-Control: no-cache`.
+- [x] `/uploads/<photo>` servi avec une seule ligne `Cache-Control: public, max-age=2592000`.
+- [x] Les réponses JSON de plus de 1 Ko sous `/api/` sont compressées.
+- [x] `frontend/nginx.conf` supprimé.
 
 ## Tests à ajouter ou adapter
 
@@ -137,3 +137,4 @@ Le test automatisé de bout en bout (upload réel de 2 Mo) relève de D-08.
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-08 : PR #31. Template réécrit selon le plan, `proxy_set_header` déclarés une fois au niveau `server` (hérités par les `location` proxifiées), `text/javascript` ajouté à `gzip_types`, `frontend/nginx.conf` supprimé. Vérifié avec `nginx -t` (nginx 1.31.6) et `docker compose up --build` + curl : bundle JS gzippé (605 Ko → 169 Ko), en-têtes de cache conformes, photo 3,5 Mo 200, CSV bouteilles 5 Mo 200, 25 Mo 413, backup 100 Mo restauré (200). Upload testé par curl à travers nginx, pas par clic dans l'UI.
