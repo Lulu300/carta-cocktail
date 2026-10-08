@@ -60,10 +60,20 @@ describe('PUT /api/settings/profile', () => {
     expect(res.status).toBe(400);
   });
 
-  it('should return 401 if currentPassword is wrong', async () => {
+  it('should return 400 with a translated message if currentPassword is wrong', async () => {
     const res = await request.put('/api/settings/profile').set(authHeader())
+      .set('Accept-Language', 'en')
       .send({ currentPassword: 'wrong', newPassword: 'newpass123' });
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Current password is incorrect');
+  });
+
+  it('should return the wrong currentPassword message in French', async () => {
+    const res = await request.put('/api/settings/profile').set(authHeader())
+      .set('Accept-Language', 'fr')
+      .send({ currentPassword: 'wrong', newPassword: 'newpass123' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Mot de passe actuel incorrect');
   });
 
   it('should update password with correct currentPassword', async () => {
