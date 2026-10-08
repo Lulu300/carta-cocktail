@@ -5,13 +5,13 @@ phase: A
 lane: frontend
 criticite: haute
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: []
 touches: [frontend/src/services/api.ts, frontend/src/contexts/AuthContext.tsx, frontend/src/App.tsx, frontend/src/pages/auth/LoginPage.tsx, backend/src/routes/settings.ts, backend/src/routes/settings.test.ts, backend/src/i18n/en.json, backend/src/i18n/fr.json]
 sources: ["05-frontend-archi.md §H1", "05-frontend-archi.md §3.4"]
-branch:
-pr:
+branch: fix/A-10-api-401-handling
+pr: 35
 ---
 
 ## Contexte
@@ -51,13 +51,13 @@ Hors périmètre : toasts (E-04) ; TanStack Query (E-02) ; helper `downloadBlob`
 
 ## Critères d'acceptation
 
-- [ ] Mot de passe actuel incorrect dans Réglages : message traduit affiché, l'admin reste connecté, le token est conservé.
-- [ ] Token expiré ou invalide pendant la navigation admin : redirection vers `/login` au premier appel en échec ; après reconnexion, retour à la page demandée.
-- [ ] Identifiants invalides sur `/login` : message `auth.loginError`, handler non appelé.
-- [ ] Toute erreur HTTP garde le message du serveur (`ApiError.message`) et expose `status`.
-- [ ] Export de bouteilles, export et import de backup : un 401 déclenche la même déconnexion que les autres appels.
-- [ ] Les messages d'erreur du serveur arrivent dans la langue choisie dans l'UI.
-- [ ] Après `login`, aucun appel supplémentaire à `/auth/me`.
+- [x] Mot de passe actuel incorrect dans Réglages : message traduit affiché, l'admin reste connecté, le token est conservé.
+- [x] Token expiré ou invalide pendant la navigation admin : redirection vers `/login` au premier appel en échec ; après reconnexion, retour à la page demandée.
+- [x] Identifiants invalides sur `/login` : message `auth.loginError`, handler non appelé.
+- [x] Toute erreur HTTP garde le message du serveur (`ApiError.message`) et expose `status`.
+- [x] Export de bouteilles, export et import de backup : un 401 déclenche la même déconnexion que les autres appels.
+- [x] Les messages d'erreur du serveur arrivent dans la langue choisie dans l'UI.
+- [x] Après `login`, aucun appel supplémentaire à `/auth/me`.
 
 ## Tests à ajouter ou adapter
 
@@ -84,3 +84,4 @@ Hors périmètre : toasts (E-04) ; TanStack Query (E-02) ; helper `downloadBlob`
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-08 : PR #35. Backend : 400 + `errors.invalidCurrentPassword` (en/fr). Front : `ApiError`, `send()` partagé (exports et import de backup compris), handler 401 enregistré par `AuthContext`, `Accept-Language`, 204, retour à la page demandée après connexion. Critères vérifiés par les tests automatisés (pas de vérification manuelle dans un navigateur). `App.test.tsx` remplace les pages par des stubs : les importer fait entrer une vingtaine de fichiers non testés dans le rapport et fait tomber la couverture globale front à ~56 % (angle mort suivi par B-02). Aucun fichier ajouté à `touches`, aucune nouvelle tâche.
