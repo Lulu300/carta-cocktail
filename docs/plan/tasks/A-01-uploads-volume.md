@@ -5,13 +5,13 @@ phase: A
 lane: infra
 criticite: critique
 effort: S
-status: todo
+status: done
 owner: mixed
 depends_on: []
 touches: [backend/src/config.ts, backend/src/config.test.ts, backend/Dockerfile, docker-compose.yml, docker-compose.prod.yml, backend/src/test/setup.ts, backend/src/routes/cocktails.test.ts]
 sources: ["07-devops-history.md §2.1", "07-devops-history.md §2.9", "03-security.md §11"]
-branch:
-pr:
+branch: fix/A-01-uploads-volume
+pr: "#28"
 ---
 
 ## Décisions validées (2026-10-08)
@@ -64,12 +64,12 @@ Hors périmètre : `.dockerignore`, multi-stage, utilisateur non-root (D-01) ; c
 
 ## Critères d'acceptation
 
-- [ ] `config.uploadDir` vaut `UPLOAD_DIR` quand la variable est définie, `<repo>/uploads` sinon.
-- [ ] L'image backend définit `UPLOAD_DIR=/app/uploads` (`docker run --rm <image> printenv UPLOAD_DIR`).
-- [ ] Les deux fichiers compose définissent `UPLOAD_DIR=/app/uploads`.
-- [ ] `docker compose up --build`, upload d'une image, puis `docker compose up -d --force-recreate` : l'image est toujours servie sur `/uploads/<fichier>`.
-- [ ] `cd backend && npm test` ne crée plus aucun fichier dans `<repo>/uploads`.
-- [ ] La procédure de récupération des images existantes figure dans la description de la PR.
+- [x] `config.uploadDir` vaut `UPLOAD_DIR` quand la variable est définie, `<repo>/uploads` sinon.
+- [x] L'image backend définit `UPLOAD_DIR=/app/uploads` (`docker run --rm <image> printenv UPLOAD_DIR`).
+- [x] Les deux fichiers compose définissent `UPLOAD_DIR=/app/uploads`.
+- [x] `docker compose up --build`, upload d'une image, puis `docker compose up -d --force-recreate` : l'image est toujours servie sur `/uploads/<fichier>`.
+- [x] `cd backend && npm test` ne crée plus aucun fichier dans `<repo>/uploads`.
+- [x] La procédure de récupération des images existantes figure dans la description de la PR.
 
 ## Tests à ajouter ou adapter
 
@@ -98,3 +98,5 @@ Hors périmètre : `.dockerignore`, multi-stage, utilisateur non-root (D-01) ; c
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : décisions validées par l'humain (voir « Décisions validées »).
+- 2026-10-08 : fait dans la PR #28 (branche `fix/A-01-uploads-volume`). `resolveUploadDir()` + `UPLOAD_DIR=/app/uploads` dans l'image et les deux compose ; dossier temporaire de test supprimé dans un `afterAll` du fichier de setup. Persistance vérifiée à la main avec l'image construite (`docker run` sur volumes nommés, upload, recréation du conteneur : image toujours servie en 200), pas avec la pile compose complète pour ne pas occuper les ports 80/3001. Les 22 faux PNG de `<repo>/uploads` ont été supprimés (`.gitkeep` conservé).
+- 2026-10-08 : revue approuvée ; suggestions non bloquantes appliquées (valeur exacte du défaut testée, commentaire de `config.ts` corrigé, `mkdirSync` redondant retiré du test).

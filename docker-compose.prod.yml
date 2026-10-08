@@ -9,6 +9,7 @@ services:
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@carta.local}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
       - PORT=3001
+      - UPLOAD_DIR=/app/uploads
     volumes:
       - db-data:/app/data
       - uploads:/app/uploads

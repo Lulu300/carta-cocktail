@@ -1,4 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { config } from '../config';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
   request, authHeader, prisma, seedCategory, seedUnit, seedBottle, seedIngredient, seedCocktail,
@@ -544,5 +548,28 @@ describe('POST /api/cocktails/:id/image - upload replacing existing', () => {
     expect(res.status).toBe(200);
     expect(res.body.imagePath).toBeDefined();
     expect(res.body.imagePath).not.toBe('old-image-99999.jpg');
+    // The upload must land in the temporary test folder, never in <repo>/uploads
+    expect(config.uploadDir.startsWith(os.tmpdir())).toBe(true);
+    expect(fs.existsSync(path.join(config.uploadDir, res.body.imagePath))).toBe(true);
+  });
+
+  it('should delete the previous image file from disk when a new one is uploaded', async () => {
+    const cocktail = await seedCocktail({ name: 'Old File Cocktail' });
+    const oldFileName = 'old-image-on-disk.png';
+    const oldFilePath = path.join(config.uploadDir, oldFileName);
+    fs.writeFileSync(oldFilePath, 'old-png-data');
+    await prisma.cocktail.update({
+      where: { id: cocktail.id },
+      data: { imagePath: oldFileName },
+    });
+
+    const res = await request
+      .post(`/api/cocktails/${cocktail.id}/image`)
+      .set(authHeader())
+      .attach('image', Buffer.from('new-png-data'), { filename: 'new.png', contentType: 'image/png' });
+
+    expect(res.status).toBe(200);
+    expect(fs.existsSync(oldFilePath)).toBe(false);
+    expect(fs.existsSync(path.join(config.uploadDir, res.body.imagePath))).toBe(true);
   });
 });
