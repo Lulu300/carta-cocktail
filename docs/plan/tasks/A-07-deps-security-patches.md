@@ -5,13 +5,13 @@ phase: A
 lane: deps
 criticite: haute
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: []
 touches: [backend/package.json, backend/package-lock.json, frontend/package.json, frontend/package-lock.json]
 sources: ["08-dependencies.md §1", "08-dependencies.md §5", "03-security.md §9", "07-devops-history.md §4.1"]
-branch:
-pr:
+branch: fix/A-07-deps-security-patches
+pr: "#30"
 ---
 
 ## Contexte
@@ -56,12 +56,12 @@ Autres points relevés dans `backend/package.json` :
 
 ## Critères d'acceptation
 
-- [ ] `npm audit --omit=dev` backend : seules restent les alertes `adm-zip` (traitées par B-07).
-- [ ] `npm audit --omit=dev` frontend : 0 vulnérabilité.
-- [ ] Aucune montée majeure dans le diff des `package.json` (vérifier chaque ligne).
-- [ ] `prisma` et `@prisma/client` en 6.19.3 exactement.
-- [ ] `nodemon` et `ts-node` absents de `backend/package.json`.
-- [ ] Build, lint, `tsc` et tests verts dans les deux paquets, seuils de couverture inchangés.
+- [x] `npm audit --omit=dev` backend : seules restent les alertes `adm-zip` (traitées par B-07).
+- [x] `npm audit --omit=dev` frontend : 0 vulnérabilité.
+- [x] Aucune montée majeure dans le diff des `package.json` (vérifier chaque ligne).
+- [x] `prisma` et `@prisma/client` en 6.19.3 exactement.
+- [x] `nodemon` et `ts-node` absents de `backend/package.json`.
+- [x] Build, lint, `tsc` et tests verts dans les deux paquets, seuils de couverture inchangés.
 
 ## Tests à ajouter ou adapter
 
@@ -77,3 +77,4 @@ Aucun nouveau test : la suite existante sert de filet. Si un test casse, corrige
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue et du rapport de dépendances.
+- 2026-10-08 : fait dans la PR #30. Audit prod après : backend 1 haute (`adm-zip`, B-07), frontend 0. `eslint-plugin-react-hooks` gardé en `~7.0.1` (7.1.1 signale deux `set-state-in-effect` dans des pages hors périmètre) → E-16. Alerte dev `deepmerge-ts` via la CLI Prisma → B-11. i18next frontend monté en `^25.10.10` avec react-i18next `^16.6.6`.
