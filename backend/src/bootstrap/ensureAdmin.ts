@@ -37,6 +37,34 @@ async function credentialsFromEnv(env: NodeJS.ProcessEnv): Promise<{ email: stri
 }
 
 /**
+ * Only the exact value 'true' triggers a reset. Any other non-empty value except
+ * 'false' (the compose default) is logged, so a typo such as '1' or 'TRUE'
+ * does not fail silently while someone is recovering a lost password.
+ */
+function isResetRequested(env: NodeJS.ProcessEnv): boolean {
+  const flag = env.ADMIN_RESET_PASSWORD;
+  if (flag === 'true') {
+    return true;
+  }
+  if (flag && flag !== 'false') {
+    console.warn(`ADMIN_RESET_PASSWORD='${flag}' is ignored: set it to exactly 'true' to reset the admin credentials`);
+  }
+  return false;
+}
+
+// Instances that never set ADMIN_PASSWORD were seeded with the old default at
+// every start. They are not overwritten, but the operator must know.
+async function warnIfDefaultPassword(passwordHash: string): Promise<void> {
+  if (await bcrypt.compare(FORBIDDEN_ADMIN_PASSWORD, passwordHash)) {
+    console.warn(
+      `WARNING: the admin password is still the old default '${FORBIDDEN_ADMIN_PASSWORD}'. ` +
+      'Change it in Settings > Profile, or set ADMIN_RESET_PASSWORD=true with a new ADMIN_PASSWORD ' +
+      'for one restart, then remove the flag.',
+    );
+  }
+}
+
+/**
  * Creates the admin user on first start. An existing admin is left untouched,
  * so a password changed from the settings page survives restarts; the
  * environment overrides it only when ADMIN_RESET_PASSWORD=true.
@@ -52,14 +80,13 @@ export async function ensureAdmin(
     return 'created';
   }
 
-  if (env.ADMIN_RESET_PASSWORD !== 'true') {
+  if (!isResetRequested(env)) {
+    await warnIfDefaultPassword(existingAdmin.passwordHash);
     return 'unchanged';
   }
 
-  await prisma.user.update({
-    where: { id: existingAdmin.id },
-    data: await credentialsFromEnv(env),
-  });
-  console.log('Admin credentials reset from environment');
+  const credentials = await credentialsFromEnv(env);
+  await prisma.user.update({ where: { id: existingAdmin.id }, data: credentials });
+  console.log(`Admin credentials reset from environment (login email: ${credentials.email})`);
   return 'reset';
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import bcrypt from 'bcryptjs';
 import { setupTestDatabase, teardownTestDatabase, cleanDatabase, prisma } from '../test/helpers';
 import { ensureAdmin } from './ensureAdmin';
@@ -6,9 +6,9 @@ import { ensureAdmin } from './ensureAdmin';
 const STRONG_PASSWORD = 'correct-horse-battery';
 const PRODUCTION_ENV = { NODE_ENV: 'production', ADMIN_EMAIL: 'owner@bar.test', ADMIN_PASSWORD: STRONG_PASSWORD };
 
-async function createExistingAdmin(): Promise<{ id: number; passwordHash: string }> {
+async function createExistingAdmin(password = 'changed-from-the-ui'): Promise<{ id: number; passwordHash: string }> {
   return prisma.user.create({
-    data: { email: 'changed@bar.test', passwordHash: await bcrypt.hash('changed-from-the-ui', 4) },
+    data: { email: 'changed@bar.test', passwordHash: await bcrypt.hash(password, 4) },
   });
 }
 
@@ -16,6 +16,7 @@ beforeAll(async () => { await setupTestDatabase(); });
 afterAll(async () => { await teardownTestDatabase(); });
 // No seedRequiredData(): these tests control whether an admin exists
 beforeEach(async () => { await cleanDatabase(); });
+afterEach(() => { vi.restoreAllMocks(); });
 
 describe('ensureAdmin without an existing admin', () => {
   it('should create the admin from the environment', async () => {
@@ -82,8 +83,43 @@ describe('ensureAdmin with an existing admin', () => {
     const admin = await prisma.user.findUniqueOrThrow({ where: { id: existing.id } });
     expect(admin.email).toBe('owner@bar.test');
     expect(await bcrypt.compare(STRONG_PASSWORD, admin.passwordHash)).toBe(true);
-    expect(log).toHaveBeenCalledWith('Admin credentials reset from environment');
-    log.mockRestore();
+    expect(log).toHaveBeenCalledWith('Admin credentials reset from environment (login email: owner@bar.test)');
+    expect(String(log.mock.calls)).not.toContain(STRONG_PASSWORD);
+  });
+
+  it.each(['1', 'TRUE', 'yes'])('should ignore ADMIN_RESET_PASSWORD=%s and say so', async (flag) => {
+    const existing = await createExistingAdmin();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const result = await ensureAdmin(prisma, { ...PRODUCTION_ENV, ADMIN_RESET_PASSWORD: flag });
+
+    expect(result).toBe('unchanged');
+    expect(warn).toHaveBeenCalledWith(
+      `ADMIN_RESET_PASSWORD='${flag}' is ignored: set it to exactly 'true' to reset the admin credentials`,
+    );
+    const admin = await prisma.user.findUniqueOrThrow({ where: { id: existing.id } });
+    expect(admin.passwordHash).toBe(existing.passwordHash);
+  });
+
+  it('should not warn when ADMIN_RESET_PASSWORD is false', async () => {
+    await createExistingAdmin();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await ensureAdmin(prisma, { ...PRODUCTION_ENV, ADMIN_RESET_PASSWORD: 'false' });
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('should warn, without changing it, when the admin still uses admin123', async () => {
+    const existing = await createExistingAdmin('admin123');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const result = await ensureAdmin(prisma, PRODUCTION_ENV);
+
+    expect(result).toBe('unchanged');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("the admin password is still the old default 'admin123'"));
+    const admin = await prisma.user.findUniqueOrThrow({ where: { id: existing.id } });
+    expect(admin.passwordHash).toBe(existing.passwordHash);
   });
 
   it('should refuse a reset with a weak password and keep the current credentials', async () => {
