@@ -34,3 +34,6 @@ backend/prisma/migrations/
 # Logs
 *.log
 npm-debug.log*
+
+# Plan d'action : page de suivi générée par docs/plan/build.mjs
+docs/plan/index.html

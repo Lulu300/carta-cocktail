@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Plan d'action Carta</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍸</text></svg>">
+<style>
+:root {
+  --bg: #f7f5f0; --surface: #ffffff; --surface-2: #f0ede6; --border: #e2ddd2; --border-strong: #cfc8b9;
+  --text: #1d1b26; --muted: #6b6676; --faint: #948f9c;
+  --accent: #b45309; --accent-soft: #fdf0dc; --accent-ink: #ffffff;
+  --s-todo: #7c7887; --s-progress: #2563eb; --s-review: #7c3aed; --s-done: #15803d; --s-blocked: #dc2626; --s-dropped: #a8a29e;
+  --c-critique: #dc2626; --c-haute: #ea580c; --c-moyenne: #ca8a04; --c-basse: #78716c;
+  --shadow: 0 1px 2px rgb(0 0 0 / .06), 0 4px 16px rgb(0 0 0 / .06);
+  --radius: 10px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f0f1a; --surface: #1a1a2e; --surface-2: #222238; --border: #2c2c46; --border-strong: #3c3c5c;
+    --text: #ece9f2; --muted: #a29fb3; --faint: #77748a;
+    --accent: #fbbf24; --accent-soft: #3a2f12; --accent-ink: #1a1405;
+    --s-todo: #8b88a0; --s-progress: #60a5fa; --s-review: #a78bfa; --s-done: #4ade80; --s-blocked: #f87171; --s-dropped: #6b6880;
+    --c-critique: #f87171; --c-haute: #fb923c; --c-moyenne: #facc15; --c-basse: #a8a29e;
+    --shadow: 0 1px 2px rgb(0 0 0 / .4), 0 8px 24px rgb(0 0 0 / .3);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f0f1a; --surface: #1a1a2e; --surface-2: #222238; --border: #2c2c46; --border-strong: #3c3c5c;
+  --text: #ece9f2; --muted: #a29fb3; --faint: #77748a;
+  --accent: #fbbf24; --accent-soft: #3a2f12; --accent-ink: #1a1405;
+  --s-todo: #8b88a0; --s-progress: #60a5fa; --s-review: #a78bfa; --s-done: #4ade80; --s-blocked: #f87171; --s-dropped: #6b6880;
+  --c-critique: #f87171; --c-haute: #fb923c; --c-moyenne: #facc15; --c-basse: #a8a29e;
+  --shadow: 0 1px 2px rgb(0 0 0 / .4), 0 8px 24px rgb(0 0 0 / .3);
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 var(--sans); }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+button { font: inherit; color: inherit; }
+code { font-family: var(--mono); font-size: .86em; background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: .05em .35em; overflow-wrap: anywhere; }
+pre { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; overflow-x: auto; font-size: 13px; line-height: 1.5; }
+pre code { background: none; border: 0; padding: 0; font-size: inherit; overflow-wrap: normal; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* En-tête */
+.top { border-bottom: 1px solid var(--border); background: var(--surface); }
+.top .wrap { display: flex; align-items: center; gap: 16px; padding-top: 14px; padding-bottom: 14px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; margin-right: auto; min-width: 0; }
+.brand .logo { font-size: 26px; line-height: 1; }
+.brand h1 { margin: 0; font-size: 18px; letter-spacing: -.01em; }
+.brand p { margin: 0; color: var(--muted); font-size: 12.5px; }
+.icon-btn { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+.icon-btn:hover { border-color: var(--border-strong); }
+
+/* Résumé */
+.summary { display: grid; grid-template-columns: minmax(240px, 1.1fr) 2fr; gap: 16px; margin: 20px auto 8px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+.overall { padding: 16px 18px; }
+.overall .big { font-size: 34px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+.overall .big small { font-size: 15px; color: var(--muted); font-weight: 500; }
+.bar { height: 8px; background: var(--surface-2); border-radius: 99px; overflow: hidden; display: flex; }
+.bar > span { display: block; height: 100%; }
+.overall .bar { margin: 12px 0 10px; height: 10px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--muted); }
+.legend b { color: var(--text); font-weight: 600; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: 0; }
+.phases { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 12px; }
+.phase-card { text-align: left; background: var(--surface-2); border: 1px solid transparent; border-radius: 8px; padding: 10px 12px; cursor: pointer; min-width: 0; }
+.phase-card:hover { border-color: var(--border-strong); }
+.phase-card .l { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.phase-card .l strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.phase-card .l span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.phase-card .bar { margin-top: 8px; height: 6px; background: var(--border); }
+.phase-card .bar span { background: var(--s-done); }
+
+/* Onglets */
+.tabs { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); }
+.tabs .wrap { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.tabs a { padding: 12px 12px 10px; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; white-space: nowrap; font-weight: 500; }
+.tabs a:hover { color: var(--text); }
+.tabs a[aria-current="page"] { color: var(--text); border-bottom-color: var(--accent); }
+.tabs .count { font-size: 11.5px; background: var(--accent-soft); color: var(--accent); border-radius: 99px; padding: 1px 7px; margin-left: 4px; font-weight: 600; }
+main { padding-top: 18px; padding-bottom: 60px; }
+
+/* Barre de filtres */
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 16px; }
+.toolbar input[type="search"] { flex: 1 1 220px; min-width: 0; }
+.toolbar input[type="search"], .toolbar select { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font: inherit; font-size: 14px; }
+.toolbar select { flex: 0 1 auto; max-width: 100%; }
+.toolbar label.chk { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); cursor: pointer; }
+.toolbar .meta { color: var(--muted); font-size: 13px; margin-left: auto; }
+.link-btn { background: none; border: 0; color: var(--accent); cursor: pointer; padding: 4px; text-decoration: underline; font-size: 14px; }
+
+/* Phases et lignes de tâches */
+.phase { margin-bottom: 26px; }
+.phase > header { display: flex; align-items: flex-end; gap: 14px; margin: 0 2px 10px; flex-wrap: wrap; }
+.phase > header h2 { margin: 0; font-size: 18px; }
+.phase > header h2 .letter { color: var(--accent); font-family: var(--mono); margin-right: 6px; }
+.phase > header p { margin: 2px 0 0; color: var(--muted); font-size: 13.5px; flex-basis: 100%; }
+.phase > header .prog { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.phase > header .prog .bar { width: 120px; height: 6px; }
+.phase > header .prog .bar span { background: var(--s-done); }
+.tasks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.task-row { width: 100%; text-align: left; display: grid; grid-template-columns: auto auto 1fr auto; gap: 4px 12px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--st); border-radius: 8px; padding: 10px 12px; cursor: pointer; }
+.task-row:hover { border-color: var(--border-strong); border-left-color: var(--st); box-shadow: var(--shadow); }
+.task-row.is-closed { opacity: .62; }
+.task-row.is-closed .t-title { text-decoration: line-through; text-decoration-color: var(--faint); }
+.t-id { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.t-title { font-weight: 550; min-width: 0; }
+.t-sub { grid-column: 3 / 5; font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.t-badges { display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 99px; padding: 2px 9px; font-size: 12px; font-weight: 600; white-space: nowrap; border: 1px solid color-mix(in srgb, var(--pc) 40%, transparent); color: var(--pc); background: color-mix(in srgb, var(--pc) 12%, transparent); }
+.pill.ghost { --pc: var(--muted); }
+.pill.ready { --pc: var(--accent); }
+.status-ico { width: 10px; height: 10px; border-radius: 50%; background: var(--st); flex: none; }
+.blocked-by { color: var(--s-blocked); }
+.empty { color: var(--muted); padding: 24px; text-align: center; border: 1px dashed var(--border); border-radius: var(--radius); }
+
+/* Prêtes */
+.lead { color: var(--muted); max-width: 72ch; margin: 0 0 16px; }
+.grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.tcard { background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--st); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.tcard h3 { margin: 0; font-size: 15px; line-height: 1.35; }
+.tcard .row { display: flex; flex-wrap: wrap; gap: 6px; }
+.tcard .branch { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.tcard .actions { margin-top: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; padding: 7px 12px; font-size: 13.5px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); text-decoration: none; }
+.btn:hover { border-color: var(--border-strong); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.section-title { display: flex; align-items: center; gap: 10px; margin: 6px 0 10px; font-size: 16px; flex-wrap: wrap; }
+.list-plain { list-style: none; padding: 0; margin: 0 0 24px; display: grid; gap: 6px; }
+.list-plain li { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.list-plain .why { color: var(--muted); font-size: 13px; flex-basis: 100%; }
+
+/* Vagues */
+.waves { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(180px, 1fr); gap: 12px; overflow-x: auto; padding-bottom: 12px; }
+.wave h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.wave ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.wcard { width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--st); border-radius: 8px; padding: 8px 10px; cursor: pointer; font-size: 13px; transition: opacity .15s, box-shadow .15s; }
+.wcard .t-id { font-size: 12px; }
+.wcard .crit { float: right; width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; }
+.waves.focus .wcard { opacity: .28; }
+.waves.focus .wcard.hl-self { opacity: 1; box-shadow: 0 0 0 2px var(--accent); }
+.waves.focus .wcard.hl-dep { opacity: 1; box-shadow: 0 0 0 2px var(--s-review); }
+.waves.focus .wcard.hl-next { opacity: 1; box-shadow: 0 0 0 2px var(--s-progress); }
+.wave-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12.5px; color: var(--muted); margin-bottom: 12px; }
+.wave-legend i { display: inline-block; width: 14px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+
+/* Rapports et contenus Markdown */
+.reports { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 20px; align-items: start; }
+.rep-nav { position: sticky; top: 56px; display: grid; gap: 4px; }
+.rep-nav a { display: block; padding: 8px 10px; border-radius: 8px; color: var(--text); text-decoration: none; font-size: 14px; border: 1px solid transparent; }
+.rep-nav a:hover { background: var(--surface); border-color: var(--border); }
+.rep-nav a[aria-current="true"] { background: var(--surface); border-color: var(--border-strong); font-weight: 600; }
+.rep-nav a small { display: block; color: var(--muted); font-size: 12px; font-weight: 400; }
+.rep-select { display: none; width: 100%; margin-bottom: 12px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 9px 10px; font: inherit; }
+.prose { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 26px; min-width: 0; overflow-wrap: break-word; }
+.prose h1 { font-size: 24px; margin: 0 0 14px; letter-spacing: -.01em; }
+.prose h2 { font-size: 19px; margin: 28px 0 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.prose h3 { font-size: 16px; margin: 22px 0 8px; }
+.prose h4 { font-size: 15px; margin: 18px 0 6px; }
+.prose p, .prose li { max-width: 80ch; }
+.prose ul, .prose ol { padding-left: 22px; }
+.prose li { margin: 3px 0; }
+.prose li.task-item { list-style: none; margin-left: -20px; }
+.prose li.task-item input { margin: 0 6px 0 0; accent-color: var(--s-done); }
+.prose blockquote { margin: 12px 0; padding: 4px 14px; border-left: 3px solid var(--accent); color: var(--muted); }
+.prose hr { border: 0; border-top: 1px solid var(--border); margin: 22px 0; }
+.table-wrap { overflow-x: auto; margin: 12px 0; border: 1px solid var(--border); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { background: var(--surface-2); font-weight: 600; }
+tr:last-child td { border-bottom: 0; }
+.flash { animation: flash 2.2s ease-out; border-radius: 6px; }
+@keyframes flash { 0%, 30% { background: var(--accent-soft); box-shadow: 0 0 0 6px var(--accent-soft); } 100% { background: transparent; box-shadow: none; } }
+a.tref { font-family: var(--mono); font-size: .92em; font-weight: 600; text-decoration: none; border-bottom: 1px dotted currentColor; }
+
+/* Tiroir de détail */
+dialog.drawer { margin: 0 0 0 auto; height: 100dvh; max-height: 100dvh; width: min(860px, 100vw); max-width: 100vw; padding: 0; border: 0; border-left: 1px solid var(--border); background: var(--bg); color: var(--text); box-shadow: -10px 0 40px rgb(0 0 0 / .25); }
+dialog.drawer::backdrop { background: rgb(10 10 20 / .5); }
+dialog.drawer[open] { animation: slide .18s ease-out; }
+@keyframes slide { from { transform: translateX(30px); opacity: .5; } to { transform: none; opacity: 1; } }
+.dr-head { position: sticky; top: 0; z-index: 1; background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 18px; display: flex; gap: 12px; align-items: flex-start; }
+.dr-head h2 { margin: 2px 0 0; font-size: 18px; line-height: 1.3; }
+.dr-head .t-id { font-size: 14px; }
+.dr-head .close { margin-left: auto; flex: none; }
+.dr-body { padding: 16px 18px 40px; display: grid; gap: 16px; }
+.meta-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.meta-grid div { background: var(--surface); padding: 9px 12px; min-width: 0; }
+.meta-grid dt { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.meta-grid dd { margin: 2px 0 0; font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
+.rel { display: grid; gap: 10px; }
+.rel h3 { margin: 0 0 6px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px; background: var(--surface); border: 1px solid var(--border); font-size: 13px; text-decoration: none; color: var(--text); max-width: 100%; }
+.chip:hover { border-color: var(--border-strong); }
+.chip .status-ico { width: 8px; height: 8px; }
+.chip.warn { border-color: color-mix(in srgb, var(--c-haute) 50%, transparent); }
+.files { margin: 0; padding-left: 18px; font-size: 13px; }
+.conflicts summary { cursor: pointer; list-style: none; }
+.conflicts summary::-webkit-details-marker { display: none; }
+.conflicts summary h3 { display: inline; }
+.conflicts summary::before { content: '▸ '; color: var(--muted); }
+.conflicts[open] summary::before { content: '▾ '; }
+.conflicts .chips { margin-top: 8px; }
+.dr-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 9px 16px; border-radius: 8px; font-size: 14px; font-weight: 600; z-index: 100; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.toast.show { opacity: 1; }
+.warnings { margin: 8px 0 0; font-size: 13px; }
+.warnings summary { cursor: pointer; color: var(--c-haute); }
+.warnings ul { margin: 6px 0 0; color: var(--muted); }
+
+@media (max-width: 860px) {
+  .summary { grid-template-columns: 1fr; }
+  .phases { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .reports { grid-template-columns: 1fr; }
+  .rep-nav { display: none; }
+  .rep-select { display: block; }
+  .prose { padding: 16px; }
+  .waves { grid-auto-flow: row; grid-auto-columns: auto; overflow-x: visible; }
+}
+@media (max-width: 560px) {
+  .task-row { grid-template-columns: auto 1fr; }
+  .task-row .t-id { grid-column: 2; grid-row: 1; }
+  .task-row .t-title { grid-column: 1 / 3; }
+  .task-row .t-badges { grid-column: 1 / 3; justify-content: flex-start; }
+  .t-sub { grid-column: 1 / 3; }
+  .phase > header .prog { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">🍸</span>
+      <div>
+        <h1>Carta Cocktail · Plan d'action</h1>
+        <p id="gen-meta"></p>
+      </div>
+    </div>
+    <button class="icon-btn" id="theme-btn" type="button" aria-label="Changer de thème">◐ Thème</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <section class="summary" aria-label="Avancement">
+    <div class="card overall" id="overall"></div>
+    <div class="card phases" id="phase-cards"></div>
+  </section>
+  <div id="warnings"></div>
+</div>
+
+<nav class="tabs" aria-label="Vues">
+  <div class="wrap" id="tabs"></div>
+</nav>
+
+<main class="wrap" id="view" tabindex="-1"></main>
+
+<dialog class="drawer" id="drawer" aria-labelledby="dr-title"></dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const D = /*__PLAN_DATA__*/null;
+(function () {
+  'use strict';
+  const $ = (s, el = document) => el.querySelector(s);
+  const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const byId = new Map(D.tasks.map((t) => [t.id, t]));
+  const CLOSED = new Set(['done', 'dropped']);
+  const ST_VAR = { todo: '--s-todo', 'in-progress': '--s-progress', review: '--s-review', done: '--s-done', blocked: '--s-blocked', dropped: '--s-dropped' };
+  const CRIT_LABEL = { critique: 'Critique', haute: 'Haute', moyenne: 'Moyenne', basse: 'Basse' };
+  const stColor = (s) => `var(${ST_VAR[s] || '--s-todo'})`;
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* stockage indisponible */ } },
+  };
+
+  // ── Thème ──
+  const applyTheme = (t) => { if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; };
+  applyTheme(store.get('carta-plan-theme', null));
+  $('#theme-btn').addEventListener('click', () => {
+    const cur = document.documentElement.dataset.theme
+      || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    const next = cur === 'dark' ? 'light' : 'dark';
+    applyTheme(next); store.set('carta-plan-theme', next);
+  });
+
+  // ── Utilitaires ──
+  let toastTimer;
+  function toast(msg) {
+    const el = $('#toast'); el.textContent = msg; el.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+  }
+  async function copy(text, msg) {
+    try { await navigator.clipboard.writeText(text); }
+    catch {
+      const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+    }
+    toast(msg || 'Copié');
+  }
+  const statusPill = (t) => `<span class="pill" style="--pc:${stColor(t.effStatus)}">${esc(D.statuses[t.effStatus])}</span>`;
+  const critPill = (t) => `<span class="pill" style="--pc:var(--c-${t.criticite})">${CRIT_LABEL[t.criticite]}</span>`;
+  const taskChip = (id, extra = '') => {
+    const t = byId.get(id); if (!t) return `<span class="chip">${esc(id)}</span>`;
+    return `<a class="chip ${extra}" href="#/tache/${t.id}" title="${esc(t.title)} · ${esc(D.statuses[t.effStatus])}"><span class="status-ico" style="--st:${stColor(t.effStatus)}"></span><b class="t-id">${t.id}</b> ${esc(t.title.length > 48 ? t.title.slice(0, 46) + '…' : t.title)}</a>`;
+  };
+  const srcHref = (s) => (s.report ? `#/rapports/${s.report}${s.anchor ? '/' + s.anchor : ''}` : null);
+
+  function taskPrompt(t) {
+    const srcFiles = [...new Set(t.sources.filter((s) => s.report).map((s) => D.reports.find((r) => r.id === s.report)?.path).filter(Boolean))];
+    const lines = [
+      `Tu travailles sur le projet Carta Cocktail (dépôt courant). Prends en charge la tâche ${t.id} — ${t.title}.`,
+      '',
+      `1. Lis AGENTS.md, docs/plan/README.md (règles de travail), puis ${t.path}${srcFiles.length ? ` et ses sources : ${srcFiles.join(', ')}` : ''}.`,
+      `2. Vérifie que les dépendances sont terminées : ${t.depends_on.length ? t.depends_on.map((d) => `${d} (${D.statuses[byId.get(d)?.effStatus] || '?'})`).join(', ') : 'aucune'}.`,
+      `3. Travaille dans un worktree dédié, sur la branche ${t.suggestedBranch} créée depuis origin/develop.`,
+      `4. Reste dans le périmètre (touches) : ${t.touches.join(', ') || 'non précisé'}. Ajoute les tests demandés.`,
+      '5. Vérifie : npm test, lint et tsc dans les paquets modifiés ; couverture ≥ 60 % globale et ≥ 80 % sur les lignes modifiées.',
+      '6. Coche les critères d\'acceptation, passe status: done, renseigne branch et pr, ajoute une ligne datée au Journal.',
+      `7. Commits au format Conventional Commits (fix:, feat:, chore(deps):…). Ouvre une PR vers develop intitulée « ${t.id}: … ». Ne merge pas.`,
+    ];
+    if (t.owner !== 'agent') lines.push('', 'Attention : cette tâche demande une action ou une décision humaine (voir « Points d\'attention »). Arrête-toi et demande avant cette étape.');
+    return lines.join('\n');
+  }
+  function lotPrompt(ids) {
+    return [
+      'Tu coordonnes le plan d\'action de Carta Cocktail (docs/plan/README.md).',
+      `Lance en parallèle ${ids.length} sous-agents, un par tâche ci-dessous, chacun dans son propre worktree git (isolation worktree), à partir de origin/develop.`,
+      'Donne à chaque sous-agent le prompt type de docs/plan/README.md complété pour sa tâche. Ces tâches ne partagent aucun fichier.',
+      'Quand toutes les PR sont ouvertes, fais-moi un récapitulatif : tâche, branche, PR, points à vérifier en relecture. Ne merge rien.',
+      '',
+      ...ids.map((id) => { const t = byId.get(id); return `- ${t.id} — ${t.title} → ${t.path} (branche ${t.suggestedBranch})`; }),
+    ].join('\n');
+  }
+
+  // ── En-tête et résumé ──
+  const gen = new Date(D.generatedAt);
+  $('#gen-meta').textContent = `Généré le ${gen.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })} à ${gen.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
+    + (D.git.branch ? ` · branche ${D.git.branch} @ ${D.git.commit}` : '') + ' · node docs/plan/build.mjs pour rafraîchir';
+  (function renderSummary() {
+    const s = D.summary;
+    const pct = s.total ? Math.round((s.closed / s.total) * 100) : 0;
+    const order = ['done', 'review', 'in-progress', 'blocked', 'todo', 'dropped'];
+    $('#overall').innerHTML = `
+      <div class="big">${pct} % <small>· ${s.closed} / ${s.total} tâches terminées</small></div>
+      <div class="bar" role="img" aria-label="Répartition par statut">${order.map((k) => s.status[k] ? `<span style="width:${(s.status[k] / s.total) * 100}%;background:${stColor(k)}" title="${D.statuses[k]} : ${s.status[k]}"></span>` : '').join('')}</div>
+      <div class="legend">${order.filter((k) => s.status[k]).map((k) => `<span><i class="dot" style="background:${stColor(k)}"></i>${D.statuses[k]} <b>${s.status[k]}</b></span>`).join('')}
+        <span><i class="dot" style="background:var(--accent)"></i>Prêtes <b>${D.tasks.filter((t) => t.ready).length}</b></span></div>`;
+    $('#phase-cards').innerHTML = Object.entries(D.phases).map(([k, p]) => {
+      const ps = s.phases[k];
+      return `<button class="phase-card" type="button" data-phase="${k}"><div class="l"><strong><span class="t-id">${k}</span> · ${esc(p.name)}</strong><span>${ps.closed}/${ps.total}</span></div><div class="bar"><span style="width:${ps.total ? (ps.closed / ps.total) * 100 : 0}%"></span></div></button>`;
+    }).join('');
+    $('#phase-cards').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-phase]'); if (!b) return;
+      filters = { ...DEFAULT_FILTERS, phase: b.dataset.phase }; store.set('carta-plan-filters', filters);
+      location.hash = '#/plan'; render();
+    });
+    if (D.warnings.length) {
+      $('#warnings').innerHTML = `<details class="warnings"><summary>${D.warnings.length} avertissement(s) de validation</summary><ul>${D.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul></details>`;
+    }
+  })();
+
+  // ── Routage ──
+  const TABS = [
+    ['plan', 'Plan'],
+    ['pretes', 'Prêtes maintenant', () => D.tasks.filter((t) => t.ready).length],
+    ['vagues', 'Vagues & dépendances'],
+    ['rapports', 'Rapports de revue', () => D.reports.length],
+    ['guide', 'Mode d\'emploi'],
+  ];
+  let lastView = 'plan';
+  function route() {
+    const parts = location.hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent);
+    return { view: parts[0] || 'plan', a: parts[1], b: parts[2] };
+  }
+  function renderTabs(active) {
+    $('#tabs').innerHTML = TABS.map(([k, label, count]) => `<a href="#/${k}"${k === active ? ' aria-current="page"' : ''}>${label}${count ? `<span class="count">${count()}</span>` : ''}</a>`).join('');
+  }
+
+  // ── Vue Plan ──
+  const DEFAULT_FILTERS = { q: '', phase: '', lane: '', criticite: '', status: '', effort: '', hideClosed: false };
+  let filters = { ...DEFAULT_FILTERS, ...store.get('carta-plan-filters', {}) };
+  const opt = (obj, cur, all) => `<option value="">${all}</option>` + Object.entries(obj).map(([k, v]) => `<option value="${k}"${k === cur ? ' selected' : ''}>${esc(typeof v === 'object' ? `${k} · ${v.name}` : v)}</option>`).join('');
+  function matches(t) {
+    const f = filters;
+    if (f.phase && t.phase !== f.phase) return false;
+    if (f.lane && t.lane !== f.lane) return false;
+    if (f.criticite && t.criticite !== f.criticite) return false;
+    if (f.effort && t.effort !== f.effort) return false;
+    if (f.status === 'ready' ? !t.ready : f.status && t.effStatus !== f.status) return false;
+    if (f.hideClosed && CLOSED.has(t.effStatus)) return false;
+    if (f.q) {
+      const q = f.q.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+      const hay = `${t.id} ${t.title} ${t.text} ${t.touches.join(' ')}`.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+      if (!q.split(/\s+/).every((w) => hay.includes(w))) return false;
+    }
+    return true;
+  }
+  function taskRow(t) {
+    const deps = t.depends_on.length
+      ? `<span${t.blockedBy.length ? ' class="blocked-by"' : ''}>${t.blockedBy.length ? 'attend' : 'après'} ${t.depends_on.join(', ')}</span>` : '<span>aucune dépendance</span>';
+    const checks = t.checks.total ? `<span>critères ${t.checks.done}/${t.checks.total}</span>` : '';
+    const br = t.effStatus === 'in-progress' && t.detectedBranches[0] ? `<span>⎇ ${esc(t.detectedBranches[0])}</span>` : '';
+    return `<li><button type="button" class="task-row${CLOSED.has(t.effStatus) ? ' is-closed' : ''}" data-task="${t.id}" style="--st:${stColor(t.effStatus)}">
+      <span class="status-ico" title="${esc(D.statuses[t.effStatus])}"></span>
+      <span class="t-id">${t.id}</span>
+      <span class="t-title">${esc(t.title)}</span>
+      <span class="t-badges">${t.ready ? '<span class="pill ready">Prête</span>' : ''}${critPill(t)}<span class="pill ghost">${t.effort}</span></span>
+      <span class="t-sub"><span>${esc(D.lanes[t.lane])}</span>${deps}${checks}${t.owner !== 'agent' ? `<span>👤 ${esc(D.owners[t.owner])}</span>` : ''}${br}</span>
+    </button></li>`;
+  }
+  function viewPlan() {
+    const list = D.tasks.filter(matches);
+    const statusOpts = { ...D.statuses, ready: 'Prêtes à démarrer' };
+    const html = [`<div class="toolbar" role="search">
+      <label class="visually-hidden" for="f-q">Rechercher</label>
+      <input type="search" id="f-q" placeholder="Rechercher (id, titre, contenu, fichier)…" value="${esc(filters.q)}">
+      <label class="visually-hidden" for="f-phase">Phase</label><select id="f-phase" data-f="phase">${opt(D.phases, filters.phase, 'Toutes les phases')}</select>
+      <label class="visually-hidden" for="f-lane">Couloir</label><select id="f-lane" data-f="lane">${opt(D.lanes, filters.lane, 'Tous les couloirs')}</select>
+      <label class="visually-hidden" for="f-crit">Criticité</label><select id="f-crit" data-f="criticite">${opt(CRIT_LABEL, filters.criticite, 'Toutes criticités')}</select>
+      <label class="visually-hidden" for="f-status">Statut</label><select id="f-status" data-f="status">${opt(statusOpts, filters.status, 'Tous les statuts')}</select>
+      <label class="visually-hidden" for="f-effort">Effort</label><select id="f-effort" data-f="effort">${opt(Object.fromEntries(Object.entries(D.efforts).map(([k, v]) => [k, `${k} · ${v}`])), filters.effort, 'Tous efforts')}</select>
+      <label class="chk"><input type="checkbox" id="f-closed"${filters.hideClosed ? ' checked' : ''}> Masquer les terminées</label>
+      <span class="meta">${list.length} / ${D.tasks.length} tâches${JSON.stringify(filters) !== JSON.stringify(DEFAULT_FILTERS) ? ' · <button type="button" class="link-btn" id="f-reset">Réinitialiser</button>' : ''}</span>
+    </div>`];
+    if (!list.length) html.push('<p class="empty">Aucune tâche ne correspond aux filtres.</p>');
+    for (const [k, p] of Object.entries(D.phases)) {
+      const ts = list.filter((t) => t.phase === k);
+      if (!ts.length) continue;
+      const ps = D.summary.phases[k];
+      html.push(`<section class="phase" aria-labelledby="ph-${k}"><header>
+        <h2 id="ph-${k}"><span class="letter">${k}</span>${esc(p.name)}</h2>
+        <span class="prog"><span class="bar"><span style="width:${ps.total ? (ps.closed / ps.total) * 100 : 0}%"></span></span>${ps.closed}/${ps.total}</span>
+        <p>${esc(p.desc)}</p></header>
+        <ol class="tasks">${ts.map(taskRow).join('')}</ol></section>`);
+    }
+    $('#view').innerHTML = html.join('');
+    const save = () => { store.set('carta-plan-filters', filters); };
+    $('#f-q').addEventListener('input', (e) => {
+      filters.q = e.target.value; save();
+      const pos = e.target.selectionStart; viewPlan(); const el = $('#f-q'); el.focus(); el.setSelectionRange(pos, pos);
+    });
+    $('#view').querySelectorAll('select[data-f]').forEach((s) => s.addEventListener('change', () => { filters[s.dataset.f] = s.value; save(); viewPlan(); }));
+    $('#f-closed').addEventListener('change', (e) => { filters.hideClosed = e.target.checked; save(); viewPlan(); });
+    $('#f-reset')?.addEventListener('click', () => { filters = { ...DEFAULT_FILTERS }; save(); viewPlan(); });
+  }
+
+  // ── Vue Prêtes ──
+  function tcard(t, withPrompt = true) {
+    return `<article class="tcard" style="--st:${stColor(t.effStatus)}">
+      <div class="row"><span class="t-id">${t.id}</span>${critPill(t)}<span class="pill ghost">${esc(D.lanes[t.lane])}</span><span class="pill ghost">${t.effort}</span>${t.owner !== 'agent' ? `<span class="pill ghost">👤 ${esc(D.owners[t.owner])}</span>` : ''}</div>
+      <h3>${esc(t.title)}</h3>
+      <div class="branch">⎇ <code>${esc(t.effStatus === 'in-progress' && t.detectedBranches[0] ? t.detectedBranches[0] : t.suggestedBranch)}</code></div>
+      <div class="actions"><a class="btn" href="#/tache/${t.id}">Détails</a>${withPrompt ? `<button type="button" class="btn" data-prompt="${t.id}">Copier le prompt</button>` : ''}</div>
+    </article>`;
+  }
+  function viewReady() {
+    const lot = D.lot;
+    const active = lot.active.map((id) => byId.get(id));
+    const soon = D.tasks.filter((t) => t.effStatus === 'todo' && t.blockedBy.length && t.blockedBy.every((b) => { const x = byId.get(b); return x.ready || x.effStatus === 'in-progress' || x.effStatus === 'review'; }));
+    $('#view').innerHTML = `
+      <p class="lead">Une tâche est <strong>prête</strong> quand toutes ses dépendances sont terminées. Le <strong>lot recommandé</strong> regroupe des tâches prêtes qui ne modifient aucun fichier en commun, entre elles ni avec le travail en cours : chacune peut partir dans son propre worktree, en parallèle. Les couloirs différents passent en premier, et les plus critiques d'abord.</p>
+      <h2 class="section-title">Lot recommandé <span class="pill ready">${lot.picked.length} en parallèle</span>${lot.picked.length ? '<button type="button" class="btn primary" id="copy-lot">Copier le prompt coordinateur</button>' : ''}</h2>
+      ${lot.picked.length ? `<div class="grid-cards">${lot.picked.map((id) => tcard(byId.get(id))).join('')}</div>` : '<p class="empty">Aucune tâche prête pour le moment.</p>'}
+      ${active.length ? `<h2 class="section-title">En cours <span class="pill" style="--pc:var(--s-progress)">${active.length}</span></h2><div class="grid-cards">${active.map((t) => tcard(t, false)).join('')}</div>` : ''}
+      ${lot.others.length ? `<h2 class="section-title">Autres tâches prêtes, à lancer ensuite</h2><ul class="list-plain">${lot.others.map((o) => `<li>${taskChip(o.id)}<span class="why">${esc(o.reason)}</span></li>`).join('')}</ul>` : ''}
+      ${soon.length ? `<h2 class="section-title">Bientôt prêtes</h2><ul class="list-plain">${soon.map((t) => `<li>${taskChip(t.id)}<span class="why">attend ${t.blockedBy.join(', ')}</span></li>`).join('')}</ul>` : ''}`;
+    $('#copy-lot')?.addEventListener('click', () => copy(lotPrompt(lot.picked), 'Prompt coordinateur copié'));
+    $('#view').querySelectorAll('[data-prompt]').forEach((b) => b.addEventListener('click', () => copy(taskPrompt(byId.get(b.dataset.prompt)), `Prompt ${b.dataset.prompt} copié`)));
+  }
+
+  // ── Vue Vagues ──
+  function viewWaves() {
+    const max = Math.max(...D.tasks.map((t) => t.wave));
+    const cols = [];
+    for (let w = 1; w <= max; w++) {
+      const ts = D.tasks.filter((t) => t.wave === w).sort((a, b) => D.criticites[a.criticite] - D.criticites[b.criticite] || a.id.localeCompare(b.id));
+      cols.push(`<section class="wave"><h3>Vague ${w} · ${ts.length}</h3><ul>${ts.map((t) => `<li><button type="button" class="wcard" data-task="${t.id}" style="--st:${stColor(t.effStatus)}"><span class="crit" style="background:var(--c-${t.criticite})" title="${CRIT_LABEL[t.criticite]}"></span><span class="t-id">${t.id}</span> ${esc(t.title)}</button></li>`).join('')}</ul></section>`);
+    }
+    $('#view').innerHTML = `
+      <p class="lead">Chaque vague regroupe les tâches dont les dépendances sont toutes dans les vagues précédentes. Les tâches d'une même vague sont indépendantes entre elles et peuvent avancer en parallèle, à condition de ne pas toucher les mêmes fichiers (voir « Prêtes maintenant »). Survolez ou sélectionnez une carte pour voir ses liens.</p>
+      <div class="wave-legend"><span><i style="background:var(--s-review)"></i>dépend de</span><span><i style="background:var(--s-progress)"></i>débloque</span><span><i style="background:var(--s-done)"></i>bordure = statut</span><span><i style="background:var(--c-critique)"></i>point = criticité</span></div>
+      <div class="waves" id="waves">${cols.join('')}</div>`;
+    const wrap = $('#waves');
+    const focus = (id) => {
+      wrap.classList.toggle('focus', !!id);
+      wrap.querySelectorAll('.wcard').forEach((c) => {
+        const t = byId.get(c.dataset.task);
+        c.classList.toggle('hl-self', t.id === id);
+        c.classList.toggle('hl-dep', !!id && byId.get(id).depends_on.includes(t.id));
+        c.classList.toggle('hl-next', !!id && byId.get(id).dependents.includes(t.id));
+      });
+    };
+    wrap.addEventListener('mouseover', (e) => { const c = e.target.closest('.wcard'); if (c) focus(c.dataset.task); });
+    wrap.addEventListener('focusin', (e) => { const c = e.target.closest('.wcard'); if (c) focus(c.dataset.task); });
+    wrap.addEventListener('mouseleave', () => focus(null));
+  }
+
+  // ── Vue Rapports ──
+  function viewReports(repId, anchor) {
+    const rep = D.reports.find((r) => r.id === repId) || D.reports[0];
+    if (!rep) { $('#view').innerHTML = '<p class="empty">Aucun rapport dans docs/review/.</p>'; return; }
+    $('#view').innerHTML = `<div class="reports">
+      <nav class="rep-nav" aria-label="Rapports">${D.reports.map((r) => `<a href="#/rapports/${r.id}"${r.id === rep.id ? ' aria-current="true"' : ''}>${esc(r.title)}<small>${esc(r.file)}</small></a>`).join('')}</nav>
+      <div><label class="visually-hidden" for="rep-sel">Rapport</label><select class="rep-select" id="rep-sel">${D.reports.map((r) => `<option value="${r.id}"${r.id === rep.id ? ' selected' : ''}>${esc(r.title)}</option>`).join('')}</select>
+      <article class="prose">${rep.html}<hr><p><small>Source : <code>${esc(rep.path)}</code></small></p></article></div></div>`;
+    $('#rep-sel').addEventListener('change', (e) => { location.hash = `#/rapports/${e.target.value}`; });
+    if (anchor) {
+      const el = document.getElementById(anchor);
+      if (el) { el.scrollIntoView({ block: 'start' }); window.scrollBy(0, -60); el.classList.add('flash'); return; }
+    }
+    window.scrollTo(0, 0);
+  }
+
+  function viewGuide() {
+    $('#view').innerHTML = `<article class="prose">${D.guide || '<p>docs/plan/README.md introuvable.</p>'}</article>`;
+  }
+
+  // ── Tiroir de tâche ──
+  const drawer = $('#drawer');
+  function openTask(id) {
+    const t = byId.get(id);
+    if (!t) { toast(`Tâche ${id} introuvable`); return; }
+    const meta = [
+      ['Statut', D.statuses[t.effStatus]], ['Phase', `${t.phase} · ${D.phases[t.phase].name}`], ['Couloir', D.lanes[t.lane]],
+      ['Criticité', CRIT_LABEL[t.criticite]], ['Effort', `${t.effort} · ${D.efforts[t.effort]}`], ['Responsable', D.owners[t.owner]],
+      ['Vague', String(t.wave)], ['Critères', t.checks.total ? `${t.checks.done} / ${t.checks.total}` : '—'],
+      ['Branche', t.detectedBranches[0] || t.branch || `${t.suggestedBranch} (suggérée)`], ['PR', t.pr || '—'],
+    ];
+    const conflicts = t.conflicts.filter((c) => !CLOSED.has(byId.get(c.id).effStatus));
+    drawer.innerHTML = `
+      <div class="dr-head" style="--st:${stColor(t.effStatus)}">
+        <span class="status-ico" style="margin-top:9px"></span>
+        <div style="min-width:0"><span class="t-id">${t.id}</span> ${statusPill(t)} ${t.ready ? '<span class="pill ready">Prête</span>' : ''}<h2 id="dr-title">${esc(t.title)}</h2></div>
+        <button type="button" class="icon-btn close" id="dr-close" aria-label="Fermer">✕</button>
+      </div>
+      <div class="dr-body">
+        <div class="dr-actions">
+          <button type="button" class="btn primary" id="dr-prompt">Copier le prompt agent</button>
+          <button type="button" class="btn" id="dr-path">Copier le chemin du fichier</button>
+        </div>
+        <dl class="meta-grid">${meta.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
+        <div class="rel">
+          ${t.depends_on.length ? `<div><h3>Dépend de${t.blockedBy.length ? ` · ${t.blockedBy.length} non terminée(s)` : ' · tout est terminé'}</h3><div class="chips">${t.depends_on.map((d) => taskChip(d)).join('')}</div></div>` : ''}
+          ${t.dependents.length ? `<div><h3>Débloque</h3><div class="chips">${t.dependents.map((d) => taskChip(d)).join('')}</div></div>` : ''}
+          ${conflicts.length ? `<details class="conflicts"><summary><h3>Fichiers en commun avec ${conflicts.length} tâche(s) non terminée(s) : ne pas les lancer en même temps</h3></summary><div class="chips">${conflicts.map((c) => taskChip(c.id, 'warn')).join('')}</div></details>` : ''}
+          ${t.sources.length ? `<div><h3>Sources dans la revue</h3><div class="chips">${t.sources.map((s) => { const h = srcHref(s); return h ? `<a class="chip" href="${h}">📄 ${esc(s.label)}</a>` : `<span class="chip">📄 ${esc(s.label)}</span>`; }).join('')}</div></div>` : ''}
+          ${t.touches.length ? `<div><h3>Fichiers touchés</h3><ul class="files">${t.touches.map((f) => `<li><code>${esc(f)}</code></li>`).join('')}</ul></div>` : ''}
+        </div>
+        <article class="prose">${t.html}<hr><p><small>Fichier : <code>${esc(t.path)}</code></small></p></article>
+      </div>`;
+    $('#dr-close').addEventListener('click', closeTask);
+    $('#dr-prompt').addEventListener('click', () => copy(taskPrompt(t), 'Prompt agent copié'));
+    $('#dr-path').addEventListener('click', () => copy(t.path, 'Chemin copié'));
+    if (!drawer.open) drawer.showModal();
+    drawer.scrollTop = 0;
+  }
+  function closeTask() {
+    if (drawer.open) drawer.close();
+  }
+  drawer.addEventListener('close', () => { if (route().view === 'tache') history.replaceState(null, '', `#/${lastView}`); });
+  drawer.addEventListener('click', (e) => {
+    if (e.target === drawer) { closeTask(); return; }
+    const a = e.target.closest('a[href^="#/rapports"]'); if (a) closeTask();
+  });
+
+  // ── Rendu ──
+  function render() {
+    const r = route();
+    if (r.view === 'tache') {
+      if (!$('#view').innerHTML) { renderTabs(lastView); viewPlan(); }
+      openTask(r.a);
+      return;
+    }
+    if (drawer.open) drawer.close();
+    lastView = ['plan', 'pretes', 'vagues', 'rapports', 'guide'].includes(r.view) ? r.view : 'plan';
+    if (r.view === 'rapports' && r.a) lastView = `rapports/${r.a}`;
+    renderTabs(lastView.split('/')[0]);
+    ({ plan: viewPlan, pretes: viewReady, vagues: viewWaves, rapports: () => viewReports(r.a, r.b), guide: viewGuide }[lastView.split('/')[0]])();
+    if (r.view !== 'rapports' || !r.b) window.scrollTo(0, Math.min(window.scrollY, $('.tabs').offsetTop));
+  }
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-task]');
+    if (b) { location.hash = `#/tache/${b.dataset.task}`; }
+  });
+  window.addEventListener('hashchange', render);
+  render();
+})();
+</script>
+</body>
+</html>

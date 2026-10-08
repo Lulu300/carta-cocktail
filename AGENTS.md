@@ -6,6 +6,15 @@ Carta Cocktail is a cocktail menu management system with an admin panel and publ
 
 **Single admin, single-tenant** - one admin user manages everything via JWT auth.
 
+## Action Plan (start here for improvement work)
+
+A full review (2026-10-08) produced an action plan in `docs/plan/`. Before picking up improvement work:
+
+- Read `docs/plan/README.md`: task format, lifecycle, branch naming, parallel-work rules.
+- Run `node docs/plan/build.mjs --ready` to see which tasks are ready and which can run in parallel.
+- Each task is a Markdown file in `docs/plan/tasks/` (source of truth); detailed findings are in `docs/review/2026-10-08/`.
+- `node docs/plan/build.mjs` regenerates the tracking page `docs/plan/index.html` (not versioned).
+
 ## Tech Stack
 
 | Layer | Technology | Version |
