@@ -124,6 +124,7 @@ L'image backend publiée sur ghcr.io est celle qui tourne sur le NAS. Elle embar
 
 ## Points d'attention
 
+- **`.dockerignore` plus urgent depuis A-04** (relevé en revue). Le README fait maintenant créer `backend/.env` avec un vrai `JWT_SECRET` et un vrai `ADMIN_PASSWORD`. Un `docker compose up --build` local (contexte `./backend`) le copie dans l'image par `COPY . .`, et `config.ts` le charge au démarrage (`path.resolve(__dirname, '../.env')`, soit `/app/.env`) : les secrets sont figés dans une couche de l'image et servent de valeurs par défaut silencieuses si le compose ne les fournit pas. Les images publiées par `release.yml` partent d'un checkout propre et ne sont pas touchées. Si D-01 attend encore B-01 et C-01, livrer d'abord les étapes 3 et 4 (les deux `.dockerignore`, sans autre changement) dans une petite PR séparée, qui ne dépend de rien.
 - Volumes existants. Les fichiers de `db-data` et `uploads` appartiennent à root sur les installations actuelles. Un `USER node` sec rendrait la base en lecture seule au premier démarrage. Le `su-exec` de l'étape 6 corrige les droits puis abandonne root. Variante plus stricte à valider avec l'humain : `USER node` dans le Dockerfile et une commande `chown` manuelle documentée dans D-09. Conséquence de la variante su-exec : le conteneur démarre en root quelques millisecondes.
 - Prisma sur Alpine. Si `prisma generate` ou le démarrage signalent une version de libssl introuvable, ajouter `openssl` à l'`apk add`. C-15 (Prisma 7) changera le générateur : relire ce Dockerfile à ce moment-là.
 - `morgan('dev')` (`app.ts:30`) reste actif en production. Le passage à un format adapté est dans D-03, qui touche `app.ts`.
@@ -133,3 +134,4 @@ L'image backend publiée sur ghcr.io est celle qui tourne sur le NAS. Elle embar
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-08 : suivi des revues de la phase A. Point d'attention ajouté : `.dockerignore` plus urgent depuis A-04 (`backend/.env` avec de vrais secrets copié dans l'image locale par `COPY . .`), livrable à part avant le reste de la tâche.

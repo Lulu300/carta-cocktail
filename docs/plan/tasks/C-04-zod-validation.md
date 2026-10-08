@@ -22,11 +22,11 @@ Aucune route ne valide ses entrées. Un mauvais type finit en erreur Prisma (500
 
 - `routes/categories.ts:74` : `desiredStock || 1` transforme 0 en 1 au POST ; le PUT accepte 0 (`:98`).
 - `routes/bottles.ts:355` : `purchasePrice || null` efface un prix de 0 ; `:359` idem pour `alcoholPercentage`. `remainingPercent` et `alcoholPercentage` ne sont bornés nulle part (POST `:357`, PUT `:394`, import `:246`).
-- `routes/cocktails.ts:490,543` : `text: inst.text || inst` ; avec `inst = { text: '' }`, l'objet entier part à Prisma. `sourceType` accepte n'importe quelle chaîne (`:477,528`) et sa cohérence avec `bottleId`/`categoryId`/`ingredientId` n'est pas vérifiée.
+- `routes/cocktails.ts`, fonction `mapInstruction` (partagée par `POST /` et `PUT /:id` depuis A-03) : `text: inst.text || inst` ; avec `inst = { text: '' }`, l'objet entier part à Prisma. Fonction `mapIngredient` (même partage) : `sourceType` accepte n'importe quelle chaîne et sa cohérence avec `bottleId`/`categoryId`/`ingredientId` n'est pas vérifiée.
 - `routes/bottles.ts:84,296` : `?categoryId=x` → `NaN`.
 - `routes/settings.ts:26-38`, `routes/units.ts:59-64` : aucun contrôle de type.
 - `routes/auth.ts:13` : `{ "email": {} }` part à Prisma.
-- Mass assignment (sécurité §14) : `cocktails.ts:288-289` (unit), `:307-308` (category), `:325-327` (bottle), `:341-342` (ingredient) étalent `r.data`. On peut forcer `id`, `createdAt`, `purchasePrice`.
+- Mass assignment (sécurité §14) : dans le handler `POST /import/confirm` de `cocktails.ts`, les boucles sur `resolutions.units`, `resolutions.categories`, `resolutions.bottles` et `resolutions.ingredients` étalent `r.data` (`...rest`, `...bottleData`) dans `tx.<entité>.create`. On peut forcer `id`, `createdAt`, `purchasePrice`.
 - Typage : `where: any`, `updateData: any`, `ing: any`, `error: any` dans la plupart des routes.
 
 ## Ce qu'il faut faire
@@ -113,3 +113,4 @@ Aucune route ne valide ses entrées. Un mauvais type finit en erreur Prisma (500
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-08 : suivi des revues de la phase A. Numéros de ligne de `cocktails.ts`, périmés depuis A-03, remplacés par les noms de fonction et de handler (`mapInstruction`, `mapIngredient`, `POST /import/confirm`).

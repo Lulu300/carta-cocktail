@@ -24,7 +24,7 @@ nginx sert le HTML de l'admin et de la carte publique. helmet ne protège que le
 - `frontend/Dockerfile:1` : stage de build en `node:20-alpine` (fin de vie). B-01 le passe en Node 24.
 - `frontend/Dockerfile:16` : `ENV BACKEND_HOST=backend`, alors que le service s'appelle `carta-cocktail-backend` (`docker-compose.yml:2,26`). Sans effet avec les compose fournis, trompeur pour un compose maison.
 - `frontend/nginx.conf.template:1-35` : aucun `add_header` de sécurité (CSP, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`), `server_tokens` actif.
-- `nginx.conf.template:9,18` : `proxy_pass http://${BACKEND_HOST}:3001/...` résout le nom une seule fois au démarrage. Si le backend est recréé seul et change d'IP, nginx renvoie des 502 jusqu'à son redémarrage.
+- `nginx.conf.template` (version A-06) : les trois `proxy_pass http://${BACKEND_HOST}:3001/...` (`location = /api/backup/import`, `/api/`, `^~ /uploads/`) résolvent le nom une seule fois au démarrage. Si le backend est recréé seul et change d'IP, nginx renvoie des 502 jusqu'à son redémarrage.
 - Dans nginx, un `add_header` placé dans un `location` annule tous ceux hérités du `server`. A-06 ajoute des `Cache-Control` dans des `location` : des en-têtes posés seulement au niveau `server` disparaîtraient sur ces réponses.
 - `frontend/src/index.css:1` charge Google Fonts (`fonts.googleapis.com` et `fonts.gstatic.com`). Une CSP `'self'` stricte casse les polices tant que E-12 ne les a pas auto-hébergées.
 - `SiteSettingsContext.tsx:36-50` pose le favicon en `data:image/svg+xml`. La CSP doit autoriser `img-src data:`.
@@ -49,9 +49,12 @@ nginx sert le HTML de l'admin et de la carte publique. helmet ne protège que le
      ```nginx
      resolver 127.0.0.11 valid=30s ipv6=off;
      set $backend http://${BACKEND_HOST}:3001;
+     location = /api/backup/import { proxy_pass $backend; ... }  # ajoutée par A-06, garder ses limites
      location /api/ { proxy_pass $backend; ... }
      location ^~ /uploads/ { proxy_pass $backend; ... }
      ```
+     Les trois `location` passent à la variable, y compris `= /api/backup/import` (A-06), dont la version actuelle répète l'URI (`.../api/backup/import`). Avec une variable, nginx ne réécrit pas l'URI : il ne faut donc mettre aucun chemin après `$backend`, sinon toutes les requêtes de la `location` partent vers ce chemin exact ;
+   - si une `location` regex (`~`) est ajoutée, passer `location /assets/` en `location ^~ /assets/` : une regex l'emporte sur un préfixe simple et pourrait capter les fichiers du build, qui perdraient leur `Cache-Control`.
    - laisser HSTS commenté, avec une note : à activer seulement si le TLS est terminé en amont (D-09 le documente).
 4. `frontend/Dockerfile`, stage final :
    ```dockerfile
@@ -85,8 +88,10 @@ nginx sert le HTML de l'admin et de la carte publique. helmet ne protège que le
 - Changement cassant. Le conteneur écoute sur 8080. Un utilisateur qui a son propre compose avec `"80:80"` perd l'accès après mise à jour de `:latest`. À annoncer dans les notes de release (D-05) et dans D-09. Alternative à confirmer : rester sur `listen 80`, qui fonctionne en non-root avec Docker ≥ 20.10 (sysctl `ip_unprivileged_port_start=0` par défaut), mais pas sous Docker rootless ni Podman.
 - `touches` complété : `frontend/security-headers.conf`, `docker-compose.yml`, `docker-compose.prod.yml`. Ces deux compose sont aussi modifiés par A-01, A-04 et D-03 : enchaîner les PR.
 - `X-Frame-Options: DENY` et `frame-ancestors 'none'` empêchent d'intégrer la carte publique dans un site tiers. Si le bar veut l'intégrer, il faudra une exception sur `/menu/`.
+- Relevé en revue de A-06 : la `location = /api/backup/import` garde `client_max_body_size 512m`, `proxy_request_buffering off` et ses délais ; seul son `proxy_pass` change. Tester une restauration de backup après la bascule (`curl -F file=@backup.zip …/api/backup/import`, attendu 401 sans token, pas 404 ni 502).
 - Le `resolver` rend aussi nginx tolérant au démarrage si le backend n'est pas encore résolvable, ce qui complète le `depends_on: service_healthy` de D-03.
 
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-08 : suivi des revues de la phase A. Étape 3 complétée : `location = /api/backup/import` (A-06) passe aussi à `proxy_pass $backend` sans URI, conseil `location ^~ /assets/` si une regex est ajoutée.

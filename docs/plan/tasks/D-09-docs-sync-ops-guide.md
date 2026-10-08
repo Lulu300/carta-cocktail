@@ -31,15 +31,20 @@ Les `AGENTS.md` sont lus par chaque agent avant une tâche : une affirmation fau
 - `frontend/AGENTS.md:106`, `README.md:136` : `nginx.conf` présenté comme config de production. C'est `nginx.conf.template` (`frontend/Dockerfile:14`).
 - `frontend/AGENTS.md:69-97` : arborescence incomplète (wizards, `Pagination`, `SearchInput`, `SortableHeader`, hooks `usePagination`, `useSort`, utils `cocktailSearch`, `uploads`...). `:173-180` : scripts `test`, `test:watch`, `test:coverage` absents.
 - `README.md:31` : « Node.js 20+ ». `README.md:77` : `test.db` « created and destroyed automatically », faux (cf. B-03). `README.md:148` : défaut `JWT_SECRET` différent de celui du code (`config.ts:8`, corrigé par A-04). `README.md:152` : défaut `BACKEND_HOST` = `backend`. `README.md:186-202` : il manque `/api/backup/*`, `/api/bottles/import` et `/export`, `/api/category-types`, `/api/menu-bottles`, `/api/menu-sections`, `/api/auth/me`.
+- Relevé en revue de la phase A (vérifié sur `develop` le 2026-10-08) :
+  - `UPLOAD_DIR` (A-01, `config.ts` `resolveUploadDir`) n'est documenté nulle part : absent du tableau « Environment Variables » du README et des `AGENTS.md`. Défaut en dev : `<repo>/uploads` ; l'image et les deux compose le fixent à `/app/uploads`.
+  - `AGENTS.md`, « Running Locally » : aucune étape `.env`. Depuis A-04, le backend refuse de démarrer sans `JWT_SECRET` et le seed refuse de créer l'admin sans `ADMIN_PASSWORD` : la commande donnée échoue. La ligne « Admin: admin@carta.local / admin123 » est fausse (identifiants pris dans `.env`, `admin123` refusé).
+  - `backend/AGENTS.md`, arborescence : `src/bootstrap/` (`ensureAdmin.ts`, A-04) manque.
 - Aucun guide d'exploitation : mise à jour, sauvegarde, restauration, rotation des secrets, récupération du mot de passe admin, HTTPS.
 
 ## Ce qu'il faut faire
 
 1. Lister les tâches mergées depuis la création du plan (`node docs/plan/build.mjs --json`) et relire leurs PR : la doc décrit l'état de `develop` au moment du travail, pas l'état de la revue.
 2. Corriger chaque écart ci-dessus. Remplacer les nombres en dur (« 14 route files », « 15 models ») par des formulations sans nombre.
-3. `AGENTS.md` : commande de typage frontend `npx tsc -b` ; convention de commit retenue dans D-07. Garder la section « Action Plan » (renvoi vers `docs/plan/`) ajoutée avec le plan.
-4. README : avertissement en tête de la section Docker production, « définir `JWT_SECRET` et `ADMIN_PASSWORD` avant d'exposer l'application » ; épinglage de version comme mode par défaut ; lien vers `docs/operations.md` et vers les GitHub Releases pour le changelog.
-5. Créer `docs/operations.md`, en français, avec ces sections :
+3. `AGENTS.md` : « Running Locally » commence par `cp .env.example backend/.env` puis renseigner `JWT_SECRET` (`openssl rand -hex 32`) et `ADMIN_PASSWORD` (12 caractères au moins), comme le README ; remplacer la ligne `admin123` par « identifiants `ADMIN_EMAIL` / `ADMIN_PASSWORD` du `.env` ». Commande de typage frontend `npx tsc -b` ; convention de commit retenue dans D-07. Garder la section « Action Plan » (renvoi vers `docs/plan/`) ajoutée avec le plan.
+4. `UPLOAD_DIR` : ligne dans le tableau « Environment Variables » du README (défaut `<repo>/uploads` hors Docker, `/app/uploads` dans l'image) et mention dans `backend/AGENTS.md` (`config.ts`). Ajouter `src/bootstrap/` (`ensureAdmin.ts` : création et réinitialisation de l'admin au démarrage) à l'arborescence de `backend/AGENTS.md`.
+5. README : avertissement en tête de la section Docker production, « définir `JWT_SECRET` et `ADMIN_PASSWORD` avant d'exposer l'application » ; épinglage de version comme mode par défaut ; lien vers `docs/operations.md` et vers les GitHub Releases pour le changelog.
+6. Créer `docs/operations.md`, en français, avec ces sections :
    - Installation : `.env` minimal, génération du secret (`openssl rand -hex 32`), `docker compose -f docker-compose.prod.yml up -d --wait`.
    - Volumes : `db-data` → `/app/data` (SQLite), `uploads` → `/app/uploads` (photos). Sauvegarde à froid : `docker run --rm -v <projet>_db-data:/data -v "$PWD":/backup alpine tar czf /backup/db-$(date +%F).tgz -C /data .`.
    - Mise à jour : sauvegarde, changement de tag épinglé, `pull`, `up -d --wait`, vérification de `/api/health`. Rôle de la copie de sécurité automatique avant migration (C-01).
@@ -49,12 +54,14 @@ Les `AGENTS.md` sont lus par chaque agent avant une tâche : une affirmation fau
    - Rotation de `JWT_SECRET` : déconnecte toutes les sessions.
    - HTTPS : reverse proxy (Caddy ou Traefik) devant le port 80, en-têtes `X-Forwarded-*`, HSTS à activer à ce niveau.
    - Migrations depuis une version ≤ 1.4.0 : récupération des photos perdues (`docker cp <backend>:/uploads/. ./uploads-rescue/`, A-01), droits des volumes (D-01), port 8080 du frontend (D-02), port 3001 non publié (D-03).
-6. Supprimer les sections devenues fausses plutôt que de les annoter.
+7. Supprimer les sections devenues fausses plutôt que de les annoter.
 
 ## Critères d'acceptation
 
 - [ ] Chaque écart listé ci-dessus est corrigé ou n'a plus d'objet.
 - [ ] `grep -rnE '14 (models|route)|Node 20|ts-node|uploads/cocktails' AGENTS.md backend/AGENTS.md frontend/AGENTS.md README.md` ne renvoie rien.
+- [ ] `grep -n admin123 AGENTS.md backend/AGENTS.md frontend/AGENTS.md` ne renvoie rien ; les commandes de « Running Locally » fonctionnent sur un clone neuf.
+- [ ] `UPLOAD_DIR` figure dans le tableau des variables du README.
 - [ ] Toutes les commandes de `docs/operations.md` ont été exécutées au moins une fois sur une pile locale (`docker compose up`), noté dans la PR.
 - [ ] Le README renvoie vers `docs/operations.md`.
 - [ ] Les arborescences des `AGENTS.md` correspondent à `ls` des dossiers concernés.
@@ -74,3 +81,4 @@ Les `AGENTS.md` sont lus par chaque agent avant une tâche : une affirmation fau
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-08 : suivi des revues de la phase A. Ajout de `UPLOAD_DIR` (A-01), de l'étape `.env` dans « Running Locally » d'`AGENTS.md` (secrets obligatoires depuis A-04, ligne `admin123` à retirer) et de `src/bootstrap/` dans `backend/AGENTS.md` (étapes 3 et 4, deux critères).

@@ -63,8 +63,10 @@ Les invités consultent la carte sur leur téléphone, souvent sur le wifi du ba
 - `touches` complété avec `frontend/src/utils/uploads.ts`.
 - sharp embarque des binaires natifs par plateforme (`@img/sharp-linuxmusl-x64`, `-arm64`). Vérifier le build de l'image arm64 (D-05) et que le lockfile généré sur macOS contient bien les variantes Linux.
 - Les backups (C-05) incluent tout `uploads/` : leur taille baisse, mais une restauration d'un ancien backup réintroduit des originaux sans variantes. Le rattrapage de l'étape 5 couvre ce cas.
+- Images hors carte (relevé en revue de A-05, impact faible) : `express.static(config.uploadDir)` (`app.ts`) et la `location ^~ /uploads/` de nginx servent tout fichier de `uploads/` sans contrôle d'accès. L'image d'un cocktail absent des menus publics reste accessible par `/uploads/<fichier>` à qui connaît le nom, même si A-05 ne publie plus son `imagePath`. Le nom actuel (`Date.now()-<aléa 0..1e9>.ext`) se devine mal mais n'est pas un secret. Puisque cette tâche change le nommage, prendre une base non devinable (`crypto.randomUUID()`) ; un vrai contrôle (servir l'image seulement si le cocktail est sur une carte publique) imposerait une route à la place du statique et casserait le cache long d'A-06 : non retenu sauf décision contraire.
 - Noms uniques par upload : A-06 peut alors servir `/uploads/` avec un cache long et `immutable`.
 
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-08 : suivi des revues de la phase A. Point d'attention ajouté : images de cocktails hors carte toujours servies par `/uploads/<fichier>` ; base de nom non devinable à prévoir avec le nouveau nommage.
