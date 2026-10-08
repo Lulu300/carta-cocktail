@@ -44,7 +44,7 @@ export default function CocktailsPage() {
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
-      if (!matchesCocktailSearch(item, search, localize)) return false;
+      if (!matchesCocktailSearch(item, search, localize, { includeNotes: true })) return false;
       if (selectedTags.length > 0) {
         const itemTags = item.tags ? item.tags.split(',').map((t) => t.trim().toLowerCase()) : [];
         if (!selectedTags.some((st) => itemTags.includes(st.toLowerCase()))) return false;

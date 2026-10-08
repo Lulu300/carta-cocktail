@@ -5,14 +5,19 @@ phase: A
 lane: backend
 criticite: haute
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: []
-touches: [backend/src/routes/public.ts, backend/src/routes/public.test.ts, backend/src/middleware/auth.ts, backend/src/middleware/auth.test.ts, frontend/src/utils/cocktailSearch.ts, frontend/src/utils/cocktailSearch.test.ts]
+touches: [backend/src/routes/public.ts, backend/src/routes/public.test.ts, backend/src/middleware/auth.ts, backend/src/middleware/auth.test.ts, frontend/src/utils/cocktailSearch.ts, frontend/src/utils/cocktailSearch.test.ts, frontend/src/pages/admin/CocktailsPage.tsx, backend/src/test/helpers.ts, docs/plan/tasks/C-09-cocktail-service.md]
 sources: ["03-security.md §3", "03-security.md §5", "06-frontend-ux-perf.md §5", "02-backend-data-perf.md §5"]
-branch:
-pr:
+branch: fix/A-05-public-api-hardening
+pr: 33
 ---
+
+## Décisions validées (2026-10-08)
+
+- **Cocktails hors carte** : un cocktail visible dans aucun menu publié renvoie 404 sur l'API publique, y compris par lien direct.
+- **Emplacement** : `location` reste public, rien à retirer côté affichage.
 
 ## Contexte
 
@@ -54,14 +59,14 @@ Hors périmètre : factorisation de l'export admin/public (C-09) ; `/public/unit
 
 ## Critères d'acceptation
 
-- [ ] `Authorization: Bearer x`, ou un token signé avec un autre secret : menu non public en 404.
-- [ ] Token admin valide : aperçu du menu non public (200).
-- [ ] Token expiré sur un menu public : 200, pas de 401.
-- [ ] Aucun élément `isHidden` dans `/public/menus/:slug`, pour l'invité comme pour l'admin.
-- [ ] Aucune réponse publique ne contient `purchasePrice`, `openedAt` ni `remainingPercent`.
-- [ ] Cocktail absent de tout menu public, ou seulement masqué : 404 pour un invité (détail et export), 200 pour l'admin.
-- [ ] `notes` et `preferredBottles` absents pour un invité, présents pour l'admin.
-- [ ] La carte publique et la fiche cocktail s'affichent comme avant (vérification manuelle en invité et en admin).
+- [x] `Authorization: Bearer x`, ou un token signé avec un autre secret : menu non public en 404.
+- [x] Token admin valide : aperçu du menu non public (200).
+- [x] Token expiré sur un menu public : 200, pas de 401.
+- [x] Aucun élément `isHidden` dans `/public/menus/:slug`, pour l'invité comme pour l'admin.
+- [x] Aucune réponse publique ne contient `purchasePrice`, `openedAt` ni `remainingPercent`.
+- [x] Cocktail absent de tout menu public, ou seulement masqué : 404 pour un invité (détail et export), 200 pour l'admin.
+- [x] `notes` et `preferredBottles` absents pour un invité, présents pour l'admin.
+- [x] La carte publique et la fiche cocktail s'affichent comme avant (vérification manuelle en invité et en admin).
 
 ## Tests à ajouter ou adapter
 
@@ -90,3 +95,6 @@ Hors périmètre : factorisation de l'export admin/public (C-09) ; `/public/unit
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-08 : décisions humaines reportées en tête (cocktail hors carte en 404 même par lien direct, `location` reste public). `verifyToken` (HS256 seul, `userId` numérique exigé) et `optionalAuth` dans `middleware/auth.ts` ; `public.ts` : `optionalAuth`, éléments masqués filtrés pour tous, `select` explicites (aucun champ d'inventaire), cocktails réservés aux menus publics pour l'invité (détail et export), `notes` et `preferredBottles` réservés à l'admin, id non numérique en 404, `_count` sans éléments masqués (ni bouteilles vides, pour coller à l'affichage). Front : `matchesCocktailSearch` n'indexe plus les notes par défaut ; option `includeNotes` utilisée par la liste admin, d'où l'ajout de `frontend/src/pages/admin/CocktailsPage.tsx` à `touches` (sinon la recherche admin par note régressait, test existant). Tests : `auth.test.ts` (11) créé, `public.test.ts` adapté et complété (32 tests), `cocktailSearch.test.ts` (+2). Couverture delta 100 % backend et frontend. Critère « vérification manuelle » laissé à l'humain. Branche `fix/A-05-public-api-hardening`, PR #33.
+- 2026-10-08 : suite à la revue (B1). Le refus d'un token expiré est désormais fixé par des tests : `verifyToken` renvoie `null`, et un token admin expiré donne 404 sur un menu non publié comme sur un cocktail hors carte (détail et export). Un mutant `ignoreExpiration: true` fait échouer ces 3 tests. Test `alg: none` ajouté. Plus de secret JWT codé en dur dans les tests : `getAuthToken` (`backend/src/test/helpers.ts`, ajouté à `touches`) accepte `secret`, `expiresInSeconds` et `algorithm`. Précision ajoutée à l'étape 5 de C-09 (`docs/plan/tasks/C-09-cocktail-service.md`, ajouté à `touches`) : l'export public exclut aussi `preferredBottles` et doit passer au `select` public, ce qui retire `category.desiredStock`. Rebase sur `origin/develop`.
+- 2026-10-08 : vérification manuelle dans un vrai navigateur (Playwright, Chromium), après rebase sur `origin/develop` (A-07, A-09, A-10 compris). Backend de la branche sur le port 3021 avec une base SQLite temporaire (`db push` + seed, secrets de test), Vite sur le port 5181 via une config jetable non commitée. Données créées par l'API admin : menu public de cocktails (dont un masqué), apéritifs publiés (une bouteille masquée, une vide), un cocktail hors carte, un menu non publié. 19 contrôles sur 19 réussis. Invité : accueil (menu non publié absent), carte des cocktails (masqué absent ; recherche sur un mot des notes sans résultat, sur un mot des instructions avec résultat), apéritifs (emplacement affiché, bouteilles masquée et vide absentes), fiche cocktail sans notes ni bouteilles préférées, page « Cocktail not found » pour le hors carte, « Menu not found » pour le menu non publié. Admin connecté par l'interface : aperçu du menu non publié, fiche hors carte avec notes, notes et bouteilles préférées sur la fiche, éléments masqués toujours absents. Console : aucune erreur côté admin ; côté invité, seulement les 404 attendus (cocktail hors carte, menu non publié), chacun doublé par le StrictMode de React en développement. Aucune autre réponse 4xx/5xx. Remarque : avant le rebase, une navigation immédiate après la connexion annulait l'appel `/auth/me` et effaçait le token. A-10 a supprimé cet appel après `login` ; le reste (`.catch(logout)` sur toute erreur de `/auth/me` au démarrage) est déjà noté dans les Points d'attention de C-11.

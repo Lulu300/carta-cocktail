@@ -62,6 +62,7 @@ CRUD et images :
    - toujours `path.join(config.uploadDir, path.basename(imagePath))`.
 4. Routes : `cocktails.ts` ne garde que validation (C-04), appel de service et réponse. Si besoin, séparer l'import dans `routes/cocktailImport.ts`, monté sous le même préfixe (ajouter le fichier à `touches`).
 5. `public.ts` : l'export public appelle `buildCocktailExport(cocktail, { includeNotes: false })`. Supprimer `parseNT` (utiliser `parseTranslations` de C-14 si mergée, sinon un helper unique dans `cocktailExport.ts`).
+   - Depuis A-05, l'export public d'un invité exclut aussi `preferredBottles` (pas seulement `notes`) : l'option doit couvrir les deux. L'export public doit aussi passer au `select` public de A-05 au lieu de l'`include` complet, ce qui retire `category.desiredStock` exposé aux invités (à refléter dans le format d'import si nécessaire).
 6. Clés i18n : `errors.importUnresolved`, `errors.unknownReference`.
 
 ## Critères d'acceptation
@@ -101,3 +102,4 @@ CRUD et images :
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : décisions validées par l'humain (voir « Décisions validées »).
+- 2026-10-08 : précision ajoutée par A-05 (PR #33) à l'étape 5 : export public sans `preferredBottles` pour l'invité, passage au `select` public (plus de `category.desiredStock`).
