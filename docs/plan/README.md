@@ -65,7 +65,7 @@ todo ──► in-progress ──► review ──► done
 4. Rester dans le périmètre : ne modifier que les fichiers listés dans `touches`, plus les tests associés. Si un autre fichier est indispensable, l'ajouter à `touches` et le noter dans le Journal.
 5. Respecter la définition de terminé d'`AGENTS.md` : tests ajoutés, `npm test`, lint, `tsc`, couverture globale ≥ 60 % et couverture des lignes modifiées ≥ 80 %.
 6. Cocher les critères d'acceptation dans le fichier de la tâche, passer `status: done`, renseigner `branch` et `pr`, ajouter une ligne datée au Journal.
-7. Écrire les messages de commit au format Conventional Commits (`fix:`, `feat:`, `chore(deps):`, `docs:`…). Ouvrir une PR vers `develop` dont le titre commence par l'`id` : `A-02: conserver les sections à la sauvegarde d'un menu`.
+7. Écrire le code, les commentaires et les messages de commit en anglais (voir « Coding Conventions » dans `AGENTS.md`), au format Conventional Commits (`fix:`, `feat:`, `chore(deps):`, `docs:`…). Ouvrir une PR vers `develop` dont le titre commence par l'`id` : `A-02: keep menu sections when saving a menu` (en anglais, comme le code et les commits).
 8. Si une découverte change le plan (nouveau bug, tâche à découper), **ne pas élargir la PR** : créer un nouveau fichier de tâche (prochain numéro libre de la phase), avec `status: todo`, et le mentionner dans la PR.
 
 ## Travailler en parallèle
