@@ -86,6 +86,7 @@ L'admin est exposé sur Internet en même temps que la carte publique. Rien ne l
 - `trust proxy = 1` suppose **un** proxy devant l'API. Tant que le port 3001 est publié (`docker-compose*.yml`), un client peut contourner nginx et forger `X-Forwarded-For`. D-03 retire ce port ; d'ici là, la limite est contournable.
 - Le compteur d'`express-rate-limit` est en mémoire : remis à zéro au redémarrage, non partagé entre processus. Suffisant ici.
 - **Décisions à confirmer** : durée de vie du token (24 h proposé, 7 j aujourd'hui) ; longueur minimale (12 proposé, appliquée aux nouveaux mots de passe seulement).
+- **Validation du token au démarrage** (relevé en revue de A-10) : `frontend/src/contexts/AuthContext.tsx` appelle `/auth/me` puis `.catch(logout)`. Une erreur 5xx ou réseau efface donc le token, alors que seul un 401 devrait le faire (l'API gère déjà le 401 via `setUnauthorizedHandler`). Pour le corriger ici, ajouter ce fichier à `touches` ; sinon, en faire une tâche E.
 - Le passage à un cookie `HttpOnly` (sécurité §7) changerait le frontend et imposerait une protection CSRF : hors périmètre.
 - Ordre : après C-01 (migration) et C-03 (erreurs), et après A-05 (`optionalAuth`) et A-10 (statut du mauvais mot de passe). Une seule tâche de schéma à la fois (C-07). `package.json` : couloir `deps`. `middleware/auth.ts` est aussi touché par C-12 : enchaîner.
 
