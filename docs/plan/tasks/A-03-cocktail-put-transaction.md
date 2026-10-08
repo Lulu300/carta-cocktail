@@ -5,13 +5,13 @@ phase: A
 lane: backend
 criticite: critique
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: []
 touches: [backend/src/routes/cocktails.ts, backend/src/routes/cocktails.test.ts]
 sources: ["01-backend-routes.md §C2", "02-backend-data-perf.md §4.3"]
-branch:
-pr:
+branch: fix/A-03-cocktail-put-transaction
+pr: 34
 ---
 
 ## Contexte
@@ -64,12 +64,12 @@ Hors périmètre : validation par schéma (C-04) ; couche service, DELETE, uploa
 
 ## Critères d'acceptation
 
-- [ ] `PUT { isAvailable: false }` sur un cocktail complet : ingrédients, instructions, tags et bouteilles préférées inchangés.
-- [ ] `PUT { name }` sans `tags` : tags conservés. `PUT { tags: [] }` : tags vidés.
-- [ ] `PUT { ingredients: [] }` vide explicitement les ingrédients et garde les instructions.
-- [ ] `PUT` avec un `unitId` inexistant : 400, recette intacte en base.
-- [ ] `PUT` sur un id inexistant : 404.
-- [ ] Le formulaire d'édition de l'UI fonctionne comme avant (création, édition, ajout et suppression d'ingrédients).
+- [x] `PUT { isAvailable: false }` sur un cocktail complet : ingrédients, instructions, tags et bouteilles préférées inchangés.
+- [x] `PUT { name }` sans `tags` : tags conservés. `PUT { tags: [] }` : tags vidés.
+- [x] `PUT { ingredients: [] }` vide explicitement les ingrédients et garde les instructions.
+- [x] `PUT` avec un `unitId` inexistant : 400, recette intacte en base.
+- [x] `PUT` sur un id inexistant : 404.
+- [x] Le formulaire d'édition de l'UI fonctionne comme avant (création, édition, ajout et suppression d'ingrédients).
 
 ## Tests à ajouter ou adapter
 
@@ -92,3 +92,4 @@ Hors périmètre : validation par schéma (C-04) ; couche service, DELETE, uploa
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-08 : traitée dans la PR #34 (branche `fix/A-03-cocktail-put-transaction`). Un seul `prisma.cocktail.update` avec écritures imbriquées `{ deleteMany: {}, create }` seulement si le tableau est fourni, `tags` écrit seulement s'il est fourni, P2025 → 404, P2003 → 400. `mapIngredient`, `mapInstruction` et `toTagsString` sont partagés par POST et PUT. Écart : pas de `findUnique` préalable, car l'`update` lève déjà P2025 pour un id absent (testé). P2003 confirmé sous SQLite/Prisma 6 (unité et bouteille préférée inconnues). UI : `CocktailFormPage` est le seul appelant et envoie toujours `tags`, `ingredients` et `instructions` en tableaux, donc comportement inchangé (vérifié par lecture du code, pas de test manuel). 9 tests ajoutés, couverture des lignes modifiées 100 %.
