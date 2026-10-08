@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import AdminLayout from './components/layout/AdminLayout';
 import PublicLayout from './components/layout/PublicLayout';
@@ -21,8 +21,10 @@ import CocktailPublicPage from './pages/public/CocktailPublicPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
+  const location = useLocation();
   if (isLoading) return <div className="min-h-screen bg-[#0f0f1a] flex items-center justify-center text-gray-500">Loading...</div>;
-  if (!user) return <Navigate to="/login" />;
+  // Remember the requested page so LoginPage can return to it after sign-in
+  if (!user) return <Navigate to="/login" replace state={{ from: location }} />;
   return <>{children}</>;
 }
 
