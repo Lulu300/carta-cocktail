@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import jwt from 'jsonwebtoken';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
-  request, authHeader, prisma, seedCocktail, seedCategory, seedBottle, seedUnit, seedIngredient,
+  request, authHeader, getAuthToken, prisma, seedCocktail, seedCategory, seedBottle, seedUnit, seedIngredient,
 } from '../test/helpers';
 
 beforeAll(async () => { await setupTestDatabase(); });
@@ -33,8 +32,7 @@ function bearer(token: string): { Authorization: string } {
 }
 
 function expiredAdminToken(): string {
-  const oneMinuteAgo = Math.floor(Date.now() / 1000) - 60;
-  return jwt.sign({ userId: 1, exp: oneMinuteAgo }, 'test-secret');
+  return getAuthToken(1, { expiresInSeconds: -60 });
 }
 
 /** Cocktail with a note, a private bottle and a CATEGORY ingredient with a preferred bottle. */
@@ -135,8 +133,13 @@ describe('GET /api/public/menus/:slug', () => {
   });
 
   it('should return 404 for non-public menu with a token signed by another secret', async () => {
-    const forged = jwt.sign({ userId: 1 }, 'autre-secret', { expiresIn: '1h' });
+    const forged = getAuthToken(1, { secret: 'another-secret' });
     const res = await request.get('/api/public/menus/aperitifs').set(bearer(forged));
+    expect(res.status).toBe(404);
+  });
+
+  it('should return 404 for non-public menu with an expired admin token', async () => {
+    const res = await request.get('/api/public/menus/aperitifs').set(bearer(expiredAdminToken()));
     expect(res.status).toBe(404);
   });
 
@@ -262,6 +265,18 @@ describe('GET /api/public/cocktails/:id', () => {
     const admin = await request.get(`/api/public/cocktails/${cocktail.id}`).set(authHeader());
     expect(admin.status).toBe(200);
     expect(admin.body.name).toBe('Draft');
+  });
+
+  it('should treat an expired admin token as a guest on an off-menu cocktail', async () => {
+    const cocktail = await seedCocktail({ name: 'Draft' });
+
+    const detail = await request.get(`/api/public/cocktails/${cocktail.id}`).set(bearer(expiredAdminToken()));
+    expect(detail.status).toBe(404);
+
+    const exported = await request
+      .get(`/api/public/cocktails/${cocktail.id}/export`)
+      .set(bearer(expiredAdminToken()));
+    expect(exported.status).toBe(404);
   });
 
   it('should return 404 to guests when the cocktail is hidden in its only public menu', async () => {

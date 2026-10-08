@@ -109,11 +109,25 @@ export async function seedRequiredData(): Promise<void> {
   });
 }
 
+export interface AuthTokenOptions {
+  /** Signing secret; defaults to the app's test secret. */
+  secret?: string;
+  /** Lifetime in seconds; a negative value gives an already expired token. */
+  expiresInSeconds?: number;
+  algorithm?: jwt.Algorithm;
+}
+
 /**
- * Get a valid JWT auth token for the admin user.
+ * Get a JWT auth token for the admin user (valid by default).
+ * Options build the invalid variants that auth tests need.
  */
-export function getAuthToken(userId: number = 1): string {
-  return jwt.sign({ userId }, process.env.JWT_SECRET || 'test-secret', { expiresIn: '1h' });
+export function getAuthToken(userId: number = 1, options: AuthTokenOptions = {}): string {
+  const {
+    secret = process.env.JWT_SECRET || 'test-secret',
+    expiresInSeconds = 3600,
+    algorithm = 'HS256',
+  } = options;
+  return jwt.sign({ userId }, secret, { expiresIn: expiresInSeconds, algorithm });
 }
 
 /**
