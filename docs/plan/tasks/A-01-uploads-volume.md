@@ -99,3 +99,4 @@ Hors périmètre : `.dockerignore`, multi-stage, utilisateur non-root (D-01) ; c
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : décisions validées par l'humain (voir « Décisions validées »).
 - 2026-10-08 : fait dans la PR #28 (branche `fix/A-01-uploads-volume`). `resolveUploadDir()` + `UPLOAD_DIR=/app/uploads` dans l'image et les deux compose ; dossier temporaire de test supprimé dans un `afterAll` du fichier de setup. Persistance vérifiée à la main avec l'image construite (`docker run` sur volumes nommés, upload, recréation du conteneur : image toujours servie en 200), pas avec la pile compose complète pour ne pas occuper les ports 80/3001. Les 22 faux PNG de `<repo>/uploads` ont été supprimés (`.gitkeep` conservé).
+- 2026-10-08 : revue approuvée ; suggestions non bloquantes appliquées (valeur exacte du défaut testée, commentaire de `config.ts` corrigé, `mkdirSync` redondant retiré du test).

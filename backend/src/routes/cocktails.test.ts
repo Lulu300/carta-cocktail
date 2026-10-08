@@ -557,7 +557,6 @@ describe('POST /api/cocktails/:id/image - upload replacing existing', () => {
     const cocktail = await seedCocktail({ name: 'Old File Cocktail' });
     const oldFileName = 'old-image-on-disk.png';
     const oldFilePath = path.join(config.uploadDir, oldFileName);
-    fs.mkdirSync(config.uploadDir, { recursive: true });
     fs.writeFileSync(oldFilePath, 'old-png-data');
     await prisma.cocktail.update({
       where: { id: cocktail.id },

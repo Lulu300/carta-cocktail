@@ -15,7 +15,7 @@ describe('resolveUploadDir', () => {
 
   it('should default to the repository uploads folder when UPLOAD_DIR is not set', () => {
     const dir = resolveUploadDir({});
-    expect(dir.endsWith(`${path.sep}uploads`)).toBe(true);
+    expect(dir).toBe(path.resolve(__dirname, '../../uploads'));
     expect(dir).not.toContain(`${path.sep}dist${path.sep}`);
   });
 
