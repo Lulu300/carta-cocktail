@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FALLBACK_LANGUAGE, getBaseLanguage } from '../../utils/localization';
 
 function FlagFR({ className }: { className?: string }) {
   return (
@@ -38,7 +39,12 @@ export default function LanguageSelector() {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const currentLanguage = languages.find(lang => lang.code === i18n.language) || languages[0];
+  // Defensive: i18n config already yields "fr" or "en", but never trust a regional or unknown code
+  // here. Fall back to English like i18next does, not to the first entry of the list.
+  const currentCode = getBaseLanguage(i18n.resolvedLanguage ?? i18n.language ?? FALLBACK_LANGUAGE);
+  const currentLanguage =
+    languages.find(lang => lang.code === currentCode) ??
+    languages.find(lang => lang.code === FALLBACK_LANGUAGE)!;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

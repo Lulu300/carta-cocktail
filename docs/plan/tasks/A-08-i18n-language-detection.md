@@ -5,13 +5,13 @@ phase: A
 lane: frontend
 criticite: haute
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: []
 touches: [frontend/src/i18n/index.ts, frontend/src/components/ui/LanguageSelector.tsx, frontend/src/utils/localization.ts]
 sources: ["06-frontend-ux-perf.md §3"]
-branch:
-pr:
+branch: fix/A-08-i18n-language-detection
+pr: 29
 ---
 
 ## Contexte
@@ -63,11 +63,11 @@ Hors périmètre : `aria-label="Change language"` en dur et pattern ARIA du menu
 
 ## Critères d'acceptation
 
-- [ ] Navigateur en `fr-FR` : UI en français, noms de catégories, d'ingrédients et d'unités en français, sélecteur sur FR, `<html lang="fr">`.
-- [ ] Navigateur en `en-US` : tout en anglais, sélecteur sur EN, `<html lang="en">`.
-- [ ] Navigateur en `de-DE` : anglais partout.
-- [ ] Changer de langue avec le sélecteur met `<html lang>` à jour immédiatement.
-- [ ] Une valeur `fr-FR` déjà stockée dans `localStorage.i18nextLng` est résolue en `fr`.
+- [x] Navigateur en `fr-FR` : UI en français, noms de catégories, d'ingrédients et d'unités en français, sélecteur sur FR, `<html lang="fr">`.
+- [x] Navigateur en `en-US` : tout en anglais, sélecteur sur EN, `<html lang="en">`.
+- [x] Navigateur en `de-DE` : anglais partout.
+- [x] Changer de langue avec le sélecteur met `<html lang>` à jour immédiatement.
+- [x] Une valeur `fr-FR` déjà stockée dans `localStorage.i18nextLng` est résolue en `fr`.
 
 ## Tests à ajouter ou adapter
 
@@ -85,3 +85,5 @@ Hors périmètre : `aria-label="Change language"` en dur et pattern ARIA du menu
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-08 : traitée dans la PR #29 (branche `fix/A-08-i18n-language-detection`). Écarts par rapport au plan : pas de `load: 'languageOnly'` (dans i18next 25, `isSupportedCode()` retire alors la région et `fr-FR` reste dans `i18n.language`, comme avec `nonExplicitSupportedLngs`) ; ajout de `detection.convertDetectedLanguage` (codes détectés ramenés à la langue de base) et retrait du détecteur `htmlTag` de `detection.order` (sinon un navigateur qui n'annonce que `fr-FR` prendrait le `lang="en"` d'`index.html`, et un `de-DE` hériterait de la langue précédente écrite dans `<html lang>`). Retrait aussi de `cookie` (lecture sans try/catch, et aucun cookie n'est écrit : le cache est dans `localStorage`). `getBaseLanguage` et `FALLBACK_LANGUAGE` partagés depuis `utils/localization.ts`. Critères couverts par des tests automatiques.
+- 2026-10-08 : étape 4 vérifiée dans de vrais navigateurs avec Playwright (script jetable hors dépôt, `vite preview` du build, page `/login`, profil neuf donc `localStorage` vide, sans backend). Chromium et WebKit : en `fr-FR` (`navigator.languages` = `fr-FR` seul), `<html lang="fr">`, `i18nextLng` = `fr`, titre « Connexion », sélecteur sur `fr` ; en `en-US`, `lang="en"`, `i18nextLng` = `en`, « Login », sélecteur sur `en` ; en `de-DE`, `lang="en"`, `i18nextLng` = `en`, « Login », sélecteur sur `en`. Firefox (Playwright 157) refuse de démarrer sur cette machine (« Could not find profile folder », aussi en lancement direct) : non vérifié, WebKit testé à la place.
