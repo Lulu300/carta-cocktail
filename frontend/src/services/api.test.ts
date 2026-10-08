@@ -14,6 +14,8 @@ afterEach(async () => {
   vi.restoreAllMocks();
   const api = await getApi();
   api.setUnauthorizedHandler(null);
+  // Some tests switch the UI language: restore the default for the next ones
+  await i18n.changeLanguage('en');
 });
 
 // Dynamic import to get fresh module
@@ -72,6 +74,24 @@ describe('API request helper', () => {
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
   });
 
+  it('should keep a newer token when a 401 arrives for a request sent with an older one', async () => {
+    localStorage.setItem('token', 'old-token');
+    let resolveFetch: (response: unknown) => void = () => {};
+    mockFetch.mockReturnValueOnce(new Promise((resolve) => { resolveFetch = resolve; }));
+    const api = await getApi();
+    const onUnauthorized = vi.fn();
+    api.setUnauthorizedHandler(onUnauthorized);
+
+    const pending = api.categories.list().catch((e: unknown) => e);
+    // The admin signs in again while the old request is still in flight
+    localStorage.setItem('token', 'new-token');
+    resolveFetch({ ok: false, status: 401, json: () => Promise.resolve({ error: 'Session expired' }) });
+
+    expect(await pending).toMatchObject({ status: 401, message: 'Session expired' });
+    expect(localStorage.getItem('token')).toBe('new-token');
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
   it('should not call the unauthorized handler on a 401 from auth.login', async () => {
     mockError(401, { error: 'Invalid email or password' });
     const api = await getApi();
@@ -116,7 +136,6 @@ describe('API request helper', () => {
     await api.publicApi.listMenus();
     await i18n.changeLanguage('fr');
     await api.publicApi.listMenus();
-    await i18n.changeLanguage('en');
 
     expect(mockFetch.mock.calls[0][1].headers['Accept-Language']).toBe('en');
     expect(mockFetch.mock.calls[1][1].headers['Accept-Language']).toBe('fr');

@@ -50,9 +50,11 @@ function buildHeaders(init: RequestInit, token: string | null): Record<string, s
   return headers;
 }
 
-function handleUnauthorized(url: string, hadToken: boolean): void {
+function handleUnauthorized(url: string, requestToken: string | null): void {
   // A 401 on login means wrong credentials, and without a token there is no session to end.
-  if (!hadToken || url === LOGIN_URL) return;
+  if (requestToken === null || url === LOGIN_URL) return;
+  // A late 401 for a request sent with an older token must not end the newer session.
+  if (localStorage.getItem('token') !== requestToken) return;
   localStorage.removeItem('token');
   unauthorizedHandler?.();
 }
@@ -73,7 +75,7 @@ async function send(url: string, init: RequestInit = {}): Promise<Response> {
 
   const body = await readErrorBody(res);
   if (res.status === 401) {
-    handleUnauthorized(url, token !== null);
+    handleUnauthorized(url, token);
   }
   const message = typeof body.error === 'string' ? body.error : `HTTP ${res.status}`;
   throw new ApiError(res.status, message, body);
