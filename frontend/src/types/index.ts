@@ -190,11 +190,13 @@ export interface MenuInput {
     cocktailId: number;
     position?: number;
     isHidden?: boolean;
+    menuSectionId?: number | null;
   }[];
   bottles?: {
     bottleId: number;
     position?: number;
     isHidden?: boolean;
+    menuSectionId?: number | null;
   }[];
 }
 
