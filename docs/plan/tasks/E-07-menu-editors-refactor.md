@@ -17,6 +17,7 @@ pr:
 ## Décisions validées (2026-10-08)
 
 - **Modèle de sauvegarde** : enregistrement immédiat pour la composition (ajout, retrait, ordre, sections, visibilité), avec mise à jour optimiste et retour arrière en cas d'erreur. Bouton « Enregistrer » seulement pour le bloc d'infos (nom, slug, description, public).
+- **Bouteilles vides (2026-10-09)** : une bouteille cochée qui devient vide reste dans ses cartes, à sa place, avec sa section et son état masqué (C-06). L'éditeur la liste donc : la marquer d'un badge « vide ». Les cartes personnelles de bouteilles sont traitées par F-08.
 
 ## Contexte
 
@@ -73,6 +74,7 @@ Si E-05 a créé `isSystemMenu()` dans ce dossier, l'utiliser ; sinon le créer 
 - Ordre : un seul appel `menuBottles.reorder(menuId, orderedIds)` vers l'endpoint de C-13. Ajouter cette méthode dans `api.ts` (signature exacte selon C-13).
 - Suppression de section : un seul `menuSections.delete`, puis invalidation. Plus de boucle de `PUT`.
 - Titre selon `menu.type` avec un cas par type, `alcoholPercentage != null`, catégorie localisée, pas de `!`.
+- Badge « vide » sur les bouteilles à 0 % (clé i18n), puisqu'elles restent dans la carte.
 
 ### 4. Textes
 
@@ -109,3 +111,4 @@ Les composants communs utilisent des clés i18n (`menus.sections.*`). Les textes
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : décisions validées par l'humain (voir « Décisions validées »).
+- 2026-10-09 : décision « bouteilles vides » reprise ; badge « vide » ajouté à l'étape 3.
