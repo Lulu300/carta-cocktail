@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import i18n from '../i18n';
 
 // We test the request helper behavior by importing the module and mocking fetch
 const mockFetch = vi.fn();
@@ -9,8 +10,10 @@ beforeEach(() => {
   mockFetch.mockReset();
 });
 
-afterEach(() => {
+afterEach(async () => {
   vi.restoreAllMocks();
+  const api = await getApi();
+  api.setUnauthorizedHandler(null);
 });
 
 // Dynamic import to get fresh module
@@ -23,6 +26,14 @@ function mockOk(data: unknown = {}) {
   mockFetch.mockResolvedValueOnce({
     ok: true,
     status: 200,
+    json: () => Promise.resolve(data),
+  });
+}
+
+function mockError(status: number, data: unknown) {
+  mockFetch.mockResolvedValueOnce({
+    ok: false,
+    status,
     json: () => Promise.resolve(data),
   });
 }
@@ -46,16 +57,80 @@ describe('API request helper', () => {
     expect(options.headers['Content-Type']).toBe('application/json');
   });
 
-  it('should remove token on 401 response', async () => {
+  it('should remove token and call the unauthorized handler on 401 response', async () => {
     localStorage.setItem('token', 'expired-token');
+    mockError(401, { error: 'Session expired' });
+    const api = await getApi();
+    const onUnauthorized = vi.fn();
+    api.setUnauthorizedHandler(onUnauthorized);
+
+    const error = await api.categories.list().catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(api.ApiError);
+    expect(error).toMatchObject({ status: 401, message: 'Session expired' });
+    expect(localStorage.getItem('token')).toBeNull();
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+  });
+
+  it('should not call the unauthorized handler on a 401 from auth.login', async () => {
+    mockError(401, { error: 'Invalid email or password' });
+    const api = await getApi();
+    const onUnauthorized = vi.fn();
+    api.setUnauthorizedHandler(onUnauthorized);
+
+    await expect(api.auth.login('a@b.c', 'wrong')).rejects.toThrow('Invalid email or password');
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
+  it('should not call the unauthorized handler on a 401 without token', async () => {
+    mockError(401, { error: 'Unauthorized' });
+    const api = await getApi();
+    const onUnauthorized = vi.fn();
+    api.setUnauthorizedHandler(onUnauthorized);
+
+    await expect(api.categories.list()).rejects.toThrow('Unauthorized');
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
+  it('should keep the server message and the token on a 400 response', async () => {
+    localStorage.setItem('token', 'my-token');
+    mockError(400, { error: 'Mot de passe actuel incorrect' });
+    const api = await getApi();
+    const onUnauthorized = vi.fn();
+    api.setUnauthorizedHandler(onUnauthorized);
+
+    const error = await api.settings
+      .updateProfile({ currentPassword: 'wrong', newPassword: 'new' })
+      .catch((e: unknown) => e);
+
+    expect(error).toMatchObject({ status: 400, message: 'Mot de passe actuel incorrect' });
+    expect(localStorage.getItem('token')).toBe('my-token');
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
+  it('should send the UI language in Accept-Language', async () => {
+    mockOk([]);
+    mockOk([]);
+    const api = await getApi();
+
+    await api.publicApi.listMenus();
+    await i18n.changeLanguage('fr');
+    await api.publicApi.listMenus();
+    await i18n.changeLanguage('en');
+
+    expect(mockFetch.mock.calls[0][1].headers['Accept-Language']).toBe('en');
+    expect(mockFetch.mock.calls[1][1].headers['Accept-Language']).toBe('fr');
+  });
+
+  it('should return undefined on a 204 response', async () => {
+    localStorage.setItem('token', 'my-token');
     mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 401,
-      json: () => Promise.resolve({ error: 'Unauthorized' }),
+      ok: true,
+      status: 204,
+      json: () => Promise.reject(new Error('no body')),
     });
     const api = await getApi();
-    await expect(api.categories.list()).rejects.toThrow('Unauthorized');
-    expect(localStorage.getItem('token')).toBeNull();
+    await expect(api.categories.delete(1)).resolves.toBeUndefined();
   });
 
   it('should throw with error message from response', async () => {
@@ -172,6 +247,43 @@ describe('bottles API', () => {
     mockOk({ message: 'ok' });
     await api.bottles.delete(1);
     expect(mockFetch.mock.calls[3][1].method).toBe('DELETE');
+  });
+});
+
+describe('bottles.exportFile', () => {
+  it('downloads the export with filters and the server filename', async () => {
+    localStorage.setItem('token', 'tok');
+    const fakeBlob = new Blob(['[]'], { type: 'application/json' });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      blob: () => Promise.resolve(fakeBlob),
+      headers: { get: () => 'attachment; filename="bottles.json"' },
+    });
+    const mockAnchor = { click: vi.fn(), href: '', download: '' };
+    vi.spyOn(document, 'createElement').mockReturnValue(mockAnchor as unknown as HTMLElement);
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fake-url');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+
+    const api = await getApi();
+    await api.bottles.exportFile('json', { categoryId: 2, type: 'SPIRIT', search: 'rum', location: 'bar' });
+
+    const [url, opts] = mockFetch.mock.calls[0];
+    expect(url).toBe('/api/bottles/export?format=json&categoryId=2&type=SPIRIT&search=rum&location=bar');
+    expect(opts.headers['Authorization']).toBe('Bearer tok');
+    expect(mockAnchor.download).toBe('bottles.json');
+    expect(mockAnchor.click).toHaveBeenCalled();
+  });
+
+  it('triggers the unauthorized handler on 401', async () => {
+    localStorage.setItem('token', 'expired-token');
+    mockError(401, { error: 'Unauthorized' });
+    const api = await getApi();
+    const onUnauthorized = vi.fn();
+    api.setUnauthorizedHandler(onUnauthorized);
+
+    await expect(api.bottles.exportFile('csv')).rejects.toMatchObject({ status: 401 });
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -418,7 +530,7 @@ describe('backup API', () => {
     await api.backup.exportBackup();
 
     expect(mockFetch.mock.calls[0][0]).toBe('/api/backup/export');
-    expect(mockFetch.mock.calls[0][1].headers).toEqual({ Authorization: 'Bearer tok' });
+    expect(mockFetch.mock.calls[0][1].headers['Authorization']).toBe('Bearer tok');
     expect(URL.createObjectURL).toHaveBeenCalledWith(fakeBlob);
     expect(mockAnchor.download).toBe('backup-2024-01-01.zip');
     expect(mockClick).toHaveBeenCalled();
@@ -484,7 +596,8 @@ describe('backup API', () => {
     const [, opts] = mockFetch.mock.calls[0];
     expect(opts.method).toBe('POST');
     expect(opts.body).toBeInstanceOf(FormData);
-    expect(opts.headers).toEqual({ Authorization: 'Bearer tok' });
+    expect(opts.headers['Authorization']).toBe('Bearer tok');
+    expect(opts.headers['Content-Type']).toBeUndefined();
     expect(result).toEqual({ imported: true });
   });
 
@@ -498,6 +611,30 @@ describe('backup API', () => {
     const api = await getApi();
     const file = new File(['bad'], 'bad.zip', { type: 'application/zip' });
     await expect(api.backup.importBackup(file)).rejects.toThrow('Invalid backup file');
+  });
+
+  it('exportBackup triggers the unauthorized handler on 401', async () => {
+    localStorage.setItem('token', 'expired-token');
+    mockError(401, { error: 'Unauthorized' });
+    const api = await getApi();
+    const onUnauthorized = vi.fn();
+    api.setUnauthorizedHandler(onUnauthorized);
+
+    await expect(api.backup.exportBackup()).rejects.toMatchObject({ status: 401 });
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem('token')).toBeNull();
+  });
+
+  it('importBackup triggers the unauthorized handler on 401', async () => {
+    localStorage.setItem('token', 'expired-token');
+    mockError(401, { error: 'Unauthorized' });
+    const api = await getApi();
+    const onUnauthorized = vi.fn();
+    api.setUnauthorizedHandler(onUnauthorized);
+
+    const file = new File(['x'], 'x.zip', { type: 'application/zip' });
+    await expect(api.backup.importBackup(file)).rejects.toMatchObject({ status: 401 });
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
   });
 
   it('importBackup throws HTTP status when error response has no message', async () => {
