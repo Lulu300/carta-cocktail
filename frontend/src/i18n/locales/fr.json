@@ -95,6 +95,7 @@
     "quantity": "Quantité",
     "quantityHint": "{{count}} bouteilles identiques seront créées",
     "saveDuplicate": "Enregistrer et dupliquer",
+    "noCategoryHint": "Créez d'abord une catégorie pour ajouter des bouteilles",
     "showAllLocations": "Voir toutes les localisations",
     "import": "Importer",
     "export": "Exporter",
@@ -344,7 +345,8 @@
     "no": "Non",
     "translations": "Traductions",
     "translationHint": "Optionnel : fournir des noms traduits pour chaque langue",
-    "selected": "{{count}} sélectionné(s)"
+    "selected": "{{count}} sélectionné(s)",
+    "retry": "Réessayer"
   },
   "pagination": {
     "showing": "{{start}}-{{end}} sur {{total}}",

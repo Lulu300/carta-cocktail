@@ -5,13 +5,13 @@ phase: A
 lane: frontend
 criticite: haute
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: []
 touches: [frontend/src/pages/admin/CocktailsPage.tsx, frontend/src/pages/admin/ShortagesPage.tsx, frontend/src/pages/admin/BottlesPage.tsx, frontend/src/pages/admin/CocktailFormPage.tsx, frontend/src/i18n/locales/en.json, frontend/src/i18n/locales/fr.json]
 sources: ["05-frontend-archi.md §H3", "05-frontend-archi.md §H6", "05-frontend-archi.md §H7", "05-frontend-archi.md §M1", "05-frontend-archi.md §H2"]
-branch:
-pr:
+branch: fix/A-09-admin-visible-bugs
+pr: 32
 ---
 
 ## Contexte
@@ -48,14 +48,14 @@ Hors périmètre : `key={idx}` des lignes d'ingrédients et d'instructions (`Coc
 
 ## Critères d'acceptation
 
-- [ ] Recherche active puis « Tout sélectionner » : seuls les cocktails filtrés sont sélectionnés et exportés.
-- [ ] Page Pénuries : jamais de bandeau vert pendant le chargement ni après une erreur ; en cas d'échec, un message et un bouton de relance s'affichent.
-- [ ] Pas de `NaN` ni d'`Infinity` dans le style quand `requiredPercent` vaut 0.
-- [ ] « Enregistrer et dupliquer » avec un nom vide : rien n'est envoyé, le navigateur signale le champ.
-- [ ] Bouton « Ajouter » désactivé tant qu'aucune catégorie n'est chargée.
-- [ ] Plus d'avertissement « unique "key" » dans la console sur la page Bouteilles.
-- [ ] Double-clic sur Enregistrer d'un nouveau cocktail : un seul cocktail créé.
-- [ ] Échec de l'upload après création : message affiché, URL en mode édition, un nouveau clic ne crée pas de doublon.
+- [x] Recherche active puis « Tout sélectionner » : seuls les cocktails filtrés sont sélectionnés et exportés.
+- [x] Page Pénuries : jamais de bandeau vert pendant le chargement ni après une erreur ; en cas d'échec, un message et un bouton de relance s'affichent.
+- [x] Pas de `NaN` ni d'`Infinity` dans le style quand `requiredPercent` vaut 0.
+- [x] « Enregistrer et dupliquer » avec un nom vide : rien n'est envoyé, le navigateur signale le champ.
+- [x] Bouton « Ajouter » désactivé tant qu'aucune catégorie n'est chargée.
+- [x] Plus d'avertissement « unique "key" » dans la console sur la page Bouteilles.
+- [x] Double-clic sur Enregistrer d'un nouveau cocktail : un seul cocktail créé.
+- [x] Échec de l'upload après création : message affiché, URL en mode édition, un nouveau clic ne crée pas de doublon.
 
 ## Tests à ajouter ou adapter
 
@@ -84,3 +84,5 @@ Hors périmètre : `key={idx}` des lignes d'ingrédients et d'instructions (`Coc
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-08 : corrigée dans la PR #32 (`fix/A-09-admin-visible-bugs`). Écart volontaire sur BottlesPage : « Enregistrer et dupliquer » reste un `type="button"` qui pose l'intention puis appelle `form.requestSubmit()` sans submitter (validation native conservée). Deux boutons `submit` auraient fait du bouton « dupliquer » le bouton par défaut, déclenché par Entrée. Un test couvre ce cas. Aucune nouvelle tâche : les autres problèmes vus sont déjà suivis par E-05, E-06 et E-10.
+- 2026-10-08 : revue indépendante approuvée. Suggestions appliquées : garde anti-double envoi par ref dans CocktailFormPage (testée par un submit réentrant), test du message d'erreur générique, hygiène des tests (restauration de `URL.createObjectURL` et de `console.error`, reset de `mockNavigate`), simplification de `renderStatus` dans ShortagesPage. Rebasée sur `origin/develop`.

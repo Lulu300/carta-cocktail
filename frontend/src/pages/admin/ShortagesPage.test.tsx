@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '../../test/test-utils';
+import userEvent from '@testing-library/user-event';
 import ShortagesPage from './ShortagesPage';
 
 vi.mock('../../services/api', () => ({
@@ -43,6 +44,7 @@ describe('ShortagesPage', () => {
   it('should render title', async () => {
     render(<ShortagesPage />);
     expect(screen.getByText('shortages.title')).toBeInTheDocument();
+    await screen.findByText('Vodka');
   });
 
   it('should display shortage cards after loading', async () => {
@@ -85,8 +87,39 @@ describe('ShortagesPage', () => {
   it('should show no shortages message when empty', async () => {
     mockList.mockResolvedValue([] as never);
     render(<ShortagesPage />);
-    await waitFor(() => {
-      expect(screen.getByText('shortages.noShortages')).toBeInTheDocument();
-    });
+    expect(await screen.findByText('shortages.noShortages')).toBeInTheDocument();
+  });
+
+  it('shows a loading message instead of "no shortages" while loading', () => {
+    mockList.mockReturnValue(new Promise(() => {}) as never);
+    render(<ShortagesPage />);
+    expect(screen.getByText('common.loading')).toBeInTheDocument();
+    expect(screen.queryByText('shortages.noShortages')).not.toBeInTheDocument();
+  });
+
+  it('shows an error with a retry button when loading fails', async () => {
+    const user = userEvent.setup();
+    mockList.mockRejectedValueOnce(new Error('Network down'));
+    render(<ShortagesPage />);
+
+    expect(await screen.findByText('common.error')).toBeInTheDocument();
+    expect(screen.queryByText('shortages.noShortages')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'common.retry' }));
+
+    expect(mockList).toHaveBeenCalledTimes(2);
+    expect(await screen.findByText('Vodka')).toBeInTheDocument();
+    expect(screen.queryByText('common.error')).not.toBeInTheDocument();
+  });
+
+  it('renders a full bar instead of NaN when the required percent is 0', async () => {
+    mockList.mockResolvedValue([
+      { ...mockShortages[0], totalPercent: 0, requiredPercent: 0 },
+    ] as never);
+    render(<ShortagesPage />);
+    await screen.findByText('Vodka');
+
+    const bar = document.querySelector('.bg-red-500') as HTMLElement;
+    expect(bar.style.width).toBe('100%');
   });
 });
