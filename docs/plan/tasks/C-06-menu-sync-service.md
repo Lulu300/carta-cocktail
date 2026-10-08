@@ -6,7 +6,7 @@ lane: backend
 criticite: moyenne
 effort: M
 status: todo
-owner: agent
+owner: mixed
 depends_on: [C-03]
 touches: [backend/src/services/menuSyncService.ts, backend/src/routes/bottles.ts, backend/src/routes/menuBottles.ts, backend/src/routes/menus.ts, backend/src/i18n/]
 sources: ["01-backend-routes.md §H3", "02-backend-data-perf.md §3.5"]
@@ -27,6 +27,7 @@ Les menus « Apéritifs » et « Digestifs » reflètent les bouteilles marquée
 - `routes/bottles.ts:269-273` (import) : synchro après la transaction, bouteille par bouteille (jusqu'à 7 requêtes chacune), non atomique.
 - `routes/bottles.ts:365-377` : POST et synchro hors transaction.
 - `routes/menus.ts:112-121` : `PUT /menus/:id` peut remplacer les bouteilles d'un menu système.
+- `routes/menus.ts` (après A-02) : `POST /menus` accepte `type: 'APEROS'`/`'DIGESTIFS'`, et `PUT /menus/:id` peut donner ce type à un menu ordinaire. A-02 ne verrouille le type que des menus système, reconnus par leur slug (`SYSTEM_MENU_SLUGS`, `isSystemMenu`), comme la protection contre la suppression.
 - Utile : `routes/public.ts:53-56` filtre déjà `bottle.remainingPercent > 0` à l'affichage public.
 
 ## Ce qu'il faut faire
@@ -54,7 +55,8 @@ Les menus « Apéritifs » et « Digestifs » reflètent les bouteilles marquée
    - import confirm : remplacer la boucle `:269-273` par `await syncAllBottleMenus(tx)` **dans** la transaction.
 4. `routes/menuBottles.ts` `/menu/:menuId/sync` : `NotFoundError` si le menu n'existe pas ; `BadRequestError('errors.cannotSyncCocktailMenu')` si `type === 'COCKTAILS'` (remplace le texte en dur `:116`) ; sinon `syncMenu` en transaction. Réponse inchangée `{ message, added, removed }`.
 5. `routes/menus.ts` PUT : refuser `bottles` sur un menu `APEROS`/`DIGESTIFS` (`BadRequestError('errors.systemMenuBottlesManaged')`). Vérifier que le frontend ne l'envoie pas (`MenuBottleEditPage` passe par `/menu-bottles`).
-6. Ajouter les clés i18n utilisées dans `en.json` et `fr.json`.
+6. Menus ordinaires de type bouteille : appliquer la décision des Points d'attention. Option A (proposée) : `POST /menus` et `PUT /menus/:id` refusent `APEROS`/`DIGESTIFS` pour un menu non système (`BadRequestError('errors.systemMenuTypeReserved')`). L'UI n'envoie déjà jamais ces types (la modale de création de `MenusPage` n'a pas de champ type) : seul l'API est concernée. Option B : les accepter, et les traiter comme des menus synchronisés à part entière (supprimables, synchronisés par `type`), en le disant dans la PR.
+7. Ajouter les clés i18n utilisées dans `en.json` et `fr.json`.
 
 ## Critères d'acceptation
 
@@ -77,16 +79,17 @@ Les menus « Apéritifs » et « Digestifs » reflètent les bouteilles marquée
   - import de 3 bouteilles `isApero` → 3 lignes dans le menu apéritifs ;
   - les tests existants `:94-118`, `:150`, `:174-204`, `:698` restent verts.
 - `menuBottles.test.ts` : `/sync` avec une bouteille vide flaggée → conforme à la règle ; adapter `:99` si besoin.
-- `menus.test.ts` : PUT avec `bottles` sur le menu apéritifs → 400.
+- `menus.test.ts` : PUT avec `bottles` sur le menu apéritifs → 400. Selon la décision de l'étape 6 : `POST /menus` et `PUT /menus/:id` d'un menu ordinaire avec `type: 'APEROS'` → 400 (option A), ou menu synchronisé puis supprimable (option B).
 - `public.test.ts` : une bouteille vide flaggée n'apparaît pas dans `/api/public/menus/aperitifs`.
 
 ## Points d'attention
 
 - **Décision produit** : garder les bouteilles vides dans le menu (masquées à l'affichage) ou les retirer comme aujourd'hui. Le défaut proposé aligne les trois chemins et supprime la perte de position/section. Effet visible : l'éditeur admin `MenuBottleEditPage` listera les vides ; un badge « vide » côté frontend serait utile (E-07). À valider en revue de PR ; si refus, il suffit d'inverser `isEligible`.
-- Un menu créé par l'utilisateur avec le type `APEROS`/`DIGESTIFS` (possible via `POST /menus`) sera aussi synchronisé automatiquement. Cohérent avec le bouton « Synchroniser », à signaler.
+- **Décision à prendre avant de coder** (relevée en revue de A-02) : un menu ordinaire peut encore être créé ou modifié avec le type `APEROS`/`DIGESTIFS`. Si les menus synchronisés sont identifiés par `type` seul, ce menu sera synchronisé automatiquement, alors qu'il reste supprimable et que son type reste modifiable (le système le reconnaît par slug). Deux identifications coexisteraient. Soit réserver ces types aux menus système (option A de l'étape 6, recommandée : une seule règle, un seul menu par type), soit accepter explicitement plusieurs menus synchronisés par type (option B). Vérifier en base qu'aucun menu existant hors `aperitifs`/`digestifs` n'a déjà ce type ; l'option A doit dire quoi en faire (le repasser en `COCKTAILS` ou le garder tel quel).
 - A-05 doit garder le filtre `remainingPercent > 0` de `public.ts` en réécrivant les `select`.
 - `menuBottles.ts` est aussi modifié par C-13 : enchaîner ; si C-13 passe avant, utiliser son `nextPosition`. C-10 réutilise `syncAllBottleMenus` et ne doit pas réécrire la synchro.
 
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-08 : suivi des revues de la phase A. Constat ajouté (type `APEROS`/`DIGESTIFS` encore attribuable à un menu ordinaire après A-02), étape 6 et décision à prendre dans les Points d'attention : réserver ces types aux menus système ou l'accepter explicitement. `owner: mixed` : la décision humaine précède le code.

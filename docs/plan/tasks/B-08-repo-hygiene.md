@@ -51,7 +51,7 @@ Petites incohérences du dépôt. Des dossiers générés apparaissent dans `git
 5. Supprimer localement `backend/prisma/dev.db` (aucun commit).
 6. Vérifier que `git status` reste propre après les tests avec couverture et la génération de la page de suivi.
 
-Hors périmètre : retrait de la ligne `migrations/` (C-01) ; suppression de `frontend/nginx.conf` (A-06) ; `@prisma/client` en `dependencies` et `.dockerignore` (D-01) ; `engines`, `.nvmrc` et `@types/node` (B-01) ; `.mailmap` (D-07) ; correction de `backend/AGENTS.md:151` (D-09).
+Hors périmètre : retrait de la ligne `migrations/` (C-01) ; suppression de `frontend/nginx.conf` (A-06) ; `@prisma/client` en `dependencies` (D-01) ; `.dockerignore` (D-10) ; `engines`, `.nvmrc` et `@types/node` (B-01) ; `.mailmap` (D-07) ; correction de `backend/AGENTS.md:151` (D-09).
 
 ## Critères d'acceptation
 
@@ -77,3 +77,4 @@ Aucun code applicatif modifié, donc pas de test unitaire. Vérifications à col
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-09 : renvoi `.dockerignore` mis à jour vers D-10 (sorti de D-01 en revue de la PR #37).

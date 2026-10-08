@@ -8,7 +8,7 @@ effort: M
 status: todo
 owner: agent
 depends_on: [C-04, C-06]
-touches: [backend/src/routes/bottles.ts, backend/src/utils/bottlesImport.ts, backend/src/utils/bottlesExport.ts, backend/src/routes/bottles.test.ts, backend/src/i18n/]
+touches: [backend/src/app.ts, backend/src/routes/bottles.ts, backend/src/utils/bottlesImport.ts, backend/src/utils/bottlesExport.ts, backend/src/routes/bottles.test.ts, backend/src/i18n/]
 sources: ["02-backend-data-perf.md §4.2", "02-backend-data-perf.md §3.5"]
 branch:
 pr:
@@ -32,6 +32,8 @@ L'import de bouteilles accepte CSV, JSON et ZIP. Il est déjà défensif (transa
 - `:240-262` (confirm) : `tx.bottle.create` un par un (lignes × quantité). `openedAt` invalide → `new Date('abc')` → échec de toute la transaction en 500. Délai par défaut de 5 s.
 - `:365-377` : POST avec `quantity` jusqu'à 50, créations hors transaction (C-06 les met dans une transaction, une par une).
 
+`src/app.ts` : `express.json()` sans option garde la limite par défaut de 100 Ko. `/import/confirm` reçoit en JSON le `payload` normalisé d'un fichier que l'aperçu accepte jusqu'à 10 Mo (`importUpload`). Au-delà d'environ 100 Ko de JSON (quelques centaines de lignes), l'aperçu réussit puis la confirmation échoue en 413 (page HTML d'Express avant C-03, « HTTP 413 » à l'écran avant E-17).
+
 `src/utils/bottlesExport.ts:124-131` `escapeCsvField` : une valeur qui commence par `=`, `+`, `-`, `@` devient une formule dans Excel. Pas de BOM : accents cassés à l'ouverture dans Excel.
 
 ## Ce qu'il faut faire
@@ -51,7 +53,8 @@ L'import de bouteilles accepte CSV, JSON et ZIP. Il est déjà défensif (transa
    - `prisma.$transaction(fn, { timeout: 30_000 })` ;
    - la synchro des menus reste `syncAllBottleMenus(tx)` (posée par C-06) : ne pas la réécrire.
 4. POST `/bottles` avec `quantity > 1` : une transaction, `tx.bottle.createManyAndReturn` (Prisma ≥ 5.14, supporté sur SQLite ; à défaut, une boucle de `create`, 50 au plus), puis une seule synchro. Réponse inchangée (objet si 1, tableau avec `category` sinon).
-5. Export (`bottlesExport.ts`) : préfixer d'une apostrophe une valeur texte qui commence par `=`, `+`, `-`, `@`, tabulation ou retour chariot (pas un nombre négatif) ; BOM UTF-8 en tête du CSV.
+5. Limite du corps JSON de la confirmation (`app.ts`) : monter un parseur dédié **avant** le `express.json()` global, par exemple `app.use('/api/bottles/import/confirm', express.json({ limit: '5mb' }))`. body-parser ignore un corps déjà lu : le parseur global (100 Ko) ne s'applique plus à cette route et reste inchangé pour les autres. Choisir la limite d'après `MAX_IMPORT_ROWS` (mesurer la taille JSON de 2 000 lignes complètes) et la garder sous le `client_max_body_size 20m` de nginx (A-06). Ne pas relever la limite globale.
+6. Export (`bottlesExport.ts`) : préfixer d'une apostrophe une valeur texte qui commence par `=`, `+`, `-`, `@`, tabulation ou retour chariot (pas un nombre négatif) ; BOM UTF-8 en tête du CSV.
 
 ## Critères d'acceptation
 
@@ -60,6 +63,7 @@ L'import de bouteilles accepte CSV, JSON et ZIP. Il est déjà défensif (transa
 - [ ] Une ligne avec `capacityMl` vide, `remainingPercent: 150` ou `openedAt: 'abc'` est écartée et listée dans `errors` ; les autres passent.
 - [ ] Un fichier de 2 001 lignes est refusé en 400 traduit.
 - [ ] Import confirm de 1 000 bouteilles en moins de 5 s sur la base de test.
+- [ ] Une confirmation de 2 000 lignes (corps JSON bien au-delà de 100 Ko) passe ; un corps JSON de plus de 100 Ko sur une autre route reste refusé en 413.
 - [ ] `POST /bottles` avec `quantity: 5` qui échoue ne crée rien.
 - [ ] Export puis réimport CSV redonne les mêmes bouteilles (BOM compris).
 - [ ] Une bouteille nommée `=1+1` est exportée en `'=1+1`.
@@ -72,7 +76,8 @@ L'import de bouteilles accepte CSV, JSON et ZIP. Il est déjà défensif (transa
   - preview d'un CSV `;` avec BOM → bouteilles parsées ;
   - preview avec une ligne invalide → `errors[0]` vaut `{ line: 2, field: 'capacityMl', … }` ;
   - confirm avec `openedAt: 'abc'` → 400, aucune bouteille créée ;
-  - confirm de 1 000 bouteilles → 201 ;
+  - confirm de 1 000 bouteilles → 201 (vérifier que le corps dépasse 100 Ko, sinon augmenter le nombre de lignes : le test doit échouer sans l'étape 5) ;
+  - corps JSON de 200 Ko sur `POST /api/units` → 413 (la limite globale ne bouge pas) ;
   - POST `quantity: 3` avec un `categoryId` inexistant → aucune bouteille créée ;
   - adapter les tests CSV existants (`:322-368`) au BOM en tête.
 
@@ -82,8 +87,10 @@ L'import de bouteilles accepte CSV, JSON et ZIP. Il est déjà défensif (transa
 - Le BOM à l'export change le premier caractère du fichier : vérifier que l'import (frontend et backend) le tolère, et que les outils de l'utilisateur ne s'en plaignent pas.
 - `createMany` ne renvoie pas les ids : sans importance pour l'import, la synchro des menus est globale (C-06).
 - B-07 (majeure d'`adm-zip`) touche aussi `bottlesImport.ts` : enchaîner.
+- Le parseur dédié de l'étape 5 lit le corps avant `authMiddleware` (monté sur `/api/bottles`) : un client non authentifié peut faire analyser jusqu'à la limite choisie. Acceptable avec une limite de quelques Mo ; sinon, ajouter `authMiddleware` devant ce parseur. `app.ts` est aussi touché par C-03 et C-11 : enchaîner.
 - Ordre : après C-04 (schéma du confirm) et C-06 (synchro). `bottles.ts` est aussi touché par C-07 et C-14 : enchaîner.
 
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-08 : suivi des revues de la phase A. Ajout de l'étape 5 (limite `express.json()` de 100 Ko qui fait échouer la confirmation d'un gros import), d'un critère et de deux tests ; `backend/src/app.ts` ajouté à `touches`.
