@@ -1,7 +1,40 @@
 import { describe, it, expect } from 'vitest';
-import { getLocalizedName } from './localization';
+import { getBaseLanguage, getLocalizedName } from './localization';
+
+describe('getBaseLanguage', () => {
+  it('should strip the region from a regional locale', () => {
+    expect(getBaseLanguage('fr-FR')).toBe('fr');
+  });
+
+  it('should keep a base language unchanged', () => {
+    expect(getBaseLanguage('en')).toBe('en');
+  });
+});
 
 describe('getLocalizedName', () => {
+  const rum = { name: 'Rum', nameTranslations: { fr: 'Rhum', en: 'Rum' } };
+
+  it('should resolve a regional French locale to the French translation', () => {
+    expect(getLocalizedName(rum, 'fr-FR')).toBe('Rhum');
+  });
+
+  it('should resolve a regional English locale to the English translation', () => {
+    expect(getLocalizedName(rum, 'en-US')).toBe('Rum');
+  });
+
+  it('should fall back to English for an unsupported language', () => {
+    expect(getLocalizedName(rum, 'de')).toBe('Rum');
+  });
+
+  it('should prefer an exact regional translation when one exists', () => {
+    const entity = { name: 'Rum', nameTranslations: { 'fr-CA': 'Rhum QC', fr: 'Rhum' } };
+    expect(getLocalizedName(entity, 'fr-CA')).toBe('Rhum QC');
+  });
+
+  it('should return name when translations is null for a regional locale', () => {
+    expect(getLocalizedName({ name: 'Rum', nameTranslations: null }, 'fr-FR')).toBe('Rum');
+  });
+
   it('should return name when no translations', () => {
     expect(getLocalizedName({ name: 'Vodka' }, 'fr')).toBe('Vodka');
   });

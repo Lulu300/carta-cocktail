@@ -3,20 +3,51 @@ import { render, screen } from '../../test/test-utils';
 import userEvent from '@testing-library/user-event';
 import LanguageSelector from './LanguageSelector';
 
-// Override the global i18n mock for this file to track changeLanguage
+// Override the global i18n mock for this file to track changeLanguage and vary the detected language
 const mockChangeLanguage = vi.fn();
+const mockI18n = vi.hoisted(() => ({
+  language: 'en' as string | undefined,
+  resolvedLanguage: undefined as string | undefined,
+}));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
-    i18n: { language: 'en', changeLanguage: mockChangeLanguage },
+    i18n: { ...mockI18n, changeLanguage: mockChangeLanguage },
   }),
 }));
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockI18n.language = 'en';
+  mockI18n.resolvedLanguage = undefined;
 });
 
 describe('LanguageSelector', () => {
+  it('should use the resolved language when the detected one is regional', () => {
+    mockI18n.language = 'en-US';
+    mockI18n.resolvedLanguage = 'en';
+    render(<LanguageSelector />);
+    expect(screen.getByText('en')).toBeInTheDocument();
+  });
+
+  it('should strip the region when no resolved language is available', () => {
+    mockI18n.language = 'fr-FR';
+    render(<LanguageSelector />);
+    expect(screen.getByText('fr')).toBeInTheDocument();
+  });
+
+  it('should fall back to English for an unsupported language', () => {
+    mockI18n.language = 'de';
+    render(<LanguageSelector />);
+    expect(screen.getByText('en')).toBeInTheDocument();
+  });
+
+  it('should fall back to English when no language is set', () => {
+    mockI18n.language = undefined;
+    render(<LanguageSelector />);
+    expect(screen.getByText('en')).toBeInTheDocument();
+  });
+
   it('should render current language button', () => {
     render(<LanguageSelector />);
     const button = screen.getByLabelText('Change language');
