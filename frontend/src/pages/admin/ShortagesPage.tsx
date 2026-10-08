@@ -9,20 +9,60 @@ export default function ShortagesPage() {
   const { t } = useTranslation();
   const localize = useLocalizedName();
   const [items, setItems] = useState<Shortage[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
 
-  useEffect(() => { api.list().then(setItems); }, []);
+  const load = async () => {
+    setIsLoading(true);
+    setHasError(false);
+    try {
+      setItems(await api.list());
+    } catch {
+      setHasError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  // Never show the green "no shortages" banner unless the list really loaded
+  const renderStatus = () => {
+    if (isLoading) {
+      return <div className="text-center py-12 text-gray-500">{t('common.loading')}</div>;
+    }
+    if (hasError) {
+      return (
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-6 py-8 rounded-xl text-center space-y-4">
+          <p className="text-lg">{t('common.error')}</p>
+          <button
+            onClick={load}
+            className="border border-red-400/40 hover:bg-red-400/10 px-4 py-2 rounded-lg transition-colors"
+          >
+            {t('common.retry')}
+          </button>
+        </div>
+      );
+    }
+    return (
+      <div className="bg-green-500/10 border border-green-500/30 text-green-400 px-6 py-8 rounded-xl text-center text-lg">
+        {t('shortages.noShortages')}
+      </div>
+    );
+  };
 
   return (
     <div>
       <h1 className="text-2xl font-bold font-serif text-amber-400 mb-6">{t('shortages.title')}</h1>
-      {items.length === 0 ? (
-        <div className="bg-green-500/10 border border-green-500/30 text-green-400 px-6 py-8 rounded-xl text-center text-lg">
-          {t('shortages.noShortages')}
-        </div>
+      {isLoading || hasError || items.length === 0 ? (
+        renderStatus()
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {items.map((item) => {
             const deficit = item.requiredPercent - item.totalPercent;
+            const fillPercent = item.requiredPercent > 0
+              ? Math.min(100, (item.totalPercent / item.requiredPercent) * 100)
+              : 100;
             return (
               <div key={item.category.id} className="bg-[#1a1a2e] border border-red-500/30 rounded-xl p-6">
                 <div className="flex items-center justify-between mb-3">
@@ -43,7 +83,7 @@ export default function ShortagesPage() {
                   <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-red-500 rounded-full transition-all"
-                      style={{ width: `${Math.min(100, (item.totalPercent / item.requiredPercent) * 100)}%` }}
+                      style={{ width: `${fillPercent}%` }}
                     />
                   </div>
                   <div className="flex justify-between">

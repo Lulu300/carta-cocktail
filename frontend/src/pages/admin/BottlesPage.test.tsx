@@ -384,4 +384,90 @@ describe('BottlesPage', () => {
       expect(screen.getByText('Network down')).toBeInTheDocument();
     });
   });
+
+  it('does not submit "save and duplicate" when the name is empty', async () => {
+    const user = userEvent.setup();
+    render(<BottlesPage />);
+    await screen.findByText('Absolut');
+    await user.click(screen.getByText('bottles.add'));
+
+    await user.click(screen.getByText('bottles.saveDuplicate'));
+
+    expect(mockApiCreate).not.toHaveBeenCalled();
+    const nameInput = document.querySelector('form input[required]') as HTMLInputElement;
+    expect(nameInput.validity.valueMissing).toBe(true);
+  });
+
+  it('creates the bottle and keeps the modal open on "save and duplicate"', async () => {
+    const user = userEvent.setup();
+    render(<BottlesPage />);
+    await screen.findByText('Absolut');
+    await user.click(screen.getByText('bottles.add'));
+
+    const nameInput = document.querySelector('form input[required]') as HTMLInputElement;
+    await user.type(nameInput, 'New Whisky');
+    await user.click(screen.getByText('bottles.saveDuplicate'));
+
+    await waitFor(() => {
+      expect(mockApiCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'New Whisky', categoryId: 1 })
+      );
+    });
+    expect(screen.getByText('bottles.saveDuplicate')).toBeInTheDocument();
+
+    // The intent is reset: a plain save afterwards closes the modal
+    await user.click(screen.getByText('common.save'));
+    await waitFor(() => {
+      expect(screen.queryByText('bottles.saveDuplicate')).not.toBeInTheDocument();
+    });
+    expect(mockApiCreate).toHaveBeenCalledTimes(2);
+  });
+
+  it('pressing Enter in the name field saves and closes the modal', async () => {
+    const user = userEvent.setup();
+    render(<BottlesPage />);
+    await screen.findByText('Absolut');
+    await user.click(screen.getByText('bottles.add'));
+
+    const nameInput = document.querySelector('form input[required]') as HTMLInputElement;
+    await user.type(nameInput, 'New Whisky{Enter}');
+
+    await waitFor(() => {
+      expect(mockApiCreate).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(screen.queryByText('bottles.saveDuplicate')).not.toBeInTheDocument();
+    });
+  });
+
+  it('disables the add button while no category is loaded', async () => {
+    mockCatList.mockResolvedValue([] as never);
+    render(<BottlesPage />);
+    await screen.findByText('Absolut');
+
+    const addButton = screen.getByRole('button', { name: 'bottles.add' });
+    expect(addButton).toBeDisabled();
+    expect(addButton).toHaveAttribute('title', 'bottles.noCategoryHint');
+  });
+
+  it('renders grouped bottles without React key warnings', async () => {
+    const user = userEvent.setup();
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockApiList.mockResolvedValue([
+      mockBottles[0],
+      { ...mockBottles[0], id: 3 },
+      mockBottles[1],
+    ] as never);
+    render(<BottlesPage />);
+
+    await screen.findByText('x2');
+    await user.click(screen.getByText('x2'));
+    expect(screen.getAllByText('Absolut')).toHaveLength(3);
+
+    const keyWarnings = consoleError.mock.calls.filter((args) =>
+      args.some((arg) => typeof arg === 'string' && arg.includes('unique "key"'))
+    );
+    expect(keyWarnings).toHaveLength(0);
+    consoleError.mockRestore();
+  });
 });

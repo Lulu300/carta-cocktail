@@ -45,6 +45,8 @@ export default function CocktailFormPage() {
   const [allUnits, setAllUnits] = useState<Unit[]>([]);
   const [newIngredientName, setNewIngredientName] = useState('');
   const [showNewIngredient, setShowNewIngredient] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -134,6 +136,7 @@ export default function CocktailFormPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     const tagsArray = tagsInput.split(',').map((t) => t.trim()).filter(Boolean);
     const data = {
       name,
@@ -153,18 +156,30 @@ export default function CocktailFormPage() {
       instructions: instructionTexts.filter((t) => t.trim()).map((t) => ({ text: t })),
     };
 
-    let cocktail;
-    if (isEdit) {
-      cocktail = await cocktailsApi.update(parseInt(id!), data);
-    } else {
-      cocktail = await cocktailsApi.create(data);
-    }
+    setIsSubmitting(true);
+    setSubmitError(null);
+    let savedId: number | null = null;
+    try {
+      const cocktail = isEdit
+        ? await cocktailsApi.update(parseInt(id!), data)
+        : await cocktailsApi.create(data);
+      savedId = cocktail.id;
 
-    if (imageFile) {
-      await cocktailsApi.uploadImage(cocktail.id, imageFile);
-    }
+      if (imageFile) {
+        await cocktailsApi.uploadImage(cocktail.id, imageFile);
+      }
 
-    navigate('/admin/cocktails');
+      navigate('/admin/cocktails');
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : t('common.error'));
+      // The cocktail exists now: switch to edit mode so the next save updates it
+      // instead of creating a duplicate.
+      if (!isEdit && savedId !== null) {
+        navigate(`/admin/cocktails/${savedId}`, { replace: true });
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const bottlesForCategory = (catId: number | null) =>
@@ -366,10 +381,16 @@ export default function CocktailFormPage() {
           </div>
         </div>
 
+        {submitError && (
+          <div role="alert" className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg p-3 text-sm">
+            {submitError}
+          </div>
+        )}
+
         {/* Submit */}
         <div className="flex justify-end gap-3">
           <button type="button" onClick={() => navigate('/admin/cocktails')} className="px-6 py-2.5 text-gray-400 hover:text-white">{t('common.cancel')}</button>
-          <button type="submit" className="bg-amber-400 hover:bg-amber-500 text-[#0f0f1a] font-semibold px-6 py-2.5 rounded-lg">{t('common.save')}</button>
+          <button type="submit" disabled={isSubmitting} className="bg-amber-400 hover:bg-amber-500 disabled:opacity-50 text-[#0f0f1a] font-semibold px-6 py-2.5 rounded-lg">{t('common.save')}</button>
         </div>
       </form>
     </div>

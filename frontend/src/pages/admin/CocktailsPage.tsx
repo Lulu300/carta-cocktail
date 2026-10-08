@@ -81,6 +81,20 @@ export default function CocktailsPage() {
     load();
   };
 
+  const allFilteredSelected = filteredItems.length > 0 && filteredItems.every((i) => selectedIds.has(i.id));
+
+  // "Select all" only acts on the cocktails matching the current filters
+  const toggleSelectAllFiltered = (checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const item of filteredItems) {
+        if (checked) next.add(item.id);
+        else next.delete(item.id);
+      }
+      return next;
+    });
+  };
+
   const toggleSelection = (id: number) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -169,14 +183,8 @@ export default function CocktailsPage() {
               <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={selectedIds.size === items.length && items.length > 0}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setSelectedIds(new Set(items.map((i) => i.id)));
-                    } else {
-                      setSelectedIds(new Set());
-                    }
-                  }}
+                  checked={allFilteredSelected}
+                  onChange={(e) => toggleSelectAllFiltered(e.target.checked)}
                   className="w-4 h-4 rounded bg-[#0f0f1a] border-gray-700 text-amber-400 accent-amber-400"
                 />
                 {t('cocktails.selectAll')}

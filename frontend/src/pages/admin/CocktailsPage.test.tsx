@@ -27,6 +27,7 @@ vi.mock('../../components/import/ImportCocktailWizard', () => ({
 }));
 
 import { cocktails as api, availability as availabilityApi } from '../../services/api';
+import { exportCocktailsAsZip } from '../../services/exportZip';
 
 const mockCocktails = [
   {
@@ -190,6 +191,62 @@ describe('CocktailsPage', () => {
     const checkboxes = screen.getAllByRole('checkbox');
     // select-all + one per card = 3 total
     expect(checkboxes.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('selects and exports only the filtered cocktails with "select all"', async () => {
+    const user = userEvent.setup();
+    const daiquiri = { ...mockCocktails[1], id: 3, name: 'Daiquiri', imagePath: null };
+    vi.mocked(api.list).mockResolvedValue([...mockCocktails, daiquiri]);
+    render(<CocktailsPage />);
+
+    const search = await screen.findByPlaceholderText('common.search');
+    await screen.findByText('Daiquiri');
+    await user.type(search, 'rum citron');
+    expect(screen.queryByText('Daiquiri')).not.toBeInTheDocument();
+
+    await user.click(screen.getByText('cocktails.batchExport'));
+    const selectAll = screen.getByLabelText('cocktails.selectAll');
+    await user.click(selectAll);
+    expect(selectAll).toBeChecked();
+
+    await user.click(screen.getByText(/cocktails.exportZip/));
+
+    await waitFor(() => {
+      expect(exportCocktailsAsZip).toHaveBeenCalledWith(
+        [1],
+        [expect.objectContaining({ id: 1 })],
+      );
+    });
+  });
+
+  it('unchecking "select all" clears only the filtered cocktails', async () => {
+    const user = userEvent.setup();
+    render(<CocktailsPage />);
+
+    await screen.findByText('Negroni');
+    await user.click(screen.getByText('cocktails.batchExport'));
+
+    // Select Negroni while it is visible, then filter it out
+    const negroniCard = screen.getByText('Negroni').closest('div.rounded-xl') as HTMLElement;
+    await user.click(negroniCard);
+
+    await user.type(screen.getByPlaceholderText('common.search'), 'rum citron');
+    const selectAll = screen.getByLabelText('cocktails.selectAll');
+    expect(selectAll).not.toBeChecked();
+
+    await user.click(selectAll);
+    expect(selectAll).toBeChecked();
+    await user.click(selectAll);
+    expect(selectAll).not.toBeChecked();
+
+    // Negroni stays selected: the export button still counts one cocktail
+    await user.click(screen.getByText(/cocktails.exportZip/));
+    await waitFor(() => {
+      expect(exportCocktailsAsZip).toHaveBeenCalledWith(
+        [2],
+        [expect.objectContaining({ id: 2 })],
+      );
+    });
   });
 
   it('opens import wizard modal on import button click', async () => {

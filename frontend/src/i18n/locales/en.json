@@ -95,6 +95,7 @@
     "quantity": "Quantity",
     "quantityHint": "{{count}} identical bottles will be created",
     "saveDuplicate": "Save and duplicate",
+    "noCategoryHint": "Create a category first to add bottles",
     "showAllLocations": "Show all locations",
     "import": "Import",
     "export": "Export",
@@ -344,7 +345,8 @@
     "no": "No",
     "translations": "Translations",
     "translationHint": "Optional: provide translated names for each language",
-    "selected": "{{count}} selected"
+    "selected": "{{count}} selected",
+    "retry": "Retry"
   },
   "pagination": {
     "showing": "{{start}}-{{end}} of {{total}}",

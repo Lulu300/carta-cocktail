@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { Fragment, useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { useSort } from '../../hooks/useSort';
@@ -24,7 +24,6 @@ interface BottleGroup {
 
 function groupBottles(bottles: Bottle[]): (Bottle | BottleGroup)[] {
   const groups = new Map<string, BottleGroup>();
-  const singles: Bottle[] = [];
 
   for (const bottle of bottles) {
     const key = `${bottle.name.toLowerCase()}|${bottle.capacityMl}|${bottle.categoryId}|${bottle.alcoholPercentage ?? ''}`;
@@ -37,7 +36,6 @@ function groupBottles(bottles: Bottle[]): (Bottle | BottleGroup)[] {
   const result: (Bottle | BottleGroup)[] = [];
   for (const group of groups.values()) {
     if (group.bottles.length === 1) {
-      singles.push(group.bottles[0]);
       result.push(group.bottles[0]);
     } else {
       result.push(group);
@@ -67,6 +65,9 @@ export default function BottlesPage() {
   const [showImportWizard, setShowImportWizard] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  // Lets "save and duplicate" reuse the form submission (and its native validation)
+  // while "Save" stays the only submit button, i.e. the one triggered by Enter.
+  const submitIntent = useRef<'save' | 'duplicate'>('save');
 
   const handleExport = async (format: 'json' | 'csv') => {
     setShowExportMenu(false);
@@ -149,8 +150,9 @@ export default function BottlesPage() {
     setShowModal(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent, duplicate = false) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const duplicate = submitIntent.current === 'duplicate';
     const data = {
       name: form.name,
       categoryId: form.categoryId,
@@ -175,6 +177,13 @@ export default function BottlesPage() {
       }
     }
     load();
+  };
+
+  const handleSaveAndDuplicate = (e: React.MouseEvent<HTMLButtonElement>) => {
+    submitIntent.current = 'duplicate';
+    // requestSubmit() checks required fields and dispatches submit synchronously
+    e.currentTarget.form?.requestSubmit();
+    submitIntent.current = 'save';
   };
 
   const handleDelete = async (id: number) => {
@@ -233,8 +242,8 @@ export default function BottlesPage() {
     const expanded = expandedGroups.has(group.key);
     const avgRemaining = Math.round(group.bottles.reduce((s, b) => s + b.remainingPercent, 0) / group.bottles.length);
     return (
-      <>
-        <tr key={group.key} className="hover:bg-gray-800/50 cursor-pointer" onClick={() => toggleGroup(group.key)}>
+      <Fragment key={group.key}>
+        <tr className="hover:bg-gray-800/50 cursor-pointer" onClick={() => toggleGroup(group.key)}>
           <td className="px-6 py-4 font-medium">
             <div className="flex items-center gap-2">
               <svg className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -260,7 +269,7 @@ export default function BottlesPage() {
           <td className="px-6 py-4"></td>
         </tr>
         {expanded && group.bottles.map((b) => renderBottleRow(b, true))}
-      </>
+      </Fragment>
     );
   };
 
@@ -299,7 +308,12 @@ export default function BottlesPage() {
               </div>
             )}
           </div>
-          <button onClick={openCreate} className="bg-amber-400 hover:bg-amber-500 text-[#0f0f1a] font-semibold px-4 py-2 rounded-lg transition-colors">
+          <button
+            onClick={openCreate}
+            disabled={cats.length === 0}
+            title={cats.length === 0 ? t('bottles.noCategoryHint') : undefined}
+            className="bg-amber-400 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-[#0f0f1a] font-semibold px-4 py-2 rounded-lg transition-colors"
+          >
             {t('bottles.add')}
           </button>
         </div>
@@ -418,7 +432,7 @@ export default function BottlesPage() {
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <form onSubmit={(e) => handleSubmit(e)} className="bg-[#1a1a2e] border border-gray-800 rounded-xl p-6 w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto">
+          <form onSubmit={handleSubmit} className="bg-[#1a1a2e] border border-gray-800 rounded-xl p-6 w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-semibold">{editing ? t('bottles.edit') : t('bottles.add')}</h2>
             <div>
               <label className="block text-sm text-gray-400 mb-1">{t('bottles.name')}</label>
@@ -481,7 +495,7 @@ export default function BottlesPage() {
             <div className="flex justify-end gap-3 pt-2">
               <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-400 hover:text-white">{t('common.cancel')}</button>
               {!editing && (
-                <button type="button" onClick={(e) => handleSubmit(e as unknown as React.FormEvent, true)} className="border border-amber-400/30 text-amber-400 hover:bg-amber-400/10 font-semibold px-4 py-2 rounded-lg transition-colors">
+                <button type="button" onClick={handleSaveAndDuplicate} className="border border-amber-400/30 text-amber-400 hover:bg-amber-400/10 font-semibold px-4 py-2 rounded-lg transition-colors">
                   {t('bottles.saveDuplicate')}
                 </button>
               )}
