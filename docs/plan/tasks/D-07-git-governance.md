@@ -17,7 +17,7 @@ pr:
 ## Décisions validées (2026-10-08)
 
 - **Commits** : Conventional Commits (`fix:`, `feat:`, `chore(deps):`…).
-- **Titres de PR** : `ID: titre` (ex. `A-02: conserver les sections`).
+- **Titres de PR** : `ID: titre` (ex. `A-02: keep menu sections when saving`, en anglais).
 - **`.mailmap`** : identité canonique `Ludwig SIMON <ludwig@simonl.fr>`.
 - Les réglages GitHub (protection de `main` et `develop`, suppression automatique des branches) restent à faire par l'humain après le merge.
 
