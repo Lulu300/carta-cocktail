@@ -51,9 +51,21 @@ describe('matchesCocktailSearch', () => {
   });
 
   it('ignores case, accents, and punctuation', () => {
-    const item = cocktail({ notes: 'Décorer avec du citron' });
+    const item = cocktail({ description: 'Décorer avec du citron' });
 
     expect(matchesCocktailSearch(item, 'DÉCORER, CITRON', localize)).toBe(true);
+  });
+
+  it('does not search private notes by default', () => {
+    const item = cocktail({ notes: 'Recette secrète du patron' });
+
+    expect(matchesCocktailSearch(item, 'patron', localize)).toBe(false);
+  });
+
+  it('searches notes when explicitly asked (admin list)', () => {
+    const item = cocktail({ notes: 'Recette secrète du patron' });
+
+    expect(matchesCocktailSearch(item, 'patron', localize, { includeNotes: true })).toBe(true);
   });
 
   it('searches preparation instructions', () => {
