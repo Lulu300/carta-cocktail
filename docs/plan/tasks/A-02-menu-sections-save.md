@@ -5,13 +5,13 @@ phase: A
 lane: backend
 criticite: critique
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: []
 touches: [backend/src/routes/menus.ts, backend/src/routes/menus.test.ts, backend/src/i18n/en.json, backend/src/i18n/fr.json, frontend/src/types/index.ts]
 sources: ["01-backend-routes.md §C1", "01-backend-routes.md §C3", "05-frontend-archi.md §C1", "02-backend-data-perf.md §4.3"]
-branch:
-pr:
+branch: fix/A-02-menu-sections-save
+pr: 27
 ---
 
 ## Contexte
@@ -52,14 +52,14 @@ Hors périmètre : remplacement des bouteilles d'un menu système et synchronisa
 
 ## Critères d'acceptation
 
-- [ ] PUT avec `cocktails[].menuSectionId`, puis GET `/api/menus/:id` : chaque cocktail garde sa section.
-- [ ] Même chose avec `bottles[].menuSectionId`.
-- [ ] `menuSectionId` appartenant à un autre menu : 400, aucune association modifiée.
-- [ ] Slug en conflit avec `cocktails` dans le body : 409, associations inchangées.
-- [ ] Menu inexistant : 404, plus de 500.
-- [ ] Menu système : changer `slug` ou `type` donne 403 ; changer `name`, `description` ou `isPublic` donne 200 ; renvoyer le slug inchangé donne 200.
-- [ ] DELETE d'un menu système : message traduit, pas la clé brute.
-- [ ] `tsc` passe dans les deux paquets.
+- [x] PUT avec `cocktails[].menuSectionId`, puis GET `/api/menus/:id` : chaque cocktail garde sa section.
+- [x] Même chose avec `bottles[].menuSectionId`.
+- [x] `menuSectionId` appartenant à un autre menu : 400, aucune association modifiée.
+- [x] Slug en conflit avec `cocktails` dans le body : 409, associations inchangées.
+- [x] Menu inexistant : 404, plus de 500.
+- [x] Menu système : changer `slug` ou `type` donne 403 ; changer `name`, `description` ou `isPublic` donne 200 ; renvoyer le slug inchangé donne 200.
+- [x] DELETE d'un menu système : message traduit, pas la clé brute.
+- [x] `tsc` passe dans les deux paquets.
 
 ## Tests à ajouter ou adapter
 
@@ -84,3 +84,4 @@ Pas de test frontend obligatoire (changement de type uniquement). Les tests de `
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-08 : PUT /menus/:id transactionnel, `menuSectionId` conservé (cocktails et bouteilles) et contrôlé, 404 sur menu inexistant, slug et type des menus système verrouillés (403), clés i18n ajoutées, type `MenuInput` complété. 9 tests ajoutés et 1 complété dans `menus.test.ts`, couverture delta 100 %. Branche `fix/A-02-menu-sections-save`, PR #27.
