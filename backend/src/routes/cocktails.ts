@@ -453,11 +453,39 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// Tags are stored as a comma-separated string; the client may send an array or a string.
+function toTagsString(tags: unknown): string {
+  return Array.isArray(tags) ? tags.join(',') : ((tags as string) || '');
+}
+
+// Maps a request ingredient to a nested Prisma create. The array index gives the position.
+function mapIngredient(ing: any, index: number) {
+  return {
+    quantity: ing.quantity,
+    unitId: ing.unitId,
+    sourceType: ing.sourceType,
+    bottleId: ing.bottleId || null,
+    categoryId: ing.categoryId || null,
+    ingredientId: ing.ingredientId || null,
+    position: index,
+    preferredBottles: ing.preferredBottleIds
+      ? { create: ing.preferredBottleIds.map((bid: number) => ({ bottleId: bid })) }
+      : undefined,
+  };
+}
+
+// Maps a request instruction (an object with `text`, or a plain string) to a nested Prisma create.
+function mapInstruction(inst: any, index: number) {
+  return {
+    stepNumber: index + 1,
+    text: inst.text || inst,
+  };
+}
+
 // Create cocktail
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
     const { name, description, notes, tags, isAvailable, ingredients, instructions } = req.body;
-    const tagsString = Array.isArray(tags) ? tags.join(',') : (tags || '');
     if (!name) {
       res.status(400).json({ error: req.t('errors.validationError') });
       return;
@@ -468,28 +496,10 @@ router.post('/', async (req: AuthRequest, res: Response) => {
         name,
         description: description || null,
         notes: notes || null,
-        tags: tagsString,
+        tags: toTagsString(tags),
         isAvailable: isAvailable ?? true,
-        ingredients: {
-          create: (ingredients || []).map((ing: any, index: number) => ({
-            quantity: ing.quantity,
-            unitId: ing.unitId,
-            sourceType: ing.sourceType,
-            bottleId: ing.bottleId || null,
-            categoryId: ing.categoryId || null,
-            ingredientId: ing.ingredientId || null,
-            position: index,
-            preferredBottles: ing.preferredBottleIds
-              ? { create: ing.preferredBottleIds.map((bid: number) => ({ bottleId: bid })) }
-              : undefined,
-          })),
-        },
-        instructions: {
-          create: (instructions || []).map((inst: any, index: number) => ({
-            stepNumber: index + 1,
-            text: inst.text || inst,
-          })),
-        },
+        ingredients: { create: (ingredients || []).map(mapIngredient) },
+        instructions: { create: (instructions || []).map(mapInstruction) },
       },
       include: cocktailIncludes,
     });
@@ -501,16 +511,14 @@ router.post('/', async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Update cocktail
+// Update cocktail. Only the fields present in the body are written, so a partial
+// update such as { isAvailable: false } keeps the recipe. Ingredients and instructions
+// are replaced through nested writes, which Prisma runs in a single transaction:
+// if any part fails, the stored recipe is left untouched.
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const id = parseInt(String(req.params.id));
     const { name, description, notes, tags, isAvailable, ingredients, instructions } = req.body;
-    const tagsString = Array.isArray(tags) ? tags.join(',') : (tags ?? '');
-
-    // Delete existing ingredients and instructions to recreate
-    await prisma.cocktailIngredient.deleteMany({ where: { cocktailId: id } });
-    await prisma.cocktailInstruction.deleteMany({ where: { cocktailId: id } });
 
     const cocktail = await prisma.cocktail.update({
       where: { id },
@@ -518,38 +526,29 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
         ...(name && { name }),
         ...(description !== undefined && { description }),
         ...(notes !== undefined && { notes }),
-        tags: tagsString,
+        ...(tags !== undefined && { tags: toTagsString(tags) }),
         ...(isAvailable !== undefined && { isAvailable }),
-        ingredients: ingredients
-          ? {
-              create: ingredients.map((ing: any, index: number) => ({
-                quantity: ing.quantity,
-                unitId: ing.unitId,
-                sourceType: ing.sourceType,
-                bottleId: ing.bottleId || null,
-                categoryId: ing.categoryId || null,
-                ingredientId: ing.ingredientId || null,
-                position: index,
-                preferredBottles: ing.preferredBottleIds
-                  ? { create: ing.preferredBottleIds.map((bid: number) => ({ bottleId: bid })) }
-                  : undefined,
-              })),
-            }
-          : undefined,
-        instructions: instructions
-          ? {
-              create: instructions.map((inst: any, index: number) => ({
-                stepNumber: index + 1,
-                text: inst.text || inst,
-              })),
-            }
-          : undefined,
+        ...(Array.isArray(ingredients) && {
+          ingredients: { deleteMany: {}, create: ingredients.map(mapIngredient) },
+        }),
+        ...(Array.isArray(instructions) && {
+          instructions: { deleteMany: {}, create: instructions.map(mapInstruction) },
+        }),
       },
       include: cocktailIncludes,
     });
 
     res.json(parseNameTranslations(cocktail));
-  } catch (error) {
+  } catch (error: any) {
+    // Local mapping until centralized error handling lands (C-03).
+    if (error.code === 'P2025') {
+      res.status(404).json({ error: req.t('errors.notFound') });
+      return;
+    }
+    if (error.code === 'P2003') {
+      res.status(400).json({ error: req.t('errors.validationError') });
+      return;
+    }
     console.error(error);
     res.status(500).json({ error: req.t('errors.serverError') });
   }

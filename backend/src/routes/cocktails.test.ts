@@ -156,6 +156,134 @@ describe('PUT /api/cocktails/:id', () => {
     expect(res.body.ingredients).toHaveLength(1);
     expect(res.body.ingredients[0].sourceType).toBe('CATEGORY');
   });
+
+  // Full recipe: a BOTTLE ingredient, a CATEGORY ingredient with a preferred bottle,
+  // two instructions and two tags.
+  async function createFullCocktail() {
+    const unit = await seedUnit();
+    const cat = await seedCategory();
+    const bottle = await seedBottle({ categoryId: cat.id });
+    const res = await request.post('/api/cocktails').set(authHeader()).send({
+      name: 'Full Recipe',
+      tags: ['rhum', 'frais'],
+      ingredients: [
+        { quantity: 4, unitId: unit.id, sourceType: 'BOTTLE', bottleId: bottle.id },
+        {
+          quantity: 2, unitId: unit.id, sourceType: 'CATEGORY', categoryId: cat.id,
+          preferredBottleIds: [bottle.id],
+        },
+      ],
+      instructions: [{ text: 'Shake' }, { text: 'Strain' }],
+    });
+    expect(res.status).toBe(201);
+    return { id: res.body.id as number, unit };
+  }
+
+  function expectRecipeIntact(body: any) {
+    expect(body.ingredients).toHaveLength(2);
+    expect(body.ingredients[0].sourceType).toBe('BOTTLE');
+    expect(body.ingredients[1].preferredBottles).toHaveLength(1);
+    expect(body.instructions.map((i: any) => i.text)).toEqual(['Shake', 'Strain']);
+  }
+
+  it('should keep ingredients, instructions, tags and preferred bottles on a partial update', async () => {
+    const { id } = await createFullCocktail();
+
+    const res = await request.put(`/api/cocktails/${id}`).set(authHeader())
+      .send({ isAvailable: false });
+
+    expect(res.status).toBe(200);
+    expect(res.body.isAvailable).toBe(false);
+    expect(res.body.tags).toBe('rhum,frais');
+    expectRecipeIntact(res.body);
+  });
+
+  it('should keep tags when only the name is updated', async () => {
+    const { id } = await createFullCocktail();
+
+    const res = await request.put(`/api/cocktails/${id}`).set(authHeader()).send({ name: 'X' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe('X');
+    expect(res.body.tags).toBe('rhum,frais');
+  });
+
+  it('should clear tags when an empty array is sent', async () => {
+    const { id } = await createFullCocktail();
+
+    const res = await request.put(`/api/cocktails/${id}`).set(authHeader()).send({ tags: [] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.tags).toBe('');
+  });
+
+  it('should clear tags when null is sent', async () => {
+    const { id } = await createFullCocktail();
+
+    const res = await request.put(`/api/cocktails/${id}`).set(authHeader()).send({ tags: null });
+
+    expect(res.status).toBe(200);
+    expect(res.body.tags).toBe('');
+  });
+
+  it('should clear ingredients but keep instructions when ingredients is an empty array', async () => {
+    const { id } = await createFullCocktail();
+
+    const res = await request.put(`/api/cocktails/${id}`).set(authHeader()).send({ ingredients: [] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.ingredients).toHaveLength(0);
+    expect(res.body.instructions).toHaveLength(2);
+    expect(await prisma.cocktailPreferredBottle.count()).toBe(0);
+  });
+
+  it('should return 400 and leave the recipe untouched when a unit does not exist', async () => {
+    const { id } = await createFullCocktail();
+
+    const res = await request.put(`/api/cocktails/${id}`).set(authHeader()).send({
+      name: 'Should Not Be Saved',
+      ingredients: [{ quantity: 1, unitId: 99999, sourceType: 'INGREDIENT' }],
+      instructions: [{ text: 'Replaced' }],
+    });
+    expect(res.status).toBe(400);
+
+    const after = await request.get(`/api/cocktails/${id}`).set(authHeader());
+    expect(after.body.name).toBe('Full Recipe');
+    expectRecipeIntact(after.body);
+  });
+
+  it('should return 400 and leave the recipe untouched when a preferred bottle does not exist', async () => {
+    const { id, unit } = await createFullCocktail();
+    const cat = await seedCategory({ name: 'Other' });
+
+    const res = await request.put(`/api/cocktails/${id}`).set(authHeader()).send({
+      ingredients: [{
+        quantity: 1, unitId: unit.id, sourceType: 'CATEGORY', categoryId: cat.id,
+        preferredBottleIds: [99999],
+      }],
+    });
+    expect(res.status).toBe(400);
+
+    const after = await request.get(`/api/cocktails/${id}`).set(authHeader());
+    expectRecipeIntact(after.body);
+  });
+
+  it('should return 404 for a non-existent cocktail', async () => {
+    const res = await request.put('/api/cocktails/99999').set(authHeader()).send({ name: 'X' });
+    expect(res.status).toBe(404);
+  });
+
+  it('should return 500 for an unexpected database error', async () => {
+    const { id } = await createFullCocktail();
+
+    // A non-string instruction text passes the mapping but is rejected by Prisma validation.
+    const res = await request.put(`/api/cocktails/${id}`).set(authHeader())
+      .send({ instructions: [{ text: 42 }] });
+    expect(res.status).toBe(500);
+
+    const after = await request.get(`/api/cocktails/${id}`).set(authHeader());
+    expectRecipeIntact(after.body);
+  });
 });
 
 describe('DELETE /api/cocktails/:id', () => {
