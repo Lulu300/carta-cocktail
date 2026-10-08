@@ -26,7 +26,8 @@ export default function ShortagesPage() {
 
   useEffect(() => { load(); }, []);
 
-  // Never show the green "no shortages" banner unless the list really loaded
+  // Never show the green "no shortages" banner unless the list really loaded.
+  // Returns null when there are shortages to display.
   const renderStatus = () => {
     if (isLoading) {
       return <div className="text-center py-12 text-gray-500">{t('common.loading')}</div>;
@@ -44,19 +45,20 @@ export default function ShortagesPage() {
         </div>
       );
     }
-    return (
-      <div className="bg-green-500/10 border border-green-500/30 text-green-400 px-6 py-8 rounded-xl text-center text-lg">
-        {t('shortages.noShortages')}
-      </div>
-    );
+    if (items.length === 0) {
+      return (
+        <div className="bg-green-500/10 border border-green-500/30 text-green-400 px-6 py-8 rounded-xl text-center text-lg">
+          {t('shortages.noShortages')}
+        </div>
+      );
+    }
+    return null;
   };
 
   return (
     <div>
       <h1 className="text-2xl font-bold font-serif text-amber-400 mb-6">{t('shortages.title')}</h1>
-      {isLoading || hasError || items.length === 0 ? (
-        renderStatus()
-      ) : (
+      {renderStatus() ?? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {items.map((item) => {
             const deficit = item.requiredPercent - item.totalPercent;

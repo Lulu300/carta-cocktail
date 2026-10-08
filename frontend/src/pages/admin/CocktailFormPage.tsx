@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
@@ -46,6 +46,9 @@ export default function CocktailFormPage() {
   const [newIngredientName, setNewIngredientName] = useState('');
   const [showNewIngredient, setShowNewIngredient] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // State is only visible after a re-render; the ref blocks a re-entrant submit
+  // fired before that (e.g. Enter pressed twice quickly).
+  const isSubmittingRef = useRef(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -136,7 +139,7 @@ export default function CocktailFormPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return;
+    if (isSubmittingRef.current) return;
     const tagsArray = tagsInput.split(',').map((t) => t.trim()).filter(Boolean);
     const data = {
       name,
@@ -156,6 +159,7 @@ export default function CocktailFormPage() {
       instructions: instructionTexts.filter((t) => t.trim()).map((t) => ({ text: t })),
     };
 
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     setSubmitError(null);
     let savedId: number | null = null;
@@ -178,6 +182,7 @@ export default function CocktailFormPage() {
         navigate(`/admin/cocktails/${savedId}`, { replace: true });
       }
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };

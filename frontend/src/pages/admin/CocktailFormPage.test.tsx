@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '../../test/test-utils';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, waitFor, act } from '../../test/test-utils';
 import userEvent from '@testing-library/user-event';
 import CocktailFormPage from './CocktailFormPage';
 
@@ -62,9 +62,17 @@ function getNameInput(container: HTMLElement) {
   return container.querySelector('input[required]') as HTMLInputElement;
 }
 
+// jsdom has no URL.createObjectURL: tests that need it set a stub, restored here
+const originalCreateObjectURL = URL.createObjectURL;
+
 describe('CocktailFormPage', () => {
+  afterEach(() => {
+    URL.createObjectURL = originalCreateObjectURL;
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
+    mockNavigate.mockReset();
     mockParams = {};
     vi.mocked(categories.list).mockResolvedValue([
       {
@@ -145,6 +153,33 @@ describe('CocktailFormPage', () => {
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/admin/cocktails');
     });
+  });
+
+  it('ignores a re-entrant submit fired before the page re-renders', async () => {
+    vi.mocked(cocktails.create).mockReturnValue(new Promise<Cocktail>(() => {}));
+    const user = userEvent.setup();
+    const { container } = render(<CocktailFormPage />);
+    await user.type(getNameInput(container), 'Mojito');
+    const form = container.querySelector('form') as HTMLFormElement;
+
+    // Both submits run in the same batch, before the disabled button is rendered
+    act(() => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    expect(cocktails.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to the generic error message when the error has no message', async () => {
+    const user = userEvent.setup();
+    vi.mocked(cocktails.create).mockRejectedValue('boom');
+    const { container } = render(<CocktailFormPage />);
+
+    await user.type(getNameInput(container), 'Mojito');
+    await user.click(screen.getByRole('button', { name: 'common.save' }));
+
+    expect(await screen.findByText('common.error')).toBeInTheDocument();
   });
 
   it('shows the server error and keeps the form usable when saving fails', async () => {

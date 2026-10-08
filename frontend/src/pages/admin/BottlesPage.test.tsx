@@ -458,16 +458,19 @@ describe('BottlesPage', () => {
       { ...mockBottles[0], id: 3 },
       mockBottles[1],
     ] as never);
-    render(<BottlesPage />);
+    try {
+      render(<BottlesPage />);
 
-    await screen.findByText('x2');
-    await user.click(screen.getByText('x2'));
-    expect(screen.getAllByText('Absolut')).toHaveLength(3);
+      await screen.findByText('x2');
+      await user.click(screen.getByText('x2'));
+      expect(screen.getAllByText('Absolut')).toHaveLength(3);
 
-    const keyWarnings = consoleError.mock.calls.filter((args) =>
-      args.some((arg) => typeof arg === 'string' && arg.includes('unique "key"'))
-    );
-    expect(keyWarnings).toHaveLength(0);
-    consoleError.mockRestore();
+      const keyWarnings = consoleError.mock.calls.filter((args) =>
+        args.some((arg) => typeof arg === 'string' && arg.includes('unique "key"'))
+      );
+      expect(keyWarnings).toHaveLength(0);
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 });
