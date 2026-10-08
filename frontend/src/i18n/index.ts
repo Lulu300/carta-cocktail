@@ -21,9 +21,10 @@ i18n
       fr: { translation: fr },
     },
     detection: {
-      // Default order without 'htmlTag': <html lang> is written by the listener above, so reading
-      // it back would make an unsupported browser language ("de") inherit the previous choice.
-      order: ['querystring', 'cookie', 'localStorage', 'sessionStorage', 'navigator'],
+      // Default order without 'htmlTag' and 'cookie'. <html lang> is written by the listener above,
+      // so reading it back would make an unsupported browser language ("de") inherit the previous
+      // choice. No cookie is ever written (the choice is cached in localStorage only).
+      order: ['querystring', 'localStorage', 'sessionStorage', 'navigator'],
       // Reduce detected codes to their base language ("fr-FR" -> "fr") so they match supportedLngs.
       convertDetectedLanguage: getBaseLanguage,
     },

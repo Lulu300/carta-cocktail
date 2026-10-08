@@ -39,7 +39,8 @@ export default function LanguageSelector() {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // i18n.language can still be a regional code ("en-US"); unknown languages fall back to English like i18next.
+  // Defensive: i18n config already yields "fr" or "en", but never trust a regional or unknown code
+  // here. Fall back to English like i18next does, not to the first entry of the list.
   const currentCode = getBaseLanguage(i18n.resolvedLanguage ?? i18n.language ?? FALLBACK_LANGUAGE);
   const currentLanguage =
     languages.find(lang => lang.code === currentCode) ??
