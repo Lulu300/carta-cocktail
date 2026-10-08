@@ -7,7 +7,9 @@
     "validationError": "Validation error",
     "duplicateEntry": "This entry already exists",
     "cannotDelete": "Cannot delete: resource is in use",
-    "invalidBackup": "Invalid backup file"
+    "invalidBackup": "Invalid backup file",
+    "cannotDeleteDefaultMenu": "Cannot delete a system menu",
+    "cannotModifySystemMenu": "System menus cannot have their slug or type changed"
   },
   "auth": {
     "loginSuccess": "Login successful",
