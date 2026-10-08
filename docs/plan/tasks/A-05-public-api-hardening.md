@@ -5,14 +5,19 @@ phase: A
 lane: backend
 criticite: haute
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: []
-touches: [backend/src/routes/public.ts, backend/src/routes/public.test.ts, backend/src/middleware/auth.ts, backend/src/middleware/auth.test.ts, frontend/src/utils/cocktailSearch.ts, frontend/src/utils/cocktailSearch.test.ts]
+touches: [backend/src/routes/public.ts, backend/src/routes/public.test.ts, backend/src/middleware/auth.ts, backend/src/middleware/auth.test.ts, frontend/src/utils/cocktailSearch.ts, frontend/src/utils/cocktailSearch.test.ts, frontend/src/pages/admin/CocktailsPage.tsx]
 sources: ["03-security.md §3", "03-security.md §5", "06-frontend-ux-perf.md §5", "02-backend-data-perf.md §5"]
-branch:
-pr:
+branch: fix/A-05-public-api-hardening
+pr: 33
 ---
+
+## Décisions validées (2026-10-08)
+
+- **Cocktails hors carte** : un cocktail visible dans aucun menu publié renvoie 404 sur l'API publique, y compris par lien direct.
+- **Emplacement** : `location` reste public, rien à retirer côté affichage.
 
 ## Contexte
 
@@ -54,13 +59,13 @@ Hors périmètre : factorisation de l'export admin/public (C-09) ; `/public/unit
 
 ## Critères d'acceptation
 
-- [ ] `Authorization: Bearer x`, ou un token signé avec un autre secret : menu non public en 404.
-- [ ] Token admin valide : aperçu du menu non public (200).
-- [ ] Token expiré sur un menu public : 200, pas de 401.
-- [ ] Aucun élément `isHidden` dans `/public/menus/:slug`, pour l'invité comme pour l'admin.
-- [ ] Aucune réponse publique ne contient `purchasePrice`, `openedAt` ni `remainingPercent`.
-- [ ] Cocktail absent de tout menu public, ou seulement masqué : 404 pour un invité (détail et export), 200 pour l'admin.
-- [ ] `notes` et `preferredBottles` absents pour un invité, présents pour l'admin.
+- [x] `Authorization: Bearer x`, ou un token signé avec un autre secret : menu non public en 404.
+- [x] Token admin valide : aperçu du menu non public (200).
+- [x] Token expiré sur un menu public : 200, pas de 401.
+- [x] Aucun élément `isHidden` dans `/public/menus/:slug`, pour l'invité comme pour l'admin.
+- [x] Aucune réponse publique ne contient `purchasePrice`, `openedAt` ni `remainingPercent`.
+- [x] Cocktail absent de tout menu public, ou seulement masqué : 404 pour un invité (détail et export), 200 pour l'admin.
+- [x] `notes` et `preferredBottles` absents pour un invité, présents pour l'admin.
 - [ ] La carte publique et la fiche cocktail s'affichent comme avant (vérification manuelle en invité et en admin).
 
 ## Tests à ajouter ou adapter
@@ -90,3 +95,4 @@ Hors périmètre : factorisation de l'export admin/public (C-09) ; `/public/unit
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-08 : décisions humaines reportées en tête (cocktail hors carte en 404 même par lien direct, `location` reste public). `verifyToken` (HS256 seul, `userId` numérique exigé) et `optionalAuth` dans `middleware/auth.ts` ; `public.ts` : `optionalAuth`, éléments masqués filtrés pour tous, `select` explicites (aucun champ d'inventaire), cocktails réservés aux menus publics pour l'invité (détail et export), `notes` et `preferredBottles` réservés à l'admin, id non numérique en 404, `_count` sans éléments masqués (ni bouteilles vides, pour coller à l'affichage). Front : `matchesCocktailSearch` n'indexe plus les notes par défaut ; option `includeNotes` utilisée par la liste admin, d'où l'ajout de `frontend/src/pages/admin/CocktailsPage.tsx` à `touches` (sinon la recherche admin par note régressait, test existant). Tests : `auth.test.ts` (11) créé, `public.test.ts` adapté et complété (32 tests), `cocktailSearch.test.ts` (+2). Couverture delta 100 % backend et frontend. Critère « vérification manuelle » laissé à l'humain. Branche `fix/A-05-public-api-hardening`, PR #33.
