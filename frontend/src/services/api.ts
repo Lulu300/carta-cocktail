@@ -6,12 +6,36 @@ import type {
   BottleImportConfirmResponse,
 } from '../types';
 
-const API_BASE = '/api';
+import i18n from '../i18n';
 
-async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const token = localStorage.getItem('token');
+const API_BASE = '/api';
+const LOGIN_URL = '/auth/login';
+
+/** HTTP error that keeps the server message and status code. */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly body?: unknown;
+
+  constructor(status: number, message: string, body?: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.body = body;
+  }
+}
+
+let unauthorizedHandler: (() => void) | null = null;
+
+/** Registers the callback run when the session is rejected (expired or invalid token). */
+export function setUnauthorizedHandler(fn: (() => void) | null): void {
+  unauthorizedHandler = fn;
+}
+
+function buildHeaders(init: RequestInit, token: string | null): Record<string, string> {
   const headers: Record<string, string> = {
-    ...(options?.headers as Record<string, string>),
+    ...(init.headers as Record<string, string>),
+    // Server error messages must follow the language chosen in the UI, not the browser's.
+    'Accept-Language': i18n.resolvedLanguage ?? i18n.language ?? 'en',
   };
 
   if (token) {
@@ -19,25 +43,48 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   }
 
   // Don't set Content-Type for FormData (browser sets it with boundary)
-  if (!(options?.body instanceof FormData)) {
+  if (!(init.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }
 
+  return headers;
+}
+
+function handleUnauthorized(url: string, requestToken: string | null): void {
+  // A 401 on login means wrong credentials, and without a token there is no session to end.
+  if (requestToken === null || url === LOGIN_URL) return;
+  // A late 401 for a request sent with an older token must not end the newer session.
+  if (localStorage.getItem('token') !== requestToken) return;
+  localStorage.removeItem('token');
+  unauthorizedHandler?.();
+}
+
+async function readErrorBody(res: Response): Promise<{ error?: unknown }> {
+  return res.json().catch(() => ({}));
+}
+
+/** Sends an API request and throws an ApiError carrying the server message on failure. */
+async function send(url: string, init: RequestInit = {}): Promise<Response> {
+  const token = localStorage.getItem('token');
   const res = await fetch(`${API_BASE}${url}`, {
-    ...options,
-    headers,
+    ...init,
+    headers: buildHeaders(init, token),
   });
 
+  if (res.ok) return res;
+
+  const body = await readErrorBody(res);
   if (res.status === 401) {
-    localStorage.removeItem('token');
-    throw new Error('Unauthorized');
+    handleUnauthorized(url, token);
   }
+  const message = typeof body.error === 'string' ? body.error : `HTTP ${res.status}`;
+  throw new ApiError(res.status, message, body);
+}
 
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || `HTTP ${res.status}`);
-  }
-
+async function request<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await send(url, init);
+  // 204 No Content has no body to parse
+  if (res.status === 204) return undefined as T;
   return res.json();
 }
 
@@ -94,19 +141,12 @@ export const bottles = {
     format: 'json' | 'csv',
     filters?: { categoryId?: number; type?: string; search?: string; location?: string }
   ) => {
-    const token = localStorage.getItem('token');
     const searchParams = new URLSearchParams({ format });
     if (filters?.categoryId) searchParams.set('categoryId', String(filters.categoryId));
     if (filters?.type) searchParams.set('type', filters.type);
     if (filters?.search) searchParams.set('search', filters.search);
     if (filters?.location) searchParams.set('location', filters.location);
-    const res = await fetch(`${API_BASE}/bottles/export?${searchParams.toString()}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || `HTTP ${res.status}`);
-    }
+    const res = await send(`/bottles/export?${searchParams.toString()}`);
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const disposition = res.headers.get('Content-Disposition') || '';
@@ -267,14 +307,7 @@ export const settings = {
 // Backup
 export const backup = {
   exportBackup: async () => {
-    const token = localStorage.getItem('token');
-    const res = await fetch(`${API_BASE}/backup/export`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || `HTTP ${res.status}`);
-    }
+    const res = await send('/backup/export');
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const disposition = res.headers.get('Content-Disposition') || '';
@@ -286,19 +319,12 @@ export const backup = {
     a.click();
     URL.revokeObjectURL(url);
   },
-  importBackup: async (file: File) => {
-    const token = localStorage.getItem('token');
+  importBackup: (file: File) => {
     const formData = new FormData();
     formData.append('backup', file);
-    const res = await fetch(`${API_BASE}/backup/import`, {
+    return request<{ success: boolean; message: string }>('/backup/import', {
       method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
     });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || `HTTP ${res.status}`);
-    }
-    return res.json();
   },
 };

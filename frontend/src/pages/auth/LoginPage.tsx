@@ -1,13 +1,30 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, type Location } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import LanguageSelector from '../../components/ui/LanguageSelector';
+
+const ADMIN_HOME = '/admin';
+
+function isAdminPath(pathname: string): boolean {
+  return pathname === ADMIN_HOME || pathname.startsWith(`${ADMIN_HOME}/`);
+}
+
+/**
+ * Page to open after sign-in: the admin page that sent the user here, if any.
+ * Only admin paths are accepted so the redirect cannot leave the admin area.
+ */
+function getRedirectPath(state: unknown): string {
+  const from = (state as { from?: Partial<Location> } | null)?.from;
+  if (typeof from?.pathname !== 'string' || !isAdminPath(from.pathname)) return ADMIN_HOME;
+  return `${from.pathname}${from.search ?? ''}${from.hash ?? ''}`;
+}
 
 export default function LoginPage() {
   const { t } = useTranslation();
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -19,7 +36,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      navigate('/admin');
+      navigate(getRedirectPath(location.state), { replace: true });
     } catch {
       setError(t('auth.loginError'));
     } finally {

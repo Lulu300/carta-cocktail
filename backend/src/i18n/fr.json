@@ -3,6 +3,7 @@
     "notFound": "Ressource introuvable",
     "unauthorized": "Non autorisé",
     "invalidCredentials": "Email ou mot de passe invalide",
+    "invalidCurrentPassword": "Mot de passe actuel incorrect",
     "serverError": "Erreur interne du serveur",
     "validationError": "Erreur de validation",
     "duplicateEntry": "Cette entrée existe déjà",

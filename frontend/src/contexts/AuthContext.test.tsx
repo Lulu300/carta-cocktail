@@ -9,11 +9,20 @@ vi.mock('../services/api', () => ({
     login: vi.fn(),
     me: vi.fn(),
   },
+  setUnauthorizedHandler: vi.fn(),
 }));
 
-import { auth as authApi } from '../services/api';
+import { auth as authApi, setUnauthorizedHandler } from '../services/api';
 const mockLogin = vi.mocked(authApi.login);
 const mockMe = vi.mocked(authApi.me);
+const mockSetUnauthorizedHandler = vi.mocked(setUnauthorizedHandler);
+
+/** Returns the last handler AuthProvider registered with the API client. */
+function registeredUnauthorizedHandler(): () => void {
+  const handler = mockSetUnauthorizedHandler.mock.calls.at(-1)?.[0];
+  if (!handler) throw new Error('No unauthorized handler registered');
+  return handler;
+}
 
 function wrapper({ children }: { children: ReactNode }) {
   return <AuthProvider>{children}</AuthProvider>;
@@ -61,13 +70,11 @@ describe('AuthContext', () => {
     expect(localStorage.getItem('token')).toBeNull();
   });
 
-  it('should login and set user/token', async () => {
+  it('should login and set user/token without calling /auth/me', async () => {
     mockLogin.mockResolvedValueOnce({
       token: 'new-token',
       user: { id: 1, email: 'admin@test.local' },
     });
-    // After login sets token, useEffect fires and calls me()
-    mockMe.mockResolvedValueOnce({ id: 1, email: 'admin@test.local' });
 
     const { result } = renderHook(() => useAuth(), { wrapper });
 
@@ -76,7 +83,36 @@ describe('AuthContext', () => {
     });
 
     expect(result.current.user).toEqual({ id: 1, email: 'admin@test.local' });
+    expect(result.current.token).toBe('new-token');
     expect(localStorage.getItem('token')).toBe('new-token');
+    expect(mockMe).not.toHaveBeenCalled();
+  });
+
+  it('should clear user and token when the API reports an unauthorized request', async () => {
+    localStorage.setItem('token', 'stored-token');
+    mockMe.mockResolvedValueOnce({ id: 1, email: 'admin@test.local' });
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.user).not.toBeNull();
+    });
+
+    act(() => {
+      registeredUnauthorizedHandler()();
+    });
+
+    expect(result.current.user).toBeNull();
+    expect(result.current.token).toBeNull();
+    expect(localStorage.getItem('token')).toBeNull();
+  });
+
+  it('should unregister the unauthorized handler on unmount', () => {
+    const { unmount } = renderHook(() => useAuth(), { wrapper });
+
+    unmount();
+
+    expect(mockSetUnauthorizedHandler).toHaveBeenLastCalledWith(null);
   });
 
   it('should logout and clear state', async () => {
