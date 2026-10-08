@@ -5,13 +5,13 @@ phase: A
 lane: backend
 criticite: critique
 effort: S
-status: todo
+status: done
 owner: mixed
 depends_on: []
 touches: [backend/prisma/seed.ts, backend/src/bootstrap/ensureAdmin.ts, backend/src/bootstrap/ensureAdmin.test.ts, backend/src/config.ts, backend/src/config.test.ts, docker-compose.yml, docker-compose.prod.yml, .env.example, README.md]
 sources: ["03-security.md §1", "03-security.md §2", "07-devops-history.md §2.3", "02-backend-data-perf.md §5"]
-branch:
-pr:
+branch: fix/A-04-secrets-seed
+pr: 36
 ---
 
 ## Décisions validées (2026-10-08)
@@ -66,13 +66,13 @@ Hors périmètre : migrations Prisma (C-01) ; limitation des essais de connexion
 
 ## Critères d'acceptation
 
-- [ ] Hors `NODE_ENV=test`, le backend refuse de démarrer sans `JWT_SECRET`, avec un secret de moins de 32 caractères ou une valeur connue, et le message donne la commande de génération.
-- [ ] `docker compose -f docker-compose.prod.yml config` échoue si `JWT_SECRET` n'est pas défini.
-- [ ] Premier démarrage sans `ADMIN_PASSWORD` valide : erreur claire, aucun admin créé.
-- [ ] Mot de passe changé dans Réglages > Profil, puis redémarrage du conteneur : le nouveau mot de passe fonctionne toujours.
-- [ ] `ADMIN_RESET_PASSWORD=true` réinitialise email et mot de passe depuis l'environnement.
-- [ ] Plus aucune valeur par défaut `admin123`, `default-secret` ou `change-me-to-a-random-secret` dans `config.ts`, `seed.ts`, les compose et `.env.example`.
-- [ ] README à jour.
+- [x] Hors `NODE_ENV=test`, le backend refuse de démarrer sans `JWT_SECRET`, avec un secret de moins de 32 caractères ou une valeur connue, et le message donne la commande de génération.
+- [x] `docker compose -f docker-compose.prod.yml config` échoue si `JWT_SECRET` n'est pas défini.
+- [x] Premier démarrage sans `ADMIN_PASSWORD` valide : erreur claire, aucun admin créé.
+- [x] Mot de passe changé dans Réglages > Profil, puis redémarrage du conteneur : le nouveau mot de passe fonctionne toujours.
+- [x] `ADMIN_RESET_PASSWORD=true` réinitialise email et mot de passe depuis l'environnement.
+- [x] Plus aucune valeur par défaut `admin123`, `default-secret` ou `change-me-to-a-random-secret` dans `config.ts`, `seed.ts`, les compose et `.env.example`.
+- [x] README à jour.
 
 ## Tests à ajouter ou adapter
 
@@ -98,3 +98,4 @@ Hors périmètre : migrations Prisma (C-01) ; limitation des essais de connexion
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : décisions validées par l'humain (voir « Décisions validées »).
+- 2026-10-08 : fait dans la PR #36 (`fix/A-04-secrets-seed`). `assertJwtSecret` dans `config.ts`, `ensureAdmin` dans `src/bootstrap/`, compose, `.env.example` et README à jour. `seed.ts` charge lui-même `backend/.env` (il tourne hors de l'application ; Prisma 7 ne le fera plus implicitement). Aucun fichier hors `touches` : la CI et `src/test/setup.ts` fixent déjà `NODE_ENV=test`. Vérifié à la main : `docker compose config` sans `JWT_SECRET`, démarrage refusé, seed sur base jetable et image Docker (création, conservation, `ADMIN_RESET_PASSWORD=true`). Couverture des lignes modifiées : 100 %. Remarque : sur le partage NAS, la suite backend échoue de façon aléatoire (SQLite sur disque réseau) ; elle passe entièrement sur disque local.
