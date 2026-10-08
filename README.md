@@ -41,6 +41,9 @@ cd carta-cocktail
 # Backend
 cd backend
 cp ../.env.example .env
+# Edit .env before seeding:
+#   JWT_SECRET     -> output of: openssl rand -hex 32
+#   ADMIN_PASSWORD -> a password of at least 12 characters
 npm install
 npx prisma db push
 npm run db:seed
@@ -54,7 +57,7 @@ npm run dev
 # App running at http://localhost:5173
 ```
 
-Default admin credentials: `admin@carta.local` / `admin123`
+Log in with the `ADMIN_EMAIL` and `ADMIN_PASSWORD` you set in `.env`. There are no default credentials: the backend refuses to start without a strong `JWT_SECRET`, and the seed refuses to create the admin without a valid `ADMIN_PASSWORD`.
 
 ### Running Tests
 
@@ -78,6 +81,8 @@ The backend tests use a dedicated `test.db` SQLite database, created and destroy
 
 ### Docker (local build)
 
+Create a `.env` file next to the compose file first (see the required variables below), then:
+
 ```bash
 docker compose up --build
 ```
@@ -95,13 +100,29 @@ docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-Configure via environment variables or a `.env` file alongside the compose file:
+Create a `.env` file alongside the compose file **before the first start**:
 
 ```bash
-JWT_SECRET=your-random-secret
+JWT_SECRET=<output of: openssl rand -hex 32>   # required, at least 32 characters
 ADMIN_EMAIL=admin@yourbar.com
-ADMIN_PASSWORD=your-secure-password
+ADMIN_PASSWORD=<at least 12 characters>        # required on first start
 ```
+
+> **Warning:** set `JWT_SECRET` and `ADMIN_PASSWORD` before exposing the app to the Internet. `docker compose` refuses to start without `JWT_SECRET`, and the backend refuses a secret shorter than 32 characters or a known default.
+
+`ADMIN_PASSWORD` is only used to create the admin on first start. After that, change the password from Settings > Profile: it survives restarts and image updates. Changing `JWT_SECRET` logs out existing sessions; it does not touch data.
+
+#### Upgrading from a version with default credentials
+
+Earlier versions fell back to a public `JWT_SECRET` and to `admin123`. The backend no longer starts without a strong `JWT_SECRET`. Before pulling the new images, add `JWT_SECRET` to the `.env` file (and `ADMIN_PASSWORD` if the database is new). The existing admin account is kept as is.
+
+#### Recovering the admin account
+
+If you lose the admin password:
+
+1. Set `ADMIN_RESET_PASSWORD=true` and the new `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `.env`.
+2. Restart the backend: `docker compose -f docker-compose.prod.yml up -d`. The log shows `Admin credentials reset from environment`.
+3. Remove `ADMIN_RESET_PASSWORD` from `.env` (or set it back to `false`) and restart again, otherwise every restart resets the password.
 
 To pin a specific version instead of `latest`, edit the image tags in `docker-compose.prod.yml`:
 
@@ -145,9 +166,10 @@ carta-cocktail/
 | Variable | Description | Default |
 | --- | --- | --- |
 | `DATABASE_URL` | SQLite database path | `file:./carta_cocktail.db` |
-| `JWT_SECRET` | Secret for JWT signing | `change-me-to-a-random-secret` |
-| `ADMIN_EMAIL` | Admin login email | `admin@carta.local` |
-| `ADMIN_PASSWORD` | Admin login password | `admin123` |
+| `JWT_SECRET` | Secret for JWT signing, at least 32 characters (`openssl rand -hex 32`) | **required**, no default |
+| `ADMIN_EMAIL` | Admin login email, used when the admin is created or reset | `admin@carta.local` |
+| `ADMIN_PASSWORD` | Admin password, at least 12 characters, used when the admin is created or reset | **required** on first start, no default |
+| `ADMIN_RESET_PASSWORD` | `true` resets the existing admin's email and password from the two variables above at startup | `false` |
 | `PORT` | Backend port | `3001` |
 | `BACKEND_HOST` | Backend hostname for nginx proxy (frontend container) | `backend` |
 
