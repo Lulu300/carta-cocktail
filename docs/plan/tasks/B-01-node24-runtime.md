@@ -56,6 +56,7 @@ Pas de test unitaire. Vérification manuelle décrite dans la PR : sortie de `do
 - `bcryptjs` est en JS pur : pas de module natif à recompiler aujourd'hui. Ce sera différent avec Prisma 7 (better-sqlite3, C-15) et sharp (F-01) : vérifier alors les binaires musl, surtout si le NAS est en ARM.
 - Node 26 deviendra LTS fin octobre 2026. Rester sur 24 jusqu'en 2027, le temps que les modules natifs publient leurs binaires.
 - Le Dockerfile backend est aussi modifié par C-01, C-15 et D-01 : enchaîner, ne pas lancer en parallèle.
+- Depuis A-07, le lockfile backend doit rester installable par `npm ci` sous npm 10 (image `node:20-alpine`) : entrée `node_modules/@prisma/config/node_modules/magicast` 0.3.5, que npm 11 peut retirer. Une fois les images en Node 24 (npm 11), retirer cette contrainte du Journal d'A-07 et des tâches qui la citent.
 
 ## Journal
 

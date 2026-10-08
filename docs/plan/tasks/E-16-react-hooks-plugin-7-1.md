@@ -2,7 +2,7 @@
 id: E-16
 title: "eslint-plugin-react-hooks 7.1 : corriger les deux setState synchrones dans un effet"
 phase: E
-lane: frontend
+lane: deps
 criticite: basse
 effort: S
 status: todo
@@ -48,6 +48,7 @@ Vérifier que les tests de `CocktailsPage` et `MenuBottleEditPage` couvrent le c
 
 - E-06 et E-07 réécrivent ces deux pages. Si l'une d'elles est en cours, faire cette tâche après elle, ou l'intégrer à sa PR et passer celle-ci en `dropped`.
 - Une seule tâche à la fois sur `frontend/package-lock.json`.
+- E-14 (étape 6) supprime la directive `eslint-disable-next-line react-hooks/set-state-in-effect` de `SettingsPage.tsx:49` comme inutile et active `reportUnusedDisableDirectives: 'error'`. Avec 7.1.1, cette directive sert de nouveau. Si E-14 passe après E-16, il faut corriger le code de `SettingsPage` (initialiser `email` depuis `user`) au lieu de simplement retirer la directive.
 
 ## Journal
 
