@@ -114,14 +114,18 @@ ADMIN_PASSWORD=<at least 12 characters>        # required on first start
 
 #### Upgrading from a version with default credentials
 
-Earlier versions fell back to a public `JWT_SECRET` and to `admin123`. The backend no longer starts without a strong `JWT_SECRET`. Before pulling the new images, add `JWT_SECRET` to the `.env` file (and `ADMIN_PASSWORD` if the database is new). The existing admin account is kept as is.
+Earlier versions fell back to a public `JWT_SECRET` and to `admin123`. The backend no longer starts without a strong `JWT_SECRET`.
+
+1. Before pulling the new images, add `JWT_SECRET` to the `.env` file (and `ADMIN_PASSWORD` if the database is new).
+2. Pull and restart. The existing admin account is kept as is: the new version no longer rewrites it at startup.
+3. **If you never set `ADMIN_PASSWORD`, your admin password is still `admin123`.** Change it right after the upgrade in Settings > Profile, or set `ADMIN_RESET_PASSWORD=true` with a new `ADMIN_PASSWORD` for one restart, then remove the flag. The backend logs a warning at each start while the password is still `admin123`.
 
 #### Recovering the admin account
 
 If you lose the admin password:
 
-1. Set `ADMIN_RESET_PASSWORD=true` and the new `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `.env`.
-2. Restart the backend: `docker compose -f docker-compose.prod.yml up -d`. The log shows `Admin credentials reset from environment`.
+1. Set `ADMIN_RESET_PASSWORD=true` (exactly `true`: other values are ignored, with a warning in the log) and the new `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `.env`. `ADMIN_EMAIL` defaults to `admin@carta.local`, so set it if your login email is different.
+2. Restart the backend: `docker compose -f docker-compose.prod.yml up -d`. The log shows `Admin credentials reset from environment (login email: …)`.
 3. Remove `ADMIN_RESET_PASSWORD` from `.env` (or set it back to `false`) and restart again, otherwise every restart resets the password.
 
 To pin a specific version instead of `latest`, edit the image tags in `docker-compose.prod.yml`:
@@ -169,7 +173,7 @@ carta-cocktail/
 | `JWT_SECRET` | Secret for JWT signing, at least 32 characters (`openssl rand -hex 32`) | **required**, no default |
 | `ADMIN_EMAIL` | Admin login email, used when the admin is created or reset | `admin@carta.local` |
 | `ADMIN_PASSWORD` | Admin password, at least 12 characters, used when the admin is created or reset | **required** on first start, no default |
-| `ADMIN_RESET_PASSWORD` | `true` resets the existing admin's email and password from the two variables above at startup | `false` |
+| `ADMIN_RESET_PASSWORD` | Exactly `true` resets the existing admin's email and password from the two variables above at startup; other values are ignored with a warning | `false` |
 | `PORT` | Backend port | `3001` |
 | `BACKEND_HOST` | Backend hostname for nginx proxy (frontend container) | `backend` |
 
