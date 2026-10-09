@@ -1,6 +1,5 @@
 import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import JSZip from 'jszip';
 import type { CocktailExportFormat } from '../../types';
 
 interface ImportStepUploadProps {
@@ -43,6 +42,8 @@ export default function ImportStepUpload({ onRecipeLoaded, onBatchLoaded, error,
 
   const handleZipFile = async (file: File) => {
     try {
+      // Loaded on demand: only ZIP imports need it
+      const { default: JSZip } = await import('jszip');
       const zip = await JSZip.loadAsync(file);
       const jsonFiles = Object.keys(zip.files).filter(
         (name) => name.endsWith('.json') && !zip.files[name].dir,
