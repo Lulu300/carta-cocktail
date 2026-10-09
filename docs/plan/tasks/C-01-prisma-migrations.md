@@ -99,9 +99,11 @@ Pas de code TypeScript nouveau : la couverture n'est pas concernée. Vérificati
 - Syntaxe Prisma 6 (`--to-schema-datamodel`, `--from-url`, `db execute --url`) : C-15 (Prisma 7) devra adapter l'entrypoint et `db:check`.
 - Le shadow `file:./shadow.db` se crée dans `backend/prisma/` : couvert par `*.db`.
 - Prisma peut exiger `PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION` quand un agent lance une commande destructive (`migrate reset`) : ne pas le contourner sans accord humain.
-- Ordre : après A-04 (seed non destructif, lancé par l'entrypoint). Avant C-07 et C-11 (premières migrations), D-01 (refonte du Dockerfile autour de cet entrypoint) et C-05 (le backup lira la version de migration). `ci.yml` est aussi touché par B-02 et D-04 : enchaîner.
+- Ordre : après A-04 (seed non destructif, lancé par l'entrypoint). Avant C-06, C-07, C-11 et F-09 (premières migrations), D-01 (refonte du Dockerfile autour de cet entrypoint) et C-05 (le backup lira la version de migration). `ci.yml` est aussi touché par B-02 et D-04 : enchaîner.
+- **Notes de version** (règle de D-11 : la PR ne touche ni `docs/releases/` ni `UPGRADING.md`). `breaking: true` : le conteneur peut refuser de démarrer si la base diffère de `0_init`. La description de la PR a une section « Required actions » et le Journal une ligne « Notes de version ». Actions attendues : *before* — arrêter le backend et copier la base hors du volume (étapes 1 et 2 de la procédure de baseline) ; si l'instance tourne une version antérieure à la précédente, passer d'abord par celle-ci ; *after* — `docker compose exec <backend> npx prisma migrate status` doit afficher « Database schema is up to date » ; en cas de refus de démarrage, suivre la procédure de baseline manuelle du README. Épinglage recommandé : `:<version>` avant D-05, `:<majeure>.<mineure>` ensuite.
 
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : décisions validées par l'humain (voir « Décisions validées »).
+- 2026-10-09 : C-06 et F-09 ajoutées aux premières migrations ; point d'attention « Notes de version » (règle de D-11 décidée le 2026-10-09).
