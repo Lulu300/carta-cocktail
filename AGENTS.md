@@ -6,6 +6,30 @@ Carta Cocktail is a cocktail menu management system with an admin panel and publ
 
 **Single admin, single-tenant** - one admin user manages everything via JWT auth.
 
+## Action Plan (start here for improvement work)
+
+A full review (2026-10-08) produced an action plan in `docs/plan/`. Before picking up improvement work:
+
+- Read `docs/plan/README.md`: task format, lifecycle, branch naming, parallel-work rules.
+- Run `node docs/plan/build.mjs --ready` to see which tasks are ready and which can run in parallel.
+- Each task is a Markdown file in `docs/plan/tasks/` (source of truth); detailed findings are in `docs/review/2026-10-08/`.
+- `node docs/plan/build.mjs` regenerates the tracking page `docs/plan/index.html` (not versioned).
+
+### Multi-agent workflow
+
+- One task = one sub-agent = one git worktree (from `origin/develop`) = one PR. Sub-agents may spawn their own sub-agents when useful.
+- Every task PR gets an **independent review sub-agent** before merge. It checks the acceptance criteria, correctness, tests, duplication and the coding conventions below. Fixes go back to the task agent, then the PR is reviewed again.
+- Merge only after an approved review and green CI. Then re-run `--ready` to pick the next tasks.
+- Stop and ask the human when a task needs a human action or decision (`owner: mixed` or `human`, or flagged in "Points d'attention").
+
+## Coding Conventions
+
+- **English everywhere in code**: identifiers, comments, commit messages, PR titles and descriptions. User-facing text goes through i18n (en/fr), never hard-coded. The plan and review documents in `docs/` are written in French.
+- **Commits** follow Conventional Commits (`fix:`, `feat:`, `refactor:`, `test:`, `chore(deps):`, `docs:`…). PR titles for plan tasks start with the task id (`A-02: …`).
+- **Readable, clear, concise code**: small functions, explicit names, no clever one-liners, no dead code. Comment the *why*, not the *what*.
+- **No duplication**: before writing a helper, component, hook or query, search for an existing one and reuse or extend it. Extract shared logic instead of copy-pasting it.
+- **Stay in scope**: change only what the task requires. Record any other problem you find as a new task in `docs/plan/tasks/`, not in the same PR.
+
 ## Tech Stack
 
 | Layer | Technology | Version |
@@ -30,7 +54,7 @@ For every change:
 4. Ensure lint and tests pass: `cd frontend && npm run lint && npm test` / `cd backend && npm test`
 5. Ensure TypeScript compiles: `cd frontend && npx tsc --noEmit` / `cd backend && npx tsc --noEmit`
 6. **Verify coverage thresholds are met** (see Testing section below)
-7. Commit and push the branch
+7. Commit (Conventional Commits, in English) and push the branch
 8. Open a PR to `develop` — CI runs automatically
 9. Once `develop` is stable, merge to `main`
 10. Tag `main` for release: `git tag v1.0.0 && git push --tags`

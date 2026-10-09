@@ -31,18 +31,25 @@ function getIngredientNames(ingredient: CocktailIngredient, localize: LocalizeNa
   ];
 }
 
+interface CocktailSearchOptions {
+  /** Notes are private: only the admin cocktail list may search them. */
+  includeNotes?: boolean;
+}
+
 export function matchesCocktailSearch(
   cocktail: Cocktail,
   query: string,
   localize: LocalizeName,
+  { includeNotes = false }: CocktailSearchOptions = {},
 ): boolean {
   const terms = normalize(query).split(/\s+/).filter(Boolean);
   if (terms.length === 0) return true;
 
+  // Off by default so a guest cannot probe the content of a note by typing words.
   const searchableText = normalize([
     cocktail.name,
     cocktail.description,
-    cocktail.notes,
+    includeNotes ? cocktail.notes : null,
     cocktail.tags,
     ...(cocktail.ingredients || []).flatMap((ingredient) => getIngredientNames(ingredient, localize)),
     ...(cocktail.instructions || []).map((instruction) => instruction.text),

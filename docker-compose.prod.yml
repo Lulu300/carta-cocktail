@@ -5,10 +5,13 @@ services:
       - "3001:3001"
     environment:
       - DATABASE_URL=file:/app/data/carta_cocktail.db
-      - JWT_SECRET=${JWT_SECRET:-change-me-to-a-random-secret}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set (openssl rand -hex 32)}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@carta.local}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      # Only needed to create the admin on first start, or with ADMIN_RESET_PASSWORD=true
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - ADMIN_RESET_PASSWORD=${ADMIN_RESET_PASSWORD:-false}
       - PORT=3001
+      - UPLOAD_DIR=/app/uploads
     volumes:
       - db-data:/app/data
       - uploads:/app/uploads

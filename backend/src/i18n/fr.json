@@ -3,11 +3,14 @@
     "notFound": "Ressource introuvable",
     "unauthorized": "Non autorisé",
     "invalidCredentials": "Email ou mot de passe invalide",
+    "invalidCurrentPassword": "Mot de passe actuel incorrect",
     "serverError": "Erreur interne du serveur",
     "validationError": "Erreur de validation",
     "duplicateEntry": "Cette entrée existe déjà",
     "cannotDelete": "Impossible de supprimer : ressource utilisée",
-    "invalidBackup": "Fichier de sauvegarde invalide"
+    "invalidBackup": "Fichier de sauvegarde invalide",
+    "cannotDeleteDefaultMenu": "Impossible de supprimer un menu système",
+    "cannotModifySystemMenu": "Le slug et le type d’un menu système ne peuvent pas être modifiés"
   },
   "auth": {
     "loginSuccess": "Connexion réussie",

@@ -44,7 +44,7 @@ export default function CocktailsPage() {
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
-      if (!matchesCocktailSearch(item, search, localize)) return false;
+      if (!matchesCocktailSearch(item, search, localize, { includeNotes: true })) return false;
       if (selectedTags.length > 0) {
         const itemTags = item.tags ? item.tags.split(',').map((t) => t.trim().toLowerCase()) : [];
         if (!selectedTags.some((st) => itemTags.includes(st.toLowerCase()))) return false;
@@ -79,6 +79,20 @@ export default function CocktailsPage() {
     if (!confirm(t('cocktails.confirmDelete'))) return;
     await api.delete(id);
     load();
+  };
+
+  const allFilteredSelected = filteredItems.length > 0 && filteredItems.every((i) => selectedIds.has(i.id));
+
+  // "Select all" only acts on the cocktails matching the current filters
+  const toggleSelectAllFiltered = (checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const item of filteredItems) {
+        if (checked) next.add(item.id);
+        else next.delete(item.id);
+      }
+      return next;
+    });
   };
 
   const toggleSelection = (id: number) => {
@@ -169,14 +183,8 @@ export default function CocktailsPage() {
               <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={selectedIds.size === items.length && items.length > 0}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setSelectedIds(new Set(items.map((i) => i.id)));
-                    } else {
-                      setSelectedIds(new Set());
-                    }
-                  }}
+                  checked={allFilteredSelected}
+                  onChange={(e) => toggleSelectAllFiltered(e.target.checked)}
                   className="w-4 h-4 rounded bg-[#0f0f1a] border-gray-700 text-amber-400 accent-amber-400"
                 />
                 {t('cocktails.selectAll')}

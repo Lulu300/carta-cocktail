@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { parseNameTranslations } from '../utils/translations';
+import { AuthRequest, optionalAuth } from '../middleware/auth';
 
 const parseNT = (val: any) => {
   if (typeof val === 'string') { try { return JSON.parse(val); } catch { return null; } }
@@ -10,13 +11,92 @@ const parseNT = (val: any) => {
 const router = Router();
 const prisma = new PrismaClient();
 
+// Public responses use explicit selects so inventory data (purchase price,
+// opening date, remaining level) never leaves the server.
+const CATEGORY_PUBLIC_SELECT = {
+  id: true, name: true, nameTranslations: true, type: true,
+} satisfies Prisma.CategorySelect;
+
+const MENU_BOTTLE_PUBLIC_SELECT = {
+  id: true, name: true, capacityMl: true, categoryId: true, alcoholPercentage: true, location: true,
+  category: { select: CATEGORY_PUBLIC_SELECT },
+} satisfies Prisma.BottleSelect;
+
+const INGREDIENT_BOTTLE_PUBLIC_SELECT = {
+  id: true, name: true, alcoholPercentage: true,
+  category: { select: CATEGORY_PUBLIC_SELECT },
+} satisfies Prisma.BottleSelect;
+
+const INGREDIENT_PUBLIC_SELECT = {
+  id: true, name: true, nameTranslations: true, icon: true,
+} satisfies Prisma.IngredientSelect;
+
+// Hidden menu items and empty bottles are never served, even in admin preview:
+// the public page does not display them either.
+const VISIBLE_MENU_COCKTAIL_WHERE = { isHidden: false } satisfies Prisma.MenuCocktailWhereInput;
+const VISIBLE_MENU_BOTTLE_WHERE = {
+  isHidden: false,
+  bottle: { remainingPercent: { gt: 0 } },
+} satisfies Prisma.MenuBottleWhereInput;
+
+// Notes and preferred bottles are private: only a verified admin gets them.
+function buildCocktailSelect(isAdmin: boolean) {
+  return {
+    id: true, name: true, description: true, imagePath: true, tags: true, isAvailable: true,
+    notes: isAdmin,
+    ingredients: {
+      select: {
+        id: true, quantity: true, position: true, sourceType: true,
+        unit: true,
+        category: { select: CATEGORY_PUBLIC_SELECT },
+        ingredient: { select: INGREDIENT_PUBLIC_SELECT },
+        bottle: { select: INGREDIENT_BOTTLE_PUBLIC_SELECT },
+        preferredBottles: isAdmin
+          ? { select: { id: true, bottle: { select: INGREDIENT_BOTTLE_PUBLIC_SELECT } } }
+          : false,
+      },
+      orderBy: { position: 'asc' },
+    },
+    instructions: {
+      select: { id: true, stepNumber: true, text: true },
+      orderBy: { stepNumber: 'asc' },
+    },
+  } satisfies Prisma.CocktailSelect;
+}
+
+// A guest only reaches cocktails that are visible in at least one published menu.
+// The admin can preview any cocktail.
+function buildPublicCocktailWhere(id: number, isAdmin: boolean): Prisma.CocktailWhereInput {
+  if (isAdmin) return { id };
+  return {
+    id,
+    menuCocktails: { some: { ...VISIBLE_MENU_COCKTAIL_WHERE, menu: { isPublic: true } } },
+  };
+}
+
+function parseCocktailId(value: unknown): number | null {
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function isAdminRequest(req: AuthRequest): boolean {
+  return req.userId !== undefined;
+}
+
+router.use(optionalAuth);
+
 // List all public menus
 router.get('/menus', async (req: Request, res: Response) => {
   try {
     const menus = await prisma.menu.findMany({
       where: { isPublic: true },
       include: {
-        _count: { select: { cocktails: true, bottles: true } },
+        _count: {
+          select: {
+            cocktails: { where: VISIBLE_MENU_COCKTAIL_WHERE },
+            bottles: { where: VISIBLE_MENU_BOTTLE_WHERE },
+          },
+        },
       },
       orderBy: { updatedAt: 'desc' },
     });
@@ -28,8 +108,9 @@ router.get('/menus', async (req: Request, res: Response) => {
 });
 
 // Get public menu by slug (or admin preview)
-router.get('/menus/:slug', async (req: Request, res: Response) => {
+router.get('/menus/:slug', async (req: AuthRequest, res: Response) => {
   try {
+    const isAdmin = isAdminRequest(req);
     const menu = await prisma.menu.findUnique({
       where: { slug: String(req.params.slug) },
       include: {
@@ -37,44 +118,24 @@ router.get('/menus/:slug', async (req: Request, res: Response) => {
           orderBy: { position: 'asc' },
         },
         cocktails: {
+          where: VISIBLE_MENU_COCKTAIL_WHERE,
           include: {
-            cocktail: {
-              include: {
-                ingredients: {
-                  include: { unit: true, bottle: true, category: true, ingredient: true },
-                  orderBy: { position: 'asc' },
-                },
-                instructions: { orderBy: { stepNumber: 'asc' } },
-              },
-            },
+            cocktail: { select: buildCocktailSelect(isAdmin) },
           },
           orderBy: { position: 'asc' },
         },
         bottles: {
-          where: {
-            bottle: { remainingPercent: { gt: 0 } },
-          },
+          where: VISIBLE_MENU_BOTTLE_WHERE,
           include: {
-            bottle: {
-              include: { category: true },
-            },
+            bottle: { select: MENU_BOTTLE_PUBLIC_SELECT },
           },
           orderBy: { position: 'asc' },
         },
       },
     });
 
-    if (!menu) {
-      res.status(404).json({ error: req.t('errors.notFound') });
-      return;
-    }
-
-    // Check if user is authenticated (admin) via Authorization header
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    const isAdmin = !!token; // If there's a token, user is logged in (admin)
-
-    // Allow if public OR if admin
-    if (!menu.isPublic && !isAdmin) {
+    // Unpublished menus are only visible to a verified admin (preview)
+    if (!menu || (!menu.isPublic && !isAdmin)) {
       res.status(404).json({ error: req.t('errors.notFound') });
       return;
     }
@@ -103,10 +164,17 @@ router.get('/settings', async (req: Request, res: Response) => {
 });
 
 // Export public cocktail as JSON
-router.get('/cocktails/:id/export', async (req: Request, res: Response) => {
+router.get('/cocktails/:id/export', async (req: AuthRequest, res: Response) => {
   try {
-    const cocktail = await prisma.cocktail.findUnique({
-      where: { id: parseInt(String(req.params.id)) },
+    const id = parseCocktailId(req.params.id);
+    if (id === null) {
+      res.status(404).json({ error: req.t('errors.notFound') });
+      return;
+    }
+
+    const isAdmin = isAdminRequest(req);
+    const cocktail = await prisma.cocktail.findFirst({
+      where: buildPublicCocktailWhere(id, isAdmin),
       include: {
         ingredients: {
           include: {
@@ -114,7 +182,9 @@ router.get('/cocktails/:id/export', async (req: Request, res: Response) => {
             bottle: { include: { category: true } },
             category: true,
             ingredient: true,
-            preferredBottles: { include: { bottle: { include: { category: true } } } },
+            preferredBottles: isAdmin
+              ? { include: { bottle: { include: { category: true } } } }
+              : false,
           },
           orderBy: { position: 'asc' },
         },
@@ -127,14 +197,14 @@ router.get('/cocktails/:id/export', async (req: Request, res: Response) => {
       return;
     }
 
-    // Build export payload (same logic as admin export)
+    // Build export payload (same logic as admin export, minus private fields for guests)
     const payload = {
       version: 1,
       exportedAt: new Date().toISOString(),
       cocktail: {
         name: cocktail.name,
         description: cocktail.description || null,
-        notes: cocktail.notes || null,
+        ...(isAdmin && { notes: cocktail.notes || null }),
         tags: cocktail.tags ? cocktail.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [],
         ingredients: (cocktail.ingredients || []).map((ing: any) => {
           let sourceName = '';
@@ -172,10 +242,12 @@ router.get('/cocktails/:id/export', async (req: Request, res: Response) => {
               nameTranslations: parseNT(ing.unit.nameTranslations),
             } : null,
             position: ing.position,
-            preferredBottles: (ing.preferredBottles || []).map((pb: any) => ({
-              name: pb.bottle?.name || '',
-              categoryName: pb.bottle?.category?.name || ing.category?.name || '',
-            })),
+            ...(isAdmin && {
+              preferredBottles: (ing.preferredBottles || []).map((pb: any) => ({
+                name: pb.bottle?.name || '',
+                categoryName: pb.bottle?.category?.name || ing.category?.name || '',
+              })),
+            }),
           };
         }),
         instructions: (cocktail.instructions || []).map((inst: any) => ({ stepNumber: inst.stepNumber, text: inst.text })),
@@ -203,23 +275,18 @@ router.get('/units', async (req: Request, res: Response) => {
 });
 
 // Get public cocktail detail
-router.get('/cocktails/:id', async (req: Request, res: Response) => {
+router.get('/cocktails/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const cocktail = await prisma.cocktail.findUnique({
-      where: { id: parseInt(String(req.params.id)) },
-      include: {
-        ingredients: {
-          include: {
-            unit: true,
-            bottle: { include: { category: true } },
-            category: true,
-            ingredient: true,
-            preferredBottles: { include: { bottle: { include: { category: true } } } },
-          },
-          orderBy: { position: 'asc' },
-        },
-        instructions: { orderBy: { stepNumber: 'asc' } },
-      },
+    const id = parseCocktailId(req.params.id);
+    if (id === null) {
+      res.status(404).json({ error: req.t('errors.notFound') });
+      return;
+    }
+
+    const isAdmin = isAdminRequest(req);
+    const cocktail = await prisma.cocktail.findFirst({
+      where: buildPublicCocktailWhere(id, isAdmin),
+      select: buildCocktailSelect(isAdmin),
     });
 
     if (!cocktail) {

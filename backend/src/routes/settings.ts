@@ -61,8 +61,10 @@ router.put('/profile', async (req: AuthRequest, res: Response) => {
 
     if (newPassword) {
       const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+      // 400, not 401: the session is valid, only the submitted password is wrong.
+      // A 401 would make the frontend log the admin out.
       if (!valid) {
-        res.status(401).json({ error: req.t('errors.invalidCredentials') });
+        res.status(400).json({ error: req.t('errors.invalidCurrentPassword') });
         return;
       }
     }
