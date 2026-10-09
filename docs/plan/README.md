@@ -110,6 +110,18 @@ Tu travailles sur le projet Carta Cocktail. Prends en charge la tâche <ID> — 
 6. Commits au format Conventional Commits. Ouvre une PR vers develop intitulée « <ID>: … ». Ne merge pas.
 ```
 
+## Releases
+
+Modèle fixé par D-11, appliqué par `.github/workflows/release.yml` (détails dans `README.md`, section « Release ») :
+
+- **Pré-version** `vX.Y.Z-rc.N`, taguée sur `develop` : images `:X.Y.Z-rc.N` sans toucher `latest`, GitHub Release marquée pre-release.
+- **Version finale** `vX.Y.Z`, taguée sur `main` après le merge `develop` → `main` : images `:X.Y.Z` et `latest`, release normale.
+- **Notes d'abord** : `docs/releases/vX.Y.Z.md` (copie de `docs/releases/TEMPLATE.md`) et la section de `UPGRADING.md` sont mergées sur `develop` avant le premier tag. Une pré-version utilise le fichier de sa version cible, sauf si `docs/releases/vX.Y.Z-rc.N.md` existe. Le coordinateur les rédige à partir des sections « Required actions » des PR et des lignes « Notes de version » des Journaux (règle 9).
+- **Pousser la branche avant le tag** : le job `verify` vérifie que le commit du tag est atteignable depuis `origin/main` (version finale) ou `origin/develop` (pré-version), et que le fichier de notes existe et a un front matter valide. Sinon il échoue avant tout push d'image.
+- Un tag refusé par `verify` n'a rien publié : le supprimer (local et distant), corriger, puis le reposer.
+- Un tag qui a publié une image n'est jamais déplacé ni repoussé : en cas d'échec après le push d'une image, corriger puis taguer la pré-version suivante (`-rc.N+1`) pour une pré-version, ou la version suivante (ex. `v1.5.1`) pour une version finale.
+- Chaque tag demande l'accord de l'humain. Première release avec ce modèle : D-12 (`v1.5.0-rc.1` puis `v1.5.0`).
+
 ## Décisions validées
 
 Décisions prises par l'humain le 2026-10-08, complétées le 2026-10-09 (lignes datées). Chaque tâche concernée les reprend en tête, dans une section « Décisions validées ». Un agent ne les remet pas en cause sans le signaler dans sa PR.

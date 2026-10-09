@@ -112,13 +112,9 @@ ADMIN_PASSWORD=<at least 12 characters>        # required on first start
 
 `ADMIN_PASSWORD` is only used to create the admin on first start. After that, change the password from Settings > Profile: it survives restarts and image updates. Changing `JWT_SECRET` logs out existing sessions; it does not touch data.
 
-#### Upgrading from a version with default credentials
+#### Upgrading
 
-Earlier versions fell back to a public `JWT_SECRET` and to `admin123`. The backend no longer starts without a strong `JWT_SECRET`.
-
-1. Before pulling the new images, add `JWT_SECRET` to the `.env` file (and `ADMIN_PASSWORD` if the database is new).
-2. Pull and restart. The existing admin account is kept as is: the new version no longer rewrites it at startup.
-3. **If you never set `ADMIN_PASSWORD`, your admin password is still `admin123`.** Change it right after the upgrade in Settings > Profile, or set `ADMIN_RESET_PASSWORD=true` with a new `ADMIN_PASSWORD` for one restart, then remove the flag. The backend logs a warning at each start while the password is still `admin123`.
+Some versions require actions before or after the upgrade (new variables in `.env`, files to copy out of the old container…). **Read [`UPGRADING.md`](UPGRADING.md) before pulling a new version**, and apply the sections of every version newer than yours, in order. Upgrading from v1.4.0 or older to v1.5.0 requires a `JWT_SECRET` and a copy of the existing cocktail photos.
 
 #### Recovering the admin account
 
@@ -128,11 +124,11 @@ If you lose the admin password:
 2. Restart the backend: `docker compose -f docker-compose.prod.yml up -d`. The log shows `Admin credentials reset from environment (login email: …)`.
 3. Remove `ADMIN_RESET_PASSWORD` from `.env` (or set it back to `false`) and restart again, otherwise every restart resets the password.
 
-To pin a specific version instead of `latest`, edit the image tags in `docker-compose.prod.yml`:
+We recommend pinning a version instead of `latest`, so that an upgrade only happens after you have read `UPGRADING.md`. Edit the image tags in `docker-compose.prod.yml`:
 
 ```yaml
-image: ghcr.io/lulu300/carta-cocktail/backend:1.0.0
-image: ghcr.io/lulu300/carta-cocktail/frontend:1.0.0
+image: ghcr.io/lulu300/carta-cocktail/backend:1.5.0
+image: ghcr.io/lulu300/carta-cocktail/frontend:1.5.0
 ```
 
 ## Project Structure
@@ -160,8 +156,10 @@ carta-cocktail/
 │   │   └── types/          # TypeScript interfaces
 │   └── nginx.conf          # Production reverse proxy
 ├── .github/workflows/      # CI + Release pipelines
+├── docs/releases/          # Release notes, one file per version
 ├── docker-compose.yml          # Local build
 ├── docker-compose.prod.yml     # Production (ghcr.io images)
+├── UPGRADING.md                # Required actions, version by version
 └── .env.example
 ```
 
@@ -186,7 +184,7 @@ This project uses a **feature branch** workflow:
 3. Ensure lint, types, and tests pass
 4. Open a PR to `develop`
 5. Once stable, merge `develop` into `main`
-6. Tag for release: `git tag v1.0.0 && git push --tags`
+6. Release (see [Release](#release) below): write `docs/releases/vX.Y.Z.md` and the `UPGRADING.md` section on `develop`, tag a pre-release `vX.Y.Z-rc.N` on `develop` to test it, then merge `develop` into `main` and tag the final `vX.Y.Z` on `main`. Always push the branch before the tag.
 
 ## CI/CD
 
@@ -197,16 +195,31 @@ This project uses a **feature branch** workflow:
 - Tests (must pass to merge)
 - Coverage report (uploaded as artifact)
 
-**Release** runs on version tags (`v*`):
-- Builds Docker images (backend + frontend)
-- Pushes to GitHub Container Registry (`ghcr.io`)
-- Creates a GitHub Release with changelog
+### Release
+
+The **Release** workflow (`.github/workflows/release.yml`) runs on version tags (`v*`):
+
+| Tag | Tagged on | Docker images | GitHub Release |
+| --- | --- | --- | --- |
+| `vX.Y.Z-rc.N` (pre-release) | a commit of `develop` | `:X.Y.Z-rc.N` only, `latest` does not move | marked as pre-release |
+| `vX.Y.Z` (final) | a commit of `main` | `:X.Y.Z` and `latest` | normal release, marked as latest |
+
+1. **Notes first.** On `develop`, copy `docs/releases/TEMPLATE.md` to `docs/releases/vX.Y.Z.md` (summary, detailed changes, required actions before and after the upgrade, `breaking`), and add the version's section to `UPGRADING.md`. A pre-release uses the notes of its target version, unless `docs/releases/vX.Y.Z-rc.N.md` exists.
+2. **Pre-release.** Push `develop`, then tag it: `git tag vX.Y.Z-rc.N origin/develop && git push origin vX.Y.Z-rc.N`.
+3. **Final release.** Merge `develop` into `main` (pull request), then tag `main`: `git fetch origin && git tag vX.Y.Z origin/main && git push origin vX.Y.Z`.
+
+**Push the branch before the tag.** The workflow checks that a final tag is reachable from `origin/main` and a pre-release from `origin/develop`. A tag on another commit, or a tag without its notes file, fails before any image is pushed.
+
+- A tag refused by the `verify` job published nothing: delete it (locally and on GitHub), fix the problem, then push it again.
+- A tag that published an image is never moved or pushed again. If the release fails after an image push, fix the problem and tag the next pre-release (`-rc.N+1`) for a pre-release, or the next version (for example `v1.5.1`) for a final release.
+
+The GitHub Release contains the notes file (without its front matter), the list of merged pull requests since the previous tag (previous final release for a final tag, previous tag of any kind for a pre-release) and the `docker pull` commands.
 
 ### Pulling release images
 
 ```bash
-docker pull ghcr.io/lulu300/carta-cocktail/backend:1.0.0
-docker pull ghcr.io/lulu300/carta-cocktail/frontend:1.0.0
+docker pull ghcr.io/lulu300/carta-cocktail/backend:1.5.0
+docker pull ghcr.io/lulu300/carta-cocktail/frontend:1.5.0
 ```
 
 ## API Overview
