@@ -48,13 +48,29 @@ prune_backups() {
     done
 }
 
+backup_name_is_taken() {
+  [ -e "$1" ] || [ -e "$1-wal" ] || [ -e "$1-shm" ]
+}
+
+# Two starts in the same second would get the same name and overwrite the
+# previous copy (or pair it with another copy's -wal): wait for a free name.
+# Names stay date-ordered, as latest_backup and prune_backups expect.
+new_backup_name() {
+  name="$BACKUP_DIR/pre-migrate-$(date +%Y%m%d-%H%M%S).db"
+  while backup_name_is_taken "$name"; do
+    sleep 1
+    name="$BACKUP_DIR/pre-migrate-$(date +%Y%m%d-%H%M%S).db"
+  done
+  echo "$name"
+}
+
 backup_database() {
   if is_unchanged_since_latest_backup; then
     echo "Database unchanged since backup $(latest_backup), no new backup."
     return
   fi
   mkdir -p "$BACKUP_DIR"
-  backup="$BACKUP_DIR/pre-migrate-$(date +%Y%m%d-%H%M%S).db"
+  backup="$(new_backup_name)"
   for suffix in "" -wal -shm; do
     if [ -f "$DB_FILE$suffix" ]; then
       cp -p "$DB_FILE$suffix" "$backup$suffix"
@@ -68,7 +84,7 @@ refuse_baseline() {
   baseline_db="$1"
   {
     echo "ERROR: the existing database at $DB_FILE has no migration history and does not match migration $BASELINE_MIGRATION."
-    echo "The backend will not start, and the database was not modified. A copy is in $BACKUP_DIR."
+    echo "The backend will not start, and its data and schema were not modified. A copy is in $BACKUP_DIR."
     echo "SQL that would bring the database to $BASELINE_MIGRATION (for review only, do not run it blindly):"
     npx prisma migrate diff --from-url "file:$DB_FILE" --to-url "file:$baseline_db" --script || true
     echo "Follow the manual baseline procedure in README.md (section \"Database migrations\")."
