@@ -77,9 +77,11 @@ Les `AGENTS.md` sont lus par chaque agent avant une tâche : une affirmation fau
 - Ne pas recopier le contenu des rapports de revue dans les `AGENTS.md` : ils décrivent le code actuel, pas son historique.
 - `backend/AGENTS.md` et `frontend/AGENTS.md` sont aussi modifiés par d'autres tâches qui ajoutent des fichiers (E-03, C-02...). Rebaser juste avant le merge.
 - `docs/operations.md` donne des commandes destructrices (restauration, `down -v`). Les accompagner d'un avertissement explicite.
+- Transmis par D-11 : `AGENTS.md` décrit encore l'ancien modèle de release (« Git Workflow », étape 10 : `git tag v1.0.0 && git push --tags` ; « CI/CD », Release : tout tag `v*` publie les images et déplace `latest`). L'aligner sur `README.md` (section « Release ») et `docs/plan/README.md` (section « Releases ») : pré-versions `vX.Y.Z-rc.N` sur `develop`, versions finales sur `main`, notes `docs/releases/vX.Y.Z.md` et `UPGRADING.md` mergées avant le tag, branche poussée avant le tag.
 
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : suivi des revues de la phase A. Ajout de `UPLOAD_DIR` (A-01), de l'étape `.env` dans « Running Locally » d'`AGENTS.md` (secrets obligatoires depuis A-04, ligne `admin123` à retirer) et de `src/bootstrap/` dans `backend/AGENTS.md` (étapes 3 et 4, deux critères).
 - 2026-10-09 : les étapes de mise à jour depuis une ancienne version renvoient vers `UPGRADING.md` (D-11) au lieu d'être recopiées dans `docs/operations.md`.
+- 2026-10-09 : D-11 (PR de D-11) transmet l'alignement d'`AGENTS.md` sur le nouveau modèle de release (Points d'attention).
