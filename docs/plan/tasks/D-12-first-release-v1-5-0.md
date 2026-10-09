@@ -39,7 +39,7 @@ Chaque étape est vérifiée avant de passer à la suivante. Pousser la branche 
    - la release marquée pre-release, avec Summary, Changes, Required actions (before / after), la liste des PR et les commandes `docker pull`, tirés de `docs/releases/v1.5.0.md` ;
    - les images `:1.5.0-rc.1` (backend et frontend) ;
    - `latest` pointe toujours sur v1.4.0 (`docker buildx imagetools inspect`).
-   Si possible, l'humain teste l'image sur une copie de son instance en suivant les « Required actions ».
+   Si possible, l'humain teste l'image sur une copie de son instance en suivant les « Required actions », avec le compose du tag `v1.5.0-rc.1` et les images `:1.5.0-rc.1` : l'URL `v1.5.0` et le tag `:1.5.0` n'existent qu'après l'étape 5 (ligne « Testing a pre-release » des notes).
 4. **Passage sur `main`** (humain). PR `develop` → `main` (merge commit, D-07), CI verte, merge.
 5. **Version finale.** Taguer `v1.5.0` sur `main` et le pousser. Vérifier la release normale, les images `:1.5.0` et `latest` déplacé, et `PREV_TAG` = `v1.4.0` (liste des PR depuis v1.4.0).
 6. Fin du gel : le coordinateur peut merger de nouveau sur `develop` dès que l'étape 4 est faite (le contenu de v1.5.0 est alors fixé sur `main`). Si l'étape 5 échoue, la corriger par une PR de notes sur `develop` puis une nouvelle PR `develop` → `main` : ne merger d'autres PR qu'après le tag `v1.5.0`.
@@ -69,3 +69,4 @@ Chaque étape est vérifiée avant de passer à la suivante. Pousser la branche 
 
 - 2026-10-09 : tâche créée lors de la revue de la PR #38 : critères post-merge et séquence réelle sortis de D-11.
 - 2026-10-09 : deuxième revue de la PR #38. Gel aligné : rien sur `develop` du tag `v1.5.0-rc.1` au merge `develop` → `main`, sauf les corrections des notes (étapes 1 et 6).
+- 2026-10-09 : revue de la PR #39 (D-11). Étape 3 : le test de la pré-version utilise le compose du tag `v1.5.0-rc.1` et les images `:1.5.0-rc.1`.

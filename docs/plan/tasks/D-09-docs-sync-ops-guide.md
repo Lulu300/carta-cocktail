@@ -8,7 +8,7 @@ effort: S
 status: todo
 owner: agent
 depends_on: [A-01, A-04, C-01]
-touches: [AGENTS.md, backend/AGENTS.md, frontend/AGENTS.md, README.md, docs/operations.md]
+touches: [AGENTS.md, backend/AGENTS.md, frontend/AGENTS.md, README.md, docs/operations.md, backend/src/bootstrap/ensureAdmin.ts]
 sources: ["07-devops-history.md §5"]
 branch:
 pr:
@@ -78,6 +78,7 @@ Les `AGENTS.md` sont lus par chaque agent avant une tâche : une affirmation fau
 - `backend/AGENTS.md` et `frontend/AGENTS.md` sont aussi modifiés par d'autres tâches qui ajoutent des fichiers (E-03, C-02...). Rebaser juste avant le merge.
 - `docs/operations.md` donne des commandes destructrices (restauration, `down -v`). Les accompagner d'un avertissement explicite.
 - Transmis par D-11 : `AGENTS.md` décrit encore l'ancien modèle de release (« Git Workflow », étape 10 : `git tag v1.0.0 && git push --tags` ; « CI/CD », Release : tout tag `v*` publie les images et déplace `latest`). L'aligner sur `README.md` (section « Release ») et `docs/plan/README.md` (section « Releases ») : pré-versions `vX.Y.Z-rc.N` sur `develop`, versions finales sur `main`, notes `docs/releases/vX.Y.Z.md` et `UPGRADING.md` mergées avant le tag, branche poussée avant le tag.
+- Transmis par D-11 (revue de la PR #39) : le libellé de l'interface est « Settings > Admin Profile » (`settings.profileConfig`), repris dans les notes de release et `UPGRADING.md`. `README.md` (« change the password from Settings > Profile ») et l'avertissement de `backend/src/bootstrap/ensureAdmin.ts` (« Change it in Settings > Profile ») disent encore « Profile » : les aligner (fichier ajouté à `touches` ; aucun test ne vérifie ce texte).
 
 ## Journal
 
@@ -85,3 +86,4 @@ Les `AGENTS.md` sont lus par chaque agent avant une tâche : une affirmation fau
 - 2026-10-08 : suivi des revues de la phase A. Ajout de `UPLOAD_DIR` (A-01), de l'étape `.env` dans « Running Locally » d'`AGENTS.md` (secrets obligatoires depuis A-04, ligne `admin123` à retirer) et de `src/bootstrap/` dans `backend/AGENTS.md` (étapes 3 et 4, deux critères).
 - 2026-10-09 : les étapes de mise à jour depuis une ancienne version renvoient vers `UPGRADING.md` (D-11) au lieu d'être recopiées dans `docs/operations.md`.
 - 2026-10-09 : D-11 (PR de D-11) transmet l'alignement d'`AGENTS.md` sur le nouveau modèle de release (Points d'attention).
+- 2026-10-09 : revue de la PR #39 (D-11). Libellé « Settings > Admin Profile » à aligner dans `README.md` et dans l'avertissement d'`ensureAdmin` (Points d'attention) ; `backend/src/bootstrap/ensureAdmin.ts` ajouté à `touches`.

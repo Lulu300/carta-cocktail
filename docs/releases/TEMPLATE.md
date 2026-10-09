@@ -6,7 +6,7 @@ required_actions:
   - when: before        # before | after
     action: "Add JWT_SECRET (at least 32 characters) to .env."
   - when: after
-    action: "If the admin password is still admin123, change it in Settings > Profile."
+    action: "If the admin password is still admin123, change it in Settings > Admin Profile."
 ---
 
 <!--
@@ -28,6 +28,9 @@ How to use this template (remove this comment in the real file):
 - "Required actions" below is the readable copy: same actions, same order,
   with details and commands. Write "None." when the list is empty.
 - Copy every required action into UPGRADING.md as well.
+- When an action names the version (compose file URL on the vX.Y.Z tag,
+  :X.Y.Z image pin), add a "Testing a pre-release" line: these only exist
+  after the final release, so testers use vX.Y.Z-rc.N and :X.Y.Z-rc.N.
 - The workflow appends the pull request list and the docker pull commands:
   do not write them here.
 -->

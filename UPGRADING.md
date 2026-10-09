@@ -56,6 +56,8 @@ Recommended first: export a backup from Settings > Backup & Restore. A backup ma
    image: ghcr.io/lulu300/carta-cocktail/frontend:1.5.0
    ```
 
+   Testing a pre-release (`v1.5.0-rc.N`): the `v1.5.0` compose URL and the `:1.5.0` images only exist after the final release. Use `v1.5.0-rc.N` in the `curl` URL and pin the images to `:1.5.0-rc.N` instead.
+
 ### After upgrading
 
 1. **Copy the rescued photos into the uploads volume.** The container was recreated, so read its id again:
