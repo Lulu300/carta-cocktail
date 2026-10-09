@@ -86,7 +86,23 @@ jobs:
             NOTES="docs/releases/v${VERSION%%-*}.md"
           fi
           if [ ! -f "$NOTES" ]; then
-            echo "::error::Missing release notes: docs/releases/v$VERSION.md (copy docs/releases/TEMPLATE.md)"
+            if [ "$PRERELEASE" = true ]; then
+              echo "::error::Missing release notes: neither docs/releases/v$VERSION.md nor docs/releases/v${VERSION%%-*}.md exists (copy docs/releases/TEMPLATE.md)"
+            else
+              echo "::error::Missing release notes: docs/releases/v$VERSION.md (copy docs/releases/TEMPLATE.md)"
+            fi
+            exit 1
+          fi
+
+          # Both cases would pass the yq checks below, and the release body would
+          # then show the raw front matter: yq reads a file without the opening
+          # --- as plain YAML, and a CRLF file's first line is "---\r"
+          if grep -q $'\r' "$NOTES"; then
+            echo "::error file=$NOTES::The notes file has CR characters: use LF line endings"
+            exit 1
+          fi
+          if [ "$(head -n 1 "$NOTES")" != "---" ]; then
+            echo "::error file=$NOTES::The notes file must start with a --- line (front matter)"
             exit 1
           fi
 
