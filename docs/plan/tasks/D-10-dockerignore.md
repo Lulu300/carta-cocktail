@@ -5,13 +5,13 @@ phase: D
 lane: infra
 criticite: moyenne
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: []
 touches: [backend/.dockerignore, frontend/.dockerignore]
 sources: ["07-devops-history.md §2.5"]
-branch:
-pr:
+branch: chore/D-10-dockerignore
+pr: 41
 ---
 
 ## Contexte
@@ -49,10 +49,10 @@ Les deux Dockerfiles font `COPY . .` sans `.dockerignore`. Lors d'un build local
 
 ## Critères d'acceptation
 
-- [ ] `docker build backend/` et `docker build frontend/` réussissent depuis un checkout qui contient un `node_modules` macOS et un `backend/.env`.
-- [ ] `docker run --rm --entrypoint ls <image backend> -a /app` ne montre ni `.env`, ni base `.db`, ni `coverage`.
-- [ ] `docker run --rm --entrypoint find <image backend> /app/src -name '*.test.ts' -o -path '/app/src/test'` ne renvoie rien.
-- [ ] `docker compose up --build -d` puis connexion admin : l'application fonctionne comme avant.
+- [x] `docker build backend/` et `docker build frontend/` réussissent depuis un checkout qui contient un `node_modules` macOS et un `backend/.env`.
+- [x] `docker run --rm --entrypoint ls <image backend> -a /app` ne montre ni `.env`, ni base `.db`, ni `coverage`.
+- [x] `docker run --rm --entrypoint find <image backend> /app/src -name '*.test.ts' -o -path '/app/src/test'` ne renvoie rien.
+- [x] `docker compose up --build -d` puis connexion admin : l'application fonctionne comme avant.
 
 ## Tests à ajouter ou adapter
 
@@ -68,3 +68,4 @@ Les deux Dockerfiles font `COPY . .` sans `.dockerignore`. Lors d'un build local
 ## Journal
 
 - 2026-10-09 : tâche créée en revue de la PR #37 (suivis de la phase A), à partir des étapes 3 et 4 de D-01, pour livrer les `.dockerignore` sans attendre B-01 et C-01.
+- 2026-10-09 : `.dockerignore` créés (PR #41). Écart avec la liste proposée : `*.db`, `*.db-journal`, `.env*` et `.DS_Store` deviennent `**/…`, car un motif `.dockerignore` ne s'applique qu'à la racine du contexte (vérifié : `prisma/dev.db` et `prisma/dev.db-journal` entraient dans l'image avec `*.db`). Vérifié avec un `node_modules` macOS réel (`npm ci`), un `backend/.env` factice, `dist`, `coverage`, des bases `.db` et `prisma/prisma/test.db` : les deux builds passent, aucun de ces fichiers n'est dans les images, le moteur Prisma est celui de Linux musl, `docker compose up --build` puis connexion admin via nginx OK, et un `docker run` sans `-e` refuse de démarrer (`JWT_SECRET must be set…`) au lieu de reprendre les secrets du poste. Aucun fichier hors test n'importe `src/test/`. Notes de version : rien d'obligatoire ; conseiller de supprimer les images construites localement avant cette version et de changer `JWT_SECRET` si l'une d'elles a été poussée ou partagée.
