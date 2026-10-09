@@ -79,6 +79,7 @@ Les `AGENTS.md` sont lus par chaque agent avant une tâche : une affirmation fau
 - `docs/operations.md` donne des commandes destructrices (restauration, `down -v`). Les accompagner d'un avertissement explicite.
 - Transmis par D-11 : `AGENTS.md` décrit encore l'ancien modèle de release (« Git Workflow », étape 10 : `git tag v1.0.0 && git push --tags` ; « CI/CD », Release : tout tag `v*` publie les images et déplace `latest`). L'aligner sur `README.md` (section « Release ») et `docs/plan/README.md` (section « Releases ») : pré-versions `vX.Y.Z-rc.N` sur `develop`, versions finales sur `main`, notes `docs/releases/vX.Y.Z.md` et `UPGRADING.md` mergées avant le tag, branche poussée avant le tag.
 - Transmis par D-11 (revue de la PR #39) : le libellé de l'interface est « Settings > Admin Profile » (`settings.profileConfig`), repris dans les notes de release et `UPGRADING.md`. `README.md` (« change the password from Settings > Profile ») et l'avertissement de `backend/src/bootstrap/ensureAdmin.ts` (« Change it in Settings > Profile ») disent encore « Profile » : les aligner (fichier ajouté à `touches` ; aucun test ne vérifie ce texte).
+- Transmis par C-01 (PR #44) : `npm run db:push` n'existe plus (remplacé par `db:deploy`, `db:status`, `db:check`). `AGENTS.md` (« Running Locally » : `npx prisma db push`) et `backend/AGENTS.md` (tableau « Scripts » : `db:push` ; `prisma/migrations/` absent de « Structure ») sont à aligner sur la section « Database migrations » du `README.md`.
 
 ## Journal
 
@@ -87,3 +88,4 @@ Les `AGENTS.md` sont lus par chaque agent avant une tâche : une affirmation fau
 - 2026-10-09 : les étapes de mise à jour depuis une ancienne version renvoient vers `UPGRADING.md` (D-11) au lieu d'être recopiées dans `docs/operations.md`.
 - 2026-10-09 : D-11 (PR de D-11) transmet l'alignement d'`AGENTS.md` sur le nouveau modèle de release (Points d'attention).
 - 2026-10-09 : revue de la PR #39 (D-11). Libellé « Settings > Admin Profile » à aligner dans `README.md` et dans l'avertissement d'`ensureAdmin` (Points d'attention) ; `backend/src/bootstrap/ensureAdmin.ts` ajouté à `touches`.
+- 2026-10-09 : C-01 (PR #44) transmet l'alignement des `AGENTS.md` sur les migrations (Points d'attention).

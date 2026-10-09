@@ -45,7 +45,7 @@ cp ../.env.example .env
 #   JWT_SECRET     -> output of: openssl rand -hex 32
 #   ADMIN_PASSWORD -> a password of at least 12 characters
 npm install
-npx prisma db push
+npx prisma migrate deploy
 npm run db:seed
 npm run dev
 # API running at http://localhost:3001
@@ -131,6 +131,81 @@ image: ghcr.io/lulu300/carta-cocktail/backend:1.5.0
 image: ghcr.io/lulu300/carta-cocktail/frontend:1.5.0
 ```
 
+## Database migrations
+
+The database schema is versioned with [Prisma Migrate](https://www.prisma.io/docs/orm/prisma-migrate). Migrations live in `backend/prisma/migrations/` and are committed with the schema change that needs them.
+
+### Changing the schema (development)
+
+```bash
+cd backend
+# Edit prisma/schema.prisma, then create and apply the migration:
+npm run db:migrate -- --name add_bottle_barcode
+npm run db:check      # exit 0: the migrations match schema.prisma
+```
+
+- Review the generated `migration.sql` before committing it: a column rename, for example, is generated as a drop and an add, which loses data.
+- Never use `prisma db push` outside the test suite. The CI runs `npm run db:check` and fails when `schema.prisma` changes without a migration.
+- Other scripts: `npm run db:deploy` applies pending migrations without creating any, `npm run db:status` shows which ones are applied.
+- A development database created with `db push` (before migrations existed) must be marked as baselined once: `npx prisma migrate resolve --applied 0_init`.
+
+### What the container does at startup
+
+`backend/docker-entrypoint.sh` runs before the API:
+
+1. If the database exists and `prisma migrate status` reports pending migrations or no migration history, it copies the database to `backups/pre-migrate-<date>.db`, next to the database (`/app/data/backups/` in the `db-data` volume). It keeps the 10 most recent copies, and skips the copy when the database has not changed since the last one.
+2. It applies the pending migrations with `prisma migrate deploy`. A new database is created from scratch.
+3. A database created by `db push` (v1.5.0 and older) has no migration history. If its schema is exactly the one of the first migration, `0_init`, the entrypoint marks `0_init` as applied and continues. Otherwise **it refuses to start**: it prints the differences, leaves the database untouched, and the container exits.
+4. It runs the seed, then starts Node.
+
+### Checking a production database before the first upgrade
+
+Do this once before deploying the first version with migrations, on a copy of the production database:
+
+1. Stop the backend: `docker compose -f docker-compose.prod.yml stop carta-cocktail-backend`.
+2. Copy the database out of the volume, and keep this copy until the upgrade is validated. The volume is named `<project>_db-data`, where `<project>` is the folder of the compose file (`docker volume ls | grep db-data` shows it):
+
+   ```bash
+   mkdir -p carta-db-copy
+   docker run --rm -v <project>_db-data:/data -v "$PWD/carta-db-copy":/out alpine sh -c 'cp /data/carta_cocktail.db* /out/'
+   ```
+
+3. From `backend/` in a checkout of the new version (after `npm ci`), compare the copy with `0_init`:
+
+   ```bash
+   npx prisma db execute --url "file:$PWD/baseline.db" --file prisma/migrations/0_init/migration.sql
+   npx prisma migrate diff --from-url "file:/absolute/path/to/carta-db-copy/carta_cocktail.db" --to-url "file:$PWD/baseline.db" --script
+   rm baseline.db
+   ```
+
+   Expected: `-- This is an empty migration.` Otherwise the output is the SQL that would bring the database to `0_init`: read it and fix the database before deploying (see below).
+4. Deploy the new image. The entrypoint backs up the database, marks `0_init` as applied, then applies the newer migrations.
+5. Check: `docker compose -f docker-compose.prod.yml exec carta-cocktail-backend npx prisma migrate status` prints `Database schema is up to date!`. Open the admin and the public menu.
+
+If the database differs from `0_init`, it usually comes from an older version: start v1.5.0 (the last version that synchronizes the schema with `db push`) once on the database, stop it, then compare again. If differences remain, fix them by hand on the copy, check again, and put the fixed copy back into the volume.
+
+### Restoring a pre-migration backup
+
+To roll back an upgrade, pin the images back to the previous version in `docker-compose.prod.yml`, then restore the copy made before the migration.
+
+1. Stop the backend and list the copies (the newest is last):
+
+   ```bash
+   docker compose -f docker-compose.prod.yml stop carta-cocktail-backend
+   docker compose -f docker-compose.prod.yml run --rm --no-deps --entrypoint ls carta-cocktail-backend -l /app/data/backups/
+   ```
+
+2. Restore the chosen copy, replacing `<date>` with its date, then start:
+
+   ```bash
+   docker compose -f docker-compose.prod.yml run --rm --no-deps --entrypoint sh carta-cocktail-backend -c '
+     B=/app/data/backups/pre-migrate-<date>.db
+     cp "$B" /app/data/carta_cocktail.db
+     rm -f /app/data/carta_cocktail.db-wal /app/data/carta_cocktail.db-shm
+     if [ -f "$B-wal" ]; then cp "$B-wal" /app/data/carta_cocktail.db-wal; fi'
+   docker compose -f docker-compose.prod.yml up -d
+   ```
+
 ## Project Structure
 
 ```
@@ -190,6 +265,7 @@ This project uses a **feature branch** workflow:
 
 **CI** runs on every PR and push to `main`/`develop`:
 - TypeScript type checking
+- Prisma migrations in sync with `schema.prisma` (backend, `npm run db:check`)
 - ESLint (frontend)
 - Build verification
 - Tests (must pass to merge)
