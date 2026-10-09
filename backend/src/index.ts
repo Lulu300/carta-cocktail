@@ -9,7 +9,12 @@ async function main(): Promise<void> {
   const journalMode = await configureSqlite();
   console.log(`SQLite journal mode: ${journalMode}`);
 
-  const server = app.listen(config.port, () => {
+  // Express 5 hands listen errors (EADDRINUSE, EACCES) to this callback
+  const server = app.listen(config.port, (err?: Error) => {
+    if (err) {
+      console.error(`Cannot listen on port ${config.port}:`, err.message);
+      process.exit(1);
+    }
     console.log(`🍸 Carta Cocktail API running on port ${config.port}`);
   });
 
