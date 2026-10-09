@@ -114,9 +114,10 @@ L'image backend publiée sur ghcr.io est celle qui tourne sur le NAS. Elle embar
 - Prisma sur Alpine. Si `prisma generate` ou le démarrage signalent une version de libssl introuvable, ajouter `openssl` à l'`apk add`. C-15 (Prisma 7) changera le générateur : relire ce Dockerfile à ce moment-là.
 - `morgan('dev')` (`app.ts:30`) reste actif en production. Le passage à un format adapté est dans D-03, qui touche `app.ts`.
 - Conflits : B-01, C-01, D-05 et C-15 modifient aussi `backend/Dockerfile`. Rebaser juste avant le merge.
-- Cette image change le comportement de démarrage pour tout utilisateur de `:latest`. Le signaler dans les notes de la release suivante (cf. D-05).
+- **Notes de version** (règle de D-11 : la PR ne touche ni `docs/releases/` ni `UPGRADING.md`). Cette image change le comportement de démarrage pour tout utilisateur de `:latest` : changement cassant, `breaking: true`. La description de la PR a une section « Required actions » et le Journal une ligne « Notes de version ». Actions attendues, à confirmer dans la PR : *before* — sauvegarder les volumes `db-data` et `uploads` ; *after* — vérifier dans les logs que le conteneur démarre et que la base est accessible en écriture (droits corrigés par `su-exec`) ; avec un compose personnalisé qui force `user:` ou sous Docker rootless, `chown` des volumes vers l'utilisateur `node` (commande exacte dans la PR). Épinglage recommandé : `:<version>` avant D-05, `:<majeure>.<mineure>` ensuite.
 
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-09 : suivi des revues de la phase A (PR #37). Étapes 3 et 4 (`.dockerignore`) déplacées dans la nouvelle tâche D-10, plus urgente depuis A-04 ; étape 3 remplacée par un renvoi, étapes suivantes renumérotées ; D-10 ajoutée à `depends_on`, les deux fichiers retirés de `touches` et du titre.
+- 2026-10-09 : point d'attention « Notes de version » (règle de D-11 décidée le 2026-10-09) : `breaking: true`, actions attendues, épinglage recommandé.

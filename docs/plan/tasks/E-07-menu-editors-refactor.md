@@ -76,7 +76,7 @@ Si E-05 a créé `isSystemMenu()` dans ce dossier, l'utiliser ; sinon le créer 
 - Suppression de section : un seul `menuSections.delete`, puis invalidation. Plus de boucle de `PUT`.
 - Titre selon `menu.type` avec un cas par type, `alcoholPercentage != null`, catégorie localisée, pas de `!`.
 - Badge « vide » sur les bouteilles à 0 % (clé i18n), puisqu'elles restent dans la carte.
-- **Retirer** (cartes système) : bouton par groupe, confirmé avec `useConfirm`, qui appelle `menuBottles.delete` pour chaque bouteille du groupe. Côté backend (C-06), cela crée une exclusion : la bouteille ne revient pas à la synchro, et reste dans l'autre carte système si elle y figure.
+- **Retirer** (cartes système) : bouton par groupe, confirmé avec `useConfirm`, qui envoie une seule requête `POST /menu-bottles/menu/:menuId/exclusions { bottleIds }` (route en lot de C-06, en transaction) avec toutes les bouteilles du groupe. Ajouter `menuBottles.exclude(menuId, bottleIds)` dans `api.ts`. Les bouteilles exclues ne reviennent pas à la synchro et restent dans l'autre carte système si elles y figurent.
 - **Section « Bouteilles retirées »** (cartes système), sous la composition, repliée par défaut si elle est vide : liste de `GET /menu-bottles/menu/:menuId/exclusions` (nom, catégorie localisée, badge « vide ») avec une action « Remettre » par bouteille, qui appelle `DELETE /menu-bottles/menu/:menuId/exclusions/:bottleId`. La bouteille remise revient en fin de liste. Mise à jour optimiste des deux listes, retour arrière et toast en cas d'erreur. Ajouter `menuBottles.exclusions(menuId)` et `menuBottles.restore(menuId, bottleId)` dans `api.ts`.
 
 ### 4. Textes
@@ -93,7 +93,8 @@ Les composants communs utilisent des clés i18n (`menus.sections.*`). Les textes
 - [ ] Une erreur serveur sur une modification remet l'écran dans son état précédent et affiche un toast.
 - [ ] Un id de menu inexistant affiche une erreur, pas « Chargement… » sans fin.
 - [ ] Les sections se réordonnent depuis l'UI.
-- [ ] Sur une carte système, retirer un groupe le fait passer dans « Bouteilles retirées » ; « Remettre » le replace en fin de liste ; les deux survivent à un rechargement.
+- [ ] Sur une carte système, retirer un groupe le fait passer dans « Bouteilles retirées » en une seule requête ; « Remettre » le replace en fin de liste ; les deux survivent à un rechargement.
+- [ ] Renommer la carte « Apéritifs » (nom, description, publication) fonctionne ; son slug est en lecture seule.
 - [ ] Les deux pages font chacune moins de 200 lignes ; aucun texte en dur ; aucun `confirm(`.
 - [ ] Couverture ≥ 80 % sur les lignes modifiées (0 % aujourd'hui).
 
@@ -101,7 +102,7 @@ Les composants communs utilisent des clés i18n (`menus.sections.*`). Les textes
 
 - `groupBySection.test.ts`, `moveItem.test.ts` : cas limites (premier, dernier, section vide, `menuSectionId` d'une section supprimée).
 - Nouveau `MenuEditPage.test.tsx` : non-régression du bug C1 (le corps envoyé à `menus.update` contient `menuSectionId`) ; ajout et retrait de cocktail ; échec → retour arrière et `role="alert"` ; 404 → état d'erreur.
-- Nouveau `MenuBottleEditPage.test.tsx` : deux bascules de visibilité rapides (résoudre les promesses dans l'ordre inverse) → les deux groupes masqués ; déplacement → un appel `reorder` avec les ids dans le bon ordre ; suppression de section → un seul appel ; retrait d'un groupe confirmé → un `menuBottles.delete` par bouteille et le groupe apparaît dans « Bouteilles retirées » ; « Remettre » → appel `restore` et la bouteille revient en fin de liste ; échec de « Remettre » → retour arrière et toast ; badge « vide » sur une bouteille à 0 %.
+- Nouveau `MenuBottleEditPage.test.tsx` : deux bascules de visibilité rapides (résoudre les promesses dans l'ordre inverse) → les deux groupes masqués ; déplacement → un appel `reorder` avec les ids dans le bon ordre ; suppression de section → un seul appel ; retrait d'un groupe confirmé → un seul appel `menuBottles.exclude(menuId, bottleIds)` et le groupe apparaît dans « Bouteilles retirées » ; carte système : champ nom modifiable, envoi de `menus.update` avec le nouveau nom, champ slug en lecture seule ; « Remettre » → appel `restore` et la bouteille revient en fin de liste ; échec de « Remettre » → retour arrière et toast ; badge « vide » sur une bouteille à 0 %.
 - `MenuSectionsManager.test.tsx` : création, renommage, suppression confirmée, réordonnancement.
 
 ## Points d'attention
@@ -109,7 +110,7 @@ Les composants communs utilisent des clés i18n (`menus.sections.*`). Les textes
 - Dépend du contrat de C-13 (`POST /menu-bottles/menu/:id/reorder` et sections). Lire la PR de C-13 avant d'écrire `menuBottles.reorder`.
 - La carte publique trie les groupes de bouteilles par nom (`MenuPublicPage.tsx:44`) et ignore l'ordre défini ici, alors que le backend renvoie bien les bouteilles par `position` (`backend/src/routes/public.ts:61`). Réordonner dans l'admin n'a donc aucun effet visible pour l'invité. Correction prévue dans E-11.
 - E-14 retire le code mort de `api.ts` : garder `menuSections.reorder`, désormais utilisé.
-- `isDefaultMenu` (`MenuBottleEditPage.tsx:206`) bloque le renommage côté UI ; A-02 doit le bloquer côté serveur. Garder les deux.
+- Cartes système (décision du 2026-10-09) : renommables et dépubliables. Aujourd'hui `isDefaultMenu` (`MenuBottleEditPage.tsx:206`) désactive le champ **nom** (`:267`), alors qu'A-02 ne verrouille côté serveur que le slug et le type (`changesSystemMenuIdentity`). Sur une carte système, le nom, la description et `isPublic` restent modifiables ; seuls le slug et le type sont verrouillés : `MenuInfoForm` avec `lockedFields={['slug']}` (le type n'est pas un champ du formulaire). Remplacer `isDefaultMenu` par `isSystemMenu()`.
 
 ## Journal
 
@@ -117,3 +118,4 @@ Les composants communs utilisent des clés i18n (`menus.sections.*`). Les textes
 - 2026-10-08 : décisions validées par l'humain (voir « Décisions validées »).
 - 2026-10-09 : décision « bouteilles vides » reprise ; badge « vide » ajouté à l'étape 3.
 - 2026-10-09 : décision « liste d'exclusions » reprise : bouton « Retirer » et section « Bouteilles retirées » avec « Remettre » sur les cartes système (étape 3, critère, tests). C-06 ajoutée à `depends_on` : ces routes viennent de C-06.
+- 2026-10-09 : revue de la PR #38. Cartes système : nom, description et `isPublic` modifiables, seuls le slug et le type verrouillés (point d'attention réécrit, critère et test ajoutés). « Retirer » un groupe passe par la route d'exclusion en lot de C-06 (une requête).

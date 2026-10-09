@@ -16,8 +16,8 @@ pr:
 
 ## Décisions validées (2026-10-09)
 
-- Modèle de release fixé par D-11 : pré-versions `vX.Y.Z-rc.N` sur `develop` ou `main` (sans `latest`, release marquée pre-release), versions finales sur `main` (avec `latest`), notes tirées de `docs/releases/`. Cette tâche garde ce modèle.
-- Versions : v1.5.0 pour la phase A, versions intermédiaires pendant la refonte, v2.0.0 à la fin du plan. Les changements cassants sortent donc en 1.x : accepté, avec `breaking: true`, les actions obligatoires dans les notes et `UPGRADING.md`, et l'épinglage sur `:<majeure>.<mineure>` recommandé.
+- Modèle de release fixé par D-11 : pré-versions `vX.Y.Z-rc.N` uniquement sur `develop` (sans `latest`, release marquée pre-release), versions finales sur `main` (avec `latest`), notes tirées de `docs/releases/`. Cette tâche garde ce modèle.
+- Versions : v1.5.0 pour la phase A, versions intermédiaires pendant la refonte, v2.0.0 à la fin du plan. Les changements cassants sortent donc en 1.x : accepté, avec `breaking: true`, les actions obligatoires dans les notes et `UPGRADING.md`, et une recommandation d'épinglage (`:<version>` avant cette tâche, `:<majeure>.<mineure>` une fois ce tag publié par cette tâche).
 
 ## Contexte
 
@@ -34,7 +34,7 @@ Le NAS tire les images publiées sur ghcr.io, en `:latest` d'après `docker-comp
 ## Ce qu'il faut faire
 
 1. Vérifier que D-04 (`ci.yml` accepte `workflow_call`) et D-11 sont mergés.
-2. Compléter le `release.yml` de D-11. Garder tels quels son job `verify` (règle de branche : tag final sur un commit de `main`, pré-version sur un commit de `develop` ou de `main` ; fichier de notes obligatoire ; `PREV_TAG`) et son job `github-release` (notes, liste des PR, `docker pull`, `prerelease`). Ajouter le job `ci` entre `verify` et `images`, et refaire `images` :
+2. Compléter le `release.yml` de D-11. Garder tels quels son job `verify` (règle de branche : tag final sur un commit atteignable depuis `main`, pré-version sur un commit atteignable depuis `develop`, commit lu avec `git rev-parse "${GITHUB_REF}^{commit}"` ; fichier de notes obligatoire ; `PREV_TAG`) et son job `github-release` (notes, liste des PR, `docker pull`, `prerelease`). Ajouter le job `ci` entre `verify` et `images`, et refaire `images` :
    ```yaml
    on:
      push:
@@ -113,7 +113,7 @@ Le NAS tire les images publiées sur ghcr.io, en `:latest` d'après `docker-comp
 
 ## Points d'attention
 
-- Impact sur les utilisateurs de `:latest`. Le manifeste multi-arch est transparent pour amd64. En revanche, la première release qui suit D-01, D-02 et D-03 apporte via `latest` un conteneur non-root, un frontend sur le port 8080 et un backend sans port publié. Recommander dans les notes de cette release l'épinglage sur `:<major>.<minor>` et décrire les changements dans ses « Required actions » et dans `UPGRADING.md` (D-11). Décision du 2026-10-09 : v2.0.0 seulement à la fin du plan, donc ces changements cassants sortent dans une version 1.x intermédiaire, avec `breaking: true` dans le front matter des notes.
+- Impact sur les utilisateurs de `:latest`. Le manifeste multi-arch est transparent pour amd64. En revanche, la première release qui suit D-01, D-02 et D-03 apporte via `latest` un conteneur non-root, un frontend sur le port 8080 et un backend sans port publié. Ces actions sont décrites par les PR de D-01, D-02 et D-03 (section « Required actions », règle de D-11), puis reprises par le coordinateur dans les notes et `UPGRADING.md`. Recommander dans ces notes l'épinglage sur `:<major>.<minor>` si cette tâche est mergée, sinon sur `:<version>`. Décision du 2026-10-09 : v2.0.0 seulement à la fin du plan, donc ces changements cassants sortent dans une version 1.x intermédiaire, avec `breaking: true` dans le front matter des notes.
 - Durée : le build arm64 sous QEMU (npm ci, prisma generate, tsc) peut prendre 10 à 20 minutes. Alternative si c'est trop lent : runners natifs `ubuntu-24.04-arm` (gratuits pour un repo public) et fusion des manifestes, plus complexe.
 - Architectures à confirmer par l'humain : le modèle du NAS (x86 ou ARM) décide si arm64 est nécessaire. armv7 est hors périmètre.
 - Les versions de `package.json` restent à `1.0.0` et `0.0.0`. Décision à prendre : les synchroniser à chaque release (commit sur `main` avant le tag) ou assumer que `APP_VERSION` fait foi.
@@ -123,3 +123,4 @@ Le NAS tire les images publiées sur ghcr.io, en `:latest` d'après `docker-comp
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-09 : D-11 ajoutée en dépendance. L'étape « le tag doit pointer sur main » est remplacée par la règle de D-11 (version finale sur `main`, pré-version sur `develop` ou `main`). Retirés car traités par D-11 : changelog et `PREV_TAG`, `generate_release_notes` et le job `github-release`, `latest` réservé aux versions finales, permissions par job, critère « les notes listent les PR », note sur `.github/release.yml`.
 - 2026-10-09 : réponses de l'humain. Changements cassants en 1.x acceptés avec garde-fous ; pas de tag jetable : la première vraie pré-version après le merge sert de test.
+- 2026-10-09 : revue de la PR #38. Pré-versions uniquement sur `develop` (la version précédente de cette tâche les autorisait aussi sur `main`) ; commit du tag lu avec `rev-parse` ; épinglage sur `:<version>` tant que le tag `:<majeure>.<mineure>` n'existe pas.

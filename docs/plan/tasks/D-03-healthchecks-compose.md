@@ -82,10 +82,12 @@ Docker ne sait pas si le backend est prêt : il le considère démarré dès que
 
 - Dépendance implicite à C-02 : si le singleton Prisma n'existe pas encore, créer un client local dans `health.ts` ajoute une connexion SQLite de plus. Mieux vaut attendre C-02 (suggestion : l'ajouter à `depends_on`).
 - `wget` est fourni par busybox dans `node:24-alpine` et `nginx-unprivileged:*-alpine`. Une image distroless n'en aurait pas.
-- Supprimer le port 3001 du compose prod casse les usages qui appellent l'API directement sur l'hôte (scripts, autre reverse proxy). Le signaler dans les notes de release et dans D-09.
+- Supprimer le port 3001 du compose prod casse les usages qui appellent l'API directement sur l'hôte (scripts, autre reverse proxy). Le signaler dans les notes de version (point suivant) et dans D-09.
+- **Notes de version** (règle de D-11 : la PR ne touche ni `docs/releases/` ni `UPGRADING.md`). `breaking: true`. La description de la PR a une section « Required actions » et le Journal une ligne « Notes de version ». Actions attendues : *before* — remplacer tout appel direct à `http://<hôte>:3001/api/...` (scripts, reverse proxy) par `http://<hôte>/api/...` via nginx, ou republier le port dans un `docker-compose.override.yml` en le limitant à `127.0.0.1` ; *after* — `docker compose up -d --wait` puis vérifier que `docker compose ps` affiche `healthy` pour les deux services. Épinglage recommandé : `:<version>` avant D-05, `:<majeure>.<mineure>` ensuite.
 - `APP_VERSION` est injectée par D-05. Avant D-05, la route renvoie `dev`.
 - A-01, A-04 et D-02 modifient les mêmes fichiers compose : rebaser avant le merge.
 
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-09 : point d'attention « Notes de version » (règle de D-11 décidée le 2026-10-09) : `breaking: true`, actions attendues, épinglage recommandé.

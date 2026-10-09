@@ -77,12 +77,16 @@ L'instance tourne sur un NAS et se met à jour par `docker compose pull`, souven
 ## Points d'attention
 
 - **Limite à dire clairement** : les actions à faire *avant* la mise à jour (ex. ajouter une variable au `.env`) ne peuvent pas être affichées par la nouvelle version avant qu'elle démarre ; si elles manquent, elle peut même refuser de démarrer. `UPGRADING.md` et les notes de release restent la référence ; le bandeau est un rappel.
-- Première version qui embarque cette tâche : `lastRunVersion` est vide sur une instance existante, la version d'origine est inconnue. Pas de bandeau ce jour-là ; le dire dans les notes de cette version.
+- Première version qui embarque cette tâche : `lastRunVersion` est vide sur une instance existante, la version d'origine est inconnue. Pas de bandeau ce jour-là.
+- **Notes de version** (règle de D-11 : la PR ne touche ni `docs/releases/` ni `UPGRADING.md`). Changement non cassant (`breaking: false`). La description de la PR a une section « Required actions » et le Journal une ligne « Notes de version » : aucune action obligatoire ; préciser que le bandeau n'apparaît qu'à partir de la mise à jour **suivante**, et qu'un compose personnalisé qui construit l'image lui-même doit passer le contexte `releases` (voir plus bas). Épinglage recommandé : `:<majeure>.<mineure>` (D-05 est une dépendance).
+- **Restauration de backup (C-05)** : une sauvegarde restaure aussi la ligne `AppState`. Un `lastRunVersion` ancien ferait apparaître au redémarrage un faux bandeau (ou un faux avertissement de retour en arrière). Après une restauration, réenregistrer la version courante (`lastRunVersion = APP_VERSION`, sans avis), ou exclure cet état de la restauration. Le tester avec C-05.
 - Lecture du front matter : un parseur YAML (paquet `yaml`) est le plus sûr. L'ajouter touche `backend/package.json` et le lockfile : une seule tâche du couloir `deps` à la fois. Sinon, D-11 peut restreindre le format pour une lecture sans dépendance : à trancher dans la PR.
 - `additional_contexts` demande Docker Compose ≥ 2.17 ; `build-contexts` est géré par `docker/build-push-action@v6`. D-01 refond le Dockerfile : placer la copie des notes dans le stage runtime.
+- `COPY --from=releases` casse un simple `docker build ./backend` : sans le contexte nommé, Docker cherche une image appelée `releases`. Le job de build Docker de D-04 (CI) et le smoke test de D-08 doivent aussi passer `build-contexts: releases=./docs/releases` (ou `--build-context releases=./docs/releases`). Les mettre à jour dans la même PR, ou documenter la commande dans le README si ces tâches ne sont pas encore mergées.
 - `release.yml` et le Dockerfile sont aussi modifiés par D-05 et D-01 : enchaîner.
 - Le chemin des notes en dev (`../docs/releases` depuis `backend/`) doit être résolu depuis le dossier du fichier, comme `resolveDatabasePath` de C-05, pas depuis le cwd.
 
 ## Journal
 
 - 2026-10-09 : tâche créée à partir des décisions humaines du 2026-10-09 (guide de mise à jour dans l'instance).
+- 2026-10-09 : revue de la PR #38. Points d'attention ajoutés : notes de version (règle de D-11), restauration de backup (réenregistrer la version courante), contexte `releases` pour les builds de D-04 et D-08.
