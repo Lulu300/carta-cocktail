@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { parseNameTranslations } from '../utils/translations';
 import { AuthRequest, optionalAuth } from '../middleware/auth';
 
@@ -9,7 +10,6 @@ const parseNT = (val: any) => {
 };
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Public responses use explicit selects so inventory data (purchase price,
 // opening date, remaining level) never leaves the server.

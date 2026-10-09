@@ -1,10 +1,9 @@
 import { Router, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { parseNameTranslations } from '../utils/translations';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // List all category types with usage count
 router.get('/', async (_req: AuthRequest, res: Response) => {

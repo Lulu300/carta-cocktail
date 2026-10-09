@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import multer from 'multer';
 import { AuthRequest } from '../middleware/auth';
 import { parseNameTranslations } from '../utils/translations';
@@ -7,7 +7,6 @@ import { buildExportPayload, buildCsvPayload } from '../utils/bottlesExport';
 import { parseImportFile, NormalizedImportPayload } from '../utils/bottlesImport';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const importUpload = multer({
   storage: multer.memoryStorage(),
