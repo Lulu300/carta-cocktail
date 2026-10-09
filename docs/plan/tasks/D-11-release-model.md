@@ -5,13 +5,13 @@ phase: D
 lane: ci
 criticite: haute
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: []
-touches: [.github/workflows/release.yml, docs/releases/, UPGRADING.md, README.md, docs/plan/README.md]
+touches: [.github/workflows/release.yml, docs/releases/, UPGRADING.md, README.md, docs/plan/README.md, docs/plan/tasks/D-09-docs-sync-ops-guide.md]
 sources: ["07-devops-history.md §3.4"]
-branch:
-pr:
+branch: chore/D-11-release-model
+pr: 39
 ---
 
 ## Décisions validées (2026-10-09)
@@ -157,15 +157,15 @@ Les images publiées sur ghcr.io sont tirées en `:latest` par le NAS (`docker-c
 
 ## Critères d'acceptation
 
-- [ ] Le workflow implémente : tag final → `<version>` et `latest`, release normale ; pré-version → `<version>` seulement (`latest` inchangé), release marquée pre-release.
-- [ ] Le workflow implémente : tag final non atteignable depuis `main`, pré-version non atteignable depuis `develop` (y compris une pré-version posée sur `main` seul), ou fichier de notes manquant → échec au job `verify`, rien de publié.
-- [ ] Le commit du tag est obtenu avec `git rev-parse "${GITHUB_REF}^{commit}"`.
-- [ ] Une pré-version sans fichier `-rc.N` utilise le fichier de la version cible.
-- [ ] Le corps de la release contient Summary, Changes, Required actions (before / after), la liste des PR et les commandes `docker pull`.
-- [ ] `PREV_TAG` est correct pour une version finale (version finale précédente) et pour une pré-version (tag précédent).
-- [ ] `contents: write` n'apparaît que sur le job `github-release`, `packages: write` que sur le job `images`.
-- [ ] `docs/releases/TEMPLATE.md`, `docs/releases/v1.5.0.md` et `UPGRADING.md` (section v1.5.0) existent ; leur front matter se lit avec `yq`.
-- [ ] `README.md` renvoie vers `UPGRADING.md`, décrit le modèle de release et dit de pousser la branche avant le tag.
+- [x] Le workflow implémente : tag final → `<version>` et `latest`, release normale ; pré-version → `<version>` seulement (`latest` inchangé), release marquée pre-release.
+- [x] Le workflow implémente : tag final non atteignable depuis `main`, pré-version non atteignable depuis `develop` (y compris une pré-version posée sur `main` seul), ou fichier de notes manquant → échec au job `verify`, rien de publié.
+- [x] Le commit du tag est obtenu avec `git rev-parse "${GITHUB_REF}^{commit}"`.
+- [x] Une pré-version sans fichier `-rc.N` utilise le fichier de la version cible.
+- [x] Le corps de la release contient Summary, Changes, Required actions (before / after), la liste des PR et les commandes `docker pull`.
+- [x] `PREV_TAG` est correct pour une version finale (version finale précédente) et pour une pré-version (tag précédent).
+- [x] `contents: write` n'apparaît que sur le job `github-release`, `packages: write` que sur le job `images`.
+- [x] `docs/releases/TEMPLATE.md`, `docs/releases/v1.5.0.md` et `UPGRADING.md` (section v1.5.0) existent ; leur front matter se lit avec `yq`.
+- [x] `README.md` renvoie vers `UPGRADING.md`, décrit le modèle de release et dit de pousser la branche avant le tag.
 
 ## Tests à ajouter ou adapter
 
@@ -191,3 +191,4 @@ Les images publiées sur ghcr.io sont tirées en `:latest` par le NAS (`docker-c
 - 2026-10-09 : réponses de l'humain. v1.5.0 après le merge de cette tâche ; changements cassants en 1.x acceptés avec garde-fous ; pas de tag jetable `v0.0.0-rc.1` : test par une branche jetable (règle de branche) puis `v1.5.0-rc.1` sur `develop` et `v1.5.0` sur `main`. Une pré-version utilise le fichier de la version cible. Critères, tests et points d'attention adaptés.
 - 2026-10-09 : revue de la PR #38. Pré-versions uniquement sur `develop` (ascendance `main` vérifiée seulement pour une version finale) ; commit du tag via `git rev-parse "${GITHUB_REF}^{commit}"` ; « atteignable depuis » précisé ; branche poussée avant le tag ; épinglage sur `:<version>` avant D-05 (aussi dans le modèle) ; règle de rédaction des notes (les tâches ne touchent ni `docs/releases/` ni `UPGRADING.md`) ; critères post-merge et séquence réelle déplacés dans D-12 ; effort M.
 - 2026-10-09 : deuxième revue de la PR #38. Gel aligné sur D-12 : du tag `v1.5.0-rc.1` au merge `develop` → `main`.
+- 2026-10-09 : fait dans la PR #39 (`chore/D-11-release-model`). `release.yml` en trois jobs (`verify`, `images` en matrice, `github-release`), permissions par job, valeurs `${{ }}` passées par `env:`. `verify` contrôle aussi la forme du front matter (`breaking` booléen, `required_actions` en `{ when: before|after, action }`), pour F-09. Testé en local sans aucun tag publié : actionlint 1.7.12 (0 erreur), et un banc jetable (Alpine, git, yq v4.47) qui extrait les scripts `run:` du workflow avec `yq` et les rejoue dans un dépôt avec `main` et `develop`, en tags légers et annotés : 77 contrôles réussis (règle de branche, branche poussée après le tag, format du tag, fichier de notes, `PREV_TAG` sur `v1.4.0` / `v1.5.0-rc.1` / `rc.2` / `rc.10` / `v1.5.0`, tags d'image, corps de release avec `gh` simulé). Mutants : sans `versionsort.suffix` (2 échecs) ou sans test de `prerelease` (5 échecs) détectés ; sans `^{commit}`, aucun échec, car `merge-base` déréférence lui-même un tag annoté (`rev-parse` gardé, il journalise le SHA). Notes v1.5.0 et `UPGRADING.md` rédigées à partir des PR #27 à #36 et vérifiées dans le code (`develop` et `v1.4.0`) ; action ajoutée par rapport à la tâche : mettre à jour `docker-compose.prod.yml` (celui de v1.4.0 ne transmet pas `ADMIN_RESET_PASSWORD` et met `admin123` par défaut). Section « Upgrading from a version with default credentials » du README remplacée par un lien vers `UPGRADING.md`. Mise à jour d'`AGENTS.md` transmise à D-09 (fichier ajouté à `touches`). Reste pour D-12 : `date` de `v1.5.0.md` à corriger si le tag final est posé un autre jour, et tout ce qui demande un vrai tag (sortie de `generate-notes`, `make_latest`, checkout d'un tag annoté sur le runner).
