@@ -1,0 +1,10 @@
+# Keep the build context to what the image needs: no local secrets and
+# no host dependencies (built for another OS).
+# Patterns match from the context root only: "**/" also covers subfolders.
+# Tests stay in the context: `tsc -b` compiles them during the build.
+node_modules
+dist
+coverage
+**/.env*
+.omc
+**/.DS_Store

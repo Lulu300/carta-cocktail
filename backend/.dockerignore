@@ -1,0 +1,16 @@
+# Keep the build context to what the image needs: no local secrets,
+# no host dependencies (built for another OS), no local data or test files.
+# Patterns match from the context root only: "**/" also covers subfolders
+# (local SQLite files live in prisma/).
+node_modules
+dist
+coverage
+**/.env*
+**/*.db
+**/*.db-journal
+prisma/prisma
+.omc
+**/.DS_Store
+**/*.test.ts
+src/test
+vitest.config.ts
