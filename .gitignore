@@ -12,6 +12,8 @@ build/
 # Database
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
 
 # Uploads
 uploads/*
@@ -27,9 +29,6 @@ uploads/*
 # OS
 .DS_Store
 Thumbs.db
-
-# Prisma
-backend/prisma/migrations/
 
 # Logs
 *.log
