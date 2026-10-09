@@ -111,7 +111,7 @@ Tu travailles sur le projet Carta Cocktail. Prends en charge la tâche <ID> — 
 
 ## Décisions validées
 
-Décisions prises par l'humain le 2026-10-08, complétées le 2026-10-09 (cinq dernières lignes). Chaque tâche concernée les reprend en tête, dans une section « Décisions validées ». Un agent ne les remet pas en cause sans le signaler dans sa PR.
+Décisions prises par l'humain le 2026-10-08, complétées le 2026-10-09 (lignes datées). Chaque tâche concernée les reprend en tête, dans une section « Décisions validées ». Un agent ne les remet pas en cause sans le signaler dans sa PR.
 
 | Sujet | Décision | Tâches |
 |---|---|---|
@@ -130,10 +130,11 @@ Décisions prises par l'humain le 2026-10-08, complétées le 2026-10-09 (cinq d
 | Éditeurs de menus | Enregistrement immédiat de la composition, bouton « Enregistrer » seulement pour les infos du menu | E-07 |
 | Lien « Connexion » public | Déplacé dans un pied de page discret | E-11 |
 | Exporter / Imprimer une recette | Conservés pour tous, en style secondaire sous la recette | E-11 |
-| Cartes de bouteilles (2026-10-09) | `isApero` / `isDigestif` = « disponible pour les cartes de ce type ». Les cartes système « Apéritifs » et « Digestifs » restent non supprimables (renommables, dépubliables) et contiennent automatiquement toutes les bouteilles cochées. L'utilisateur peut créer ses propres cartes `APEROS` ou `DIGESTIFS`, supprimables, composées à la main parmi les bouteilles cochées. Décocher retire la bouteille de toutes les cartes du type. Pas de fusion des deux types | C-06, F-08 |
-| Bouteilles vides (2026-10-09) | Une bouteille cochée qui devient vide reste dans ses cartes (place, section, état masqué) et n'est pas affichée sur la carte publique. L'admin la retire à la main si elle ne revient pas en stock | C-06, E-07, F-08 |
-| Numéros de version (2026-10-09) | v1.5.0 pour la phase A, versions intermédiaires pendant la refonte, v2.0.0 à la fin du plan | D-11, D-05 |
-| Releases (2026-10-09) | Travail sur `develop`. Pré-versions `vX.Y.Z-rc.N` sur `develop` : images versionnées sans `latest`, GitHub Release marquée pre-release. Versions finales taguées sur `main`, publiées de temps en temps. Chaque release a un résumé, un changelog détaillé et les actions obligatoires ; notes en anglais | D-11, D-05 |
+| Cartes de bouteilles (2026-10-09) | `isApero` / `isDigestif` = « disponible pour les cartes de ce type ». Les cartes système « Apéritifs » et « Digestifs » restent non supprimables (renommables, dépubliables) et contiennent automatiquement toutes les bouteilles cochées, sauf celles que l'admin en a retirées. L'utilisateur peut créer ses propres cartes `APEROS` ou `DIGESTIFS`, supprimables, composées à la main parmi les bouteilles cochées. Décocher retire la bouteille de toutes les cartes du type. Pas de fusion des deux types. Le type d'une carte non système ne change plus après sa création | C-06, E-07, F-08 |
+| Retrait d'une carte système (2026-10-09) | Liste d'exclusions : retirer une bouteille d'une carte système l'exclut de cette carte seulement ; elle reste cochée, présente dans l'autre carte système et disponible pour les cartes personnelles. La synchro ne la remet jamais, même après décochage puis recochage. L'éditeur liste les bouteilles retirées et permet de les remettre. Supprimer la bouteille ou la carte supprime l'exclusion | C-06, E-07, F-08 |
+| Bouteilles vides (2026-10-09) | Une bouteille cochée qui devient vide reste dans ses cartes (place, section, état masqué) et n'est pas affichée sur la carte publique. L'admin la retire à la main si elle ne revient pas en stock (exclusion sur une carte système, retrait simple sur une carte personnelle) | C-06, E-07, F-08 |
+| Numéros de version (2026-10-09) | v1.5.0 pour la phase A, taguée après le merge de D-11 ; versions intermédiaires pendant la refonte, v2.0.0 à la fin du plan. Les changements cassants (D-01, D-02, D-03) sortent donc en 1.x, avec `breaking: true`, les actions obligatoires dans les notes et `UPGRADING.md`, et l'épinglage sur `:<majeure>.<mineure>` recommandé | D-11, D-05 |
+| Releases (2026-10-09) | Travail sur `develop`. Pré-versions `vX.Y.Z-rc.N` sur `develop` : images versionnées sans `latest`, GitHub Release marquée pre-release. Versions finales taguées sur `main`, publiées de temps en temps. Chaque release a un résumé, un changelog détaillé et les actions obligatoires ; notes en anglais. Pas de tag jetable : le pipeline se teste avec `v1.5.0-rc.1` sur `develop` puis `v1.5.0` sur `main` (accord humain donné pour cette séquence) ; la règle de branche, avec un tag sur une branche jetable, supprimé ensuite | D-11, D-05 |
 | Guide de mise à jour (2026-10-09) | Enchaînement des actions obligatoires de toutes les versions sautées, dans `UPGRADING.md` et si possible dans l'instance | D-11, F-09 |
 
 ## Ajouter ou modifier une tâche

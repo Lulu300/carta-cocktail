@@ -7,7 +7,7 @@ criticite: moyenne
 effort: M
 status: todo
 owner: agent
-depends_on: [A-02, C-13, E-02, E-03]
+depends_on: [A-02, C-13, E-02, E-03, C-06]
 touches: [frontend/src/pages/admin/MenuEditPage.tsx, frontend/src/pages/admin/MenuBottleEditPage.tsx, frontend/src/components/admin/menus/, frontend/src/services/api.ts, frontend/src/i18n/locales/]
 sources: ["05-frontend-archi.md §4.3", "05-frontend-archi.md §H5"]
 branch:
@@ -18,6 +18,7 @@ pr:
 
 - **Modèle de sauvegarde** : enregistrement immédiat pour la composition (ajout, retrait, ordre, sections, visibilité), avec mise à jour optimiste et retour arrière en cas d'erreur. Bouton « Enregistrer » seulement pour le bloc d'infos (nom, slug, description, public).
 - **Bouteilles vides (2026-10-09)** : une bouteille cochée qui devient vide reste dans ses cartes, à sa place, avec sa section et son état masqué (C-06). L'éditeur la liste donc : la marquer d'un badge « vide ». Les cartes personnelles de bouteilles sont traitées par F-08.
+- **Retrait d'une carte système (2026-10-09)** : retirer une bouteille d'une carte système l'exclut de cette carte seulement ; la synchro ne la remet jamais. L'éditeur liste les bouteilles retirées et permet de les remettre (backend : C-06).
 
 ## Contexte
 
@@ -75,6 +76,8 @@ Si E-05 a créé `isSystemMenu()` dans ce dossier, l'utiliser ; sinon le créer 
 - Suppression de section : un seul `menuSections.delete`, puis invalidation. Plus de boucle de `PUT`.
 - Titre selon `menu.type` avec un cas par type, `alcoholPercentage != null`, catégorie localisée, pas de `!`.
 - Badge « vide » sur les bouteilles à 0 % (clé i18n), puisqu'elles restent dans la carte.
+- **Retirer** (cartes système) : bouton par groupe, confirmé avec `useConfirm`, qui appelle `menuBottles.delete` pour chaque bouteille du groupe. Côté backend (C-06), cela crée une exclusion : la bouteille ne revient pas à la synchro, et reste dans l'autre carte système si elle y figure.
+- **Section « Bouteilles retirées »** (cartes système), sous la composition, repliée par défaut si elle est vide : liste de `GET /menu-bottles/menu/:menuId/exclusions` (nom, catégorie localisée, badge « vide ») avec une action « Remettre » par bouteille, qui appelle `DELETE /menu-bottles/menu/:menuId/exclusions/:bottleId`. La bouteille remise revient en fin de liste. Mise à jour optimiste des deux listes, retour arrière et toast en cas d'erreur. Ajouter `menuBottles.exclusions(menuId)` et `menuBottles.restore(menuId, bottleId)` dans `api.ts`.
 
 ### 4. Textes
 
@@ -90,6 +93,7 @@ Les composants communs utilisent des clés i18n (`menus.sections.*`). Les textes
 - [ ] Une erreur serveur sur une modification remet l'écran dans son état précédent et affiche un toast.
 - [ ] Un id de menu inexistant affiche une erreur, pas « Chargement… » sans fin.
 - [ ] Les sections se réordonnent depuis l'UI.
+- [ ] Sur une carte système, retirer un groupe le fait passer dans « Bouteilles retirées » ; « Remettre » le replace en fin de liste ; les deux survivent à un rechargement.
 - [ ] Les deux pages font chacune moins de 200 lignes ; aucun texte en dur ; aucun `confirm(`.
 - [ ] Couverture ≥ 80 % sur les lignes modifiées (0 % aujourd'hui).
 
@@ -97,7 +101,7 @@ Les composants communs utilisent des clés i18n (`menus.sections.*`). Les textes
 
 - `groupBySection.test.ts`, `moveItem.test.ts` : cas limites (premier, dernier, section vide, `menuSectionId` d'une section supprimée).
 - Nouveau `MenuEditPage.test.tsx` : non-régression du bug C1 (le corps envoyé à `menus.update` contient `menuSectionId`) ; ajout et retrait de cocktail ; échec → retour arrière et `role="alert"` ; 404 → état d'erreur.
-- Nouveau `MenuBottleEditPage.test.tsx` : deux bascules de visibilité rapides (résoudre les promesses dans l'ordre inverse) → les deux groupes masqués ; déplacement → un appel `reorder` avec les ids dans le bon ordre ; suppression de section → un seul appel.
+- Nouveau `MenuBottleEditPage.test.tsx` : deux bascules de visibilité rapides (résoudre les promesses dans l'ordre inverse) → les deux groupes masqués ; déplacement → un appel `reorder` avec les ids dans le bon ordre ; suppression de section → un seul appel ; retrait d'un groupe confirmé → un `menuBottles.delete` par bouteille et le groupe apparaît dans « Bouteilles retirées » ; « Remettre » → appel `restore` et la bouteille revient en fin de liste ; échec de « Remettre » → retour arrière et toast ; badge « vide » sur une bouteille à 0 %.
 - `MenuSectionsManager.test.tsx` : création, renommage, suppression confirmée, réordonnancement.
 
 ## Points d'attention
@@ -112,3 +116,4 @@ Les composants communs utilisent des clés i18n (`menus.sections.*`). Les textes
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : décisions validées par l'humain (voir « Décisions validées »).
 - 2026-10-09 : décision « bouteilles vides » reprise ; badge « vide » ajouté à l'étape 3.
+- 2026-10-09 : décision « liste d'exclusions » reprise : bouton « Retirer » et section « Bouteilles retirées » avec « Remettre » sur les cartes système (étape 3, critère, tests). C-06 ajoutée à `depends_on` : ces routes viennent de C-06.

@@ -17,7 +17,7 @@ pr:
 ## Décisions validées (2026-10-09)
 
 - Modèle de release fixé par D-11 : pré-versions `vX.Y.Z-rc.N` sur `develop` ou `main` (sans `latest`, release marquée pre-release), versions finales sur `main` (avec `latest`), notes tirées de `docs/releases/`. Cette tâche garde ce modèle.
-- Versions : v1.5.0 pour la phase A, versions intermédiaires pendant la refonte, v2.0.0 à la fin du plan.
+- Versions : v1.5.0 pour la phase A, versions intermédiaires pendant la refonte, v2.0.0 à la fin du plan. Les changements cassants sortent donc en 1.x : accepté, avec `breaking: true`, les actions obligatoires dans les notes et `UPGRADING.md`, et l'épinglage sur `:<majeure>.<mineure>` recommandé.
 
 ## Contexte
 
@@ -108,12 +108,12 @@ Le NAS tire les images publiées sur ghcr.io, en `:latest` d'après `docker-comp
 ## Tests à ajouter ou adapter
 
 - `actionlint` sur `release.yml`.
-- Répétition à blanc, après accord de l'humain pour le tag : pousser une pré-version de test (`v0.0.0-rc.1`, avec son fichier de notes, voir D-11) sur `develop` ; vérifier que la CI passe avant les images et que le manifeste est multi-arch. Supprimer ensuite le tag, la release et les images de test sur ghcr.io.
+- Pas de tag jetable publié (décision du 2026-10-09, voir D-11) : la première vraie pré-version qui suit le merge (ex. `v1.6.0-rc.1` sur `develop`, avec son fichier de notes, accord humain pour le tag) sert de test. Vérifier que la CI passe avant les images, que le manifeste est multi-arch et que `latest` n'a pas bougé. En cas d'échec après un push d'image, corriger et taguer `-rc.2`.
 - Sur le NAS ou en local : `docker pull --platform linux/arm64 ...` puis `docker run` de l'image arm64 sous émulation, l'API répond sur `/api/health`.
 
 ## Points d'attention
 
-- Impact sur les utilisateurs de `:latest`. Le manifeste multi-arch est transparent pour amd64. En revanche, la première release qui suit D-01, D-02 et D-03 apporte via `latest` un conteneur non-root, un frontend sur le port 8080 et un backend sans port publié. Recommander dans les notes de cette release l'épinglage sur `:<major>.<minor>` et décrire les changements dans ses « Required actions » et dans `UPGRADING.md` (D-11). Décision du 2026-10-09 : v2.0.0 seulement à la fin du plan, donc ces changements cassants sortent dans une version 1.x intermédiaire.
+- Impact sur les utilisateurs de `:latest`. Le manifeste multi-arch est transparent pour amd64. En revanche, la première release qui suit D-01, D-02 et D-03 apporte via `latest` un conteneur non-root, un frontend sur le port 8080 et un backend sans port publié. Recommander dans les notes de cette release l'épinglage sur `:<major>.<minor>` et décrire les changements dans ses « Required actions » et dans `UPGRADING.md` (D-11). Décision du 2026-10-09 : v2.0.0 seulement à la fin du plan, donc ces changements cassants sortent dans une version 1.x intermédiaire, avec `breaking: true` dans le front matter des notes.
 - Durée : le build arm64 sous QEMU (npm ci, prisma generate, tsc) peut prendre 10 à 20 minutes. Alternative si c'est trop lent : runners natifs `ubuntu-24.04-arm` (gratuits pour un repo public) et fusion des manifestes, plus complexe.
 - Architectures à confirmer par l'humain : le modèle du NAS (x86 ou ARM) décide si arm64 est nécessaire. armv7 est hors périmètre.
 - Les versions de `package.json` restent à `1.0.0` et `0.0.0`. Décision à prendre : les synchroniser à chaque release (commit sur `main` avant le tag) ou assumer que `APP_VERSION` fait foi.
@@ -122,3 +122,4 @@ Le NAS tire les images publiées sur ghcr.io, en `:latest` d'après `docker-comp
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-09 : D-11 ajoutée en dépendance. L'étape « le tag doit pointer sur main » est remplacée par la règle de D-11 (version finale sur `main`, pré-version sur `develop` ou `main`). Retirés car traités par D-11 : changelog et `PREV_TAG`, `generate_release_notes` et le job `github-release`, `latest` réservé aux versions finales, permissions par job, critère « les notes listent les PR », note sur `.github/release.yml`.
+- 2026-10-09 : réponses de l'humain. Changements cassants en 1.x acceptés avec garde-fous ; pas de tag jetable : la première vraie pré-version après le merge sert de test.
