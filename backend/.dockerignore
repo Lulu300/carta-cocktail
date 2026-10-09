@@ -10,6 +10,7 @@ coverage
 **/*.db-journal
 prisma/prisma
 .omc
+**/.claude
 **/.DS_Store
 **/*.test.ts
 src/test

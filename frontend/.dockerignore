@@ -1,10 +1,13 @@
 # Keep the build context to what the image needs: no local secrets and
 # no host dependencies (built for another OS).
 # Patterns match from the context root only: "**/" also covers subfolders.
+# Host .env* files (.env.production included) are excluded on purpose, so a
+# local build matches the release build made from a clean checkout.
 # Tests stay in the context: `tsc -b` compiles them during the build.
 node_modules
 dist
 coverage
 **/.env*
 .omc
+**/.claude
 **/.DS_Store
