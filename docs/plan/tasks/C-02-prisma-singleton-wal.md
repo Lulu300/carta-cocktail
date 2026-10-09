@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: haute
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: []
-touches: [backend/src/lib/prisma.ts, backend/src/routes/, backend/src/services/, backend/src/index.ts, backend/src/test/]
+touches: [backend/src/lib/prisma.ts, backend/src/routes/, backend/src/services/, backend/src/index.ts, backend/src/test/, backend/AGENTS.md]
 sources: ["02-backend-data-perf.md §3.4", "01-backend-routes.md §M6"]
-branch:
-pr:
+branch: fix/C-02-prisma-singleton-wal
+pr: 42
 ---
 
 ## Contexte
@@ -62,11 +62,11 @@ Chaque fichier de routes crée son propre `PrismaClient`, donc son propre pool d
 
 ## Critères d'acceptation
 
-- [ ] `grep -rn "new PrismaClient" backend/src` ne renvoie que `src/lib/prisma.ts` et son test.
-- [ ] Au démarrage, `PRAGMA journal_mode` renvoie `wal` sur une base locale (voir partage réseau plus bas).
-- [ ] `SQLITE_WAL=false` laisse le mode `delete`.
-- [ ] Ctrl+C sur `npm run dev` ou `npm start` : message d'arrêt, sortie en code 0.
-- [ ] Tous les tests backend passent sans changer leurs assertions.
+- [x] `grep -rn "new PrismaClient" backend/src` ne renvoie que `src/lib/prisma.ts` et son test.
+- [x] Au démarrage, `PRAGMA journal_mode` renvoie `wal` sur une base locale (voir partage réseau plus bas).
+- [x] `SQLITE_WAL=false` laisse le mode `delete`.
+- [x] Ctrl+C sur `npm run dev` ou `npm start` : message d'arrêt, sortie en code 0.
+- [x] Tous les tests backend passent sans changer leurs assertions.
 
 ## Tests à ajouter ou adapter
 
@@ -88,3 +88,5 @@ Chaque fichier de routes crée son propre `PrismaClient`, donc son propre pool d
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-09 : fait dans la PR #42 (`fix/C-02-prisma-singleton-wal`). `src/lib/prisma.ts` (client unique et `configureSqlite`), importé par les 13 routes, `availabilityService.ts` et `test/helpers.ts`. `index.ts` : WAL avant `listen`, arrêt propre sur SIGTERM/SIGINT (`server.close`, `$disconnect`, code 0, sortie forcée en code 1 après 10 s), `unhandledRejection` journalisé. Deux écarts avec le texte : pas de `PRAGMA busy_timeout`, car Prisma 6.19 règle déjà 5 000 ms sur chaque connexion du pool et le pragma ne touche qu'une connexion (vérifié ; `socket_timeout` dans l'URL règle tout le pool) ; `SQLITE_WAL=false` repasse explicitement en `DELETE`, pour qu'une base déjà en WAL revienne au journal classique. `backend/AGENTS.md` ajouté à `touches` : son modèle de route demandait encore un `PrismaClient` par fichier. Vérifié avec un vrai serveur sur base locale (`npm start` et `tsx watch`) : `wal` au démarrage, `delete` avec `SQLITE_WAL=false`, SIGTERM et SIGINT donnent le message d'arrêt et le code 0, `-wal`/`-shm` supprimés à la sortie (fermeture propre). Couverture des lignes modifiées : 100 %. Nouvelle tâche D-13 (documenter `SQLITE_WAL` dans le README et `.env.example`, hors PR à cause du conflit possible avec C-01 sur le README).
+- **Notes de version** : changement non cassant (`breaking: false`). La base passe en mode WAL au démarrage. *Before* : si la base SQLite est sur un partage réseau (SMB/NFS, NAS monté en bind mount), mettre `SQLITE_WAL=false` ; le volume nommé `db-data` par défaut n'est pas concerné. À noter : pendant que le serveur tourne, la base a deux fichiers compagnons `-wal` et `-shm` ; une copie à chaud du seul `.db` peut manquer les dernières écritures. À livrer dans la même release que C-05 (export par `VACUUM INTO`).
