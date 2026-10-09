@@ -81,7 +81,7 @@ Partie humaine (réglages GitHub, à faire après merge) :
 
 - Les noms des checks obligatoires doivent correspondre exactement aux `name:` des jobs (`ci.yml:11,61`). Si D-04 ou D-08 ajoutent des jobs, mettre à jour le ruleset. Un check requis qui ne tourne jamais bloque toutes les PR.
 - Avec `pull_request` obligatoire, Dependabot (D-06) et les agents passent par des PR, ce qui est voulu. Le bypass admin reste disponible pour une urgence.
-- Décision validée : convention des titres de PR. Le plan impose `ID: titre`. Les notes de release (D-05) se classent alors par labels, pas par préfixe de titre. Ne pas ajouter de lint de titre de PR (type `semantic-pull-request`), il rejetterait le format du plan.
+- Décision validée : convention des titres de PR. Le plan impose `ID: titre`. Les notes de release (D-11) se classent alors par labels, pas par préfixe de titre. Ne pas ajouter de lint de titre de PR (type `semantic-pull-request`), il rejetterait le format du plan.
 - `commitlint` en CI : facultatif, à ne pas imposer tant que des PR de la phase A/B sont ouvertes avec des messages en style libre.
 - La suppression des branches distantes est irréversible côté GitHub (récupérable seulement par SHA). L'humain la lance lui-même.
 
@@ -89,3 +89,4 @@ Partie humaine (réglages GitHub, à faire après merge) :
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : décisions validées par l'humain (voir « Décisions validées »).
+- 2026-10-09 : les notes de release (liste des PR classée par labels) relèvent désormais de D-11, plus de D-05 : renvoi corrigé.

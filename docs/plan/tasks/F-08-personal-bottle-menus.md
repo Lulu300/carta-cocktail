@@ -37,7 +37,7 @@ L'application sert à la fois de carte de cocktails et de carte de boissons serv
    - sélecteur d'ajout limité aux bouteilles cochées pour le type de la carte (`isApero` pour `APEROS`, `isDigestif` pour `DIGESTIFS`) et absentes de la carte. Les bouteilles vides restent proposées, marquées « vide » ;
    - ajout via `menuBottles.create`, retrait via `menuBottles.delete`, avec le modèle d'enregistrement immédiat d'E-07 (mise à jour optimiste, retour arrière et toast en cas d'erreur) ;
    - une erreur 400 du backend (bouteille non cochée) s'affiche dans un toast traduit.
-4. **Cartes système inchangées** (comportement d'E-07) : pas de sélecteur d'ajout, bouton « Retirer » qui crée une exclusion, section « Bouteilles retirées » avec « Remettre », bouton « Synchroniser » conservé, suppression impossible. Utiliser le helper `isSystemMenu()` de `components/admin/menus/` (E-05/E-07). Sur une carte personnelle : pas de bouton « Synchroniser », pas de section « Bouteilles retirées » (le retrait est un retrait simple), suppression de la carte possible depuis `MenusPage` (avec `useConfirm`). Réutiliser le bouton « Retirer » d'E-07 : seul l'effet backend diffère.
+4. **Cartes système inchangées** (comportement d'E-07) : pas de sélecteur d'ajout, bouton « Retirer » qui crée une exclusion, section « Bouteilles retirées » avec « Remettre », bouton « Synchroniser » conservé, suppression impossible. Utiliser le helper `isSystemMenu()` de `components/admin/menus/` (E-05/E-07). Sur une carte personnelle : pas de bouton « Synchroniser », pas de section « Bouteilles retirées » (le retrait est un retrait simple), suppression de la carte possible depuis `MenusPage` (avec `useConfirm`). Réutiliser le composant du bouton « Retirer » d'E-07 avec un autre handler : sur une carte système, il appelle `menuBottles.exclude(menuId, bottleIds)` (comportement d'E-07) ; sur une carte personnelle, il appelle la suppression simple `menuBottles.delete` pour chaque bouteille du groupe (C-06 refuse `exclude` sur une carte personnelle avec un 400). Le choix du handler passe par `isSystemMenu()`.
 5. **Badge « vide »** sur les bouteilles à 0 % dans l'éditeur, si E-07 ne l'a pas déjà fait.
 6. **Textes** : clés i18n en `en` et `fr` pour tout le nouveau texte (types, sélecteur, badge, messages d'erreur, carte vide). Le message de carte vide dépend du type de carte (système : cocher des bouteilles ; personnelle : en ajouter avec le sélecteur).
 
@@ -59,6 +59,7 @@ L'application sert à la fois de carte de cocktails et de carte de boissons serv
 - `MenuBottleEditPage.test.tsx` (créé par E-07) :
   - carte personnelle : le sélecteur ne liste que les bouteilles cochées pour le type et absentes de la carte ; ajout → appel `menuBottles.create` avec `menuId` et `bottleId` ; retrait → `menuBottles.delete` ; échec 400 → retour arrière et toast ;
   - carte personnelle : pas de bouton « Synchroniser », pas de section « Bouteilles retirées » ;
+  - carte personnelle : « Retirer » sur un groupe → `menuBottles.delete` pour chaque bouteille, aucun appel à `menuBottles.exclude` ; carte système : « Retirer » → un appel `menuBottles.exclude`, aucun `delete` ;
   - carte système : bouton « Synchroniser » et section « Bouteilles retirées » présents, pas de sélecteur d'ajout ;
   - badge « vide » sur une bouteille à 0 %.
 - Test i18n existant (clés `en`/`fr` alignées) vert.
@@ -74,3 +75,4 @@ L'application sert à la fois de carte de cocktails et de carte de boissons serv
 
 - 2026-10-09 : tâche créée à partir des décisions humaines du 2026-10-09 (cartes personnelles de bouteilles). Backend fait par C-06.
 - 2026-10-09 : cartes système alignées sur la liste d'exclusions (retrait et « Remettre » faits par E-07) ; type figé repris dans les décisions.
+- 2026-10-09 : deuxième revue de la PR #38. Bouton « Retirer » d'E-07 réutilisé avec un handler par type de carte (exclusion sur une carte système, suppression simple sur une carte personnelle) ; test « carte personnelle → aucun appel à `exclude` ».

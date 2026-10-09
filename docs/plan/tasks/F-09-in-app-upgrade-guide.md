@@ -8,7 +8,7 @@ effort: M
 status: todo
 owner: agent
 depends_on: [D-11, D-05, C-01]
-touches: [backend/prisma/schema.prisma, backend/prisma/migrations/, backend/src/services/upgradeNoticeService.ts, backend/src/routes/system.ts, backend/src/app.ts, backend/src/index.ts, backend/src/i18n/, backend/package.json, backend/package-lock.json, backend/Dockerfile, .github/workflows/release.yml, docker-compose.yml, frontend/src/components/admin/UpgradeNoticeBanner.tsx, frontend/src/components/layout/AdminLayout.tsx, frontend/src/services/api.ts, frontend/src/i18n/locales/]
+touches: [backend/prisma/schema.prisma, backend/prisma/migrations/, backend/src/services/upgradeNoticeService.ts, backend/src/routes/system.ts, backend/src/app.ts, backend/src/index.ts, backend/src/i18n/, backend/package.json, backend/package-lock.json, backend/Dockerfile, .github/workflows/release.yml, .github/workflows/ci.yml, docker-compose.yml, frontend/src/components/admin/UpgradeNoticeBanner.tsx, frontend/src/components/layout/AdminLayout.tsx, frontend/src/services/api.ts, frontend/src/i18n/locales/]
 sources: ["07-devops-history.md §3.4"]
 branch:
 pr:
@@ -82,7 +82,7 @@ L'instance tourne sur un NAS et se met à jour par `docker compose pull`, souven
 - **Restauration de backup (C-05)** : une sauvegarde restaure aussi la ligne `AppState`. Un `lastRunVersion` ancien ferait apparaître au redémarrage un faux bandeau (ou un faux avertissement de retour en arrière). Après une restauration, réenregistrer la version courante (`lastRunVersion = APP_VERSION`, sans avis), ou exclure cet état de la restauration. Le tester avec C-05.
 - Lecture du front matter : un parseur YAML (paquet `yaml`) est le plus sûr. L'ajouter touche `backend/package.json` et le lockfile : une seule tâche du couloir `deps` à la fois. Sinon, D-11 peut restreindre le format pour une lecture sans dépendance : à trancher dans la PR.
 - `additional_contexts` demande Docker Compose ≥ 2.17 ; `build-contexts` est géré par `docker/build-push-action@v6`. D-01 refond le Dockerfile : placer la copie des notes dans le stage runtime.
-- `COPY --from=releases` casse un simple `docker build ./backend` : sans le contexte nommé, Docker cherche une image appelée `releases`. Le job de build Docker de D-04 (CI) et le smoke test de D-08 doivent aussi passer `build-contexts: releases=./docs/releases` (ou `--build-context releases=./docs/releases`). Les mettre à jour dans la même PR, ou documenter la commande dans le README si ces tâches ne sont pas encore mergées.
+- `COPY --from=releases` casse un simple `docker build ./backend` : sans le contexte nommé, Docker cherche une image appelée `releases`. Le job de build Docker de D-04 (`.github/workflows/ci.yml`, dans `touches`) doit aussi passer `build-contexts: releases=./docs/releases` : le mettre à jour dans la même PR (D-04 est déjà mergée, via D-05). Le smoke test de D-08 construit les images par `docker compose up --build` : l'`additional_contexts` ajouté à `docker-compose.yml` lui suffit, ni `scripts/smoke/` ni `smoke.yml` ne changent. Le vérifier en lançant le smoke test si D-08 est mergée. Documenter `--build-context releases=./docs/releases` dans le README pour un `docker build` manuel.
 - `release.yml` et le Dockerfile sont aussi modifiés par D-05 et D-01 : enchaîner.
 - Le chemin des notes en dev (`../docs/releases` depuis `backend/`) doit être résolu depuis le dossier du fichier, comme `resolveDatabasePath` de C-05, pas depuis le cwd.
 
@@ -90,3 +90,4 @@ L'instance tourne sur un NAS et se met à jour par `docker compose pull`, souven
 
 - 2026-10-09 : tâche créée à partir des décisions humaines du 2026-10-09 (guide de mise à jour dans l'instance).
 - 2026-10-09 : revue de la PR #38. Points d'attention ajoutés : notes de version (règle de D-11), restauration de backup (réenregistrer la version courante), contexte `releases` pour les builds de D-04 et D-08.
+- 2026-10-09 : deuxième revue de la PR #38. `.github/workflows/ci.yml` ajouté à `touches` (job de build de D-04) ; le smoke test de D-08 passe par `docker-compose.yml`, déjà listé.

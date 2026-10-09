@@ -33,7 +33,7 @@ D-11 réécrit le workflow de release et rédige les notes de v1.5.0, mais ses e
 
 Chaque étape est vérifiée avant de passer à la suivante. Pousser la branche avant le tag (sinon la règle de branche lit un `origin/<branche>` en retard).
 
-1. **Gel du contenu.** Vérifier que `develop` ne contient que la phase A, D-11 et les PR de documentation. Le coordinateur ne merge aucune PR du lot suivant avant le tag `v1.5.0-rc.1` (étape 3). Si une PR a été mergée entre-temps, reprendre sa section « Required actions » dans `docs/releases/v1.5.0.md` et `UPGRADING.md` (PR sur `develop`) avant de continuer.
+1. **Gel du contenu.** Vérifier que `develop` ne contient que la phase A, D-11 et les PR de documentation. Si une autre PR a été mergée après D-11, reprendre sa section « Required actions » dans `docs/releases/v1.5.0.md` et `UPGRADING.md` (PR sur `develop`) avant de continuer. **Gel** : du tag `v1.5.0-rc.1` (étape 3) jusqu'au merge `develop` → `main` (étape 4), le coordinateur ne merge rien sur `develop`, sauf les corrections des notes de release (`docs/releases/v1.5.0.md`, `UPGRADING.md`). Sinon la PR `develop` → `main` emporterait dans v1.5.0 des changements non testés par la pré-version et absents des notes.
 2. **Règle de branche.** Créer une branche jetable depuis `develop` avec un commit vide, la pousser, y poser un tag de pré-version au format valide qui ne servira jamais (ex. `v1.5.0-rc.0`) et le pousser. Attendu : échec au job `verify` sur la règle de branche, aucune image sur ghcr.io, aucune release. Supprimer ensuite le tag (local et distant), la branche et l'exécution échouée.
 3. **Pré-version.** Taguer `v1.5.0-rc.1` sur `develop` et le pousser. Vérifier :
    - la release marquée pre-release, avec Summary, Changes, Required actions (before / after), la liste des PR et les commandes `docker pull`, tirés de `docs/releases/v1.5.0.md` ;
@@ -42,7 +42,7 @@ Chaque étape est vérifiée avant de passer à la suivante. Pousser la branche 
    Si possible, l'humain teste l'image sur une copie de son instance en suivant les « Required actions ».
 4. **Passage sur `main`** (humain). PR `develop` → `main` (merge commit, D-07), CI verte, merge.
 5. **Version finale.** Taguer `v1.5.0` sur `main` et le pousser. Vérifier la release normale, les images `:1.5.0` et `latest` déplacé, et `PREV_TAG` = `v1.4.0` (liste des PR depuis v1.4.0).
-6. Rouvrir le merge des PR du lot suivant (coordinateur).
+6. Fin du gel : le coordinateur peut merger de nouveau sur `develop` dès que l'étape 4 est faite (le contenu de v1.5.0 est alors fixé sur `main`). Si l'étape 5 échoue, la corriger par une PR de notes sur `develop` puis une nouvelle PR `develop` → `main` : ne merger d'autres PR qu'après le tag `v1.5.0`.
 
 ## Critères d'acceptation
 
@@ -68,3 +68,4 @@ Chaque étape est vérifiée avant de passer à la suivante. Pousser la branche 
 ## Journal
 
 - 2026-10-09 : tâche créée lors de la revue de la PR #38 : critères post-merge et séquence réelle sortis de D-11.
+- 2026-10-09 : deuxième revue de la PR #38. Gel aligné : rien sur `develop` du tag `v1.5.0-rc.1` au merge `develop` → `main`, sauf les corrections des notes (étapes 1 et 6).
