@@ -186,18 +186,25 @@ If the database differs from `0_init`, it usually comes from an older version: s
 
 ### Restoring a pre-migration backup
 
-To roll back an upgrade, pin the images back to the previous version in `docker-compose.prod.yml`, then restore the copy made before the migration:
+To roll back an upgrade, pin the images back to the previous version in `docker-compose.prod.yml`, then restore the copy made before the migration.
 
-```bash
-docker compose -f docker-compose.prod.yml stop carta-cocktail-backend
-docker compose -f docker-compose.prod.yml run --rm --no-deps --entrypoint sh carta-cocktail-backend -c '
-  ls -1 /app/data/backups/
-  B=/app/data/backups/pre-migrate-<date>.db
-  cp "$B" /app/data/carta_cocktail.db
-  rm -f /app/data/carta_cocktail.db-wal /app/data/carta_cocktail.db-shm
-  if [ -f "$B-wal" ]; then cp "$B-wal" /app/data/carta_cocktail.db-wal; fi'
-docker compose -f docker-compose.prod.yml up -d
-```
+1. Stop the backend and list the copies (the newest is last):
+
+   ```bash
+   docker compose -f docker-compose.prod.yml stop carta-cocktail-backend
+   docker compose -f docker-compose.prod.yml run --rm --no-deps --entrypoint ls carta-cocktail-backend -l /app/data/backups/
+   ```
+
+2. Restore the chosen copy, replacing `<date>` with its date, then start:
+
+   ```bash
+   docker compose -f docker-compose.prod.yml run --rm --no-deps --entrypoint sh carta-cocktail-backend -c '
+     B=/app/data/backups/pre-migrate-<date>.db
+     cp "$B" /app/data/carta_cocktail.db
+     rm -f /app/data/carta_cocktail.db-wal /app/data/carta_cocktail.db-shm
+     if [ -f "$B-wal" ]; then cp "$B-wal" /app/data/carta_cocktail.db-wal; fi'
+   docker compose -f docker-compose.prod.yml up -d
+   ```
 
 ## Project Structure
 
