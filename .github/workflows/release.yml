@@ -1,21 +1,148 @@
 name: Release
 
+# Release model (see README.md "CI/CD" and UPGRADING.md):
+# - vX.Y.Z-rc.N: pre-release, tagged on develop. Publishes :X.Y.Z-rc.N images
+#   (latest is not moved) and a GitHub Release marked as pre-release.
+# - vX.Y.Z: final release, tagged on main. Publishes :X.Y.Z and :latest images
+#   and a normal GitHub Release.
+# Push the branch before the tag: the branch rule reads origin/<branch>.
+
 on:
   push:
     tags:
       - "v*"
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   REGISTRY: ghcr.io
 
 jobs:
-  build-and-push:
-    name: Build & Push Docker Images
+  # Everything that can refuse a tag runs here, before any image is pushed.
+  verify:
+    name: Verify tag and release notes
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+      prerelease: ${{ steps.tag.outputs.prerelease }}
+      notes: ${{ steps.notes.outputs.path }}
+      prev_tag: ${{ steps.prev.outputs.tag }}
+
+    steps:
+      # fetch-depth 0 brings origin/main, origin/develop and every tag
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Parse the tag
+        id: tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          NUMBER='(0|[1-9][0-9]*)'
+          if [[ ! "$VERSION" =~ ^$NUMBER\.$NUMBER\.$NUMBER(-rc\.$NUMBER)?$ ]]; then
+            echo "::error::Invalid tag $GITHUB_REF_NAME: expected vX.Y.Z or vX.Y.Z-rc.N"
+            exit 1
+          fi
+          if [[ "$VERSION" == *-rc.* ]]; then
+            PRERELEASE=true
+          else
+            PRERELEASE=false
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+          echo "$GITHUB_REF_NAME: version $VERSION, pre-release: $PRERELEASE"
+
+      - name: A final tag must be reachable from main, a pre-release from develop
+        env:
+          PRERELEASE: ${{ steps.tag.outputs.prerelease }}
+        run: |
+          # Peel the tag: for an annotated tag the ref points to a tag object, not a commit
+          COMMIT=$(git rev-parse "${GITHUB_REF}^{commit}")
+          if [ "$PRERELEASE" = true ]; then
+            BRANCH=develop
+          else
+            BRANCH=main
+          fi
+          if ! git merge-base --is-ancestor "$COMMIT" "origin/$BRANCH"; then
+            echo "::error::$GITHUB_REF_NAME ($COMMIT) is not reachable from origin/$BRANCH. Push the branch before the tag, and tag pre-releases on develop and final releases on main."
+            exit 1
+          fi
+          echo "$GITHUB_REF_NAME ($COMMIT) is reachable from origin/$BRANCH"
+
+      - name: Release notes file must exist and be valid
+        id: notes
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+          PRERELEASE: ${{ steps.tag.outputs.prerelease }}
+        run: |
+          # A pre-release without its own notes file uses the target version's file
+          NOTES="docs/releases/v$VERSION.md"
+          if [ "$PRERELEASE" = true ] && [ ! -f "$NOTES" ]; then
+            NOTES="docs/releases/v${VERSION%%-*}.md"
+          fi
+          if [ ! -f "$NOTES" ]; then
+            echo "::error::Missing release notes: docs/releases/v$VERSION.md (copy docs/releases/TEMPLATE.md)"
+            exit 1
+          fi
+
+          # The front matter must name the version of the file it is in
+          EXPECTED=$(basename "$NOTES" .md)
+          EXPECTED="${EXPECTED#v}"
+          if ! FOUND=$(yq --front-matter=extract '.version' "$NOTES"); then
+            echo "::error file=$NOTES::The front matter is not valid YAML"
+            exit 1
+          fi
+          if [ "$FOUND" != "$EXPECTED" ]; then
+            echo "::error file=$NOTES::Front matter version is '$FOUND', expected '$EXPECTED'"
+            exit 1
+          fi
+
+          # Shape read by the in-app upgrade guide: breaking is a boolean,
+          # required_actions a list of { when: before|after, action: text }
+          VALID=$(yq --front-matter=extract '
+            (.breaking | tag) == "!!bool" and
+            (.required_actions | tag) == "!!seq" and
+            ([.required_actions[] | select((.when == "before" or .when == "after") and (.action | tag) == "!!str" and .action != "")] | length) == (.required_actions | length)
+          ' "$NOTES")
+          if [ "$VALID" != true ]; then
+            echo "::error file=$NOTES::The front matter needs breaking (true or false) and required_actions (a list of { when: before|after, action: \"...\" }, or [])"
+            exit 1
+          fi
+          echo "path=$NOTES" >> "$GITHUB_OUTPUT"
+          echo "Release notes: $NOTES"
+
+      - name: Previous tag
+        id: prev
+        env:
+          PRERELEASE: ${{ steps.tag.outputs.prerelease }}
+        run: |
+          # Newest first. versionsort.suffix=- sorts v1.5.0-rc.N before v1.5.0.
+          # The version order is used, not git describe: the last final tag is a
+          # merge commit on main, which is not always an ancestor of develop.
+          TAGS=$(git -c versionsort.suffix=- tag --list 'v*' --sort=-v:refname)
+          if [ "$PRERELEASE" = false ]; then
+            # A final release lists the changes since the previous final release
+            TAGS=$(printf '%s\n' "$TAGS" | grep -v -- '-' || true)
+          fi
+          PREV_TAG=$(printf '%s\n' "$TAGS" | awk -v tag="$GITHUB_REF_NAME" 'found { print; exit } $0 == tag { found = 1 }')
+          echo "tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
+          echo "Previous tag: ${PREV_TAG:-none}"
+
+  images:
+    name: Build and push ${{ matrix.service }} image
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        service: [backend, frontend]
 
     steps:
       - uses: actions/checkout@v5
@@ -30,71 +157,80 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract version from tag
-        id: version
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - name: Image tags
+        id: tags
+        env:
+          SERVICE: ${{ matrix.service }}
+          VERSION: ${{ needs.verify.outputs.version }}
+          PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+        run: |
+          IMAGE="$REGISTRY/${GITHUB_REPOSITORY,,}/$SERVICE"
+          {
+            echo "list<<EOF"
+            echo "$IMAGE:$VERSION"
+            # latest only follows final releases
+            if [ "$PRERELEASE" = false ]; then
+              echo "$IMAGE:latest"
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: Lowercase repository name
-        id: repo
-        run: echo "name=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
-
-      - name: Build and push backend
+      - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: ./backend
+          context: ./${{ matrix.service }}
           push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}/backend:${{ steps.version.outputs.version }}
-            ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}/backend:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push frontend
-        uses: docker/build-push-action@v6
-        with:
-          context: ./frontend
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}/frontend:${{ steps.version.outputs.version }}
-            ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}/frontend:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ steps.tags.outputs.list }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
   github-release:
     name: Create GitHub Release
+    needs: [verify, images]
     runs-on: ubuntu-latest
-    needs: build-and-push
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
-      - name: Generate release body
+      - name: Build the release body
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NOTES: ${{ needs.verify.outputs.notes }}
+          VERSION: ${{ needs.verify.outputs.version }}
+          PREV_TAG: ${{ needs.verify.outputs.prev_tag }}
         run: |
-          REPO="${{ github.repository }}"
-          REPO="${REPO,,}"
-          TAG="${{ github.ref_name }}"
-          PREV_TAG=$(git tag --sort=-v:refname | sed -n '2p')
-          if [ -z "$PREV_TAG" ]; then
-            CHANGELOG=$(git log --pretty=format:"- %s (%h)")
-          else
-            CHANGELOG=$(git log --pretty=format:"- %s (%h)" "${PREV_TAG}..HEAD")
+          IMAGE_BASE="$REGISTRY/${GITHUB_REPOSITORY,,}"
+          ARGS=(-f "tag_name=$GITHUB_REF_NAME")
+          if [ -n "$PREV_TAG" ]; then
+            ARGS+=(-f "previous_tag_name=$PREV_TAG")
           fi
-          cat > /tmp/release-body.md << EOF
-          ## Changes
+          PULL_REQUESTS=$(gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" "${ARGS[@]}" --jq .body)
 
-          ${CHANGELOG}
-
-          ## Docker Images
-
-          \`\`\`bash
-          docker pull ${{ env.REGISTRY }}/${REPO}/backend:${TAG#v}
-          docker pull ${{ env.REGISTRY }}/${REPO}/frontend:${TAG#v}
-          \`\`\`
-          EOF
+          {
+            # Notes file without its front matter: Summary, Changes, Required actions
+            awk 'NR == 1 && $0 == "---" { in_front_matter = 1; next }
+                 in_front_matter && $0 == "---" { in_front_matter = 0; next }
+                 !in_front_matter' "$NOTES"
+            echo
+            echo "## Pull requests"
+            echo
+            # Drop GitHub's own top heading and nest its other sections under ours
+            printf '%s\n' "$PULL_REQUESTS" | sed -e "/^## What's Changed$/d" -e 's/^## /### /'
+            echo
+            echo "## Docker images"
+            echo
+            echo '```bash'
+            echo "docker pull $IMAGE_BASE/backend:$VERSION"
+            echo "docker pull $IMAGE_BASE/frontend:$VERSION"
+            echo '```'
+          } > "$RUNNER_TEMP/release-body.md"
+          cat "$RUNNER_TEMP/release-body.md"
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          body_path: /tmp/release-body.md
+          body_path: ${{ runner.temp }}/release-body.md
+          prerelease: ${{ needs.verify.outputs.prerelease == 'true' }}
+          make_latest: ${{ needs.verify.outputs.prerelease == 'true' && 'false' || 'true' }}
