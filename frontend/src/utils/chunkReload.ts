@@ -3,7 +3,7 @@ const LAST_RELOAD_KEY = 'chunkReloadAt';
 // stop reloading so the visitor does not get stuck in a loop.
 const RELOAD_GUARD_MS = 10_000;
 
-type ReloadTarget = Pick<Window, 'addEventListener' | 'sessionStorage' | 'location'>;
+type ReloadTarget = Pick<Window, 'addEventListener' | 'sessionStorage' | 'location' | 'navigator'>;
 
 function reloadedRecently(storage: Storage, now: number): boolean {
   const lastReload = Number(storage.getItem(LAST_RELOAD_KEY));
@@ -17,6 +17,9 @@ function reloadedRecently(storage: Storage, now: number): boolean {
  */
 export function registerChunkReloadHandler(target: ReloadTarget = window): void {
   target.addEventListener('vite:preloadError', () => {
+    // Offline, the chunk is not missing but unreachable: a reload would only
+    // replace the page with the browser's offline error.
+    if (target.navigator.onLine === false) return;
     const now = Date.now();
     try {
       if (reloadedRecently(target.sessionStorage, now)) return;

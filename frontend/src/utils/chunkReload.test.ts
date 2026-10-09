@@ -13,13 +13,14 @@ function createStorage(): Storage {
   };
 }
 
-function createTarget(storage: Storage = createStorage()) {
+function createTarget(storage: Storage = createStorage(), onLine = true) {
   const events = new EventTarget();
   const reload = vi.fn();
   const target = {
     addEventListener: events.addEventListener.bind(events),
     sessionStorage: storage,
     location: { reload } as unknown as Location,
+    navigator: { onLine } as Navigator,
   };
   registerChunkReloadHandler(target);
   const firePreloadError = () => events.dispatchEvent(new Event('vite:preloadError'));
@@ -74,5 +75,16 @@ describe('registerChunkReloadHandler', () => {
     firePreloadError();
 
     expect(reload).not.toHaveBeenCalled();
+  });
+
+  it('does not reload while the browser is offline', () => {
+    const storage = createStorage();
+    const { reload, firePreloadError } = createTarget(storage, false);
+
+    firePreloadError();
+
+    expect(reload).not.toHaveBeenCalled();
+    // The guard is left untouched, so a later failure once back online still reloads
+    expect(storage.getItem('chunkReloadAt')).toBeNull();
   });
 });
