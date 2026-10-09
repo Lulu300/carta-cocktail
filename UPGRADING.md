@@ -50,7 +50,7 @@ Recommended first: export a backup from Settings > Backup & Restore.
    docker run -d --name carta-check -v "$PWD/carta-db-check":/app/data \
      -e DATABASE_URL=file:/app/data/carta_cocktail.db -e JWT_SECRET="$(openssl rand -hex 32)" \
      ghcr.io/lulu300/carta-cocktail/backend:1.6.0
-   docker logs -f carta-check                         # Ctrl+C after "API running" or "ERROR"
+   docker logs -f carta-check                         # Ctrl+C after "API running"; on a refusal it ends by itself after the SQL
    docker exec carta-check npx prisma migrate status  # "Database schema is up to date!"
    docker rm -f carta-check
    ls carta-db-check/backups/                         # pre-migrate-<date>.db
@@ -66,14 +66,7 @@ Recommended first: export a backup from Settings > Backup & Restore.
 
    Testing a pre-release (`v1.6.0-rc.N`): the `:1.6.0` image only exists after the final release. Use `ghcr.io/lulu300/carta-cocktail/backend:1.6.0-rc.N` instead (`:1.6.0-rc.1` for the first one).
 
-4. **Only if the database is on a network share** (a bind mount on an SMB or NFS share, a NAS mount for example): WAL does not work there. Add `SQLITE_WAL=false` to the `environment` list of `carta-cocktail-backend` in `docker-compose.prod.yml`. The compose files do not pass this variable from `.env`. The default `db-data` named volume is local and needs nothing.
-
-   ```yaml
-       environment:
-         - SQLITE_WAL=false
-   ```
-
-5. **Pin both images to `:1.6.0`.** `docker-compose.prod.yml` has not changed since v1.5.0: if yours is the v1.5.0 one, only change the image tags. Otherwise, update it first, keeping your own changes (ports, for example):
+4. **Pin both images to `:1.6.0`.** `docker-compose.prod.yml` has not changed since v1.5.0: if yours is the v1.5.0 one, only change the image tags. Otherwise, update it first, keeping your own changes (ports, for example):
 
    ```bash
    cp docker-compose.prod.yml docker-compose.prod.yml.bak
@@ -86,6 +79,13 @@ Recommended first: export a backup from Settings > Backup & Restore.
    ```
 
    Testing a pre-release (`v1.6.0-rc.N`): the `v1.6.0` compose URL and the `:1.6.0` images only exist after the final release. Use `v1.6.0-rc.N` in the `curl` URL and pin the images to `:1.6.0-rc.N` instead (`v1.6.0-rc.1` and `:1.6.0-rc.1` for the first one).
+
+5. **Only if the database is on a network share** (a bind mount on an SMB or NFS share, a NAS mount for example): WAL does not work there. In the `docker-compose.prod.yml` from step 4, add `SQLITE_WAL=false` to the existing `environment` list of `carta-cocktail-backend`, for example after `- UPLOAD_DIR=/app/uploads`. The compose files do not pass this variable from `.env`. The default `db-data` named volume is local and needs nothing.
+
+   ```yaml
+         - UPLOAD_DIR=/app/uploads
+         - SQLITE_WAL=false
+   ```
 
 ### After upgrading
 
