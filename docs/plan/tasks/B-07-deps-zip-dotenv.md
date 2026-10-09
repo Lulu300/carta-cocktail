@@ -67,3 +67,4 @@ Voir étape 1. Le test d'export doit décompresser l'archive (avec adm-zip) et v
 ## Journal
 
 - 2026-10-08 : tâche créée à partir du rapport de dépendances.
+- 2026-10-09 : C-02 (PR #42) crée `backend/src/routes/backup.test.ts` (tests de régression WAL) et modifie `backup.ts` : compléter ce fichier à l'étape 1 au lieu de le créer, rebaser si B-07 est déjà en cours.

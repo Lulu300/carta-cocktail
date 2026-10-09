@@ -1,4 +1,3 @@
-import { PrismaClient } from '@prisma/client';
 import { execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
@@ -6,10 +5,12 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import supertest from 'supertest';
 import app from '../app';
+import { prisma } from '../lib/prisma';
 
 const TEST_DB_PATH = path.resolve(__dirname, '../../prisma/test.db');
 
-export const prisma = new PrismaClient();
+// Tests and routes share the server's client, as in production
+export { prisma };
 export const request = supertest(app);
 
 /**

@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
 
 // Unit conversion factors to milliliters (ml)
 const UNIT_TO_ML: Record<string, number> = {

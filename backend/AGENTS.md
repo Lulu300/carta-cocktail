@@ -44,6 +44,8 @@ backend/
 │   ├── index.ts              # Server entry (port 3001)
 │   ├── app.ts                # Express setup, middleware, route mounting
 │   ├── config.ts             # Environment config (port, JWT, upload dir)
+│   ├── lib/
+│   │   └── prisma.ts         # The only PrismaClient + SQLite setup (WAL)
 │   ├── middleware/
 │   │   └── auth.ts           # JWT Bearer validation, AuthRequest type
 │   ├── routes/               # One file per resource (14 route files)
@@ -86,12 +88,11 @@ All routes follow this structure:
 
 ```typescript
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 
 const router = Router();
-const prisma = new PrismaClient();
 
-// Each route file instantiates its own PrismaClient
+// Never create a PrismaClient: import the shared one from src/lib/prisma.ts
 // Routes use async handlers with try/catch
 router.get('/', async (req, res) => {
   try {
@@ -153,6 +154,8 @@ Entity names support multi-language via JSON strings stored in SQLite:
 ## Database
 
 - SQLite file at `prisma/carta_cocktail.db`
+- One shared `PrismaClient` (`src/lib/prisma.ts`), also used by the test helpers. Only `prisma/seed.ts` (separate process) and `src/lib/prisma.test.ts` create their own
+- WAL journal mode, set at startup; `SQLITE_WAL=false` keeps the rollback journal, required when the database sits on a network share (SMB/NFS)
 - Cascading deletes on most relations
 - Unique constraints on slugs, name pairs, menu-entity pairs
 - Seed creates: 1 admin, 3 category types (SPIRIT/SYRUP/SOFT), 18 units, 2 system menus (aperitifs/digestifs), site settings
