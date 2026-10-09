@@ -27,7 +27,7 @@ const SettingsPage = lazy(() => import('./pages/admin/SettingsPage'));
 function RouteFallback() {
   const { t } = useTranslation();
   return (
-    <div className="min-h-screen bg-[#0f0f1a] flex items-center justify-center text-gray-500">
+    <div role="status" className="min-h-screen bg-[#0f0f1a] flex items-center justify-center text-gray-500">
       {t('common.loading')}
     </div>
   );

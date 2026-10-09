@@ -79,7 +79,7 @@ describe('ProtectedRoute', () => {
 
     renderAt('/admin/bottles');
 
-    expect(await screen.findByText('common.loading')).toBeInTheDocument();
+    expect(await screen.findByRole('status')).toHaveTextContent('common.loading');
     expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
     expect(screen.queryByTestId('admin-layout')).not.toBeInTheDocument();
   });
@@ -91,8 +91,8 @@ describe('route code splitting', () => {
 
     renderAt('/admin');
 
-    // The fallback shows first, then the dashboard chunk resolves
-    expect(screen.getByText('common.loading')).toBeInTheDocument();
+    // The fallback shows first, announced to screen readers, then the dashboard chunk resolves
+    expect(screen.getByRole('status')).toHaveTextContent('common.loading');
     expect(await screen.findByText('dashboard.title')).toBeInTheDocument();
     expect(screen.queryByText('common.loading')).not.toBeInTheDocument();
   });
