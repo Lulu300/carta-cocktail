@@ -1,9 +1,9 @@
-import { describe, it } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdtempSync, mkdirSync, realpathSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   parseUnifiedDiff,
@@ -326,27 +326,104 @@ describe('formatReport', () => {
 
 describe('delta-coverage.mjs CLI', () => {
   const cli = fileURLToPath(new URL('./delta-coverage.mjs', import.meta.url));
+  let repo;
 
-  function runCli(args) {
-    return spawnSync(process.execPath, [cli, ...args], { encoding: 'utf-8' });
+  function git(...args) {
+    execFileSync('git', args, { cwd: repo, stdio: 'ignore' });
   }
 
-  it('fails with an explicit message when the base ref does not exist', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'delta-coverage-'));
-    const coverage = join(dir, 'coverage-final.json');
-    writeFileSync(coverage, '{}');
-    try {
-      const run = runCli([
-        '--coverage', coverage,
-        '--base', 'refs/heads/no-such-branch-for-delta-coverage',
-        '--scope', 'backend/src/',
-      ]);
+  function writeRepoFile(path, content) {
+    mkdirSync(dirname(join(repo, path)), { recursive: true });
+    writeFileSync(join(repo, path), content);
+  }
 
-      assert.equal(run.status, 1);
-      assert.match(run.stderr, /Base ref "refs\/heads\/no-such-branch-for-delta-coverage" not found/);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
+  function writeCoverage(entries) {
+    writeRepoFile('coverage-final.json', JSON.stringify(entries));
+    return join(repo, 'coverage-final.json');
+  }
+
+  function runCli(args) {
+    return spawnSync(process.execPath, [cli, ...args], { cwd: repo, encoding: 'utf-8' });
+  }
+
+  // A throwaway repository: the "base" tag holds one file; HEAD modifies it and
+  // adds an untested file under backend/src plus a file outside the scope.
+  before(() => {
+    // realpath: on macOS the temp dir is a symlink, and git reports the resolved path.
+    repo = realpathSync(mkdtempSync(join(tmpdir(), 'delta-coverage-')));
+    git('init', '--quiet');
+    git('config', 'user.email', 'test@example.com');
+    git('config', 'user.name', 'Test');
+    git('config', 'commit.gpgsign', 'false');
+    writeRepoFile('backend/src/tested.ts', 'export const a = 1;\n');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'base');
+    git('tag', 'base');
+    writeRepoFile('backend/src/tested.ts', 'export const a = 1;\nexport const b = 2;\n');
+    writeRepoFile('backend/src/untested.ts', 'export function f() {\n  return 1;\n}\n');
+    writeRepoFile('frontend/src/other.ts', 'export const c = 3;\n');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'change');
+  });
+
+  after(() => {
+    rmSync(repo, { recursive: true, force: true });
+  });
+
+  it('fails when a changed file of the scope has no coverage data', () => {
+    const coverage = writeCoverage({
+      [join(repo, 'backend/src/tested.ts')]: fileCoverage([
+        [1, 1, 1],
+        [2, 2, 1],
+      ]),
+    });
+
+    const run = runCli(['--coverage', coverage, '--base', 'base', '--scope', 'backend/src', '--threshold', '80']);
+
+    assert.equal(run.status, 1);
+    assert.match(run.stdout, /backend\/src\/untested\.ts\s+3\s+0\s+0% !! not in coverage report/);
+    assert.match(run.stdout, /backend\/src\/tested\.ts\s+1\s+1\s+100%/);
+    assert.doesNotMatch(run.stdout, /frontend/);
+    assert.match(run.stderr, /Delta coverage 25% is below the 80% threshold/);
+  });
+
+  it('passes when the changed lines are covered and the rest is ignored', () => {
+    const coverage = writeCoverage({
+      [join(repo, 'backend/src/tested.ts')]: fileCoverage([[2, 2, 1]]),
+    });
+
+    const run = runCli([
+      '--coverage', coverage, '--base', 'base', '--scope', 'backend/src/',
+      '--ignore', 'backend/src/untested.ts',
+    ]);
+
+    assert.equal(run.status, 0);
+    assert.match(run.stdout, /Delta coverage 100% meets the 80% threshold/);
+  });
+
+  it('reports N/A when nothing changed under the scope', () => {
+    const coverage = writeCoverage({});
+
+    const run = runCli(['--coverage', coverage, '--base', 'HEAD', '--scope', 'backend/src/']);
+
+    assert.equal(run.status, 0);
+    assert.match(run.stdout, /Delta coverage: N\/A/);
+  });
+
+  it('fails with an explicit message when the base ref does not exist', () => {
+    const coverage = writeCoverage({});
+
+    const run = runCli(['--coverage', coverage, '--base', 'origin/no-such-branch', '--scope', 'backend/src/']);
+
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /Base ref "origin\/no-such-branch" not found/);
+  });
+
+  it('fails when the coverage report does not exist', () => {
+    const run = runCli(['--coverage', 'missing.json', '--base', 'base', '--scope', 'backend/src/']);
+
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /Coverage file not found/);
   });
 
   it('fails when a required argument is missing', () => {
@@ -357,7 +434,7 @@ describe('delta-coverage.mjs CLI', () => {
   });
 
   it('fails on an invalid threshold', () => {
-    const run = runCli(['--coverage', 'x.json', '--base', 'HEAD', '--scope', 'backend/src/', '--threshold', 'abc']);
+    const run = runCli(['--coverage', 'x.json', '--base', 'base', '--scope', 'backend/src/', '--threshold', 'abc']);
 
     assert.equal(run.status, 1);
     assert.match(run.stderr, /Invalid --threshold/);
