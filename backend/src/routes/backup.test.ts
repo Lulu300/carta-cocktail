@@ -157,6 +157,7 @@ describe('backup import validation', () => {
   });
 
   it.each([
+    ['that is not a zip', Buffer.from('not a zip archive')],
     ['without metadata.json', zipWith({ 'database.db': 'x' })],
     ['without database.db', zipWith({ 'metadata.json': '{"version":1}' })],
     ['with an unsupported metadata version', zipWith({ 'metadata.json': '{"version":2}', 'database.db': 'x' })],

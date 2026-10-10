@@ -22,6 +22,15 @@ function getDatabasePath(): string {
   return dbUrl.replace(/^file:/, '');
 }
 
+/** Opens the uploaded archive: a file that is not a readable zip is a client error. */
+function openBackupZip(buffer: Buffer): AdmZip {
+  try {
+    return new AdmZip(buffer);
+  } catch {
+    throw new BadRequestError('errors.invalidBackup');
+  }
+}
+
 // Export backup as ZIP
 router.get('/export', async (_req: AuthRequest, res: Response) => {
   const dbPath = getDatabasePath();
@@ -76,7 +85,7 @@ router.post('/import', upload.single('backup'), async (req: AuthRequest, res: Re
     return;
   }
 
-  const zip = new AdmZip(req.file.buffer);
+  const zip = openBackupZip(req.file.buffer);
   const entries = zip.getEntries();
 
   // Validate ZIP contents
