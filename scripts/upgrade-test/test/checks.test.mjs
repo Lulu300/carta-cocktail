@@ -1,10 +1,20 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isStrongJwtSecret } from '../lib/actions.mjs';
-import { checkLogLines, checkRowCounts, checkUploadsPersistent } from '../lib/checks.mjs';
+import { checkImages, checkLogLines, checkRowCounts, checkUploadsPersistent } from '../lib/checks.mjs';
 import { parseSnapshot } from '../lib/database.mjs';
 import { allowedFailures, isRequirementMet, markExpected, unexpectedFailures } from '../lib/expectations.mjs';
-import { readEnvVariable, renderTemplate, writeEnvVariable } from '../lib/instance.mjs';
+import {
+  BACKEND_SERVICE, FRONTEND_SERVICE, Instance, publishedContainerPort, readEnvVariable, renderTemplate, writeEnvVariable,
+} from '../lib/instance.mjs';
+
+const LAYOUTS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'layouts');
+// Port the frontend container listens on, per compose generation of the layouts.
+const FRONTEND_PORT_BY_GENERATION = { '1.4.0': 80, '1.5.0': 80, '1.8.0': 8080 };
 
 test('parseSnapshot reads the helper output', () => {
   const snapshot = parseSnapshot([
@@ -66,7 +76,7 @@ test('expectations: naive failures listed by the notes and inherited ones are ex
   const profile = { knownIssues: {} };
   const naive = allowedFailures({ mode: 'naive', profile, crossedHooks, unmetRequirements: [] });
   const conformant = allowedFailures({ mode: 'conformant', profile, crossedHooks, unmetRequirements: ['v1.5.0'] });
-  assert.deepEqual(naive, { images: 'photos lost' });
+  assert.deepEqual(naive, { images: 'photos lost', frontendImages: 'photos lost' });
   assert.match(conformant.startup, /skips v1.5.0/);
 
   const rows = [
@@ -85,7 +95,7 @@ test('expectations: a layout reason replaces the reason of the notes in naive mo
   const layoutReasons = { images: 'custom photo mount', uploadsPersistent: 'custom photo mount' };
   const profile = { knownIssues: {} };
   assert.deepEqual(allowedFailures({ mode: 'naive', profile, crossedHooks, unmetRequirements: [], layoutReasons }),
-    { images: 'custom photo mount', startup: 'weak secret' });
+    { images: 'custom photo mount', frontendImages: 'custom photo mount', startup: 'weak secret' });
   assert.deepEqual(allowedFailures({ mode: 'conformant', profile, crossedHooks, unmetRequirements: [], layoutReasons }), {});
 });
 
@@ -101,4 +111,68 @@ test('isRequirementMet accepts a started version, or a direct jump from the allo
   assert.equal(isRequirementMet(hook, new Set(['1.4.0']), '1.4.0'), true);
   assert.equal(isRequirementMet(hook, new Set(['1.3.0']), '1.3.0'), false);
   assert.equal(isRequirementMet({ ...hook, directFrom: undefined }, new Set(['1.4.0']), '1.4.0'), false);
+});
+
+test('expectations: frontendImages may fail whenever images may, unless the notes give their own reason', () => {
+  const profile = { knownIssues: {} };
+  const photosLost = [{ naiveMayFail: { images: 'photos lost' } }];
+  const portChanged = [{ naiveMayFail: { frontend: 'port changed', frontendImages: 'port changed' } }];
+  assert.equal(allowedFailures({ mode: 'naive', profile, crossedHooks: photosLost, unmetRequirements: [] }).frontendImages, 'photos lost');
+  assert.equal(allowedFailures({ mode: 'naive', profile, crossedHooks: [...photosLost, ...portChanged], unmetRequirements: [] }).frontendImages,
+    'port changed');
+  assert.deepEqual(allowedFailures({ mode: 'naive', profile, crossedHooks: portChanged, unmetRequirements: [] }),
+    { frontend: 'port changed', frontendImages: 'port changed' });
+
+  const knownBug = { knownIssues: { images: 'known bug' } };
+  assert.equal(allowedFailures({ mode: 'conformant', profile: knownBug, crossedHooks: [], unmetRequirements: [] }).frontendImages, 'known bug');
+  assert.equal(allowedFailures({ mode: 'conformant', profile, crossedHooks: photosLost, unmetRequirements: [] }).frontendImages, undefined);
+});
+
+test('checkImages reports in the group it is given', async () => {
+  const backend = await checkImages('images', 'http://127.0.0.1:9', [], 'backend');
+  const nginx = await checkImages('frontendImages', 'http://127.0.0.1:9', [], 'frontend nginx');
+  assert.deepEqual([backend.group, nginx.group], ['images', 'frontendImages']);
+  assert.equal(nginx.label, 'photos via frontend nginx');
+});
+
+test('publishedContainerPort reads the container port of one service only', () => {
+  const compose = [
+    'services:',
+    '  carta-cocktail-backend:',
+    '    ports:',
+    '      - "127.0.0.1::3001"',
+    '',
+    '  carta-cocktail-frontend:',
+    '    # comment',
+    '    ports:',
+    '      - "127.0.0.1::8080"',
+    'volumes:',
+    '  data:',
+  ].join('\n');
+  assert.equal(publishedContainerPort(compose, FRONTEND_SERVICE), 8080);
+  assert.equal(publishedContainerPort(compose, BACKEND_SERVICE), 3001);
+  assert.throws(() => publishedContainerPort(compose, 'other'), /No service other/);
+  assert.throws(() => publishedContainerPort('services:\n  carta-cocktail-frontend:\n    image: x\n', FRONTEND_SERVICE),
+    /No "127.0.0.1::<port>" published/);
+});
+
+test('every compose generation of every layout publishes the frontend port its image listens on', async () => {
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'carta-layout-test-'));
+  try {
+    for (const name of fs.readdirSync(LAYOUTS_DIR)) {
+      const layoutDir = path.join(LAYOUTS_DIR, name);
+      const layout = (await import(pathToFileURL(path.join(layoutDir, 'layout.mjs')))).default;
+      const instance = new Instance({ project: 'test', layout, layoutDir, workDir: path.join(workDir, name) });
+      const generations = fs.readdirSync(layoutDir)
+        .map((file) => /^compose-(.+)\.yml$/.exec(file)?.[1])
+        .filter(Boolean);
+      assert.deepEqual(generations.sort(), Object.keys(FRONTEND_PORT_BY_GENERATION).sort(), `generations of ${name}`);
+      for (const generation of generations) {
+        instance.generation = generation;
+        assert.equal(instance.frontendContainerPort(), FRONTEND_PORT_BY_GENERATION[generation], `${name} compose-${generation}.yml`);
+      }
+    }
+  } finally {
+    fs.rmSync(workDir, { recursive: true, force: true });
+  }
 });

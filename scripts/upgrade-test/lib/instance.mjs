@@ -22,6 +22,27 @@ export function readEnvVariable(text, name) {
   return line === undefined ? undefined : line.slice(name.length + 1);
 }
 
+/** Lines of one service of a compose file, up to the next service or top-level key. */
+function serviceLines(composeText, service) {
+  const lines = composeText.split('\n');
+  const start = lines.findIndex((line) => line.trimEnd() === `  ${service}:`);
+  if (start === -1) throw new Error(`No service ${service} in the compose file`);
+  const end = lines.findIndex((line, index) => index > start && /^ {0,2}\S/.test(line));
+  return lines.slice(start + 1, end === -1 ? undefined : end);
+}
+
+/**
+ * Container port that a layout compose file publishes for a service. The layouts publish every
+ * port as "127.0.0.1::<container port>" (free host port).
+ */
+export function publishedContainerPort(composeText, service) {
+  for (const line of serviceLines(composeText, service)) {
+    const match = /^\s*- "127\.0\.0\.1::(\d+)"\s*$/.exec(line);
+    if (match) return Number(match[1]);
+  }
+  throw new Error(`No "127.0.0.1::<port>" published for ${service}`);
+}
+
 export function writeEnvVariable(text, name, value) {
   const lines = text.split('\n').filter((line) => line !== '');
   const index = lines.findIndex((line) => line.startsWith(`${name}=`));
@@ -67,10 +88,18 @@ export class Instance {
     fs.writeFileSync(this.envPath, renderTemplate(template, values));
   }
 
+  composeTemplate() {
+    return fs.readFileSync(path.join(this.layoutDir, `compose-${this.generation}.yml`), 'utf8');
+  }
+
+  /** Port the frontend container listens on, as published by the current compose generation. */
+  frontendContainerPort() {
+    return publishedContainerPort(this.composeTemplate(), FRONTEND_SERVICE);
+  }
+
   /** Writes the compose file of the current generation with the current images. */
   writeComposeFile(adminEmail) {
-    const template = fs.readFileSync(path.join(this.layoutDir, `compose-${this.generation}.yml`), 'utf8');
-    fs.writeFileSync(this.composePath, renderTemplate(template, {
+    fs.writeFileSync(this.composePath, renderTemplate(this.composeTemplate(), {
       PROJECT: this.project,
       ADMIN_EMAIL: adminEmail,
       BACKEND_IMAGE: this.images.backend,

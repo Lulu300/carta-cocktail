@@ -17,6 +17,9 @@ export function isRequirementMet(hook, startedReleases, previousVersion) {
  *   The notes describe the default setup: `layoutReasons` replaces their reason when the layout
  *   knows the real cause;
  * - a refused start when the path skips a version that the notes require to start first.
+ * Photos that the backend does not serve cannot reach the frontend nginx either: whenever
+ * `images` may fail, `frontendImages` may fail for the same reason, unless the notes give it
+ * a reason of their own.
  */
 export function allowedFailures({ mode, profile, crossedHooks, unmetRequirements, layoutReasons = {} }) {
   const allowed = { ...profile.knownIssues };
@@ -26,6 +29,7 @@ export function allowedFailures({ mode, profile, crossedHooks, unmetRequirements
       if (allowed[group]) allowed[group] = reason;
     }
   }
+  if (allowed.images && !allowed.frontendImages) allowed.frontendImages = allowed.images;
   if (unmetRequirements.length) {
     allowed.startup = `the path skips ${unmetRequirements.join(', ')}, which the notes require to start first`;
   }

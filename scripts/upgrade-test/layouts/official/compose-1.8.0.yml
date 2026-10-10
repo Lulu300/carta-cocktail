@@ -1,8 +1,13 @@
+# docker-compose.prod.yml of v1.8.0: compose-1.5.0.yml with the frontend container port 8080
+# (non-root nginx) instead of 80. Nothing else changes.
+# Test-bench changes: images and platform filled in by the bench, ports published on 127.0.0.1
+# with a free host port.
 services:
   carta-cocktail-backend:
-    image: ghcr.io/lulu300/carta-cocktail/backend:latest
+    image: {{BACKEND_IMAGE}}
+    platform: {{BACKEND_PLATFORM}}
     ports:
-      - "3001:3001"
+      - "127.0.0.1::3001"
     environment:
       - DATABASE_URL=file:/app/data/carta_cocktail.db
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set (openssl rand -hex 32)}
@@ -18,9 +23,10 @@ services:
     restart: unless-stopped
 
   carta-cocktail-frontend:
-    image: ghcr.io/lulu300/carta-cocktail/frontend:latest
+    image: {{FRONTEND_IMAGE}}
+    platform: {{FRONTEND_PLATFORM}}
     ports:
-      - "80:8080"
+      - "127.0.0.1::8080"
     environment:
       - BACKEND_HOST=carta-cocktail-backend
     depends_on:
