@@ -39,6 +39,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Delta coverage script tests
+        run: node --test '../.github/scripts/*.test.mjs'
+
       - name: Tests with coverage
         run: npm run test:coverage
         env:
@@ -48,9 +51,20 @@ jobs:
           ADMIN_PASSWORD: testpass123
           NODE_ENV: test
 
+      # The --ignore globs mirror coverage.exclude in backend/vitest.config.ts:
+      # keep both lists in sync, or excluded files will count as 0% here.
       - name: Delta coverage check (80%)
         if: github.event_name == 'pull_request'
-        run: node ../.github/scripts/delta-coverage.mjs coverage/coverage-final.json 80 origin/${{ github.base_ref }}
+        env:
+          BASE_REF: origin/${{ github.base_ref }}
+        run: >-
+          node ../.github/scripts/delta-coverage.mjs
+          --coverage coverage/coverage-final.json
+          --threshold 80
+          --base "$BASE_REF"
+          --scope backend/src/
+          --ignore 'backend/src/test/**'
+          --ignore 'backend/src/index.ts'
 
       - name: Upload backend coverage
         if: always()
@@ -92,9 +106,22 @@ jobs:
       - name: Tests with coverage
         run: npm run test:coverage
 
+      # The --ignore globs mirror coverage.exclude in frontend/vitest.config.ts:
+      # keep both lists in sync, or excluded files will count as 0% here.
       - name: Delta coverage check (80%)
         if: github.event_name == 'pull_request'
-        run: node ../.github/scripts/delta-coverage.mjs coverage/coverage-final.json 80 origin/${{ github.base_ref }}
+        env:
+          BASE_REF: origin/${{ github.base_ref }}
+        run: >-
+          node ../.github/scripts/delta-coverage.mjs
+          --coverage coverage/coverage-final.json
+          --threshold 80
+          --base "$BASE_REF"
+          --scope frontend/src/
+          --ignore 'frontend/src/test/**'
+          --ignore 'frontend/src/main.tsx'
+          --ignore 'frontend/src/i18n/**'
+          --ignore 'frontend/src/types/**'
 
       - name: Upload frontend coverage
         if: always()
