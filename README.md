@@ -28,7 +28,7 @@ A cocktail menu management system with admin panel and public-facing menu displa
 
 ### Prerequisites
 
-- Node.js 24 (`.nvmrc`; `nvm use` picks it up). Both packages require Node >= 22.13 (`engines`)
+- Node.js 24 or newer (`.nvmrc`; `nvm use` picks it up), required by `engines` in both packages
 - npm
 
 ### Development
