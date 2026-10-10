@@ -63,7 +63,7 @@ Recommended first: export a backup from Settings > Backup & Restore.
    docker run --rm -v <project>_db-data:/data -v "$PWD/carta-db-copy":/out alpine sh -c 'cp /data/carta_cocktail.db* /out/ && ls -la /out'
    ```
 
-   **Database in a folder of the host** (a bind mount such as `./data:/app/data`: the `docker inspect` command of step 2 prints `bind <folder> -> /app/data`): there is no volume, copy the files from that folder instead, with the backend stopped:
+   **Database in a folder of the host** (a bind mount such as `./data:/app/data`: the `docker inspect` command of step 2 (or of step 1 of the v1.5.0 section) prints `bind <folder> -> /app/data`): there is no volume, copy the files from that folder instead, with the backend stopped:
 
    ```bash
    docker compose -f docker-compose.prod.yml stop carta-cocktail-backend
@@ -140,13 +140,12 @@ Recommended first: export a backup from Settings > Backup & Restore.
 
    ```bash
    BACKEND=$(docker compose -f docker-compose.prod.yml ps -q carta-cocktail-backend)
-   docker inspect "$BACKEND" --format '{{range .Mounts}}{{.Destination}}{{println}}{{end}}' | grep -x /app/uploads
-   docker cp ./uploads-rescue/. "$BACKEND":/app/uploads/
+   docker inspect "$BACKEND" --format '{{range .Mounts}}{{.Destination}}{{println}}{{end}}' | grep -x /app/uploads && docker cp ./uploads-rescue/. "$BACKEND":/app/uploads/
    PHOTO=$(docker exec "$BACKEND" ls /app/uploads | head -n 1)
    docker exec "$BACKEND" wget -q --spider "http://localhost:3001/uploads/$PHOTO" && echo "photo served"
    ```
 
-   The `docker inspect` line must print `/app/uploads`; if it prints nothing, stop there and fix the mount first (step 5 of "Before upgrading"), or the photos go back into the container. The last line must print `photo served`. Check that the photos show on a cocktail page, then delete `./uploads-rescue/`.
+   The second command must print `/app/uploads`, and only then copies the photos. If it prints nothing, `/app/uploads` is not a mount and nothing was copied: fix the mount (step 5 of "Before upgrading"), run `docker compose -f docker-compose.prod.yml up -d`, then run these commands again. The last line must print `photo served`. Check that the photos show on a cocktail page, then delete `./uploads-rescue/`.
 
 3. **If something goes wrong, roll back.**
    - **The backend refuses to start** (`ERROR: the existing database … does not match migration 0_init` in the log, container restarting): the database was not modified. Pin the images back to `:1.5.0` and run `docker compose -f docker-compose.prod.yml up -d`, then fix the database as described in "Database migrations" in [`README.md`](README.md#database-migrations) before trying again.
@@ -231,33 +230,27 @@ Recommended first: export a backup from Settings > Backup & Restore. A backup ma
 
      The other option is to keep your mount and set `UPLOAD_DIR` to its path, by changing the `- UPLOAD_DIR=/app/uploads` line of the backend `environment` list (`- UPLOAD_DIR=/uploads`). The compose file sets this variable itself, so a value in `.env` has no effect. The mounted path and `UPLOAD_DIR` must always be the same. Prefer the first option: the commands of this guide use `/app/uploads`.
 
-   - **Secrets in an `env_file`** (a file other than `.env`, named in an `env_file:` entry of the backend). The `- JWT_SECRET=${JWT_SECRET:?…}` and `- ADMIN_PASSWORD=${ADMIN_PASSWORD:-}` lines of the new file take their values from `.env` or from the shell, never from `env_file`, and a variable set in `environment` wins over the same variable in `env_file`. Copied as they are, the first line stops `docker compose` when `.env` has no `JWT_SECRET` (`required variable JWT_SECRET is missing a value`), and the second replaces your `ADMIN_PASSWORD` with an empty value. Keep your secrets in your `env_file` and do not copy these two lines. The same goes for the `ADMIN_EMAIL` and `ADMIN_RESET_PASSWORD` lines if you set these variables in your `env_file`. Wherever this guide says `.env` for one of these variables, use your `env_file`.
+   - **Secrets in an `env_file`** (a file other than `.env`, named in an `env_file:` entry of the backend). The `- JWT_SECRET=${JWT_SECRET:?…}` and `- ADMIN_PASSWORD=${ADMIN_PASSWORD:-}` lines of the new file take their values from `.env` or from the shell, never from `env_file`, and a variable set in `environment` wins over the same variable in `env_file`. Copied as they are, the first line stops `docker compose` when `.env` has no `JWT_SECRET` (`required variable JWT_SECRET is missing a value`), and the second replaces your `ADMIN_PASSWORD` with an empty value. Keep your secrets in your `env_file` and do not copy these two lines. The same goes for the `ADMIN_EMAIL` line if you set `ADMIN_EMAIL` in your `env_file`. Wherever this guide says `.env` for `JWT_SECRET`, `ADMIN_PASSWORD` or `ADMIN_EMAIL`, use your `env_file`. Keep the `- ADMIN_RESET_PASSWORD=${ADMIN_RESET_PASSWORD:-false}` line as it is: it reads `.env` or the shell, so `ADMIN_RESET_PASSWORD` always goes there, never in your `env_file`, where the line would replace it with `false` (step 2 of "After upgrading").
 
 ### After upgrading
 
-1. **Copy the rescued photos into the uploads volume, then check the photos.** The container was recreated, so read its id again:
+1. **Check that `/app/uploads` is a mount, copy the rescued photos into it, then check that a photo is served.** The container was recreated, so read its id again:
 
    ```bash
    BACKEND=$(docker compose -f docker-compose.prod.yml ps -q carta-cocktail-backend)
-   docker cp ./uploads-rescue/. "$BACKEND":/app/uploads/
+   docker inspect "$BACKEND" --format '{{range .Mounts}}{{.Destination}}{{println}}{{end}}' | grep -x /app/uploads && docker cp ./uploads-rescue/. "$BACKEND":/app/uploads/
    docker exec "$BACKEND" ls -la /app/uploads
-   ```
-
-   No restart is needed. Photos mounted on `/uploads` before the upgrade (second case of step 1 of "Before upgrading") were not rescued: skip the `docker cp` line, they are already in the folder now mounted on `/app/uploads`.
-
-   In both cases, check that `/app/uploads` is a mount and that a photo is served:
-
-   ```bash
-   docker inspect "$BACKEND" --format '{{range .Mounts}}{{.Destination}}{{println}}{{end}}' | grep -x /app/uploads
    PHOTO=$(docker exec "$BACKEND" ls /app/uploads | head -n 1)
    docker exec "$BACKEND" wget -q --spider "http://localhost:3001/uploads/$PHOTO" && echo "photo served"
    ```
 
-   The first command must print `/app/uploads`, the last one `photo served` (skip the last two on an instance without any photo). If the first command prints nothing, the photos are inside the container and the next recreation deletes them: fix the mount (step 3 of "Before upgrading"), copying the photos out of the running container first if needed (`docker cp "$BACKEND":/app/uploads/. ./uploads-rescue/`). With `UPLOAD_DIR=/uploads`, use `/uploads` instead of `/app/uploads` in the first two commands. Then check that the photos show on a cocktail page, and delete `./uploads-rescue/`. The photos now survive container recreations.
+   No restart is needed. Photos mounted on `/uploads` before the upgrade (second case of step 1 of "Before upgrading") were not rescued: leave out the `&& docker cp …` part of the second command, they are already in the folder now mounted on `/app/uploads`.
+
+   The second command must print `/app/uploads`, and only then copies the photos. The last one must print `photo served` (skip the last two on an instance without any photo). If the second command prints nothing, `/app/uploads` is not a mount and nothing was copied: fix the mount (step 3 of "Before upgrading"), run `docker compose -f docker-compose.prod.yml up -d`, then run these commands again. With `UPLOAD_DIR=/uploads`, replace `/app/uploads` with `/uploads` in these commands, except in the URL. Then check that the photos show on a cocktail page, and delete `./uploads-rescue/`. The photos now survive container recreations.
 
 2. **Change the admin password if it is still `admin123`, or shorter than 12 characters.** Older versions reset the password to `ADMIN_PASSWORD` at every start, or to `admin123` when `ADMIN_PASSWORD` was not set, even after a change in the settings. If you never set `ADMIN_PASSWORD`, your password is `admin123`, and the backend log says so at each start. Log in (the new `JWT_SECRET` ended the previous sessions), then either:
    - change it in Settings > Admin Profile; it now survives restarts and updates; or
-   - set `ADMIN_RESET_PASSWORD=true` and a new `ADMIN_PASSWORD` (at least 12 characters) in `.env`, run `docker compose -f docker-compose.prod.yml up -d`, check the log line `Admin credentials reset from environment (login email: …)`, then remove `ADMIN_RESET_PASSWORD` from `.env` and run `up -d` again. Otherwise every restart resets the password.
+   - set `ADMIN_RESET_PASSWORD=true` and a new `ADMIN_PASSWORD` (at least 12 characters) in `.env`, run `docker compose -f docker-compose.prod.yml up -d`, check the log line `Admin credentials reset from environment (login email: …)`, then remove `ADMIN_RESET_PASSWORD` from `.env` and run `up -d` again. Otherwise every restart resets the password. With an `env_file` (step 3 of "Before upgrading"), put the new `ADMIN_PASSWORD` in your `env_file`, but `ADMIN_RESET_PASSWORD=true` in `.env`, or run `ADMIN_RESET_PASSWORD=true docker compose -f docker-compose.prod.yml up -d` once and then a plain `up -d`: set in the `env_file`, it is replaced by `false` and the reset silently does not happen.
 
    If `.env` sets an `ADMIN_PASSWORD` shorter than 12 characters, it is your current password, for the same reason. The new version starts with it, because an existing admin is left as is, but refuses it to create or reset the admin. Change the password in Settings > Admin Profile, choosing at least 12 characters, then remove `ADMIN_PASSWORD` from `.env` or set it to at least 12 characters.
 
