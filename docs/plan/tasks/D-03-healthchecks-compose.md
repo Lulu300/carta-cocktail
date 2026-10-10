@@ -14,6 +14,10 @@ branch:
 pr:
 ---
 
+## Décisions validées (2026-10-10)
+
+- **Port du frontend** : le conteneur frontend écoute sur 8080 (D-02, changement cassant).
+
 ## Contexte
 
 Docker ne sait pas si le backend est prêt : il le considère démarré dès que le processus existe, même pendant les migrations ou si la base est inaccessible. nginx peut donc démarrer avant le backend et l'API est joignable sur le port 3001 en contournant nginx. Un endpoint de santé sert aussi au smoke test D-08 et à la supervision sur le NAS.
