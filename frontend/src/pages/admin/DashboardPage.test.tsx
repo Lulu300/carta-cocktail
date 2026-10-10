@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '../../test/test-utils';
+import { Route, Routes } from 'react-router-dom';
+import { render, screen, waitFor, within } from '../../test/test-utils';
+import AdminLayout from '../../components/layout/AdminLayout';
 import DashboardPage from './DashboardPage';
 
 vi.mock('../../services/api', () => ({
@@ -8,6 +10,14 @@ vi.mock('../../services/api', () => ({
   cocktails: { list: vi.fn() },
   menus: { list: vi.fn() },
   shortages: { list: vi.fn() },
+}));
+
+vi.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => ({ logout: vi.fn() }),
+}));
+
+vi.mock('../../contexts/SiteSettingsContext', () => ({
+  useSiteSettings: () => ({ siteSettings: { siteName: 'Carta', siteIcon: '' } }),
 }));
 
 import { categories, bottles, cocktails, menus, shortages } from '../../services/api';
@@ -83,5 +93,50 @@ describe('DashboardPage', () => {
       expect(hrefs).toContain('/admin/cocktails');
       expect(hrefs).toContain('/admin/menus');
     });
+  });
+
+  it('shows a spinner, not 0, on each card while its count loads', () => {
+    mockCatList.mockReturnValue(new Promise(() => {}));
+    mockBotList.mockReturnValue(new Promise(() => {}));
+    mockCockList.mockReturnValue(new Promise(() => {}));
+    mockMenuList.mockReturnValue(new Promise(() => {}));
+
+    render(<DashboardPage />);
+
+    expect(screen.getAllByRole('status')).toHaveLength(4);
+    expect(screen.queryByText('0')).not.toBeInTheDocument();
+  });
+
+  it('shows a dash and an error on the card whose request failed, never 0', async () => {
+    mockCatList.mockResolvedValue([{}, {}, {}] as never);
+    mockBotList.mockRejectedValue(new Error('Network down'));
+
+    render(<DashboardPage />);
+
+    const bottlesCard = screen.getByRole('link', { name: /dashboard\.stats\.bottles/ });
+    expect(await within(bottlesCard).findByText('common.error')).toBeInTheDocument();
+    expect(within(bottlesCard).getByText('–')).toBeInTheDocument();
+    expect(within(bottlesCard).queryByText('0')).not.toBeInTheDocument();
+
+    const categoriesCard = screen.getByRole('link', { name: /dashboard\.stats\.categories/ });
+    expect(within(categoriesCard).getByText('3')).toBeInTheDocument();
+  });
+
+  it('sends a single shortages request when rendered inside AdminLayout', async () => {
+    mockShortList.mockResolvedValue([{ category: {} }] as never);
+
+    render(
+      <Routes>
+        <Route element={<AdminLayout />}>
+          <Route path="/" element={<DashboardPage />} />
+        </Route>
+      </Routes>,
+    );
+
+    // Layout badge and dashboard alert both show the count from the same request
+    await waitFor(() => {
+      expect(screen.getAllByText(/dashboard\.shortageAlert/)).toHaveLength(2);
+    });
+    expect(mockShortList).toHaveBeenCalledTimes(1);
   });
 });
