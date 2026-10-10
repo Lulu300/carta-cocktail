@@ -37,15 +37,18 @@ C-07 place les index uniques en tête de sa migration : un doublon l'arrête ava
 - [ ] Une migration en échec affiche au démarrage son nom, la copie à restaurer et le renvoi vers la procédure.
 - [ ] La procédure de reprise est dans le README et a été suivie une fois sur une base jetable.
 - [ ] La règle d'écriture des migrations est documentée.
+- [ ] Après `prisma migrate resolve --rolled-back`, le démarrage suivant fait une copie `pre-migrate` avant d'appliquer la migration.
 
 ## Tests à ajouter ou adapter
 
 - Test de l'entrypoint (si D-02 fournit un harnais) ou essai manuel décrit dans la PR : base avec doublons de catégories, démarrage refusé, message affiché, reprise par la copie.
+- Base jetable : `deploy` en échec (P3018), correction, `migrate resolve --rolled-back`, puis démarrage du conteneur : une nouvelle copie `pre-migrate-*` est créée avant que la migration soit appliquée.
 
 ## Points d'attention
 
 - Le banc `scripts/upgrade-test/` attend un refus propre (message et base inchangée) : vérifier qu'il reconnaît ce nouveau cas.
 - Ne jamais restaurer automatiquement : la décision reste humaine.
+- 2026-10-10, transmis par C-07 (deuxième revue de la PR #60, point 10) : après `prisma migrate resolve --rolled-back`, `prisma migrate status` répond « Database schema is up to date! » (code 0) alors que la migration est encore à appliquer. L'entrypoint ne sauvegarde que si `migrate status` échoue : la nouvelle tentative applique donc la migration sans copie `pre-migrate`. L'entrypoint doit sauvegarder dès qu'une migration du dossier `prisma/migrations/` n'a pas de ligne terminée (`finished_at` non nul, `rolled_back_at` nul) dans `_prisma_migrations`, au lieu de se fier au seul code de sortie de `migrate status`.
 
 ## Journal
 
