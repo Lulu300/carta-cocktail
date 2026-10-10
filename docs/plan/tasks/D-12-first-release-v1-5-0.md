@@ -5,13 +5,13 @@ phase: D
 lane: ci
 criticite: haute
 effort: S
-status: todo
+status: done
 owner: mixed
 depends_on: [D-11]
 touches: [docs/releases/v1.5.0.md, UPGRADING.md]
 sources: ["07-devops-history.md §3.4"]
-branch:
-pr:
+branch: docs/D-12-close-first-release
+pr: 40
 ---
 
 ## Décisions validées (2026-10-09)
@@ -46,11 +46,11 @@ Chaque étape est vérifiée avant de passer à la suivante. Pousser la branche 
 
 ## Critères d'acceptation
 
-- [ ] Tag sur une branche jetable : échec au `verify` sur la règle de branche, aucune image, aucune release ; tag et branche supprimés.
-- [ ] `v1.5.0-rc.1` sur `develop` : images `:1.5.0-rc.1` publiées, `latest` inchangé, release marquée pre-release avec les notes de `v1.5.0.md`.
-- [ ] `v1.5.0` sur `main` : images `:1.5.0` et `latest`, release normale, `PREV_TAG` = `v1.4.0`.
-- [ ] Les notes de v1.5.0 recommandent l'épinglage sur `:1.5.0` (le tag `:<majeure>.<mineure>` n'existe qu'après D-05).
-- [ ] (humain) L'instance de production est passée en v1.5.0 en suivant `UPGRADING.md`.
+- [x] Tag sur une branche jetable : échec au `verify` sur la règle de branche, aucune image, aucune release ; tag et branche supprimés.
+- [x] `v1.5.0-rc.1` sur `develop` : images `:1.5.0-rc.1` publiées, `latest` inchangé, release marquée pre-release avec les notes de `v1.5.0.md`.
+- [x] `v1.5.0` sur `main` : images `:1.5.0` et `latest`, release normale, `PREV_TAG` = `v1.4.0`.
+- [x] Les notes de v1.5.0 recommandent l'épinglage sur `:1.5.0` (le tag `:<majeure>.<mineure>` n'existe qu'après D-05).
+- [x] (humain) L'instance de production est passée en v1.5.0 en suivant `UPGRADING.md`. Fait sur une instance réelle passée directement de v1.4.0 à v1.6.0 (actions v1.5.0 et v1.6.0 cumulées) ; voir le Journal.
 
 ## Tests à ajouter ou adapter
 
@@ -70,3 +70,6 @@ Chaque étape est vérifiée avant de passer à la suivante. Pousser la branche 
 - 2026-10-09 : tâche créée lors de la revue de la PR #38 : critères post-merge et séquence réelle sortis de D-11.
 - 2026-10-09 : deuxième revue de la PR #38. Gel aligné : rien sur `develop` du tag `v1.5.0-rc.1` au merge `develop` → `main`, sauf les corrections des notes (étapes 1 et 6).
 - 2026-10-09 : revue de la PR #39 (D-11). Étape 3 : le test de la pré-version utilise le compose du tag `v1.5.0-rc.1` et les images `:1.5.0-rc.1`.
+- 2026-10-09 : étapes 1 à 5 faites. Tag `v1.5.0-rc.0` sur une branche jetable refusé par `verify` (aucune image, aucune release, tag et branche supprimés). `v1.5.0-rc.1` ([exécution](https://github.com/Lulu300/carta-cocktail/actions/runs/37939165582)) : pre-release, images `:1.5.0-rc.1`, `latest` inchangé. PR `develop` → `main` #40, puis `v1.5.0` ([exécution](https://github.com/Lulu300/carta-cocktail/actions/runs/37940044631)) : release normale, images `:1.5.0` et `latest`, PR listées depuis v1.4.0.
+- 2026-10-10 : le modèle a resservi pour v1.6.0 : `v1.6.0-rc.1` ([exécution](https://github.com/Lulu300/carta-cocktail/actions/runs/37954450873)), PR `develop` → `main` #49, `v1.6.0` ([exécution](https://github.com/Lulu300/carta-cocktail/actions/runs/38052396099)) : release Latest, images `:1.6.0` et `latest` déplacé, PR listées depuis v1.5.0 (#41 à #48).
+- 2026-10-10 : critère humain. L'humain n'a pas d'instance à lui ; il a mis à jour l'instance réelle d'un ami de v1.4.0 à v1.6.0 en suivant `UPGRADING.md` (actions de v1.5.0 et v1.6.0 cumulées, volume des photos passé sur `/app/uploads`), après validation de ce même chemin sur le banc D-15 avec une copie de cette base. Résultat : sauvegarde `pre-migrate-*` créée, `0_init` marquée appliquée, WAL actif, `migrate status` à jour, photos servies, mot de passe admin changé depuis l'interface puis `ADMIN_PASSWORD` retiré du fichier d'environnement, connexion vérifiée après redémarrage. Une deuxième instance (autre ami, pas d'accès) reste en v1.4.0 ; l'humain juge la validation suffisante.
