@@ -1,12 +1,14 @@
 -- The unique indexes come first: they are the statements that fail on existing
 -- duplicates (see backend/scripts/check-integrity.ts). SQLite migrations do not run
--- in a transaction, so failing here leaves the database unchanged.
+-- in a transaction: a failure here comes before any table is rebuilt. IF NOT EXISTS
+-- keeps a retry possible after `prisma migrate resolve --rolled-back`, when the
+-- first index was created before the second one failed.
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Category_name_key" ON "Category"("name");
+CREATE UNIQUE INDEX IF NOT EXISTS "Category_name_key" ON "Category"("name");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Unit_abbreviation_key" ON "Unit"("abbreviation");
+CREATE UNIQUE INDEX IF NOT EXISTS "Unit_abbreviation_key" ON "Unit"("abbreviation");
 
 -- RedefineTables
 PRAGMA defer_foreign_keys=ON;
