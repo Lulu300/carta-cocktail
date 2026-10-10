@@ -5,13 +5,13 @@ phase: E
 lane: frontend
 criticite: haute
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [A-10, A-09]
 touches: [frontend/src/main.tsx, frontend/src/queries/, frontend/src/pages/admin/ShortagesPage.tsx, frontend/src/pages/admin/DashboardPage.tsx, frontend/src/components/layout/AdminLayout.tsx, frontend/package.json, frontend/package-lock.json, frontend/src/test/test-utils.tsx]
 sources: ["05-frontend-archi.md §3.1", "05-frontend-archi.md §R1", "05-frontend-archi.md §9"]
-branch:
-pr:
+branch: feature/E-02-tanstack-query-foundation
+pr: https://github.com/Lulu300/carta-cocktail/pull/59
 ---
 
 ## Contexte
@@ -72,13 +72,13 @@ Chaque page admin recharge ses données à la main, sans cache, sans état de ch
 
 ## Critères d'acceptation
 
-- [ ] Sur `/admin`, l'onglet Réseau montre une seule requête `GET /api/shortages` (deux aujourd'hui).
-- [ ] Navigation `/admin` → `/admin/categories` → `/admin` : les compteurs du dashboard s'affichent sans écran vide (cache), la requête de fond part seulement si les données ont plus de 30 s.
-- [ ] Avec le backend arrêté, `ShortagesPage` affiche une erreur et un bouton « Réessayer », jamais le bandeau vert.
-- [ ] Avec le backend arrêté, le dashboard n'affiche aucun 0 trompeur.
-- [ ] Une 401 n'est pas réessayée (vérifier dans l'onglet Réseau).
-- [ ] Toutes les clés de requête viennent de `queries/keys.ts` (aucun tableau littéral dans les pages).
-- [ ] `npm test`, `npm run lint`, `npx tsc --noEmit` passent ; couverture ≥ 80 % sur les lignes modifiées.
+- [x] Sur `/admin`, l'onglet Réseau montre une seule requête `GET /api/shortages` (deux aujourd'hui). *(Vérifié par test : `DashboardPage.test.tsx`, Dashboard + `AdminLayout` → un seul appel ; contrôle navigateur à faire.)*
+- [x] Navigation `/admin` → `/admin/categories` → `/admin` : les compteurs du dashboard s'affichent sans écran vide (cache), la requête de fond part seulement si les données ont plus de 30 s. *(`staleTime: 30_000` testé dans `queryClient.test.ts`. Exception voulue : `/shortages` repart à chaque navigation à cause de l'invalidation transitoire, jusqu'à E-05. Contrôle navigateur à faire.)*
+- [x] Avec le backend arrêté, `ShortagesPage` affiche une erreur et un bouton « Réessayer », jamais le bandeau vert. *(Vérifié par test.)*
+- [x] Avec le backend arrêté, le dashboard n'affiche aucun 0 trompeur. *(Vérifié par test.)*
+- [x] Une 401 n'est pas réessayée (vérifier dans l'onglet Réseau). *(Vérifié par test sur `shouldRetryQuery` ; contrôle navigateur à faire.)*
+- [x] Toutes les clés de requête viennent de `queries/keys.ts` (aucun tableau littéral dans les pages).
+- [x] `npm test`, `npm run lint`, `npx tsc --noEmit` passent ; couverture ≥ 80 % sur les lignes modifiées. *(Delta 100 %, 43/43 lignes.)*
 
 ## Tests à ajouter ou adapter
 
@@ -99,3 +99,4 @@ Chaque page admin recharge ses données à la main, sans cache, sans état de ch
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-10 : faite dans la PR #59 (`feature/E-02-tanstack-query-foundation`). `@tanstack/react-query` 5.104.1, sans devtools ; le lockfile n'ajoute que `react-query` et `query-core`. Écarts et choix : chargement des cartes du dashboard avec le `Spinner` d'E-03 au lieu d'un « … » littéral ; erreur d'une carte = « – » + `common.error` (pas de nouvelle clé i18n, `i18n/locales/` hors `touches`) ; hook `useCocktailsAvailability()` ajouté dans `queries/cocktails.ts` pour `qk.availability` ; `test-utils` exporte aussi un `renderHook` avec client de test. L'invalidation transitoire d'`AdminLayout` passe `cancelRefetch: false` : sans cette option, revenir sur `/admin` avec des pénuries périmées annule la requête du dashboard et en envoie une seconde (couvert par un test). Le chunk d'entrée passe de 17,80 à 25,37 kB gzip (+7,6 kB) : chiffre à reprendre pour le seuil de D-14. Couverture globale avant / après : statements 62,82 → 63,94 %, branches 54,62 → 55,48 %, functions 54,74 → 56,68 %, lines 64,71 → 65,75 %. Nouvelle tâche E-19 (transmettre le `signal` d'annulation à `fetch`). Reste à l'humain : les contrôles « onglet Réseau » (une requête `/shortages` sur `/admin`, cache entre pages, 401 non réessayée, backend arrêté), vérifiés seulement par des tests.
