@@ -101,3 +101,30 @@ describe('backup in WAL mode', () => {
     expect(integrity.integrity_check).toBe('ok');
   });
 });
+
+describe('backup import validation', () => {
+  function zipWith(files: Record<string, string>): Buffer {
+    const zip = new AdmZip();
+    for (const [name, content] of Object.entries(files)) zip.addFile(name, Buffer.from(content));
+    return zip.toBuffer();
+  }
+
+  it('should answer 400 JSON without a file', async () => {
+    const res = await request.post('/api/backup/import').set(authHeader());
+    expect(res.status).toBe(400);
+  });
+
+  it.each([
+    ['without database.db', { 'metadata.json': '{"version":1}' }],
+    ['with an unsupported metadata version', { 'metadata.json': '{"version":2}', 'database.db': 'x' }],
+  ])('should answer 400 and keep the data for a backup %s', async (_label, files) => {
+    await seedIngredient({ name: 'Lime' });
+
+    const res = await request.post('/api/backup/import').set(authHeader())
+      .attach('backup', zipWith(files), 'backup.zip');
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid backup file');
+    expect(await ingredientNames()).toEqual(['Lime']);
+  });
+});

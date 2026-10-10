@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { parseNameTranslations } from '../utils/translations';
 import { AuthRequest, optionalAuth } from '../middleware/auth';
+import { NotFoundError } from '../errors';
 
 const parseNT = (val: any) => {
   if (typeof val === 'string') { try { return JSON.parse(val); } catch { return null; } }
@@ -86,219 +87,174 @@ function isAdminRequest(req: AuthRequest): boolean {
 router.use(optionalAuth);
 
 // List all public menus
-router.get('/menus', async (req: Request, res: Response) => {
-  try {
-    const menus = await prisma.menu.findMany({
-      where: { isPublic: true },
-      include: {
-        _count: {
-          select: {
-            cocktails: { where: VISIBLE_MENU_COCKTAIL_WHERE },
-            bottles: { where: VISIBLE_MENU_BOTTLE_WHERE },
-          },
+router.get('/menus', async (_req: Request, res: Response) => {
+  const menus = await prisma.menu.findMany({
+    where: { isPublic: true },
+    include: {
+      _count: {
+        select: {
+          cocktails: { where: VISIBLE_MENU_COCKTAIL_WHERE },
+          bottles: { where: VISIBLE_MENU_BOTTLE_WHERE },
         },
       },
-      orderBy: { updatedAt: 'desc' },
-    });
-    res.json(menus);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: req.t('errors.serverError') });
-  }
+    },
+    orderBy: { updatedAt: 'desc' },
+  });
+  res.json(menus);
 });
 
 // Get public menu by slug (or admin preview)
 router.get('/menus/:slug', async (req: AuthRequest, res: Response) => {
-  try {
-    const isAdmin = isAdminRequest(req);
-    const menu = await prisma.menu.findUnique({
-      where: { slug: String(req.params.slug) },
-      include: {
-        sections: {
-          orderBy: { position: 'asc' },
-        },
-        cocktails: {
-          where: VISIBLE_MENU_COCKTAIL_WHERE,
-          include: {
-            cocktail: { select: buildCocktailSelect(isAdmin) },
-          },
-          orderBy: { position: 'asc' },
-        },
-        bottles: {
-          where: VISIBLE_MENU_BOTTLE_WHERE,
-          include: {
-            bottle: { select: MENU_BOTTLE_PUBLIC_SELECT },
-          },
-          orderBy: { position: 'asc' },
-        },
+  const isAdmin = isAdminRequest(req);
+  const menu = await prisma.menu.findUnique({
+    where: { slug: String(req.params.slug) },
+    include: {
+      sections: {
+        orderBy: { position: 'asc' },
       },
-    });
+      cocktails: {
+        where: VISIBLE_MENU_COCKTAIL_WHERE,
+        include: {
+          cocktail: { select: buildCocktailSelect(isAdmin) },
+        },
+        orderBy: { position: 'asc' },
+      },
+      bottles: {
+        where: VISIBLE_MENU_BOTTLE_WHERE,
+        include: {
+          bottle: { select: MENU_BOTTLE_PUBLIC_SELECT },
+        },
+        orderBy: { position: 'asc' },
+      },
+    },
+  });
 
-    // Unpublished menus are only visible to a verified admin (preview)
-    if (!menu || (!menu.isPublic && !isAdmin)) {
-      res.status(404).json({ error: req.t('errors.notFound') });
-      return;
-    }
+  // Unpublished menus are only visible to a verified admin (preview)
+  if (!menu || (!menu.isPublic && !isAdmin)) throw new NotFoundError();
 
-    res.json(parseNameTranslations(menu));
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: req.t('errors.serverError') });
-  }
+  res.json(parseNameTranslations(menu));
 });
 
 // Get site settings (public)
-router.get('/settings', async (req: Request, res: Response) => {
-  try {
-    let settings = await prisma.siteSettings.findUnique({ where: { id: 1 } });
-    if (!settings) {
-      settings = await prisma.siteSettings.create({
-        data: { id: 1, siteName: 'Carta Cocktail', siteIcon: '' },
-      });
-    }
-    res.json({ siteName: settings.siteName, siteIcon: settings.siteIcon });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: req.t('errors.serverError') });
+router.get('/settings', async (_req: Request, res: Response) => {
+  let settings = await prisma.siteSettings.findUnique({ where: { id: 1 } });
+  if (!settings) {
+    settings = await prisma.siteSettings.create({
+      data: { id: 1, siteName: 'Carta Cocktail', siteIcon: '' },
+    });
   }
+  res.json({ siteName: settings.siteName, siteIcon: settings.siteIcon });
 });
 
 // Export public cocktail as JSON
 router.get('/cocktails/:id/export', async (req: AuthRequest, res: Response) => {
-  try {
-    const id = parseCocktailId(req.params.id);
-    if (id === null) {
-      res.status(404).json({ error: req.t('errors.notFound') });
-      return;
-    }
+  const id = parseCocktailId(req.params.id);
+  if (id === null) throw new NotFoundError();
 
-    const isAdmin = isAdminRequest(req);
-    const cocktail = await prisma.cocktail.findFirst({
-      where: buildPublicCocktailWhere(id, isAdmin),
-      include: {
-        ingredients: {
-          include: {
-            unit: true,
-            bottle: { include: { category: true } },
-            category: true,
-            ingredient: true,
-            preferredBottles: isAdmin
-              ? { include: { bottle: { include: { category: true } } } }
-              : false,
-          },
-          orderBy: { position: 'asc' },
+  const isAdmin = isAdminRequest(req);
+  const cocktail = await prisma.cocktail.findFirst({
+    where: buildPublicCocktailWhere(id, isAdmin),
+    include: {
+      ingredients: {
+        include: {
+          unit: true,
+          bottle: { include: { category: true } },
+          category: true,
+          ingredient: true,
+          preferredBottles: isAdmin
+            ? { include: { bottle: { include: { category: true } } } }
+            : false,
         },
-        instructions: { orderBy: { stepNumber: 'asc' } },
+        orderBy: { position: 'asc' },
       },
-    });
+      instructions: { orderBy: { stepNumber: 'asc' } },
+    },
+  });
 
-    if (!cocktail) {
-      res.status(404).json({ error: req.t('errors.notFound') });
-      return;
-    }
+  if (!cocktail) throw new NotFoundError();
 
-    // Build export payload (same logic as admin export, minus private fields for guests)
-    const payload = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      cocktail: {
-        name: cocktail.name,
-        description: cocktail.description || null,
-        ...(isAdmin && { notes: cocktail.notes || null }),
-        tags: cocktail.tags ? cocktail.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [],
-        ingredients: (cocktail.ingredients || []).map((ing: any) => {
-          let sourceName = '';
-          let sourceDetail: any = {};
-          if (ing.sourceType === 'BOTTLE' && ing.bottle) {
-            sourceName = ing.bottle.name;
-            sourceDetail = {
-              categoryName: ing.bottle.category?.name || '',
-              categoryType: ing.bottle.category?.type || 'SPIRIT',
-              categoryNameTranslations: parseNT(ing.bottle.category?.nameTranslations),
-            };
-          } else if (ing.sourceType === 'CATEGORY' && ing.category) {
-            sourceName = ing.category.name;
-            sourceDetail = {
-              type: ing.category.type,
-              desiredStock: ing.category.desiredStock,
-              nameTranslations: parseNT(ing.category.nameTranslations),
-            };
-          } else if (ing.sourceType === 'INGREDIENT' && ing.ingredient) {
-            sourceName = ing.ingredient.name;
-            sourceDetail = {
-              icon: ing.ingredient.icon || null,
-              nameTranslations: parseNT(ing.ingredient.nameTranslations),
-            };
-          }
-          return {
-            sourceType: ing.sourceType,
-            sourceName,
-            sourceDetail,
-            quantity: ing.quantity,
-            unit: ing.unit ? {
-              name: ing.unit.name,
-              abbreviation: ing.unit.abbreviation,
-              conversionFactorToMl: ing.unit.conversionFactorToMl,
-              nameTranslations: parseNT(ing.unit.nameTranslations),
-            } : null,
-            position: ing.position,
-            ...(isAdmin && {
-              preferredBottles: (ing.preferredBottles || []).map((pb: any) => ({
-                name: pb.bottle?.name || '',
-                categoryName: pb.bottle?.category?.name || ing.category?.name || '',
-              })),
-            }),
+  // Build export payload (same logic as admin export, minus private fields for guests)
+  const payload = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    cocktail: {
+      name: cocktail.name,
+      description: cocktail.description || null,
+      ...(isAdmin && { notes: cocktail.notes || null }),
+      tags: cocktail.tags ? cocktail.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [],
+      ingredients: (cocktail.ingredients || []).map((ing: any) => {
+        let sourceName = '';
+        let sourceDetail: any = {};
+        if (ing.sourceType === 'BOTTLE' && ing.bottle) {
+          sourceName = ing.bottle.name;
+          sourceDetail = {
+            categoryName: ing.bottle.category?.name || '',
+            categoryType: ing.bottle.category?.type || 'SPIRIT',
+            categoryNameTranslations: parseNT(ing.bottle.category?.nameTranslations),
           };
-        }),
-        instructions: (cocktail.instructions || []).map((inst: any) => ({ stepNumber: inst.stepNumber, text: inst.text })),
-      },
-    };
+        } else if (ing.sourceType === 'CATEGORY' && ing.category) {
+          sourceName = ing.category.name;
+          sourceDetail = {
+            type: ing.category.type,
+            desiredStock: ing.category.desiredStock,
+            nameTranslations: parseNT(ing.category.nameTranslations),
+          };
+        } else if (ing.sourceType === 'INGREDIENT' && ing.ingredient) {
+          sourceName = ing.ingredient.name;
+          sourceDetail = {
+            icon: ing.ingredient.icon || null,
+            nameTranslations: parseNT(ing.ingredient.nameTranslations),
+          };
+        }
+        return {
+          sourceType: ing.sourceType,
+          sourceName,
+          sourceDetail,
+          quantity: ing.quantity,
+          unit: ing.unit ? {
+            name: ing.unit.name,
+            abbreviation: ing.unit.abbreviation,
+            conversionFactorToMl: ing.unit.conversionFactorToMl,
+            nameTranslations: parseNT(ing.unit.nameTranslations),
+          } : null,
+          position: ing.position,
+          ...(isAdmin && {
+            preferredBottles: (ing.preferredBottles || []).map((pb: any) => ({
+              name: pb.bottle?.name || '',
+              categoryName: pb.bottle?.category?.name || ing.category?.name || '',
+            })),
+          }),
+        };
+      }),
+      instructions: (cocktail.instructions || []).map((inst: any) => ({ stepNumber: inst.stepNumber, text: inst.text })),
+    },
+  };
 
-    const slug = cocktail.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    res.setHeader('Content-Disposition', `attachment; filename="cocktail-${slug}.json"`);
-    res.json(payload);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: req.t('errors.serverError') });
-  }
+  const slug = cocktail.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  res.setHeader('Content-Disposition', `attachment; filename="cocktail-${slug}.json"`);
+  res.json(payload);
 });
 
 // List all units (public, needed for unit conversion on public pages)
-router.get('/units', async (req: Request, res: Response) => {
-  try {
-    const units = await prisma.unit.findMany({ orderBy: { name: 'asc' } });
-    res.json(units);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: req.t('errors.serverError') });
-  }
+router.get('/units', async (_req: Request, res: Response) => {
+  const units = await prisma.unit.findMany({ orderBy: { name: 'asc' } });
+  res.json(units);
 });
 
 // Get public cocktail detail
 router.get('/cocktails/:id', async (req: AuthRequest, res: Response) => {
-  try {
-    const id = parseCocktailId(req.params.id);
-    if (id === null) {
-      res.status(404).json({ error: req.t('errors.notFound') });
-      return;
-    }
+  const id = parseCocktailId(req.params.id);
+  if (id === null) throw new NotFoundError();
 
-    const isAdmin = isAdminRequest(req);
-    const cocktail = await prisma.cocktail.findFirst({
-      where: buildPublicCocktailWhere(id, isAdmin),
-      select: buildCocktailSelect(isAdmin),
-    });
+  const isAdmin = isAdminRequest(req);
+  const cocktail = await prisma.cocktail.findFirst({
+    where: buildPublicCocktailWhere(id, isAdmin),
+    select: buildCocktailSelect(isAdmin),
+  });
 
-    if (!cocktail) {
-      res.status(404).json({ error: req.t('errors.notFound') });
-      return;
-    }
+  if (!cocktail) throw new NotFoundError();
 
-    res.json(parseNameTranslations(cocktail));
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: req.t('errors.serverError') });
-  }
+  res.json(parseNameTranslations(cocktail));
 });
 
 export default router;

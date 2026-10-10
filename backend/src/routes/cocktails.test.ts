@@ -273,13 +273,13 @@ describe('PUT /api/cocktails/:id', () => {
     expect(res.status).toBe(404);
   });
 
-  it('should return 500 for an unexpected database error', async () => {
+  it('should return 400 and leave the recipe untouched when Prisma rejects a field type', async () => {
     const { id } = await createFullCocktail();
 
     // A non-string instruction text passes the mapping but is rejected by Prisma validation.
     const res = await request.put(`/api/cocktails/${id}`).set(authHeader())
       .send({ instructions: [{ text: 42 }] });
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(400);
 
     const after = await request.get(`/api/cocktails/${id}`).set(authHeader());
     expectRecipeIntact(after.body);
