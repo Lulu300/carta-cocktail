@@ -36,3 +36,10 @@ npm-debug.log*
 
 # Plan d'action : page de suivi générée par docs/plan/build.mjs
 docs/plan/index.html
+
+# Upgrade test bench (scripts/upgrade-test): reports, fixtures with personal data, working copies
+upgrade-test-reports/
+carta-fixtures/
+carta-upgrade-test/
+uploads-rescue/
+*.tgz
