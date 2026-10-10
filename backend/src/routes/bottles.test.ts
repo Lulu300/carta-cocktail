@@ -278,6 +278,32 @@ describe('DELETE /api/bottles/:id', () => {
     expect(await prisma.cocktailPreferredBottle.count()).toBe(0);
     expect(await prisma.menuBottle.count()).toBe(0);
   });
+
+  it('should delete nothing when the forced deletion fails midway', async () => {
+    const unit = await seedUnit();
+    const category = await seedCategory();
+    const bottle = await seedBottle({ categoryId: category.id });
+    const aperitifs = await prisma.menu.findUniqueOrThrow({ where: { slug: 'aperitifs' } });
+    await prisma.menuBottle.create({ data: { menuId: aperitifs.id, bottleId: bottle.id } });
+    await seedCocktailUsing('Daiquiri', unit.id, [
+      { sourceType: 'BOTTLE', bottleId: bottle.id },
+      { sourceType: 'CATEGORY', categoryId: category.id, preferredBottleIds: [bottle.id] },
+    ]);
+    // Fails the last statement of the transaction, after lines, preferences and menu entries are deleted
+    await prisma.$executeRawUnsafe(
+      `CREATE TRIGGER fail_bottle_delete BEFORE DELETE ON Bottle BEGIN SELECT RAISE(ABORT, 'simulated failure'); END`,
+    );
+    try {
+      const res = await request.delete(`/api/bottles/${bottle.id}?force=true`).set(authHeader());
+      expect(res.status).toBeGreaterThanOrEqual(400);
+    } finally {
+      await prisma.$executeRawUnsafe('DROP TRIGGER fail_bottle_delete');
+    }
+    expect(await prisma.bottle.count()).toBe(1);
+    expect(await prisma.cocktailIngredient.count()).toBe(2);
+    expect(await prisma.cocktailPreferredBottle.count()).toBe(1);
+    expect(await prisma.menuBottle.count()).toBe(1);
+  });
 });
 
 describe('GET /api/bottles/export', () => {

@@ -170,4 +170,22 @@ describe('DELETE /api/ingredients/:id', () => {
     expect(await prisma.cocktailIngredient.findMany({ select: { ingredientId: true } }))
       .toEqual([{ ingredientId: sugar.id }]);
   });
+
+  it('should delete nothing when the forced deletion fails midway', async () => {
+    const unit = await seedUnit();
+    const mint = await seedIngredient({ name: 'Mint' });
+    await seedCocktailUsing('Mojito', unit.id, [{ sourceType: 'INGREDIENT', ingredientId: mint.id }]);
+    // Fails the last statement of the transaction, after the recipe lines are deleted
+    await prisma.$executeRawUnsafe(
+      `CREATE TRIGGER fail_ingredient_delete BEFORE DELETE ON Ingredient BEGIN SELECT RAISE(ABORT, 'simulated failure'); END`,
+    );
+    try {
+      const res = await request.delete(`/api/ingredients/${mint.id}?force=true`).set(authHeader());
+      expect(res.status).toBeGreaterThanOrEqual(400);
+    } finally {
+      await prisma.$executeRawUnsafe('DROP TRIGGER fail_ingredient_delete');
+    }
+    expect(await prisma.ingredient.count()).toBe(1);
+    expect(await prisma.cocktailIngredient.count()).toBe(1);
+  });
 });
