@@ -5,13 +5,13 @@ phase: D
 lane: infra
 criticite: moyenne
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [A-06, B-01]
-touches: [frontend/Dockerfile, frontend/nginx.conf.template, frontend/security-headers.conf, docker-compose.yml, docker-compose.prod.yml, scripts/upgrade-test/layouts/, scripts/upgrade-test/lib/, scripts/upgrade-test/test/]
+touches: [frontend/Dockerfile, frontend/nginx.conf.template, frontend/security-headers.conf, docker-compose.yml, docker-compose.prod.yml, scripts/upgrade-test/layouts/, scripts/upgrade-test/lib/, scripts/upgrade-test/test/, scripts/upgrade-test/README.md]
 sources: ["03-security.md §8", "07-devops-history.md §2.8"]
-branch:
-pr:
+branch: chore/D-02-frontend-image-security-headers
+pr: https://github.com/Lulu300/carta-cocktail/pull/61
 ---
 
 ## Décisions validées (2026-10-10)
@@ -79,13 +79,13 @@ nginx sert le HTML de l'admin et de la carte publique. helmet ne protège que le
 
 ## Critères d'acceptation
 
-- [ ] `curl -sI http://localhost/` renvoie les 5 en-têtes de sécurité et pas de version dans `Server`.
-- [ ] `curl -sI http://localhost/assets/<fichier>.js` renvoie aussi les en-têtes de sécurité, en plus du `Cache-Control` d'A-06.
-- [ ] La carte publique et l'admin s'affichent sans erreur CSP dans la console (polices, favicon emoji, images de cocktails).
-- [ ] `docker compose exec carta-cocktail-frontend id -u` renvoie un uid différent de 0.
-- [ ] `docker compose up -d --force-recreate carta-cocktail-backend` puis `curl http://localhost/api/public/menus` : 200 sans redémarrer nginx.
-- [ ] Le Dockerfile n'utilise plus de tag flottant.
-- [ ] Banc, avec le hook temporaire `1.8.0` non commité : `--path 1.4.0,1.6.0,local --local-version 1.8.0 --mode both`, layouts `friend` et `official`. En mode conforme, aucun échec inattendu, et le frontend et les photos sont servis par nginx. En mode naïf, aucun échec inattendu ; par rapport au même run sans D-02, les seuls nouveaux échecs (attendus) sont ceux des groupes `frontend` et `frontendImages`, couverts par le `naiveMayFail` du hook 1.8.0. Avant le changement de port, après le regroupement seul, un run naïf du chemin existant (sans hook 1.8.0) donne le même résultat que sur `develop`. `node --test scripts/upgrade-test/test/*.test.mjs` passe.
+- [x] `curl -sI http://localhost/` renvoie les 5 en-têtes de sécurité et pas de version dans `Server`.
+- [x] `curl -sI http://localhost/assets/<fichier>.js` renvoie aussi les en-têtes de sécurité, en plus du `Cache-Control` d'A-06.
+- [x] La carte publique et l'admin s'affichent sans erreur CSP dans la console (polices, favicon emoji, images de cocktails).
+- [x] `docker compose exec carta-cocktail-frontend id -u` renvoie un uid différent de 0.
+- [x] `docker compose up -d --force-recreate carta-cocktail-backend` puis `curl http://localhost/api/public/menus` : 200 sans redémarrer nginx.
+- [x] Le Dockerfile n'utilise plus de tag flottant.
+- [x] Banc, avec le hook temporaire `1.8.0` non commité : `--path 1.4.0,1.6.0,local --local-version 1.8.0 --mode both`, layouts `friend` et `official`. En mode conforme, aucun échec inattendu, et le frontend et les photos sont servis par nginx. En mode naïf, aucun échec inattendu ; par rapport au même run sans D-02, les seuls nouveaux échecs (attendus) sont ceux des groupes `frontend` et `frontendImages`, couverts par le `naiveMayFail` du hook 1.8.0. Avant le changement de port, après le regroupement seul, un run naïf du chemin existant (sans hook 1.8.0) donne le même résultat que sur `develop`. `node --test scripts/upgrade-test/test/*.test.mjs` passe.
 
 ## Tests à ajouter ou adapter
 
@@ -108,3 +108,5 @@ nginx sert le HTML de l'admin et de la carte publique. helmet ne protège que le
 - 2026-10-08 : suivi des revues de la phase A. Étape 3 complétée : `location = /api/backup/import` (A-06) passe aussi à `proxy_pass $backend` sans URI, conseil `location ^~ /assets/` si une regex est ajoutée.
 - 2026-10-09 : point d'attention « Notes de version » (règle de D-11 décidée le 2026-10-09) : `breaking: true`, actions attendues, épinglage recommandé.
 - 2026-10-10 : décision de l'humain, port 8080 (voir « Décisions validées ») ; `scripts/upgrade-test/layouts/` ajouté à `touches` pour la nouvelle génération de compose du banc.
+- 2026-10-10 : réalisée (PR #61). Image `nginxinc/nginx-unprivileged:1.30-alpine` (branche stable vérifiée sur Docker Hub le jour même : `stable-alpine` = `1.30-alpine` = 1.30.5), uid 101, port 8080, compose en `"80:8080"`. Écarts et choix : (1) le resolver n'est pas `127.0.0.11` en dur mais `${NGINX_LOCAL_RESOLVERS}`, lu dans `/etc/resolv.conf` par l'entrypoint de l'image (`NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1`), pour fonctionner aussi sous Podman ; (2) le snippet masque aussi les copies des en-têtes envoyées par helmet (`proxy_hide_header`), sinon `/api/*` et `/uploads/*` portaient deux valeurs contradictoires (`X-Frame-Options` `DENY` et `SAMEORIGIN`, deux `Referrer-Policy`) ; (3) `absolute_redirect off`, sinon `/assets` redirigeait vers `:8080` derrière le mapping `80:8080` ; (4) HSTS commenté dans `security-headers.conf` (il faudrait sinon l'inclure partout) ; (5) `scripts/upgrade-test/README.md` ajouté à `touches` (groupes `images` / `frontendImages` et lecture du port). Banc : le regroupement seul donne sur le chemin existant le même résultat que `develop` (naïf, deux layouts) ; avec le hook 1.8.0 temporaire, les deux layouts passent dans les deux modes, et en naïf le seul nouvel échec (attendu) est `frontend` (la ligne `frontendImages` échouait déjà à cause des photos perdues en naïf). Contenu proposé pour `hooks/1.8.0.mjs` (au coordinateur) dans la PR. Vérifications sur un projet compose dédié : `nginx -t`, 5 en-têtes sur `/`, `/assets/…` (avec le `Cache-Control` d'A-06), `/api/public/settings` et `/uploads/…`, `id -u` = 101, 200 après recréation du backend (avec changement d'IP forcé) sans redémarrer nginx, 401 sur `POST /api/backup/import` sans token, aucune erreur CSP dans Chromium headless (carte publique et admin, polices, favicon emoji, photos, aperçu `blob:`). D-08 n'est pas mergé : l'assertion d'en-tête sur `/` reste à ajouter par D-08 (son point 12 peut devenir une vraie assertion). Reste à l'humain : vérifier une restauration de backup réelle après la mise à jour d'une instance.
+- Notes de version : `breaking: true`. Le conteneur frontend écoute sur 8080 (nginx non-root). Avant : dans un compose personnalisé, remplacer `"<port>:80"` par `"<port>:8080"` pour le frontend (et viser le port 8080 si un reverse proxy cible directement le conteneur) ; les compose du dépôt sont à jour. Après : vérifier que la carte publique, l'admin et une restauration de backup répondent. Retour arrière : revenir aussi à `"<port>:80"`. Épinglage recommandé sur `:<version>`. Nouveaux en-têtes de sécurité (CSP, `X-Frame-Options: DENY`…) : la carte ne peut plus être intégrée dans une iframe d'un autre site.
