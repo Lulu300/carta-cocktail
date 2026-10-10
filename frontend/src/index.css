@@ -1,9 +1,29 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap');
 @import "tailwindcss";
 
+/*
+ * Design tokens. Plain @theme (not inline) so a future light theme can
+ * redefine these variables under a selector such as [data-theme="light"].
+ * Each color token generates the matching utilities (bg-*, text-*, border-*…).
+ */
 @theme {
   --font-sans: 'Inter', sans-serif;
   --font-serif: 'Playfair Display', serif;
+
+  --color-canvas: #0f0f1a;                     /* page background: bg-canvas */
+  --color-surface: #1a1a2e;                    /* cards, modals, header: bg-surface */
+  --color-line: var(--color-gray-800);         /* card borders: border-line */
+  --color-line-strong: var(--color-gray-700);  /* field borders: border-line-strong */
+  --color-fg: var(--color-gray-100);           /* main text: text-fg */
+  --color-fg-muted: var(--color-gray-400);     /* secondary text: text-fg-muted */
+  --color-accent: var(--color-amber-400);      /* bg-accent, text-accent, border-accent */
+  --color-accent-hover: var(--color-amber-500);
+  --color-accent-soft: var(--color-amber-300); /* hover state of amber links */
+  --color-on-accent: #0f0f1a;                  /* text on an amber background: text-on-accent */
+  --color-danger: var(--color-red-400);
+  --color-success: var(--color-green-400);
+  --color-warning: var(--color-yellow-400);
+  --color-info: var(--color-blue-400);
 }
 
 /* Print styles for recipe card (bristol format ~10x15cm) */
@@ -19,7 +39,7 @@
     font-size: 10pt;
   }
 
-  header, nav, .print\\:hidden {
+  header, nav {
     display: none !important;
   }
 
