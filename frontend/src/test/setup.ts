@@ -23,6 +23,19 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
 
+// jsdom does not implement HTMLDialogElement.showModal/close: minimal polyfill
+// that toggles `open` and emits `close`, enough for the Modal component.
+if (!HTMLDialogElement.prototype.showModal) {
+  HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
+    this.open = true;
+  };
+  HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement) {
+    if (!this.open) return;
+    this.open = false;
+    this.dispatchEvent(new Event('close'));
+  };
+}
+
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
   writable: true,

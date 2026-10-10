@@ -346,7 +346,8 @@
     "translations": "Translations",
     "translationHint": "Optional: provide translated names for each language",
     "selected": "{{count}} selected",
-    "retry": "Retry"
+    "retry": "Retry",
+    "close": "Close"
   },
   "pagination": {
     "showing": "{{start}}-{{end}} of {{total}}",
