@@ -9,6 +9,7 @@
  * Vitest thresholds.
  */
 
+import { Buffer } from 'node:buffer';
 import { posix } from 'node:path';
 
 const HUNK_HEADER = /^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/;
@@ -76,9 +77,46 @@ export function parseUnifiedDiff(text) {
   return changedLines;
 }
 
+/**
+ * Reads the path of a "+++" header. Git appends a TAB when the path contains a
+ * space, and quotes it with C escapes when it contains `"`, `\`, control
+ * characters or (unless core.quotePath=false) non-ASCII bytes. A path must
+ * never be dropped silently: a skipped file would let the gate fail open.
+ */
 function parseNewPath(header) {
-  if (header === '/dev/null') return null;
-  return header.startsWith('b/') ? header.slice(2) : header;
+  const raw = header.endsWith('\t') ? header.slice(0, -1) : header;
+  if (raw === '/dev/null') return null;
+  const path = raw.startsWith('"') ? decodeQuotedPath(raw) : raw;
+  return path.startsWith('b/') ? path.slice(2) : path;
+}
+
+const C_ESCAPES = { a: 7, b: 8, t: 9, n: 10, v: 11, f: 12, r: 13, '"': 34, '\\': 92 };
+
+/** Decodes a git C-quoted path such as "b/caf\303\251.ts" (octal escapes are UTF-8 bytes). */
+function decodeQuotedPath(quoted) {
+  if (quoted.length < 2 || !quoted.endsWith('"')) {
+    throw new Error(`Cannot parse quoted path in diff header: ${quoted}`);
+  }
+  // Code points, not UTF-16 units: with core.quotePath=false, non-ASCII stays raw.
+  const chars = Array.from(quoted.slice(1, -1));
+  const bytes = [];
+  for (let i = 0; i < chars.length; i++) {
+    if (chars[i] !== '\\') {
+      bytes.push(...Buffer.from(chars[i], 'utf-8'));
+      continue;
+    }
+    const octal = chars.slice(i + 1, i + 4).join('');
+    if (/^[0-7]{3}$/.test(octal)) {
+      bytes.push(parseInt(octal, 8));
+      i += 3;
+    } else if (Object.hasOwn(C_ESCAPES, chars[i + 1])) {
+      bytes.push(C_ESCAPES[chars[i + 1]]);
+      i += 1;
+    } else {
+      throw new Error(`Cannot parse quoted path in diff header: ${quoted}`);
+    }
+  }
+  return Buffer.from(bytes).toString('utf-8');
 }
 
 function addLine(changedLines, file, line) {
@@ -118,15 +156,16 @@ export function lineCoverage(fileCov) {
  * @param {Map<string, Set<number>>} options.changedLines repo-relative path -> lines
  * @param {Record<string, object>} options.coverage coverage-final.json content (absolute paths)
  * @param {string} options.root absolute path of the repository root
- * @param {string} options.scope repo-relative folder, e.g. "backend/src/"
+ * @param {string} options.scope repo-relative folder, e.g. "backend/src/" (trailing slash optional)
  * @param {string[]} [options.ignore] repo-relative globs, e.g. "backend/src/index.ts"
  */
 export function computeDelta({ changedLines, coverage, root, scope, ignore = [] }) {
   const coverageByPath = indexCoverageByRelativePath(coverage, root);
+  const scopePrefix = toFolderPrefix(scope);
   const files = [];
 
   for (const [file, lines] of changedLines) {
-    if (!isInScope(file, scope, ignore)) continue;
+    if (!isInScope(file, scopePrefix, ignore)) continue;
 
     const fileCov = coverageByPath.get(file);
     const result = fileCov
@@ -153,8 +192,13 @@ function toPosix(path) {
   return path.replaceAll('\\', '/');
 }
 
-function isInScope(file, scope, ignore) {
-  if (!file.startsWith(scope)) return false;
+// The scope is matched as a path prefix, so "backend/src" must not match "backend/srcx/".
+function toFolderPrefix(scope) {
+  return scope === '' || scope.endsWith('/') ? scope : `${scope}/`;
+}
+
+function isInScope(file, scopePrefix, ignore) {
+  if (!file.startsWith(scopePrefix)) return false;
   if (!SOURCE_FILE.test(file) || NON_SOURCE_FILE.test(file)) return false;
   return !ignore.some((glob) => posix.matchesGlob(file, glob));
 }
@@ -172,10 +216,25 @@ function measureCoveredFile(file, lines, fileCov) {
   return { file, changed, covered, missingFromReport: false };
 }
 
-/** @returns {number | null} percentage with one decimal, null when nothing was measured */
+/**
+ * Display only: percentage rounded down to one decimal, null when nothing was
+ * measured. Rounded down so a failing run never prints "80% is below 80%"
+ * (399/499 = 79.96% shows as 79.9%). Use meetsThreshold for the decision.
+ */
 function percentage(covered, total) {
   if (total === 0) return null;
-  return Math.round((covered / total) * 1000) / 10;
+  // Integer arithmetic first: Math.floor on a float product can lose a unit.
+  return Math.floor((covered * 1000) / total) / 10;
+}
+
+/**
+ * Compares the exact ratio with the threshold, without rounding.
+ *
+ * @param {{ covered: number, changed: number }} counts
+ * @param {number} threshold percentage, e.g. 80
+ */
+export function meetsThreshold({ covered, changed }, threshold) {
+  return covered * 100 >= threshold * changed;
 }
 
 /**
@@ -195,9 +254,7 @@ export function formatReport(result, threshold) {
     flag;
   const separator = '-'.repeat(fileWidth + 30);
 
-  const sorted = [...result.files].sort(
-    (a, b) => percentage(a.covered, a.changed) - percentage(b.covered, b.changed),
-  );
+  const sorted = [...result.files].sort((a, b) => a.covered / a.changed - b.covered / b.changed);
   const lines = [
     `Threshold: ${threshold}%`,
     '',
@@ -205,9 +262,10 @@ export function formatReport(result, threshold) {
     separator,
   ];
   for (const f of sorted) {
-    const pct = percentage(f.covered, f.changed);
-    const flag = f.missingFromReport ? ' !! not in coverage report' : pct < threshold ? ' !!' : '';
-    lines.push(row(f.file, f.changed, f.covered, `${pct}%`, flag));
+    let flag = '';
+    if (f.missingFromReport) flag = ' !! not in coverage report';
+    else if (!meetsThreshold(f, threshold)) flag = ' !!';
+    lines.push(row(f.file, f.changed, f.covered, `${percentage(f.covered, f.changed)}%`, flag));
   }
   lines.push(separator, row('TOTAL', result.changed, result.covered, `${result.pct}%`));
   return lines.join('\n');

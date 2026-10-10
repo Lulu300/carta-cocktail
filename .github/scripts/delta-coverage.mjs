@@ -23,7 +23,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { parseUnifiedDiff, computeDelta, formatReport } from './delta-coverage-lib.mjs';
+import { parseUnifiedDiff, computeDelta, formatReport, meetsThreshold } from './delta-coverage-lib.mjs';
 
 function fail(message) {
   console.error(message);
@@ -51,9 +51,7 @@ function readOptions() {
   if (!Number.isFinite(threshold) || threshold < 0 || threshold > 100) {
     fail(`Invalid --threshold: ${values.threshold}`);
   }
-  // The scope is matched as a path prefix, so "backend/src" must not match "backend/srcx/".
-  const scope = values.scope.endsWith('/') ? values.scope : `${values.scope}/`;
-  return { ...values, threshold, scope };
+  return { ...values, threshold };
 }
 
 function assertBaseExists(base) {
@@ -68,10 +66,12 @@ function assertBaseExists(base) {
 }
 
 function changedLinesSince(base, scope, root) {
-  // Fixed prefixes so a user's diff.noprefix / diff.mnemonicPrefix config cannot break parsing.
+  // Fixed prefixes so a user's diff.noprefix / diff.mnemonicPrefix config cannot
+  // break parsing, and raw UTF-8 paths instead of C-quoted octal escapes.
   const diff = execFileSync(
     'git',
     [
+      '-c', 'core.quotePath=false',
       'diff', '--unified=0', '--no-color', '--no-ext-diff', '--find-renames',
       '--src-prefix=a/', '--dst-prefix=b/', '--diff-filter=ACMR',
       `${base}...HEAD`, '--', scope,
@@ -108,10 +108,15 @@ function main() {
   console.log(formatReport(result, options.threshold));
   console.log('');
 
-  if (result.pct < options.threshold) {
+  if (!meetsThreshold(result, options.threshold)) {
     fail(`Delta coverage ${result.pct}% is below the ${options.threshold}% threshold.`);
   }
   console.log(`Delta coverage ${result.pct}% meets the ${options.threshold}% threshold.`);
 }
 
-main();
+try {
+  main();
+} catch (error) {
+  // An unparseable diff must fail the check, never skip files silently.
+  fail(error.message);
+}

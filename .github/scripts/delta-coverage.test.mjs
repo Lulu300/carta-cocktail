@@ -10,6 +10,7 @@ import {
   lineCoverage,
   computeDelta,
   formatReport,
+  meetsThreshold,
 } from './delta-coverage-lib.mjs';
 
 const ROOT = '/repo';
@@ -133,18 +134,65 @@ describe('parseUnifiedDiff', () => {
     assert.deepEqual(parseUnifiedDiff(diff), new Map([['backend/src/a.ts', lines(1)]]));
   });
 
-  it('skips blank added lines and reads "+++" inside a hunk as content', () => {
+  it('skips blank added lines', () => {
     const diff = [
       '--- a/backend/src/a.ts',
       '+++ b/backend/src/a.ts',
       '@@ -0,0 +1,3 @@',
       '+const a = 1;',
       '+   ',
-      '+++counter;',
+      '+const b = 2;',
       '\\ No newline at end of file',
     ].join('\n');
 
     assert.deepEqual(parseUnifiedDiff(diff), new Map([['backend/src/a.ts', lines(1, 3)]]));
+  });
+
+  it('reads an added line that looks like a "+++" header as content of the current file', () => {
+    // The added line "++ b/evil.ts" is printed as "+++ b/evil.ts" inside the hunk.
+    const diff = [
+      '--- a/backend/src/a.ts',
+      '+++ b/backend/src/a.ts',
+      '@@ -0,0 +1,3 @@',
+      '+const a = 1;',
+      '+++ b/evil.ts',
+      '+const b = 2;',
+    ].join('\n');
+
+    assert.deepEqual(parseUnifiedDiff(diff), new Map([['backend/src/a.ts', lines(1, 2, 3)]]));
+  });
+
+  it('strips the TAB git appends to a path containing a space', () => {
+    const diff = [
+      '--- /dev/null',
+      '+++ b/backend/src/with space.ts\t',
+      '@@ -0,0 +1 @@',
+      '+export const a = 1;',
+    ].join('\n');
+
+    assert.deepEqual(parseUnifiedDiff(diff), new Map([['backend/src/with space.ts', lines(1)]]));
+  });
+
+  it('decodes a C-quoted path with octal and character escapes', () => {
+    const diff = [
+      '--- /dev/null',
+      '+++ "b/backend/src/caf\\303\\251 \\"x\\".ts"',
+      '@@ -0,0 +1 @@',
+      '+export const a = 1;',
+    ].join('\n');
+
+    assert.deepEqual(parseUnifiedDiff(diff), new Map([['backend/src/café "x".ts', lines(1)]]));
+  });
+
+  it('keeps raw non-ASCII characters inside a quoted path', () => {
+    const diff = ['+++ "b/backend/src/🍸 \\"x\\".ts"', '@@ -0,0 +1 @@', '+export const a = 1;'].join('\n');
+
+    assert.deepEqual(parseUnifiedDiff(diff), new Map([['backend/src/🍸 "x".ts', lines(1)]]));
+  });
+
+  it('throws on a quoted path it cannot decode instead of skipping the file', () => {
+    assert.throws(() => parseUnifiedDiff('+++ "b/backend/src/a\\q.ts"'), /Cannot parse quoted path/);
+    assert.throws(() => parseUnifiedDiff('+++ "b/backend/src/unterminated.ts'), /Cannot parse quoted path/);
   });
 
   it('follows context lines when the diff has some', () => {
@@ -258,6 +306,23 @@ describe('computeDelta', () => {
     assert.equal(result.pct, null);
   });
 
+  it('treats a scope without a trailing slash as a folder, not a name prefix', () => {
+    const result = computeDelta({
+      changedLines: new Map([
+        ['backend/srcx/a.ts', lines(1)],
+        ['backend/src/a.ts', lines(1)],
+      ]),
+      coverage: {},
+      root: ROOT,
+      scope: 'backend/src',
+    });
+
+    assert.deepEqual(
+      result.files.map((f) => f.file),
+      ['backend/src/a.ts'],
+    );
+  });
+
   it('ignores files matching an --ignore glob', () => {
     const result = computeDelta({
       changedLines: new Map([
@@ -322,6 +387,44 @@ describe('formatReport', () => {
     assert.match(report, /backend\/src\/new\.ts.*0%.*not in coverage report/);
     assert.match(report, /TOTAL\s+6\s+4\s+66\.7%/);
   });
+
+  it('flags a file just under the threshold and never rounds it up to the threshold', () => {
+    const report = formatReport(
+      {
+        files: [{ file: 'backend/src/almost.ts', changed: 499, covered: 399, missingFromReport: false }],
+        changed: 499,
+        covered: 399,
+        pct: 79.9,
+      },
+      80,
+    );
+
+    assert.match(report, /backend\/src\/almost\.ts\s+499\s+399\s+79\.9% !!/);
+  });
+});
+
+describe('meetsThreshold', () => {
+  it('compares the exact ratio, so 399/499 (79.96%) misses an 80% threshold', () => {
+    assert.equal(meetsThreshold({ covered: 399, changed: 499 }, 80), false);
+  });
+
+  it('accepts a ratio exactly at the threshold', () => {
+    assert.equal(meetsThreshold({ covered: 4, changed: 5 }, 80), true);
+  });
+
+  it('reports the display percentage rounded down', () => {
+    const result = computeDelta({
+      changedLines: new Map([['backend/src/a.ts', new Set(Array.from({ length: 499 }, (_, i) => i + 1))]]),
+      coverage: {
+        '/repo/backend/src/a.ts': fileCoverage(Array.from({ length: 499 }, (_, i) => [i + 1, i + 1, i < 399 ? 1 : 0])),
+      },
+      root: ROOT,
+      scope: 'backend/src/',
+    });
+
+    assert.equal(result.pct, 79.9);
+    assert.equal(meetsThreshold(result, 80), false);
+  });
 });
 
 describe('delta-coverage.mjs CLI', () => {
@@ -347,7 +450,8 @@ describe('delta-coverage.mjs CLI', () => {
   }
 
   // A throwaway repository: the "base" tag holds one file; HEAD modifies it and
-  // adds an untested file under backend/src plus a file outside the scope.
+  // adds untested files under backend/src (one with a space in its name, one
+  // with a quote, which git prints C-quoted) plus files outside the scope.
   before(() => {
     // realpath: on macOS the temp dir is a symlink, and git reports the resolved path.
     repo = realpathSync(mkdtempSync(join(tmpdir(), 'delta-coverage-')));
@@ -361,6 +465,9 @@ describe('delta-coverage.mjs CLI', () => {
     git('tag', 'base');
     writeRepoFile('backend/src/tested.ts', 'export const a = 1;\nexport const b = 2;\n');
     writeRepoFile('backend/src/untested.ts', 'export function f() {\n  return 1;\n}\n');
+    writeRepoFile('backend/src/with space.ts', 'export const d = 4;\n');
+    writeRepoFile('backend/src/quote"d.ts', 'export const e = 5;\n');
+    writeRepoFile('backend/srcx/a.ts', 'export const g = 6;\n');
     writeRepoFile('frontend/src/other.ts', 'export const c = 3;\n');
     git('add', '.');
     git('commit', '--quiet', '-m', 'change');
@@ -382,9 +489,11 @@ describe('delta-coverage.mjs CLI', () => {
 
     assert.equal(run.status, 1);
     assert.match(run.stdout, /backend\/src\/untested\.ts\s+3\s+0\s+0% !! not in coverage report/);
+    assert.match(run.stdout, /backend\/src\/with space\.ts\s+1\s+0\s+0% !! not in coverage report/);
+    assert.match(run.stdout, /backend\/src\/quote"d\.ts\s+1\s+0\s+0% !! not in coverage report/);
     assert.match(run.stdout, /backend\/src\/tested\.ts\s+1\s+1\s+100%/);
-    assert.doesNotMatch(run.stdout, /frontend/);
-    assert.match(run.stderr, /Delta coverage 25% is below the 80% threshold/);
+    assert.doesNotMatch(run.stdout, /frontend|srcx/);
+    assert.match(run.stderr, /Delta coverage 16\.6% is below the 80% threshold/);
   });
 
   it('passes when the changed lines are covered and the rest is ignored', () => {
@@ -395,6 +504,8 @@ describe('delta-coverage.mjs CLI', () => {
     const run = runCli([
       '--coverage', coverage, '--base', 'base', '--scope', 'backend/src/',
       '--ignore', 'backend/src/untested.ts',
+      '--ignore', 'backend/src/with space.ts',
+      '--ignore', 'backend/src/quote"d.ts',
     ]);
 
     assert.equal(run.status, 0);
@@ -424,6 +535,14 @@ describe('delta-coverage.mjs CLI', () => {
 
     assert.equal(run.status, 1);
     assert.match(run.stderr, /Coverage file not found/);
+  });
+
+  it('fails with a clear message instead of a stack trace on an unknown option', () => {
+    const run = runCli(['--coverage', 'x.json', '--base', 'base', '--scope', 'backend/src/', '--bogus']);
+
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /Unknown option '--bogus'/);
+    assert.doesNotMatch(run.stderr, /at main/);
   });
 
   it('fails when a required argument is missing', () => {
