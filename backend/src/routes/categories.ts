@@ -3,6 +3,8 @@ import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { BadRequestError, NotFoundError } from '../errors';
 import { parseNameTranslations } from '../utils/translations';
+import { assertUniqueIgnoringCase } from '../utils/uniqueness';
+import { deleteCategory, isForceRequested } from '../services/deletionService';
 
 const router = Router();
 
@@ -22,6 +24,11 @@ async function ensureCategoryType(type: string) {
   if (!existing) {
     await prisma.categoryType.create({ data: { name: type, color: 'gray' } });
   }
+}
+
+async function assertCategoryNameIsFree(name: string, ownId?: number) {
+  const categories = await prisma.category.findMany({ select: { id: true, name: true } });
+  assertUniqueIgnoringCase(categories.map((c) => ({ id: c.id, value: c.name })), name, ownId);
 }
 
 // List all categories
@@ -49,6 +56,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 router.post('/', async (req: AuthRequest, res: Response) => {
   const { name, type, desiredStock, minimumPercent, nameTranslations } = req.body;
   if (!name || !type) throw new BadRequestError();
+  await assertCategoryNameIsFree(name);
   await ensureCategoryType(type);
   const category = await prisma.category.create({
     data: {
@@ -65,11 +73,15 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 // Update category
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   const { name, type, desiredStock, minimumPercent, nameTranslations } = req.body;
+  const id = parseInt(String(req.params.id));
+  if (name) {
+    await assertCategoryNameIsFree(name, id);
+  }
   if (type) {
     await ensureCategoryType(type);
   }
   const category = await prisma.category.update({
-    where: { id: parseInt(String(req.params.id)) },
+    where: { id },
     data: {
       ...(name && { name }),
       ...(type && { type }),
@@ -81,10 +93,10 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
   res.json(parseNameTranslations(category));
 });
 
-// Delete category
+// Delete category: refused while it holds bottles or recipes use it, unless ?force=true
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
-  await prisma.category.delete({ where: { id: parseInt(String(req.params.id)) } });
-  res.json({ message: req.t('categories.deleted') });
+  const impact = await deleteCategory(parseInt(String(req.params.id)), isForceRequested(req.query.force));
+  res.json({ message: req.t('categories.deleted'), deleted: true, impact });
 });
 
 export default router;

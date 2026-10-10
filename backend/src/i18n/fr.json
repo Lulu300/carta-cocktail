@@ -8,6 +8,8 @@
     "validationError": "Erreur de validation",
     "duplicateEntry": "Cette entrée existe déjà",
     "cannotDelete": "Impossible de supprimer : ressource utilisée",
+    "inUseByCocktails": "Impossible de supprimer : cet élément est utilisé par des recettes de cocktails",
+    "categoryNotEmpty": "Impossible de supprimer : cette catégorie contient encore des bouteilles",
     "invalidBackup": "Fichier de sauvegarde invalide",
     "cannotDeleteDefaultMenu": "Impossible de supprimer un menu système",
     "cannotModifySystemMenu": "Le slug et le type d’un menu système ne peuvent pas être modifiés",
