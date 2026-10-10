@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: haute
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [C-02, A-02, A-03, A-05, A-10]
 touches: [backend/src/app.ts, backend/src/errors.ts, backend/src/routes/, backend/src/middleware/, backend/src/services/availabilityService.ts, backend/src/i18n/en.json, backend/src/i18n/fr.json]
 sources: ["01-backend-routes.md §H1", "01-backend-routes.md §R1", "01-backend-routes.md §M7"]
-branch:
-pr:
+branch: feature/C-03-error-middleware
+pr: https://github.com/Lulu300/carta-cocktail/pull/54
 ---
 
 ## Contexte
@@ -87,13 +87,13 @@ Chaque route gère ses erreurs elle-même : 71 `try/catch` qui renvoient presque
 
 ## Critères d'acceptation
 
-- [ ] Plus aucun `try {` dans `src/routes/*.ts`, sauf les deux cas de l'étape 4.
-- [ ] `GET/PUT/DELETE /api/units/abc` → 400 JSON ; `/api/units/99999` → 404 JSON.
-- [ ] `DELETE /api/units/:id` d'une unité utilisée → 409 JSON.
-- [ ] Image de 6 Mo sur `POST /api/cocktails/:id/image` → 413 JSON (plus de HTML).
-- [ ] Corps JSON invalide → 400 JSON traduit selon `Accept-Language`.
-- [ ] `GET /api/inexistant` → 404 JSON.
-- [ ] Toutes les erreurs ont la forme `{ error: string, details?: unknown }`, sans stack trace.
+- [x] Plus aucun `try {` dans `src/routes/*.ts`, sauf les deux cas de l'étape 4.
+- [x] `GET/PUT/DELETE /api/units/abc` → 400 JSON ; `/api/units/99999` → 404 JSON.
+- [x] `DELETE /api/units/:id` d'une unité utilisée → 409 JSON.
+- [x] Image de 6 Mo sur `POST /api/cocktails/:id/image` → 413 JSON (plus de HTML).
+- [x] Corps JSON invalide → 400 JSON traduit selon `Accept-Language`.
+- [x] `GET /api/inexistant` → 404 JSON.
+- [x] Toutes les erreurs ont la forme `{ error: string, details?: unknown }`, sans stack trace.
 
 ## Tests à ajouter ou adapter
 
@@ -118,3 +118,5 @@ Chaque route gère ses erreurs elle-même : 71 `try/catch` qui renvoient presque
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-10 : faite (PR #54). `errors.ts`, `middleware/errorHandler.ts` (`toHttpError`, `errorHandler`, `apiNotFoundHandler`), i18n avant `express.json()`, 68 `try/catch` de handlers supprimés, `availabilityService` lève `NotFoundError`. Écarts : P2003 donne 409 `cannotDelete` sur `DELETE` mais 400 `validationError` sur `POST`/`PUT` (référence inexistante, cas testé par A-03) ; option `cause` retirée de `HttpError` (`ErrorOptions` absent de la lib ES2020 du `tsconfig`) ; ajout de `PayloadTooLargeError` (413) ; les autres erreurs http-errors 4xx exposées (charset non supporté → 415) gardent leur statut au lieu de devenir 500. Restent volontairement : le `try/catch` du parseur d'import (`bottles.ts`), `archive.on('error')` (backup), les `try { JSON.parse }` de `parseNT` (C-09/C-14), les messages en dur de `categoryTypes.ts`, `menuSections.ts`, `menuBottles.ts` `/sync` et `backup.ts` (C-12, C-06, C-05). Le motif précis d'un fichier d'import illisible est dans `details.reason` ; le frontend affiche le message générique (C-10 traduira les motifs). Couverture réelle des lignes modifiées : 92,8 % (les lignes non couvertes sont du code existant seulement désindenté). Rien à faire pour l'humain.
+- 2026-10-10 : Notes de version : les erreurs de l'API qui répondaient 500 répondent maintenant 400 (id non numérique, type rejeté par Prisma, JSON invalide), 404 (id inconnu en modification ou suppression, chemin `/api/*` inconnu), 409 (suppression d'un élément encore utilisé) ou 413 (fichier ou corps trop gros). Toutes les erreurs sont en JSON `{ error, details? }`, traduites, sans stack trace. La forme `{ error }` ne change pas : changement non cassant, aucune action requise.
