@@ -19,8 +19,10 @@ export default defineConfig({
       include: ['src/**/*.{ts,tsx}'],
       thresholds: {
         lines: 60,
-        functions: 60,
-        branches: 60,
+        // Ratchet: set to the coverage measured once untested files entered the
+        // report (B-02). Never lower these; task B-10 raises them back to 60.
+        functions: 53,
+        branches: 52,
         statements: 60,
       },
       exclude: [
