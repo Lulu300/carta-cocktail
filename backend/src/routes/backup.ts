@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 import AdmZip from 'adm-zip';
 import fs from 'fs';
 import path from 'path';
@@ -48,7 +48,7 @@ router.get('/export', async (_req: AuthRequest, res: Response) => {
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', `attachment; filename=backup-${date}.zip`);
 
-  const archive = archiver('zip', { zlib: { level: 6 } });
+  const archive = new ZipArchive({ zlib: { level: 6 } });
 
   // Stream errors are emitted outside the handler's promise, so Express never sees them
   archive.on('error', (err) => {
