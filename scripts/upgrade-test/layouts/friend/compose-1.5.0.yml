@@ -1,7 +1,10 @@
 # compose-1.4.0.yml after step "Before upgrading 3" of the v1.5.0 notes ("update the compose file
-# to the v1.5.0 version, keeping your own changes"): the backend gets the two new variables of
-# the v1.5.0 file, UPLOAD_DIR and ADMIN_RESET_PASSWORD. The secrets stay in the env_file, and the
-# own changes (bind mounts, photos on /uploads, external network) are kept, as the notes say.
+# to the v1.5.0 version, keeping your own changes"):
+# - photos mounted on /uploads: the same folder is mounted on /app/uploads instead;
+# - secrets in an env_file: they stay there, and the JWT_SECRET and ADMIN_PASSWORD lines of the
+#   v1.5.0 file are not copied (ADMIN_EMAIL is already set in environment by this setup);
+# - the new ADMIN_RESET_PASSWORD and UPLOAD_DIR lines are added as they are.
+# Other own changes (bind mount of the data folder, external network) are kept.
 services:
   carta-cocktail-backend:
     image: {{BACKEND_IMAGE}}
@@ -17,7 +20,7 @@ services:
       - UPLOAD_DIR=/app/uploads
     volumes:
       - ./data:/app/data
-      - ./uploads:/uploads
+      - ./uploads:/app/uploads
     networks:
       - swag
     ports:

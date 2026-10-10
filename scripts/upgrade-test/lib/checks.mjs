@@ -11,13 +11,30 @@ export function infoRow(group, label, detail) {
   return { group, label, status: 'info', detail };
 }
 
+function describeError(error) {
+  return [error.message, error.cause?.code ?? error.cause?.message].filter(Boolean).join(': ');
+}
+
+async function fetchOnce(url, options) {
+  const response = await fetch(url, { ...options, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+  return { status: response.status, body: Buffer.from(await response.arrayBuffer()) };
+}
+
+/**
+ * The docker commands run with spawnSync and block the event loop: a keep-alive connection that
+ * the server closed meanwhile is only seen as closed when the next request uses it
+ * (UND_ERR_SOCKET). That request is sent once more, on a new connection.
+ */
 async function request(url, options = {}) {
   try {
-    const response = await fetch(url, { ...options, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
-    const body = Buffer.from(await response.arrayBuffer());
-    return { status: response.status, body };
+    return await fetchOnce(url, options);
   } catch (error) {
-    return { status: 0, body: Buffer.alloc(0), error: error.message };
+    if (error.cause?.code !== 'UND_ERR_SOCKET') return { status: 0, body: Buffer.alloc(0), error: describeError(error) };
+  }
+  try {
+    return await fetchOnce(url, options);
+  } catch (error) {
+    return { status: 0, body: Buffer.alloc(0), error: describeError(error) };
   }
 }
 
@@ -41,15 +58,33 @@ export async function tryLogin(backendUrl, email, password) {
     body: JSON.stringify({ email, password }),
   });
   const token = parseJson(login.body)?.token;
-  if (login.status !== 200 || !token) return { loginStatus: login.status, meStatus: null };
+  if (login.status !== 200 || !token) return { loginStatus: login.status, meStatus: null, error: login.error };
   const me = await request(`${backendUrl}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
   return { loginStatus: login.status, meStatus: me.status };
 }
 
+/** Settings > Admin Profile: returns the HTTP status of the password change. */
+export async function changeAdminPassword(backendUrl, email, currentPassword, newPassword) {
+  const login = await request(`${backendUrl}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: currentPassword }),
+  });
+  const token = parseJson(login.body)?.token;
+  if (!token) return login.status;
+  const update = await request(`${backendUrl}/api/settings/profile`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  return update.status;
+}
+
 export async function checkAdminLogin(backendUrl, { email, password, label }) {
-  const { loginStatus, meStatus } = await tryLogin(backendUrl, email, password);
+  const { loginStatus, meStatus, error } = await tryLogin(backendUrl, email, password);
+  const outcome = error ? `request failed (${error})` : String(loginStatus);
   return row('login', `admin login: ${label}`, meStatus === 200,
-    `POST /api/auth/login ${loginStatus}${meStatus === null ? '' : `, GET /api/auth/me ${meStatus}`}`);
+    `POST /api/auth/login ${outcome}${meStatus === null ? '' : `, GET /api/auth/me ${meStatus}`}`);
 }
 
 /** Public menu list, every public menu, and the recipe of every cocktail shown on them. */

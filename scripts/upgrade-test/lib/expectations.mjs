@@ -1,4 +1,14 @@
 // Decides which failures a step may have without failing the bench.
+import { releaseOf } from './versions.mjs';
+
+/**
+ * `requireStarted` hooks: the version must have started earlier on the path, unless the jump
+ * comes from a release line the notes allow to skip it (`directFrom: '1.4'` for v1.6.0).
+ */
+export function isRequirementMet(hook, startedReleases, previousVersion) {
+  if (startedReleases.has(hook.version)) return true;
+  return Boolean(hook.directFrom) && releaseOf(previousVersion).startsWith(`${hook.directFrom}.`);
+}
 
 /**
  * Failures allowed for a step, by check group, with the reason shown in the report:

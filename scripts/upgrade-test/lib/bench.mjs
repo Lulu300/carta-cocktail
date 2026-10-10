@@ -12,7 +12,9 @@ import { createAnonymizedCopy, fillVolume, takeSnapshot } from './database.mjs';
 import {
   containerLogs, containerMounts, containerState, docker, removeResources, RESOURCE_PREFIX,
 } from './docker.mjs';
-import { allowedFailures, failedGroups, markExpected, unexpectedFailures } from './expectations.mjs';
+import {
+  allowedFailures, failedGroups, isRequirementMet, markExpected, unexpectedFailures,
+} from './expectations.mjs';
 import { BACKEND_SERVICE, FRONTEND_SERVICE, Instance, waitForHttp, waitForStart } from './instance.mjs';
 import { hooksForJump, profileOf, releaseOf } from './versions.mjs';
 
@@ -151,6 +153,7 @@ export class BenchRun {
       target,
       previous,
       profile,
+      previousProfile: previous ? profileOf(this.hookFiles, previous.version) : null,
       fromDbPush,
       expectedStartLogs,
       crossedHooks: previous ? hooksForJump(this.hookFiles, previous.version, target.version) : [],
@@ -159,6 +162,10 @@ export class BenchRun {
       startedReleases: this.startedReleases,
       timeoutMs: this.timeoutMs,
       adminEmail: ADMIN_EMAIL,
+      currentAdminPassword: () => this.admin.password,
+      setAdminPassword: (password, label) => {
+        this.admin = { password, label };
+      },
     };
   }
 
@@ -175,7 +182,7 @@ export class BenchRun {
   unmetRequirements(ctx) {
     return ctx.crossedHooks
       .flatMap((hooks) => hooks.before.filter((hook) => hook.action === 'requireStarted'))
-      .filter((hook) => !this.startedReleases.has(hook.version))
+      .filter((hook) => !isRequirementMet(hook, this.startedReleases, ctx.previous.version))
       .map((hook) => `v${hook.version}`);
   }
 

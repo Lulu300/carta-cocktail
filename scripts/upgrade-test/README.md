@@ -54,7 +54,16 @@ A layout is a folder in `layouts/` with a `layout.mjs`, one compose template per
 `hooks/<version>.mjs` describes one release:
 
 - `profile`: how the version behaves (upload folder, migrations, journal mode, expected log lines, known bugs). A version without a hook file inherits the profile of the previous one.
-- `before` / `after`: the required actions, each linked to its step in the notes. Actions are implemented in `lib/actions.mjs`: `rescueUploads`, `restoreUploads`, `ensureJwtSecret`, `updateCompose` (switch to another compose template of the layout), `requireStarted`, `copyDatabase`, `checkDatabaseCopy`, `checkDefaultAdminPassword`, `manual` (reported, not automated).
+- `before` / `after`: the required actions, each linked to its step in the notes. Actions are implemented in `lib/actions.mjs` and follow the notes for any layout, from what `docker inspect` shows:
+  - `rescueUploads`: copies the photos out of the old container, unless their folder is a mount;
+  - `checkPhotoMount`: on v1.5.0, checks that `/app/uploads` is a mount, and copies the photos out if it is not;
+  - `restoreUploads`: refuses to copy unless the target is a mount, copies the rescued photos, then checks that a photo is served (`wget` inside the container);
+  - `ensureJwtSecret`: in the layout's env file (`.env`, or the `env_file` that holds the secrets);
+  - `updateCompose`: switches to another compose template of the layout (`compose-<generation>.yml`), which holds the changes the notes ask for that setup;
+  - `requireStarted`: the version started earlier on the path, or `directFrom` allows a direct jump from that release line;
+  - `copyDatabase`, `checkDatabaseCopy`: copy of the database files with the backend stopped (volume or data folder), and check of a second copy with the new image;
+  - `changeWeakAdminPassword`: an admin password that is `admin123` or shorter than 12 characters is changed through Settings > Admin Profile, and a short `ADMIN_PASSWORD` is removed from the env file. The bench then logs in with the new password;
+  - `manual`: reported, not automated.
 - `naiveMayFail`: what the notes say breaks when the actions are skipped. In naive mode, these failures, and the ones already present at the previous step, are reported as expected and do not change the exit code. When the layout mounts the photos on a folder that the version no longer reads (`friend` from v1.5.0), the report gives that cause instead of the reason of the notes.
 
 A conformant step that skips a required action (`requireStarted` on a path that does not start v1.5.0, for example) is marked "required action(s) not met" in the summary, even when its checks pass.

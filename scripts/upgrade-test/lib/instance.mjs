@@ -57,6 +57,11 @@ export class Instance {
     fs.writeFileSync(this.envPath, writeEnvVariable(fs.readFileSync(this.envPath, 'utf8'), name, value));
   }
 
+  removeEnv(name) {
+    const lines = fs.readFileSync(this.envPath, 'utf8').split('\n').filter((line) => line !== '' && !line.startsWith(`${name}=`));
+    fs.writeFileSync(this.envPath, `${lines.join('\n')}\n`);
+  }
+
   writeEnvFile(values) {
     const template = fs.readFileSync(path.join(this.layoutDir, `${this.layout.envFile}.template`), 'utf8');
     fs.writeFileSync(this.envPath, renderTemplate(template, values));

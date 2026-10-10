@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { isStrongJwtSecret } from '../lib/actions.mjs';
 import { checkLogLines, checkRowCounts, checkUploadsPersistent } from '../lib/checks.mjs';
 import { parseSnapshot } from '../lib/database.mjs';
-import { allowedFailures, markExpected, unexpectedFailures } from '../lib/expectations.mjs';
+import { allowedFailures, isRequirementMet, markExpected, unexpectedFailures } from '../lib/expectations.mjs';
 import { readEnvVariable, renderTemplate, writeEnvVariable } from '../lib/instance.mjs';
 
 test('parseSnapshot reads the helper output', () => {
@@ -93,4 +93,12 @@ test('expectations: conformant mode does not inherit previous failures', () => {
   const rows = [{ group: 'images', status: 'ko' }];
   markExpected(rows, { mode: 'conformant', allowed: {}, previousFailedGroups: new Set(['images']) });
   assert.equal(unexpectedFailures(rows).length, 1);
+});
+
+test('isRequirementMet accepts a started version, or a direct jump from the allowed release line', () => {
+  const hook = { action: 'requireStarted', version: '1.5.0', directFrom: '1.4' };
+  assert.equal(isRequirementMet(hook, new Set(['1.5.0']), '1.5.0'), true);
+  assert.equal(isRequirementMet(hook, new Set(['1.4.0']), '1.4.0'), true);
+  assert.equal(isRequirementMet(hook, new Set(['1.3.0']), '1.3.0'), false);
+  assert.equal(isRequirementMet({ ...hook, directFrom: undefined }, new Set(['1.4.0']), '1.4.0'), false);
 });
