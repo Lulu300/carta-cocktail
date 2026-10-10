@@ -289,11 +289,14 @@ export class BenchRun {
     }
     rows.push(...await checkPublicApi(ctx.backendUrl));
 
-    const frontendUrl = this.instance.serviceUrl(FRONTEND_SERVICE, 80);
+    // The compose file of the current generation says which container port it publishes. A naive
+    // upgrade can keep a file whose port the new image no longer listens on: the frontend checks
+    // then fail and are reported, the run goes on.
+    const frontendUrl = this.instance.serviceUrl(FRONTEND_SERVICE, this.instance.frontendContainerPort());
     await waitForHttp(`${frontendUrl}/`, FRONTEND_TIMEOUT_MS);
     rows.push(await checkFrontendShell(frontendUrl));
-    rows.push(await checkImages(ctx.backendUrl, this.baseline.imagePaths, 'backend'));
-    rows.push(await checkImages(frontendUrl, this.baseline.imagePaths, `frontend nginx ${ctx.target.label}`));
+    rows.push(await checkImages('images', ctx.backendUrl, this.baseline.imagePaths, 'backend'));
+    rows.push(await checkImages('frontendImages', frontendUrl, this.baseline.imagePaths, `frontend nginx ${ctx.target.label}`));
     return rows;
   }
 
