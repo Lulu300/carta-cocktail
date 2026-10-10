@@ -22,7 +22,7 @@ model CategoryType {
 
 model Category {
   id               Int      @id @default(autoincrement())
-  name             String
+  name             String   @unique
   nameTranslations String?  // JSON: {"fr": "...", "en": "..."}
   type             String   // SPIRIT or SYRUP
   desiredStock     Int      @default(1)
@@ -31,13 +31,15 @@ model Category {
 
   bottles             Bottle[]
   cocktailIngredients CocktailIngredient[]
+
+  @@index([type])
 }
 
 model Bottle {
   id               Int       @id @default(autoincrement())
   name             String
   categoryId       Int
-  category         Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  category         Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   purchasePrice    Float?
   capacityMl       Int
   remainingPercent Int       @default(100)
@@ -51,6 +53,8 @@ model Bottle {
   cocktailIngredients CocktailIngredient[]
   preferredFor        CocktailPreferredBottle[]
   menuBottles         MenuBottle[]
+
+  @@index([categoryId])
 }
 
 model Ingredient {
@@ -68,7 +72,7 @@ model Unit {
   id                   Int     @id @default(autoincrement())
   name                 String
   nameTranslations     String? // JSON: {"fr": "...", "en": "..."}
-  abbreviation         String
+  abbreviation         String  @unique
   conversionFactorToMl Float?  // Factor to convert this unit to ml (null = non-convertible)
 
   cocktailIngredients CocktailIngredient[]
@@ -96,17 +100,23 @@ model CocktailIngredient {
   cocktail   Cocktail @relation(fields: [cocktailId], references: [id], onDelete: Cascade)
   quantity   Float
   unitId     Int
-  unit       Unit     @relation(fields: [unitId], references: [id])
+  unit       Unit     @relation(fields: [unitId], references: [id], onDelete: Restrict)
   sourceType String   // BOTTLE, CATEGORY, INGREDIENT
   bottleId   Int?
-  bottle     Bottle?  @relation(fields: [bottleId], references: [id])
+  bottle     Bottle?  @relation(fields: [bottleId], references: [id], onDelete: Restrict)
   categoryId Int?
-  category   Category? @relation(fields: [categoryId], references: [id])
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   ingredientId Int?
-  ingredient   Ingredient? @relation(fields: [ingredientId], references: [id])
+  ingredient   Ingredient? @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
   position   Int      @default(0)
 
   preferredBottles CocktailPreferredBottle[]
+
+  @@index([cocktailId])
+  @@index([bottleId])
+  @@index([categoryId])
+  @@index([ingredientId])
+  @@index([unitId])
 }
 
 model CocktailPreferredBottle {
@@ -114,9 +124,10 @@ model CocktailPreferredBottle {
   cocktailIngredientId Int
   cocktailIngredient   CocktailIngredient @relation(fields: [cocktailIngredientId], references: [id], onDelete: Cascade)
   bottleId             Int
-  bottle               Bottle             @relation(fields: [bottleId], references: [id])
+  bottle               Bottle             @relation(fields: [bottleId], references: [id], onDelete: Cascade)
 
   @@unique([cocktailIngredientId, bottleId])
+  @@index([bottleId])
 }
 
 model CocktailInstruction {
@@ -125,6 +136,8 @@ model CocktailInstruction {
   cocktail   Cocktail @relation(fields: [cocktailId], references: [id], onDelete: Cascade)
   stepNumber Int
   text       String
+
+  @@index([cocktailId])
 }
 
 model Menu {
@@ -154,6 +167,8 @@ model MenuCocktail {
   isHidden      Boolean      @default(false)
 
   @@unique([menuId, cocktailId])
+  @@index([cocktailId])
+  @@index([menuSectionId])
 }
 
 model MenuBottle {
@@ -168,6 +183,8 @@ model MenuBottle {
   isHidden      Boolean      @default(false)
 
   @@unique([menuId, bottleId])
+  @@index([bottleId])
+  @@index([menuSectionId])
 }
 
 model MenuSection {
@@ -179,6 +196,8 @@ model MenuSection {
 
   cocktails MenuCocktail[]
   bottles   MenuBottle[]
+
+  @@index([menuId])
 }
 
 model SiteSettings {

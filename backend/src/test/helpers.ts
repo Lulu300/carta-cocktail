@@ -241,3 +241,29 @@ export async function seedCocktail(overrides: Partial<{
     },
   });
 }
+
+export interface RecipeLineSource {
+  sourceType: 'BOTTLE' | 'CATEGORY' | 'INGREDIENT';
+  bottleId?: number;
+  categoryId?: number;
+  ingredientId?: number;
+  preferredBottleIds?: number[];
+}
+
+/** Creates a cocktail whose recipe has one line per source, all in the given unit. */
+export async function seedCocktailUsing(name: string, unitId: number, sources: RecipeLineSource[]) {
+  return prisma.cocktail.create({
+    data: {
+      name,
+      ingredients: {
+        create: sources.map(({ preferredBottleIds = [], ...source }, position) => ({
+          ...source,
+          quantity: 1,
+          unitId,
+          position,
+          preferredBottles: { create: preferredBottleIds.map((bottleId) => ({ bottleId })) },
+        })),
+      },
+    },
+  });
+}

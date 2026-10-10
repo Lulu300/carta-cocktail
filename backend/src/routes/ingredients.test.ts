@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
-  request, authHeader, prisma, seedIngredient,
+  request, authHeader, prisma, seedIngredient, seedUnit, seedCocktailUsing,
 } from '../test/helpers';
 
 beforeAll(async () => { await setupTestDatabase(); });
@@ -136,5 +136,38 @@ describe('DELETE /api/ingredients/:id', () => {
     const ing = await seedIngredient({ name: 'Basil' });
     const res = await request.delete(`/api/ingredients/${ing.id}`).set(authHeader());
     expect(res.status).toBe(200);
+  });
+
+  it('should refuse with 409 and the cocktails while a recipe uses the ingredient', async () => {
+    const unit = await seedUnit();
+    const mint = await seedIngredient({ name: 'Mint' });
+    const cocktail = await seedCocktailUsing('Mojito', unit.id, [{ sourceType: 'INGREDIENT', ingredientId: mint.id }]);
+
+    const res = await request.delete(`/api/ingredients/${mint.id}`).set(authHeader());
+
+    expect(res.status).toBe(409);
+    expect(res.body.details).toEqual({
+      cocktails: [{ id: cocktail.id, name: 'Mojito', removedLines: 1 }],
+      bottles: [],
+    });
+    expect(await prisma.ingredient.findUnique({ where: { id: mint.id } })).not.toBeNull();
+  });
+
+  it('should force the deletion with the recipe lines that use the ingredient', async () => {
+    const unit = await seedUnit();
+    const mint = await seedIngredient({ name: 'Mint' });
+    const sugar = await seedIngredient({ name: 'Sugar' });
+    await seedCocktailUsing('Mojito', unit.id, [
+      { sourceType: 'INGREDIENT', ingredientId: mint.id },
+      { sourceType: 'INGREDIENT', ingredientId: sugar.id },
+    ]);
+
+    const res = await request.delete(`/api/ingredients/${mint.id}?force=true`).set(authHeader());
+
+    expect(res.status).toBe(200);
+    expect(res.body.impact.cocktails).toHaveLength(1);
+    expect(await prisma.ingredient.findUnique({ where: { id: mint.id } })).toBeNull();
+    expect(await prisma.cocktailIngredient.findMany({ select: { ingredientId: true } }))
+      .toEqual([{ ingredientId: sugar.id }]);
   });
 });

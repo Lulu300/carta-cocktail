@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
-  request, authHeader, seedUnit,
+  request, authHeader, prisma, seedUnit, seedIngredient, seedCocktailUsing,
 } from '../test/helpers';
 
 beforeAll(async () => { await setupTestDatabase(); });
@@ -72,6 +72,14 @@ describe('POST /api/units', () => {
     expect(res.status).toBe(201);
     expect(res.body.nameTranslations).toEqual({ fr: 'Centilitre' });
   });
+
+  it('should return 409 when the abbreviation exists, ignoring case', async () => {
+    await seedUnit({ abbreviation: 'cl' });
+    const res = await request.post('/api/units').set(authHeader())
+      .send({ name: 'Other centilitre', abbreviation: 'CL' });
+    expect(res.status).toBe(409);
+    expect(await prisma.unit.count()).toBe(1);
+  });
 });
 
 describe('PUT /api/units/:id', () => {
@@ -91,6 +99,21 @@ describe('PUT /api/units/:id', () => {
     expect(res.status).toBe(200);
     expect(res.body.conversionFactorToMl).toBe(15);
   });
+
+  it('should return 409 when taking the abbreviation of another unit', async () => {
+    await seedUnit({ name: 'Millilitre', abbreviation: 'ml' });
+    const unit = await seedUnit({ abbreviation: 'cl' });
+    const res = await request.put(`/api/units/${unit.id}`).set(authHeader())
+      .send({ abbreviation: 'ml' });
+    expect(res.status).toBe(409);
+  });
+
+  it('should keep its own abbreviation', async () => {
+    const unit = await seedUnit({ abbreviation: 'cl' });
+    const res = await request.put(`/api/units/${unit.id}`).set(authHeader())
+      .send({ name: 'Centiliter', abbreviation: 'cl' });
+    expect(res.status).toBe(200);
+  });
 });
 
 describe('DELETE /api/units/:id', () => {
@@ -98,5 +121,19 @@ describe('DELETE /api/units/:id', () => {
     const unit = await seedUnit();
     const res = await request.delete(`/api/units/${unit.id}`).set(authHeader());
     expect(res.status).toBe(200);
+  });
+
+  it('should refuse with 409 and the cocktails, even when forced, while a recipe uses the unit', async () => {
+    const unit = await seedUnit();
+    const ingredient = await seedIngredient({ name: 'Lime' });
+    const cocktail = await seedCocktailUsing('Gimlet', unit.id, [
+      { sourceType: 'INGREDIENT', ingredientId: ingredient.id },
+    ]);
+
+    const res = await request.delete(`/api/units/${unit.id}?force=true`).set(authHeader());
+
+    expect(res.status).toBe(409);
+    expect(res.body.details.cocktails).toEqual([{ id: cocktail.id, name: 'Gimlet', removedLines: 1 }]);
+    expect(await prisma.unit.findUnique({ where: { id: unit.id } })).not.toBeNull();
   });
 });

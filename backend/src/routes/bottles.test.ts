@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import AdmZip from 'adm-zip';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
-  request, authHeader, prisma, seedCategory, seedBottle,
+  request, authHeader, prisma, seedCategory, seedBottle, seedUnit, seedCocktailUsing,
 } from '../test/helpers';
 
 beforeAll(async () => { await setupTestDatabase(); });
@@ -209,6 +209,74 @@ describe('DELETE /api/bottles/:id', () => {
     expect(res.status).toBe(200);
     const check = await prisma.bottle.findUnique({ where: { id: bottle.id } });
     expect(check).toBeNull();
+  });
+
+  it('should return 404 for an unknown bottle, even when forced', async () => {
+    const res = await request.delete('/api/bottles/99999?force=true').set(authHeader());
+    expect(res.status).toBe(404);
+  });
+
+  it('should refuse with 409 and the cocktails when a recipe uses the bottle', async () => {
+    const unit = await seedUnit();
+    const bottle = await seedBottle();
+    const cocktail = await seedCocktailUsing('Daiquiri', unit.id, [{ sourceType: 'BOTTLE', bottleId: bottle.id }]);
+
+    const res = await request.delete(`/api/bottles/${bottle.id}`).set(authHeader());
+
+    expect(res.status).toBe(409);
+    expect(res.body.details).toEqual({
+      cocktails: [{ id: cocktail.id, name: 'Daiquiri', removedLines: 1 }],
+      bottles: [],
+    });
+    expect(await prisma.bottle.findUnique({ where: { id: bottle.id } })).not.toBeNull();
+    expect(await prisma.cocktailIngredient.count()).toBe(1);
+  });
+
+  it('should delete a bottle that is only a preferred bottle, with its preference', async () => {
+    const unit = await seedUnit();
+    const category = await seedCategory();
+    const bottle = await seedBottle({ categoryId: category.id });
+    await seedCocktailUsing('Prefers it', unit.id, [
+      { sourceType: 'CATEGORY', categoryId: category.id, preferredBottleIds: [bottle.id] },
+    ]);
+
+    const res = await request.delete(`/api/bottles/${bottle.id}`).set(authHeader());
+
+    expect(res.status).toBe(200);
+    expect(res.body.impact).toEqual({ cocktails: [], bottles: [] });
+    expect(await prisma.cocktailPreferredBottle.count()).toBe(0);
+    expect(await prisma.cocktailIngredient.count()).toBe(1);
+  });
+
+  it('should force the deletion of a bottle used by two cocktails', async () => {
+    const unit = await seedUnit();
+    const category = await seedCategory();
+    const bottle = await seedBottle({ categoryId: category.id, isApero: true });
+    await prisma.menuBottle.create({
+      data: { menuId: (await prisma.menu.findUniqueOrThrow({ where: { slug: 'aperitifs' } })).id, bottleId: bottle.id },
+    });
+    const first = await seedCocktailUsing('First', unit.id, [
+      { sourceType: 'BOTTLE', bottleId: bottle.id },
+      { sourceType: 'BOTTLE', bottleId: bottle.id },
+    ]);
+    const second = await seedCocktailUsing('Second', unit.id, [
+      { sourceType: 'BOTTLE', bottleId: bottle.id },
+      { sourceType: 'CATEGORY', categoryId: category.id, preferredBottleIds: [bottle.id] },
+    ]);
+
+    const res = await request.delete(`/api/bottles/${bottle.id}?force=true`).set(authHeader());
+
+    expect(res.status).toBe(200);
+    expect(res.body.deleted).toBe(true);
+    expect(res.body.impact.cocktails).toEqual([
+      { id: first.id, name: 'First', removedLines: 2 },
+      { id: second.id, name: 'Second', removedLines: 1 },
+    ]);
+    expect(await prisma.bottle.findUnique({ where: { id: bottle.id } })).toBeNull();
+    expect(await prisma.cocktailIngredient.findMany({ select: { sourceType: true } }))
+      .toEqual([{ sourceType: 'CATEGORY' }]);
+    expect(await prisma.cocktailPreferredBottle.count()).toBe(0);
+    expect(await prisma.menuBottle.count()).toBe(0);
   });
 });
 
