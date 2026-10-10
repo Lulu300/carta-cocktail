@@ -60,3 +60,4 @@ Fichiers sans aucun test d'après la revue (`04-tests.md §2`), par ordre de pri
 ## Journal
 
 - 2026-10-08 : tâche créée suite à la décision « cliquet » sur B-02.
+- 2026-10-10 : point de départ fixé par B-02 (PR #52). Seul le frontend est sous 60 %, sur deux métriques : `branches: 52` (mesuré 52,24 %, 954/1826) et `functions: 53` (mesuré 53,21 %, 439/825) dans `frontend/vitest.config.ts`. `statements` (61,45 %) et `lines` (63,38 %) restent à 60. Backend au-dessus de 60 % partout, seuils inchangés. Il manque 142 branches et 56 fonctions couvertes pour revenir à 60 %. La tâche se limite donc à remonter ces deux seuils frontend jusqu'à 60.
