@@ -1,10 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
 import { render, screen, waitFor, within } from '../../test/test-utils';
 import AdminLayout from '../../components/layout/AdminLayout';
+import { createQueryClient } from '../../queries/queryClient';
 import DashboardPage from './DashboardPage';
 
 vi.mock('../../services/api', () => ({
+  // Imported by the production query client's retry rule
+  ApiError: class ApiError extends Error {},
   categories: { list: vi.fn() },
   bottles: { list: vi.fn() },
   cocktails: { list: vi.fn() },
@@ -37,7 +40,38 @@ beforeEach(() => {
   mockShortList.mockResolvedValue([]);
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe('DashboardPage', () => {
+  it('shows the counts from the cache when coming back, and reloads them once stale', async () => {
+    mockCatList.mockResolvedValue([{}, {}, {}] as never);
+    // Production client: the 30 s stale time is what this test is about
+    const queryClient = createQueryClient();
+    const getCategoriesCard = () => screen.getByRole('link', { name: /dashboard\.stats\.categories/ });
+
+    const firstVisit = render(<DashboardPage />, { queryClient });
+    await waitFor(() => expect(screen.queryAllByRole('status')).toHaveLength(0));
+    firstVisit.unmount();
+
+    // Back on /admin within 30 s: counts at once, no spinner, no new request
+    const secondVisit = render(<DashboardPage />, { queryClient });
+    expect(screen.queryAllByRole('status')).toHaveLength(0);
+    expect(within(getCategoriesCard()).getByText('3')).toBeInTheDocument();
+    expect(mockCatList).toHaveBeenCalledTimes(1);
+    secondVisit.unmount();
+
+    // After 30 s the cached counts still show while the list reloads in the background
+    vi.setSystemTime(Date.now() + 31_000);
+    render(<DashboardPage />, { queryClient });
+    expect(screen.queryAllByRole('status')).toHaveLength(0);
+    expect(within(getCategoriesCard()).getByText('3')).toBeInTheDocument();
+    await waitFor(() => expect(mockCatList).toHaveBeenCalledTimes(2));
+
+    queryClient.clear();
+  });
+
   it('renders the dashboard title', async () => {
     render(<DashboardPage />);
     await waitFor(() => {
