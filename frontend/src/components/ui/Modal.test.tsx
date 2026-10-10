@@ -1,8 +1,13 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { useState } from 'react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { createRef, useState } from 'react';
 import { render, screen, fireEvent } from '../../test/test-utils';
 import userEvent from '@testing-library/user-event';
 import Modal from './Modal';
+
+// jsdom has no layout: give the dialog a box so backdrop detection can work.
+const DIALOG_BOX = { left: 100, top: 100, right: 500, bottom: 400 };
+const OUTSIDE = { clientX: 5, clientY: 5 };
+const INSIDE = { clientX: 300, clientY: 200 };
 
 function renderModal(props: Partial<React.ComponentProps<typeof Modal>> = {}) {
   const onClose = vi.fn();
@@ -20,8 +25,18 @@ function getDialogElement(container: HTMLElement): HTMLDialogElement {
   return dialog;
 }
 
+function pressAndRelease(pressTarget: Element, releaseTarget: Element, point: { clientX: number; clientY: number }) {
+  fireEvent.pointerDown(pressTarget, point);
+  fireEvent.click(releaseTarget, point);
+}
+
 describe('Modal', () => {
+  beforeEach(() => {
+    vi.spyOn(HTMLDialogElement.prototype, 'getBoundingClientRect').mockReturnValue(DIALOG_BOX as DOMRect);
+  });
+
   afterEach(() => {
+    vi.restoreAllMocks();
     document.body.style.overflow = '';
   });
 
@@ -48,19 +63,37 @@ describe('Modal', () => {
     expect(dialog.open).toBe(true);
   });
 
-  it('calls onClose on a backdrop click but not on a content click', async () => {
-    const user = userEvent.setup();
+  it('calls onClose when a press starts and ends on the backdrop', () => {
     const { onClose, container } = renderModal();
-    await user.click(screen.getByText('Modal body'));
-    expect(onClose).not.toHaveBeenCalled();
-    await user.click(getDialogElement(container));
+    const dialog = getDialogElement(container);
+    pressAndRelease(dialog, dialog, OUTSIDE);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('ignores backdrop clicks when closeOnBackdrop is false', async () => {
+  it('does not close on a click in the content', async () => {
     const user = userEvent.setup();
+    const { onClose } = renderModal();
+    await user.click(screen.getByText('Modal body'));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('does not close when a drag starts in the content and ends on the backdrop', () => {
+    const { onClose, container } = renderModal();
+    pressAndRelease(screen.getByText('Modal body'), getDialogElement(container), OUTSIDE);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('does not close on a click on the dialog box itself, such as its scrollbar', () => {
+    const { onClose, container } = renderModal();
+    const dialog = getDialogElement(container);
+    pressAndRelease(dialog, dialog, INSIDE);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('ignores backdrop clicks when closeOnBackdrop is false', () => {
     const { onClose, container } = renderModal({ closeOnBackdrop: false });
-    await user.click(getDialogElement(container));
+    const dialog = getDialogElement(container);
+    pressAndRelease(dialog, dialog, OUTSIDE);
     expect(onClose).not.toHaveBeenCalled();
   });
 
@@ -87,13 +120,50 @@ describe('Modal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('opens with a consumer ref and forwards the dialog element to it', () => {
+    const ref = createRef<HTMLDialogElement>();
+    const { container } = renderModal({ ref });
+    const dialog = getDialogElement(container);
+    expect(dialog.open).toBe(true);
+    expect(ref.current).toBe(dialog);
+    expect(screen.getByText('Modal body')).toBeInTheDocument();
+  });
+
+  it('forwards the dialog element to a callback ref', () => {
+    const ref = vi.fn();
+    const { container } = renderModal({ ref });
+    expect(ref).toHaveBeenCalledWith(getDialogElement(container));
+  });
+
+  it('mounts the content only once the dialog is open, so autoFocus works', () => {
+    let dialogOpenWhenMounted: boolean | undefined;
+    render(
+      <Modal open onClose={vi.fn()} title="Rename">
+        <input
+          aria-label="Name"
+          autoFocus
+          ref={(input) => {
+            if (input) dialogOpenWhenMounted = input.closest('dialog')?.open;
+          }}
+        />
+      </Modal>,
+    );
+    expect(dialogOpenWhenMounted).toBe(true);
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveFocus();
+  });
+
   it('opens and closes the dialog and locks page scroll while open', () => {
+    const closeSpy = vi.fn();
     function Harness() {
       const [open, setOpen] = useState(false);
+      const close = () => {
+        closeSpy();
+        setOpen(false);
+      };
       return (
         <>
           <button type="button" onClick={() => setOpen(true)}>Open</button>
-          <Modal open={open} onClose={() => setOpen(false)} title="Harness">
+          <Modal open={open} onClose={close} title="Harness">
             <p>Harness body</p>
           </Modal>
         </>
@@ -108,7 +178,37 @@ describe('Modal', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'common.close' }));
     expect(dialog.open).toBe(false);
+    // The close event fired by dialog.close() must not report the closing twice.
+    expect(closeSpy).toHaveBeenCalledTimes(1);
     expect(document.body.style.overflow).toBe('');
     expect(screen.queryByText('Harness body')).not.toBeInTheDocument();
+  });
+
+  it('keeps the page locked until the last of two stacked modals closes', () => {
+    document.body.style.overflow = 'scroll';
+    const { rerender } = render(
+      <>
+        <Modal open onClose={vi.fn()} title="First"><p>First</p></Modal>
+        <Modal open onClose={vi.fn()} title="Second"><p>Second</p></Modal>
+      </>,
+    );
+    expect(document.body.style.overflow).toBe('hidden');
+
+    // Close the first opened modal first: the second one still needs the lock.
+    rerender(
+      <>
+        <Modal open={false} onClose={vi.fn()} title="First"><p>First</p></Modal>
+        <Modal open onClose={vi.fn()} title="Second"><p>Second</p></Modal>
+      </>,
+    );
+    expect(document.body.style.overflow).toBe('hidden');
+
+    rerender(
+      <>
+        <Modal open={false} onClose={vi.fn()} title="First"><p>First</p></Modal>
+        <Modal open={false} onClose={vi.fn()} title="Second"><p>Second</p></Modal>
+      </>,
+    );
+    expect(document.body.style.overflow).toBe('scroll');
   });
 });

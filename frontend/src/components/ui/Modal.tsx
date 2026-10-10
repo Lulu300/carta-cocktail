@@ -1,11 +1,27 @@
-import { useEffect, useId, useRef, type ComponentPropsWithRef, type MouseEvent, type ReactNode, type SyntheticEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ComponentPropsWithRef,
+  type MouseEvent,
+  type PointerEvent,
+  type ReactNode,
+  type Ref,
+  type SyntheticEvent,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from './classNames';
 import IconButton from './IconButton';
 
 type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
 
-interface ModalProps extends Omit<ComponentPropsWithRef<'dialog'>, 'open' | 'onClose' | 'title' | 'children'> {
+// The modal owns the dialog's open state and its click, pointer and Escape handling.
+type OwnedDialogProps = 'open' | 'onClose' | 'onCancel' | 'onClick' | 'onPointerDown' | 'title' | 'children';
+
+interface ModalProps extends Omit<ComponentPropsWithRef<'dialog'>, OwnedDialogProps> {
   open: boolean;
   onClose: () => void;
   title: ReactNode;
@@ -22,6 +38,40 @@ const SIZE_CLASSES: Record<ModalSize, string> = {
   xl: 'max-w-2xl',
 };
 
+// Shared across modals so that stacked modals closing in any order
+// only restore the page scroll once the last one is closed.
+let scrollLockCount = 0;
+let overflowBeforeLock = '';
+
+function lockPageScroll() {
+  if (scrollLockCount === 0) {
+    overflowBeforeLock = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+  }
+  scrollLockCount += 1;
+}
+
+function unlockPageScroll() {
+  scrollLockCount -= 1;
+  if (scrollLockCount === 0) document.body.style.overflow = overflowBeforeLock;
+}
+
+function assignRef<T>(ref: Ref<T> | undefined, value: T | null) {
+  if (typeof ref === 'function') ref(value);
+  else if (ref) ref.current = value;
+}
+
+/**
+ * True when the pointer is on the backdrop: the dialog is the target (it has no
+ * padding) and the point lies outside its box, which excludes its own scrollbar.
+ */
+function isOnBackdrop(dialog: HTMLDialogElement | null, event: MouseEvent<HTMLDialogElement>) {
+  if (!dialog || event.target !== dialog) return false;
+  const box = dialog.getBoundingClientRect();
+  return event.clientX < box.left || event.clientX > box.right
+    || event.clientY < box.top || event.clientY > box.bottom;
+}
+
 /**
  * Modal built on the native <dialog>: the browser provides the focus trap,
  * focus restoration, top-layer rendering and the Escape key.
@@ -36,26 +86,36 @@ export default function Modal({
   closeOnBackdrop = true,
   className,
   children,
+  ref,
   ...rest
 }: ModalProps) {
   const { t } = useTranslation();
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
+  const pressStartedOnBackdrop = useRef(false);
   const titleId = useId();
+  // The body is mounted only once showModal() has run: React applies `autoFocus`
+  // while committing, which has no effect inside a closed (display: none) dialog.
+  // The header is there from the start, so showModal() focuses the close button
+  // when the body asks for no autoFocus.
+  const [isShown, setIsShown] = useState(false);
 
-  useEffect(() => {
+  const setDialogRef = useCallback((node: HTMLDialogElement | null) => {
+    dialogRef.current = node;
+    assignRef(ref, node);
+  }, [ref]);
+
+  useLayoutEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
     if (open && !dialog.open) dialog.showModal();
     if (!open && dialog.open) dialog.close();
+    setIsShown(dialog.open);
   }, [open]);
 
   useEffect(() => {
     if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
+    lockPageScroll();
+    return unlockPageScroll;
   }, [open]);
 
   // Escape: keep the dialog open and let the parent decide through onClose.
@@ -70,18 +130,26 @@ export default function Modal({
     if (open) onClose();
   };
 
-  // The dialog has no padding, so a click whose target is the dialog itself
-  // landed on the backdrop.
+  // A drag that starts in the content and ends on the backdrop fires a click on
+  // the dialog too: only close when the press also started on the backdrop.
+  const handlePointerDown = (event: PointerEvent<HTMLDialogElement>) => {
+    pressStartedOnBackdrop.current = isOnBackdrop(dialogRef.current, event);
+  };
+
   const handleClick = (event: MouseEvent<HTMLDialogElement>) => {
-    if (closeOnBackdrop && event.target === dialogRef.current) onClose();
+    const startedOnBackdrop = pressStartedOnBackdrop.current;
+    pressStartedOnBackdrop.current = false;
+    if (closeOnBackdrop && startedOnBackdrop && isOnBackdrop(dialogRef.current, event)) onClose();
   };
 
   return (
     <dialog
-      ref={dialogRef}
+      {...rest}
+      ref={setDialogRef}
       aria-labelledby={titleId}
       onCancel={handleCancel}
       onClose={handleNativeClose}
+      onPointerDown={handlePointerDown}
       onClick={handleClick}
       className={cx(
         'm-auto w-[calc(100%-2rem)] max-h-[90vh] overflow-y-auto p-0',
@@ -89,7 +157,6 @@ export default function Modal({
         SIZE_CLASSES[size],
         className,
       )}
-      {...rest}
     >
       {open && (
         <>
@@ -97,8 +164,12 @@ export default function Modal({
             <h2 id={titleId} className="text-lg font-semibold">{title}</h2>
             <IconButton icon="close" label={t('common.close')} variant="neutral" onClick={onClose} className="-mr-2 -mt-2" />
           </div>
-          <div className={cx('px-6 pt-4', !footer && 'pb-6')}>{children}</div>
-          {footer && <div className="flex justify-end gap-3 px-6 pt-4 pb-6">{footer}</div>}
+          {isShown && (
+            <>
+              <div className={cx('px-6 pt-4', !footer && 'pb-6')}>{children}</div>
+              {footer && <div className="flex justify-end gap-3 px-6 pt-4 pb-6">{footer}</div>}
+            </>
+          )}
         </>
       )}
     </dialog>
