@@ -8,11 +8,16 @@ effort: S
 status: todo
 owner: agent
 depends_on: [A-06, B-01]
-touches: [frontend/Dockerfile, frontend/nginx.conf.template, frontend/security-headers.conf, docker-compose.yml, docker-compose.prod.yml]
+touches: [frontend/Dockerfile, frontend/nginx.conf.template, frontend/security-headers.conf, docker-compose.yml, docker-compose.prod.yml, scripts/upgrade-test/layouts/]
 sources: ["03-security.md §8", "07-devops-history.md §2.8"]
 branch:
 pr:
 ---
+
+## Décisions validées (2026-10-10)
+
+- **Port 8080** : le conteneur frontend écoute sur 8080. L'alternative `listen 80` est écartée (elle ne marche ni sous Docker rootless ni sous Podman). Changement cassant, `breaking: true` dans les notes de la version qui l'embarque (v1.8.0 au plus tôt).
+- **Banc de mise à jour** : les layouts du banc publient le port 80 du frontend (`127.0.0.1::80` dans `compose-1.5.0.yml`). Ajouter dans `scripts/upgrade-test/layouts/friend/` et `layouts/official/` une génération `compose-1.8.0.yml` identique à `compose-1.5.0.yml` sauf le port du conteneur frontend (`127.0.0.1::8080`), et l'enregistrer dans les `layout.mjs` si besoin. Le hook `hooks/1.8.0.mjs` reste au coordinateur (notes de release, règle 9) : pour vérifier la PR, utiliser un hook temporaire non commité qui fait `updateCompose` vers la génération `1.8.0`.
 
 ## Contexte
 
@@ -86,7 +91,7 @@ nginx sert le HTML de l'admin et de la carte publique. helmet ne protège que le
 ## Points d'attention
 
 - Changement cassant. Le conteneur écoute sur 8080. Un utilisateur qui a son propre compose avec `"80:80"` perd l'accès après mise à jour de `:latest`. À annoncer dans les notes de version (point suivant) et dans D-09.
-- **Notes de version** (règle de D-11 : la PR ne touche ni `docs/releases/` ni `UPGRADING.md`). `breaking: true`. La description de la PR a une section « Required actions » et le Journal une ligne « Notes de version ». Actions attendues : *before* — dans un compose personnalisé, remplacer le mapping `"<port>:80"` du frontend par `"<port>:8080"` (les compose du dépôt sont déjà à jour) ; *after* — vérifier que la carte publique et l'admin répondent, et qu'une restauration de backup passe toujours. Épinglage recommandé : `:<version>` avant D-05, `:<majeure>.<mineure>` ensuite. Alternative à confirmer : rester sur `listen 80`, qui fonctionne en non-root avec Docker ≥ 20.10 (sysctl `ip_unprivileged_port_start=0` par défaut), mais pas sous Docker rootless ni Podman.
+- **Notes de version** (règle de D-11 : la PR ne touche ni `docs/releases/` ni `UPGRADING.md`). `breaking: true`. La description de la PR a une section « Required actions » et le Journal une ligne « Notes de version ». Actions attendues : *before* — dans un compose personnalisé, remplacer le mapping `"<port>:80"` du frontend par `"<port>:8080"` (les compose du dépôt sont déjà à jour) ; *after* — vérifier que la carte publique et l'admin répondent, et qu'une restauration de backup passe toujours. Épinglage recommandé : `:<version>` avant D-05, `:<majeure>.<mineure>` ensuite. Alternative écartée le 2026-10-10 : rester sur `listen 80`, qui fonctionne en non-root avec Docker ≥ 20.10 (sysctl `ip_unprivileged_port_start=0` par défaut), mais pas sous Docker rootless ni Podman.
 - `touches` complété : `frontend/security-headers.conf`, `docker-compose.yml`, `docker-compose.prod.yml`. Ces deux compose sont aussi modifiés par A-01, A-04 et D-03 : enchaîner les PR.
 - `X-Frame-Options: DENY` et `frame-ancestors 'none'` empêchent d'intégrer la carte publique dans un site tiers. Si le bar veut l'intégrer, il faudra une exception sur `/menu/`.
 - Relevé en revue de A-06 : la `location = /api/backup/import` garde `client_max_body_size 512m`, `proxy_request_buffering off` et ses délais ; seul son `proxy_pass` change. Tester une restauration de backup après la bascule (`curl -F file=@backup.zip …/api/backup/import`, attendu 401 sans token, pas 404 ni 502).
@@ -97,3 +102,4 @@ nginx sert le HTML de l'admin et de la carte publique. helmet ne protège que le
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : suivi des revues de la phase A. Étape 3 complétée : `location = /api/backup/import` (A-06) passe aussi à `proxy_pass $backend` sans URI, conseil `location ^~ /assets/` si une regex est ajoutée.
 - 2026-10-09 : point d'attention « Notes de version » (règle de D-11 décidée le 2026-10-09) : `breaking: true`, actions attendues, épinglage recommandé.
+- 2026-10-10 : décision de l'humain, port 8080 (voir « Décisions validées ») ; `scripts/upgrade-test/layouts/` ajouté à `touches` pour la nouvelle génération de compose du banc.
