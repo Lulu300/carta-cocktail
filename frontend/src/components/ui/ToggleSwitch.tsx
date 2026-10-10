@@ -1,7 +1,7 @@
 import type { ComponentPropsWithRef } from 'react';
 import { cx, focusRingClasses } from './classNames';
 
-interface ToggleSwitchProps extends Omit<ComponentPropsWithRef<'button'>, 'onChange' | 'children' | 'role'> {
+interface ToggleSwitchProps extends Omit<ComponentPropsWithRef<'button'>, 'onChange' | 'onClick' | 'children' | 'role' | 'aria-checked'> {
   checked: boolean;
   onChange: (checked: boolean) => void;
   label: string;
