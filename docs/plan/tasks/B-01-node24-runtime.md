@@ -5,13 +5,13 @@ phase: B
 lane: infra
 criticite: haute
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: []
-touches: [backend/Dockerfile, frontend/Dockerfile, .nvmrc, backend/package.json, frontend/package.json, AGENTS.md, README.md]
+touches: [backend/Dockerfile, frontend/Dockerfile, .nvmrc, backend/package.json, frontend/package.json, backend/package-lock.json, frontend/package-lock.json, AGENTS.md, README.md, docs/plan/tasks/A-07-deps-security-patches.md]
 sources: ["08-dependencies.md §2", "07-devops-history.md §3.3", "03-security.md §11"]
-branch:
-pr:
+branch: chore/B-01-node24-runtime
+pr: "#53"
 ---
 
 ## Contexte
@@ -41,11 +41,11 @@ Calendrier Node au 2026-10-08 : 20 EOL ; 22 en maintenance jusqu'en avril 2027 ;
 
 ## Critères d'acceptation
 
-- [ ] Plus aucune occurrence de `node:20` dans le dépôt (`grep -rn "node:20" --include=Dockerfile .`).
-- [ ] `.nvmrc` présent, `engines` présent dans les deux paquets.
-- [ ] `docker compose build` réussit pour les deux services.
-- [ ] L'application démarre et le seed passe dans le conteneur backend.
-- [ ] Doc alignée (AGENTS.md, README.md).
+- [x] Plus aucune occurrence de `node:20` dans le dépôt (`grep -rn "node:20" --include=Dockerfile .`).
+- [x] `.nvmrc` présent, `engines` présent dans les deux paquets.
+- [x] `docker compose build` réussit pour les deux services.
+- [x] L'application démarre et le seed passe dans le conteneur backend.
+- [x] Doc alignée (AGENTS.md, README.md).
 
 ## Tests à ajouter ou adapter
 
@@ -61,3 +61,6 @@ Pas de test unitaire. Vérification manuelle décrite dans la PR : sortie de `do
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue et du rapport de dépendances.
+- 2026-10-10 : fait dans la PR #53. Images en `node:24.21-alpine` (Node 24.21.0, npm 11.19.0, dernière mineure publiée), `.nvmrc` à `24`, `engines.node` `>=22.13` dans les deux paquets, AGENTS.md et README.md alignés. Écarts : les deux lockfiles reçoivent seulement l'entrée `engines` de leur racine (ajoutés à `touches`), sans la normalisation de npm 11 (retrait de `magicast` côté backend, entrées `oxide-wasm32-wasi` côté frontend) ; `npm ci` passe sous npm 11.19 (image) et npm 10.9 (Node 22). Contrainte npm 10 levée par une ligne datée dans le Journal d'A-07 (fichier ajouté à `touches`), sans réécrire l'historique. Vérifications : `docker compose build`, `docker compose up` sur volumes neufs (`0_init` appliquée, seed OK, `node -v` → `v24.21.0`), connexion, carte publique, `/api/public/*` en 200. Banc de mise à jour `1.4.0,1.6.0,local` en mode conformant, layouts `friend` et `official` : OK, aucun échec inattendu. Il faut `--local-version 1.7.0` : avec la valeur par défaut (1.6.0), le banc refuse le saut `1.6.0 → local`. Sur Apple Silicon, les images `local` sont construites en `linux/arm64`. Il reste à l'humain de décider s'il garde `>=22.13` : un futur `npm install` sous npm 11 retirera l'entrée `magicast`, et `npm ci` échouera alors sous Node 22 (npm 10).
+- 2026-10-10 : suite de la revue de la PR #53 et décisions de l'humain. Écart à la tâche décidé par l'humain le 2026-10-10 : `engines.node` passe de `>=22.13` à `>=24` dans les deux `package.json` et dans l'entrée racine des deux lockfiles (aucun autre changement de lockfile). On aligne ainsi `engines` sur `.nvmrc`, la CI et les images, et on supprime le risque d'un `npm ci` cassé sous npm 10 (Node 22) quand npm 11 régénérera le lockfile backend sans l'entrée `magicast`. `npm ci --ignore-scripts` repasse dans `node:24.21-alpine` pour les deux paquets. AGENTS.md et README.md annoncent Node 24 au minimum. Revue : `node:24-alpine` n'est publiée que pour amd64, arm64 et s390x (`node:20-alpine` l'était aussi pour arm/v6 et arm/v7) ; l'humain garde Node 24, d'où la note de version ci-dessous. Le refus du chemin `1.6.0 → local` par le banc avec la valeur par défaut de `--local-version` devient la tâche D-17.
+- 2026-10-10 : Notes de version : les images backend et le stage de build frontend passent de Node 20 (fin de vie) à Node 24 LTS (`node:24.21-alpine`). Le build local (`docker compose up --build`) demande désormais un hôte 64 bits (amd64 ou arm64) : `node:24-alpine` n'est pas publiée pour l'ARM 32 bits (armv6/armv7). Les images publiées ne sont pas concernées. `breaking: false`.
