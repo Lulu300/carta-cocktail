@@ -5,13 +5,13 @@ phase: B
 lane: ci
 criticite: haute
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: []
-touches: [backend/vitest.config.ts, frontend/vitest.config.ts, .github/scripts/, .github/workflows/ci.yml]
+touches: [backend/vitest.config.ts, frontend/vitest.config.ts, .github/scripts/, .github/workflows/ci.yml, docs/plan/tasks/B-10-coverage-ratchet-up.md]
 sources: ["04-tests.md §2", "04-tests.md §3", "07-devops-history.md §3.2"]
-branch:
-pr:
+branch: chore/B-02-honest-coverage
+pr: "#52"
 ---
 
 ## Décisions validées (2026-10-08)
@@ -59,13 +59,13 @@ Hors périmètre : `tsc -b`, lint backend, audit, build Docker, `concurrency`, `
 
 ## Critères d'acceptation
 
-- [ ] Les `coverage-final.json` des deux paquets listent tous les fichiers de `src/` hors exclusions, y compris ceux sans test (à 0 %).
-- [ ] Couverture globale réelle mesurée et notée ; seuils fixés selon la règle du cliquet.
-- [ ] Sur un rapport backend réel, le script donne pour `routes/backup.ts` un taux proche (±2 points) de la colonne « % Lines » du reporter `text`.
-- [ ] Un fichier nouveau sous `src/`, sans aucun test, fait échouer le delta.
-- [ ] Base introuvable : échec explicite, code de sortie différent de 0.
-- [ ] `node --test .github/scripts/` passe en local et en CI.
-- [ ] Plus aucune interpolation `${{ github.base_ref }}` dans un `run:`.
+- [x] Les `coverage-final.json` des deux paquets listent tous les fichiers de `src/` hors exclusions, y compris ceux sans test (à 0 %).
+- [x] Couverture globale réelle mesurée et notée ; seuils fixés selon la règle du cliquet.
+- [x] Sur un rapport backend réel, le script donne pour `routes/backup.ts` un taux proche (±2 points) de la colonne « % Lines » du reporter `text`.
+- [x] Un fichier nouveau sous `src/`, sans aucun test, fait échouer le delta.
+- [x] Base introuvable : échec explicite, code de sortie différent de 0.
+- [x] `node --test .github/scripts/` passe en local et en CI. *(lancé sous la forme `node --test '.github/scripts/*.test.mjs'`, voir Journal)*
+- [x] Plus aucune interpolation `${{ github.base_ref }}` dans un `run:`.
 
 ## Tests à ajouter ou adapter
 
@@ -94,3 +94,7 @@ Vérification manuelle à décrire dans la PR : sur une branche jetable, ajouter
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : décisions validées par l'humain (voir « Décisions validées »).
+- 2026-10-10 : PR #52. Couverture avant (`origin/develop`) → après `coverage.include` (statements / branches / functions / lines). Backend : 83,36 / 75,81 / 98,38 / 84,18 → 83,16 / 75,81 / 98,38 / 83,98 (seule différence : les JSON i18n sortent du rapport). Frontend : 82,86 / 74,35 / 71,84 / 85,66 → 61,45 / **52,24** / **53,21** / 63,38 ; 11 fichiers entrent à 0 %. Seuils **non modifiés** à la demande du coordinateur : la CI frontend est rouge (branches et functions) jusqu'à la décision de l'humain. Cliquet proposé : `branches: 52`, `functions: 53`, le reste à 60 ; il manque 142 branches et 56 fonctions couvertes pour revenir à 60 %. Script : `routes/backup.ts` à 66,7 % contre 66,66 % dans « % Lines » (ancienne méthode : 100 %). Branche jetable non poussée avec `backend/src/utils/untestedDiscount.ts` : delta à 0 %, code de sortie 1. Point 7 : lignes seulement, documenté en tête de `delta-coverage-lib.mjs`. Écarts : `node --test <dossier>` ne marche plus depuis Node 22 (les arguments sont des globs), d'où `node --test '.github/scripts/*.test.mjs'` ; les `--ignore` sont relatifs à la racine du dépôt, comme `--scope` ; tests de bout en bout du CLI sur un dépôt git temporaire, en plus des tests demandés. Reste à l'humain : choisir entre cliquet, tests d'abord (E-13) ou exclusions, puis cocher le critère des seuils. Les PR ouvertes en même temps (B-01, C-03, E-03) verront leur delta recalculé après le merge.
+- 2026-10-10 : décision de l'humain : option (a), cliquet. Seuils fixés dans `frontend/vitest.config.ts` au chiffre mesuré arrondi à l'entier inférieur : `branches: 52` (52,24 %) et `functions: 53` (53,21 %), avec un commentaire qui renvoie à B-10. `statements` et `lines` restent à 60, backend inchangé. Valeurs de départ notées dans le Journal de B-10 (fichier ajouté au périmètre de cette PR pour cette seule ligne).
+- 2026-10-10 : corrections après la revue indépendante (sur 4108326). (1) Chemins avec espace ou caractères spéciaux : `git diff -c core.quotePath=false`, TAB final retiré, chemins entre guillemets décodés (échappements C), échec en code 1 si le décodage est impossible ; tests unitaires et test de bout en bout avec `backend/src/with space.ts` et `backend/src/quote"d.ts`. (2) Le test « +++ dans un hunk » utilise `+++ b/evil.ts`. (3) Le seuil est comparé sur le ratio exact (`covered * 100 >= threshold * changed`) ; le pourcentage affiché est arrondi à l'inférieur (399/499 s'affiche 79,9 % et échoue). `routes/backup.ts` s'affiche donc 66,6 % (reporter : 66,66 %). (4) Normalisation du `/` final de `--scope` déplacée dans `computeDelta` et testée. 38 tests, 100 % des lignes des deux scripts.
+- 2026-10-10 : revue approuvée sur e2f034b. Rebase sur `develop` (8c2af71, après le merge de C-03, B-01 et E-03). E-03 ajoute du code testé : la couverture frontend remesurée vaut 62,82 / 54,62 / 54,74 / 64,71 (statements / branches / functions / lines ; branches 1051/1924, functions 467/853). Le cliquet s'applique au chiffre mesuré au moment du merge : seuils frontend relevés à `branches: 54` et `functions: 54` (au lieu de 52 et 53), `statements` et `lines` à 60, backend inchangé. Il manque 104 branches et 45 fonctions couvertes pour revenir à 60 %. Journal de B-10 mis à jour avec ces valeurs. Règle 4 : `docs/plan/tasks/B-10-coverage-ratchet-up.md` ajouté aux `touches` (une ligne de Journal pour noter le point de départ du cliquet).

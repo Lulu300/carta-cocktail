@@ -4,14 +4,15 @@ import {
   prisma, seedCategory, seedUnit, seedBottle, seedIngredient,
 } from '../test/helpers';
 import { calculateCocktailAvailability, calculateAllCocktailsAvailability } from './availabilityService';
+import { NotFoundError } from '../errors';
 
 beforeAll(async () => { await setupTestDatabase(); });
 afterAll(async () => { await teardownTestDatabase(); });
 beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
 
 describe('calculateCocktailAvailability', () => {
-  it('should throw for non-existent cocktail', async () => {
-    await expect(calculateCocktailAvailability(9999)).rejects.toThrow('Cocktail not found');
+  it('should throw a NotFoundError for non-existent cocktail', async () => {
+    await expect(calculateCocktailAvailability(9999)).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it('should return 999 maxServings for cocktail with no ingredients', async () => {

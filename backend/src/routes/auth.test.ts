@@ -22,11 +22,13 @@ describe('POST /api/auth/login', () => {
   it('should return 401 for non-existent email', async () => {
     const res = await request.post('/api/auth/login').send({ email: 'nobody@test.local', password: 'wrong' });
     expect(res.status).toBe(401);
+    expect(res.body.error).toBe('Invalid email or password');
   });
 
   it('should return 401 for wrong password', async () => {
     const res = await request.post('/api/auth/login').send({ email: 'admin@test.local', password: 'wrongpass' });
     expect(res.status).toBe(401);
+    expect(res.body.error).toBe('Invalid email or password');
   });
 
   it('should return 200 with token and user for valid credentials', async () => {

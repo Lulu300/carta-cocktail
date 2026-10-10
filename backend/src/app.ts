@@ -6,6 +6,7 @@ import path from 'path';
 import { config } from './config';
 import { i18nMiddleware } from './i18n';
 import { authMiddleware } from './middleware/auth';
+import { apiNotFoundHandler, errorHandler } from './middleware/errorHandler';
 import authRoutes from './routes/auth';
 import categoryRoutes from './routes/categories';
 import categoryTypeRoutes from './routes/categoryTypes';
@@ -28,8 +29,9 @@ const app = express();
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors());
 app.use(morgan('dev'));
-app.use(express.json());
+// i18n first, so that body parsing errors are answered in the client's language
 app.use(i18nMiddleware);
+app.use(express.json());
 
 // Static files for uploads
 app.use('/uploads', express.static(config.uploadDir));
@@ -52,5 +54,10 @@ app.use('/api/shortages', authMiddleware, shortageRoutes);
 app.use('/api/availability', authMiddleware, availabilityRoutes);
 app.use('/api/settings', authMiddleware, settingsRoutes);
 app.use('/api/backup', authMiddleware, backupRoutes);
+
+// Unknown API paths answer JSON, not Express's HTML page
+app.use('/api', apiNotFoundHandler);
+// Must stay last: receives every error thrown or rejected by the routes above
+app.use(errorHandler);
 
 export default app;

@@ -117,6 +117,7 @@ Modèle fixé par D-11, appliqué par `.github/workflows/release.yml` (détails 
 - **Pré-version** `vX.Y.Z-rc.N`, taguée sur `develop` : images `:X.Y.Z-rc.N` sans toucher `latest`, GitHub Release marquée pre-release.
 - **Version finale** `vX.Y.Z`, taguée sur `main` après le merge `develop` → `main` : images `:X.Y.Z` et `latest`, release normale.
 - **Notes d'abord** : `docs/releases/vX.Y.Z.md` (copie de `docs/releases/TEMPLATE.md`) et la section de `UPGRADING.md` sont mergées sur `develop` avant le premier tag. Une pré-version utilise le fichier de sa version cible, sauf si `docs/releases/vX.Y.Z-rc.N.md` existe. Le coordinateur les rédige à partir des sections « Required actions » des PR et des lignes « Notes de version » des Journaux (règle 9).
+- **Banc de mise à jour avant la version finale** : avant de taguer `vX.Y.Z`, passer le banc `scripts/upgrade-test/` sur la dernière pré-version, depuis la plus ancienne version encore en production, avec les layouts `friend` et `official`, en mode naïf et conforme (`--path 1.4.0,…,X.Y.Z-rc.N`). Chaque échec inattendu est corrigé (nouvelle pré-version) ou ajouté aux notes de version avant le tag. Le jeu d'essai est fourni par l'humain et ne va jamais dans le dépôt (voir `scripts/upgrade-test/README.md`).
 - **Pousser la branche avant le tag** : le job `verify` vérifie que le commit du tag est atteignable depuis `origin/main` (version finale) ou `origin/develop` (pré-version), et que le fichier de notes existe et a un front matter valide. Sinon il échoue avant tout push d'image.
 - Un tag refusé par `verify` n'a rien publié : le supprimer (local et distant), corriger, puis le reposer.
 - Un tag qui a publié une image n'est jamais déplacé ni repoussé : en cas d'échec après le push d'une image, corriger puis taguer la pré-version suivante (`-rc.N+1`) pour une pré-version, ou la version suivante (ex. `v1.5.1`) pour une version finale.
@@ -124,7 +125,7 @@ Modèle fixé par D-11, appliqué par `.github/workflows/release.yml` (détails 
 
 ## Décisions validées
 
-Décisions prises par l'humain le 2026-10-08, complétées le 2026-10-09 (lignes datées). Chaque tâche concernée les reprend en tête, dans une section « Décisions validées ». Un agent ne les remet pas en cause sans le signaler dans sa PR.
+Décisions prises par l'humain le 2026-10-08, complétées le 2026-10-09 et le 2026-10-10 (lignes datées). Chaque tâche concernée les reprend en tête, dans une section « Décisions validées ». Un agent ne les remet pas en cause sans le signaler dans sa PR.
 
 | Sujet | Décision | Tâches |
 |---|---|---|
@@ -150,6 +151,8 @@ Décisions prises par l'humain le 2026-10-08, complétées le 2026-10-09 (lignes
 | Releases (2026-10-09) | Travail sur `develop`. Pré-versions `vX.Y.Z-rc.N` **uniquement sur `develop`** : images versionnées sans `latest`, GitHub Release marquée pre-release. Versions finales taguées sur `main`, publiées de temps en temps. Chaque release a un résumé, un changelog détaillé et les actions obligatoires ; notes en anglais. Pas de tag jetable publié : le pipeline se teste avec `v1.5.0-rc.1` sur `develop` puis `v1.5.0` sur `main` (accord humain donné pour cette séquence). La règle de branche se vérifie avec un tag posé sur une branche jetable, qui doit échouer avant tout push d'image et qu'on supprime ensuite | D-11, D-12, D-05 |
 | Rédaction des notes (2026-10-09) | Les tâches ne touchent ni `docs/releases/` ni `UPGRADING.md`. Une PR qui impose une action ou un changement cassant a une section « Required actions » dans sa description et une ligne « Notes de version » dans son Journal ; le coordinateur les reprend au moment de la release (règle 9 ci-dessus) | D-11, D-12, C-01, C-06, D-01, D-02, D-03, F-09 |
 | Guide de mise à jour (2026-10-09) | Enchaînement des actions obligatoires de toutes les versions sautées, dans `UPGRADING.md` et si possible dans l'instance | D-11, F-09 |
+| Version de Node (2026-10-10) | Node 24 LTS pour les images, la CI et le développement ; `engines.node` vaut `>=24` dans les deux paquets. Les builds locaux des images demandent un hôte 64 bits (`node:24-alpine` n'existe pas en ARM 32 bits, et v1.7.0 ne tourne plus en ARM 32 bits). Images de base épinglées sur une mineure (`node:24.21-alpine`) | B-01, D-01, D-02 |
+| Port du frontend (2026-10-10) | Le conteneur frontend écoute sur 8080 (nginx non-root, compatible Docker rootless et Podman). Changement cassant : `breaking: true`, un compose personnalisé passe de `"<port>:80"` à `"<port>:8080"` | D-02, D-03, D-09 |
 
 ## Ajouter ou modifier une tâche
 

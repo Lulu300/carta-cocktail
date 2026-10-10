@@ -84,27 +84,29 @@ backend/
 
 ### Route Pattern
 
-All routes follow this structure:
+Handlers never catch errors to answer them. Express 5 forwards rejected promises to
+`errorHandler` (`src/middleware/errorHandler.ts`), which maps them to `{ error, details? }`:
 
 ```typescript
 import { Router } from 'express';
 import { prisma } from '../lib/prisma';
+import { NotFoundError } from '../errors';
 
 const router = Router();
 
 // Never create a PrismaClient: import the shared one from src/lib/prisma.ts
-// Routes use async handlers with try/catch
-router.get('/', async (req, res) => {
-  try {
-    const items = await prisma.model.findMany();
-    res.json(items);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch' });
-  }
+router.get('/:id', async (req, res) => {
+  const item = await prisma.model.findUnique({ where: { id: parseInt(String(req.params.id)) } });
+  if (!item) throw new NotFoundError();
+  res.json(item);
 });
 
 export default router;
 ```
+
+- Throw the classes of `src/errors.ts` (`BadRequestError`, `NotFoundError`, `ConflictError`, `ForbiddenError`…) with an i18n key.
+- Let Prisma errors propagate: the middleware maps P2025 to 404, P2002 to 409, P2003 to 409 on DELETE (400 otherwise) and validation errors (NaN ids) to 400.
+- Keep a local handler only for callbacks outside the handler's promise (stream `error` events, multer `destination`): Express never sees those errors.
 
 ### Auth Pattern
 

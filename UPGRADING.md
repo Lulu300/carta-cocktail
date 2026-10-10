@@ -14,9 +14,25 @@ This guide lists the actions required to upgrade an existing instance, version b
 
 Pre-releases (`vX.Y.Z-rc.N`) are not listed: they use the section of their target version `vX.Y.Z`. The detailed changes of each version are in its [GitHub Release](https://github.com/Lulu300/carta-cocktail/releases) and in [`docs/releases/`](docs/releases/).
 
-We recommend pinning the images to a version (`:1.6.0`) instead of `:latest`, so that an upgrade only happens when you have read this guide.
+We recommend pinning the images to a version (`:1.7.0`) instead of `:latest`, so that an upgrade only happens when you have read this guide.
 
 The commands below assume the default `docker-compose.prod.yml`, run from its folder. Adapt the file name and the service name `carta-cocktail-backend` if yours differ.
+
+## v1.7.0
+
+No required action with the published images. `docker-compose.prod.yml` has not changed since v1.5.0: pin both images to `:1.7.0` (`:1.7.0-rc.N` to test a pre-release), then pull and restart. The images now run on Node 24 LTS, and API errors get a JSON answer with the right HTTP status (400, 404, 409, 413) instead of 500 or an HTML page. **v1.7.0 does not run on 32-bit ARM hosts** (step 1). Release notes: [`docs/releases/v1.7.0.md`](docs/releases/v1.7.0.md).
+
+Instances older than v1.6.0: upgrade to v1.6.0 first, following the [v1.6.0 section](#v160) (and the sections before it), check that it works, then apply this one.
+
+### Before upgrading
+
+1. **Only on a 32-bit ARM host.** Check the architecture Docker runs with:
+
+   ```bash
+   docker version --format '{{.Server.Arch}}'
+   ```
+
+   If it prints `arm` (armv6/armv7, for example Raspberry Pi OS 32-bit, even on a Raspberry Pi 4 or 5 where `uname -m` prints `aarch64`): v1.7.0 does not run on 32-bit ARM. The `node:24-alpine` base image cannot be pulled for this platform, so the build stops (`no match for platform in manifest`, or `no matching manifest for linux/arm/v7` with the legacy builder), and the published images are amd64 only. Stay on v1.6.0, or move the instance to a 64-bit system (amd64, or arm64, for example Raspberry Pi OS 64-bit on a Raspberry Pi 3 or newer) and build there. The build fails before any container is replaced, so the running v1.6.0 instance keeps working.
 
 ## v1.6.0
 

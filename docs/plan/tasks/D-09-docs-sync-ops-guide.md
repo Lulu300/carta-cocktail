@@ -14,6 +14,10 @@ branch:
 pr:
 ---
 
+## Décisions validées (2026-10-10)
+
+- **Port du frontend** : le conteneur frontend écoute sur 8080 (D-02, changement cassant).
+
 ## Contexte
 
 Les `AGENTS.md` sont lus par chaque agent avant une tâche : une affirmation fausse y produit du code faux. Le README est la seule doc d'installation pour qui déploie l'application. Après les phases A, C et D, la procédure d'exploitation change (secrets obligatoires, migrations, volumes, healthchecks, versions épinglées). Il faut un guide d'exploitation écrit pour le NAS.

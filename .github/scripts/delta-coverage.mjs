@@ -3,217 +3,120 @@
 /**
  * Delta Coverage Check
  *
- * Compares coverage data (coverage-final.json) against the git diff
- * to ensure that new/modified lines in a PR meet a minimum coverage threshold.
+ * Fails when less than `--threshold` percent of the lines added or modified
+ * since `--base` are covered by tests. Only lines are measured (Istanbul
+ * "lines" semantics), not branches: see delta-coverage-lib.mjs.
  *
  * Usage:
- *   node delta-coverage.mjs <coverage-json-path> <threshold> [base-ref]
+ *   node delta-coverage.mjs --coverage <coverage-final.json> --threshold 80 \
+ *     --base <git ref> --scope <repo-relative folder> [--ignore <glob>]...
  *
- * Example:
- *   node delta-coverage.mjs frontend/coverage/coverage-final.json 80 origin/main
+ * Example (from the backend folder):
+ *   node ../.github/scripts/delta-coverage.mjs --coverage coverage/coverage-final.json \
+ *     --threshold 80 --base origin/develop --scope backend/src/ --ignore 'backend/src/index.ts'
+ *
+ * Exit codes: 0 when the threshold is met or nothing measurable changed,
+ * 1 on failure (threshold missed, missing base ref, missing report, bad arguments).
  */
 
-import { readFileSync, existsSync } from 'fs';
-import { execSync } from 'child_process';
-import { resolve, relative } from 'path';
+import { readFileSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { resolve } from 'node:path';
+import { parseArgs } from 'node:util';
+import { parseUnifiedDiff, computeDelta, formatReport, meetsThreshold } from './delta-coverage-lib.mjs';
 
-const [coveragePath, thresholdStr = '80', baseRef = 'origin/main'] = process.argv.slice(2);
-
-if (!coveragePath) {
-  console.error('Usage: delta-coverage.mjs <coverage-json-path> <threshold> [base-ref]');
+function fail(message) {
+  console.error(message);
   process.exit(1);
 }
 
-const THRESHOLD = Number(thresholdStr);
-const ROOT = execSync('git rev-parse --show-toplevel', { encoding: 'utf-8' }).trim();
-
-// ── Load coverage data ──────────────────────────────────────────────
-const absPath = resolve(coveragePath);
-if (!existsSync(absPath)) {
-  console.error(`Coverage file not found: ${absPath}`);
-  process.exit(1);
+function git(args) {
+  return execFileSync('git', args, { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 });
 }
 
-const coverage = JSON.parse(readFileSync(absPath, 'utf-8'));
+function readOptions() {
+  const { values } = parseArgs({
+    options: {
+      coverage: { type: 'string' },
+      threshold: { type: 'string', default: '80' },
+      base: { type: 'string' },
+      scope: { type: 'string' },
+      ignore: { type: 'string', multiple: true, default: [] },
+    },
+  });
+  if (!values.coverage || !values.base || !values.scope) {
+    fail('Usage: delta-coverage.mjs --coverage <path> --threshold <pct> --base <ref> --scope <dir> [--ignore <glob>]...');
+  }
+  const threshold = Number(values.threshold);
+  if (!Number.isFinite(threshold) || threshold < 0 || threshold > 100) {
+    fail(`Invalid --threshold: ${values.threshold}`);
+  }
+  return { ...values, threshold };
+}
 
-// ── Get changed lines from git diff ────────────────────────────────
-function getChangedLines() {
-  // --unified=0 gives us only the changed lines with no context
-  // --diff-filter=ACMR excludes deleted files
-  let diff;
+function assertBaseExists(base) {
   try {
-    diff = execSync(
-      `git diff --unified=0 --diff-filter=ACMR ${baseRef}...HEAD -- '*.ts' '*.tsx'`,
-      { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 }
-    );
+    git(['rev-parse', '--verify', '--quiet', `${base}^{commit}`]);
   } catch {
-    // If the base ref doesn't exist (first PR), compare against HEAD~1
-    try {
-      diff = execSync(
-        `git diff --unified=0 --diff-filter=ACMR HEAD~1...HEAD -- '*.ts' '*.tsx'`,
-        { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 }
-      );
-    } catch {
-      console.log('No base commit to compare against. Skipping delta coverage.');
-      process.exit(0);
-    }
-  }
-
-  // Parse unified diff to extract file paths and added line numbers
-  const changedLines = new Map(); // filePath -> Set<lineNumber>
-  let currentFile = null;
-
-  for (const line of diff.split('\n')) {
-    // Match file header: +++ b/frontend/src/foo.ts
-    const fileMatch = line.match(/^\+\+\+ b\/(.+)$/);
-    if (fileMatch) {
-      currentFile = fileMatch[1];
-      continue;
-    }
-
-    // Match hunk header: @@ -old,count +new,count @@
-    const hunkMatch = line.match(/^@@ .+ \+(\d+)(?:,(\d+))? @@/);
-    if (hunkMatch && currentFile) {
-      const start = Number(hunkMatch[1]);
-      const count = hunkMatch[2] !== undefined ? Number(hunkMatch[2]) : 1;
-      if (count === 0) continue; // Pure deletion hunk
-
-      if (!changedLines.has(currentFile)) {
-        changedLines.set(currentFile, new Set());
-      }
-      const lines = changedLines.get(currentFile);
-      for (let i = start; i < start + count; i++) {
-        lines.add(i);
-      }
-    }
-  }
-
-  return changedLines;
-}
-
-// ── Check coverage for changed lines ────────────────────────────────
-const changedLines = getChangedLines();
-
-if (changedLines.size === 0) {
-  console.log('No changed source files detected. Delta coverage: N/A');
-  process.exit(0);
-}
-
-// Build a map of coverage file paths (coverage JSON uses absolute paths)
-const coverageByRelPath = new Map();
-for (const [absFilePath, fileCov] of Object.entries(coverage)) {
-  const rel = relative(ROOT, absFilePath);
-  coverageByRelPath.set(rel, fileCov);
-}
-
-let totalChanged = 0;
-let totalCovered = 0;
-const fileResults = [];
-
-for (const [filePath, lineNumbers] of changedLines) {
-  // Skip test files
-  if (filePath.includes('.test.') || filePath.includes('/test/')) continue;
-
-  const fileCov = coverageByRelPath.get(filePath);
-  if (!fileCov) {
-    // File has no coverage data (might be excluded from coverage)
-    continue;
-  }
-
-  // Build a set of covered lines from statement map
-  const coveredLines = new Set();
-  const { statementMap, s } = fileCov;
-
-  for (const [stmtId, loc] of Object.entries(statementMap)) {
-    const count = s[stmtId];
-    if (count > 0) {
-      for (let line = loc.start.line; line <= loc.end.line; line++) {
-        coveredLines.add(line);
-      }
-    }
-  }
-
-  // Count changed lines that are covered
-  let fileTotalChanged = 0;
-  let fileTotalCovered = 0;
-
-  for (const line of lineNumbers) {
-    // Only count lines that exist in statement map (skip comments, blank lines, imports)
-    const isExecutable = Object.values(statementMap).some(
-      loc => line >= loc.start.line && line <= loc.end.line
+    fail(
+      `Base ref "${base}" not found. Fetch it first (actions/checkout needs fetch-depth: 0). ` +
+        'Delta coverage cannot be computed without a base, so the check fails.',
     );
-    if (!isExecutable) continue;
-
-    fileTotalChanged++;
-    if (coveredLines.has(line)) {
-      fileTotalCovered++;
-    }
-  }
-
-  if (fileTotalChanged > 0) {
-    const pct = ((fileTotalCovered / fileTotalChanged) * 100).toFixed(1);
-    fileResults.push({
-      file: filePath,
-      changed: fileTotalChanged,
-      covered: fileTotalCovered,
-      pct: Number(pct),
-    });
-    totalChanged += fileTotalChanged;
-    totalCovered += fileTotalCovered;
   }
 }
 
-// ── Report ──────────────────────────────────────────────────────────
-if (totalChanged === 0) {
-  console.log('No executable changed lines found in coverage scope. Delta coverage: N/A');
-  process.exit(0);
+function changedLinesSince(base, scope, root) {
+  // Fixed prefixes so a user's diff.noprefix / diff.mnemonicPrefix config cannot
+  // break parsing, and raw UTF-8 paths instead of C-quoted octal escapes.
+  const diff = execFileSync(
+    'git',
+    [
+      '-c', 'core.quotePath=false',
+      'diff', '--unified=0', '--no-color', '--no-ext-diff', '--find-renames',
+      '--src-prefix=a/', '--dst-prefix=b/', '--diff-filter=ACMR',
+      `${base}...HEAD`, '--', scope,
+    ],
+    { cwd: root, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 },
+  );
+  return parseUnifiedDiff(diff);
 }
 
-const overallPct = ((totalCovered / totalChanged) * 100).toFixed(1);
+function main() {
+  const options = readOptions();
+  const root = git(['rev-parse', '--show-toplevel']).trim();
 
-console.log('\n=== Delta Coverage Report ===\n');
-console.log(`Threshold: ${THRESHOLD}%\n`);
+  const coveragePath = resolve(options.coverage);
+  if (!existsSync(coveragePath)) fail(`Coverage file not found: ${coveragePath}`);
+  const coverage = JSON.parse(readFileSync(coveragePath, 'utf-8'));
 
-// Sort by coverage ascending (worst first)
-fileResults.sort((a, b) => a.pct - b.pct);
+  assertBaseExists(options.base);
+  const changedLines = changedLinesSince(options.base, options.scope, root);
+  const result = computeDelta({
+    changedLines,
+    coverage,
+    root,
+    scope: options.scope,
+    ignore: options.ignore,
+  });
 
-const COL_FILE = 50;
-const COL_NUM = 10;
+  if (result.pct === null) {
+    console.log(`No executable changed lines under ${options.scope}. Delta coverage: N/A`);
+    return;
+  }
 
-console.log(
-  'File'.padEnd(COL_FILE) +
-  'Changed'.padStart(COL_NUM) +
-  'Covered'.padStart(COL_NUM) +
-  'Delta %'.padStart(COL_NUM)
-);
-console.log('-'.repeat(COL_FILE + COL_NUM * 3));
+  console.log('\n=== Delta Coverage Report ===\n');
+  console.log(formatReport(result, options.threshold));
+  console.log('');
 
-for (const r of fileResults) {
-  const status = r.pct >= THRESHOLD ? ' ' : ' !!';
-  console.log(
-    r.file.padEnd(COL_FILE) +
-    String(r.changed).padStart(COL_NUM) +
-    String(r.covered).padStart(COL_NUM) +
-    `${r.pct}%`.padStart(COL_NUM) +
-    status
-  );
+  if (!meetsThreshold(result, options.threshold)) {
+    fail(`Delta coverage ${result.pct}% is below the ${options.threshold}% threshold.`);
+  }
+  console.log(`Delta coverage ${result.pct}% meets the ${options.threshold}% threshold.`);
 }
 
-console.log('-'.repeat(COL_FILE + COL_NUM * 3));
-console.log(
-  'TOTAL'.padEnd(COL_FILE) +
-  String(totalChanged).padStart(COL_NUM) +
-  String(totalCovered).padStart(COL_NUM) +
-  `${overallPct}%`.padStart(COL_NUM)
-);
-
-console.log('');
-
-if (Number(overallPct) < THRESHOLD) {
-  console.error(
-    `Delta coverage ${overallPct}% is below the ${THRESHOLD}% threshold.`
-  );
-  process.exit(1);
-} else {
-  console.log(`Delta coverage ${overallPct}% meets the ${THRESHOLD}% threshold.`);
+try {
+  main();
+} catch (error) {
+  // An unparseable diff must fail the check, never skip files silently.
+  fail(error.message);
 }

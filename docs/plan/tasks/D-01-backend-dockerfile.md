@@ -14,6 +14,10 @@ branch:
 pr:
 ---
 
+## Décisions validées (2026-10-10)
+
+- **Version de Node** : Node 24 LTS, image de base épinglée sur une mineure comme l'a fait B-01 (`node:24.21-alpine` au 2026-10-10, ou la dernière mineure 24.x publiée au moment du travail). Remplacer les `node:24-alpine` flottants des exemples ci-dessous. Les builds locaux demandent un hôte 64 bits (pas d'image ARM 32 bits).
+
 ## Contexte
 
 L'image backend publiée sur ghcr.io est celle qui tourne sur le NAS. Elle embarque aujourd'hui tout l'outillage de dev, tourne en root et dépend de devDependencies pour démarrer. Un build local copie en plus le `node_modules` macOS de l'hôte et le `.env` dans l'image. Cette tâche produit une image plus petite, non-root, reproductible, sans changer le comportement fonctionnel.

@@ -8,11 +8,16 @@ effort: S
 status: todo
 owner: agent
 depends_on: [A-06, B-01]
-touches: [frontend/Dockerfile, frontend/nginx.conf.template, frontend/security-headers.conf, docker-compose.yml, docker-compose.prod.yml]
+touches: [frontend/Dockerfile, frontend/nginx.conf.template, frontend/security-headers.conf, docker-compose.yml, docker-compose.prod.yml, scripts/upgrade-test/layouts/, scripts/upgrade-test/lib/, scripts/upgrade-test/test/]
 sources: ["03-security.md §8", "07-devops-history.md §2.8"]
 branch:
 pr:
 ---
+
+## Décisions validées (2026-10-10)
+
+- **Port 8080** : le conteneur frontend écoute sur 8080. L'alternative `listen 80` est écartée (elle ne marche ni sous Docker rootless ni sous Podman). Changement cassant, `breaking: true` dans les notes de la version qui l'embarque (v1.8.0 au plus tôt).
+- **Banc de mise à jour** : le banc publie et lit le port 80 du conteneur frontend (`127.0.0.1::80` dans les `compose-1.5.0.yml`, et la constante `80` dans `lib/bench.mjs`, qui appelle `docker compose port carta-cocktail-frontend 80`). D-02 adapte le banc (étape 6) ; le hook `hooks/1.8.0.mjs` reste au coordinateur (notes de release, règle 9).
 
 ## Contexte
 
@@ -67,6 +72,10 @@ nginx sert le HTML de l'admin et de la carte publique. helmet ne protège que le
    ```
    Prendre la dernière version stable publiée sur Docker Hub au moment du travail (1.28 est un exemple). Supprimer la ligne `CMD`, celle de l'image de base suffit.
 5. `docker-compose.yml` et `docker-compose.prod.yml` : `ports: - "80:8080"` pour le frontend.
+6. Banc de mise à jour (`scripts/upgrade-test/`, sauf `hooks/`) :
+   - ajouter une génération `compose-1.8.0.yml` dans `layouts/friend/` et `layouts/official/`, identique à `compose-1.5.0.yml` sauf le port du conteneur frontend (`127.0.0.1::8080`). Une génération est simplement le fichier `compose-<génération>.yml`, chargé par son nom (`lib/instance.mjs`) ;
+   - lire le port du conteneur frontend dans la génération de compose courante de l'instance, au lieu de la constante `80` de `lib/bench.mjs` (par exemple une table génération → port dans chaque `layout.mjs`, ou une lecture du gabarit), avec un test unitaire dans `test/`. Placer aussi la ligne « photos servies par le nginx du frontend » de `checkImages` (`lib/checks.mjs`, groupe `images`) dans son propre groupe, `frontendImages`, et, dans `allowedFailures` (`lib/expectations.mjs`), autoriser `frontendImages` chaque fois que `images` l'est, avec la même raison (des photos que le backend ne sert pas n'arrivent pas non plus à nginx) ; ajouter un test unitaire. Ainsi `naiveMayFail` peut viser ce que casse le port 8080 sans masquer un échec des photos servies par le backend. En mode conforme, `updateCompose` passe à `1.8.0` et le banc lit 8080 ; en mode naïf, la génération reste `1.5.0` (port 80) avec une image qui écoute sur 8080 : les contrôles du frontend doivent alors être rapportés en échec, sans faire planter le run ;
+   - vérifier avec un hook temporaire `hooks/1.8.0.mjs` **non commité**, qui contient `updateCompose` vers `1.8.0` **et** les entrées `naiveMayFail` que le vrai hook devra contenir, avec `--local-version 1.8.0`. Indiquer dans la PR ce que le vrai hook devra contenir, en particulier les entrées `naiveMayFail` pour les contrôles du frontend et des photos servies par nginx.
 
 ## Critères d'acceptation
 
@@ -76,6 +85,7 @@ nginx sert le HTML de l'admin et de la carte publique. helmet ne protège que le
 - [ ] `docker compose exec carta-cocktail-frontend id -u` renvoie un uid différent de 0.
 - [ ] `docker compose up -d --force-recreate carta-cocktail-backend` puis `curl http://localhost/api/public/menus` : 200 sans redémarrer nginx.
 - [ ] Le Dockerfile n'utilise plus de tag flottant.
+- [ ] Banc, avec le hook temporaire `1.8.0` non commité : `--path 1.4.0,1.6.0,local --local-version 1.8.0 --mode both`, layouts `friend` et `official`. En mode conforme, aucun échec inattendu, et le frontend et les photos sont servis par nginx. En mode naïf, aucun échec inattendu ; par rapport au même run sans D-02, les seuls nouveaux échecs (attendus) sont ceux des groupes `frontend` et `frontendImages`, couverts par le `naiveMayFail` du hook 1.8.0. Avant le changement de port, après le regroupement seul, un run naïf du chemin existant (sans hook 1.8.0) donne le même résultat que sur `develop`. `node --test scripts/upgrade-test/test/*.test.mjs` passe.
 
 ## Tests à ajouter ou adapter
 
@@ -86,7 +96,7 @@ nginx sert le HTML de l'admin et de la carte publique. helmet ne protège que le
 ## Points d'attention
 
 - Changement cassant. Le conteneur écoute sur 8080. Un utilisateur qui a son propre compose avec `"80:80"` perd l'accès après mise à jour de `:latest`. À annoncer dans les notes de version (point suivant) et dans D-09.
-- **Notes de version** (règle de D-11 : la PR ne touche ni `docs/releases/` ni `UPGRADING.md`). `breaking: true`. La description de la PR a une section « Required actions » et le Journal une ligne « Notes de version ». Actions attendues : *before* — dans un compose personnalisé, remplacer le mapping `"<port>:80"` du frontend par `"<port>:8080"` (les compose du dépôt sont déjà à jour) ; *after* — vérifier que la carte publique et l'admin répondent, et qu'une restauration de backup passe toujours. Épinglage recommandé : `:<version>` avant D-05, `:<majeure>.<mineure>` ensuite. Alternative à confirmer : rester sur `listen 80`, qui fonctionne en non-root avec Docker ≥ 20.10 (sysctl `ip_unprivileged_port_start=0` par défaut), mais pas sous Docker rootless ni Podman.
+- **Notes de version** (règle de D-11 : la PR ne touche ni `docs/releases/` ni `UPGRADING.md`). `breaking: true`. La description de la PR a une section « Required actions » et le Journal une ligne « Notes de version ». Actions attendues : *before* — dans un compose personnalisé, remplacer le mapping `"<port>:80"` du frontend par `"<port>:8080"` (les compose du dépôt sont déjà à jour) ; *after* — vérifier que la carte publique et l'admin répondent, et qu'une restauration de backup passe toujours. Épinglage recommandé : `:<version>` avant D-05, `:<majeure>.<mineure>` ensuite. Alternative écartée le 2026-10-10 : rester sur `listen 80`, qui fonctionne en non-root avec Docker ≥ 20.10 (sysctl `ip_unprivileged_port_start=0` par défaut), mais pas sous Docker rootless ni Podman.
 - `touches` complété : `frontend/security-headers.conf`, `docker-compose.yml`, `docker-compose.prod.yml`. Ces deux compose sont aussi modifiés par A-01, A-04 et D-03 : enchaîner les PR.
 - `X-Frame-Options: DENY` et `frame-ancestors 'none'` empêchent d'intégrer la carte publique dans un site tiers. Si le bar veut l'intégrer, il faudra une exception sur `/menu/`.
 - Relevé en revue de A-06 : la `location = /api/backup/import` garde `client_max_body_size 512m`, `proxy_request_buffering off` et ses délais ; seul son `proxy_pass` change. Tester une restauration de backup après la bascule (`curl -F file=@backup.zip …/api/backup/import`, attendu 401 sans token, pas 404 ni 502).
@@ -97,3 +107,4 @@ nginx sert le HTML de l'admin et de la carte publique. helmet ne protège que le
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : suivi des revues de la phase A. Étape 3 complétée : `location = /api/backup/import` (A-06) passe aussi à `proxy_pass $backend` sans URI, conseil `location ^~ /assets/` si une regex est ajoutée.
 - 2026-10-09 : point d'attention « Notes de version » (règle de D-11 décidée le 2026-10-09) : `breaking: true`, actions attendues, épinglage recommandé.
+- 2026-10-10 : décision de l'humain, port 8080 (voir « Décisions validées ») ; `scripts/upgrade-test/layouts/` ajouté à `touches` pour la nouvelle génération de compose du banc.
