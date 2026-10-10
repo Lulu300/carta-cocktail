@@ -11,8 +11,10 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "tsx prisma/seed.ts",
-    "db:push": "prisma db push"
+    "db:deploy": "prisma migrate deploy",
+    "db:status": "prisma migrate status",
+    "db:check": "prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --shadow-database-url file::memory: --exit-code",
+    "db:seed": "tsx prisma/seed.ts"
   },
   "keywords": [],
   "author": "",

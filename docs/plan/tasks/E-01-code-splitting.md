@@ -5,13 +5,13 @@ phase: E
 lane: frontend
 criticite: haute
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [A-10]
-touches: [frontend/src/App.tsx, frontend/vite.config.ts, frontend/src/components/import/ImportStepUpload.tsx, frontend/src/services/exportZip.ts]
+touches: [frontend/src/App.tsx, frontend/vite.config.ts, frontend/src/components/import/ImportStepUpload.tsx, frontend/src/services/exportZip.ts, frontend/src/main.tsx, frontend/src/utils/chunkReload.ts]
 sources: ["06-frontend-ux-perf.md §0", "06-frontend-ux-perf.md §1"]
-branch:
-pr:
+branch: feature/E-01-code-splitting
+pr: https://github.com/Lulu300/carta-cocktail/pull/43
 ---
 
 ## Contexte
@@ -64,13 +64,13 @@ Un invité qui scanne le QR code de la carte télécharge aujourd'hui toute l'ap
 
 ## Critères d'acceptation
 
-- [ ] `npx vite build` ne produit plus l'avertissement « chunks larger than 500 kB ».
-- [ ] Le JS chargé sur `/menu/:slug` (entrée + chunks vendor) pèse au plus 120 kB gzip. Mesure reportée dans le Journal (avant : 167,7 kB).
-- [ ] `jszip` n'apparaît dans aucun chunk chargé par `/`, `/menu/:slug` ou `/menu/:slug/cocktail/:id` (vérifier dans l'onglet Réseau ou avec `grep -l JSZip dist/assets/*.js`).
-- [ ] Un chunk séparé existe pour chaque page admin et pour `LoginPage`.
-- [ ] Sur `/menu/:slug`, l'onglet Réseau ne montre aucune requête vers un chunk admin.
-- [ ] Import ZIP de recettes et export ZIP fonctionnent toujours (test manuel en dev).
-- [ ] Plus de texte « Loading... » en dur dans `App.tsx`.
+- [x] `npx vite build` ne produit plus l'avertissement « chunks larger than 500 kB ».
+- [x] Le JS chargé sur `/menu/:slug` (entrée + chunks vendor) pèse au plus 120 kB gzip. Mesure reportée dans le Journal (avant : 167,7 kB).
+- [x] `jszip` n'apparaît dans aucun chunk chargé par `/`, `/menu/:slug` ou `/menu/:slug/cocktail/:id` (vérifier dans l'onglet Réseau ou avec `grep -l JSZip dist/assets/*.js`).
+- [x] Un chunk séparé existe pour chaque page admin et pour `LoginPage`.
+- [x] Sur `/menu/:slug`, l'onglet Réseau ne montre aucune requête vers un chunk admin.
+- [x] Import ZIP de recettes et export ZIP fonctionnent toujours (test manuel en dev).
+- [x] Plus de texte « Loading... » en dur dans `App.tsx`.
 
 ## Tests à ajouter ou adapter
 
@@ -93,3 +93,8 @@ Un invité qui scanne le QR code de la carte télécharge aujourd'hui toute l'ap
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-09 : mesure de départ (`npx vite build`) : un seul chunk JS, `index-*.js` 640,90 kB brut / 178,83 kB gzip (la revue mesurait 605 kB / 167,7 kB), CSS 47,05 kB / 8,43 kB gzip, avertissement « larger than 500 kB ».
+- 2026-10-09 : après : 25 chunks JS, plus d'avertissement. Chargé sur `/menu/:slug` : `index` 17,74 + `vendor-react` 82,68 + `vendor-i18n` 18,42 = 118,84 kB gzip. `jszip` à part (30,15 kB gzip), un chunk par page admin et pour `LoginPage` (le plus gros : CocktailsPage, 9,20 kB gzip). `react-dom/client` ajouté à `vendor-react` : c'est une entrée distincte qui contient l'essentiel de React DOM, sans elle React DOM restait dans `index`.
+- 2026-10-09 : pas de second `Suspense` dans `AdminLayout` : React Router 7 fait ses navigations dans `startTransition`, la page courante reste affichée pendant le chargement du chunk suivant. Rechargement après chunk manquant dans `utils/chunkReload.ts` (testable seul), appelé depuis `main.tsx` ; ces deux fichiers sont ajoutés à `touches`.
+- 2026-10-09 : vérifié avec Playwright Chromium contre `vite preview` (API simulée) : les trois routes publiques ne chargent que `index` et les deux vendors. Les chunks de connexion, d'admin et `jszip` se chargent à la navigation. Import et export ZIP fonctionnent. Un chunk en 404 donne un seul rechargement. La page vide qui suit, faute d'error boundary, est reportée dans la nouvelle tâche E-18. PR #43.
+- 2026-10-09 : suites de la revue de la PR #43 : `role="status"` sur `RouteFallback`, pas de rechargement hors ligne (`navigator.onLine === false`), et nouvelle tâche D-14 (budget de bundle en CI).

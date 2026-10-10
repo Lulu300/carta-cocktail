@@ -8,7 +8,7 @@ effort: M
 status: todo
 owner: agent
 depends_on: [B-07, C-02]
-touches: [backend/src/routes/backup.ts, backend/src/routes/backup.test.ts, backend/src/services/backupService.ts, backend/src/i18n/]
+touches: [backend/src/routes/backup.ts, backend/src/routes/backup.test.ts, backend/src/services/backupService.ts, backend/src/lib/prisma.ts, backend/src/i18n/]
 sources: ["02-backend-data-perf.md §4.1", "01-backend-routes.md §H2", "03-security.md §6", "07-devops-history.md §2.10", "04-tests.md §6"]
 branch:
 pr:
@@ -31,7 +31,8 @@ La restauration d'une sauvegarde est l'opération la plus destructrice de l'appl
 - `:125-129` : `unlinkSync` sur chaque entrée de `uploads/` ; un sous-dossier lève une exception **après** l'écrasement de la base.
 - `:135-141` : aucune liste blanche d'extensions. Un `uploads/x.js` ou `x.html` est servi sur la même origine que l'admin (`app.ts:35`).
 - `:30,43,78,144` : messages en anglais en dur.
-- Aucun fichier `backup.test.ts` aujourd'hui. B-07 (montée adm-zip/archiver) en crée un premier (export, imports invalides) : le compléter ici plutôt que de le recréer.
+- `backup.test.ts` existe depuis C-02 (tests de régression WAL : export après écriture, restauration). B-07 (montée adm-zip/archiver) y ajoute l'export et les imports invalides : le compléter ici plutôt que de le recréer.
+- Garde temporaire de C-02 (PR #42) : `checkpointWal()` (`lib/prisma.ts`) avant l'archivage de l'export ; à l'import, checkpoint, `prisma.$disconnect()`, suppression de `-wal`/`-shm`/`-journal`, `writeFileSync`, `configureSqlite()`.
 
 ## Ce qu'il faut faire
 
@@ -53,6 +54,7 @@ La restauration d'une sauvegarde est l'opération la plus destructrice de l'appl
    Échec avant 6.3 : supprimer les temporaires, base intacte. Échec après : remettre la copie `pre-restore` et répondre 500.
 7. Réponse : `{ message: req.t('backup.restored'), skippedFiles, restartRecommended }`. `restartRecommended` vaut `true` si la sauvegarde a un schéma plus ancien : au redémarrage, l'entrypoint de C-01 applique les migrations manquantes.
 8. Traduire tous les messages (clés `backup.*` et `errors.*` dans `en.json`/`fr.json`).
+9. Remplacer la garde temporaire de C-02 : l'export passe par `VACUUM INTO` (étape 2) et l'import par la bascule atomique (étape 6). Supprimer `checkpointWal()` de `lib/prisma.ts` si plus rien ne l'utilise (la bascule peut le réutiliser à l'étape 6.1). Garder les deux tests de régression WAL de `backup.test.ts`.
 
 ## Critères d'acceptation
 
@@ -93,3 +95,4 @@ La restauration d'une sauvegarde est l'opération la plus destructrice de l'appl
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-09 : C-02 (PR #42) ajoute une garde temporaire dans `backup.ts` pour le mode WAL et crée `backup.test.ts` ; étape 9 et `lib/prisma.ts` (dans `touches`) ajoutés pour la remplacer.

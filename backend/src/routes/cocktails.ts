@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -13,7 +13,6 @@ const parseNT = (val: any) => {
 };
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Multer config for image upload
 const storage = multer.diskStorage({

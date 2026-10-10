@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: critique
 effort: M
-status: todo
+status: done
 owner: mixed
 depends_on: [A-04]
 touches: [backend/prisma/migrations/, backend/Dockerfile, backend/package.json, .gitignore, backend/docker-entrypoint.sh, README.md, .github/workflows/ci.yml]
 sources: ["07-devops-history.md §2.2", "02-backend-data-perf.md §5"]
-branch:
-pr:
+branch: feature/C-01-prisma-migrations
+pr: "#44"
 ---
 
 ## Décisions validées (2026-10-08)
@@ -71,14 +71,15 @@ Le conteneur backend applique le schéma Prisma à chaque démarrage avec `db pu
 
 ## Critères d'acceptation
 
-- [ ] `prisma/migrations/0_init/migration.sql` et `migration_lock.toml` sont versionnés.
-- [ ] `npm run db:check` passe, et échoue si on ajoute un champ au schéma sans migration.
-- [ ] Le CI exécute `db:check`.
-- [ ] Volume vide : le conteneur démarre, tables créées par `migrate deploy`, seed passé.
-- [ ] Base existante issue de `db push` (copie de `develop`) : sauvegarde `pre-migrate-*` créée, `0_init` marquée appliquée, aucune donnée perdue.
-- [ ] Base différente de `0_init` : démarrage refusé avec un message clair, base intacte.
-- [ ] `docker compose stop` arrête le backend en moins de 2 s.
-- [ ] Plus aucun `db push` hors `src/test/helpers.ts`.
+- [x] `prisma/migrations/0_init/migration.sql` et `migration_lock.toml` sont versionnés.
+- [x] `npm run db:check` passe, et échoue si on ajoute un champ au schéma sans migration.
+- [x] Le CI exécute `db:check`.
+- [x] Volume vide : le conteneur démarre, tables créées par `migrate deploy`, seed passé.
+- [x] Base existante issue de `db push` (copie de `develop`) : sauvegarde `pre-migrate-*` créée, `0_init` marquée appliquée, aucune donnée perdue.
+- [ ] Même vérification sur une copie de la base de production (humain, étape 3 de la procédure de baseline ; commandes dans la PR #44, « Required actions »).
+- [x] Base différente de `0_init` : démarrage refusé avec un message clair, base intacte.
+- [x] `docker compose stop` arrête le backend en moins de 2 s (0,22 s après rebase sur C-02).
+- [x] Plus aucun `db push` hors `src/test/helpers.ts` (code, scripts, Dockerfile, README). Les deux `AGENTS.md` en parlent encore : D-09.
 
 ## Tests à ajouter ou adapter
 
@@ -107,3 +108,6 @@ Pas de code TypeScript nouveau : la couverture n'est pas concernée. Vérificati
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : décisions validées par l'humain (voir « Décisions validées »).
 - 2026-10-09 : C-06 et F-09 ajoutées aux premières migrations ; point d'attention « Notes de version » (règle de D-11 décidée le 2026-10-09).
+- 2026-10-09 : C-01 réalisée (PR #44). Vérifié sur Prisma 6.19.3 : `migrate status` sort en 1 pour des migrations en attente comme pour une base `db push` sans historique, en `P1003` si le fichier n'existe pas (d'où le test d'existence) ; l'ordre des colonnes (`Bottle.location` ajoutée en dernier) ne gêne pas la comparaison. Écarts : `db:check` utilise `--shadow-database-url file::memory:` (avec `file:./shadow.db`, Prisma ne vide pas la base fantôme, le deuxième lancement échoue en `P3006`, et le fichier se crée dans `backend/`) ; dossier de sauvegarde déduit du chemin de la base (`/app/data/backups` en Docker) ; pas de nouvelle copie si la base est identique à la dernière (sinon une boucle de redémarrage après un refus ou une migration ratée ferait sortir la bonne copie des 10 gardées) ; le refus affiche le SQL d'écart. Docker (image construite depuis une archive propre de `backend/`, npm 10.8.2) : volume vide OK ; base créée par l'image publiée `backend:1.5.0` avec 3 bouteilles : copie identique à l'octet, `0_init` marquée appliquée, mêmes comptes de lignes ; base sans `Bottle.location` : refus (code 1), SHA-256 inchangé, pas de deuxième copie au redémarrage. Arrêt en moins de 2 s seulement avec C-02 (critère non coché). Reste à l'humain : vérification sur une copie de la production avant le premier déploiement. Mentions de `db push` dans les `AGENTS.md` transmises à D-09.
+- 2026-10-09 : Notes de version : `breaking: true`. Le backend peut refuser de démarrer si la base existante ne correspond pas à `0_init` (base intacte, copie dans `/app/data/backups/`). *Before* : arrêter le backend, copier la base hors du volume, passer d'abord par v1.5.0 si l'instance est plus ancienne, vérifier la copie (diff vide contre `0_init`, ou entrypoint lancé sur la copie). *After* : `docker compose exec carta-cocktail-backend npx prisma migrate status` → « Database schema is up to date! » ; en cas de refus, procédure de baseline manuelle du README (« Database migrations ») ou retour à la version précédente avec la copie `pre-migrate-*`. Bases de dev `db push` : `npx prisma migrate resolve --applied 0_init`. Épinglage recommandé : `:<version>`.
+- 2026-10-09 : revue de la PR #44. Rebase sur `develop` (C-02 mergée) : `docker compose stop` en 0,22 s (`SIGTERM received, shutting down`, code 0), critère coché. Bloquant corrigé : une sauvegarde ne réutilise jamais un nom existant (`.db`, `-wal` ou `-shm`) : l'entrypoint attend la seconde suivante, les noms restent triés par date. Rejoué : collision forcée (41 noms pris d'avance sur les secondes à venir, en `.db` ou en `-wal`/`-shm` orphelins) → nouvelle copie sur le premier nom libre, fichiers existants intacts (SHA-256), aucun `-wal`/`-shm` accolé ; rotation (10 gardées) ; boucle de redémarrage après refus (pas de deuxième copie) ; les trois scénarios Docker. Suggestions appliquées : README (listage des sauvegardes séparé de la restauration), message de refus « its data and schema were not modified », nettoyage `sudo rm -rf` de l'option B sous Linux (PR), `exec "$@"` et tini transmis à D-01.

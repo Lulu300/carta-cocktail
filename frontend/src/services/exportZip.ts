@@ -1,4 +1,3 @@
-import JSZip from 'jszip';
 import { cocktails as cocktailsApi } from './api';
 import type { Cocktail } from '../types';
 
@@ -6,6 +5,8 @@ export async function exportCocktailsAsZip(
   ids: number[],
   cocktailList: Cocktail[],
 ): Promise<void> {
+  // Loaded on demand: only batch exports need it
+  const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
 
   const exports = await Promise.all(

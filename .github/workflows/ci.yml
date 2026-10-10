@@ -30,6 +30,9 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
+      - name: Check that migrations match the Prisma schema
+        run: npm run db:check
+
       - name: TypeScript check
         run: npx tsc --noEmit
 

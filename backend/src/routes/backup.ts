@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import multer from 'multer';
 import { config } from '../config';
+import { checkpointWal, configureSqlite, prisma } from '../lib/prisma';
 import { AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -31,6 +32,9 @@ router.get('/export', async (req: AuthRequest, res: Response) => {
       return;
     }
 
+    // In WAL mode the latest writes may still be in the -wal file only
+    await checkpointWal();
+
     const date = new Date().toISOString().slice(0, 10);
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename=backup-${date}.zip`);
@@ -54,7 +58,6 @@ router.get('/export', async (req: AuthRequest, res: Response) => {
     });
     archive.append(metadata, { name: 'metadata.json' });
 
-    // Add database file
     archive.file(dbPath, { name: 'database.db' });
 
     // Add uploads directory if it exists
@@ -113,13 +116,16 @@ router.post('/import', upload.single('backup'), async (req: AuthRequest, res: Re
       res.status(400).json({ error: req.t('errors.invalidBackup') });
       return;
     }
+    // Open connections would keep reading the old WAL and later checkpoint
+    // its pages over the restored file: flush it and close them all first
+    await checkpointWal();
+    await prisma.$disconnect();
+    for (const suffix of ['-wal', '-shm', '-journal']) {
+      fs.rmSync(dbPath + suffix, { force: true });
+    }
     fs.writeFileSync(dbPath, dbEntry.getData());
-
-    // Remove WAL and journal files if they exist
-    const walPath = dbPath + '-wal';
-    const journalPath = dbPath + '-journal';
-    if (fs.existsSync(walPath)) fs.unlinkSync(walPath);
-    if (fs.existsSync(journalPath)) fs.unlinkSync(journalPath);
+    // Reconnects and applies the journal mode to the restored file
+    await configureSqlite();
 
     // Clear and restore uploads directory
     if (fs.existsSync(uploadsDir)) {

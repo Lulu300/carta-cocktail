@@ -1,9 +1,9 @@
 import { Router, Response } from 'express';
-import { Menu, Prisma, PrismaClient } from '@prisma/client';
+import { Menu, Prisma } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middleware/auth';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Menus created by the seed and kept in sync with the bottles' apero/digestif flags.
 // Their slug and type are what the sync and the delete protection rely on.
