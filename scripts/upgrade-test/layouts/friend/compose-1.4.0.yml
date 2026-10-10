@@ -1,0 +1,42 @@
+# Self-hosted setup seen in the field (values replaced by placeholders): bind mounts instead of
+# named volumes, photos mounted on /uploads (where v1.4.0 wrote them), secrets in a separate
+# env_file, an external reverse-proxy network and :latest images.
+# Test-bench changes: prefixed names, images and platform filled in by the bench, and published
+# ports on 127.0.0.1 (the real setup is only reached through the reverse proxy).
+services:
+  carta-cocktail-backend:
+    image: {{BACKEND_IMAGE}}
+    platform: {{BACKEND_PLATFORM}}
+    container_name: {{PROJECT}}-backend
+    env_file:
+      - carta-cocktail.env
+    environment:
+      - DATABASE_URL=file:/app/data/carta_cocktail.db
+      - ADMIN_EMAIL={{ADMIN_EMAIL}}
+      - PORT=3001
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/uploads
+    networks:
+      - swag
+    ports:
+      - "127.0.0.1::3001"
+    restart: unless-stopped
+
+  carta-cocktail-frontend:
+    image: {{FRONTEND_IMAGE}}
+    platform: {{FRONTEND_PLATFORM}}
+    container_name: {{PROJECT}}-frontend
+    environment:
+      - BACKEND_HOST=carta-cocktail-backend
+    depends_on:
+      - carta-cocktail-backend
+    networks:
+      - swag
+    ports:
+      - "127.0.0.1::80"
+    restart: unless-stopped
+networks:
+  swag:
+    external: true
+    name: {{PROJECT}}-swag

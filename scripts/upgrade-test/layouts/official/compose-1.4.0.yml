@@ -1,0 +1,34 @@
+# docker-compose.prod.yml of v1.4.0 (git show v1.4.0:docker-compose.prod.yml).
+# Test-bench changes: images and platform filled in by the bench, ports published on 127.0.0.1
+# with a free host port.
+services:
+  carta-cocktail-backend:
+    image: {{BACKEND_IMAGE}}
+    platform: {{BACKEND_PLATFORM}}
+    ports:
+      - "127.0.0.1::3001"
+    environment:
+      - DATABASE_URL=file:/app/data/carta_cocktail.db
+      - JWT_SECRET=${JWT_SECRET:-change-me-to-a-random-secret}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@carta.local}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - PORT=3001
+    volumes:
+      - db-data:/app/data
+      - uploads:/app/uploads
+    restart: unless-stopped
+
+  carta-cocktail-frontend:
+    image: {{FRONTEND_IMAGE}}
+    platform: {{FRONTEND_PLATFORM}}
+    ports:
+      - "127.0.0.1::80"
+    environment:
+      - BACKEND_HOST=carta-cocktail-backend
+    depends_on:
+      - carta-cocktail-backend
+    restart: unless-stopped
+
+volumes:
+  db-data:
+  uploads:
