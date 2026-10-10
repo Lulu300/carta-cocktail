@@ -59,6 +59,16 @@ describe('findIntegrityIssues', () => {
     }
   });
 
+  it('reports unit abbreviations that differ only by case as blocking', async () => {
+    await seedUnit({ abbreviation: 'cl' });
+    await seedUnit({ abbreviation: 'CL' });
+
+    const issues = await findIntegrityIssues(prisma);
+
+    expect(issues.duplicateUnitAbbreviations).toEqual([{ value: 'cl', count: 2 }]);
+    expect(hasBlockingIssues(issues)).toBe(true);
+  });
+
   it('lists duplicate cocktail names without blocking', async () => {
     await seedCocktail({ name: 'Mojito' });
     await seedCocktail({ name: 'mojito' });

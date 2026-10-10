@@ -32,7 +32,7 @@ export interface ForeignKeyViolation {
 export interface IntegrityIssues {
   /** Same name ignoring case. Blocking: the migration refuses exact duplicates, and imports match names ignoring case. */
   duplicateCategoryNames: DuplicateGroup[];
-  /** Same abbreviation. Blocking: the migration refuses duplicates. */
+  /** Same abbreviation ignoring case. Blocking: the migration refuses exact duplicates, and the routes refuse case-only ones. */
   duplicateUnitAbbreviations: DuplicateGroup[];
   /** Same name ignoring case. Allowed (cocktail names are not unique), listed for information. */
   duplicateCocktailNames: DuplicateGroup[];
@@ -61,7 +61,7 @@ export async function findIntegrityIssues(db: IntegrityDb): Promise<IntegrityIss
     SELECT lower(name) AS value, COUNT(*) AS count FROM Category
     GROUP BY value HAVING count > 1 ORDER BY value`;
   const duplicateUnitAbbreviations = await db.$queryRaw<RawDuplicate[]>`
-    SELECT abbreviation AS value, COUNT(*) AS count FROM Unit
+    SELECT lower(abbreviation) AS value, COUNT(*) AS count FROM Unit
     GROUP BY value HAVING count > 1 ORDER BY value`;
   const duplicateCocktailNames = await db.$queryRaw<RawDuplicate[]>`
     SELECT lower(name) AS value, COUNT(*) AS count FROM Cocktail
@@ -111,7 +111,7 @@ export function countIssues(issues: IntegrityIssues): IntegrityCounts {
 
 const LABELS: Record<keyof IntegrityIssues, string> = {
   duplicateCategoryNames: 'Duplicate category names, ignoring case (blocking)',
-  duplicateUnitAbbreviations: 'Duplicate unit abbreviations (blocking)',
+  duplicateUnitAbbreviations: 'Duplicate unit abbreviations, ignoring case (blocking)',
   duplicateCocktailNames: 'Duplicate cocktail names, ignoring case (allowed)',
   invalidIngredientLines: 'Recipe lines without their bottle, category or ingredient',
   unknownCategoryTypes: 'Category types missing from CategoryType',
