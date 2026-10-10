@@ -8,7 +8,7 @@ effort: S
 status: todo
 owner: agent
 depends_on: [A-06, B-01]
-touches: [frontend/Dockerfile, frontend/nginx.conf.template, frontend/security-headers.conf, docker-compose.yml, docker-compose.prod.yml, scripts/upgrade-test/layouts/]
+touches: [frontend/Dockerfile, frontend/nginx.conf.template, frontend/security-headers.conf, docker-compose.yml, docker-compose.prod.yml, scripts/upgrade-test/layouts/, scripts/upgrade-test/lib/, scripts/upgrade-test/test/]
 sources: ["03-security.md §8", "07-devops-history.md §2.8"]
 branch:
 pr:
@@ -17,7 +17,7 @@ pr:
 ## Décisions validées (2026-10-10)
 
 - **Port 8080** : le conteneur frontend écoute sur 8080. L'alternative `listen 80` est écartée (elle ne marche ni sous Docker rootless ni sous Podman). Changement cassant, `breaking: true` dans les notes de la version qui l'embarque (v1.8.0 au plus tôt).
-- **Banc de mise à jour** : les layouts du banc publient le port 80 du frontend (`127.0.0.1::80` dans `compose-1.5.0.yml`). Ajouter dans `scripts/upgrade-test/layouts/friend/` et `layouts/official/` une génération `compose-1.8.0.yml` identique à `compose-1.5.0.yml` sauf le port du conteneur frontend (`127.0.0.1::8080`), et l'enregistrer dans les `layout.mjs` si besoin. Le hook `hooks/1.8.0.mjs` reste au coordinateur (notes de release, règle 9) : pour vérifier la PR, utiliser un hook temporaire non commité qui fait `updateCompose` vers la génération `1.8.0`.
+- **Banc de mise à jour** : le banc publie et lit le port 80 du conteneur frontend (`127.0.0.1::80` dans les `compose-1.5.0.yml`, et la constante `80` dans `lib/bench.mjs`, qui appelle `docker compose port carta-cocktail-frontend 80`). D-02 adapte le banc (étape 6) ; le hook `hooks/1.8.0.mjs` reste au coordinateur (notes de release, règle 9).
 
 ## Contexte
 
@@ -72,6 +72,10 @@ nginx sert le HTML de l'admin et de la carte publique. helmet ne protège que le
    ```
    Prendre la dernière version stable publiée sur Docker Hub au moment du travail (1.28 est un exemple). Supprimer la ligne `CMD`, celle de l'image de base suffit.
 5. `docker-compose.yml` et `docker-compose.prod.yml` : `ports: - "80:8080"` pour le frontend.
+6. Banc de mise à jour (`scripts/upgrade-test/`, sauf `hooks/`) :
+   - ajouter une génération `compose-1.8.0.yml` dans `layouts/friend/` et `layouts/official/`, identique à `compose-1.5.0.yml` sauf le port du conteneur frontend (`127.0.0.1::8080`). Une génération est simplement le fichier `compose-<génération>.yml`, chargé par son nom (`lib/instance.mjs`) ;
+   - lire le port du conteneur frontend dans la génération de compose courante de l'instance, au lieu de la constante `80` de `lib/bench.mjs` (par exemple une table génération → port dans chaque `layout.mjs`, ou une lecture du gabarit), avec un test unitaire dans `test/`. En mode conforme, `updateCompose` passe à `1.8.0` et le banc lit 8080 ; en mode naïf, la génération reste `1.5.0` (port 80) avec une image qui écoute sur 8080 : les contrôles du frontend doivent alors être rapportés en échec, sans faire planter le run ;
+   - vérifier avec un hook temporaire `hooks/1.8.0.mjs` **non commité** (`updateCompose` vers `1.8.0`) et `--local-version 1.8.0`. Indiquer dans la PR ce que le vrai hook devra contenir, en particulier les entrées `naiveMayFail` pour les contrôles du frontend et des photos servies par nginx.
 
 ## Critères d'acceptation
 
@@ -81,6 +85,7 @@ nginx sert le HTML de l'admin et de la carte publique. helmet ne protège que le
 - [ ] `docker compose exec carta-cocktail-frontend id -u` renvoie un uid différent de 0.
 - [ ] `docker compose up -d --force-recreate carta-cocktail-backend` puis `curl http://localhost/api/public/menus` : 200 sans redémarrer nginx.
 - [ ] Le Dockerfile n'utilise plus de tag flottant.
+- [ ] Banc, avec le hook temporaire `1.8.0` non commité : `--path 1.4.0,1.6.0,local --local-version 1.8.0 --mode both`, layouts `friend` et `official`. En mode conforme, aucun échec inattendu, et le frontend et les photos sont servis par nginx. En mode naïf, seuls les contrôles du frontend échouent. `node --test scripts/upgrade-test/test/*.test.mjs` passe.
 
 ## Tests à ajouter ou adapter
 
