@@ -5,13 +5,13 @@ phase: D
 lane: ci
 criticite: haute
 effort: M
-status: todo
+status: done
 owner: mixed
 depends_on: [D-11]
 touches: [scripts/upgrade-test/, .gitignore, docs/plan/README.md]
 sources: ["07-devops-history.md §2.1", "07-devops-history.md §2.2", "07-devops-history.md §3.4"]
-branch:
-pr:
+branch: chore/D-15-upgrade-test-bench
+pr: "#46"
 ---
 
 ## Contexte
@@ -40,12 +40,12 @@ Un utilisateur a fourni une copie de sa base de production (v1.4.0), ses photos 
 
 ## Critères d'acceptation
 
-- [ ] `node scripts/upgrade-test/run.mjs --fixture <dir> --layout friend --path 1.4.0,1.5.0,1.6.0-rc.1` rejoue les deux modes et écrit un rapport par saut et par mode.
-- [ ] Le rapport ne contient ni email, ni hash, ni donnée nominative : compteurs et statuts seulement.
-- [ ] Le hash admin de la copie de travail est remplacé par un hash de test, et le rapport le dit.
-- [ ] Le code de sortie est différent de 0 quand une vérification attendue échoue.
-- [ ] Aucun conteneur, volume ou réseau `carta-ut-*` ne reste après un passage sans `--keep`.
-- [ ] La procédure de release du README du plan demande de passer le banc sur la pré-version.
+- [x] `node scripts/upgrade-test/run.mjs --fixture <dir> --layout friend --path 1.4.0,1.5.0,1.6.0-rc.1` rejoue les deux modes et écrit un rapport par saut et par mode.
+- [x] Le rapport ne contient ni email, ni hash, ni donnée nominative : compteurs et statuts seulement.
+- [x] Le hash admin de la copie de travail est remplacé par un hash de test, et le rapport le dit.
+- [x] Le code de sortie est différent de 0 quand une vérification attendue échoue.
+- [x] Aucun conteneur, volume ou réseau `carta-ut-*` ne reste après un passage sans `--keep`.
+- [x] La procédure de release du README du plan demande de passer le banc sur la pré-version.
 
 ## Tests à ajouter ou adapter
 
@@ -61,4 +61,5 @@ Un utilisateur a fourni une copie de sa base de production (v1.4.0), ses photos 
 
 ## Journal
 
-- 2026-10-10 : tâche créée avec le banc.
+- 2026-10-10 : tâche créée avec le banc. Passages sur le jeu d'essai (layouts `friend` et `official`, chemins `1.4.0,1.5.0,1.6.0-rc.1` et `1.4.0,1.6.0-rc.1`, modes naïf et conforme) : `official` OK partout ; `friend` conforme KO, les photos montées sur `/uploads` ne sont plus servies à partir de 1.5.0 et celles recopiées dans `/app/uploads` (non monté) disparaissent au saut suivant. Détail et actions manquantes dans les notes : PR #46.
+- Notes de version : aucune action pour cette PR (outillage). Actions manquantes relevées pour v1.5.0 et v1.6.0 (montage personnalisé des photos, données en bind mount, `env_file`), listées dans la PR #46 pour le coordinateur.
