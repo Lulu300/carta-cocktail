@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -9,14 +9,17 @@ import {
   prisma, request, authHeader,
 } from '../test/helpers';
 import { configureSqlite } from '../lib/prisma';
+import { config } from '../config';
 
-// Regression tests for the WAL guard in backup.ts (C-02). C-05 rewrites the
-// backup routes and extends these tests.
+// Export and import tests written before the adm-zip 0.6 / archiver 8 upgrade (B-07),
+// plus the regression tests for the WAL guard (C-02). C-05 rewrites the backup
+// routes and extends these tests.
 
 const originalDatabaseUrl = process.env.DATABASE_URL;
 
-async function exportBackup(): Promise<Buffer> {
-  const res = await request
+/** Downloads a backup, keeping the zip as a Buffer instead of letting supertest parse it. */
+function requestExport() {
+  return request
     .get('/api/backup/export')
     .set(authHeader())
     .buffer(true)
@@ -25,6 +28,10 @@ async function exportBackup(): Promise<Buffer> {
       response.on('data', (chunk: Buffer) => chunks.push(chunk));
       response.on('end', () => callback(null, Buffer.concat(chunks)));
     });
+}
+
+async function exportBackup(): Promise<Buffer> {
+  const res = await requestExport();
   expect(res.status).toBe(200);
   return res.body as Buffer;
 }
@@ -68,6 +75,41 @@ afterAll(async () => {
 beforeEach(async () => {
   await cleanDatabase();
   await seedRequiredData();
+});
+
+describe('backup authentication', () => {
+  it.each([
+    ['GET', '/api/backup/export'],
+    ['POST', '/api/backup/import'],
+  ])('should answer 401 to %s %s without a token', async (method, url) => {
+    const res = method === 'GET' ? await request.get(url) : await request.post(url);
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('backup export', () => {
+  const uploadedImage = path.join(config.uploadDir, 'export-test.jpg');
+
+  afterEach(() => {
+    fs.rmSync(uploadedImage, { force: true });
+  });
+
+  it('should send a zip with the metadata, the database and the uploads', async () => {
+    fs.mkdirSync(config.uploadDir, { recursive: true });
+    fs.writeFileSync(uploadedImage, 'image bytes');
+
+    const res = await requestExport();
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toBe('application/zip');
+    expect(res.headers['content-disposition']).toMatch(/^attachment; filename=backup-\d{4}-\d{2}-\d{2}\.zip$/);
+    const zip = new AdmZip(res.body as Buffer);
+    const entryNames = zip.getEntries().map((entry) => entry.entryName);
+    expect(entryNames).toEqual(expect.arrayContaining(['metadata.json', 'database.db', 'uploads/export-test.jpg']));
+    expect(JSON.parse(zip.getEntry('metadata.json')!.getData().toString('utf8'))).toMatchObject({ version: 1 });
+    expect(zip.getEntry('database.db')!.getData().subarray(0, 16).toString('latin1')).toBe('SQLite format 3\0');
+    expect(zip.getEntry('uploads/export-test.jpg')!.getData().toString('utf8')).toBe('image bytes');
+  });
 });
 
 describe('backup in WAL mode', () => {
@@ -115,13 +157,14 @@ describe('backup import validation', () => {
   });
 
   it.each([
-    ['without database.db', { 'metadata.json': '{"version":1}' }],
-    ['with an unsupported metadata version', { 'metadata.json': '{"version":2}', 'database.db': 'x' }],
-  ])('should answer 400 and keep the data for a backup %s', async (_label, files) => {
+    ['without metadata.json', zipWith({ 'database.db': 'x' })],
+    ['without database.db', zipWith({ 'metadata.json': '{"version":1}' })],
+    ['with an unsupported metadata version', zipWith({ 'metadata.json': '{"version":2}', 'database.db': 'x' })],
+  ])('should answer 400 and keep the data for a backup %s', async (_label, backup) => {
     await seedIngredient({ name: 'Lime' });
 
     const res = await request.post('/api/backup/import').set(authHeader())
-      .attach('backup', zipWith(files), 'backup.zip');
+      .attach('backup', backup, 'backup.zip');
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('Invalid backup file');
