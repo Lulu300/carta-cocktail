@@ -74,8 +74,8 @@ nginx sert le HTML de l'admin et de la carte publique. helmet ne protège que le
 5. `docker-compose.yml` et `docker-compose.prod.yml` : `ports: - "80:8080"` pour le frontend.
 6. Banc de mise à jour (`scripts/upgrade-test/`, sauf `hooks/`) :
    - ajouter une génération `compose-1.8.0.yml` dans `layouts/friend/` et `layouts/official/`, identique à `compose-1.5.0.yml` sauf le port du conteneur frontend (`127.0.0.1::8080`). Une génération est simplement le fichier `compose-<génération>.yml`, chargé par son nom (`lib/instance.mjs`) ;
-   - lire le port du conteneur frontend dans la génération de compose courante de l'instance, au lieu de la constante `80` de `lib/bench.mjs` (par exemple une table génération → port dans chaque `layout.mjs`, ou une lecture du gabarit), avec un test unitaire dans `test/`. En mode conforme, `updateCompose` passe à `1.8.0` et le banc lit 8080 ; en mode naïf, la génération reste `1.5.0` (port 80) avec une image qui écoute sur 8080 : les contrôles du frontend doivent alors être rapportés en échec, sans faire planter le run ;
-   - vérifier avec un hook temporaire `hooks/1.8.0.mjs` **non commité** (`updateCompose` vers `1.8.0`) et `--local-version 1.8.0`. Indiquer dans la PR ce que le vrai hook devra contenir, en particulier les entrées `naiveMayFail` pour les contrôles du frontend et des photos servies par nginx.
+   - lire le port du conteneur frontend dans la génération de compose courante de l'instance, au lieu de la constante `80` de `lib/bench.mjs` (par exemple une table génération → port dans chaque `layout.mjs`, ou une lecture du gabarit), avec un test unitaire dans `test/`. Placer aussi la ligne « photos servies par le nginx du frontend » de `checkImages` (`lib/checks.mjs`, groupe `images`) dans le groupe `frontend`, pour qu'une entrée `naiveMayFail.frontend` couvre exactement ce que casse le port 8080 sans masquer un échec des photos servies par le backend ; adapter le test. En mode conforme, `updateCompose` passe à `1.8.0` et le banc lit 8080 ; en mode naïf, la génération reste `1.5.0` (port 80) avec une image qui écoute sur 8080 : les contrôles du frontend doivent alors être rapportés en échec, sans faire planter le run ;
+   - vérifier avec un hook temporaire `hooks/1.8.0.mjs` **non commité**, qui contient `updateCompose` vers `1.8.0` **et** les entrées `naiveMayFail` que le vrai hook devra contenir, avec `--local-version 1.8.0`. Indiquer dans la PR ce que le vrai hook devra contenir, en particulier les entrées `naiveMayFail` pour les contrôles du frontend et des photos servies par nginx.
 
 ## Critères d'acceptation
 
@@ -85,7 +85,7 @@ nginx sert le HTML de l'admin et de la carte publique. helmet ne protège que le
 - [ ] `docker compose exec carta-cocktail-frontend id -u` renvoie un uid différent de 0.
 - [ ] `docker compose up -d --force-recreate carta-cocktail-backend` puis `curl http://localhost/api/public/menus` : 200 sans redémarrer nginx.
 - [ ] Le Dockerfile n'utilise plus de tag flottant.
-- [ ] Banc, avec le hook temporaire `1.8.0` non commité : `--path 1.4.0,1.6.0,local --local-version 1.8.0 --mode both`, layouts `friend` et `official`. En mode conforme, aucun échec inattendu, et le frontend et les photos sont servis par nginx. En mode naïf, seuls les contrôles du frontend échouent. `node --test scripts/upgrade-test/test/*.test.mjs` passe.
+- [ ] Banc, avec le hook temporaire `1.8.0` non commité : `--path 1.4.0,1.6.0,local --local-version 1.8.0 --mode both`, layouts `friend` et `official`. En mode conforme, aucun échec inattendu, et le frontend et les photos sont servis par nginx. En mode naïf, aucun échec inattendu ; par rapport au même run sans D-02, les seuls nouveaux échecs (attendus) sont ceux du groupe `frontend`. `node --test scripts/upgrade-test/test/*.test.mjs` passe.
 
 ## Tests à ajouter ou adapter
 
