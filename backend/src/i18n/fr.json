@@ -10,7 +10,10 @@
     "cannotDelete": "Impossible de supprimer : ressource utilisée",
     "invalidBackup": "Fichier de sauvegarde invalide",
     "cannotDeleteDefaultMenu": "Impossible de supprimer un menu système",
-    "cannotModifySystemMenu": "Le slug et le type d’un menu système ne peuvent pas être modifiés"
+    "cannotModifySystemMenu": "Le slug et le type d’un menu système ne peuvent pas être modifiés",
+    "fileTooLarge": "Le fichier ou la requête est trop volumineux",
+    "invalidJson": "Le corps de la requête n’est pas un JSON valide",
+    "invalidImportFile": "Le fichier d’import n’a pas pu être lu"
   },
   "auth": {
     "loginSuccess": "Connexion réussie",

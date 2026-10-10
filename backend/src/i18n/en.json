@@ -10,7 +10,10 @@
     "cannotDelete": "Cannot delete: resource is in use",
     "invalidBackup": "Invalid backup file",
     "cannotDeleteDefaultMenu": "Cannot delete a system menu",
-    "cannotModifySystemMenu": "System menus cannot have their slug or type changed"
+    "cannotModifySystemMenu": "System menus cannot have their slug or type changed",
+    "fileTooLarge": "The file or request is too large",
+    "invalidJson": "The request body is not valid JSON",
+    "invalidImportFile": "The import file could not be read"
   },
   "auth": {
     "loginSuccess": "Login successful",
