@@ -13,6 +13,10 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json-summary', 'json'],
+      // List every source file, even those no test imports, so untested code
+      // counts as 0% instead of disappearing from the report.
+      // Keep `exclude` in sync with the delta coverage `--ignore` flags in ci.yml.
+      include: ['src/**/*.{ts,tsx}'],
       thresholds: {
         lines: 60,
         functions: 60,
@@ -25,6 +29,8 @@ export default defineConfig({
         'src/vite-env.d.ts',
         'src/i18n/**',
         '*.config.*',
+        'src/**/*.test.{ts,tsx}',
+        'src/types/**',
       ],
     },
   },
