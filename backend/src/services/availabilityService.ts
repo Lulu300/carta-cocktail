@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { NotFoundError } from '../errors';
 
 // Unit conversion factors to milliliters (ml)
 const UNIT_TO_ML: Record<string, number> = {
@@ -205,7 +206,7 @@ export async function calculateCocktailAvailability(
   });
 
   if (!cocktail) {
-    throw new Error('Cocktail not found');
+    throw new NotFoundError();
   }
 
   // Calculate availability for each ingredient

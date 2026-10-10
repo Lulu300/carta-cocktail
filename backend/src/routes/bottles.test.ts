@@ -476,6 +476,16 @@ describe('POST /api/bottles/import/preview', () => {
       .set(authHeader())
       .attach('file', Buffer.from(csv), 'bottles.csv');
     expect(res.status).toBe(400);
+    expect(res.body.error).toBe('The import file could not be read');
+    expect(res.body.details).toEqual({ reason: 'CSV missing required column: capacityMl' });
+  });
+
+  it('should answer 413 JSON for a file over 10 MB', async () => {
+    const res = await request.post('/api/bottles/import/preview')
+      .set(authHeader())
+      .attach('file', Buffer.alloc(11 * 1024 * 1024), 'bottles.csv');
+    expect(res.status).toBe(413);
+    expect(res.body.error).toBe('The file or request is too large');
   });
 
   it('should parse a ZIP containing bottles.csv and categories.csv', async () => {
