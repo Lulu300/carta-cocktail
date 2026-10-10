@@ -41,7 +41,7 @@ Exit code: `0` when every check gives the expected result, `1` when a check or a
 
 ## Layouts
 
-A layout is a folder in `layouts/` with a `layout.mjs`, one compose template per compose file generation (`compose-<version>.yml`) and an env file template. Placeholders (`{{BACKEND_IMAGE}}`…) are filled in by the bench; ports are published on `127.0.0.1` with free host ports.
+A layout is a folder in `layouts/` with a `layout.mjs`, one compose template per compose file generation (`compose-<version>.yml`) and an env file template. Placeholders (`{{BACKEND_IMAGE}}`…) are filled in by the bench; ports are published on `127.0.0.1` with free host ports (`"127.0.0.1::<container port>"`). The bench reaches the frontend on the container port published by the current generation: 80 up to `compose-1.5.0.yml`, 8080 from `compose-1.8.0.yml` (non-root nginx).
 
 - **`friend`**: a self-hosted setup seen in the field. Bind mounts `./data:/app/data` and `./uploads:/uploads` (photos where v1.4.0 wrote them), secrets in an `env_file` holding only `JWT_SECRET` (46 characters) and `ADMIN_PASSWORD` (6 characters), `ADMIN_EMAIL` and `DATABASE_URL` in `environment`, an external network, `:latest` images. The bench uses random values of the same lengths.
 - **`official`**: `docker-compose.prod.yml` as published, with the named volumes `db-data` and `uploads`, and a `.env` with `JWT_SECRET`, `ADMIN_EMAIL` and `ADMIN_PASSWORD`. As with a real v1.4.0 install, the photos start inside the backend container, in `/uploads`.
@@ -81,7 +81,7 @@ After each start or jump:
 | `prisma migrate status` | versions with migrations |
 | Admin login | `POST /api/auth/login` then `/api/auth/me`. v1.4.0 rewrites the admin password from `ADMIN_PASSWORD` at each start: from then on the bench expects that password, and checks it still works after each jump |
 | Public API | menu list, each public menu, each cocktail recipe of a public menu |
-| Photos | each `Cocktail.imagePath`, through the backend and through the frontend nginx of the same version |
+| Photos | each `Cocktail.imagePath`, through the backend (group `images`) and through the frontend nginx of the same version (group `frontendImages`). `frontendImages` may fail whenever `images` may, for the same reason, unless a hook gives it its own `naiveMayFail` entry |
 | Upload folder | the upload folder of the version is on a mount, so photos survive a container recreation |
 | Database | backend stopped, on a copy of the database files read from a read-only mount (opening the live database would checkpoint its WAL and change what the next version gets): row count of each table vs the fixture (no loss), `PRAGMA integrity_check`, journal mode, `pre-migrate-*` backup |
 

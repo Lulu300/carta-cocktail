@@ -1,0 +1,41 @@
+# compose-1.5.0.yml after the required action of the v1.8.0 notes: the frontend container listens
+# on 8080 (non-root nginx), so its published port maps to 8080 instead of 80. Nothing else changes.
+services:
+  carta-cocktail-backend:
+    image: {{BACKEND_IMAGE}}
+    platform: {{BACKEND_PLATFORM}}
+    container_name: {{PROJECT}}-backend
+    env_file:
+      - carta-cocktail.env
+    environment:
+      - DATABASE_URL=file:/app/data/carta_cocktail.db
+      - ADMIN_EMAIL={{ADMIN_EMAIL}}
+      - ADMIN_RESET_PASSWORD=${ADMIN_RESET_PASSWORD:-false}
+      - PORT=3001
+      - UPLOAD_DIR=/app/uploads
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+    networks:
+      - swag
+    ports:
+      - "127.0.0.1::3001"
+    restart: unless-stopped
+
+  carta-cocktail-frontend:
+    image: {{FRONTEND_IMAGE}}
+    platform: {{FRONTEND_PLATFORM}}
+    container_name: {{PROJECT}}-frontend
+    environment:
+      - BACKEND_HOST=carta-cocktail-backend
+    depends_on:
+      - carta-cocktail-backend
+    networks:
+      - swag
+    ports:
+      - "127.0.0.1::8080"
+    restart: unless-stopped
+networks:
+  swag:
+    external: true
+    name: {{PROJECT}}-swag

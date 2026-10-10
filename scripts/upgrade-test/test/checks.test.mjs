@@ -14,7 +14,7 @@ import {
 
 const LAYOUTS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'layouts');
 // Port the frontend container listens on, per compose generation of the layouts.
-const FRONTEND_PORT_BY_GENERATION = { '1.4.0': 80, '1.5.0': 80 };
+const FRONTEND_PORT_BY_GENERATION = { '1.4.0': 80, '1.5.0': 80, '1.8.0': 8080 };
 
 test('parseSnapshot reads the helper output', () => {
   const snapshot = parseSnapshot([
