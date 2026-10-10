@@ -5,13 +5,13 @@ phase: E
 lane: frontend
 criticite: haute
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: []
 touches: [frontend/src/index.css, frontend/src/components/ui/, frontend/src/test/setup.ts, frontend/src/i18n/locales/]
 sources: ["06-frontend-ux-perf.md §2", "05-frontend-archi.md §4.1"]
-branch:
-pr:
+branch: feature/E-03-ui-primitives-tokens
+pr: https://github.com/Lulu300/carta-cocktail/pull/51
 ---
 
 ## Contexte
@@ -96,13 +96,13 @@ Les états de focus des composants utilisent `focus-visible:outline-2 focus-visi
 
 ## Critères d'acceptation
 
-- [ ] Les 14 tokens existent dans `index.css` ; `bg-canvas`, `bg-surface`, `text-on-accent` produisent les mêmes couleurs que les valeurs en dur (vérification visuelle sur une page de démonstration en dev, sans la committer).
-- [ ] Les 14 composants listés existent, avec au moins un test chacun (`Input`, `Select` et `Textarea` peuvent partager un fichier).
-- [ ] `Modal` : Échap ferme, clic sur le fond ferme, clic dans le contenu ne ferme pas, le titre est le nom accessible du dialogue.
-- [ ] `Field` + `Input` : `getByLabelText('Nom')` trouve le champ ; `error` est relié par `aria-describedby` et `aria-invalid="true"`.
-- [ ] Aucune classe `focus:outline-none` dans les nouveaux composants.
-- [ ] Le build n'émet plus d'avertissement CSS sur le bloc `@media print`.
-- [ ] Couverture ≥ 80 % sur les fichiers créés.
+- [x] Les 14 tokens existent dans `index.css` ; `bg-canvas`, `bg-surface`, `text-on-accent` produisent les mêmes couleurs que les valeurs en dur (vérification visuelle sur une page de démonstration en dev, sans la committer).
+- [x] Les 14 composants listés existent, avec au moins un test chacun (`Input`, `Select` et `Textarea` peuvent partager un fichier).
+- [x] `Modal` : Échap ferme, clic sur le fond ferme, clic dans le contenu ne ferme pas, le titre est le nom accessible du dialogue.
+- [x] `Field` + `Input` : `getByLabelText('Nom')` trouve le champ ; `error` est relié par `aria-describedby` et `aria-invalid="true"`.
+- [x] Aucune classe `focus:outline-none` dans les nouveaux composants.
+- [x] Le build n'émet plus d'avertissement CSS sur le bloc `@media print`.
+- [x] Couverture ≥ 80 % sur les fichiers créés.
 
 ## Tests à ajouter ou adapter
 
@@ -125,3 +125,4 @@ Un fichier par composant, à côté de la source (`components/ui/Modal.test.tsx`
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-10 : tokens et 14 composants livrés (PR #51), aucune page migrée. Écarts : `IconButton` a une troisième variante `neutral` (bouton de fermeture de `Modal`, gris comme les boutons actuels) ; le `className` d'`Icon` remplace la taille par défaut au lieu de s'y ajouter ; dans un `Field`, l'`id` du champ vient toujours du `Field` (le label reste associé) ; `ToggleSwitch` activé passe de `green-500` à `bg-success` (`green-400`) ; `Button variant="danger"` reprend le style teinté (`bg-danger/10`). Ajouts internes : `classNames.ts` (`cx()`, anneau de focus partagé) et `fieldContext.ts`. `Modal` ne monte son contenu qu'à l'ouverture et resynchronise le parent si le navigateur ferme le dialogue seul. Vérification des tokens sur une page de démo non commitée (Chromium headless) : couleurs calculées identiques aux valeurs en dur. Police : Inter conservée, choix reporté à E-12. Noms des tokens listés dans la PR pour D-09. Aucune action utilisateur requise.
