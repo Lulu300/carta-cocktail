@@ -19,14 +19,16 @@ interface IconProps extends Omit<ComponentPropsWithRef<'svg'>, 'children'> {
 
 /**
  * Decorative icon: the surrounding control carries the accessible name.
- * `className` replaces the default size, since two size utilities would conflict.
+ * The default 20 px size is set with attributes, so any `size-*` utility in
+ * `className` overrides it while a colour-only `className` keeps it.
  */
-export default function Icon({ name, className = 'size-5', ...rest }: IconProps) {
+export default function Icon({ name, ...rest }: IconProps) {
   return (
     <svg
       aria-hidden="true"
       focusable="false"
-      className={className}
+      width={20}
+      height={20}
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
