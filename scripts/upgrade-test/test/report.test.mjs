@@ -26,6 +26,12 @@ test('stepVerdict lists unexpected failures, or counts the expected ones', () =>
   assert.equal(stepVerdict({ ...failedStep, checks: failedStep.checks.slice(1) }), 'OK, 1 expected failure(s)');
 });
 
+test('stepVerdict shows the required actions that were not met', () => {
+  const notMet = { step: 'v1.6.0 Before 1', note: 'start v1.5.0 first', status: 'not met', detail: '' };
+  assert.equal(stepVerdict({ ...okStep, actions: [notMet] }), 'OK, 1 required action(s) not met');
+  assert.equal(stepVerdict({ ...failedStep, actions: [notMet] }), '**KO**: photos via backend; 1 required action(s) not met');
+});
+
 test('renderReport writes a summary column per mode and escapes table cells', () => {
   const report = renderReport({
     generatedAt: '2026-10-10T00:00:00.000Z',
@@ -34,7 +40,10 @@ test('renderReport writes a summary column per mode and escapes table cells', ()
     images: { '1.4.0': { backend: 'b', frontend: 'f', platform: 'linux/amd64' } },
     runs: [
       { mode: 'naive', setup: { tables: 15, rows: 758, users: 1 }, steps: [okStep] },
-      { mode: 'conformant', setup: { tables: 15, rows: 758, users: 1 }, steps: [okStep, failedStep], kept: { project: 'p', workDir: '/w' } },
+      {
+        mode: 'conformant', setup: { tables: 15, rows: 758, users: 1 }, steps: [okStep, failedStep],
+        kept: { project: 'p', workDir: '/w' }, cleanupWarnings: ['cannot delete /x'],
+      },
     ],
   });
   assert.match(report, /# Upgrade test: friend layout, 1\.4\.0 → 1\.5\.0/);
@@ -42,4 +51,5 @@ test('renderReport writes a summary column per mode and escapes table cells', ()
   assert.match(report, /\| 1\.4\.0 → 1\.5\.0 \| not run \| \*\*KO\*\*: photos via backend \|/);
   assert.match(report, /copy \\\| photos/);
   assert.match(report, /Environment kept for inspection/);
+  assert.match(report, /\*\*Cleanup warnings\*\*: cannot delete \/x/);
 });

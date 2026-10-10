@@ -7,10 +7,15 @@ import { runHelper } from './docker.mjs';
 
 export const DB_FILE_NAME = 'carta_cocktail.db';
 
+// Reads a copy of the database files, from a read-only mount: opening the live database would
+// checkpoint its WAL and change the state handed to the next version. The fingerprint and the
+// backups are read from the original folder.
 const SNAPSHOT_SCRIPT = `
 set -e
-DB=/data/${DB_FILE_NAME}
-echo "fingerprint|$(sha256sum "$DB" | cut -d' ' -f1)"
+mkdir /tmp/snapshot
+cp /data/${DB_FILE_NAME}* /tmp/snapshot/
+DB=/tmp/snapshot/${DB_FILE_NAME}
+echo "fingerprint|$(sha256sum /data/${DB_FILE_NAME} | cut -d' ' -f1)"
 echo "backups|$(ls /data/backups/pre-migrate-*.db 2>/dev/null | wc -l)"
 echo "integrity|$(sqlite3 "$DB" 'PRAGMA integrity_check;' | tr '\\n' ' ')"
 echo "journal|$(sqlite3 "$DB" 'PRAGMA journal_mode;')"
@@ -36,7 +41,7 @@ export function parseSnapshot(output) {
 
 /** Counts, integrity, journal mode and backups of the database in `dataMount` (a `-v` source). */
 export function takeSnapshot(dataMount) {
-  return parseSnapshot(runHelper([`${dataMount}:/data`], SNAPSHOT_SCRIPT));
+  return parseSnapshot(runHelper([`${dataMount}:/data:ro`], SNAPSHOT_SCRIPT));
 }
 
 function sqlString(value) {
@@ -44,23 +49,29 @@ function sqlString(value) {
 }
 
 /**
- * Replaces the admin credentials of the working copy: the bench never needs the real password,
- * and the real email never reaches a log or a report. Returns the number of users.
+ * Copies the fixture database into `dataDir` with the admin credentials replaced: the bench
+ * never needs the real password, and the real email never reaches a log or a report. The copy
+ * gets its final name only once anonymized, and freed pages are wiped (secure_delete, VACUUM)
+ * so that the old values do not stay in the file. Returns the number of users.
  */
-export function replaceAdminCredentials(dataDir, { email, passwordHash }) {
-  const sqlDir = fs.mkdtempSync(path.join(dataDir, '..', 'sql-'));
+export function createAnonymizedCopy(fixtureDir, dataDir, { email, passwordHash }) {
+  fs.mkdirSync(dataDir, { recursive: true });
+  const pendingName = `${DB_FILE_NAME}.anonymizing`;
+  fs.copyFileSync(path.join(fixtureDir, DB_FILE_NAME), path.join(dataDir, pendingName));
+  const sqlDir = fs.mkdtempSync(path.join(path.dirname(dataDir), 'sql-'));
   const sql = [
+    'PRAGMA secure_delete = ON;',
     `UPDATE "User" SET email = 'user' || id || '@example.test', passwordHash = ${sqlString(passwordHash)};`,
     `UPDATE "User" SET email = ${sqlString(email)} WHERE id = (SELECT MIN(id) FROM "User");`,
+    'VACUUM;',
     'SELECT COUNT(*) FROM "User";',
   ].join('\n');
   fs.writeFileSync(path.join(sqlDir, 'credentials.sql'), sql);
   try {
-    const output = runHelper(
-      [`${dataDir}:/data`, `${sqlDir}:/sql:ro`],
-      `sqlite3 /data/${DB_FILE_NAME} < /sql/credentials.sql`,
-    );
-    return Number(output.trim());
+    const output = runHelper([`${dataDir}:/data`, `${sqlDir}:/sql:ro`], `sqlite3 /data/${pendingName} < /sql/credentials.sql`);
+    fs.renameSync(path.join(dataDir, pendingName), path.join(dataDir, DB_FILE_NAME));
+    // The PRAGMA prints its new value first: the user count is the last line.
+    return Number(output.trim().split('\n').at(-1));
   } finally {
     fs.rmSync(sqlDir, { recursive: true, force: true });
   }

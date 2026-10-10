@@ -24,16 +24,22 @@ export function resultLabel(check) {
   return check.expected ? `${label} (expected: ${check.expected})` : label;
 }
 
-/** OK, "OK, n expected failures" or "KO: <groups>" for the summary table. */
+/**
+ * Summary cell: "**KO**: <checks>", or "OK" followed by the expected failures and the required
+ * actions that were not met (a conformant run that skips one is not fully conformant).
+ */
 export function stepVerdict(step) {
   const rows = [...step.actions, ...step.checks];
+  const unmet = step.actions.filter((action) => action.status === 'not met').length;
+  const unmetNote = unmet ? `${unmet} required action(s) not met` : null;
   const unexpected = unexpectedFailures(rows);
   if (unexpected.length) {
     const labels = [...new Set(unexpected.map((result) => result.label ?? result.step))];
-    return `**KO**: ${labels.join(', ')}`;
+    return [`**KO**: ${labels.join(', ')}`, unmetNote].filter(Boolean).join('; ');
   }
   const expected = rows.filter((result) => result.expected).length;
-  return expected ? `OK, ${expected} expected failure(s)` : 'OK';
+  const notes = [expected ? `${expected} expected failure(s)` : null, unmetNote].filter(Boolean);
+  return ['OK', ...notes].join(', ');
 }
 
 function renderStep(step, mode) {
@@ -88,6 +94,7 @@ export function renderReport({ generatedAt, layout, pathLabels, images, runs }) 
   for (const run of runs) {
     sections.push(`## ${run.mode} mode`);
     if (run.error) sections.push(`**Bench error**: ${run.error}`);
+    if (run.cleanupWarnings) sections.push(`**Cleanup warnings**: ${run.cleanupWarnings.join('; ')}`);
     if (run.kept) sections.push(`Environment kept for inspection: compose project \`${run.kept.project}\`, folder \`${run.kept.workDir}\`.`);
     sections.push(...run.steps.map((step) => renderStep(step, run.mode)));
   }

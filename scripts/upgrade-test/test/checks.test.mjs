@@ -80,6 +80,15 @@ test('expectations: naive failures listed by the notes and inherited ones are ex
   assert.deepEqual(unexpectedFailures(rows).map((result) => result.group), ['rowCounts']);
 });
 
+test('expectations: a layout reason replaces the reason of the notes in naive mode only', () => {
+  const crossedHooks = [{ naiveMayFail: { images: 'photos lost', startup: 'weak secret' } }];
+  const layoutReasons = { images: 'custom photo mount', uploadsPersistent: 'custom photo mount' };
+  const profile = { knownIssues: {} };
+  assert.deepEqual(allowedFailures({ mode: 'naive', profile, crossedHooks, unmetRequirements: [], layoutReasons }),
+    { images: 'custom photo mount', startup: 'weak secret' });
+  assert.deepEqual(allowedFailures({ mode: 'conformant', profile, crossedHooks, unmetRequirements: [], layoutReasons }), {});
+});
+
 test('expectations: conformant mode does not inherit previous failures', () => {
   const rows = [{ group: 'images', status: 'ko' }];
   markExpected(rows, { mode: 'conformant', allowed: {}, previousFailedGroups: new Set(['images']) });

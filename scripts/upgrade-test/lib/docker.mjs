@@ -37,10 +37,13 @@ export function buildImage(tag, contextDir) {
   docker(['build', '--quiet', '--tag', tag, contextDir]);
 }
 
+export function helperImageExists() {
+  return docker(['image', 'inspect', HELPER_IMAGE], { allowFailure: true }).status === 0;
+}
+
 /** Small Alpine image with the sqlite3 CLI, used to read the databases inside volumes. */
 export function ensureHelperImage() {
-  const exists = docker(['image', 'inspect', HELPER_IMAGE], { allowFailure: true }).status === 0;
-  if (!exists) docker(['build', '--quiet', '--tag', HELPER_IMAGE, '-'], { input: HELPER_DOCKERFILE });
+  if (!helperImageExists()) docker(['build', '--quiet', '--tag', HELPER_IMAGE, '-'], { input: HELPER_DOCKERFILE });
 }
 
 /** Runs a shell script in the helper image. `mounts` are `-v` values. */

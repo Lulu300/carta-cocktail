@@ -3,13 +3,18 @@
 /**
  * Failures allowed for a step, by check group, with the reason shown in the report:
  * - known bugs of the target version (any mode);
- * - in naive mode, what the release notes of the crossed versions say breaks without their actions;
+ * - in naive mode, what the release notes of the crossed versions say breaks without their actions.
+ *   The notes describe the default setup: `layoutReasons` replaces their reason when the layout
+ *   knows the real cause;
  * - a refused start when the path skips a version that the notes require to start first.
  */
-export function allowedFailures({ mode, profile, crossedHooks, unmetRequirements }) {
+export function allowedFailures({ mode, profile, crossedHooks, unmetRequirements, layoutReasons = {} }) {
   const allowed = { ...profile.knownIssues };
   if (mode === 'naive') {
     for (const hooks of crossedHooks) Object.assign(allowed, hooks.naiveMayFail);
+    for (const [group, reason] of Object.entries(layoutReasons)) {
+      if (allowed[group]) allowed[group] = reason;
+    }
   }
   if (unmetRequirements.length) {
     allowed.startup = `the path skips ${unmetRequirements.join(', ')}, which the notes require to start first`;

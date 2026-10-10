@@ -7,8 +7,9 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { BenchRun } from './lib/bench.mjs';
+import { cleanupAll, cleanupRun, workRoot } from './lib/cleanup.mjs';
 import {
-  buildImage, ensureHelperImage, pullImage, remoteDigest, removeResources, RESOURCE_PREFIX, serverPlatform,
+  buildImage, ensureHelperImage, pullImage, remoteDigest, RESOURCE_PREFIX, serverPlatform,
 } from './lib/docker.mjs';
 import { renderReport } from './lib/report.mjs';
 import { latestHookVersion, parseUpgradePath } from './lib/versions.mjs';
@@ -23,6 +24,8 @@ const MODES = ['naive', 'conformant'];
 const EXIT_UNEXPECTED_FAILURE = 1;
 // Wrong arguments, missing fixture, image not found: no report is written.
 const EXIT_SETUP_ERROR = 2;
+// Conventional exit code of a process stopped by Ctrl+C.
+const EXIT_INTERRUPTED = 130;
 
 const USAGE = `Usage: node scripts/upgrade-test/run.mjs --fixture <dir> --layout friend|official --path <v1,v2,...>
   --fixture <dir>        folder with carta_cocktail.db and uploads.tgz (never modified)
@@ -33,7 +36,8 @@ const USAGE = `Usage: node scripts/upgrade-test/run.mjs --fixture <dir> --layout
   --report-dir <dir>     default <fixture>/../upgrade-test-reports/<date>/
   --timeout <seconds>    wait for each backend start (default 300)
   --keep                 keep the containers, volumes and work folder of a failed run
-  --clean-all            remove every resource left by earlier runs (${RESOURCE_PREFIX}*) and exit`;
+  --clean-all            remove every resource left by earlier runs (${RESOURCE_PREFIX}*) and their
+                         work folders, then exit`;
 
 function parseCli() {
   const { values } = parseArgs({
@@ -115,6 +119,20 @@ function defaultReportDir(fixtureDir, now) {
   return path.resolve(fixtureDir, '..', 'upgrade-test-reports', now.toISOString().slice(0, 10));
 }
 
+/**
+ * Ctrl+C or a stop must not leave containers, volumes or copies of the database behind. The
+ * handler runs once the current docker command returns (spawnSync blocks the event loop).
+ */
+function cleanUpOnSignal(id) {
+  const onSignal = (signal) => {
+    console.error(`${signal} received: removing the containers, volumes, networks and work folders of run ${id}`);
+    for (const warning of cleanupRun(id)) console.error(warning);
+    process.exit(EXIT_INTERRUPTED);
+  };
+  process.once('SIGINT', onSignal);
+  process.once('SIGTERM', onSignal);
+}
+
 function runId(now) {
   return now.toISOString().replace(/[-:T]/g, '').slice(2, 14);
 }
@@ -123,8 +141,8 @@ async function main() {
   const options = parseCli();
   if (options.help) return console.log(USAGE);
   if (options['clean-all']) {
-    const removed = removeResources(RESOURCE_PREFIX);
-    return console.log(`Removed ${removed.containers} containers, ${removed.volumes} volumes, ${removed.networks} networks.`);
+    for (const warning of cleanupAll()) console.error(warning);
+    return console.log(`Removed the ${RESOURCE_PREFIX}* containers, volumes and networks, and ${workRoot()}.`);
   }
   if (!options.fixture || !options.layout || !options.path) throw new Error(USAGE);
   const modes = options.mode === 'both' ? MODES : [options.mode];
@@ -136,6 +154,8 @@ async function main() {
   const hookFiles = await loadHookFiles();
   const steps = parseUpgradePath(options.path, options['local-version'] ?? latestHookVersion(hookFiles));
   const now = new Date();
+  const id = runId(now);
+  cleanUpOnSignal(id);
 
   ensureHelperImage();
   const images = resolveImages(steps, hookFiles);
@@ -143,7 +163,7 @@ async function main() {
   for (const mode of modes) {
     const bench = new BenchRun({
       fixtureDir, layout, layoutDir, mode, steps, images, hookFiles,
-      runId: runId(now), timeoutMs: Number(options.timeout) * 1000,
+      runId: id, timeoutMs: Number(options.timeout) * 1000,
     });
     runs.push({ ...await bench.execute({ keep: options.keep }), failed: bench.hasFailed() });
   }
@@ -156,7 +176,10 @@ async function main() {
     generatedAt: now.toISOString(), layout, pathLabels: steps.map((step) => step.label), images, runs,
   }));
   console.log(`Report: ${reportPath}`);
-  for (const run of runs) console.log(`${run.mode}: ${run.failed ? 'KO' : 'OK'}${run.kept ? ` (kept: ${run.kept.workDir})` : ''}`);
+  for (const run of runs) {
+    console.log(`${run.mode}: ${run.failed ? 'KO' : 'OK'}${run.kept ? ` (kept: ${run.kept.workDir})` : ''}`);
+    for (const warning of run.cleanupWarnings ?? []) console.error(`cleanup warning: ${warning}`);
+  }
   if (runs.some((run) => run.failed)) process.exitCode = EXIT_UNEXPECTED_FAILURE;
 }
 

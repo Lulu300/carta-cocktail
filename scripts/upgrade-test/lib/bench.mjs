@@ -1,6 +1,5 @@
 // Runs one upgrade path, in one mode (naive or conformant), on a fresh copy of the fixture.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { MIGRATE_STATUS_OK, randomSecret, runAction } from './actions.mjs';
@@ -8,7 +7,8 @@ import {
   checkAdminLogin, checkFrontendShell, checkImages, checkIntegrity, checkJournalMode, checkLogLines,
   checkPublicApi, checkRowCounts, checkUploadsPersistent, infoRow, row, tryLogin,
 } from './checks.mjs';
-import { DB_FILE_NAME, fillVolume, replaceAdminCredentials, takeSnapshot } from './database.mjs';
+import { removeDirectories, workDirOf } from './cleanup.mjs';
+import { createAnonymizedCopy, fillVolume, takeSnapshot } from './database.mjs';
 import {
   containerLogs, containerMounts, containerState, docker, removeResources, RESOURCE_PREFIX,
 } from './docker.mjs';
@@ -47,7 +47,7 @@ export class BenchRun {
   constructor({ fixtureDir, layout, layoutDir, mode, steps, images, hookFiles, runId, timeoutMs }) {
     Object.assign(this, { fixtureDir, layout, mode, steps, images, hookFiles, timeoutMs });
     this.project = `${RESOURCE_PREFIX}${runId}-${layout.name}-${mode}`;
-    this.workDir = path.join(os.tmpdir(), 'carta-upgrade-test', `${runId}-${layout.name}-${mode}`);
+    this.workDir = workDirOf(runId, layout.name, mode);
     this.instance = new Instance({ project: this.project, layout, layoutDir, workDir: this.workDir });
     this.logsDir = path.join(this.workDir, 'logs');
     this.startedReleases = new Set();
@@ -83,9 +83,16 @@ export class BenchRun {
       this.result.kept = { project: this.project, workDir: this.workDir };
       return;
     }
-    if (fs.existsSync(this.instance.composePath)) this.instance.down();
-    removeResources(this.project);
-    fs.rmSync(this.workDir, { recursive: true, force: true });
+    // A cleanup error is reported next to the result, never instead of it.
+    const warnings = [];
+    try {
+      if (fs.existsSync(this.instance.composePath)) this.instance.down();
+      removeResources(this.project);
+    } catch (error) {
+      warnings.push(`Docker cleanup failed: ${error.message}`);
+    }
+    warnings.push(...removeDirectories([this.workDir]));
+    if (warnings.length) this.result.cleanupWarnings = warnings;
   }
 
   // ───────────── Preparation: working copy, credentials, first containers ─────────────
@@ -93,16 +100,15 @@ export class BenchRun {
   async prepare() {
     fs.mkdirSync(this.logsDir, { recursive: true });
     const first = this.steps[0];
-    const photosDir = extractPhotos(path.join(this.fixtureDir, 'uploads.tgz'), this.workDir);
+    // The hash is computed first (it starts a container): the copy of the real database then
+    // exists for as short a time as possible before it is anonymized.
+    this.testPassword = randomSecret(TEST_PASSWORD_LENGTH);
+    const passwordHash = bcryptHash(this.images[first.label].backend, this.images[first.label].platform, this.testPassword);
     const dataDir = this.layout.database.kind === 'bind'
       ? path.join(this.instance.dir, this.layout.database.hostDir)
       : path.join(this.workDir, 'seed-data');
-    fs.mkdirSync(dataDir, { recursive: true });
-    fs.copyFileSync(path.join(this.fixtureDir, DB_FILE_NAME), path.join(dataDir, DB_FILE_NAME));
-
-    this.testPassword = randomSecret(TEST_PASSWORD_LENGTH);
-    const passwordHash = bcryptHash(this.images[first.label].backend, this.images[first.label].platform, this.testPassword);
-    const users = replaceAdminCredentials(dataDir, { email: ADMIN_EMAIL, passwordHash });
+    const users = createAnonymizedCopy(this.fixtureDir, dataDir, { email: ADMIN_EMAIL, passwordHash });
+    const photosDir = extractPhotos(path.join(this.fixtureDir, 'uploads.tgz'), this.workDir);
     this.baseline = takeSnapshot(dataDir);
     this.lastSnapshot = this.baseline;
     this.admin = { password: this.testPassword, label: 'test password (hash replaced in the copy)' };
@@ -207,12 +213,27 @@ export class BenchRun {
     if (outcome.started) step.checks.push(this.shutdownRow(ctx, backend, Date.now() - stopStartedAt));
     step.checks.push(...this.databaseChecks(ctx, outcome));
 
-    const allowed = allowedFailures({ mode: this.mode, profile: ctx.profile, crossedHooks: ctx.crossedHooks, unmetRequirements: unmet });
+    const allowed = allowedFailures({
+      mode: this.mode,
+      profile: ctx.profile,
+      crossedHooks: ctx.crossedHooks,
+      unmetRequirements: unmet,
+      layoutReasons: this.photoMountReasons(ctx.profile),
+    });
     markExpected(step.checks, { mode: this.mode, allowed, previousFailedGroups: this.previousFailedGroups });
     this.previousFailedGroups = failedGroups(step.checks);
     const unexpected = unexpectedFailures([...step.actions, ...step.checks]).length;
     this.log(`${title}: ${outcome.started ? 'started' : 'refused'}, ${unexpected} unexpected failure(s)`);
     return step;
+  }
+
+  /** Photos bind-mounted on a folder that the version no longer reads (friend layout from v1.5.0). */
+  photoMountReasons(profile) {
+    const { photos } = this.layout;
+    if (photos.kind !== 'bind' || photos.containerPath === profile.uploadDir) return {};
+    const reason = `custom photo mount: the layout mounts ./${photos.hostDir} on ${photos.containerPath}, `
+      + `but this version reads ${profile.uploadDir} (UPLOAD_DIR set by the image); the photos are still on the host`;
+    return { images: reason, uploadsPersistent: reason };
   }
 
   trackAdminPasswordReset(ctx) {
