@@ -21,8 +21,8 @@ export default defineConfig({
         lines: 60,
         // Ratchet: set to the coverage measured once untested files entered the
         // report (B-02). Never lower these; task B-10 raises them back to 60.
-        functions: 53,
-        branches: 52,
+        functions: 54,
+        branches: 54,
         statements: 60,
       },
       exclude: [
