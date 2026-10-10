@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: haute
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [C-01, C-03]
-touches: [backend/prisma/schema.prisma, backend/prisma/migrations/, backend/src/routes/categories.ts, backend/src/routes/bottles.ts, backend/src/routes/ingredients.ts, backend/src/routes/units.ts, backend/src/services/integrityService.ts, backend/scripts/check-integrity.ts, backend/src/i18n/]
+touches: [backend/prisma/schema.prisma, backend/prisma/migrations/, backend/src/routes/categories.ts, backend/src/routes/bottles.ts, backend/src/routes/ingredients.ts, backend/src/routes/units.ts, backend/src/services/integrityService.ts, backend/src/services/deletionService.ts, backend/src/utils/uniqueness.ts, backend/scripts/check-integrity.ts, backend/src/i18n/, backend/src/test/helpers.ts, backend/src/app.test.ts]
 sources: ["02-backend-data-perf.md §2.3", "02-backend-data-perf.md §2.4", "02-backend-data-perf.md §2.5"]
-branch:
-pr:
+branch: feature/C-07-schema-integrity
+pr: https://github.com/Lulu300/carta-cocktail/pull/60
 ---
 
 ## Décisions validées (2026-10-08)
@@ -68,14 +68,14 @@ Vérifié sur `backend/prisma/schema.prisma` et sur le SQL réel (`sqlite3 backe
 
 ## Critères d'acceptation
 
-- [ ] `DELETE …?force=true` sur une bouteille, un ingrédient ou une catégorie utilisés → 200, suppression en cascade dans une transaction, `impact` liste les cocktails modifiés ; en cas d'erreur, rien n'est supprimé.
-- [ ] Le script d'intégrité a tourné sur une copie de la prod ; résultat joint à la PR.
-- [ ] Migration `schema_integrity` versionnée ; `npm run db:check` (C-01) passe.
-- [ ] Supprimer une bouteille, catégorie, unité ou ingrédient utilisé par une recette → 409 avec la liste des cocktails ; rien n'est supprimé.
-- [ ] Supprimer une catégorie non vide → 409 ; bouteilles intactes.
-- [ ] Supprimer une bouteille seulement « préférée » → 200 ; la préférence disparaît.
-- [ ] Créer la catégorie « rhum » quand « Rhum » existe → 409.
-- [ ] `EXPLAIN QUERY PLAN SELECT * FROM CocktailIngredient WHERE cocktailId = 1` utilise un index.
+- [x] `DELETE …?force=true` sur une bouteille, un ingrédient ou une catégorie utilisés → 200, suppression en cascade dans une transaction, `impact` liste les cocktails modifiés ; en cas d'erreur, rien n'est supprimé.
+- [x] Le script d'intégrité a tourné sur une copie de la prod ; résultat joint à la PR.
+- [x] Migration `schema_integrity` versionnée ; `npm run db:check` (C-01) passe.
+- [x] Supprimer une bouteille, catégorie, unité ou ingrédient utilisé par une recette → 409 avec la liste des cocktails ; rien n'est supprimé.
+- [x] Supprimer une catégorie non vide → 409 ; bouteilles intactes.
+- [x] Supprimer une bouteille seulement « préférée » → 200 ; la préférence disparaît.
+- [x] Créer la catégorie « rhum » quand « Rhum » existe → 409.
+- [x] `EXPLAIN QUERY PLAN SELECT * FROM CocktailIngredient WHERE cocktailId = 1` utilise un index.
 
 ## Tests à ajouter ou adapter
 
@@ -99,3 +99,8 @@ Vérifié sur `backend/prisma/schema.prisma` et sur le SQL réel (`sqlite3 backe
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : décisions validées par l'humain (voir « Décisions validées »).
+- 2026-10-10 : fait (PR #60). Schéma (`Restrict` explicites, `Cascade` sur les bouteilles préférées, `@unique` sur `Category.name` et `Unit.abbreviation`, 14 index), migration `20261010173910_schema_integrity`, `findIntegrityIssues` et `scripts/check-integrity.ts` (`--counts-only`), suppressions gardées dans `src/services/deletionService.ts` (409 avec `details`, `?force=true` en `$transaction`, pas de forçage pour les unités), unicité insensible à la casse dans `src/utils/uniqueness.ts`.
+- 2026-10-10 : écarts et choix. Migration générée par `prisma migrate diff` (`migrate dev` refuse le mode non interactif), avec les deux index uniques déplacés en tête : SQLite n'exécute pas la migration dans une transaction, et dans l'ordre de Prisma un doublon arrêtait la migration après la reconstruction de `Bottle` (essai sur base jetable). `PRAGMA foreign_key_check` ajouté à la main (Prisma 6 ne le génère plus) : il n'arrête pas la migration, d'où le contrôle `foreignKeyViolations` du script. Le 409 d'une catégorie non vide utilise le format commun `{ cocktails, bottles }` (liste des bouteilles) plutôt que `{ bottles: n }`. Les doublons de catégories à la casse près sont bloquants pour le script (la migration ne refuse que les doublons exacts). `touches` complété : `deletionService.ts`, `uniqueness.ts`, `src/test/helpers.ts` (fabrique `seedCocktailUsing`), `src/app.test.ts` (deux cas adaptés). Étape 7 (relation `Category.type`) non faite : nouvelle tâche C-17. Nouvelles tâches C-18 (reprise après une migration en échec) et C-19 (imports et casse).
+- 2026-10-10 : jeu d'essai réel (copie temporaire, montée en v1.6.0) : 0 doublon de catégorie, d'unité et de cocktail, 0 ligne orpheline, 0 type inconnu, 0 violation de clé étrangère ; migration appliquée sans perte de lignes. Banc conforme 1.4.0 → 1.6.0 → 1.7.0 → local : `friend` 69 OK, 0 échec ; `official` 67 OK, 1 échec attendu (bug photos v1.4.0), 0 inattendu.
+- 2026-10-10 : Notes de version : `breaking: true` proposé. Le conteneur refuse de démarrer si des catégories ou des unités sont en double. Avant la mise à jour : lancer `scripts/check-integrity.ts` de la nouvelle image sur une copie de la base et corriger les doublons. Après : la suppression d'un élément utilisé est refusée (409 avec la liste des cocktails), y compris une catégorie qui contient des bouteilles. Retour arrière : copie `pre-migrate` de C-01, ou `migrate resolve --rolled-back` (la migration s'arrête sur sa première instruction). Section « Required actions » dans la PR, à valider par l'humain.
+- 2026-10-10 : reste à l'humain : valider la section « Required actions » et `breaking: true`. Côté interface, l'affichage de `details` et le forçage sont prévus dans E-05 et E-15.
