@@ -97,6 +97,13 @@ describe('Request body errors', () => {
     expect(res.body.error).toBe('Le corps de la requête n’est pas un JSON valide');
   });
 
+  it('keeps the 415 status of a body in an unsupported charset', async () => {
+    const res = await request.post('/api/units').set(authHeader())
+      .set('Content-Type', 'application/json; charset=latin1').send('{}');
+    expect(res.status).toBe(415);
+    expectJsonError(res);
+  });
+
   it('answers 413 JSON for a JSON body over the parser limit', async () => {
     const res = await request.post('/api/units').set(authHeader())
       .set('Content-Type', 'application/json')

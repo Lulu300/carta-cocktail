@@ -16,6 +16,15 @@ function bodyParserErrorType(err: unknown): string | undefined {
   return typeof err.type === 'string' ? err.type : undefined;
 }
 
+// Other client errors raised by body-parser (unsupported charset or encoding, aborted
+// request) follow the http-errors convention: a 4xx `status` and `expose: true`.
+function exposedClientStatus(err: unknown): number | undefined {
+  if (typeof err !== 'object' || err === null) return undefined;
+  const { status, expose } = err as { status?: unknown; expose?: unknown };
+  const isClientStatus = typeof status === 'number' && status >= 400 && status < 500;
+  return expose === true && isClientStatus ? status : undefined;
+}
+
 function fromPrismaKnownError(
   err: Prisma.PrismaClientKnownRequestError,
   method: string,
@@ -55,6 +64,8 @@ export function toHttpError(err: unknown, method = 'GET'): HttpError {
   const parserErrorType = bodyParserErrorType(err);
   if (parserErrorType === 'entity.parse.failed') return new BadRequestError('errors.invalidJson');
   if (parserErrorType === 'entity.too.large') return new PayloadTooLargeError();
+  const clientStatus = exposedClientStatus(err);
+  if (clientStatus) return new HttpError(clientStatus, 'errors.validationError');
 
   return new HttpError(500, 'errors.serverError');
 }

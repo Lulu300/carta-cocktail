@@ -82,9 +82,16 @@ describe('toHttpError', () => {
       .toMatchObject({ status: 413, i18nKey: 'errors.fileTooLarge' });
   });
 
+  it('keeps the status of other exposed client errors', () => {
+    const error = Object.assign(bodyParserError('charset.unsupported'), { status: 415, expose: true });
+    expect(toHttpError(error)).toMatchObject({ status: 415, i18nKey: 'errors.validationError' });
+  });
+
   it.each([
     ['an Error', new Error('boom')],
     ['an unknown body-parser type', bodyParserError('charset.unsupported')],
+    ['an exposed server error', Object.assign(new Error('x'), { status: 503, expose: true })],
+    ['an unexposed client error', Object.assign(new Error('x'), { status: 400, expose: false })],
     ['an error with a non-string type', Object.assign(new Error('x'), { type: 42 })],
     ['a string', 'boom'],
     ['null', null],
