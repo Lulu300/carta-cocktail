@@ -7,7 +7,7 @@ criticite: basse
 effort: S
 status: todo
 owner: agent
-depends_on: [D-01]
+depends_on: [D-01, B-03]
 touches: [backend/src/config.ts, backend/prisma/seed.ts, backend/Dockerfile]
 sources: []
 branch:
@@ -24,13 +24,13 @@ Logs de `docker compose logs carta-cocktail-backend` au démarrage de l'image `b
 
 - encadré de Prisma proposant une mise à jour (`npm i @prisma/client@latest`) à chaque `prisma migrate` lancé par l'entrypoint ;
 - `◇ injected env (0) from .env // tip: …` affiché deux fois par dotenv 17 (`backend/src/config.ts:4`, `backend/prisma/seed.ts:7`), alors qu'il n'y a aucun `.env` dans l'image ;
-- bannière publicitaire d'i18next (déjà traitée par B-03 avec `showSupportNotice: false`, ou par B-09 en passant à i18next 26).
+- bannière publicitaire d'i18next (traitée par B-03 avec `showSupportNotice: false`, dont cette tâche dépend).
 
 ## Ce qu'il faut faire
 
 1. `backend/src/config.ts` et `backend/prisma/seed.ts` : `dotenv.config({ path, quiet: true })`.
-2. `backend/Dockerfile` : désactiver le message de mise à jour du CLI Prisma (variable d'environnement prévue par Prisma 6, à vérifier : `PRISMA_HIDE_UPDATE_MESSAGE=1`).
-3. Vérifier que la bannière i18next a disparu (B-03 ou B-09) ; sinon, la traiter ici.
+2. `backend/Dockerfile` : `ENV CHECKPOINT_DISABLE=1`, qui coupe l'appel à `checkpoint.prisma.io` (source de l'encadré de mise à jour et de télémétrie à chaque démarrage). Si l'encadré reste, ajouter `PRISMA_HIDE_UPDATE_MESSAGE=1` (vérifié dans le CLI Prisma 6.19).
+3. Vérifier que la bannière i18next a disparu (B-03).
 
 ## Critères d'acceptation
 
@@ -44,6 +44,7 @@ Logs de `docker compose logs carta-cocktail-backend` au démarrage de l'image `b
 ## Points d'attention
 
 - `touches` recoupe D-01 (`backend/Dockerfile`) : lancer après D-01.
+- dotenv : `quiet: true` fonctionne en 17 et en 18 (B-07), qui logue toujours par défaut. Préférer l'option à la variable d'environnement, dont le nom change entre les deux versions (`DOTENV_CONFIG_QUIET`, `DOTENV_QUIET`). C-15 ajoutera `import 'dotenv/config'` dans `backend/prisma.config.ts`, ce qui fera revenir la ligne `injected env` : la traiter dans C-15 ou ici, selon l'ordre.
 - Ne pas couper les logs de l'entrypoint ni ceux de `prisma migrate deploy` : les notes de version s'y réfèrent.
 
 ## Journal
