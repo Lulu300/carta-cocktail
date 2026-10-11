@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useState } from 'react';
 import { act, render, renderHook, screen, fireEvent } from '../test/test-utils';
+import { renderHook as renderPlainHook } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConfirmProvider, useConfirm, type ConfirmOptions } from './ConfirmContext';
 
@@ -115,18 +116,14 @@ describe('ConfirmProvider and useConfirm', () => {
   });
 
   it('cancels a pending question when a new one is asked', async () => {
-    let confirm: ReturnType<typeof useConfirm> | undefined;
-    function CaptureConfirm() {
-      confirm = useConfirm();
-      return null;
-    }
-    render(<ConfirmProvider><CaptureConfirm /></ConfirmProvider>);
+    // The provider needs no router nor query client: the plain renderHook takes it as wrapper.
+    const { result } = renderPlainHook(() => useConfirm(), { wrapper: ConfirmProvider });
 
     let first: Promise<boolean> | undefined;
     let second: Promise<boolean> | undefined;
     act(() => {
-      first = confirm?.({ title: 'First' });
-      second = confirm?.({ title: 'Second' });
+      first = result.current({ title: 'First' });
+      second = result.current({ title: 'Second' });
     });
 
     await expect(first).resolves.toBe(false);
