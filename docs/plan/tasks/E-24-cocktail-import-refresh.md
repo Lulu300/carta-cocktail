@@ -40,6 +40,7 @@ E-05 (partie 2) retire l'invalidation transitoire de `AdminLayout` qui rechargea
 ## Points d'attention
 
 - Conflit de fichiers avec E-06 (`CocktailsPage.tsx`) : enchaîner, ou regrouper dans E-06.
+- À faire avec E-06 ou juste après, avant la prochaine release.
 
 ## Journal
 

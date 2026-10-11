@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useLocalizedName } from '../../../hooks/useLocalizedName';
 import type { BottleGroup } from '../../../utils/bottleGrouping';
 import { cx } from '../../ui/classNames';
@@ -6,6 +5,9 @@ import BottleRow, { RemainingBar, type BottleActions } from './BottleRow';
 
 interface BottleGroupRowProps extends BottleActions {
   group: BottleGroup;
+  /** Kept by the page, so a group stays open across pagination and filters. */
+  expanded: boolean;
+  onToggle: (groupKey: string) => void;
 }
 
 function averageRemaining(group: BottleGroup): number {
@@ -14,14 +16,13 @@ function averageRemaining(group: BottleGroup): number {
 }
 
 /** Row of identical bottles with their count; a click lists each bottle below it. */
-export default function BottleGroupRow({ group, onEdit, onDelete }: BottleGroupRowProps) {
+export default function BottleGroupRow({ group, expanded, onToggle, onEdit, onDelete }: BottleGroupRowProps) {
   const localize = useLocalizedName();
-  const [expanded, setExpanded] = useState(false);
   const average = averageRemaining(group);
 
   return (
     <>
-      <tr className="hover:bg-line/50 cursor-pointer" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}>
+      <tr className="hover:bg-line/50 cursor-pointer" onClick={() => onToggle(group.key)} aria-expanded={expanded}>
         <td className="px-6 py-4 font-medium">
           <div className="flex items-center gap-2">
             <svg aria-hidden="true" className={cx('w-4 h-4 text-fg-muted transition-transform', expanded && 'rotate-90')} fill="none" stroke="currentColor" viewBox="0 0 24 24">

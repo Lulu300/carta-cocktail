@@ -8,6 +8,7 @@ import type { Menu, MenuInput } from '../../types';
 import { qk } from '../../queries/keys';
 import { useMenus } from '../../queries/menus';
 import { useCrudMutations } from '../../queries/crud';
+import { getBadgeClasses } from '../../utils/colors';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import Field from '../../components/ui/Field';
@@ -33,10 +34,10 @@ interface MenuForm {
 
 const EMPTY_MENU_FORM: MenuForm = { name: '', slug: '', description: '', isPublic: false };
 
-const TYPE_BADGES: Record<Menu['type'], { label: string; className: string }> = {
-  COCKTAILS: { label: 'Cocktails', className: 'bg-purple-500/20 text-purple-400' },
-  APEROS: { label: 'Apéritifs', className: 'bg-amber-500/20 text-amber-400' },
-  DIGESTIFS: { label: 'Digestifs', className: 'bg-orange-500/20 text-orange-400' },
+const TYPE_BADGES: Record<Menu['type'], { label: string; color: string }> = {
+  COCKTAILS: { label: 'Cocktails', color: 'purple' },
+  APEROS: { label: 'Apéritifs', color: 'yellow' },
+  DIGESTIFS: { label: 'Digestifs', color: 'orange' },
 };
 
 function isBottleMenu(menu: Menu): boolean {
@@ -107,7 +108,7 @@ export default function MenusPage() {
       header: 'Type',
       sortable: true,
       render: (menu) => (
-        <span className={cx('px-2 py-0.5 rounded text-xs font-medium', TYPE_BADGES[menu.type].className)}>
+        <span className={cx('px-2 py-0.5 rounded text-xs font-medium', getBadgeClasses(TYPE_BADGES[menu.type].color))}>
           {TYPE_BADGES[menu.type].label}
         </span>
       ),

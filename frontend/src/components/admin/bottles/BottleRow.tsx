@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../../hooks/useLocalizedName';
 import type { Bottle } from '../../../types';
+import Badge from '../../ui/Badge';
 import IconButton from '../../ui/IconButton';
 import { cx } from '../../ui/classNames';
 
@@ -10,16 +11,16 @@ export interface BottleActions {
 }
 
 function remainingColor(percent: number): string {
-  if (percent > 50) return 'bg-green-500';
-  if (percent > 20) return 'bg-yellow-500';
-  return 'bg-red-500';
+  if (percent > 50) return 'bg-success';
+  if (percent > 20) return 'bg-warning';
+  return 'bg-danger';
 }
 
 /** Fill level of a bottle (or the average of a group), colored by how full it is. */
 export function RemainingBar({ percent, label }: { percent: number; label: string }) {
   return (
     <div className="flex items-center gap-2">
-      <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
+      <div className="w-24 h-2 bg-line-strong rounded-full overflow-hidden">
         <div className={cx('h-full rounded-full', remainingColor(percent))} style={{ width: `${percent}%` }} />
       </div>
       <span className="text-sm">{label}</span>
@@ -61,12 +62,9 @@ export default function BottleRow({ bottle, indented = false, onEdit, onDelete }
       </td>
       <td className="px-6 py-4 text-fg-muted">{bottle.alcoholPercentage ? `${bottle.alcoholPercentage}%` : '-'}</td>
       <td className="px-6 py-4">
-        <span className={cx(
-          'px-2 py-1 rounded text-xs font-medium',
-          bottle.openedAt ? 'bg-orange-500/20 text-orange-400' : 'bg-green-500/20 text-green-400',
-        )}>
+        <Badge tone={bottle.openedAt ? 'warning' : 'success'}>
           {bottle.openedAt ? t('bottles.opened') : t('bottles.unopened')}
-        </span>
+        </Badge>
       </td>
       <td className="px-6 py-4 text-fg-muted">{bottle.purchasePrice ? `${bottle.purchasePrice} €` : '-'}</td>
       <td className="px-6 py-4 text-right">

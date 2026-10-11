@@ -172,10 +172,11 @@ describe('BottlesPage', () => {
       expect(screen.getByText('bottles.activeTitle (2)')).toBeInTheDocument();
     });
 
-    it('colors the fill level: green above 50 %, red at 20 % or less', async () => {
+    it('colors the fill level: success above 50 %, danger at 20 % or less', async () => {
       await renderLoadedPage();
-      expect(document.querySelector('.bg-green-500')).not.toBeNull();
-      expect(document.querySelector('.bg-red-500')).not.toBeNull();
+      expect(document.querySelector('.bg-success')).not.toBeNull();
+      expect(document.querySelector('.bg-warning')).toBeNull();
+      expect(document.querySelector('.bg-danger')).not.toBeNull();
     });
 
     it('never shows "no results" while the bottles are loading', () => {
@@ -256,6 +257,48 @@ describe('BottlesPage', () => {
       } finally {
         consoleError.mockRestore();
       }
+    });
+
+    it('keeps a group open after a page change and back', async () => {
+      const user = userEvent.setup();
+      const singles = Array.from({ length: 25 }, (_, index) => ({ ...mockBottles[1], id: 100 + index, name: `Bottle ${index + 1}` }));
+      const group = [{ ...mockBottles[0], id: 1 }, { ...mockBottles[0], id: 2 }];
+      mockApiList.mockResolvedValue([...singles, ...group] as never);
+      renderPage();
+      await screen.findByText('Bottle 1');
+
+      await user.click(screen.getByRole('button', { name: '2' }));
+      await user.click(screen.getByText('x2'));
+      expect(screen.getAllByText('Absolut')).toHaveLength(3);
+      await user.click(screen.getByRole('button', { name: '1' }));
+      await user.click(screen.getByRole('button', { name: '2' }));
+
+      expect(screen.getAllByText('Absolut')).toHaveLength(3);
+    });
+
+    it('keeps a group open after a search hides it and shows it again', async () => {
+      const user = userEvent.setup();
+      mockApiList.mockResolvedValue([mockBottles[0], { ...mockBottles[0], id: 3 }, mockBottles[1]] as never);
+      renderPage();
+      await user.click(await screen.findByText('x2'));
+
+      await user.type(screen.getByPlaceholderText('common.search'), 'hend');
+      expect(screen.queryByText('Absolut')).not.toBeInTheDocument();
+      await user.clear(screen.getByPlaceholderText('common.search'));
+
+      expect(screen.getAllByText('Absolut')).toHaveLength(3);
+    });
+
+    it('closes an open group on a second click', async () => {
+      const user = userEvent.setup();
+      mockApiList.mockResolvedValue([mockBottles[0], { ...mockBottles[0], id: 3 }] as never);
+      renderPage();
+      await user.click(await screen.findByText('x2'));
+      expect(screen.getAllByText('Absolut')).toHaveLength(3);
+
+      await user.click(screen.getByText('x2'));
+
+      expect(screen.getAllByText('Absolut')).toHaveLength(1);
     });
 
     it('keeps the empty bottles in a collapsed history', async () => {

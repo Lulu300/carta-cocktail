@@ -48,6 +48,7 @@ export default function BottlesPage() {
   const bottleForm = useEntityForm((bottle?: Bottle) => toBottleForm(categories, bottle));
   const filters = useBottleFilters(bottlesQuery.data);
   const [showImportWizard, setShowImportWizard] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<ReadonlySet<string>>(new Set());
 
   const sort = useSort<ListedBottle>(filters.activeBottles);
   const groupedBottles = useMemo(() => groupBottles(sort.sortedItems), [sort.sortedItems]);
@@ -67,10 +68,19 @@ export default function BottlesPage() {
     if (await confirmDelete(t('bottles.confirmDelete'))) remove.mutate(bottle.id);
   };
 
+  const toggleGroup = (groupKey: string) => {
+    setExpandedGroups((current) => {
+      const next = new Set(current);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
+      return next;
+    });
+  };
+
   const rowActions = { onEdit: bottleForm.open, onDelete: handleDelete };
 
   const renderRow = (item: BottleListItem) => (isGroup(item)
-    ? <BottleGroupRow group={item} {...rowActions} />
+    ? <BottleGroupRow group={item} expanded={expandedGroups.has(item.key)} onToggle={toggleGroup} {...rowActions} />
     : <BottleRow bottle={item} {...rowActions} />);
 
   const columns: Column<BottleListItem>[] = [
