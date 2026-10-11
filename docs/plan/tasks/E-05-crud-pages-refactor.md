@@ -8,10 +8,10 @@ effort: L
 status: todo
 owner: agent
 depends_on: [E-02, E-03, E-04]
-touches: [frontend/src/pages/admin/CategoriesPage.tsx, frontend/src/pages/admin/IngredientsPage.tsx, frontend/src/pages/admin/UnitsPage.tsx, frontend/src/pages/admin/BottlesPage.tsx, frontend/src/pages/admin/MenusPage.tsx, frontend/src/components/admin/, frontend/src/queries/, frontend/src/components/layout/AdminLayout.tsx, frontend/src/utils/bottleGrouping.ts, frontend/src/utils/translations.ts, frontend/src/utils/colors.ts]
+touches: [frontend/src/pages/admin/CategoriesPage.tsx, frontend/src/pages/admin/IngredientsPage.tsx, frontend/src/pages/admin/UnitsPage.tsx, frontend/src/pages/admin/BottlesPage.tsx, frontend/src/pages/admin/MenusPage.tsx, frontend/src/components/admin/, frontend/src/queries/, frontend/src/components/layout/AdminLayout.tsx, frontend/src/utils/bottleGrouping.ts, frontend/src/utils/translations.ts, frontend/src/utils/colors.ts, frontend/src/components/ui/Toaster.tsx, frontend/src/i18n/locales/, frontend/src/test/feedback.tsx]
 sources: ["05-frontend-archi.md §4.2", "05-frontend-archi.md §H2"]
-branch:
-pr:
+branch: feature/E-05-crud-pages-refactor
+pr: "#83 (1/2)"
 ---
 
 ## Décisions validées (2026-10-08)
@@ -77,12 +77,12 @@ Les textes en dur déplacés (« Alcool % (vol.) », « Facteur de conversion (m
 ## Critères d'acceptation
 
 - [ ] Plus aucun `confirm(`, `alert(`, `useEffect(() => { load(); }` dans les 5 pages.
-- [ ] Supprimer une catégorie qui a des bouteilles affiche le message d'erreur du backend dans un toast.
+- [x] Supprimer une catégorie qui a des bouteilles affiche le message d'erreur du backend dans un toast.
 - [ ] Chaque création, modification et suppression réussie affiche le toast `*.created`, `*.updated` ou `*.deleted`.
 - [ ] Double clic rapide sur « Enregistrer » : une seule requête `POST` (onglet Réseau ou test).
 - [ ] Vider une bouteille dans `BottlesPage` met à jour le badge de pénuries sans changer de page.
 - [ ] « Aucun résultat » n'apparaît jamais pendant le chargement.
-- [ ] Rouvrir l'édition après avoir ouvert les traductions d'une autre entité : le bloc revient à son état par défaut.
+- [x] Rouvrir l'édition après avoir ouvert les traductions d'une autre entité : le bloc revient à son état par défaut.
 - [ ] `BottlesPage.tsx` ≤ 200 lignes, `CategoriesPage.tsx` ≤ 150 lignes.
 - [ ] Plus de `bg-[#…]` dans les fichiers touchés.
 - [ ] Tests et couverture ≥ 80 % sur les lignes modifiées.
@@ -106,3 +106,4 @@ Les textes en dur déplacés (« Alcool % (vol.) », « Facteur de conversion (m
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : décisions validées par l'humain (voir « Décisions validées »).
+- 2026-10-11 : partie 1/2 (PR #83) : socle commun, `UnitsPage`, `IngredientsPage`, `CategoriesPage`. Socle : `queries/crud.ts` (`useEntityMutation`, `useCrudMutations` ; création et modification ignorent un second appel tant que le premier est en cours, car le bouton n'est désactivé qu'au rendu suivant, que TanStack Query programme après l'événement ; bascules et suppressions restent concurrentes), `queries/deletionImpact.ts` (un 409 avec `details` garde le message du backend et nomme cocktails et bouteilles, 5 noms au plus puis « et N autres » ; `readDeletionImpact` servira à E-15), `components/admin/` (`useEntityForm` avec `formKey`, `TranslationFields`, `DataTable` avec squelette et erreur + réessayer, `LoadError`, `useConfirmDelete`), `utils/translations.ts`, `getDotClasses`, `utils/bottleGrouping.ts` (seul l'import change dans `BottlesPage`). Catégories : 128 lignes, `components/admin/categories/` (`CategoryFormModal`, `CategoryTypesManager`, `useCategoryTypeForm`, `categoryForm.ts` avec `OTHER_TYPE`). Choix : pas de toast de succès pour la bascule de disponibilité et les boutons « tous disponibles / indisponibles » (la carte montre déjà le changement) ; l'erreur de suppression d'un type affiche le message du backend, encore en anglais jusqu'à C-12. Nouvelles clés en/fr : `categoryTypes.created/updated/deleted`, `deletion.*`. Ajouts à `touches` : `components/ui/Toaster.tsx` (remarque 3 de la revue d'E-04 : après fermeture d'un toast au clavier, le focus revient à l'élément d'avant, sinon à un autre toast, au lieu de `<body>`), `i18n/locales/`, `test/feedback.tsx` (`renderWithFeedback`, `clearToasts`, hors de `test-utils` car le store des toasts charge la vraie config i18n). 580 tests, couverture globale 70,74 / 61,25 / 66,92 / 72,13 %, lignes modifiées 98,7 %, chargement initial 134,83 kB gzip. Reste pour la partie 2 : `MenusPage`, `BottlesPage`, retrait de l'invalidation transitoire d'`AdminLayout`, et les critères correspondants. Aucune action requise.
