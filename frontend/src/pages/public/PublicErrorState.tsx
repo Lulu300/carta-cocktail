@@ -20,7 +20,12 @@ interface PublicErrorStateProps {
   isRetrying: boolean;
 }
 
-/** Tells "this page does not exist" apart from "this page could not be loaded". */
+const ERROR_CLASSES = 'min-h-[60vh] justify-center';
+
+/**
+ * Tells "this page does not exist" apart from "this page could not be loaded".
+ * Both replace the loading status, so they are announced as an alert.
+ */
 export default function PublicErrorState({ error, loadErrorTitle, notFound, onRetry, isRetrying }: PublicErrorStateProps) {
   const { t } = useTranslation();
 
@@ -29,7 +34,8 @@ export default function PublicErrorState({ error, loadErrorTitle, notFound, onRe
       <EmptyState
         icon="🍸"
         title={notFound.title}
-        className="min-h-[60vh] justify-center"
+        role="alert"
+        className={ERROR_CLASSES}
         action={(
           <Link to={notFound.linkTo} className="text-accent hover:text-accent-soft underline underline-offset-4">
             {notFound.linkLabel}
@@ -44,7 +50,8 @@ export default function PublicErrorState({ error, loadErrorTitle, notFound, onRe
       icon="⚠️"
       title={loadErrorTitle}
       description={t('public.loadErrorHint')}
-      className="min-h-[60vh] justify-center"
+      role="alert"
+      className={ERROR_CLASSES}
       action={(
         <Button variant="secondary" loading={isRetrying} onClick={onRetry}>
           {t('common.retry')}

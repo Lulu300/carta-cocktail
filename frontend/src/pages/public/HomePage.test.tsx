@@ -69,7 +69,7 @@ describe('HomePage', () => {
 
     render(<HomePage />);
 
-    expect(await screen.findByText('home.loadError')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('home.loadError');
     expect(screen.queryByText('home.noMenus')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'common.retry' }));

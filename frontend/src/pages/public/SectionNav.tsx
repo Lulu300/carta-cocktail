@@ -22,7 +22,7 @@ function prefersReducedMotion(): boolean {
 /** Horizontal list of the menu sections: a click scrolls to one, the active one follows the scroll. */
 export default function SectionNav({ items }: SectionNavProps) {
   const { t } = useTranslation();
-  const [observedId, setActiveId] = useState(items[0]?.anchorId);
+  const [observedId, setObservedId] = useState(items[0]?.anchorId);
   const listRef = useRef<HTMLUListElement>(null);
   // A search can remove the active section: fall back to the first one left.
   const activeId = items.some((item) => item.anchorId === observedId) ? observedId : items[0]?.anchorId;
@@ -37,7 +37,7 @@ export default function SectionNav({ items }: SectionNavProps) {
       const topmost = entries
         .filter((entry) => entry.isIntersecting)
         .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-      if (topmost) setActiveId(topmost.target.id);
+      if (topmost) setObservedId(topmost.target.id);
     }, { rootMargin: ACTIVE_BAND_MARGIN });
     targets.forEach((target) => observer.observe(target));
     return () => observer.disconnect();
@@ -53,7 +53,7 @@ export default function SectionNav({ items }: SectionNavProps) {
   }, [activeId]);
 
   const scrollToSection = (anchorId: string) => {
-    setActiveId(anchorId);
+    setObservedId(anchorId);
     document.getElementById(anchorId)?.scrollIntoView({
       behavior: prefersReducedMotion() ? 'auto' : 'smooth',
       block: 'start',

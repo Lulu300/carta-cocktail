@@ -46,6 +46,7 @@ export default function BottleGroupRow({ group, showInventory, onShowLocations }
             <button
               type="button"
               onClick={() => onShowLocations(group)}
+              aria-label={t('public.showAllLocations', { count: group.locations.length })}
               className="text-accent hover:text-accent-soft text-xs px-1"
             >
               +{hiddenLocationCount}

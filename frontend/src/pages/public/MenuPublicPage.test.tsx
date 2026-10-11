@@ -126,7 +126,7 @@ describe('MenuPublicPage', () => {
       vi.mocked(publicApi.getMenu).mockRejectedValue(new ApiError(404, 'Not found'));
       renderMenu('unknown');
 
-      expect(await screen.findByText('public.menuNotFound')).toBeInTheDocument();
+      expect(await screen.findByRole('alert')).toHaveTextContent('public.menuNotFound');
       expect(screen.queryByRole('button', { name: 'common.retry' })).not.toBeInTheDocument();
 
       await user.click(screen.getByRole('link', { name: 'public.backHome' }));
@@ -139,7 +139,7 @@ describe('MenuPublicPage', () => {
       vi.mocked(publicApi.getMenu).mockResolvedValueOnce(mojitoMenu);
       renderMenu('cocktails');
 
-      expect(await screen.findByText('public.menuLoadError')).toBeInTheDocument();
+      expect(await screen.findByRole('alert')).toHaveTextContent('public.menuLoadError');
       expect(screen.queryByText('public.menuNotFound')).not.toBeInTheDocument();
 
       await user.click(screen.getByRole('button', { name: 'common.retry' }));
@@ -204,7 +204,7 @@ describe('MenuPublicPage', () => {
       ));
       renderMenu('aperitifs');
 
-      await user.click(await screen.findByRole('button', { name: '+1' }));
+      await user.click(await screen.findByRole('button', { name: 'public.showAllLocations(4)' }));
 
       const dialog = screen.getByRole('dialog', { name: 'Suze' });
       expect(within(dialog).getByText('Garage')).toBeInTheDocument();

@@ -308,7 +308,10 @@
     "resultCount_one": "{{count}} résultat",
     "resultCount_other": "{{count}} résultats",
     "sectionNav": "Sections de la carte",
-    "moreIngredients": "+{{count}}",
+    "moreIngredients_one": "{{count}} autre ingrédient",
+    "moreIngredients_other": "{{count}} autres ingrédients",
+    "showAllLocations_one": "Voir {{count}} emplacement",
+    "showAllLocations_other": "Voir les {{count}} emplacements",
     "alcoholPercentage": "{{value}} % vol.",
     "capacityMl": "{{value}} ml"
   },

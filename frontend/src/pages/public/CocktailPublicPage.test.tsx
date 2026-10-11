@@ -196,7 +196,7 @@ describe('CocktailPublicPage', () => {
       mockGetCocktail.mockRejectedValue(new ApiError(404, 'Not found'));
       render(<CocktailPublicPage />);
 
-      expect(await screen.findByText('public.cocktailNotFound')).toBeInTheDocument();
+      expect(await screen.findByRole('alert')).toHaveTextContent('public.cocktailNotFound');
       expect(screen.getByRole('link', { name: 'public.back' })).toHaveAttribute('href', '/menu/summer-menu');
       expect(screen.queryByRole('button', { name: 'common.retry' })).not.toBeInTheDocument();
     });
@@ -206,7 +206,7 @@ describe('CocktailPublicPage', () => {
       mockGetCocktail.mockRejectedValueOnce(new ApiError(503, 'Unavailable'));
       render(<CocktailPublicPage />);
 
-      expect(await screen.findByText('public.cocktailLoadError')).toBeInTheDocument();
+      expect(await screen.findByRole('alert')).toHaveTextContent('public.cocktailLoadError');
       await user.click(screen.getByRole('button', { name: 'common.retry' }));
 
       expect(await screen.findByText('Negroni')).toBeInTheDocument();

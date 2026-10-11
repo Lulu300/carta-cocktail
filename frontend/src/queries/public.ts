@@ -30,7 +30,7 @@ export function isNotFoundError(error: Error | null): boolean {
   return error instanceof ApiError && error.status === 404;
 }
 
-export function usePublicMenus():UseQueryResult<Menu[], Error> {
+export function usePublicMenus(): UseQueryResult<Menu[], Error> {
   const viewer = usePublicViewer();
   return useQuery({
     queryKey: qk.publicMenus,

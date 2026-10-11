@@ -118,7 +118,8 @@ function PublicCocktailItem({
             ))}
             {hiddenIngredientCount > 0 && (
               <span className="text-xs text-gray-400 px-2 py-1">
-                {t('public.moreIngredients', { count: hiddenIngredientCount })}
+                <span aria-hidden="true">+{hiddenIngredientCount}</span>
+                <span className="sr-only">{t('public.moreIngredients', { count: hiddenIngredientCount })}</span>
               </span>
             )}
           </div>

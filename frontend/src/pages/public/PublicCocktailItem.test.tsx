@@ -55,7 +55,8 @@ describe('PublicCocktailItem', () => {
 
     expect(screen.getByText('Sugar')).toBeInTheDocument();
     expect(screen.queryByText('Soda')).not.toBeInTheDocument();
-    expect(screen.getByText('public.moreIngredients(2)')).toBeInTheDocument();
+    expect(screen.getByText('public.moreIngredients(2)')).toHaveClass('sr-only');
+    expect(screen.getByText('+2')).toHaveAttribute('aria-hidden', 'true');
   });
 
   it('tells the cocktail page that the guest comes from the menu', async () => {

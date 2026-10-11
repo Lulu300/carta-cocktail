@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
-import { useScrollRestoration } from './useScrollRestoration';
+import { forgetStalePositions, useScrollRestoration } from './useScrollRestoration';
 
 // The page under test: `ready` stays false until "load" is clicked when
 // `startsLoading` is set, like a menu that is not in the cache.
@@ -84,6 +84,33 @@ describe('useScrollRestoration', () => {
 
     await user.click(screen.getByRole('button', { name: 'load' }));
     expect(scrollTo).toHaveBeenCalledWith(0, 640);
+  });
+
+  it('ignores a position left on the first entry by an earlier page load in the tab', async () => {
+    // First load: leave the first entry (key "default") scrolled down.
+    const user = userEvent.setup();
+    const firstLoad = renderPages();
+    scrollPageTo(800);
+    await user.click(screen.getByRole('button', { name: 'forward' }));
+    firstLoad.unmount();
+    expect(sessionStorage.getItem('carta:scroll:default')).toBe('800');
+    scrollTo.mockClear();
+
+    // A new page load in the same tab (pasted link, QR code) starts again on "default".
+    forgetStalePositions();
+    renderPages();
+
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+
+  it('keeps the position of the first entry when the page is reloaded', () => {
+    sessionStorage.setItem('carta:scroll:default', '800');
+    vi.spyOn(performance, 'getEntriesByType').mockReturnValue([{ type: 'reload' } as PerformanceNavigationTiming]);
+
+    forgetStalePositions();
+    renderPages();
+
+    expect(scrollTo).toHaveBeenCalledWith(0, 800);
   });
 
   it('leaves the position alone on a first visit without saved position', () => {
