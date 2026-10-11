@@ -6,6 +6,7 @@ import { config } from '../config';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
   request, authHeader, prisma, seedCategory, seedUnit, seedBottle, seedIngredient, seedCocktail,
+  seedFullCocktail,
 } from '../test/helpers';
 
 beforeAll(async () => { await setupTestDatabase(); });
@@ -38,17 +39,9 @@ describe('GET /api/cocktails/:id', () => {
   });
 
   it('should return cocktail with ingredients and instructions', async () => {
-    const unit = await seedUnit();
-    const cat = await seedCategory();
-    const bottle = await seedBottle({ categoryId: cat.id });
+    const cocktail = await seedFullCocktail({ name: 'Test Cocktail' });
 
-    const createRes = await request.post('/api/cocktails').set(authHeader()).send({
-      name: 'Test Cocktail',
-      ingredients: [{ quantity: 4, unitId: unit.id, sourceType: 'BOTTLE', bottleId: bottle.id }],
-      instructions: [{ text: 'Shake well' }],
-    });
-
-    const res = await request.get(`/api/cocktails/${createRes.body.id}`).set(authHeader());
+    const res = await request.get(`/api/cocktails/${cocktail.id}`).set(authHeader());
     expect(res.status).toBe(200);
     expect(res.body.name).toBe('Test Cocktail');
     expect(res.body.ingredients).toHaveLength(1);

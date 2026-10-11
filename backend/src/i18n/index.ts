@@ -10,6 +10,8 @@ i18next.use(middleware.LanguageDetector).init({
   },
   fallbackLng: 'en',
   preload: ['en', 'fr'],
+  // No promotional banner in the server logs
+  showSupportNotice: false,
 });
 
 export default i18next;

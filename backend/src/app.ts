@@ -37,7 +37,10 @@ app.set('trust proxy', config.trustProxy);
 // Middleware
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({ origin: config.corsOrigin || false }));
-app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+// Request logs would bury the test results
+if (process.env.NODE_ENV !== 'test') {
+  app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+}
 // i18n first, so that body parsing errors are answered in the client's language
 app.use(i18nMiddleware);
 app.use(express.json());
