@@ -45,6 +45,7 @@ C-05 change la réponse de `POST /api/backup/import` : `{ message, skippedFiles,
 
 - Après E-04 : les messages passent par les toasts.
 - Le libellé de l'avertissement dépend du déploiement (Docker : redémarrer le conteneur backend).
+- Sauvegardes v1.0.x (avant `Category.minimumPercent`) : `restartRecommended` vaut `true`, mais leur schéma ne correspond pas à la baseline `0_init` ; au redémarrage, l'entrypoint de C-01 refuse la baseline (`refuse_baseline`) et le backend ne démarre pas. Limite de mise à jour existante de C-01, pas une régression de C-05. Le message ne doit pas promettre qu'un redémarrage suffit (renvoyer par exemple vers `UPGRADING.md`).
 
 ## Journal
 
