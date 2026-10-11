@@ -38,9 +38,10 @@ server {
     set $backend http://${BACKEND_HOST}:3001;
 
     # Backup restore: large archive, streamed to the backend instead of buffered on disk.
-    # Keep the size in line with the multer limit in backend/src/routes/backup.ts (500 MB).
+    # Keep the size in line with MAX_BACKUP_UPLOAD_BYTES in backend/src/services/backupService.ts
+    # (200 MB), plus a margin for the multipart envelope, so the backend answers the 413.
     location = /api/backup/import {
-        client_max_body_size 512m;
+        client_max_body_size 210m;
         proxy_request_buffering off;
         proxy_read_timeout 300s;
         proxy_send_timeout 300s;

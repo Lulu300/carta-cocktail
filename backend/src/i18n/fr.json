@@ -15,7 +15,9 @@
     "cannotModifySystemMenu": "Le slug et le type d’un menu système ne peuvent pas être modifiés",
     "fileTooLarge": "Le fichier ou la requête est trop volumineux",
     "invalidJson": "Le corps de la requête n’est pas un JSON valide",
-    "invalidImportFile": "Le fichier d’import n’a pas pu être lu"
+    "invalidImportFile": "Le fichier d’import n’a pas pu être lu",
+    "noFileUploaded": "Aucun fichier envoyé",
+    "backupSchemaTooNew": "Cette sauvegarde vient d’une version plus récente de Carta Cocktail : mettez l’application à jour avant de la restaurer"
   },
   "auth": {
     "loginSuccess": "Connexion réussie",
@@ -57,5 +59,8 @@
     "profileUpdated": "Profil mis à jour avec succès",
     "currentPasswordRequired": "Le mot de passe actuel est requis",
     "currentPasswordInvalid": "Le mot de passe actuel est incorrect"
+  },
+  "backup": {
+    "restored": "Sauvegarde restaurée"
   }
 }
