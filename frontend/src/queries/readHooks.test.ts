@@ -76,6 +76,15 @@ describe.each(cases)('$name', ({ useHook, apiCall, key, expectedArgs }) => {
   });
 });
 
+describe('useCocktailsAvailability options', () => {
+  it('does not request the availability when disabled', () => {
+    const { result } = renderHook(() => useCocktailsAvailability({ enabled: false }));
+
+    expect(result.current.fetchStatus).toBe('idle');
+    expect(api.availability.getAllCocktails).not.toHaveBeenCalled();
+  });
+});
+
 describe('qk', () => {
   it('nests a single cocktail or menu under its list key, so invalidating the list covers it', () => {
     expect(qk.cocktail(7).slice(0, 1)).toEqual(qk.cocktails);
