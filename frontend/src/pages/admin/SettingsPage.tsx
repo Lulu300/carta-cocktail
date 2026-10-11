@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { settings as settingsApi, backup as backupApi } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteSettings } from '../../contexts/SiteSettingsContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
+import { toast } from '../../components/ui/ToastStore';
 
 const ICON_OPTIONS = [
   '', '🍸', '🍹', '🥃', '🍷', '🥂', '🍺', '🧉', '🫗',
@@ -13,6 +15,7 @@ export default function SettingsPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const { refresh: refreshSiteSettings } = useSiteSettings();
+  const confirm = useConfirm();
 
   // Site settings
   const [siteName, setSiteName] = useState('');
@@ -107,7 +110,13 @@ export default function SettingsPage() {
 
   const handleBackupImport = async () => {
     if (!backupFile) return;
-    if (!confirm(t('settings.backup.confirmRestore'))) return;
+    const confirmed = await confirm({
+      title: t('settings.backup.import'),
+      message: t('settings.backup.confirmRestore'),
+      confirmLabel: t('settings.backup.import'),
+      tone: 'danger',
+    });
+    if (!confirmed) return;
 
     setBackupMessage('');
     setBackupError('');
@@ -115,6 +124,7 @@ export default function SettingsPage() {
     try {
       await backupApi.importBackup(backupFile);
       setBackupMessage(t('settings.backup.importSuccess'));
+      toast.success(t('settings.backup.importSuccess'));
       setBackupFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       setTimeout(() => window.location.reload(), 1500);

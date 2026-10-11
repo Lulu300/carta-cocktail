@@ -366,10 +366,15 @@
     "translationHint": "Optional: provide translated names for each language",
     "selected": "{{count}} selected",
     "retry": "Retry",
-    "close": "Close"
+    "close": "Close",
+    "undo": "Undo"
   },
   "pagination": {
     "showing": "{{start}}-{{end}} of {{total}}",
     "page": "page"
+  },
+  "confirm": {
+    "deleteTitle": "Delete?",
+    "irreversible": "This action cannot be undone."
   }
 }
