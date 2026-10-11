@@ -271,14 +271,24 @@ The compose files pass only some of these variables to the backend. To set `JWT_
 
 ### Login limit behind a reverse proxy
 
-The login limit counts failures per client IP address. In Docker, requests reach the API through nginx, so the API reads the client address from the `X-Forwarded-For` header, but only from the proxies that `TRUST_PROXY` trusts. The default trusts the host and private networks: nginx, and a reverse proxy in front of it on a private network (SWAG, Traefik…), work without any setting, and an address forged by a client on the Internet is ignored.
+The login limit counts failures per client IP address. The frontend's nginx forwards requests to the API, so the API reads the client address from the `X-Forwarded-For` header, but only from the proxies that `TRUST_PROXY` trusts. The default trusts the host and private networks: nginx, and a reverse proxy in front of it on a private network (SWAG, Traefik…), work without any setting, and an address forged by a client on the Internet is ignored.
 
 The default has limits:
 
 - A client on your local network connects from a private address, so it is trusted: it can forge its address and get around the limit.
 - In some installs, the first proxy (nginx, or SWAG) sees a client from the Internet under a **private** address: Docker rootless or Podman (through their port forwarder), Docker Desktop, or an IPv6 client on a published port when the Docker daemon has no IPv6 and `docker-proxy` relays the connection. That address is trusted, so the API reads the address the client wrote in `X-Forwarded-For`: the client can change it at each attempt and get around the limit.
 
-In these installs, set `TRUST_PROXY=1` (nginx alone) or `TRUST_PROXY=2` (SWAG or another reverse proxy in front of nginx). The API then uses the address the first proxy sees, which is the same for every client: all clients share one counter. The limit holds, but `LOGIN_RATE_LIMIT` failures from anyone also block the admin for up to 15 minutes. The counters are kept in memory: restarting the backend clears them.
+In these installs, set `TRUST_PROXY=1` (nginx alone) or `TRUST_PROXY=2` (SWAG or another reverse proxy in front of nginx) in the `environment` list of `carta-cocktail-backend`:
+
+```yaml
+      - TRUST_PROXY=1
+```
+
+Write values without quotes in this list: compose keeps them as part of the value, and the backend refuses to start with `- TRUST_PROXY="loopback, linklocal, uniquelocal"`.
+
+The API then uses the address the first proxy sees, which is the same for every client: all clients share one counter. The limit holds, but `LOGIN_RATE_LIMIT` failures from anyone also block the admin for up to 15 minutes. The counters are kept in memory: restarting the backend clears them.
+
+These settings hold only when clients cannot skip a proxy. The compose files still publish the backend port 3001: with `TRUST_PROXY=1` or `2`, a client that connects to it directly passes for the first proxy, and the API reads the address that client wrote in `X-Forwarded-For`. Behind SWAG, the same goes for nginx's port when a client reaches it without SWAG. Do not forward these ports from the Internet, or block them at the firewall.
 
 ## Git Workflow
 
