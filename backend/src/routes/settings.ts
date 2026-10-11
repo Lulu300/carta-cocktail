@@ -1,10 +1,10 @@
 import { Router, Response } from 'express';
 import { prisma } from '../lib/prisma';
-import bcrypt from 'bcryptjs';
-import { AuthRequest } from '../middleware/auth';
+import { hashPassword, MIN_PASSWORD_LENGTH, verifyPassword } from '../bootstrap/password';
+import { AuthRequest, signToken } from '../middleware/auth';
 import { BadRequestError, NotFoundError } from '../errors';
 import { valid, validate } from '../validation/validate';
-import { ProfileUpdate, SiteSettingsUpdate } from '../validation/settings';
+import { EmailAddress, ProfileUpdate, SiteSettingsUpdate } from '../validation/settings';
 
 const router = Router();
 
@@ -37,32 +37,36 @@ const profileSchemas = { body: ProfileUpdate };
 router.put('/profile', validate(profileSchemas), async (req: AuthRequest, res: Response) => {
   const { email, currentPassword, newPassword } = valid<typeof profileSchemas>(res).body;
 
+  if (email && !EmailAddress.safeParse(email).success) throw new BadRequestError('errors.invalidEmail');
+  // New passwords only: a shorter password set before this rule still logs in
+  if (newPassword && newPassword.length < MIN_PASSWORD_LENGTH) throw new BadRequestError('errors.passwordTooShort');
+
   const user = await prisma.user.findUnique({ where: { id: req.userId } });
   if (!user) throw new NotFoundError();
 
-  if (newPassword) {
-    // The schema only accepts a new password together with the current one
-    const isPasswordValid = await bcrypt.compare(currentPassword ?? '', user.passwordHash);
+  if (email || newPassword) {
+    // The schema only accepts these changes together with the current password
+    const isPasswordValid = await verifyPassword(currentPassword ?? '', user.passwordHash);
     // 400, not 401: the session is valid, only the submitted password is wrong.
     // A 401 would make the frontend log the admin out.
     if (!isPasswordValid) throw new BadRequestError('errors.invalidCurrentPassword');
   }
 
-  const updateData: { email?: string; passwordHash?: string } = {};
-  if (email) {
-    updateData.email = email;
-  }
-  if (newPassword) {
-    updateData.passwordHash = await bcrypt.hash(newPassword, 10);
-  }
-
   const updatedUser = await prisma.user.update({
-    where: { id: req.userId },
-    data: updateData,
-    select: { id: true, email: true },
+    where: { id: user.id },
+    data: {
+      // Absent fields are undefined, which Prisma leaves untouched
+      email: email || undefined,
+      passwordHash: newPassword ? await hashPassword(newPassword) : undefined,
+      // A new password revokes every token issued before it
+      tokenVersion: newPassword ? { increment: 1 } : undefined,
+    },
+    select: { id: true, email: true, tokenVersion: true },
   });
 
-  res.json(updatedUser);
+  const profile = { id: updatedUser.id, email: updatedUser.email };
+  // The token that sent this request is now revoked: hand over a new one
+  res.json(newPassword ? { ...profile, token: signToken(updatedUser) } : profile);
 });
 
 export default router;

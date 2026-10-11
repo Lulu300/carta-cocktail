@@ -17,11 +17,15 @@
     "invalidJson": "Le corps de la requête n’est pas un JSON valide",
     "invalidImportFile": "Le fichier d’import n’a pas pu être lu",
     "noFileUploaded": "Aucun fichier envoyé",
-    "backupSchemaTooNew": "Cette sauvegarde vient d’une version plus récente de Carta Cocktail : mettez l’application à jour avant de la restaurer"
+    "backupSchemaTooNew": "Cette sauvegarde vient d’une version plus récente de Carta Cocktail : mettez l’application à jour avant de la restaurer",
+    "tooManyAttempts": "Trop de tentatives de connexion échouées : réessayez dans quelques minutes",
+    "passwordTooShort": "Le nouveau mot de passe doit contenir au moins 12 caractères",
+    "invalidEmail": "L’adresse email n’est pas valide"
   },
   "auth": {
     "loginSuccess": "Connexion réussie",
-    "logoutSuccess": "Déconnexion réussie"
+    "logoutSuccess": "Déconnexion réussie",
+    "loggedOutEverywhere": "Déconnecté de tous les appareils"
   },
   "categories": {
     "created": "Catégorie créée avec succès",

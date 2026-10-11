@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import path from 'path';
-import { assertJwtSecret, resolveUploadDir } from './config';
+import jwt from 'jsonwebtoken';
+import { assertJwtSecret, parseJwtExpiresIn, parseLoginRateLimit, resolveUploadDir } from './config';
 
 describe('resolveUploadDir', () => {
   it('should use UPLOAD_DIR when it is an absolute path', () => {
@@ -48,5 +49,42 @@ describe('assertJwtSecret', () => {
 
   it.each(rejectedSecrets)('should not reject %s when NODE_ENV is test', (_label, secret) => {
     expect(() => assertJwtSecret(secret, 'test')).not.toThrow();
+  });
+});
+
+describe('parseLoginRateLimit', () => {
+  it.each([undefined, ''])('should default to 10 failed attempts for %j', (value) => {
+    expect(parseLoginRateLimit(value)).toBe(10);
+  });
+
+  it('should read a positive integer', () => {
+    expect(parseLoginRateLimit('3')).toBe(3);
+  });
+
+  it.each(['0', '-1', '2.5', 'ten'])('should reject %s', (value) => {
+    expect(() => parseLoginRateLimit(value)).toThrow(`LOGIN_RATE_LIMIT must be a positive integer, got '${value}'`);
+  });
+});
+
+describe('parseJwtExpiresIn', () => {
+  it.each([undefined, ''])('should keep the 7-day lifetime for %j', (value) => {
+    expect(parseJwtExpiresIn(value)).toBe('7d');
+  });
+
+  it('should read a timespan', () => {
+    expect(parseJwtExpiresIn('24h')).toBe('24h');
+  });
+
+  it('should read a number of seconds', () => {
+    const expiresIn = parseJwtExpiresIn('3600');
+    expect(expiresIn).toBe(3600);
+    const decoded = jwt.decode(jwt.sign({}, 'secret', { expiresIn })) as jwt.JwtPayload;
+    expect(decoded.exp! - decoded.iat!).toBe(3600);
+  });
+
+  it('should reject a value jsonwebtoken cannot read', () => {
+    expect(() => parseJwtExpiresIn('one week')).toThrow(
+      "JWT_EXPIRES_IN must be a number of seconds or a timespan such as 7d or 24h, got 'one week'",
+    );
   });
 });

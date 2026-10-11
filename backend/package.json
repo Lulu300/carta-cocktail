@@ -30,6 +30,7 @@
     "cors": "^2.8.6",
     "dotenv": "^18.0.7",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
     "helmet": "^8.3.0",
     "i18next": "^25.8.4",
     "i18next-http-middleware": "^3.9.9",

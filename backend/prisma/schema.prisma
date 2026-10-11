@@ -12,6 +12,8 @@ model User {
   email        String   @unique
   passwordHash String
   createdAt    DateTime @default(now())
+  // Copied into each token; incrementing it revokes every token issued before
+  tokenVersion Int      @default(0)
 }
 
 model CategoryType {
@@ -23,8 +25,8 @@ model CategoryType {
 model Category {
   id               Int      @id @default(autoincrement())
   name             String   @unique
-  nameTranslations String?  // JSON: {"fr": "...", "en": "..."}
-  type             String   // SPIRIT or SYRUP
+  nameTranslations String? // JSON: {"fr": "...", "en": "..."}
+  type             String // SPIRIT or SYRUP
   desiredStock     Int      @default(1)
   minimumPercent   Int      @default(30)
   createdAt        DateTime @default(now())
@@ -36,19 +38,19 @@ model Category {
 }
 
 model Bottle {
-  id               Int       @id @default(autoincrement())
-  name             String
-  categoryId       Int
-  category         Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  purchasePrice    Float?
-  capacityMl       Int
-  remainingPercent Int       @default(100)
-  openedAt         DateTime?
-  alcoholPercentage Float?   // Optional alcohol percentage
-  location         String?   // Optional free-text storage location
-  isApero          Boolean   @default(false) // Usable as apéritif
-  isDigestif       Boolean   @default(false) // Usable as digestif
-  createdAt        DateTime  @default(now())
+  id                Int       @id @default(autoincrement())
+  name              String
+  categoryId        Int
+  category          Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  purchasePrice     Float?
+  capacityMl        Int
+  remainingPercent  Int       @default(100)
+  openedAt          DateTime?
+  alcoholPercentage Float? // Optional alcohol percentage
+  location          String? // Optional free-text storage location
+  isApero           Boolean   @default(false) // Usable as apéritif
+  isDigestif        Boolean   @default(false) // Usable as digestif
+  createdAt         DateTime  @default(now())
 
   cocktailIngredients CocktailIngredient[]
   preferredFor        CocktailPreferredBottle[]
@@ -60,7 +62,7 @@ model Bottle {
 model Ingredient {
   id               Int      @id @default(autoincrement())
   name             String   @unique
-  nameTranslations String?  // JSON: {"fr": "...", "en": "..."}
+  nameTranslations String? // JSON: {"fr": "...", "en": "..."}
   icon             String?
   isAvailable      Boolean  @default(true)
   createdAt        DateTime @default(now())
@@ -73,7 +75,7 @@ model Unit {
   name                 String
   nameTranslations     String? // JSON: {"fr": "...", "en": "..."}
   abbreviation         String  @unique
-  conversionFactorToMl Float?  // Factor to convert this unit to ml (null = non-convertible)
+  conversionFactorToMl Float? // Factor to convert this unit to ml (null = non-convertible)
 
   cocktailIngredients CocktailIngredient[]
 }
@@ -89,26 +91,26 @@ model Cocktail {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  ingredients  CocktailIngredient[]
-  instructions CocktailInstruction[]
+  ingredients   CocktailIngredient[]
+  instructions  CocktailInstruction[]
   menuCocktails MenuCocktail[]
 }
 
 model CocktailIngredient {
-  id         Int      @id @default(autoincrement())
-  cocktailId Int
-  cocktail   Cocktail @relation(fields: [cocktailId], references: [id], onDelete: Cascade)
-  quantity   Float
-  unitId     Int
-  unit       Unit     @relation(fields: [unitId], references: [id], onDelete: Restrict)
-  sourceType String   // BOTTLE, CATEGORY, INGREDIENT
-  bottleId   Int?
-  bottle     Bottle?  @relation(fields: [bottleId], references: [id], onDelete: Restrict)
-  categoryId Int?
-  category   Category? @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  id           Int         @id @default(autoincrement())
+  cocktailId   Int
+  cocktail     Cocktail    @relation(fields: [cocktailId], references: [id], onDelete: Cascade)
+  quantity     Float
+  unitId       Int
+  unit         Unit        @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  sourceType   String // BOTTLE, CATEGORY, INGREDIENT
+  bottleId     Int?
+  bottle       Bottle?     @relation(fields: [bottleId], references: [id], onDelete: Restrict)
+  categoryId   Int?
+  category     Category?   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   ingredientId Int?
   ingredient   Ingredient? @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
-  position   Int      @default(0)
+  position     Int         @default(0)
 
   preferredBottles CocktailPreferredBottle[]
 
@@ -188,11 +190,11 @@ model MenuBottle {
 }
 
 model MenuSection {
-  id        Int      @id @default(autoincrement())
-  menuId    Int
-  menu      Menu     @relation(fields: [menuId], references: [id], onDelete: Cascade)
-  name      String
-  position  Int      @default(0)
+  id       Int    @id @default(autoincrement())
+  menuId   Int
+  menu     Menu   @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  name     String
+  position Int    @default(0)
 
   cocktails MenuCocktail[]
   bottles   MenuBottle[]
