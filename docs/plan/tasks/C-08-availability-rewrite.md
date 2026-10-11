@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: haute
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [A-05, C-02]
-touches: [backend/src/services/availabilityService.ts, backend/src/services/availabilityService.test.ts, backend/src/routes/availability.ts, backend/src/routes/public.ts, backend/src/routes/public.test.ts]
+touches: [backend/src/services/availabilityService.ts, backend/src/services/availabilityService.test.ts, backend/src/routes/availability.ts, backend/src/routes/availability.test.ts, backend/src/routes/public.ts, backend/src/routes/public.test.ts, frontend/src/pages/public/PublicCocktailItem.tsx, frontend/src/pages/public/PublicCocktailItem.test.tsx, frontend/src/types/index.ts, backend/AGENTS.md]
 sources: ["02-backend-data-perf.md §3.1", "02-backend-data-perf.md §3.2", "02-backend-data-perf.md §3.3"]
-branch:
-pr:
+branch: feature/C-08-availability-rewrite
+pr: "#75"
 ---
 
 ## Décisions validées (2026-10-08)
@@ -69,13 +69,13 @@ La disponibilité (nombre de portions possibles avec le stock) s'affiche dans la
 
 ## Critères d'acceptation
 
-- [ ] `preferredAvailable` présent sur les lignes `CATEGORY` avec préférées ; `available` présent et combiné dans les deux réponses publiques.
-- [ ] Le nombre de requêtes de `GET /api/availability/cocktails` ne dépend pas du nombre de cocktails (8 au plus).
-- [ ] « 1 tasse » consomme 250 ml ; « 2 g » ou « 1 rondelle » sont non mesurables.
-- [ ] Deux lignes de 40 ml sur une bouteille de 100 ml → `maxServings = 1`.
-- [ ] 3 × 0,6 ml sur 1,8 ml disponibles → 1 portion.
-- [ ] La forme JSON est inchangée : tests frontend verts sans modification.
-- [ ] Les décisions sur `preferredBottles` et `isAvailable` sont notées dans la PR et en commentaire du code.
+- [x] `preferredAvailable` présent sur les lignes `CATEGORY` avec préférées ; `available` présent et combiné dans les deux réponses publiques.
+- [x] Le nombre de requêtes de `GET /api/availability/cocktails` ne dépend pas du nombre de cocktails (8 au plus).
+- [x] « 1 tasse » consomme 250 ml ; « 2 g » ou « 1 rondelle » sont non mesurables.
+- [x] Deux lignes de 40 ml sur une bouteille de 100 ml → `maxServings = 1`.
+- [x] 3 × 0,6 ml sur 1,8 ml disponibles → 1 portion.
+- [x] La forme JSON est inchangée : tests frontend verts sans modification.
+- [x] Les décisions sur `preferredBottles` et `isAvailable` sont notées dans la PR et en commentaire du code.
 
 ## Tests à ajouter ou adapter
 
@@ -106,3 +106,4 @@ La disponibilité (nombre de portions possibles avec le stock) s'affiche dans la
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : décisions validées par l'humain (voir « Décisions validées »).
 - 2026-10-11 : E-11 grise sur `isAvailable` seul ; C-08 doit passer le grisé public sur `available` (calcul de `isUnavailable` dans `frontend/src/pages/public/PublicCocktailItem.tsx`, fichier à ajouter aux `touches` de C-08, avec son test `PublicCocktailItem.test.tsx`).
+- 2026-10-11 : faite (PR #75). `loadStock` (7 requêtes, quel que soit le nombre de cocktails) et `computeAvailability` pure ; facteurs des unités lus en base, agrégation par ressource, tolérance flottante ; `preferredAvailable` et `available` public selon les décisions ; grisé public sur `available`. Ajoutés aux `touches` : `PublicCocktailItem.tsx` et son test (journal du 2026-10-11), `frontend/src/types/index.ts` (champs `available` et `preferredAvailable`), `routes/availability.test.ts` (cas « tasse ») et `backend/AGENTS.md` (section disponibilité, client Prisma jetable du test de comptage). La base de seed ne contient aucun cocktail ; sur une copie du jeu d'essai, 42 cocktails et aucun changement d'état ni de portions. Les tests frontend qui lisent la disponibilité passent sans modification ; seul `PublicCocktailItem.test.tsx` change, pour le grisé.
