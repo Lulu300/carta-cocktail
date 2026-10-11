@@ -100,6 +100,16 @@ describe('PUT /api/units/:id', () => {
     expect(res.body.conversionFactorToMl).toBe(15);
   });
 
+  it('should return 400 and keep the unit when conversionFactorToMl is not a number', async () => {
+    const unit = await seedUnit({ conversionFactorToMl: 10 });
+    const res = await request.put(`/api/units/${unit.id}`).set(authHeader())
+      .send({ conversionFactorToMl: 'ten' });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('body.conversionFactorToMl');
+    const inDb = await prisma.unit.findUniqueOrThrow({ where: { id: unit.id } });
+    expect(inDb.conversionFactorToMl).toBe(10);
+  });
+
   it('should return 409 when taking the abbreviation of another unit', async () => {
     await seedUnit({ name: 'Millilitre', abbreviation: 'ml' });
     const unit = await seedUnit({ abbreviation: 'cl' });
