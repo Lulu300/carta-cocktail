@@ -88,15 +88,15 @@ Aucune dépendance n'a été mise à jour depuis février : les lockfiles datent
 
 ## Critères d'acceptation
 
-- [ ] `.github/dependabot.yml` existe et GitHub l'accepte (aucune erreur dans Insights > Dependency graph > Dependabot). Fichier validé par le schéma Dependabot ; l'acceptation par GitHub se vérifie après merge (« Check for updates »).
-- [ ] Les 4 écosystèmes apparaissent (npm backend, npm frontend, docker, github-actions). Configurés ; à vérifier après merge.
-- [ ] Les PR Dependabot ciblent `develop`, pas `main`. `target-branch: develop` sur les 4 entrées ; à vérifier sur les premières PR Docker et Actions après merge.
+- [ ] `.github/dependabot.yml` existe et GitHub l'accepte (aucune erreur dans Insights > Dependency graph > Dependabot). Fichier validé par le schéma Dependabot ; l'acceptation par GitHub se vérifie une fois le fichier sur `main` (« Check for updates »).
+- [ ] Les 4 écosystèmes apparaissent (npm backend, npm frontend, docker, github-actions). Configurés ; à vérifier une fois le fichier sur `main`.
+- [ ] Les PR Dependabot ciblent `develop`, pas `main`. `target-branch: develop` sur les 4 entrées ; à vérifier sur les premières PR Docker et Actions, une fois le fichier sur `main`.
 - [ ] Les mises à jour mineures et patch d'un même paquet npm arrivent en une seule PR groupée. Groupes configurés ; observable seulement après D-21 (limite npm à 0).
 - [x] Les majeures de Prisma, TypeScript et Node ne génèrent pas de PR.
 
 ## Tests à ajouter ou adapter
 
-- Pas de test automatisé. Après merge, déclencher une vérification manuelle (Insights > Dependency graph > Dependabot > « Check for updates ») et contrôler les premières PR : branche cible, labels, groupement, CI verte.
+- Pas de test automatisé. Une fois le fichier sur `main` (release v1.11.0), déclencher une vérification manuelle (Insights > Dependency graph > Dependabot > « Check for updates ») et contrôler les premières PR : branche cible, labels, groupement, CI verte.
 
 ## Points d'attention
 
@@ -114,3 +114,4 @@ Aucune dépendance n'a été mise à jour depuis février : les lockfiles datent
 - 2026-10-11 : actions manuelles laissées à l'humain (listées dans la PR) : créer les labels `dependencies`, `backend`, `frontend`, `docker`, `ci` (aucun n'existe, Dependabot ignore un label absent) ; activer, si souhaité, « Dependabot alerts » et « Dependabot security updates » (désactivés). Les PR de sécurité visent toujours la branche par défaut (`main`) et ignorent les options de l'écosystème quand `target-branch` est défini.
 - 2026-10-11 : décisions humaines sur ces actions : labels `dependencies`, `backend`, `frontend`, `docker`, `ci` créés par le coordinateur ; « Dependabot alerts » activées ; « Dependabot security updates » laissées désactivées, les correctifs de sécurité passent à la main par `develop`. Activées pendant la phase B, elles ouvriraient des PR vers `main` qui ignorent `ignore`, `groups` et `labels`, et recréeraient les conflits de lockfile que la limite à 0 évite. À reconsidérer dans D-21. Reste à l'humain : « Check for updates » après merge.
 - 2026-10-11 : relecture de la PR #80 : critères 1 à 4 décochés (vérifiables après merge, ou après D-21 pour le 4) ; D-21 passée en `owner: mixed`.
+- 2026-10-11 : vérification humaine après merge : Insights > Dependency graph > Dependabot affiche « Dependabot version updates aren't configured yet ». Cause : GitHub ne lit `.github/dependabot.yml` que sur la branche par défaut (`main`), et le fichier n'est encore que sur `develop` (`target-branch: develop` ne règle que la cible des PR). Il arrivera sur `main` avec la release v1.11.0 ; « Check for updates » et les critères 1 à 3 se vérifient après le merge de cette release dans `main`. L'humain a activé Dependabot dans les réglages du dépôt.
