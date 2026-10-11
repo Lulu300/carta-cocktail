@@ -11,7 +11,7 @@ depends_on: [C-22]
 touches: [UPGRADING.md]
 sources: []
 branch: docs/release-notes-v1.11.0
-pr:
+pr: "#90"
 ---
 
 ## Contexte
@@ -53,4 +53,4 @@ Aucun (documentation). Vérifier l'ancre dans l'aperçu Markdown de GitHub.
 
 - 2026-10-11 : tâche créée par C-22 (revue de la PR #88, décision du coordinateur sur le titre de la section).
 - 2026-10-11 : revue de la PR #88 : ajout du cas hors Docker d'une sauvegarde de v1.5.0 ou plus ancienne (baseline avant `db:deploy`), formulation « schéma plus ancien » au point 1.
-- 2026-10-11 : fait dans la PR de notes de v1.11.0. Section `## Restoring a backup from an older version` à la fin d'`UPGRADING.md`, citée par l'introduction, la section v1.11.0 et la puce v1.10.0 (remplacée par un renvoi). Sous-sections : mise à jour de la base après la restauration (Docker : redémarrage ; sans Docker : `npm run db:deploy` puis redémarrage), effet depuis v1.11.0 (connexion refusée avec « Invalid email or password », pages admin et carte publique d'un navigateur connecté en erreur serveur), cas où le redémarrage ne suffit pas (v1.0.x, doublons d'avant v1.8.0, et sans Docker v1.5.0 ou plus ancienne : vérification contre `0_init` puis `migrate resolve --applied 0_init` avant `db:deploy`), retour à la copie `pre-restore-<date>.db` (base seulement, les photos restent celles de la sauvegarde). Le titre cité par `settings.backup.restartMayFail` (en/fr) est inchangé.
+- 2026-10-11 : fait dans la PR de notes de v1.11.0 (#90). Section `## Restoring a backup from an older version` à la fin d'`UPGRADING.md`, citée par l'introduction, la section v1.11.0 et la puce v1.10.0 (remplacée par un renvoi). Sous-sections : mise à jour de la base après la restauration (Docker : redémarrage ; sans Docker : `npm run db:deploy` puis redémarrage), effet depuis v1.11.0 (connexion refusée avec « Invalid email or password », pages admin et carte publique d'un navigateur connecté en erreur serveur), cas où le redémarrage ne suffit pas (v1.0.x, doublons d'avant v1.8.0, et sans Docker v1.5.0 ou plus ancienne : vérification contre `0_init` puis `migrate resolve --applied 0_init` avant `db:deploy`), retour à la copie `pre-restore-<date>.db` (base seulement, les photos restent celles de la sauvegarde). Le titre cité par `settings.backup.restartMayFail` (en/fr) est inchangé.
