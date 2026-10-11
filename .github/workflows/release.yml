@@ -197,6 +197,9 @@ jobs:
           context: ./${{ matrix.service }}
           push: true
           tags: ${{ steps.tags.outputs.list }}
+          # Version shown in the admin, read by frontend/Dockerfile only: the
+          # backend image gets no build arg, so it is built exactly as before.
+          build-args: ${{ matrix.service == 'frontend' && format('APP_VERSION={0}', needs.verify.outputs.version) || '' }}
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 

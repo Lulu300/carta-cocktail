@@ -7,6 +7,7 @@ import { useSiteSettings } from '../../contexts/SiteSettingsContext';
 import { qk } from '../../queries/keys';
 import { useShortages } from '../../queries/shortages';
 import LanguageSelector from '../ui/LanguageSelector';
+import AppVersion from './AppVersion';
 
 const navItems = [
   { path: '/admin', key: 'dashboard', icon: '📊' },
@@ -48,7 +49,7 @@ export default function AdminLayout() {
     <div className="min-h-screen bg-[#0f0f1a] text-gray-100 flex">
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-64 bg-[#1a1a2e] border-r border-gray-800 transform transition-transform duration-200 lg:translate-x-0 lg:static ${
+        className={`fixed inset-y-0 left-0 z-30 w-64 flex flex-col bg-[#1a1a2e] border-r border-gray-800 transform transition-transform duration-200 lg:translate-x-0 lg:static ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -85,6 +86,7 @@ export default function AdminLayout() {
             );
           })}
         </nav>
+        <AppVersion className="mt-auto px-6 py-4 border-t border-gray-800" />
       </aside>
 
       {/* Overlay for mobile */}
