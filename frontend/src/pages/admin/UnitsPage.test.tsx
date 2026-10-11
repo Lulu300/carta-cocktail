@@ -1,17 +1,21 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '../../test/test-utils';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
+import { clearToasts, fireEvent, renderWithFeedback, screen, waitFor, within } from '../../test/test-utils';
 import UnitsPage from './UnitsPage';
 
-vi.mock('../../services/api', () => ({
-  units: { list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
-}));
+vi.mock('../../services/api', async () => {
+  const actual = await vi.importActual<typeof import('../../services/api')>('../../services/api');
+  return {
+    ApiError: actual.ApiError,
+    units: { list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
+  };
+});
 
 vi.mock('../../hooks/useLocalizedName', () => ({
   useLocalizedName: () => (entity: { name: string }) => entity.name,
 }));
 
-import { units as api } from '../../services/api';
+import { ApiError, units as api } from '../../services/api';
 const mockList = vi.mocked(api.list);
 const mockCreate = vi.mocked(api.create);
 const mockUpdate = vi.mocked(api.update);
@@ -22,6 +26,25 @@ const mockUnits = [
   { id: 2, name: 'Piece', abbreviation: 'pc', conversionFactorToMl: null, nameTranslations: null },
 ];
 
+function renderPage() {
+  return renderWithFeedback(<UnitsPage />);
+}
+
+async function renderLoadedPage() {
+  renderPage();
+  await screen.findByText('Centiliter');
+}
+
+function dialog() {
+  return screen.getByRole('dialog');
+}
+
+async function fillCreateForm(user: ReturnType<typeof userEvent.setup>, name: string, abbreviation: string) {
+  await user.click(screen.getByRole('button', { name: 'units.add' }));
+  await user.type(within(dialog()).getByLabelText(/units\.name/), name);
+  await user.type(within(dialog()).getByLabelText(/units\.abbreviation/), abbreviation);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockList.mockResolvedValue(mockUnits as never);
@@ -30,319 +53,241 @@ beforeEach(() => {
   mockDelete.mockResolvedValue({ message: 'ok' } as never);
 });
 
+afterEach(clearToasts);
+
 describe('UnitsPage', () => {
-  it('should render title and add button', async () => {
-    render(<UnitsPage />);
+  it('renders the title and the add button', () => {
+    renderPage();
     expect(screen.getByText('units.title')).toBeInTheDocument();
-    expect(screen.getByText('units.add')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'units.add' })).toBeInTheDocument();
   });
 
-  it('should display units in table after loading', async () => {
-    render(<UnitsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Centiliter')).toBeInTheDocument();
-      expect(screen.getByText('Piece')).toBeInTheDocument();
-    });
+  it('lists the units with their conversion', async () => {
+    await renderLoadedPage();
+    expect(screen.getByText('Piece')).toBeInTheDocument();
+    expect(screen.getByText('1 cl = 10 ml')).toBeInTheDocument();
+    expect(screen.getByText('Non convertible')).toBeInTheDocument();
   });
 
-  it('should show conversion factor for convertible units', async () => {
-    render(<UnitsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('1 cl = 10 ml')).toBeInTheDocument();
-    });
+  it('never shows "no results" while the units are loading', async () => {
+    mockList.mockReturnValue(new Promise(() => {}));
+    renderPage();
+
+    expect(screen.getByText('common.loading')).toBeInTheDocument();
+    expect(screen.queryByText('common.noResults')).not.toBeInTheDocument();
   });
 
-  it('should show "Non convertible" for non-convertible units', async () => {
-    render(<UnitsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Non convertible')).toBeInTheDocument();
-    });
-  });
-
-  it('should show empty state when no units', async () => {
+  it('shows "no results" once loaded without units', async () => {
     mockList.mockResolvedValue([] as never);
-    render(<UnitsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('common.noResults')).toBeInTheDocument();
-    });
+    renderPage();
+    expect(await screen.findByText('common.noResults')).toBeInTheDocument();
   });
 
-  it('should open create modal on add click', async () => {
+  it('shows a load error with a retry button', async () => {
     const user = userEvent.setup();
-    render(<UnitsPage />);
-    await user.click(screen.getByText('units.add'));
-    // Modal opens - "units.name" appears in both table header and modal label
-    const nameLabels = screen.getAllByText('units.name');
-    expect(nameLabels.length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText('common.save')).toBeInTheDocument();
+    mockList.mockRejectedValueOnce(new Error('Failed to fetch'));
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'common.retry' }));
+
+    expect(await screen.findByText('Centiliter')).toBeInTheDocument();
+    expect(screen.queryByText('common.noResults')).not.toBeInTheDocument();
   });
 
-  it('should call delete with confirm', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+  it('creates a unit, closes the modal and confirms with a toast', async () => {
     const user = userEvent.setup();
-    render(<UnitsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Centiliter')).toBeInTheDocument();
+    await renderLoadedPage();
+    await fillCreateForm(user, 'Milliliter', 'ml');
+    await user.type(within(dialog()).getByPlaceholderText('Laisser vide si non convertible'), '1');
+
+    await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(mockCreate).toHaveBeenCalledWith({
+      name: 'Milliliter',
+      abbreviation: 'ml',
+      conversionFactorToMl: 1,
+      nameTranslations: null,
     });
-    const deleteButtons = screen.getAllByTitle('common.delete');
-    await user.click(deleteButtons[0]);
-    expect(window.confirm).toHaveBeenCalled();
-    expect(mockDelete).toHaveBeenCalledWith(1);
+    expect(screen.getByText('units.created')).toBeInTheDocument();
+    expect(mockList).toHaveBeenCalledTimes(2);
   });
 
-  it('should not call delete when confirm returns false', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
+  it('sends an empty conversion factor as null', async () => {
     const user = userEvent.setup();
-    render(<UnitsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Centiliter')).toBeInTheDocument();
-    });
-    const deleteButtons = screen.getAllByTitle('common.delete');
-    await user.click(deleteButtons[0]);
-    expect(window.confirm).toHaveBeenCalled();
+    await renderLoadedPage();
+    await fillCreateForm(user, 'Pinch', 'pinch');
+
+    await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledWith({
+      name: 'Pinch',
+      abbreviation: 'pinch',
+      conversionFactorToMl: null,
+      nameTranslations: null,
+    }));
+  });
+
+  it('sends a single request on a fast double click, with the button busy meanwhile', async () => {
+    const user = userEvent.setup();
+    mockCreate.mockReturnValue(new Promise(() => {}));
+    await renderLoadedPage();
+    await fillCreateForm(user, 'Dash', 'dash');
+    const save = within(dialog()).getByRole('button', { name: 'common.save' });
+
+    fireEvent.click(save);
+    fireEvent.click(save);
+
+    await waitFor(() => expect(save).toBeDisabled());
+    expect(save).toHaveAttribute('aria-busy', 'true');
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the modal open and shows the error when saving fails', async () => {
+    const user = userEvent.setup();
+    mockCreate.mockRejectedValue(new ApiError(409, 'This unit already exists'));
+    await renderLoadedPage();
+    await fillCreateForm(user, 'Centiliter', 'cl');
+
+    await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('This unit already exists'));
+    expect(dialog()).toBeInTheDocument();
+  });
+
+  it('opens the edit modal filled with the unit, an empty factor for a piece unit', async () => {
+    const user = userEvent.setup();
+    await renderLoadedPage();
+
+    await user.click(screen.getAllByRole('button', { name: 'common.edit' })[1]);
+
+    expect(screen.getByText('units.edit')).toBeInTheDocument();
+    expect(within(dialog()).getByDisplayValue('Piece')).toBeInTheDocument();
+    expect(within(dialog()).getByPlaceholderText('Laisser vide si non convertible')).toHaveValue(null);
+  });
+
+  it('updates a unit and confirms with a toast', async () => {
+    const user = userEvent.setup();
+    await renderLoadedPage();
+    await user.click(screen.getAllByRole('button', { name: 'common.edit' })[0]);
+
+    const name = within(dialog()).getByDisplayValue('Centiliter');
+    await user.clear(name);
+    await user.type(name, 'Centilitre');
+    await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledWith(1, {
+      name: 'Centilitre',
+      abbreviation: 'cl',
+      conversionFactorToMl: 10,
+      nameTranslations: null,
+    }));
+    expect(await screen.findByText('units.updated')).toBeInTheDocument();
+  });
+
+  it('deletes a unit after confirmation in the dialog', async () => {
+    const user = userEvent.setup();
+    await renderLoadedPage();
+
+    await user.click(screen.getAllByRole('button', { name: 'common.delete' })[0]);
+    const confirmation = screen.getByRole('alertdialog');
+    expect(confirmation).toHaveAccessibleDescription('units.confirmDelete');
+    await user.click(within(confirmation).getByRole('button', { name: 'common.delete' }));
+
+    await waitFor(() => expect(mockDelete).toHaveBeenCalledWith(1));
+    expect(await screen.findByText('units.deleted')).toBeInTheDocument();
+  });
+
+  it('does not delete when the dialog is cancelled', async () => {
+    const user = userEvent.setup();
+    await renderLoadedPage();
+
+    await user.click(screen.getAllByRole('button', { name: 'common.delete' })[0]);
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.cancel' }));
+
     expect(mockDelete).not.toHaveBeenCalled();
   });
 
-  it('should open edit modal with pre-filled data including conversionFactorToMl', async () => {
+  it('shows the backend message and the cocktails that use a unit it refuses to delete', async () => {
     const user = userEvent.setup();
-    render(<UnitsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Centiliter')).toBeInTheDocument();
-    });
-    const editButtons = screen.getAllByTitle('common.edit');
-    await user.click(editButtons[0]);
+    mockDelete.mockRejectedValue(new ApiError(409, 'This unit is used by cocktails', {
+      error: 'This unit is used by cocktails',
+      details: { cocktails: [{ id: 5, name: 'Mojito', removedLines: 1 }], bottles: [] },
+    }));
+    await renderLoadedPage();
 
-    expect(screen.getByText('units.edit')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Centiliter')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('cl')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('10')).toBeInTheDocument();
+    await user.click(screen.getAllByRole('button', { name: 'common.delete' })[0]);
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.delete' }));
+
+    const alert = await screen.findByText(/This unit is used by cocktails/);
+    expect(alert).toHaveTextContent('deletion.usedByCocktails');
+    expect(screen.getByText('Centiliter')).toBeInTheDocument();
   });
 
-  it('should open edit modal for unit with null conversionFactorToMl showing empty conversion input', async () => {
+  it('filters the units by name or abbreviation', async () => {
     const user = userEvent.setup();
-    render(<UnitsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Piece')).toBeInTheDocument();
-    });
-    const editButtons = screen.getAllByTitle('common.edit');
-    await user.click(editButtons[1]);
+    await renderLoadedPage();
 
-    expect(screen.getByText('units.edit')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Piece')).toBeInTheDocument();
-    // conversionFactorToMl is null so the number input should be empty (value null)
-    const conversionInput = screen.getByPlaceholderText('Laisser vide si non convertible');
-    expect(conversionInput).toHaveValue(null);
+    await user.type(screen.getByPlaceholderText('common.search'), 'pc');
+
+    expect(screen.getByText('Piece')).toBeInTheDocument();
+    expect(screen.queryByText('Centiliter')).not.toBeInTheDocument();
   });
 
-  it('should submit create form and call api.create with correct data', async () => {
+  it('sends the translations typed in the translations block', async () => {
     const user = userEvent.setup();
-    render(<UnitsPage />);
-    await user.click(screen.getByText('units.add'));
+    await renderLoadedPage();
+    await fillCreateForm(user, 'Gram', 'g');
 
-    // In the modal: textboxes in order are name, abbreviation (conversion is type=number)
-    const textboxes = screen.getAllByRole('textbox');
-    // textboxes[0] is the search input, textboxes[1] is name, textboxes[2] is abbreviation
-    const nameInput = textboxes[1];
-    const abbrevInput = textboxes[2];
+    await user.click(within(dialog()).getByRole('button', { name: 'common.translations' }));
+    await user.type(within(dialog()).getByLabelText('Français'), 'Gramme');
+    await user.type(within(dialog()).getByLabelText('English'), 'Gram');
+    await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
 
-    await user.clear(nameInput);
-    await user.type(nameInput, 'Milliliter');
-    await user.clear(abbrevInput);
-    await user.type(abbrevInput, 'ml');
-
-    const conversionInput = screen.getByPlaceholderText('Laisser vide si non convertible');
-    await user.clear(conversionInput);
-    await user.type(conversionInput, '1');
-
-    await user.click(screen.getByText('common.save'));
-
-    await waitFor(() => {
-      expect(mockCreate).toHaveBeenCalledWith({
-        name: 'Milliliter',
-        abbreviation: 'ml',
-        conversionFactorToMl: 1,
-        nameTranslations: null,
-      });
-    });
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledWith({
+      name: 'Gram',
+      abbreviation: 'g',
+      conversionFactorToMl: null,
+      nameTranslations: { fr: 'Gramme', en: 'Gram' },
+    }));
   });
 
-  it('should submit create form with empty conversionFactorToMl as null', async () => {
+  it('fills the translations of the unit being edited', async () => {
     const user = userEvent.setup();
-    render(<UnitsPage />);
-    await user.click(screen.getByText('units.add'));
-
-    const textboxes = screen.getAllByRole('textbox');
-    const nameInput = textboxes[1];
-    const abbrevInput = textboxes[2];
-
-    await user.clear(nameInput);
-    await user.type(nameInput, 'Piece');
-    await user.clear(abbrevInput);
-    await user.type(abbrevInput, 'pc');
-    // Leave conversion factor empty
-
-    await user.click(screen.getByText('common.save'));
-
-    await waitFor(() => {
-      expect(mockCreate).toHaveBeenCalledWith({
-        name: 'Piece',
-        abbreviation: 'pc',
-        conversionFactorToMl: null,
-        nameTranslations: null,
-      });
-    });
-  });
-
-  it('should submit edit form and call api.update with correct data', async () => {
-    const user = userEvent.setup();
-    render(<UnitsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Centiliter')).toBeInTheDocument();
-    });
-    const editButtons = screen.getAllByTitle('common.edit');
-    await user.click(editButtons[0]);
-
-    const nameInput = screen.getByDisplayValue('Centiliter');
-    await user.clear(nameInput);
-    await user.type(nameInput, 'Centilitre');
-
-    await user.click(screen.getByText('common.save'));
-
-    await waitFor(() => {
-      expect(mockUpdate).toHaveBeenCalledWith(1, {
-        name: 'Centilitre',
-        abbreviation: 'cl',
-        conversionFactorToMl: 10,
-        nameTranslations: null,
-      });
-    });
-  });
-
-  it('should filter items by name when typing in search', async () => {
-    const user = userEvent.setup();
-    render(<UnitsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Centiliter')).toBeInTheDocument();
-      expect(screen.getByText('Piece')).toBeInTheDocument();
-    });
-
-    const searchInput = screen.getByPlaceholderText('common.search');
-    await user.type(searchInput, 'Cent');
-
-    await waitFor(() => {
-      expect(screen.getByText('Centiliter')).toBeInTheDocument();
-      expect(screen.queryByText('Piece')).not.toBeInTheDocument();
-    });
-  });
-
-  it('should filter items by abbreviation when typing in search', async () => {
-    const user = userEvent.setup();
-    render(<UnitsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Centiliter')).toBeInTheDocument();
-      expect(screen.getByText('Piece')).toBeInTheDocument();
-    });
-
-    const searchInput = screen.getByPlaceholderText('common.search');
-    await user.type(searchInput, 'pc');
-
-    await waitFor(() => {
-      expect(screen.getByText('Piece')).toBeInTheDocument();
-      expect(screen.queryByText('Centiliter')).not.toBeInTheDocument();
-    });
-  });
-
-  it('should show translation inputs when translations toggle is clicked', async () => {
-    const user = userEvent.setup();
-    render(<UnitsPage />);
-    await user.click(screen.getByText('units.add'));
-
-    // Translation inputs not visible yet
-    expect(screen.queryByText('Français')).not.toBeInTheDocument();
-
-    await user.click(screen.getByText('common.translations'));
-
-    expect(screen.getByText('Français')).toBeInTheDocument();
-    expect(screen.getByText('English')).toBeInTheDocument();
-  });
-
-  it('should hide translation inputs when translations toggle is clicked again', async () => {
-    const user = userEvent.setup();
-    render(<UnitsPage />);
-    await user.click(screen.getByText('units.add'));
-
-    await user.click(screen.getByText('common.translations'));
-    expect(screen.getByText('Français')).toBeInTheDocument();
-
-    await user.click(screen.getByText('common.translations'));
-    expect(screen.queryByText('Français')).not.toBeInTheDocument();
-  });
-
-  it('should submit form with nameTranslations when translations are filled', async () => {
-    const user = userEvent.setup();
-    render(<UnitsPage />);
-    await user.click(screen.getByText('units.add'));
-
-    const textboxes = screen.getAllByRole('textbox');
-    const nameInput = textboxes[1];
-    const abbrevInput = textboxes[2];
-
-    await user.clear(nameInput);
-    await user.type(nameInput, 'Gram');
-    await user.clear(abbrevInput);
-    await user.type(abbrevInput, 'g');
-
-    await user.click(screen.getByText('common.translations'));
-
-    // After typing name 'Gram', the translation placeholders become 'Gram'
-    const frInput = screen.getByText('Français').closest('div')!.querySelector('input')!;
-    const enInput = screen.getByText('English').closest('div')!.querySelector('input')!;
-    await user.type(frInput, 'Gramme');
-    await user.type(enInput, 'Gram');
-
-    await user.click(screen.getByText('common.save'));
-
-    await waitFor(() => {
-      expect(mockCreate).toHaveBeenCalledWith({
-        name: 'Gram',
-        abbreviation: 'g',
-        conversionFactorToMl: null,
-        nameTranslations: { fr: 'Gramme', en: 'Gram' },
-      });
-    });
-  });
-
-  it('should pre-fill translations when editing unit with nameTranslations', async () => {
-    const unitWithTranslations = [
+    mockList.mockResolvedValue([
       { id: 3, name: 'Litre', abbreviation: 'l', conversionFactorToMl: 1000, nameTranslations: { fr: 'Litre', en: 'Liter' } },
-    ];
-    mockList.mockResolvedValue(unitWithTranslations as never);
-    const user = userEvent.setup();
-    render(<UnitsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Litre')).toBeInTheDocument();
-    });
-    const editButtons = screen.getAllByTitle('common.edit');
-    await user.click(editButtons[0]);
+    ] as never);
+    renderPage();
+    await screen.findByText('Litre');
 
-    // Open translations section
-    await user.click(screen.getByText('common.translations'));
+    await user.click(screen.getByRole('button', { name: 'common.edit' }));
+    await user.click(within(dialog()).getByRole('button', { name: 'common.translations' }));
 
-    // Multiple inputs may have value 'Litre' (name input + fr translation input)
-    const allLitre = screen.getAllByDisplayValue('Litre');
-    expect(allLitre.length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByDisplayValue('Liter')).toBeInTheDocument();
+    expect(within(dialog()).getByLabelText('English')).toHaveValue('Liter');
   });
 
-  it('should close modal when cancel is clicked', async () => {
+  it('collapses the translations block again when another unit is opened', async () => {
     const user = userEvent.setup();
-    render(<UnitsPage />);
-    await user.click(screen.getByText('units.add'));
+    await renderLoadedPage();
 
-    expect(screen.getByText('common.save')).toBeInTheDocument();
+    await user.click(screen.getAllByRole('button', { name: 'common.edit' })[0]);
+    await user.click(within(dialog()).getByRole('button', { name: 'common.translations' }));
+    expect(within(dialog()).getByLabelText('Français')).toBeInTheDocument();
+    await user.click(within(dialog()).getByRole('button', { name: 'common.cancel' }));
 
-    await user.click(screen.getByText('common.cancel'));
+    await user.click(screen.getAllByRole('button', { name: 'common.edit' })[1]);
 
-    expect(screen.queryByText('common.save')).not.toBeInTheDocument();
+    expect(within(dialog()).getByDisplayValue('Piece')).toBeInTheDocument();
+    expect(within(dialog()).queryByLabelText('Français')).not.toBeInTheDocument();
+  });
+
+  it('closes the modal on cancel', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByRole('button', { name: 'units.add' }));
+
+    await user.click(within(dialog()).getByRole('button', { name: 'common.cancel' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });
