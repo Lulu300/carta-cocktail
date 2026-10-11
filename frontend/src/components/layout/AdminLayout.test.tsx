@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { render, screen, waitFor, within } from '../../test/test-utils';
@@ -110,5 +110,20 @@ describe('AdminLayout logout', () => {
 
     expect(mockLogout).toHaveBeenCalledTimes(1);
     expect(await screen.findByText('login page')).toBeInTheDocument();
+  });
+});
+
+describe('AdminLayout app version', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('shows the app version at the bottom of the sidebar', async () => {
+    vi.stubEnv('VITE_APP_VERSION', '1.8.0');
+    renderLayout();
+
+    const sidebar = screen.getByRole('complementary');
+    expect(within(sidebar).getByText('v1.8.0')).toBeInTheDocument();
+    await waitFor(() => expect(mockShortList).toHaveBeenCalled());
   });
 });
