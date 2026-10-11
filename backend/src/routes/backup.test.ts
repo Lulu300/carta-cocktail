@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -60,6 +60,40 @@ function withClaimedSize(backup: Buffer, size: number): Buffer {
     patched.writeUInt32LE(size, offset + 24);
   }
   return patched;
+}
+
+interface EntryHeader { nameAt: number; crcAt: number }
+
+/** Calls `patch` on the local and central headers of an entry, in a copy of the zip. */
+function patchEntryHeaders(backup: Buffer, entryName: string, patch: (zip: Buffer, header: EntryHeader) => void): Buffer {
+  const patched = Buffer.from(backup);
+  const layouts = [
+    { signature: [0x50, 0x4b, 0x03, 0x04], nameLengthAt: 26, nameAt: 30, crcAt: 14 },
+    { signature: [0x50, 0x4b, 0x01, 0x02], nameLengthAt: 28, nameAt: 46, crcAt: 16 },
+  ];
+  for (const { signature, nameLengthAt, nameAt, crcAt } of layouts) {
+    const marker = Buffer.from(signature);
+    for (let offset = patched.indexOf(marker); offset !== -1; offset = patched.indexOf(marker, offset + 4)) {
+      const nameLength = patched.readUInt16LE(offset + nameLengthAt);
+      const name = patched.subarray(offset + nameAt, offset + nameAt + nameLength).toString('utf8');
+      if (name === entryName) patch(patched, { nameAt: offset + nameAt, crcAt: offset + crcAt });
+    }
+  }
+  return patched;
+}
+
+/** Breaks the CRC an entry announces, so inflating it fails. */
+function withBadCrc(backup: Buffer, entryName: string): Buffer {
+  return patchEntryHeaders(backup, entryName, (zip, { crcAt }) => {
+    zip.writeUInt32LE((zip.readUInt32LE(crcAt) ^ 0xffffffff) >>> 0, crcAt);
+  });
+}
+
+/** Renames an entry in place (same length), for names adm-zip would sanitize when adding a file. */
+function withRawEntryName(backup: Buffer, entryName: string, rawName: string): Buffer {
+  return patchEntryHeaders(backup, entryName, (zip, { nameAt }) => {
+    zip.write(rawName, nameAt, 'utf8');
+  });
 }
 
 /** Writes a SQLite database made by `sql` and returns its bytes. */
@@ -131,7 +165,7 @@ function preRestoreCopies(): string[] {
 /** Temporary files a restore leaves when it does not clean up after itself. */
 function restoreLeftovers(): string[] {
   const nextToDatabase = fs.readdirSync(path.dirname(dbPath)).filter((name) => name.includes('.restore-'));
-  const inUploads = fs.readdirSync(config.uploadDir).filter((name) => name.startsWith('.restore-'));
+  const inUploads = fs.readdirSync(config.uploadDir).filter((name) => /^\.(pre-)?restore-/.test(name));
   return [...nextToDatabase, ...inUploads];
 }
 
@@ -317,6 +351,34 @@ describe('backup restore', () => {
     expect(fs.readFileSync(path.join(config.uploadDir, 'a.png'), 'utf8')).toBe('png bytes');
   });
 
+  it('should keep an image with a traversal name inside the uploads folder', async () => {
+    const backup = withRawEntryName(
+      withEntries(await exportBackup(), { 'uploads/xx/xx/escaped.jpg': 'jpg bytes' }),
+      'uploads/xx/xx/escaped.jpg',
+      'uploads/../../escaped.jpg',
+    );
+    expect(new AdmZip(backup).getEntries().map((entry) => entry.entryName)).toContain('uploads/../../escaped.jpg');
+
+    const res = await importBackup(backup);
+
+    expect(res.status).toBe(200);
+    expect(uploadDirContent()).toEqual(['escaped.jpg']);
+    expect(fs.existsSync(path.resolve(config.uploadDir, '../../escaped.jpg'))).toBe(false);
+  });
+
+  it('should keep the first of two images with the same name and count the other', async () => {
+    const backup = withEntries(await exportBackup(), {
+      'uploads/a/same.jpg': 'first',
+      'uploads/b/same.jpg': 'second',
+    });
+
+    const res = await importBackup(backup);
+
+    expect(res.status).toBe(200);
+    expect(res.body.skippedFiles).toBe(1);
+    expect(fs.readFileSync(path.join(config.uploadDir, 'same.jpg'), 'utf8')).toBe('first');
+  });
+
   it('should replace an uploads folder that contains a sub-folder', async () => {
     const backup = withEntries(await exportBackup(), { 'uploads/restored.jpg': 'jpg bytes' });
     fs.mkdirSync(path.join(config.uploadDir, 'cocktails'));
@@ -338,24 +400,52 @@ describe('backup restore', () => {
     expect(res.body.restartRecommended).toBe(false);
   });
 
-  it.skipIf(isRoot)('should put the previous database back when the switch fails after the rename', async () => {
-    const backup = await exportBackup();
-    await seedCocktail({ name: 'Kept' });
-    // A file the restore cannot delete makes the uploads swap fail
-    const locked = path.join(config.uploadDir, 'locked');
-    fs.mkdirSync(locked);
-    fs.writeFileSync(path.join(locked, 'photo.jpg'), 'bytes');
-    fs.chmodSync(locked, 0o555);
+  describe('when the switch fails after the database rename', () => {
+    let backup: Buffer;
 
-    try {
-      const res = await importBackup(backup);
+    beforeEach(async () => {
+      backup = withEntries(await exportBackup(), {
+        'uploads/restored-1.jpg': 'restored bytes',
+        'uploads/restored-2.jpg': 'restored bytes',
+      });
+      await seedCocktail({ name: 'Kept' });
+      fs.writeFileSync(path.join(config.uploadDir, 'kept.jpg'), 'kept bytes');
+      fs.mkdirSync(path.join(config.uploadDir, 'cocktails'));
+      fs.writeFileSync(path.join(config.uploadDir, 'cocktails', 'nested.jpg'), 'nested bytes');
+    });
 
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    async function expectPreviousStateBack(res: { status: number }): Promise<void> {
       expect(res.status).toBe(500);
       expect(await cocktailNames()).toEqual(['Kept']);
       expect((await request.get('/api/cocktails').set(authHeader())).status).toBe(200);
-    } finally {
-      fs.chmodSync(locked, 0o755);
+      expect(uploadDirContent()).toEqual(['cocktails', 'kept.jpg']);
+      expect(fs.readFileSync(path.join(config.uploadDir, 'kept.jpg'), 'utf8')).toBe('kept bytes');
+      expect(fs.readdirSync(path.join(config.uploadDir, 'cocktails'))).toEqual(['nested.jpg']);
+      expect(restoreLeftovers()).toEqual([]);
     }
+
+    it('should put the previous database and uploads back when moving the restored files fails', async () => {
+      const renameSync = fs.renameSync;
+      let stagedMoves = 0;
+      // Let the first restored file in, then fail: both halves of the swap must be undone
+      vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+        const fromStaging = path.basename(path.dirname(String(from))).startsWith('.restore-');
+        if (fromStaging && ++stagedMoves === 2) throw new Error('rename failed');
+        renameSync(from, to);
+      });
+
+      await expectPreviousStateBack(await importBackup(backup));
+    });
+
+    it('should put the previous database and uploads back when reconnecting fails', async () => {
+      vi.spyOn(prisma, '$connect').mockRejectedValueOnce(new Error('connect failed'));
+
+      await expectPreviousStateBack(await importBackup(backup));
+    });
   });
 });
 
@@ -376,7 +466,10 @@ describe('backup import validation', () => {
     ['with a null metadata.json', async () => zipWith({ 'metadata.json': 'null', 'database.db': 'x' })],
     ['without database.db', async () => zipWith({ 'metadata.json': validMetadata })],
     ['with an unsupported metadata version', async () => zipWith({ 'metadata.json': '{"version":2}', 'database.db': 'x' })],
-    ['whose database.db is plain text', async () => zipWith({ 'metadata.json': validMetadata, 'database.db': 'plain text' })],
+    ['whose database.db data is corrupt', async () => withBadCrc(
+      zipWith({ 'metadata.json': validMetadata, 'database.db': 'x'.repeat(1000) }), 'database.db',
+    )],
+    ['whose database.db is plain text',async () => zipWith({ 'metadata.json': validMetadata, 'database.db': 'plain text' })],
     ['whose database.db only has a SQLite header', async () => zipWith({
       'metadata.json': validMetadata,
       'database.db': Buffer.concat([Buffer.from('SQLite format 3\0', 'latin1'), Buffer.alloc(200, 7)]),

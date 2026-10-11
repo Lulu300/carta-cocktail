@@ -41,9 +41,12 @@ export interface BackupMetadata {
 }
 
 export interface RestoreResult {
-  /** Files of uploads/ that were not restored because their type is not an image. */
+  /** Files of uploads/ that were not restored: not an image, or a name already restored. */
   skippedFiles: number;
-  /** The backup has an older schema: a restart applies the missing migrations. */
+  /**
+   * The backup has an older schema: the database migrations run at startup
+   * (C-01 entrypoint), which refuses schemas older than the `0_init` baseline.
+   */
   restartRecommended: boolean;
 }
 
@@ -87,7 +90,8 @@ export async function readSchemaVersion(client: PrismaClient): Promise<string | 
   const tables = await listTables(client);
   if (!tables.includes('_prisma_migrations')) return null;
   const rows = await client.$queryRawUnsafe<{ migration_name: string }[]>(
-    'SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL ORDER BY finished_at DESC LIMIT 1',
+    // Ties on finished_at (same second) fall back to the name order, which is the apply order
+    'SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL ORDER BY finished_at DESC, migration_name DESC LIMIT 1',
   );
   return rows[0]?.migration_name ?? null;
 }
@@ -127,11 +131,20 @@ function openArchive(zipPath: string): AdmZip {
   }
 }
 
+/** Inflates an entry: corrupt data (bad CRC, invalid deflate stream) is a client error. */
+function readEntry(entry: AdmZip.IZipEntry): Buffer {
+  try {
+    return entry.getData();
+  } catch {
+    throw new BadRequestError('errors.invalidBackup');
+  }
+}
+
 function parseMetadata(zip: AdmZip): unknown {
   const entry = zip.getEntry('metadata.json');
   if (!entry) throw new BadRequestError('errors.invalidBackup');
   try {
-    return JSON.parse(entry.getData().toString('utf8'));
+    return JSON.parse(readEntry(entry).toString('utf8'));
   } catch {
     throw new BadRequestError('errors.invalidBackup');
   }
@@ -203,36 +216,69 @@ async function validateDatabase(dbPath: string): Promise<string | null> {
   }
 }
 
-/** Extracts the image files of uploads/ to a flat folder; returns how many were skipped. */
+/**
+ * Extracts the image files of uploads/ to a flat folder; returns how many were
+ * skipped. Two entries with the same name in different sub-folders would
+ * overwrite each other once flattened: the first one is kept, the others skipped.
+ */
 function extractUploads(zip: AdmZip, targetDir: string): number {
+  const writtenNames = new Set<string>();
   let skippedFiles = 0;
   for (const entry of zip.getEntries()) {
     if (entry.isDirectory || !entry.entryName.startsWith('uploads/')) continue;
     // basename: an entry named uploads/../../x cannot leave the target folder
     const fileName = path.basename(entry.entryName);
-    if (!RESTORABLE_UPLOAD_EXTENSIONS.has(path.extname(fileName).toLowerCase())) {
+    const isImage = RESTORABLE_UPLOAD_EXTENSIONS.has(path.extname(fileName).toLowerCase());
+    if (!isImage || writtenNames.has(fileName)) {
       skippedFiles++;
       continue;
     }
-    fs.writeFileSync(path.join(targetDir, fileName), entry.getData());
+    fs.writeFileSync(path.join(targetDir, fileName), readEntry(entry));
+    writtenNames.add(fileName);
   }
   return skippedFiles;
 }
 
 /**
- * Replaces the content of the uploads folder with the staged files. The folder
- * itself is a Docker mount point (EBUSY on rename), so it is emptied and the files
- * are moved one by one; the staging folder is inside it, on the same volume.
+ * Folders used to swap the content of the uploads folder. Both sit inside it:
+ * the folder itself is a Docker mount point (EBUSY on rename), so its entries
+ * are moved one by one, and a rename only stays cheap on the same volume.
+ * The leading dot keeps them out of express.static (dotfiles are ignored).
  */
-function swapUploads(uploadDir: string, stagingDir: string): void {
-  const stagingName = path.basename(stagingDir);
-  for (const entry of fs.readdirSync(uploadDir)) {
-    if (entry !== stagingName) fs.rmSync(path.join(uploadDir, entry), { recursive: true, force: true });
+interface UploadsSwap {
+  uploadDir: string;
+  /** Restored files, extracted before the switch. */
+  stagingDir: string;
+  /** Previous entries, kept until the restore succeeds. */
+  asideDir: string;
+  /** Names moved from stagingDir to uploadDir so far. */
+  movedIn: string[];
+}
+
+function moveEntries(fromDir: string, toDir: string, names: string[], onMoved?: (name: string) => void): void {
+  for (const name of names) {
+    fs.renameSync(path.join(fromDir, name), path.join(toDir, name));
+    onMoved?.(name);
   }
-  for (const fileName of fs.readdirSync(stagingDir)) {
-    fs.renameSync(path.join(stagingDir, fileName), path.join(uploadDir, fileName));
-  }
-  fs.rmSync(stagingDir, { recursive: true, force: true });
+}
+
+/** Moves the previous entries aside, then the restored files in. */
+function swapUploads(swap: UploadsSwap): void {
+  const { uploadDir, stagingDir, asideDir } = swap;
+  const ownFolders = [path.basename(stagingDir), path.basename(asideDir)];
+  fs.mkdirSync(asideDir);
+  const previousEntries = fs.readdirSync(uploadDir).filter((name) => !ownFolders.includes(name));
+  moveEntries(uploadDir, asideDir, previousEntries);
+  moveEntries(stagingDir, uploadDir, fs.readdirSync(stagingDir), (name) => swap.movedIn.push(name));
+}
+
+/** Removes the restored files and moves the previous entries back. */
+function undoUploadsSwap(swap: UploadsSwap): void {
+  const { uploadDir, asideDir, movedIn } = swap;
+  for (const name of movedIn) fs.rmSync(path.join(uploadDir, name), { force: true });
+  if (!fs.existsSync(asideDir)) return;
+  moveEntries(asideDir, uploadDir, fs.readdirSync(asideDir));
+  fs.rmSync(asideDir, { recursive: true, force: true });
 }
 
 /** Reopens the shared client on the database file currently in place. */
@@ -260,8 +306,9 @@ function fileTimestamp(date: Date): string {
  * Restores a backup archive over the live database and uploads.
  *
  * Everything that can fail on bad input (archive, database checks, extraction)
- * happens before the live files are touched. The switch itself is short and
- * keeps a copy of the replaced database in `<database folder>/backups/`.
+ * happens before the live files are touched. The switch itself is short, keeps
+ * a copy of the replaced database in `<database folder>/backups/`, and puts the
+ * previous database and uploads back if it fails.
  */
 export async function restoreBackup(zipPath: string): Promise<RestoreResult> {
   const zip = openArchive(zipPath);
@@ -270,18 +317,21 @@ export async function restoreBackup(zipPath: string): Promise<RestoreResult> {
   const dbPath = resolveDatabasePath();
   const stamp = fileTimestamp(new Date());
   const restoredDbPath = `${dbPath}.restore-${stamp}`;
-  // Inside the uploads folder so the final moves stay on the same volume. The
-  // dot keeps it out of express.static (dotfiles are ignored).
-  const stagingDir = path.join(config.uploadDir, `.restore-${stamp}`);
   const preRestorePath = path.join(path.dirname(dbPath), 'backups', `pre-restore-${stamp}.db`);
+  const uploadsSwap: UploadsSwap = {
+    uploadDir: config.uploadDir,
+    stagingDir: path.join(config.uploadDir, `.restore-${stamp}`),
+    asideDir: path.join(config.uploadDir, `.pre-restore-${stamp}`),
+    movedIn: [],
+  };
 
   let databaseReplaced = false;
   try {
-    fs.writeFileSync(restoredDbPath, databaseEntry.getData());
+    fs.writeFileSync(restoredDbPath, readEntry(databaseEntry));
     const schemaVersion = await validateDatabase(restoredDbPath);
 
-    fs.mkdirSync(stagingDir, { recursive: true });
-    const skippedFiles = extractUploads(zip, stagingDir);
+    fs.mkdirSync(uploadsSwap.stagingDir, { recursive: true });
+    const skippedFiles = extractUploads(zip, uploadsSwap.stagingDir);
 
     // Open connections would keep reading the old WAL and later checkpoint its
     // pages over the restored file: flush it and close them all first.
@@ -293,20 +343,27 @@ export async function restoreBackup(zipPath: string): Promise<RestoreResult> {
     fs.renameSync(restoredDbPath, dbPath);
     databaseReplaced = true;
 
-    swapUploads(config.uploadDir, stagingDir);
+    swapUploads(uploadsSwap);
     await reconnect();
+    fs.rmSync(uploadsSwap.asideDir, { recursive: true, force: true });
 
     const appSchemaVersion = latestAppMigration();
     const restartRecommended = appSchemaVersion !== null && schemaVersion !== appSchemaVersion;
     return { skippedFiles, restartRecommended };
   } catch (err) {
-    // Before the rename the live database is untouched: Prisma reconnects to it on
-    // the next query. After it, the restored file may be broken: put the copy back.
-    if (databaseReplaced) await putBackPreviousDatabase(preRestorePath, dbPath);
+    // Before the rename the live files are untouched: Prisma reconnects to the
+    // database on the next query. After it, put the previous state back.
+    if (databaseReplaced) {
+      try {
+        undoUploadsSwap(uploadsSwap);
+      } finally {
+        await putBackPreviousDatabase(preRestorePath, dbPath);
+      }
+    }
     throw err;
   } finally {
     fs.rmSync(restoredDbPath, { force: true });
     removeSqliteSideFiles(restoredDbPath);
-    fs.rmSync(stagingDir, { recursive: true, force: true });
+    fs.rmSync(uploadsSwap.stagingDir, { recursive: true, force: true });
   }
 }
