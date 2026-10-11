@@ -44,8 +44,9 @@ C-11 ajoute `POST /api/auth/logout-all` : la route incrémente `User.tokenVersio
 ## Points d'attention
 
 - `SettingsPage.tsx` est aussi touché par C-22 : enchaîner.
-- Restaurer une sauvegarde ramène le `User.tokenVersion` de la sauvegarde : un token révoqué après la date de la sauvegarde (changement de mot de passe, « Se déconnecter partout ») redevient valable jusqu'à son expiration. Au choix : recommander « Se déconnecter partout » après une restauration, ou faire poser par la restauration `tokenVersion` = max(actuel, restauré) + 1 (relevé à la revue de la PR #82).
+- Tokens ramenés par une restauration : traité par C-30 (la restauration révoque toutes les sessions, au démarrage suivant pour une sauvegarde antérieure à v1.11.0). Rien à faire ici.
 
 ## Journal
 
 - 2026-10-11 : tâche créée pendant C-11 (PR #82).
+- 2026-10-11 : point d'attention sur les tokens ramenés par une restauration remplacé par un renvoi vers C-30 (PR #93).

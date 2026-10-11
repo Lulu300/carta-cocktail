@@ -2,6 +2,8 @@ import app from './app';
 import { config } from './config';
 import { configureSqlite, prisma } from './lib/prisma';
 import { reportUploadsCheck } from './services/uploadsCheck';
+import { resolveDatabasePath } from './services/backupService';
+import { applySessionFloor } from './services/sessionFloor';
 
 // In-flight requests get this long to finish before the process is killed
 const SHUTDOWN_TIMEOUT_MS = 10_000;
@@ -9,6 +11,8 @@ const SHUTDOWN_TIMEOUT_MS = 10_000;
 async function main(): Promise<void> {
   const journalMode = await configureSqlite();
   console.log(`SQLite journal mode: ${journalMode}`);
+  // The entrypoint has run the migrations: the tokenVersion column exists by now
+  await applySessionFloor(resolveDatabasePath());
   // Before listening, so the warnings sit next to the other startup lines. Never throws.
   await reportUploadsCheck(prisma, { uploadDir: config.uploadDir });
 
