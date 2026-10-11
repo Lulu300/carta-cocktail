@@ -593,3 +593,53 @@ describe('GET /api/public/menus/:slug - menu with cocktails and bottles', () => 
     expect(res.body.bottles[0].bottle.categoryId).toBe(category.id);
   });
 });
+
+describe('public availability (manual switch and stock)', () => {
+  /** A cocktail in the public menu whose recipe takes 4 cl of a bottle filled at `remainingPercent`. */
+  async function seedMenuCocktail(isAvailable: boolean, remainingPercent: number) {
+    const unit = await seedUnit({ abbreviation: 'cl', conversionFactorToMl: 10 });
+    const bottle = await seedBottle({ name: 'Rum', capacityMl: 700, remainingPercent });
+    const cocktail = await prisma.cocktail.create({
+      data: {
+        name: 'Daiquiri',
+        isAvailable,
+        ingredients: { create: { sourceType: 'BOTTLE', bottleId: bottle.id, unitId: unit.id, quantity: 4 } },
+      },
+    });
+    await addCocktailToMenu(cocktail.id);
+    return cocktail;
+  }
+
+  /** The cocktail as the menu serves it, then as its detail page gets it. */
+  async function fetchPublicCocktail(cocktailId: number) {
+    const menu = await request.get('/api/public/menus/public-menu');
+    const detail = await request.get(`/api/public/cocktails/${cocktailId}`);
+    expect(menu.status).toBe(200);
+    expect(detail.status).toBe(200);
+    return [menu.body.cocktails[0].cocktail, detail.body];
+  }
+
+  it('should mark a cocktail available when switched on and in stock', async () => {
+    const cocktail = await seedMenuCocktail(true, 100);
+
+    for (const served of await fetchPublicCocktail(cocktail.id)) {
+      expect(served).toMatchObject({ isAvailable: true, available: true });
+    }
+  });
+
+  it('should mark a cocktail switched on but out of stock unavailable', async () => {
+    const cocktail = await seedMenuCocktail(true, 0);
+
+    for (const served of await fetchPublicCocktail(cocktail.id)) {
+      expect(served).toMatchObject({ isAvailable: true, available: false });
+    }
+  });
+
+  it('should mark a cocktail in stock but switched off unavailable', async () => {
+    const cocktail = await seedMenuCocktail(false, 100);
+
+    for (const served of await fetchPublicCocktail(cocktail.id)) {
+      expect(served).toMatchObject({ isAvailable: false, available: false });
+    }
+  });
+});
