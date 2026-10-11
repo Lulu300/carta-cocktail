@@ -4,40 +4,46 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useSiteSettings } from '../../contexts/SiteSettingsContext';
 import LanguageSelector from '../ui/LanguageSelector';
 
+/**
+ * `--header-h` is the height of the sticky header: the menu toolbar sticks right
+ * below it, and the section anchors leave room for both.
+ */
 export default function PublicLayout() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const { siteSettings } = useSiteSettings();
 
   return (
-    <div className="min-h-screen bg-[#0f0f1a] text-gray-100">
-      <header className="bg-[#1a1a2e]/80 backdrop-blur-sm border-b border-gray-800 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
-        <Link to="/" className="text-xl font-bold text-amber-400 font-serif hover:text-amber-300 transition-colors">
+    <div className="[--header-h:4rem] min-h-screen flex flex-col bg-canvas text-fg">
+      <header className="h-[var(--header-h)] bg-surface/80 backdrop-blur-sm border-b border-line px-4 sm:px-6 flex items-center justify-between gap-3 sticky top-0 z-10">
+        <Link to="/" className="min-w-0 truncate text-xl font-bold text-accent font-serif hover:text-accent-soft transition-colors">
           {siteSettings.siteIcon && <span className="mr-1">{siteSettings.siteIcon}</span>}
           {siteSettings.siteName}
         </Link>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           <LanguageSelector />
-          {user ? (
+          {user && (
             <Link
               to="/admin"
-              className="text-sm text-amber-400 hover:text-amber-300 px-3 py-1.5 rounded-lg border border-amber-400/30 hover:bg-amber-400/10 transition-colors"
+              className="text-sm text-accent hover:text-accent-soft px-3 py-1.5 rounded-lg border border-accent/30 hover:bg-accent/10 transition-colors"
             >
               {t('nav.dashboard')}
-            </Link>
-          ) : (
-            <Link
-              to="/login"
-              className="text-sm text-amber-400 hover:text-amber-300 px-3 py-1.5 rounded-lg border border-amber-400/30 hover:bg-amber-400/10 transition-colors"
-            >
-              {t('nav.login')}
             </Link>
           )}
         </div>
       </header>
-      <main>
+      <main className="flex-1">
         <Outlet />
       </main>
+      {/* Guests come for the menu: the admin sign-in link stays discreet, down here. */}
+      <footer className="border-t border-line px-4 sm:px-6 py-6 flex items-center justify-between gap-3 text-sm text-fg-muted print:hidden">
+        <span className="min-w-0 truncate">{siteSettings.siteName}</span>
+        {!user && (
+          <Link to="/login" className="shrink-0 hover:text-fg transition-colors">
+            {t('nav.login')}
+          </Link>
+        )}
+      </footer>
     </div>
   );
 }

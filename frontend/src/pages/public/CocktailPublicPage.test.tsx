@@ -1,14 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import userEvent from '@testing-library/user-event';
 import { render, screen, waitFor } from '../../test/test-utils';
+import { ApiError } from '../../services/api';
 import CocktailPublicPage from './CocktailPublicPage';
 
 const mockGetCocktail = vi.fn();
 const mockNavigate = vi.fn();
 const mockUseAuth = vi.fn();
 
-vi.mock('../../services/api', () => ({
-  publicApi: { getCocktail: (...args: unknown[]) => mockGetCocktail(...args) },
-}));
+vi.mock('../../services/api', async () => {
+  const actual = await vi.importActual<typeof import('../../services/api')>('../../services/api');
+  return {
+    ApiError: actual.ApiError,
+    publicApi: { getCocktail: (...args: unknown[]) => mockGetCocktail(...args) },
+  };
+});
 
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => mockUseAuth(),
@@ -118,5 +124,104 @@ describe('CocktailPublicPage', () => {
 
     expect(screen.queryByText('Use the large mixing glass.')).not.toBeInTheDocument();
     expect(screen.queryByText('Cocchi Vermouth di Torino')).not.toBeInTheDocument();
+  });
+
+  describe('back to the menu', () => {
+    beforeEach(() => {
+      mockUseAuth.mockReturnValue({ user: null });
+    });
+
+    // BrowserRouter reads the location state from history.state.usr.
+    function openFrom(state: unknown) {
+      window.history.replaceState({ usr: state, key: 'cocktail', idx: 1 }, '', '/menu/summer-menu/cocktail/42');
+    }
+
+    it('is a real link to the menu, so it can open in a new tab', async () => {
+      openFrom(null);
+      render(<CocktailPublicPage />);
+
+      const back = await screen.findByRole('link', { name: /public\.back/ });
+
+      expect(back).toHaveAttribute('href', '/menu/summer-menu');
+    });
+
+    it('goes back in history when the guest came from the menu', async () => {
+      const user = userEvent.setup();
+      openFrom({ fromMenu: true });
+      render(<CocktailPublicPage />);
+
+      await user.click(await screen.findByRole('link', { name: /public\.back/ }));
+
+      expect(mockNavigate).toHaveBeenCalledWith(-1);
+    });
+
+    it('follows the link when the page was opened directly', async () => {
+      const user = userEvent.setup();
+      openFrom(null);
+      render(<CocktailPublicPage />);
+
+      await user.click(await screen.findByRole('link', { name: /public\.back/ }));
+
+      expect(mockNavigate).not.toHaveBeenCalled();
+      expect(window.location.pathname).toBe('/menu/summer-menu');
+    });
+
+    it('lets a modified click (new tab) through even when coming from the menu', async () => {
+      const user = userEvent.setup();
+      openFrom({ fromMenu: true });
+      render(<CocktailPublicPage />);
+      const back = await screen.findByRole('link', { name: /public\.back/ });
+
+      await user.keyboard('{Control>}');
+      await user.click(back);
+      await user.keyboard('{/Control}');
+
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('loading and errors', () => {
+    beforeEach(() => {
+      mockUseAuth.mockReturnValue({ user: null });
+    });
+
+    it('shows a skeleton while the recipe loads', () => {
+      mockGetCocktail.mockReturnValue(new Promise(() => {}));
+      render(<CocktailPublicPage />);
+
+      expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
+    });
+
+    it('tells an unknown cocktail apart and links back to the menu', async () => {
+      mockGetCocktail.mockRejectedValue(new ApiError(404, 'Not found'));
+      render(<CocktailPublicPage />);
+
+      expect(await screen.findByText('public.cocktailNotFound')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'public.back' })).toHaveAttribute('href', '/menu/summer-menu');
+      expect(screen.queryByRole('button', { name: 'common.retry' })).not.toBeInTheDocument();
+    });
+
+    it('offers a retry when the recipe cannot be loaded', async () => {
+      const user = userEvent.setup();
+      mockGetCocktail.mockRejectedValueOnce(new ApiError(503, 'Unavailable'));
+      render(<CocktailPublicPage />);
+
+      expect(await screen.findByText('public.cocktailLoadError')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'common.retry' }));
+
+      expect(await screen.findByText('Negroni')).toBeInTheDocument();
+    });
+  });
+
+  it('keeps export and print as secondary actions below the recipe', async () => {
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+    const user = userEvent.setup();
+    mockUseAuth.mockReturnValue({ user: null });
+    render(<CocktailPublicPage />);
+
+    await user.click(await screen.findByRole('button', { name: /public\.print/ }));
+
+    expect(print).toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'export' })).toBeInTheDocument();
   });
 });

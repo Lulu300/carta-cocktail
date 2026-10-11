@@ -1,8 +1,17 @@
+import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
-import type { CocktailAvailability, MenuCocktail } from '../../types';
+import type { CocktailAvailability, CocktailIngredient, MenuCocktail } from '../../types';
 import { getUploadUrl } from '../../utils/uploads';
+
+// Beyond four ingredients a card becomes a wall of pills: the rest is summed up as "+N".
+const MAX_VISIBLE_INGREDIENTS = 4;
+
+/** Lets the cocktail page go back in history instead of loading the menu again. */
+export interface CocktailLinkState {
+  fromMenu: true;
+}
 
 interface PublicCocktailItemProps {
   menuCocktail: MenuCocktail;
@@ -12,7 +21,7 @@ interface PublicCocktailItemProps {
   showAvailability: boolean;
 }
 
-export default function PublicCocktailItem({
+function PublicCocktailItem({
   menuCocktail,
   menuSlug,
   viewMode,
@@ -22,12 +31,22 @@ export default function PublicCocktailItem({
   const { t } = useTranslation();
   const localize = useLocalizedName();
   const cocktail = menuCocktail.cocktail!;
+  // Only the manual switch for now: the stock-based `available` field comes with C-08.
   const isUnavailable = !cocktail.isAvailable;
   const isList = viewMode === 'list';
+  const ingredients = cocktail.ingredients ?? [];
+  const hiddenIngredientCount = ingredients.length - MAX_VISIBLE_INGREDIENTS;
+  const linkState: CocktailLinkState = { fromMenu: true };
+
+  const ingredientName = (ingredient: CocktailIngredient) =>
+    ingredient.bottle?.name ||
+    (ingredient.category ? localize(ingredient.category) : null) ||
+    (ingredient.ingredient ? localize(ingredient.ingredient) : null);
 
   return (
     <Link
       to={`/menu/${menuSlug}/cocktail/${cocktail.id}`}
+      state={linkState}
       className={`group bg-[#1a1a2e] border rounded-xl overflow-hidden transition-all duration-300 ${
         isList ? 'flex min-h-28' : ''
       } ${
@@ -90,18 +109,24 @@ export default function PublicCocktailItem({
           </div>
         )}
 
-        {cocktail.ingredients && cocktail.ingredients.length > 0 && (
+        {ingredients.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {cocktail.ingredients.map((ingredient) => (
+            {ingredients.slice(0, MAX_VISIBLE_INGREDIENTS).map((ingredient) => (
               <span key={ingredient.id} className="text-xs bg-[#0f0f1a] text-gray-400 px-2 py-1 rounded">
-                {ingredient.bottle?.name ||
-                  (ingredient.category ? localize(ingredient.category) : null) ||
-                  (ingredient.ingredient ? localize(ingredient.ingredient) : null)}
+                {ingredientName(ingredient)}
               </span>
             ))}
+            {hiddenIngredientCount > 0 && (
+              <span className="text-xs text-gray-400 px-2 py-1">
+                {t('public.moreIngredients', { count: hiddenIngredientCount })}
+              </span>
+            )}
           </div>
         )}
       </div>
     </Link>
   );
 }
+
+// The menu re-renders on every keystroke of the search: unchanged cards are skipped.
+export default memo(PublicCocktailItem);

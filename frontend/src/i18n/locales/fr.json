@@ -19,7 +19,11 @@
   "home": {
     "subtitle": "Découvrez nos cartes de cocktails",
     "noMenus": "Aucune carte disponible pour le moment",
-    "cocktailCount": "cocktails"
+    "cocktailCount_one": "{{count}} cocktail",
+    "cocktailCount_other": "{{count}} cocktails",
+    "bottleCount_one": "{{count}} bouteille",
+    "bottleCount_other": "{{count}} bouteilles",
+    "loadError": "Impossible de charger les cartes"
   },
   "auth": {
     "login": "Connexion",
@@ -294,7 +298,19 @@
     "instructions": "Préparation",
     "print": "Imprimer",
     "export": "Exporter la recette",
-    "back": "Retour à la carte"
+    "back": "Retour à la carte",
+    "backHome": "Retour à l'accueil",
+    "menuLoadError": "Impossible de charger la carte",
+    "cocktailLoadError": "Impossible de charger le cocktail",
+    "loadErrorHint": "Vérifiez votre connexion puis réessayez.",
+    "emptyMenu": "Cette carte est vide pour le moment",
+    "noResults": "Aucun résultat pour « {{query}} »",
+    "resultCount_one": "{{count}} résultat",
+    "resultCount_other": "{{count}} résultats",
+    "sectionNav": "Sections de la carte",
+    "moreIngredients": "+{{count}}",
+    "alcoholPercentage": "{{value}} % vol.",
+    "capacityMl": "{{value}} ml"
   },
   "settings": {
     "title": "Paramètres",
