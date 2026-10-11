@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: haute
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-08, C-21]
 touches: [backend/src/services/availabilityService.ts, backend/src/services/availabilityService.test.ts, backend/src/routes/public.test.ts, backend/AGENTS.md]
 sources: []
-branch:
-pr:
+branch: fix/C-24-orphan-lines-public-availability
+pr: https://github.com/Lulu300/carta-cocktail/pull/78
 ---
 
 ## Contexte
@@ -48,13 +48,13 @@ Décision de l'humain (2026-10-11) : une ligne « -- » n'affecte plus la dispon
 
 ## Critères d'acceptation
 
-- [ ] Un cocktail activé avec une ligne orpheline (chaque `sourceType`, clé NULL ou introuvable, quantité 0 comprise) et le reste en stock : `available: true` dans `GET /api/public/menus/:slug` et `GET /api/public/cocktails/:id`.
-- [ ] La ligne orpheline garde `isAvailable: false`, son `reason` et sa place dans `missingIngredients`.
-- [ ] `maxServings` d'un tel cocktail est celui des autres ressources ; 999 si toutes ses lignes sont orphelines.
-- [ ] Un ingrédient désactivé, ou une source en rupture, rend toujours le cocktail indisponible, même à côté d'une ligne orpheline.
-- [ ] Une ligne au `sourceType` inconnu rend toujours le cocktail indisponible.
-- [ ] Forme JSON inchangée ; aucun fichier frontend modifié.
-- [ ] `npm test -- --coverage`, `npx tsc --noEmit`, `npm run build` passent dans `backend/` ; couverture des lignes modifiées ≥ 80 %.
+- [x] Un cocktail activé avec une ligne orpheline (chaque `sourceType`, clé NULL ou introuvable, quantité 0 comprise) et le reste en stock : `available: true` dans `GET /api/public/menus/:slug` et `GET /api/public/cocktails/:id`.
+- [x] La ligne orpheline garde `isAvailable: false`, son `reason` et sa place dans `missingIngredients`.
+- [x] `maxServings` d'un tel cocktail est celui des autres ressources ; 999 si toutes ses lignes sont orphelines.
+- [x] Un ingrédient désactivé, ou une source en rupture, rend toujours le cocktail indisponible, même à côté d'une ligne orpheline.
+- [x] Une ligne au `sourceType` inconnu rend toujours le cocktail indisponible.
+- [x] Forme JSON inchangée ; aucun fichier frontend modifié.
+- [x] `npm test -- --coverage`, `npx tsc --noEmit`, `npm run build` passent dans `backend/` ; couverture des lignes modifiées ≥ 80 %.
 
 ## Tests à ajouter ou adapter
 
@@ -72,3 +72,5 @@ Décision de l'humain (2026-10-11) : une ligne « -- » n'affecte plus la dispon
 
 - 2026-10-11 : tâche créée à partir du point 3 de la revue de la PR #77 (notes de v1.10.0).
 - 2026-10-11 : Décision de l'humain 2026-10-11 : les lignes « -- » (source supprimée avant v1.8.0, conservées par C-21) n'affectent plus la disponibilité publique ; un ingrédient désactivé continue de rendre le cocktail indisponible (vrai manque).
+- 2026-10-11 : fait (PR #78). `resolveLine` renvoie `kind: 'orphan'` pour une ligne dont la source de son type est absente (clé NULL ou introuvable), `kind: 'invalid'` reste réservé au `sourceType` inconnu ; `reason` inchangés. `computeAvailability` ignore les lignes orphelines pour `isAvailable`, la ligne reste indisponible et dans `missingIngredients`. Aucun changement dans `routes/public.ts` ni dans le frontend ; `backend/AGENTS.md` (section disponibilité) ajouté aux `touches` et complété. 723 tests, couverture des lignes modifiées 100 %.
+- Notes de version : une ligne de recette affichée « -- » (source supprimée avant v1.8.0) ne rend plus le cocktail indisponible sur la carte publique ; elle reste signalée dans « Manquant » de la liste admin des cocktails, qui affiche désormais les portions du cocktail au lieu de « Indisponible ». Un ingrédient désactivé rend toujours le cocktail indisponible. À reprendre dans les notes de v1.10.0 (#77), qui disent l'inverse. Aucune action requise, pas de `breaking: true`.
