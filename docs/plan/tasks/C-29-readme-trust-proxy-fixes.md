@@ -11,7 +11,7 @@ depends_on: [C-27]
 touches: [README.md]
 sources: []
 branch: docs/C-29-readme-trust-proxy-fixes
-pr:
+pr: https://github.com/Lulu300/carta-cocktail/pull/92
 ---
 
 ## Contexte
@@ -49,4 +49,4 @@ C-27 (PR #87) a écrit la section `README.md` « Login limit behind a reverse pr
 ## Journal
 
 - 2026-10-11 : tâche créée (revue de la PR #90, points 1, 2 et 10 ; décision humaine : prérequis de v1.11.0).
-- 2026-10-11 : fait. Vérifié avec `proxy-addr` 2.0.7 et `compileTrust` d'Express 5 (socket nginx `172.18.0.3`). Rootless, nginx seul : `X-Forwarded-For: 10.0.2.100` donne `10.0.2.100` avec le défaut, `1` et `2` ; `1.2.3.4, 10.0.2.100` donne `1.2.3.4` avec le défaut, `10.0.2.100` avec `1`. Rootless derrière SWAG : `1.2.3.4, 10.0.2.100, 172.18.0.4` donne `10.0.2.100` avec `2`. Rootful, IPv4 via nginx : l'adresse réelle avec le défaut et `1`, quel que soit l'en-tête. Accès direct au port 3001 : socket `203.0.113.9` et en-tête `9.9.9.9` donnent `9.9.9.9` avec `1` ou `2` ; socket privée (rootless) : `9.9.9.9` aussi avec le défaut. Seule la section « Login limit behind a reverse proxy » de `README.md` change. Pas d'action utilisateur imposée (recommandations de configuration), pas de ligne « Notes de version ».
+- 2026-10-11 : fait (PR #92). Vérifié avec `proxy-addr` 2.0.7 et `compileTrust` d'Express 5 (socket nginx `172.18.0.3`). Rootless, nginx seul : `X-Forwarded-For: 10.0.2.100` donne `10.0.2.100` avec le défaut, `1` et `2` ; `1.2.3.4, 10.0.2.100` donne `1.2.3.4` avec le défaut, `10.0.2.100` avec `1`. Rootless derrière SWAG : `1.2.3.4, 10.0.2.100, 172.18.0.4` donne `10.0.2.100` avec `2`. Rootful, IPv4 via nginx : l'adresse réelle avec le défaut et `1`, quel que soit l'en-tête. Accès direct au port 3001 : socket `203.0.113.9` et en-tête `9.9.9.9` donnent `9.9.9.9` avec `1` ou `2` ; socket privée (rootless) : `9.9.9.9` aussi avec le défaut. Seule la section « Login limit behind a reverse proxy » de `README.md` change. Pas d'action utilisateur imposée (recommandations de configuration), pas de ligne « Notes de version ».
