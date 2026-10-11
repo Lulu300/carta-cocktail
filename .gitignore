@@ -30,6 +30,9 @@ uploads/*
 .DS_Store
 Thumbs.db
 
+# Vitest 5 reports and attachments
+.vitest/
+
 # Logs
 *.log
 npm-debug.log*

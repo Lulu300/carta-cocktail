@@ -5,13 +5,13 @@ phase: B
 lane: deps
 criticite: moyenne
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [A-07, B-01, B-02]
 touches: [backend/package.json, backend/package-lock.json, frontend/package.json, frontend/package-lock.json, backend/vitest.config.ts, frontend/vitest.config.ts, frontend/src/test/, .gitignore]
 sources: ["08-dependencies.md §3.2", "08-dependencies.md §3.10", "08-dependencies.md §3.11", "08-dependencies.md §5"]
-branch:
-pr:
+branch: chore/B-04-deps-test-tooling
+pr: "#73"
 ---
 
 ## Contexte
@@ -39,11 +39,11 @@ Vitest 4 → 5, jsdom 28 → 29 et jest-dom 6 → 7 sont des montées à faible 
 
 ## Critères d'acceptation
 
-- [ ] Vitest 5.0.x installé dans les deux paquets, versions identiques.
-- [ ] jsdom 29.1.x (pas 30 : il exige Node ≥ 24.15) et jest-dom 7 côté frontend, `@testing-library/dom` explicite.
-- [ ] Tous les tests passent ; couverture globale à ±1 point de la mesure B-02 (sinon expliquer l'écart).
-- [ ] Les fichiers exclus avant le sont toujours.
-- [ ] Le job CI de delta-coverage passe sur la PR.
+- [x] Vitest 5.0.x installé dans les deux paquets, versions identiques.
+- [x] jsdom 29.1.x (pas 30 : il exige Node ≥ 24.15) et jest-dom 7 côté frontend, `@testing-library/dom` explicite.
+- [x] Tous les tests passent ; couverture globale à ±1 point de la mesure B-02 (sinon expliquer l'écart).
+- [x] Les fichiers exclus avant le sont toujours.
+- [x] Le job CI de delta-coverage passe sur la PR.
 
 ## Tests à ajouter ou adapter
 
@@ -57,3 +57,4 @@ Aucun nouveau test. Si un test casse à cause de `clearMocks` (compteur d'appels
 ## Journal
 
 - 2026-10-08 : tâche créée à partir du rapport de dépendances.
+- 2026-10-11 : vitest et @vitest/coverage-v8 5.0.3 dans les deux paquets, jsdom 29.1.1, jest-dom 7.0.1, @testing-library/dom 10.4.2 explicite, `.vitest/` ignoré. Les exclusions de couverture marchent sans changement (aucun fichier ajouté au rapport ni retiré), donc les `vitest.config.ts` ne changent pas. Aucun test cassé par `clearMocks`. Couverture origin/develop → Vitest 5 : backend statements 94,23 → 94,22 % (1471/1561 → 1468/1558), branches 81,94 % et functions 98,54 % inchangées, lines 95,51 → 95,50 % (1364/1428 → 1361/1425) ; frontend inchangé (statements 68,19 %, branches 59,27 %, functions 62,82 %, lines 69,84 %). Écart backend de 0,01 point accepté par l'humain : coverage-v8 5 ne compte plus trois instructions qui étaient couvertes (`backup.ts:37` et `:105`, `recipeDefectsService.ts:33`), ce n'est pas une perte de couverture. Delta coverage N/A (aucune ligne de code modifiée). PR #73.
