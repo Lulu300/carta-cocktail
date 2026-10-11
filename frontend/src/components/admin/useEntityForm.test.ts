@@ -49,4 +49,16 @@ describe('useEntityForm', () => {
     expect(result.current.editing).toBeNull();
     expect(result.current.form).toEqual({ name: '', abbreviation: '' });
   });
+
+  it('gives a new form key on every opening', () => {
+    const { result } = renderHook(() => useEntityForm(toForm));
+    const initialKey = result.current.formKey;
+
+    act(() => result.current.open());
+    const firstKey = result.current.formKey;
+    act(() => result.current.open());
+
+    expect(firstKey).not.toBe(initialKey);
+    expect(result.current.formKey).not.toBe(firstKey);
+  });
 });
