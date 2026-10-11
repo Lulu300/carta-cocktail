@@ -5,13 +5,13 @@ phase: E
 lane: frontend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [E-05]
 touches: [frontend/src/pages/admin/CocktailsPage.tsx, frontend/src/pages/admin/CocktailsPage.test.tsx]
 sources: ["05-frontend-archi.md §4.2"]
-branch:
-pr:
+branch: fix/E-24-cocktail-import-refresh
+pr: "#86"
 ---
 
 ## Contexte
@@ -30,8 +30,8 @@ E-05 (partie 2) retire l'invalidation transitoire de `AdminLayout` qui rechargea
 
 ## Critères d'acceptation
 
-- [ ] Après un import de cocktail qui crée une catégorie et une bouteille, la page Catégories et le badge de pénuries sont à jour sans recharger la page.
-- [ ] Couverture ≥ 80 % sur les lignes modifiées.
+- [x] Après un import de cocktail qui crée une catégorie et une bouteille, la page Catégories et le badge de pénuries sont à jour sans recharger la page.
+- [x] Couverture ≥ 80 % sur les lignes modifiées.
 
 ## Tests à ajouter ou adapter
 
@@ -45,3 +45,4 @@ E-05 (partie 2) retire l'invalidation transitoire de `AdminLayout` qui rechargea
 ## Journal
 
 - 2026-10-11 : tâche créée par E-05 (partie 2), qui retire l'invalidation transitoire d'`AdminLayout`.
+- 2026-10-11 : fait dans la PR #86. Correction minimale, sans migrer `CocktailsPage` : la fermeture de l'assistant invalide les huit clés. L'assistant ne dit pas si une recette a été importée, donc chaque fermeture rafraîchit, même après une annulation. E-06 pourra ajouter un `onImported` à l'assistant, comme `ImportBottlesWizard`. Couverture des lignes modifiées : 100 %.
