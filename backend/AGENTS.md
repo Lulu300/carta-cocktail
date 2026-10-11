@@ -197,4 +197,5 @@ For `CATEGORY` sources, `CocktailPreferredBottle` records can specify preferred 
 - `loadStock()` loads bottles, categories, ingredients and recipes in a fixed number of queries, whatever the number of cocktails
 - `computeAvailability()` is pure: volumes come from `Unit.conversionFactorToMl` (`null` = not measured, the line only needs some stock), lines sharing a bottle or a category add up before dividing
 - A category counts all its non-empty bottles; `preferredAvailable` only warns when no preferred bottle is left
+- An orphan line (known `sourceType` whose source key is NULL or names a missing row, shown "--" in the admin form) stays unavailable with its `reason` and in `missingIngredients`, but does not make the cocktail unavailable. A line with an unknown `sourceType` still does
 - The public endpoints add `available` = manual switch (`Cocktail.isAvailable`) and at least one serving in stock

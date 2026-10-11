@@ -95,8 +95,15 @@ interface VolumeResource {
   insufficientReason: string;
 }
 
+/**
+ * `orphan`: a known source type whose source is gone. Its key was set to NULL
+ * when the source was deleted before v1.8.0 (the admin form shows "--" and
+ * C-21 keeps the line), or it names a row that no longer exists.
+ * `invalid`: an unknown source type.
+ */
 type LineResolution =
-  | { kind: 'invalid'; name: string; reason: string }
+  | { kind: 'invalid'; reason: string }
+  | { kind: 'orphan'; reason: string }
   | { kind: 'ingredient'; ingredient: StockIngredient }
   | { kind: 'volume'; resource: VolumeResource; requiredMl: number | null };
 
@@ -105,9 +112,10 @@ interface ResourceUsage {
   servings: number;
 }
 
-const INVALID_CONFIGURATION: LineResolution = {
-  kind: 'invalid', name: 'Unknown', reason: 'Invalid ingredient configuration',
-};
+const INVALID_CONFIGURATION_REASON = 'Invalid ingredient configuration';
+
+/** Name of a line whose source cannot be read. */
+const UNKNOWN_SOURCE_NAME = 'Unknown';
 
 function isNotEmpty(bottle: StockBottle): boolean {
   return bottle.remainingPercent > 0;
@@ -162,23 +170,31 @@ function requiredMlOf(line: RecipeLine): number | null {
   return requiredMl > 0 ? requiredMl : null;
 }
 
+function findSource<T>(rows: Map<number, T>, sourceId: number | null): T | undefined {
+  return sourceId === null ? undefined : rows.get(sourceId);
+}
+
+function orphanLine(sourceId: number | null, notFoundReason: string): LineResolution {
+  return { kind: 'orphan', reason: sourceId === null ? INVALID_CONFIGURATION_REASON : notFoundReason };
+}
+
 function resolveLine(line: RecipeLine, stock: StockSnapshot): LineResolution {
-  if (line.sourceType === 'INGREDIENT' && line.ingredientId !== null) {
-    const ingredient = stock.ingredients.get(line.ingredientId);
-    if (!ingredient) return { kind: 'invalid', name: 'Unknown', reason: 'Ingredient not found' };
+  if (line.sourceType === 'INGREDIENT') {
+    const ingredient = findSource(stock.ingredients, line.ingredientId);
+    if (!ingredient) return orphanLine(line.ingredientId, 'Ingredient not found');
     return { kind: 'ingredient', ingredient };
   }
-  if (line.sourceType === 'BOTTLE' && line.bottleId !== null) {
-    const bottle = stock.bottles.get(line.bottleId);
-    if (!bottle) return { kind: 'invalid', name: 'Unknown', reason: 'Bottle not found' };
+  if (line.sourceType === 'BOTTLE') {
+    const bottle = findSource(stock.bottles, line.bottleId);
+    if (!bottle) return orphanLine(line.bottleId, 'Bottle not found');
     return { kind: 'volume', resource: bottleResource(bottle), requiredMl: requiredMlOf(line) };
   }
-  if (line.sourceType === 'CATEGORY' && line.categoryId !== null) {
-    const category = stock.categories.get(line.categoryId);
-    if (!category) return { kind: 'invalid', name: 'Unknown', reason: 'Category not found' };
+  if (line.sourceType === 'CATEGORY') {
+    const category = findSource(stock.categories, line.categoryId);
+    if (!category) return orphanLine(line.categoryId, 'Category not found');
     return { kind: 'volume', resource: categoryResource(category, stock), requiredMl: requiredMlOf(line) };
   }
-  return INVALID_CONFIGURATION;
+  return { kind: 'invalid', reason: INVALID_CONFIGURATION_REASON };
 }
 
 /**
@@ -226,8 +242,8 @@ function describeLine(
     availableCount: null,
   };
 
-  if (resolution.kind === 'invalid') {
-    return { ...base, name: resolution.name, reason: resolution.reason };
+  if (resolution.kind === 'invalid' || resolution.kind === 'orphan') {
+    return { ...base, name: UNKNOWN_SOURCE_NAME, reason: resolution.reason };
   }
 
   if (resolution.kind === 'ingredient') {
@@ -294,7 +310,12 @@ export function computeAvailability(
   const missingIngredients = ingredients
     .filter((ingredient) => !ingredient.isAvailable)
     .map((ingredient) => ingredient.name);
-  const isAvailable = missingIngredients.length === 0;
+  // Decision of 2026-10-11: an orphan line stays unavailable and listed in
+  // missingIngredients, so the admin still sees it, but it no longer makes the
+  // cocktail unavailable: nothing is missing from the stock.
+  const isAvailable = ingredients.every(
+    (ingredient, index) => ingredient.isAvailable || resolutions[index].kind === 'orphan',
+  );
   const resourceServings = [...usages.values()].map(({ servings }) => servings);
   const stockServings = resourceServings.length > 0 ? Math.min(...resourceServings) : UNLIMITED_SERVINGS;
 
