@@ -49,4 +49,4 @@ C-11 ajoute `POST /api/auth/logout-all` : la route incrémente `User.tokenVersio
 ## Journal
 
 - 2026-10-11 : tâche créée pendant C-11 (PR #82).
-- 2026-10-11 : point d'attention sur les tokens ramenés par une restauration remplacé par un renvoi vers C-30 (PR de C-30).
+- 2026-10-11 : point d'attention sur les tokens ramenés par une restauration remplacé par un renvoi vers C-30 (PR #93).

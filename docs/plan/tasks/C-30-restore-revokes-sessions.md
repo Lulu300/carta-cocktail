@@ -11,7 +11,7 @@ depends_on: [C-11, C-05]
 touches: [backend/src/services/backupService.ts, backend/src/routes/backup.test.ts, backend/AGENTS.md, docs/plan/tasks/C-25-logout-everywhere-ui.md]
 sources: []
 branch: fix/C-30-restore-revokes-sessions
-pr:
+pr: "#93"
 ---
 
 ## Contexte
@@ -55,5 +55,5 @@ C-11 révoque les tokens par `User.tokenVersion` : le token porte la version (`t
 ## Journal
 
 - 2026-10-11 : tâche créée (décision humaine, prérequis de v1.11.0), à partir du point d'attention de C-25 relevé à la revue de la PR #82.
-- 2026-10-11 : fait. `highestLiveTokenVersion()` (agrégat Prisma sur la base courante, lu après `checkpointWal()` et avant `$disconnect()`) et `revokeRestoredSessions()` (client jetable sur le fichier restauré : `PRAGMA table_info("User")`, puis `UPDATE "User" SET "tokenVersion" = MAX("tokenVersion", ?) + 1`), appelée après la copie `pre-restore` et avant le `rename`. Le `$disconnect()` du client jetable reporte le WAL dans le fichier (vérifié). Tests : `backup.test.ts`, 3 cas, `currentSessionHeader()` pour les appels après restauration ; helper `withDatabaseFile()` partagé par les helpers qui ouvrent une base temporaire. `backend/AGENTS.md` (règles d'auth) ajouté à `touches`. Point d'attention de C-25 retiré, renvoi vers C-30. Nouvelle tâche : C-31 (dire à l'admin qu'il doit se reconnecter après une restauration).
+- 2026-10-11 : fait (PR #93). `highestLiveTokenVersion()` (agrégat Prisma sur la base courante, lu après `checkpointWal()` et avant `$disconnect()`) et `revokeRestoredSessions()` (client jetable sur le fichier restauré : `PRAGMA table_info("User")`, puis `UPDATE "User" SET "tokenVersion" = MAX("tokenVersion", ?) + 1`), appelée après la copie `pre-restore` et avant le `rename`. Le `$disconnect()` du client jetable reporte le WAL dans le fichier (vérifié). Tests : `backup.test.ts`, 3 cas, `currentSessionHeader()` pour les appels après restauration ; helper `withDatabaseFile()` partagé par les helpers qui ouvrent une base temporaire. `backend/AGENTS.md` (règles d'auth) ajouté à `touches`. Point d'attention de C-25 retiré, renvoi vers C-30. Nouvelle tâche : C-31 (dire à l'admin qu'il doit se reconnecter après une restauration).
 - Notes de version : après une restauration, toutes les sessions sont fermées, celle qui a restauré comprise ; l'admin se reconnecte avec le mot de passe de la sauvegarde. Après la restauration d'une sauvegarde antérieure à v1.11.0 et le redémarrage, changer le mot de passe admin pour révoquer les tokens émis avant la restauration.
