@@ -7,6 +7,8 @@ import './i18n';
 import App from './App';
 import { AuthProvider } from './contexts/AuthContext';
 import { SiteSettingsProvider } from './contexts/SiteSettingsContext';
+import { ConfirmProvider } from './contexts/ConfirmContext';
+import Toaster from './components/ui/Toaster';
 import { registerChunkReloadHandler } from './utils/chunkReload';
 import { createQueryClient } from './queries/queryClient';
 
@@ -20,7 +22,10 @@ createRoot(document.getElementById('root')!).render(
       <BrowserRouter>
         <SiteSettingsProvider>
           <AuthProvider>
-            <App />
+            <ConfirmProvider>
+              <App />
+              <Toaster />
+            </ConfirmProvider>
           </AuthProvider>
         </SiteSettingsProvider>
       </BrowserRouter>

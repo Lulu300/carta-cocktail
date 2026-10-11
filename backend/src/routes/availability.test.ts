@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
-  request, authHeader, prisma, seedCategory, seedUnit, seedBottle, seedIngredient,
+  request, authHeader, prisma, seedCategory, seedUnit, seedBottle, seedIngredient, seedCocktailUsing,
 } from '../test/helpers';
 
 beforeAll(async () => { await setupTestDatabase(); });
@@ -118,6 +118,19 @@ describe('GET /api/availability/cocktails/:id', () => {
     expect(res.status).toBe(200);
     expect(res.body.isAvailable).toBe(true);
     expect(res.body.lowStockWarnings.length).toBeGreaterThan(0);
+  });
+
+  it('should convert a cup with the factor of its unit (250 ml)', async () => {
+    const cup = await seedUnit({ name: 'Tasse', abbreviation: 'tasse', conversionFactorToMl: 250 });
+    const cat = await seedCategory();
+    const bottle = await seedBottle({ categoryId: cat.id, capacityMl: 700, remainingPercent: 100 });
+    const cocktail = await seedCocktailUsing('Cup Test', cup.id, [{ sourceType: 'BOTTLE', bottleId: bottle.id }]);
+
+    const res = await request.get(`/api/availability/cocktails/${cocktail.id}`).set(authHeader());
+    expect(res.status).toBe(200);
+    // 700 ml / 250 ml = 2 servings
+    expect(res.body.maxServings).toBe(2);
+    expect(res.body.ingredients[0]).toMatchObject({ unit: 'tasse', availableCount: 2 });
   });
 
   it('should use min servings across multiple ingredients', async () => {

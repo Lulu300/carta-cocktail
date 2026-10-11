@@ -31,8 +31,8 @@ function PublicCocktailItem({
   const { t } = useTranslation();
   const localize = useLocalizedName();
   const cocktail = menuCocktail.cocktail!;
-  // Only the manual switch for now: the stock-based `available` field comes with C-08.
-  const isUnavailable = !cocktail.isAvailable;
+  // `available` combines the admin's manual switch and the stock (computed by the server)
+  const isUnavailable = cocktail.available === false;
   const isList = viewMode === 'list';
   const ingredients = cocktail.ingredients ?? [];
   const hiddenIngredientCount = ingredients.length - MAX_VISIBLE_INGREDIENTS;

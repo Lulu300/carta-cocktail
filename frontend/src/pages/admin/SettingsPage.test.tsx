@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '../../test/test-utils';
+import { render, screen, waitFor, within } from '../../test/test-utils';
 import userEvent from '@testing-library/user-event';
 import { fireEvent } from '@testing-library/react';
 import SettingsPage from './SettingsPage';
+import { ConfirmProvider } from '../../contexts/ConfirmContext';
+import { toast } from '../../components/ui/ToastStore';
 
 vi.mock('../../services/api', () => ({
   settings: { get: vi.fn(), update: vi.fn(), updateProfile: vi.fn() },
@@ -24,6 +26,38 @@ const mockUpdateProfile = vi.mocked(settingsApi.updateProfile);
 const mockExportBackup = vi.mocked(backupApi.exportBackup);
 const mockImportBackup = vi.mocked(backupApi.importBackup);
 
+function renderPage() {
+  return render(
+    <ConfirmProvider>
+      <SettingsPage />
+    </ConfirmProvider>,
+  );
+}
+
+async function selectBackupFileAndClickImport(): Promise<File> {
+  await waitFor(() => {
+    expect(screen.getByText('settings.backup.selectFile')).toBeInTheDocument();
+  });
+
+  // Select a file via the hidden input
+  const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+  const file = new File(['content'], 'backup.zip', { type: 'application/zip' });
+  fireEvent.change(fileInput, { target: { files: [file] } });
+
+  // Import button appears after file selection
+  await waitFor(() => {
+    expect(screen.getByText('settings.backup.import')).toBeInTheDocument();
+  });
+  fireEvent.click(screen.getByText('settings.backup.import'));
+  return file;
+}
+
+async function answerRestoreDialog(buttonName: 'settings.backup.import' | 'common.cancel') {
+  const dialog = await screen.findByRole('alertdialog', { name: 'settings.backup.import' });
+  expect(dialog).toHaveAccessibleDescription('settings.backup.confirmRestore');
+  fireEvent.click(within(dialog).getByRole('button', { name: buttonName }));
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockGet.mockResolvedValue({ id: 1, siteName: 'My Bar', siteIcon: '🍸' } as never);
@@ -31,19 +65,19 @@ beforeEach(() => {
   mockUpdateProfile.mockResolvedValue({ id: 1, email: 'admin@test.local' } as never);
   mockExportBackup.mockResolvedValue(undefined as never);
   mockImportBackup.mockResolvedValue(undefined as never);
-  vi.stubGlobal('confirm', vi.fn(() => true));
+  vi.spyOn(toast, 'success').mockReturnValue('toast-1');
 });
 
 describe('SettingsPage', () => {
   it('should show loading state initially', () => {
     // Don't resolve the promise yet
     mockGet.mockReturnValue(new Promise(() => {}) as never);
-    render(<SettingsPage />);
+    renderPage();
     expect(screen.getByText('common.loading')).toBeInTheDocument();
   });
 
   it('should render title and both forms after loading', async () => {
-    render(<SettingsPage />);
+    renderPage();
     await waitFor(() => {
       expect(screen.getByText('settings.title')).toBeInTheDocument();
       expect(screen.getByText('settings.siteConfig')).toBeInTheDocument();
@@ -52,7 +86,7 @@ describe('SettingsPage', () => {
   });
 
   it('should display site settings after loading', async () => {
-    render(<SettingsPage />);
+    renderPage();
     await waitFor(() => {
       const siteNameInput = screen.getByDisplayValue('My Bar');
       expect(siteNameInput).toBeInTheDocument();
@@ -60,7 +94,7 @@ describe('SettingsPage', () => {
   });
 
   it('should display user email in profile form', async () => {
-    render(<SettingsPage />);
+    renderPage();
     await waitFor(() => {
       expect(screen.getByDisplayValue('admin@test.local')).toBeInTheDocument();
     });
@@ -68,7 +102,7 @@ describe('SettingsPage', () => {
 
   it('should save site settings on submit', async () => {
     const user = userEvent.setup();
-    render(<SettingsPage />);
+    renderPage();
     await waitFor(() => {
       expect(screen.getByDisplayValue('My Bar')).toBeInTheDocument();
     });
@@ -87,7 +121,7 @@ describe('SettingsPage', () => {
 
   it('should show success message after site save', async () => {
     const user = userEvent.setup();
-    render(<SettingsPage />);
+    renderPage();
     await waitFor(() => {
       expect(screen.getByDisplayValue('My Bar')).toBeInTheDocument();
     });
@@ -103,7 +137,7 @@ describe('SettingsPage', () => {
   it('should show error on site save failure', async () => {
     mockUpdate.mockRejectedValue(new Error('Server error'));
     const user = userEvent.setup();
-    render(<SettingsPage />);
+    renderPage();
     await waitFor(() => {
       expect(screen.getByDisplayValue('My Bar')).toBeInTheDocument();
     });
@@ -119,7 +153,7 @@ describe('SettingsPage', () => {
   it('should show error on site save failure with non-Error object', async () => {
     mockUpdate.mockRejectedValue('string error');
     const user = userEvent.setup();
-    render(<SettingsPage />);
+    renderPage();
     await waitFor(() => {
       expect(screen.getByDisplayValue('My Bar')).toBeInTheDocument();
     });
@@ -134,7 +168,7 @@ describe('SettingsPage', () => {
 
   it('should show password mismatch error', async () => {
     const user = userEvent.setup();
-    render(<SettingsPage />);
+    renderPage();
     await waitFor(() => {
       expect(screen.getByDisplayValue('admin@test.local')).toBeInTheDocument();
     });
@@ -157,7 +191,7 @@ describe('SettingsPage', () => {
 
   it('should save profile with matching passwords and show success message', async () => {
     const user = userEvent.setup();
-    render(<SettingsPage />);
+    renderPage();
     await waitFor(() => {
       expect(screen.getByDisplayValue('admin@test.local')).toBeInTheDocument();
     });
@@ -185,7 +219,7 @@ describe('SettingsPage', () => {
   it('should show error on profile save failure', async () => {
     mockUpdateProfile.mockRejectedValue(new Error('Profile error'));
     const user = userEvent.setup();
-    render(<SettingsPage />);
+    renderPage();
     await waitFor(() => {
       expect(screen.getByDisplayValue('admin@test.local')).toBeInTheDocument();
     });
@@ -201,7 +235,7 @@ describe('SettingsPage', () => {
   it('should show error on profile save failure with non-Error object', async () => {
     mockUpdateProfile.mockRejectedValue('profile string error');
     const user = userEvent.setup();
-    render(<SettingsPage />);
+    renderPage();
     await waitFor(() => {
       expect(screen.getByDisplayValue('admin@test.local')).toBeInTheDocument();
     });
@@ -216,7 +250,7 @@ describe('SettingsPage', () => {
 
   it('should render after site settings load error', async () => {
     mockGet.mockRejectedValue(new Error('Network error'));
-    render(<SettingsPage />);
+    renderPage();
     // Page should render (not stuck in loading state) after load error
     await waitFor(() => {
       expect(screen.getByText('settings.title')).toBeInTheDocument();
@@ -226,7 +260,7 @@ describe('SettingsPage', () => {
   // Backup section tests
 
   it('should show backup section title', async () => {
-    render(<SettingsPage />);
+    renderPage();
     await waitFor(() => {
       expect(screen.getByText('settings.backup.title')).toBeInTheDocument();
     });
@@ -234,7 +268,7 @@ describe('SettingsPage', () => {
 
   it('should export backup successfully and show success message', async () => {
     const user = userEvent.setup();
-    render(<SettingsPage />);
+    renderPage();
     await waitFor(() => {
       expect(screen.getByText('settings.backup.export')).toBeInTheDocument();
     });
@@ -251,7 +285,7 @@ describe('SettingsPage', () => {
   it('should show error on backup export failure', async () => {
     mockExportBackup.mockRejectedValue(new Error('Export failed'));
     const user = userEvent.setup();
-    render(<SettingsPage />);
+    renderPage();
     await waitFor(() => {
       expect(screen.getByText('settings.backup.export')).toBeInTheDocument();
     });
@@ -267,7 +301,7 @@ describe('SettingsPage', () => {
   it('should show error on backup export failure with non-Error object', async () => {
     mockExportBackup.mockRejectedValue('export string error');
     const user = userEvent.setup();
-    render(<SettingsPage />);
+    renderPage();
     await waitFor(() => {
       expect(screen.getByText('settings.backup.export')).toBeInTheDocument();
     });
@@ -281,7 +315,7 @@ describe('SettingsPage', () => {
   });
 
   it('should show file name after selecting a backup file', async () => {
-    render(<SettingsPage />);
+    renderPage();
     await waitFor(() => {
       expect(screen.getByText('settings.backup.selectFile')).toBeInTheDocument();
     });
@@ -296,96 +330,53 @@ describe('SettingsPage', () => {
     });
   });
 
-  it('should import backup successfully after confirm and show success message', async () => {
-    vi.stubGlobal('confirm', vi.fn(() => true));
+  it('should import backup after confirming in the dialog and show success message', async () => {
+    renderPage();
+    const file = await selectBackupFileAndClickImport();
 
-    render(<SettingsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('settings.backup.selectFile')).toBeInTheDocument();
-    });
-
-    // Select a file via the hidden input
-    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-    const file = new File(['content'], 'backup.zip', { type: 'application/zip' });
-    fireEvent.change(fileInput, { target: { files: [file] } });
-
-    // Import button appears after file selection
-    await waitFor(() => {
-      expect(screen.getByText('settings.backup.import')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByText('settings.backup.import'));
+    expect(mockImportBackup).not.toHaveBeenCalled();
+    await answerRestoreDialog('settings.backup.import');
 
     await waitFor(() => {
       expect(mockImportBackup).toHaveBeenCalledWith(file);
       expect(screen.getByText('settings.backup.importSuccess')).toBeInTheDocument();
     });
+    expect(toast.success).toHaveBeenCalledWith('settings.backup.importSuccess');
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   });
 
-  it('should not import backup when confirm is cancelled', async () => {
-    vi.stubGlobal('confirm', vi.fn(() => false));
+  it('should not import backup when the dialog is cancelled', async () => {
+    renderPage();
+    await selectBackupFileAndClickImport();
 
-    render(<SettingsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('settings.backup.selectFile')).toBeInTheDocument();
-    });
-
-    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-    const file = new File(['content'], 'backup.zip', { type: 'application/zip' });
-    fireEvent.change(fileInput, { target: { files: [file] } });
+    await answerRestoreDialog('common.cancel');
 
     await waitFor(() => {
-      expect(screen.getByText('settings.backup.import')).toBeInTheDocument();
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     });
-
-    fireEvent.click(screen.getByText('settings.backup.import'));
-
-    // confirm returned false so importBackup should never be called
     expect(mockImportBackup).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
   });
 
   it('should show error on backup import failure', async () => {
-    vi.stubGlobal('confirm', vi.fn(() => true));
     mockImportBackup.mockRejectedValue(new Error('Import failed'));
 
-    render(<SettingsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('settings.backup.selectFile')).toBeInTheDocument();
-    });
-
-    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-    const file = new File(['content'], 'backup.zip', { type: 'application/zip' });
-    fireEvent.change(fileInput, { target: { files: [file] } });
-
-    await waitFor(() => {
-      expect(screen.getByText('settings.backup.import')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByText('settings.backup.import'));
+    renderPage();
+    await selectBackupFileAndClickImport();
+    await answerRestoreDialog('settings.backup.import');
 
     await waitFor(() => {
       expect(screen.getByText('Import failed')).toBeInTheDocument();
     });
+    expect(toast.success).not.toHaveBeenCalled();
   });
 
   it('should show error on backup import failure with non-Error object', async () => {
-    vi.stubGlobal('confirm', vi.fn(() => true));
     mockImportBackup.mockRejectedValue('import string error');
 
-    render(<SettingsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('settings.backup.selectFile')).toBeInTheDocument();
-    });
-
-    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-    const file = new File(['content'], 'backup.zip', { type: 'application/zip' });
-    fireEvent.change(fileInput, { target: { files: [file] } });
-
-    await waitFor(() => {
-      expect(screen.getByText('settings.backup.import')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByText('settings.backup.import'));
+    renderPage();
+    await selectBackupFileAndClickImport();
+    await answerRestoreDialog('settings.backup.import');
 
     await waitFor(() => {
       expect(screen.getByText('common.error')).toBeInTheDocument();

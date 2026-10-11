@@ -176,7 +176,7 @@ Entity names support multi-language via JSON strings stored in SQLite:
 ## Database
 
 - SQLite file at `prisma/carta_cocktail.db`
-- One shared `PrismaClient` (`src/lib/prisma.ts`), also used by the test helpers. Only `prisma/seed.ts` (separate process) and `src/lib/prisma.test.ts` create their own
+- One shared `PrismaClient` (`src/lib/prisma.ts`), also used by the test helpers. Only `prisma/seed.ts` (separate process), `src/lib/prisma.test.ts` and `src/services/availabilityService.test.ts` (counts the queries) create their own
 - WAL journal mode, set at startup; `SQLITE_WAL=false` keeps the rollback journal, required when the database sits on a network share (SMB/NFS)
 - Cascading deletes on most relations
 - Unique constraints on slugs, name pairs, menu-entity pairs
@@ -194,7 +194,8 @@ For `CATEGORY` sources, `CocktailPreferredBottle` records can specify preferred 
 ## Availability Calculation
 
 `availabilityService.ts` computes how many servings a cocktail can make:
-- Checks sealed bottle counts per category
-- Evaluates remaining percentage of opened bottles
-- Identifies missing or low-stock ingredients
-- Returns max servings and shortage details
+- `loadStock()` loads bottles, categories, ingredients and recipes in a fixed number of queries, whatever the number of cocktails
+- `computeAvailability()` is pure: volumes come from `Unit.conversionFactorToMl` (`null` = not measured, the line only needs some stock), lines sharing a bottle or a category add up before dividing
+- A category counts all its non-empty bottles; `preferredAvailable` only warns when no preferred bottle is left
+- An orphan line (known `sourceType` whose source key is NULL or names a missing row, shown "--" in the admin form) stays unavailable with its `reason` and in `missingIngredients`, but does not make the cocktail unavailable. A line with an unknown `sourceType` still does
+- The public endpoints add `available` = manual switch (`Cocktail.isAvailable`) and at least one serving in stock

@@ -94,7 +94,10 @@ export interface Cocktail {
   notes: string | null;
   imagePath: string | null;
   tags: string;
+  /** Manual switch set by the admin. */
   isAvailable: boolean;
+  /** Public endpoints only: the manual switch is on and the stock allows one serving. */
+  available?: boolean;
   createdAt: string;
   updatedAt: string;
   ingredients?: CocktailIngredient[];
@@ -211,6 +214,8 @@ export interface IngredientAvailability {
   isAvailable: boolean;
   availableCount: number | null;
   reason?: string;
+  /** CATEGORY lines with preferred bottles only: at least one preferred bottle is not empty. */
+  preferredAvailable?: boolean;
 }
 
 export interface SiteSettings {

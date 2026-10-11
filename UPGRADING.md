@@ -14,9 +14,21 @@ This guide lists the actions required to upgrade an existing instance, version b
 
 Pre-releases (`vX.Y.Z-rc.N`) are not listed: they use the section of their target version `vX.Y.Z`. The detailed changes of each version are in its [GitHub Release](https://github.com/Lulu300/carta-cocktail/releases) and in [`docs/releases/`](docs/releases/).
 
-We recommend pinning the images to a version (`:1.9.0`) instead of `:latest`, so that an upgrade only happens when you have read this guide.
+We recommend pinning the images to a version (`:1.10.0`) instead of `:latest`, so that an upgrade only happens when you have read this guide.
 
 The commands below assume the default `docker-compose.prod.yml`, run from its folder. Adapt the file name and the service name `carta-cocktail-backend` if yours differ.
+
+## v1.10.0
+
+No required action. `docker-compose.prod.yml` has not changed since v1.8.0: pin both images to `:1.10.0` (`:1.10.0-rc.N` to test a pre-release), then pull and restart. Release notes: [`docs/releases/v1.10.0.md`](docs/releases/v1.10.0.md).
+
+Instances older than v1.8.0: upgrade to v1.8.0 first, following the [v1.8.0 section](#v180) (and the sections before it), check that it works, then apply this one.
+
+Worth checking after the upgrade:
+
+- **Backup size.** A restore now refuses files larger than 200 MB (v1.9.0 accepted 500 MB), and the export does not warn. Check the size of your latest export: above 200 MB, restore it by hand, as described in the release notes ([Backups larger than 200 MB](docs/releases/v1.10.0.md#backups-larger-than-200-mb)). A restore also refuses archives that are too large once uncompressed, damaged or made by a newer version. It needs free disk space for the archive, a copy of the database and the photos, and keeps a copy of the replaced database in `/app/data/backups/pre-restore-<date>.db`, which is not deleted automatically.
+- **Restoring a backup made before v1.8.0.** Restart the backend afterwards (`docker compose -f docker-compose.prod.yml restart carta-cocktail-backend`) so that it applies the migrations. A backup from v1.0.x, or from before v1.8.0 with duplicate category names or unit abbreviations, then stops the backend at startup, as the upgrade from that version would (see the [v1.8.0](#v180) and [v1.6.0](#v160) sections). Put back the `pre-restore-<date>.db` copy to get the previous database, as in [README › "Restoring a pre-migration backup"](README.md#restoring-a-pre-migration-backup).
+- **Public menu.** A cocktail is now greyed out, marked "Unavailable" and cannot be opened by guests when it is switched off, short of stock, or uses an ingredient switched off (before, only the switch counted). Restock, or switch the ingredient on, to show it again. A recipe line shown as "--" because its source was deleted before v1.8.0 does not make the cocktail unavailable; the admin cocktail list still lists it under "❌ Manquant". A "--" on a bottle line can also mean an empty bottle (the form lists only bottles that are not empty): that cocktail stays unavailable until the bottle is restocked. Units are now converted with their own factor: a hand-made unit with a factor (a 40 ml "shot") counted 1 ml and now counts its factor, so servings can drop.
 
 ## v1.9.0
 

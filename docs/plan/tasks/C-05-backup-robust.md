@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: haute
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [B-07, C-02]
-touches: [backend/src/routes/backup.ts, backend/src/routes/backup.test.ts, backend/src/services/backupService.ts, backend/src/lib/prisma.ts, backend/src/i18n/]
+touches: [backend/src/routes/backup.ts, backend/src/routes/backup.test.ts, backend/src/services/backupService.ts, backend/src/services/backupService.test.ts, backend/src/lib/prisma.ts, backend/src/i18n/, frontend/nginx.conf.template]
 sources: ["02-backend-data-perf.md §4.1", "01-backend-routes.md §H2", "03-security.md §6", "07-devops-history.md §2.10", "04-tests.md §6"]
-branch:
-pr:
+branch: feature/C-05-backup-robust
+pr: https://github.com/Lulu300/carta-cocktail/pull/76
 ---
 
 ## Contexte
@@ -58,14 +58,14 @@ La restauration d'une sauvegarde est l'opération la plus destructrice de l'appl
 
 ## Critères d'acceptation
 
-- [ ] En dev avec `DATABASE_URL="file:./carta_cocktail.db"`, l'export fonctionne et contient la base de `backend/prisma/`.
-- [ ] L'export est un instantané cohérent (`VACUUM INTO`), y compris en mode WAL.
-- [ ] Un zip dont `database.db` n'est pas une base SQLite → 400 ; base et uploads inchangés.
-- [ ] Une sauvegarde valide est restaurée, une copie `backups/pre-restore-*.db` existe, l'API répond sans redémarrage.
-- [ ] Un sous-dossier dans `uploads/` ne fait plus échouer la restauration.
-- [ ] Un `uploads/evil.html` présent dans le zip n'est pas écrit.
-- [ ] Plus aucun message en dur dans `backup.ts`.
-- [ ] Couverture de `backup.ts` et `backupService.ts` ≥ 80 %.
+- [x] En dev avec `DATABASE_URL="file:./carta_cocktail.db"`, l'export fonctionne et contient la base de `backend/prisma/`.
+- [x] L'export est un instantané cohérent (`VACUUM INTO`), y compris en mode WAL.
+- [x] Un zip dont `database.db` n'est pas une base SQLite → 400 ; base et uploads inchangés.
+- [x] Une sauvegarde valide est restaurée, une copie `backups/pre-restore-*.db` existe, l'API répond sans redémarrage.
+- [x] Un sous-dossier dans `uploads/` ne fait plus échouer la restauration.
+- [x] Un `uploads/evil.html` présent dans le zip n'est pas écrit.
+- [x] Plus aucun message en dur dans `backup.ts`.
+- [x] Couverture de `backup.ts` et `backupService.ts` ≥ 80 %.
 
 ## Tests à ajouter ou adapter
 
@@ -96,3 +96,8 @@ La restauration d'une sauvegarde est l'opération la plus destructrice de l'appl
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-09 : C-02 (PR #42) ajoute une garde temporaire dans `backup.ts` pour le mode WAL et crée `backup.test.ts` ; étape 9 et `lib/prisma.ts` (dans `touches`) ajoutés pour la remplacer.
+- 2026-10-11 : question à l'humain (limites de taille) ; réponse : option A. 200 Mo reçus, 500 Mo décompressés, 5 000 entrées ; refus des bases corrompues ou sans tables gardés en 400 ; extension comparée en minuscules. `frontend/nginx.conf.template` ajouté aux `touches` : `location = /api/backup/import` passe à `client_max_body_size 210m`.
+- 2026-10-11 : fait (PR #76). `services/backupService.ts` : `resolveDatabasePath`, `createSnapshot` (`VACUUM INTO`), `readSchemaVersion`, `latestAppMigration` (dossier le plus récent de `prisma/migrations`, référence de la comparaison de schéma), `buildMetadata`, `restoreBackup`. `checkpointWal()` gardé (réutilisé à l'étape 6.1), commentaire mis à jour. Format des sauvegardes vérifié de v1.0.1 à v1.9.0 (inchangé) ; une sauvegarde au format v1.4.0 construite sur une copie temporaire du jeu d'essai réel se restaure (200, 42 photos, `skippedFiles: 0`, `restartRecommended: true`). 678 tests, couverture des lignes modifiées 100 %. Nouvelles tâches : C-22 (affichage de `skippedFiles` et `restartRecommended` dans l'admin), C-23 (`appVersion` toujours à `1.0.0`).
+- 2026-10-11 : revue de la PR #76 (7 points). Rollback complet : `swapUploads` déplace les anciennes entrées dans `<uploadDir>/.pre-restore-<ts>` (rename, même volume) au lieu de les supprimer ; en cas d'échec après le rename de la base (déplacement des fichiers restaurés ou reconnexion), les fichiers restaurés sont retirés et les anciennes entrées remises en place, puis la base `pre-restore` ; le dossier n'est supprimé qu'après un `reconnect()` réussi. Données d'une entrée illisibles (CRC, inflate) : 400 au lieu de 500. Deux images de même nom dans des sous-dossiers : la première est gardée, les suivantes comptées dans `skippedFiles`. Tests ajoutés : traversée (`uploads/../../x.jpg`), doublons, CRC, rollback sur échec de déplacement et sur échec de reconnexion (`kept.jpg` et un sous-dossier survivent). `readSchemaVersion` départage les égalités de `finished_at` par nom. Rebase sur develop (B-04, Vitest 5). Nouvelle tâche C-26 (`check-integrity.ts` réutilise `resolveDatabasePath`) ; point d'attention ajouté à C-22 (sauvegardes v1.0.x).
+- 2026-10-11 : deuxième revue de la PR #76. Une fois `reconnect()` réussi, la restauration est validée : la suppression de `<uploadDir>/.pre-restore-<ts>` se fait hors du chemin de rollback, en best effort (`console.warn` en cas d'échec). Le dossier résiduel n'est pas servi, et la restauration suivante le supprime (test ajouté).
+- Notes de version : l'import refuse les sauvegardes de plus de 200 Mo (413), ainsi que celles qui dépassent 500 Mo décompressées, comptent plus de 5 000 entrées, ou dont la base est corrompue, incomplète (tables manquantes) ou trop récente (400). Seules les images (jpg, jpeg, png, webp) de `uploads/` sont restaurées. Une copie de la base remplacée est gardée dans `<dossier de la base>/backups/pre-restore-*.db`.

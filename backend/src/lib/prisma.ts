@@ -44,8 +44,8 @@ export async function configureSqlite(
  * empties the WAL, so the .db file alone holds all the data. No effect on a
  * database in rollback journal mode.
  *
- * Temporary guard for the backup routes, until C-05 replaces it with
- * VACUUM INTO and an atomic file swap.
+ * The backup restore runs it before replacing the database file, so that no
+ * pending WAL page can be written over the restored file.
  */
 export async function checkpointWal(client: PrismaClient = prisma): Promise<void> {
   const rows = await client.$queryRawUnsafe<{ busy: number | bigint }[]>('PRAGMA wal_checkpoint(TRUNCATE);');

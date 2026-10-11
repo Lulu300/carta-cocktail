@@ -68,9 +68,9 @@ describe('PublicCocktailItem', () => {
     expect(screen.getByText('cocktail page, state: {"fromMenu":true}')).toBeInTheDocument();
   });
 
-  it('greys out a cocktail switched off and does not open it', async () => {
+  it('greys out a cocktail switched on but out of stock and does not open it', async () => {
     const user = userEvent.setup();
-    renderItem(menuCocktail(1, { isAvailable: false }));
+    renderItem(menuCocktail(1, { isAvailable: true, available: false }));
 
     const link = screen.getByRole('link', { name: /Mojito/ });
     expect(link).toHaveClass('grayscale');
@@ -78,5 +78,12 @@ describe('PublicCocktailItem', () => {
 
     await user.click(link);
     expect(screen.queryByText(/cocktail page/)).not.toBeInTheDocument();
+  });
+
+  it('keeps an available cocktail in color', () => {
+    renderItem(menuCocktail(1, { isAvailable: true, available: true }));
+
+    expect(screen.getByRole('link', { name: /Mojito/ })).not.toHaveClass('grayscale');
+    expect(screen.queryByText('public.unavailable')).not.toBeInTheDocument();
   });
 });

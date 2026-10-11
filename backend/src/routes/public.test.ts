@@ -593,3 +593,76 @@ describe('GET /api/public/menus/:slug - menu with cocktails and bottles', () => 
     expect(res.body.bottles[0].bottle.categoryId).toBe(category.id);
   });
 });
+
+describe('public availability (manual switch and stock)', () => {
+  /** One more recipe line: no key at all makes an orphan line, as a source deleted before v1.8.0 left it. */
+  type OtherLine = { sourceType: string; ingredientId?: number };
+
+  /**
+   * A cocktail in the public menu whose recipe takes 4 cl of a bottle filled at
+   * `remainingPercent`, then one unit of each of `otherLines`.
+   */
+  async function seedMenuCocktail(isAvailable: boolean, remainingPercent: number, otherLines: OtherLine[] = []) {
+    const unit = await seedUnit({ abbreviation: 'cl', conversionFactorToMl: 10 });
+    const bottle = await seedBottle({ name: 'Rum', capacityMl: 700, remainingPercent });
+    const lines = [
+      { sourceType: 'BOTTLE', bottleId: bottle.id, unitId: unit.id, quantity: 4 },
+      ...otherLines.map((otherLine) => ({ ...otherLine, unitId: unit.id, quantity: 1 })),
+    ];
+    const cocktail = await prisma.cocktail.create({
+      data: { name: 'Daiquiri', isAvailable, ingredients: { create: lines } },
+    });
+    await addCocktailToMenu(cocktail.id);
+    return cocktail;
+  }
+
+  /** The cocktail as the menu serves it, then as its detail page gets it. */
+  async function fetchPublicCocktail(cocktailId: number) {
+    const menu = await request.get('/api/public/menus/public-menu');
+    const detail = await request.get(`/api/public/cocktails/${cocktailId}`);
+    expect(menu.status).toBe(200);
+    expect(detail.status).toBe(200);
+    return [menu.body.cocktails[0].cocktail, detail.body];
+  }
+
+  it('should mark a cocktail available when switched on and in stock', async () => {
+    const cocktail = await seedMenuCocktail(true, 100);
+
+    for (const served of await fetchPublicCocktail(cocktail.id)) {
+      expect(served).toMatchObject({ isAvailable: true, available: true });
+    }
+  });
+
+  it('should mark a cocktail switched on but out of stock unavailable', async () => {
+    const cocktail = await seedMenuCocktail(true, 0);
+
+    for (const served of await fetchPublicCocktail(cocktail.id)) {
+      expect(served).toMatchObject({ isAvailable: true, available: false });
+    }
+  });
+
+  it('should mark a cocktail in stock but switched off unavailable', async () => {
+    const cocktail = await seedMenuCocktail(false, 100);
+
+    for (const served of await fetchPublicCocktail(cocktail.id)) {
+      expect(served).toMatchObject({ isAvailable: false, available: false });
+    }
+  });
+
+  it('should mark a cocktail available when switched on and in stock despite an orphan line', async () => {
+    const cocktail = await seedMenuCocktail(true, 100, [{ sourceType: 'CATEGORY' }]);
+
+    for (const served of await fetchPublicCocktail(cocktail.id)) {
+      expect(served).toMatchObject({ isAvailable: true, available: true });
+    }
+  });
+
+  it('should still mark a cocktail with a switched-off ingredient unavailable', async () => {
+    const mint = await seedIngredient({ name: 'Mint', isAvailable: false });
+    const cocktail = await seedMenuCocktail(true, 100, [{ sourceType: 'INGREDIENT', ingredientId: mint.id }]);
+
+    for (const served of await fetchPublicCocktail(cocktail.id)) {
+      expect(served).toMatchObject({ isAvailable: true, available: false });
+    }
+  });
+});
