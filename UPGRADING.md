@@ -20,7 +20,7 @@ The commands below assume the default `docker-compose.prod.yml`, run from its fo
 
 ## v1.8.0
 
-**Breaking:** the frontend container now listens on port 8080 (non-root nginx), so the port mapping of the compose file changes (step 2). The backend **refuses to start** when two categories have the same name or two units the same abbreviation: check a copy of the database first (step 1). Deleting an item still in use is now refused. Release notes: [`docs/releases/v1.8.0.md`](docs/releases/v1.8.0.md).
+**Breaking:** the frontend container now listens on port 8080 (non-root nginx), so the port mapping of the compose file changes (step 2). The backend **refuses to start** when two categories have exactly the same name, or two units the same abbreviation: check a copy of the database first (step 1). Deleting an item still in use is now refused. Release notes: [`docs/releases/v1.8.0.md`](docs/releases/v1.8.0.md).
 
 Instances older than v1.7.0: upgrade to v1.7.0 first, following the [v1.7.0 section](#v170) (and the sections before it), check that it works, then apply this one.
 
@@ -30,9 +30,9 @@ Pin both images to `:1.8.0` (not `:latest`) so that the upgrade only happens onc
 
 ### Before upgrading
 
-1. **Check the database for duplicates.** The v1.8.0 backend refuses to start when two categories have the same name, or two units the same abbreviation (compared ignoring case).
+1. **Check the database for duplicates.** The v1.8.0 backend refuses to start when two categories have exactly the same name, or two units the same abbreviation. The check also reports names that differ only by case (exit code `1`): fix them too, since the admin now refuses them.
 
-   1. Stop the backend and copy the database out of its volume, as in [README › "Checking a production database before the first upgrade"](README.md#checking-a-production-database-before-the-first-upgrade), steps 1 and 2. With a data folder mounted from the host, copy `carta_cocktail.db*` from that folder. Then start the backend again.
+   1. Stop the backend and copy the database out of its volume, as in [README › "Checking a production database before the first upgrade"](README.md#checking-a-production-database-before-the-first-upgrade), steps 1 and 2. With a data folder mounted from the host, copy `carta_cocktail.db*` from that folder into `carta-db-copy`. Then start the backend again.
    2. Run the integrity check of the new image on the copy:
 
       ```bash
@@ -73,18 +73,18 @@ Deleting an item used by a recipe, or a category that still holds bottles, is no
 
 ### Rolling back
 
-Pin the images back to `:1.7.0` and change the frontend port mapping back to `"<port>:80"`.
+To go back to v1.7.0, pin both images back to `:1.7.0`, change the frontend port mapping back to `"<port>:80"`, then start.
 
-If the backend stops at startup on `20261010173910_schema_integrity` (`P3018`, then `P3009` on each restart), the database also needs one of the two procedures below.
+If the backend stopped at startup on `20261010173910_schema_integrity` (`P3018`, then `P3009` on each restart), fix the database first with one of the two procedures below, otherwise v1.7.0 stops on `P3009` too. Both procedures include the step above.
 
 **Restore a copy.**
 
-1. Stop the backend.
+1. Stop the backend: `docker compose -f docker-compose.prod.yml stop carta-cocktail-backend`.
 2. Restore the right `pre-migrate-<date>.db` copy over the database, with its `-wal`/`-shm` files, as in [README › "Restoring a pre-migration backup"](README.md#restoring-a-pre-migration-backup).
-3. Start v1.7.0.
+3. Pin both images back to `:1.7.0`, change the frontend port mapping back to `"<port>:80"`, then start.
 4. Fix the duplicates, run the check again, then upgrade again.
 
-The right copy is the one the entrypoint made **before the first failed start**. Under a restart policy, each new start makes another copy, which already records the failed migration: restoring it makes v1.7.0 stop on `P3009` too. The right copy has no `schema_integrity` row; to check:
+The right copy is the one the entrypoint made **before the first failed start**. Under a restart policy, the next start makes another copy, which already records the failed migration: restoring it makes v1.7.0 stop on `P3009` too. The right copy has no `schema_integrity` row; to check:
 
 ```bash
 docker run --rm -v <project>_db-data:/data alpine:3 sh -c 'apk add -q sqlite >/dev/null
@@ -97,17 +97,17 @@ Restore the newest copy that prints `0`. With a data folder mounted from the hos
 
 **Without restoring.**
 
-1. Mark the failed migration as rolled back, with the v1.8.0 image:
+1. Stop the backend while the compose file still names `:1.8.0`: `docker compose -f docker-compose.prod.yml stop carta-cocktail-backend`. Otherwise the restart policy runs the migration again and undoes step 2.
+2. Mark the failed migration as rolled back, with the v1.8.0 image:
 
    ```bash
    docker compose -f docker-compose.prod.yml run --rm --no-deps --entrypoint npx carta-cocktail-backend \
      prisma migrate resolve --rolled-back 20261010173910_schema_integrity
    ```
 
-2. Pin and start v1.7.0.
-3. Fix the duplicates in the admin.
-4. Run the integrity check again on a new copy.
-5. Stop the backend and copy the database out of its volume or data folder (README › "Checking a production database before the first upgrade", step 2).
+3. Pin both images back to `:1.7.0`, change the frontend port mapping back to `"<port>:80"`, then start.
+4. Fix the duplicates in the admin.
+5. Stop the backend, copy the database out of its volume or data folder into `carta-db-copy` (README › "Checking a production database before the first upgrade", step 2), keep this copy, and run the integrity check on it. Repeat steps 4 and 5 until it exits `0`.
 6. Upgrade again.
 
 After `resolve --rolled-back`, the entrypoint makes **no** `pre-migrate` copy before the new attempt. If it fails again, restore the copy from step 5, not a `pre-migrate` copy: the newest `pre-migrate` copy predates the fixes made in the admin.
