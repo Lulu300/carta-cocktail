@@ -129,8 +129,12 @@ function uploadUrl(baseUrl, imagePath) {
   return `${baseUrl}/uploads/${name.split('/').map(encodeURIComponent).join('/')}`;
 }
 
-/** Every photo referenced by a cocktail, through one server (backend or frontend nginx). */
-export async function checkImages(baseUrl, imagePaths, serverLabel) {
+/**
+ * Every photo referenced by a cocktail, through one server (backend or frontend nginx). The two
+ * servers report in separate groups (`images`, `frontendImages`): a release note can then expect
+ * the nginx route to break (frontend port change) without hiding a backend photo failure.
+ */
+export async function checkImages(group, baseUrl, imagePaths, serverLabel) {
   let served = 0;
   const statuses = {};
   for (const imagePath of imagePaths) {
@@ -140,7 +144,7 @@ export async function checkImages(baseUrl, imagePaths, serverLabel) {
     statuses[image.status] = (statuses[image.status] ?? 0) + 1;
   }
   const byStatus = Object.entries(statuses).map(([status, count]) => `${count}x ${status}`).join(', ');
-  return row('images', `photos via ${serverLabel}`, served === imagePaths.length,
+  return row(group, `photos via ${serverLabel}`, served === imagePaths.length,
     `${served}/${imagePaths.length} in 200 (${byStatus || 'none referenced'})`);
 }
 

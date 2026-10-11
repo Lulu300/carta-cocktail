@@ -16,6 +16,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.104.1",
     "i18next": "^25.10.10",
     "i18next-browser-languagedetector": "^8.2.0",
     "jszip": "^3.10.1",

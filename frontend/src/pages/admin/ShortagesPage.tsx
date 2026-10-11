@@ -1,43 +1,24 @@
-import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
-import { shortages as api } from '../../services/api';
-import type { Shortage } from '../../types';
+import { useShortages } from '../../queries/shortages';
 import { getBadgeClasses } from '../../utils/colors';
 
 export default function ShortagesPage() {
   const { t } = useTranslation();
   const localize = useLocalizedName();
-  const [items, setItems] = useState<Shortage[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
-
-  const load = async () => {
-    setIsLoading(true);
-    setHasError(false);
-    try {
-      setItems(await api.list());
-    } catch {
-      setHasError(true);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => { load(); }, []);
+  const { data: items, isPending, isError, refetch } = useShortages();
 
   // Never show the green "no shortages" banner unless the list really loaded.
-  // Returns null when there are shortages to display.
-  const renderStatus = () => {
-    if (isLoading) {
+  const renderContent = () => {
+    if (isPending) {
       return <div className="text-center py-12 text-gray-500">{t('common.loading')}</div>;
     }
-    if (hasError) {
+    if (isError) {
       return (
         <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-6 py-8 rounded-xl text-center space-y-4">
           <p className="text-lg">{t('common.error')}</p>
           <button
-            onClick={load}
+            onClick={() => refetch()}
             className="border border-red-400/40 hover:bg-red-400/10 px-4 py-2 rounded-lg transition-colors"
           >
             {t('common.retry')}
@@ -52,64 +33,64 @@ export default function ShortagesPage() {
         </div>
       );
     }
-    return null;
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {items.map((item) => {
+          const deficit = item.requiredPercent - item.totalPercent;
+          const fillPercent = item.requiredPercent > 0
+            ? Math.min(100, (item.totalPercent / item.requiredPercent) * 100)
+            : 100;
+          return (
+            <div key={item.category.id} className="bg-[#1a1a2e] border border-red-500/30 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-lg">{localize(item.category)}</h3>
+                <span className={`px-2 py-1 rounded text-xs font-medium ${getBadgeClasses(item.category.categoryType?.color)}`}>
+                  {item.category.categoryType ? localize(item.category.categoryType) : item.category.type}
+                </span>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">{t('shortages.currentStock')}</span>
+                  <span className="text-white">{item.totalPercent}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">{t('shortages.required')}</span>
+                  <span className="text-white">{item.requiredPercent}%</span>
+                </div>
+                <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-red-500 rounded-full transition-all"
+                    style={{ width: `${fillPercent}%` }}
+                  />
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">{t('shortages.deficit')}</span>
+                  <span className="text-red-400 font-bold">-{deficit}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">{t('shortages.totalUsable')}</span>
+                  <span className="text-white">{item.totalUsable}</span>
+                </div>
+                <div className="flex justify-between border-t border-gray-800 pt-2 mt-2">
+                  <span className="text-gray-400">{t('shortages.desired')}</span>
+                  <span className="text-white">{item.category.desiredStock}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">{t('shortages.threshold')}</span>
+                  <span className="text-amber-400">{item.category.minimumPercent}%</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   return (
     <div>
       <h1 className="text-2xl font-bold font-serif text-amber-400 mb-6">{t('shortages.title')}</h1>
-      {renderStatus() ?? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {items.map((item) => {
-            const deficit = item.requiredPercent - item.totalPercent;
-            const fillPercent = item.requiredPercent > 0
-              ? Math.min(100, (item.totalPercent / item.requiredPercent) * 100)
-              : 100;
-            return (
-              <div key={item.category.id} className="bg-[#1a1a2e] border border-red-500/30 rounded-xl p-6">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-semibold text-lg">{localize(item.category)}</h3>
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${getBadgeClasses(item.category.categoryType?.color)}`}>
-                    {item.category.categoryType ? localize(item.category.categoryType) : item.category.type}
-                  </span>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">{t('shortages.currentStock')}</span>
-                    <span className="text-white">{item.totalPercent}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">{t('shortages.required')}</span>
-                    <span className="text-white">{item.requiredPercent}%</span>
-                  </div>
-                  <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-red-500 rounded-full transition-all"
-                      style={{ width: `${fillPercent}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">{t('shortages.deficit')}</span>
-                    <span className="text-red-400 font-bold">-{deficit}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">{t('shortages.totalUsable')}</span>
-                    <span className="text-white">{item.totalUsable}</span>
-                  </div>
-                  <div className="flex justify-between border-t border-gray-800 pt-2 mt-2">
-                    <span className="text-gray-400">{t('shortages.desired')}</span>
-                    <span className="text-white">{item.category.desiredStock}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">{t('shortages.threshold')}</span>
-                    <span className="text-amber-400">{item.category.minimumPercent}%</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {renderContent()}
     </div>
   );
 }

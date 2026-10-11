@@ -6,6 +6,7 @@ import { BadRequestError, NotFoundError } from '../errors';
 import { parseNameTranslations } from '../utils/translations';
 import { buildExportPayload, buildCsvPayload } from '../utils/bottlesExport';
 import { parseImportFile, NormalizedImportPayload } from '../utils/bottlesImport';
+import { deleteBottle, isForceRequested } from '../services/deletionService';
 
 const router = Router();
 
@@ -365,9 +366,10 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
   res.json(parseNameTranslations(bottle));
 });
 
+// Refused while recipes use the bottle as a source, unless ?force=true
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
-  await prisma.bottle.delete({ where: { id: parseInt(String(req.params.id)) } });
-  res.json({ message: req.t('bottles.deleted') });
+  const impact = await deleteBottle(parseInt(String(req.params.id)), isForceRequested(req.query.force));
+  res.json({ message: req.t('bottles.deleted'), deleted: true, impact });
 });
 
 export default router;

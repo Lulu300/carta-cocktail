@@ -7,7 +7,7 @@ criticite: basse
 effort: S
 status: todo
 owner: agent
-depends_on: [A-01, A-04, C-01]
+depends_on: [A-01, A-04, C-01, C-05, D-01, D-03, D-05]
 touches: [AGENTS.md, backend/AGENTS.md, frontend/AGENTS.md, README.md, docs/operations.md, backend/src/bootstrap/ensureAdmin.ts]
 sources: ["07-devops-history.md §5"]
 branch:
@@ -77,7 +77,7 @@ Les `AGENTS.md` sont lus par chaque agent avant une tâche : une affirmation fau
 
 ## Points d'attention
 
-- Ordre : la tâche dépend de A-01, A-04 et C-01, mais le guide décrit aussi D-01, D-02, D-03 et D-05 (non-root, port 8080, healthcheck, tags `major.minor`) et C-05 (backups). Suggestion : ajouter ces tâches à `depends_on`, ou faire D-09 en dernier de la phase D. Sinon, documenter seulement ce qui est mergé et créer une tâche de suivi.
+- Ordre (décidé le 2026-10-11) : après D-01, D-03, D-05 et C-05, ajoutées à `depends_on` (D-02 est déjà faite), car le guide décrit le non-root, le port 8080, le healthcheck, les tags `major.minor` et les backups.
 - Ne pas recopier le contenu des rapports de revue dans les `AGENTS.md` : ils décrivent le code actuel, pas son historique.
 - `backend/AGENTS.md` et `frontend/AGENTS.md` sont aussi modifiés par d'autres tâches qui ajoutent des fichiers (E-03, C-02...). Rebaser juste avant le merge.
 - `docs/operations.md` donne des commandes destructrices (restauration, `down -v`). Les accompagner d'un avertissement explicite.
@@ -93,3 +93,4 @@ Les `AGENTS.md` sont lus par chaque agent avant une tâche : une affirmation fau
 - 2026-10-09 : D-11 (PR de D-11) transmet l'alignement d'`AGENTS.md` sur le nouveau modèle de release (Points d'attention).
 - 2026-10-09 : revue de la PR #39 (D-11). Libellé « Settings > Admin Profile » à aligner dans `README.md` et dans l'avertissement d'`ensureAdmin` (Points d'attention) ; `backend/src/bootstrap/ensureAdmin.ts` ajouté à `touches`.
 - 2026-10-09 : C-01 (PR #44) transmet l'alignement des `AGENTS.md` sur les migrations (Points d'attention).
+- 2026-10-11 : décision humaine : D-09 passe après D-01, D-03, D-05 et C-05, ajoutées à `depends_on` comme le suggéraient les Points d'attention (D-02 déjà faite), pour documenter l'image finale et les backups en une fois. Dans le lot C-04, E-11, D-14, l'humain l'a remplacée par C-16 (`--ready` propose D-13 à cette place).

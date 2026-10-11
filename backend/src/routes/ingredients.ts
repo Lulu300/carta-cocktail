@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { BadRequestError, NotFoundError } from '../errors';
 import { parseNameTranslations } from '../utils/translations';
+import { deleteIngredient, isForceRequested } from '../services/deletionService';
 
 const router = Router();
 
@@ -56,9 +57,10 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
   res.json(parseNameTranslations(ingredient));
 });
 
+// Refused while recipes use the ingredient, unless ?force=true
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
-  await prisma.ingredient.delete({ where: { id: parseInt(String(req.params.id)) } });
-  res.json({ message: req.t('ingredients.deleted') });
+  const impact = await deleteIngredient(parseInt(String(req.params.id)), isForceRequested(req.query.force));
+  res.json({ message: req.t('ingredients.deleted'), deleted: true, impact });
 });
 
 export default router;

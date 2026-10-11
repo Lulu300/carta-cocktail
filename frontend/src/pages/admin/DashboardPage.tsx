@@ -1,36 +1,49 @@
-import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { categories as categoriesApi, bottles as bottlesApi, cocktails as cocktailsApi, menus as menusApi, shortages as shortagesApi } from '../../services/api';
+import type { UseQueryResult } from '@tanstack/react-query';
+import Spinner from '../../components/ui/Spinner';
+import { useBottles } from '../../queries/bottles';
+import { useCategories } from '../../queries/categories';
+import { useCocktails } from '../../queries/cocktails';
+import { useMenus } from '../../queries/menus';
+import { useShortages } from '../../queries/shortages';
+
+/** Count shown on a stat card: never a misleading 0 while loading or after a failed request. */
+function StatCount({ query }: { query: UseQueryResult<unknown[], Error> }) {
+  const { t } = useTranslation();
+
+  if (query.isPending) {
+    return (
+      <div className="text-3xl font-bold text-gray-500">
+        <Spinner />
+      </div>
+    );
+  }
+  if (query.isError) {
+    return (
+      <>
+        <div aria-hidden="true" className="text-3xl font-bold text-gray-500">–</div>
+        <div className="text-xs text-red-400">{t('common.error')}</div>
+      </>
+    );
+  }
+  return <div className="text-3xl font-bold text-white">{query.data.length}</div>;
+}
 
 export default function DashboardPage() {
   const { t } = useTranslation();
-  const [stats, setStats] = useState({ categories: 0, bottles: 0, cocktails: 0, menus: 0 });
-  const [shortageCount, setShortageCount] = useState(0);
-
-  useEffect(() => {
-    Promise.all([
-      categoriesApi.list(),
-      bottlesApi.list(),
-      cocktailsApi.list(),
-      menusApi.list(),
-      shortagesApi.list(),
-    ]).then(([cats, bots, cocks, mens, shorts]) => {
-      setStats({
-        categories: cats.length,
-        bottles: bots.length,
-        cocktails: cocks.length,
-        menus: mens.length,
-      });
-      setShortageCount(shorts.length);
-    });
-  }, []);
+  const categoriesQuery = useCategories();
+  const bottlesQuery = useBottles();
+  const cocktailsQuery = useCocktails();
+  const menusQuery = useMenus();
+  const { data: shortageList } = useShortages();
+  const shortageCount = shortageList?.length ?? 0;
 
   const statCards = [
-    { label: t('dashboard.stats.categories'), value: stats.categories, icon: '🏷️', path: '/admin/categories' },
-    { label: t('dashboard.stats.bottles'), value: stats.bottles, icon: '🍾', path: '/admin/bottles' },
-    { label: t('dashboard.stats.cocktails'), value: stats.cocktails, icon: '🍸', path: '/admin/cocktails' },
-    { label: t('dashboard.stats.menus'), value: stats.menus, icon: '📋', path: '/admin/menus' },
+    { label: t('dashboard.stats.categories'), query: categoriesQuery, icon: '🏷️', path: '/admin/categories' },
+    { label: t('dashboard.stats.bottles'), query: bottlesQuery, icon: '🍾', path: '/admin/bottles' },
+    { label: t('dashboard.stats.cocktails'), query: cocktailsQuery, icon: '🍸', path: '/admin/cocktails' },
+    { label: t('dashboard.stats.menus'), query: menusQuery, icon: '📋', path: '/admin/menus' },
   ];
 
   return (
@@ -54,7 +67,7 @@ export default function DashboardPage() {
             className="bg-[#1a1a2e] border border-gray-800 rounded-xl p-6 hover:border-amber-400/30 transition-colors"
           >
             <div className="text-3xl mb-2">{card.icon}</div>
-            <div className="text-3xl font-bold text-white">{card.value}</div>
+            <StatCount query={card.query} />
             <div className="text-sm text-gray-400 mt-1">{card.label}</div>
           </Link>
         ))}

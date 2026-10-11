@@ -20,7 +20,7 @@ services:
   carta-cocktail-frontend:
     image: ghcr.io/lulu300/carta-cocktail/frontend:latest
     ports:
-      - "80:80"
+      - "80:8080"
     environment:
       - BACKEND_HOST=carta-cocktail-backend
     depends_on:

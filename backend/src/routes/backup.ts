@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 import AdmZip from 'adm-zip';
 import fs from 'fs';
 import path from 'path';
@@ -22,6 +22,15 @@ function getDatabasePath(): string {
   return dbUrl.replace(/^file:/, '');
 }
 
+/** Opens the uploaded archive: a file that is not a readable zip is a client error. */
+function openBackupZip(buffer: Buffer): AdmZip {
+  try {
+    return new AdmZip(buffer);
+  } catch {
+    throw new BadRequestError('errors.invalidBackup');
+  }
+}
+
 // Export backup as ZIP
 router.get('/export', async (_req: AuthRequest, res: Response) => {
   const dbPath = getDatabasePath();
@@ -39,7 +48,7 @@ router.get('/export', async (_req: AuthRequest, res: Response) => {
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', `attachment; filename=backup-${date}.zip`);
 
-  const archive = archiver('zip', { zlib: { level: 6 } });
+  const archive = new ZipArchive({ zlib: { level: 6 } });
 
   // Stream errors are emitted outside the handler's promise, so Express never sees them
   archive.on('error', (err) => {
@@ -76,7 +85,7 @@ router.post('/import', upload.single('backup'), async (req: AuthRequest, res: Re
     return;
   }
 
-  const zip = new AdmZip(req.file.buffer);
+  const zip = openBackupZip(req.file.buffer);
   const entries = zip.getEntries();
 
   // Validate ZIP contents

@@ -8,6 +8,8 @@
     "validationError": "Validation error",
     "duplicateEntry": "This entry already exists",
     "cannotDelete": "Cannot delete: resource is in use",
+    "inUseByCocktails": "Cannot delete: this item is used by cocktail recipes",
+    "categoryNotEmpty": "Cannot delete: this category still contains bottles",
     "invalidBackup": "Invalid backup file",
     "cannotDeleteDefaultMenu": "Cannot delete a system menu",
     "cannotModifySystemMenu": "System menus cannot have their slug or type changed",

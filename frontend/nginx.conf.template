@@ -1,14 +1,21 @@
 server {
-    listen 80;
+    # Unprivileged port: nginx runs as a non-root user (also under rootless Docker and Podman).
+    listen 8080;
     server_name _;
     root /usr/share/nginx/html;
     index index.html;
+    server_tokens off;
+    # The host publishes this port under another number ("80:8080"): a redirect such as
+    # /assets -> /assets/ must stay relative instead of naming port 8080.
+    absolute_redirect off;
+
+    include /etc/nginx/snippets/security-headers.conf;
 
     # nginx defaults to 1 MB. Must cover the backend upload limits:
     # cocktail image 5 MB, bottle import 10 MB (backup restore has its own location).
     client_max_body_size 20m;
 
-    # nginx:alpine ships with gzip disabled. Proxied API responses are compressed too.
+    # The nginx base image ships with gzip disabled. Proxied API responses are compressed too.
     gzip on;
     gzip_vary on;
     gzip_proxied any;
@@ -23,6 +30,13 @@ server {
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
 
+    # Resolve the backend at request time, not once at startup: a recreated backend container
+    # gets a new IP, which would otherwise give 502 errors until nginx restarts. The resolvers
+    # are read from /etc/resolv.conf by the image entrypoint (NGINX_ENTRYPOINT_LOCAL_RESOLVERS).
+    # With a variable, proxy_pass must not carry a URI: nginx then forwards the request URI as is.
+    resolver ${NGINX_LOCAL_RESOLVERS} valid=30s ipv6=off;
+    set $backend http://${BACKEND_HOST}:3001;
+
     # Backup restore: large archive, streamed to the backend instead of buffered on disk.
     # Keep the size in line with the multer limit in backend/src/routes/backup.ts (500 MB).
     location = /api/backup/import {
@@ -30,26 +44,28 @@ server {
         proxy_request_buffering off;
         proxy_read_timeout 300s;
         proxy_send_timeout 300s;
-        proxy_pass http://${BACKEND_HOST}:3001/api/backup/import;
+        proxy_pass $backend;
     }
 
     # API proxy
     location /api/ {
-        proxy_pass http://${BACKEND_HOST}:3001/api/;
+        proxy_pass $backend;
     }
 
     # Uploaded photos: file names are unique per upload, so a long cache is safe.
     # Express sends its own Cache-Control (max-age=0); hide it to avoid two headers.
     location ^~ /uploads/ {
-        proxy_pass http://${BACKEND_HOST}:3001/uploads/;
+        proxy_pass $backend;
         proxy_hide_header Cache-Control;
         add_header Cache-Control "public, max-age=2592000";
+        include /etc/nginx/snippets/security-headers.conf;
     }
 
     # Vite build output: file names contain a content hash, so they never change.
     location /assets/ {
         try_files $uri =404;
         add_header Cache-Control "public, max-age=31536000, immutable";
+        include /etc/nginx/snippets/security-headers.conf;
     }
 
     # The SPA shell must be revalidated on every load, otherwise a browser can keep
@@ -57,6 +73,7 @@ server {
     # SPA routes reach this location through the try_files fallback below.
     location = /index.html {
         add_header Cache-Control "no-cache";
+        include /etc/nginx/snippets/security-headers.conf;
     }
 
     # SPA fallback

@@ -58,6 +58,7 @@ C-07 change le comportement du backend. Supprimer une bouteille, un ingrédient 
 
 - Le focus initial doit être sur « Annuler » (comportement `tone: 'danger'` d'E-04).
 - Ne pas proposer le forçage si la réponse 409 ne contient pas `details` (ancien backend, ou conflit d'une autre nature comme un slug déjà pris).
+- 2026-10-10, transmis par C-07 (revue de la PR #60) : depuis C-07, supprimer une catégorie qui contient des bouteilles renvoie 409 et ne supprime plus rien. Le texte de confirmation `categories.confirmDelete` (`frontend/src/i18n/locales/en.json:55` et `fr.json:55`) promet pourtant que les bouteilles seront supprimées : le corriger. Afficher `details` (cocktails et bouteilles impactés) dans toutes les réponses 409 de suppression, unités comprises : elles n'ont pas de forçage, mais la liste dit à l'admin quelles recettes modifier d'abord.
 
 ## Journal
 

@@ -1,0 +1,38 @@
+# docker-compose.prod.yml of v1.8.0: compose-1.5.0.yml with the frontend container port 8080
+# (non-root nginx) instead of 80. Nothing else changes.
+# Test-bench changes: images and platform filled in by the bench, ports published on 127.0.0.1
+# with a free host port.
+services:
+  carta-cocktail-backend:
+    image: {{BACKEND_IMAGE}}
+    platform: {{BACKEND_PLATFORM}}
+    ports:
+      - "127.0.0.1::3001"
+    environment:
+      - DATABASE_URL=file:/app/data/carta_cocktail.db
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set (openssl rand -hex 32)}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@carta.local}
+      # Only needed to create the admin on first start, or with ADMIN_RESET_PASSWORD=true
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - ADMIN_RESET_PASSWORD=${ADMIN_RESET_PASSWORD:-false}
+      - PORT=3001
+      - UPLOAD_DIR=/app/uploads
+    volumes:
+      - db-data:/app/data
+      - uploads:/app/uploads
+    restart: unless-stopped
+
+  carta-cocktail-frontend:
+    image: {{FRONTEND_IMAGE}}
+    platform: {{FRONTEND_PLATFORM}}
+    ports:
+      - "127.0.0.1::8080"
+    environment:
+      - BACKEND_HOST=carta-cocktail-backend
+    depends_on:
+      - carta-cocktail-backend
+    restart: unless-stopped
+
+volumes:
+  db-data:
+  uploads:

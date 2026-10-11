@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
-  request, authHeader, seedUnit, seedCategory, seedBottle, seedIngredient, prisma,
+  request, authHeader, seedUnit, seedCategory, seedBottle, seedIngredient, seedCocktailUsing, prisma,
 } from './test/helpers';
 
 beforeAll(async () => { await setupTestDatabase(); });
@@ -37,43 +37,27 @@ describe.each(RESOURCES_BY_ID)('$name: invalid or unknown id', ({ path, methods 
 });
 
 describe('DELETE of a row still referenced', () => {
-  it('answers 409 for a unit used by a cocktail', async () => {
+  it('answers 409 JSON with the cocktails for a unit used by a cocktail', async () => {
     const unit = await seedUnit();
     const ingredient = await seedIngredient();
-    await prisma.cocktail.create({
-      data: {
-        name: 'Uses the unit',
-        ingredients: {
-          create: [{ quantity: 1, unitId: unit.id, sourceType: 'INGREDIENT', ingredientId: ingredient.id, position: 0 }],
-        },
-      },
-    });
+    const cocktail = await seedCocktailUsing('Uses the unit', unit.id, [
+      { sourceType: 'INGREDIENT', ingredientId: ingredient.id },
+    ]);
 
     const res = await request.delete(`/api/units/${unit.id}`).set(authHeader());
 
     expect(res.status).toBe(409);
     expectJsonError(res);
-    expect(res.body.error).toBe('Cannot delete: resource is in use');
+    expect(res.body.error).toBe('Cannot delete: this item is used by cocktail recipes');
+    expect(res.body.details.cocktails).toEqual([{ id: cocktail.id, name: 'Uses the unit', removedLines: 1 }]);
     expect(await prisma.unit.findUnique({ where: { id: unit.id } })).not.toBeNull();
   });
 
-  it('answers 409 for a bottle kept as a preferred bottle', async () => {
-    const unit = await seedUnit();
+  it('answers 409 JSON for a category that still holds bottles', async () => {
     const category = await seedCategory();
-    const bottle = await seedBottle({ categoryId: category.id });
-    await prisma.cocktail.create({
-      data: {
-        name: 'Prefers the bottle',
-        ingredients: {
-          create: [{
-            quantity: 1, unitId: unit.id, sourceType: 'CATEGORY', categoryId: category.id, position: 0,
-            preferredBottles: { create: [{ bottleId: bottle.id }] },
-          }],
-        },
-      },
-    });
+    await seedBottle({ categoryId: category.id });
 
-    const res = await request.delete(`/api/bottles/${bottle.id}`).set(authHeader());
+    const res = await request.delete(`/api/categories/${category.id}`).set(authHeader());
 
     expect(res.status).toBe(409);
     expectJsonError(res);

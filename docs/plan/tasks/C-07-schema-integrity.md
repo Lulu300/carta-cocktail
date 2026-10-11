@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: haute
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [C-01, C-03]
-touches: [backend/prisma/schema.prisma, backend/prisma/migrations/, backend/src/routes/categories.ts, backend/src/routes/bottles.ts, backend/src/routes/ingredients.ts, backend/src/routes/units.ts, backend/src/services/integrityService.ts, backend/scripts/check-integrity.ts, backend/src/i18n/]
+touches: [docs/plan/tasks/D-01-backend-dockerfile.md, docs/plan/tasks/E-15-forced-deletion-ui.md, backend/prisma/schema.prisma, backend/prisma/migrations/, backend/src/routes/categories.ts, backend/src/routes/bottles.ts, backend/src/routes/ingredients.ts, backend/src/routes/units.ts, backend/src/services/integrityService.ts, backend/src/services/deletionService.ts, backend/src/utils/uniqueness.ts, backend/scripts/check-integrity.ts, backend/src/i18n/, backend/src/test/helpers.ts, backend/src/app.test.ts]
 sources: ["02-backend-data-perf.md §2.3", "02-backend-data-perf.md §2.4", "02-backend-data-perf.md §2.5"]
-branch:
-pr:
+branch: feature/C-07-schema-integrity
+pr: https://github.com/Lulu300/carta-cocktail/pull/60
 ---
 
 ## Décisions validées (2026-10-08)
@@ -68,14 +68,14 @@ Vérifié sur `backend/prisma/schema.prisma` et sur le SQL réel (`sqlite3 backe
 
 ## Critères d'acceptation
 
-- [ ] `DELETE …?force=true` sur une bouteille, un ingrédient ou une catégorie utilisés → 200, suppression en cascade dans une transaction, `impact` liste les cocktails modifiés ; en cas d'erreur, rien n'est supprimé.
-- [ ] Le script d'intégrité a tourné sur une copie de la prod ; résultat joint à la PR.
-- [ ] Migration `schema_integrity` versionnée ; `npm run db:check` (C-01) passe.
-- [ ] Supprimer une bouteille, catégorie, unité ou ingrédient utilisé par une recette → 409 avec la liste des cocktails ; rien n'est supprimé.
-- [ ] Supprimer une catégorie non vide → 409 ; bouteilles intactes.
-- [ ] Supprimer une bouteille seulement « préférée » → 200 ; la préférence disparaît.
-- [ ] Créer la catégorie « rhum » quand « Rhum » existe → 409.
-- [ ] `EXPLAIN QUERY PLAN SELECT * FROM CocktailIngredient WHERE cocktailId = 1` utilise un index.
+- [x] `DELETE …?force=true` sur une bouteille, un ingrédient ou une catégorie utilisés → 200, suppression en cascade dans une transaction, `impact` liste les cocktails modifiés ; en cas d'erreur, rien n'est supprimé.
+- [x] Le script d'intégrité a tourné sur une copie de la prod ; résultat joint à la PR.
+- [x] Migration `schema_integrity` versionnée ; `npm run db:check` (C-01) passe.
+- [x] Supprimer une bouteille, catégorie, unité ou ingrédient utilisé par une recette → 409 avec la liste des cocktails ; rien n'est supprimé.
+- [x] Supprimer une catégorie non vide → 409 ; bouteilles intactes.
+- [x] Supprimer une bouteille seulement « préférée » → 200 ; la préférence disparaît.
+- [x] Créer la catégorie « rhum » quand « Rhum » existe → 409.
+- [x] `EXPLAIN QUERY PLAN SELECT * FROM CocktailIngredient WHERE cocktailId = 1` utilise un index.
 
 ## Tests à ajouter ou adapter
 
@@ -99,3 +99,10 @@ Vérifié sur `backend/prisma/schema.prisma` et sur le SQL réel (`sqlite3 backe
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : décisions validées par l'humain (voir « Décisions validées »).
+- 2026-10-10 : fait (PR #60). Schéma (`Restrict` explicites, `Cascade` sur les bouteilles préférées, `@unique` sur `Category.name` et `Unit.abbreviation`, 14 index), migration `20261010173910_schema_integrity`, `findIntegrityIssues` et `scripts/check-integrity.ts` (`--counts-only`), suppressions gardées dans `src/services/deletionService.ts` (409 avec `details`, `?force=true` en `$transaction`, pas de forçage pour les unités), unicité insensible à la casse dans `src/utils/uniqueness.ts`.
+- 2026-10-10 : écarts et choix. Migration générée par `prisma migrate diff` (`migrate dev` refuse le mode non interactif), avec les deux index uniques déplacés en tête : SQLite n'exécute pas la migration dans une transaction, et dans l'ordre de Prisma un doublon arrêtait la migration après la reconstruction de `Bottle` (essai sur base jetable). `PRAGMA foreign_key_check` ajouté à la main (Prisma 6 ne le génère plus) : il n'arrête pas la migration, d'où le contrôle `foreignKeyViolations` du script. Le 409 d'une catégorie non vide utilise le format commun `{ cocktails, bottles }` (liste des bouteilles) plutôt que `{ bottles: n }`. Les doublons de catégories et d'abréviations d'unités à la casse près sont bloquants pour le script (la migration ne refuse que les doublons exacts, les routes refusent aussi ceux à la casse près). `touches` complété : `deletionService.ts`, `uniqueness.ts`, `src/test/helpers.ts` (fabrique `seedCocktailUsing`), `src/app.test.ts` (deux cas adaptés). Étape 7 (relation `Category.type`) non faite : nouvelle tâche C-17. Nouvelles tâches C-18 (reprise après une migration en échec) et C-19 (imports et casse).
+- 2026-10-10 : jeu d'essai réel (copie temporaire, montée en v1.6.0) : 0 doublon de catégorie, d'unité et de cocktail, 0 ligne orpheline, 0 type inconnu, 0 violation de clé étrangère ; migration appliquée sans perte de lignes. Banc conforme 1.4.0 → 1.6.0 → 1.7.0 → local : `friend` 69 OK, 0 échec ; `official` 67 OK, 1 échec attendu (bug photos v1.4.0), 0 inattendu.
+- 2026-10-10 : revue de la PR #60 (changements demandés), corrigée sur la même branche après rebase sur `develop` (B-07, E-02, D-02 mergées). (1) Bloquant : avec un doublon d'unité seul, l'index de `Category.name` était créé avant l'échec, et la reprise par `migrate resolve --rolled-back` puis `deploy` s'arrêtait sur cet index. Les deux index uniques sont maintenant en `CREATE UNIQUE INDEX IF NOT EXISTS`. Vérifié sur bases jetables : doublon d'unité, puis doublon de catégorie, P3018, correction, `resolve --rolled-back`, `deploy` → « All migrations have been successfully applied », base conforme au schéma ; `db:check` passe. Ma phrase précédente (« la migration s'arrête sur sa première instruction et laisse la base inchangée ») était fausse pour les unités : un échec arrive avant toute reconstruction de table, mais l'index des catégories peut déjà exister, et `IF NOT EXISTS` permet de relancer. (2) Section « Required actions » refaite : copie `pre-migrate` à restaurer et moyen de la reconnaître, reprise sans restauration dans le bon ordre, épinglage. (3) Note ajoutée à D-01 : l'image de D-01 n'aura ni `tsx`, ni `scripts/`, ni `src/`, il faudra une autre commande de contrôle. (4) Tests de rollback de la suppression forcée d'une bouteille et d'un ingrédient (déclencheurs `BEFORE DELETE`) ; une mutation sans `$transaction` les fait échouer. (5) Tests au niveau de la base pour les règles `onDelete` ; une mutation `Cascade` sur `Bottle.category` en fait échouer un. (6) Note ajoutée à E-15 : le texte `categories.confirmDelete` du frontend promet une suppression des bouteilles qui n'a plus lieu. Remarques mineures : abréviations d'unités comparées sans tenir compte de la casse dans le script (7) ; seed ajouté à C-19 (8) ; le script vérifie que le fichier de base existe (9). `touches` complété avec les fichiers de tâches D-01 et E-15.
+- 2026-10-10 : après la revue, jeu d'essai réel (nouvelle copie temporaire, montée en v1.6.0) : tous les contrôles à 0, code de sortie 0 ; migration appliquée, 758 lignes dans 15 tables identiques avant et après, `integrity_check` ok, `foreign_key_check` vide. Banc conforme 1.4.0 → 1.6.0 → 1.7.0 → local avec le hook 1.8.0 temporaire de la PR #61 (non commité) : `friend` 4 étapes sur 4 OK, 0 échec ; `official` 4 sur 4 OK, 1 échec attendu (bug photos v1.4.0), 0 inattendu.
+- 2026-10-10 : Notes de version : `breaking: true` (validé par la revue). Le conteneur refuse de démarrer s'il existe des catégories en double (sans tenir compte de la casse pour le contrôle) ou des abréviations d'unités en double. Avant la mise à jour : épingler `:<version>` (par exemple `:1.8.0`), lancer `scripts/check-integrity.ts` de la nouvelle image sur une copie de la base, corriger les doublons. Après : la suppression d'un élément utilisé est refusée (409 avec la liste des cocktails), y compris une catégorie qui contient des bouteilles. Retour arrière : restaurer la copie `pre-migrate` prise avant le premier démarrage en échec (celle sans ligne `schema_integrity` dans `_prisma_migrations`), ou bien `migrate resolve --rolled-back` via `docker compose run`, revenir à la version précédente, corriger les doublons, relancer le contrôle, copier la base hors du volume (étape 2 de « Checking a production database… » du README), puis remettre à jour. Après `resolve --rolled-back`, `migrate status` répond « up to date » et l'entrypoint ne fait pas de copie `pre-migrate` (deuxième revue, point 10, noté dans C-18) : si cette nouvelle tentative échoue, restaurer cette copie manuelle, pas une copie `pre-migrate`, sinon les corrections faites dans l'admin sont perdues. Commande de contrôle à changer avec D-01. Section « Required actions » dans la PR.
+- 2026-10-10 : reste à l'humain : valider le texte final de « Required actions ». Côté interface, l'affichage de `details`, le texte de confirmation et le forçage sont prévus dans E-15.

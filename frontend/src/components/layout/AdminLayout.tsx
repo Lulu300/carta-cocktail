@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteSettings } from '../../contexts/SiteSettingsContext';
-import { shortages as shortagesApi } from '../../services/api';
+import { qk } from '../../queries/keys';
+import { useShortages } from '../../queries/shortages';
 import LanguageSelector from '../ui/LanguageSelector';
 
 const navItems = [
@@ -25,11 +27,17 @@ export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [shortageCount, setShortageCount] = useState(0);
+  const queryClient = useQueryClient();
+  const { data: shortageList } = useShortages();
+  const shortageCount = shortageList?.length ?? 0;
 
+  // TODO E-05: remove once bottle and category mutations invalidate qk.shortages.
+  // Until then, refresh the badge on every navigation, as before. cancelRefetch: false
+  // joins a request already in flight (a page refetching stale shortages on mount)
+  // instead of cancelling it and sending a second one.
   useEffect(() => {
-    shortagesApi.list().then((data) => setShortageCount(data.length)).catch(() => {});
-  }, [location.pathname]);
+    queryClient.invalidateQueries({ queryKey: qk.shortages }, { cancelRefetch: false });
+  }, [location.pathname, queryClient]);
 
   const handleLogout = () => {
     logout();
