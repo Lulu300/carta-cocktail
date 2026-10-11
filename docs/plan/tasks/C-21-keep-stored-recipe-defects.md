@@ -21,7 +21,7 @@ C-04 (PR #69) valide les entrées avec zod. Le schéma `IngredientLine` (`backen
 ## Problème constaté
 
 - **Lignes orphelines** : jusqu'à v1.7.0, supprimer une bouteille, une catégorie ou un ingrédient utilisé mettait la clé de la ligne à NULL (`ON DELETE SET NULL` dans `0_init`). v1.8.0 a gardé ces lignes (`check-integrity` les signale sans bloquer). Le formulaire admin (`CocktailFormPage`) les affiche sur « -- » et renvoie `bottleId`/`categoryId`/`ingredientId: null`.
-- **Lignes à quantité 0** : le formulaire envoyait 0 quand le champ était vidé (`parseFloat(...) || 0`), et l'import de cocktail accepte toujours une quantité 0.
+- **Lignes à quantité 0** : le formulaire envoie 0 quand le champ est vidé (`parseFloat(...) || 0`) ; jusqu'à C-04, ces lignes étaient enregistrées. L'import de cocktail accepte toujours une quantité 0.
 - Avec C-04, tout `PUT /api/cocktails/:id` d'un tel cocktail renvoie 400, même un simple renommage : le formulaire renvoie toujours toutes les lignes.
 
 ## Ce qu'il faut faire
@@ -45,7 +45,7 @@ Décision de l'humain (2026-10-11) : au PUT, un défaut **déjà stocké** pour 
 ## Tests à ajouter ou adapter
 
 - `backend/src/routes/cocktails.test.ts` : lignes défectueuses fabriquées directement en base avec Prisma ; les cas des critères ci-dessus, plus une quantité négative toujours refusée.
-- `backend/src/services/recipeDefectsService.test.ts` (sans base) : comptage par type de défaut, par `sourceType`, lignes déplacées, défauts au-delà du stock, ligne à deux défauts, message identique au schéma strict.
+- `backend/src/services/recipeDefectsService.test.ts` (sans base) : comptage par type de défaut, par `sourceType`, lignes déplacées, défauts au-delà du stock, ligne à deux défauts, message identique au schéma strict, exactement un issue strict pour chacun des quatre types de défaut, issue de repli si le schéma strict n'en donne plus.
 - `backend/src/validation/cocktails.test.ts` : `IngredientLineUpdate` laisse passer les deux défauts et garde les autres règles ; `CocktailCreate` reste strict.
 
 ## Points d'attention
@@ -58,4 +58,5 @@ Décision de l'humain (2026-10-11) : au PUT, un défaut **déjà stocké** pour 
 
 - 2026-10-11 : tâche créée à partir de la remarque 1 de la revue de la PR #70 (notes de v1.9.0) et de la décision de l'humain.
 - 2026-10-11 : fait (PR #71). `IngredientLineUpdate` dérivé des champs du schéma strict (`IngredientLineFields`) avec une seule fonction de cohérence paramétrée (`checkLineCoherence`) : quantité `nonnegative`, clé de la source facultative, toutes les autres règles inchangées ; `CocktailUpdate` l'utilise, `CocktailCreate` reste strict. Contrôle dans `services/recipeDefectsService.ts` (`findNewRecipeDefects`, pur, et `refuseNewRecipeDefects`, qui ne lit les lignes stockées que si la requête a un défaut), appelé par le PUT. Les issues refusées sont celles du schéma strict (même `path`, `code`, `message` qu'au POST). Conversion issue zod → `details[]` extraite dans `toValidationIssue` (`validate.ts`) pour être partagée avec le middleware. 641 tests, couverture des lignes modifiées 100 %.
+- 2026-10-11 : suite de la revue de la PR #71. Contrôle fermé par défaut : si le schéma strict ne signale plus un défaut sous sa clé, `strictIssues` renvoie un issue de repli au même format (`path` de la clé ou de `quantity`, `code: custom`) au lieu de l'accepter ; message de clé manquante partagé (`missingSourceKeyMessage`). Tests : un seul issue strict par type de défaut (`bottleId`, `categoryId`, `ingredientId`, `quantity`) et repli. « Problème constaté » mis au présent : le formulaire envoie toujours 0 pour une quantité vidée.
 - Notes de version : enregistrer un cocktail dont la recette a déjà une ligne sans sa bouteille, sa catégorie ou son ingrédient (supprimé avant v1.8.0), ou une ligne à quantité 0, fonctionne de nouveau ; ces lignes sont conservées telles quelles. Ajouter une **nouvelle** ligne de ce genre reste refusé (400), comme à la création. L'action facultative après la mise à jour de v1.9.0 (corriger les lignes à quantité 0 si l'enregistrement échoue) n'est plus nécessaire. Aucune action requise, pas de `breaking: true`.

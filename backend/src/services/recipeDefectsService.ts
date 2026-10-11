@@ -2,7 +2,9 @@ import type { CocktailIngredient } from '@prisma/client';
 import type { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { BadRequestError } from '../errors';
-import { IngredientLine, IngredientLineUpdate, SOURCE_KEYS, SourceKey, SourceType } from '../validation/cocktails';
+import {
+  IngredientLine, IngredientLineUpdate, missingSourceKeyMessage, SOURCE_KEYS, SourceKey, SourceType,
+} from '../validation/cocktails';
 import { toValidationIssue, ValidationIssue } from '../validation/validate';
 
 /**
@@ -48,13 +50,20 @@ function countDefects(lines: StoredLine[]): Map<Defect, number> {
   return counts;
 }
 
+// Used only if the strict schema stops reporting a defect under its own key: the
+// defect is still refused (fail closed) rather than silently accepted.
+function fallbackIssue(line: RequestLine, index: number, defect: Defect): ValidationIssue {
+  const message = defect === 'quantity' ? 'Must be greater than 0' : missingSourceKeyMessage(line.sourceType);
+  return { path: ['body', 'ingredients', index, defect].join('.'), code: 'custom', message };
+}
+
 // The issue the strict line schema gives for this defect, so a refused line reads
 // exactly as on a cocktail creation.
 function strictIssues(line: RequestLine, index: number, defect: Defect): ValidationIssue[] {
-  const issues = IngredientLine.safeParse(line).error?.issues ?? [];
-  return issues
+  const issues = (IngredientLine.safeParse(line).error?.issues ?? [])
     .filter((issue) => issue.path[0] === defect)
     .map((issue) => toValidationIssue(['body', 'ingredients', index], issue));
+  return issues.length > 0 ? issues : [fallbackIssue(line, index, defect)];
 }
 
 /**

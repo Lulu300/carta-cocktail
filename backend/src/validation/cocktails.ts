@@ -26,13 +26,17 @@ const IngredientLineFields = z.object({
 
 type IngredientLineValue = z.output<typeof IngredientLineFields>;
 
+export function missingSourceKeyMessage(sourceType: string): string {
+  return `Required when sourceType is ${sourceType}`;
+}
+
 function checkLineCoherence({ requireSourceKey }: { requireSourceKey: boolean }) {
   return (line: IngredientLineValue, ctx: z.RefinementCtx) => {
     const expectedKey = SOURCE_KEYS[line.sourceType];
     for (const key of Object.values(SOURCE_KEYS)) {
       const isSet = line[key] != null;
       if (key === expectedKey && !isSet && requireSourceKey) {
-        ctx.addIssue({ code: 'custom', path: [key], message: `Required when sourceType is ${line.sourceType}` });
+        ctx.addIssue({ code: 'custom', path: [key], message: missingSourceKeyMessage(line.sourceType) });
       } else if (key !== expectedKey && isSet) {
         ctx.addIssue({ code: 'custom', path: [key], message: `Must be empty when sourceType is ${line.sourceType}` });
       }
