@@ -1,13 +1,18 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '../../test/test-utils';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
+import { fireEvent, screen, waitFor, within } from '../../test/test-utils';
+import { clearToasts, renderWithFeedback } from '../../test/feedback';
 import MenusPage from './MenusPage';
 
-vi.mock('../../services/api', () => ({
-  menus: { list: vi.fn(), create: vi.fn(), delete: vi.fn() },
-}));
+vi.mock('../../services/api', async () => {
+  const actual = await vi.importActual<typeof import('../../services/api')>('../../services/api');
+  return {
+    ApiError: actual.ApiError,
+    menus: { list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
+  };
+});
 
-import { menus as api } from '../../services/api';
+import { ApiError, menus as api } from '../../services/api';
 const mockList = vi.mocked(api.list);
 const mockCreate = vi.mocked(api.create);
 const mockDelete = vi.mocked(api.delete);
@@ -18,6 +23,27 @@ const mockMenus = [
   { id: 3, name: 'Summer Menu', slug: 'summer', type: 'COCKTAILS', description: 'Summer cocktails', isPublic: true, createdAt: '2024-01-01', updatedAt: '2024-01-01', _count: { cocktails: 8, bottles: 0 } },
 ];
 
+type User = ReturnType<typeof userEvent.setup>;
+
+function renderPage() {
+  return renderWithFeedback(<MenusPage />);
+}
+
+async function renderLoadedPage() {
+  renderPage();
+  await screen.findByText('Summer Menu');
+}
+
+function dialog() {
+  return screen.getByRole('dialog');
+}
+
+async function fillCreateForm(user: User, name: string, slug: string) {
+  await user.click(screen.getByRole('button', { name: 'menus.add' }));
+  await user.type(within(dialog()).getByLabelText(/menus\.name/), name);
+  await user.type(within(dialog()).getByLabelText(/menus\.slug/), slug);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockList.mockResolvedValue(mockMenus as never);
@@ -25,98 +51,141 @@ beforeEach(() => {
   mockDelete.mockResolvedValue({ message: 'ok' } as never);
 });
 
+afterEach(clearToasts);
+
 describe('MenusPage', () => {
-  it('should render title and add button', async () => {
-    render(<MenusPage />);
+  it('renders the title and the add button', () => {
+    renderPage();
     expect(screen.getByText('menus.title')).toBeInTheDocument();
-    expect(screen.getByText('menus.add')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'menus.add' })).toBeInTheDocument();
   });
 
-  it('should display menus in table after loading', async () => {
-    render(<MenusPage />);
-    await waitFor(() => {
-      // "Apéritifs" appears in both <a> (name) and <span> (type badge)
-      expect(screen.getAllByText('Apéritifs').length).toBeGreaterThanOrEqual(1);
-      expect(screen.getAllByText('Digestifs').length).toBeGreaterThanOrEqual(1);
-      expect(screen.getByText('Summer Menu')).toBeInTheDocument();
-    });
+  it('lists the menus with their type, visibility and content', async () => {
+    await renderLoadedPage();
+    expect(screen.getByText('Cocktails')).toBeInTheDocument();
+    expect(screen.getByText('Apéritifs', { selector: 'span' })).toBeInTheDocument();
+    expect(screen.getByText('Digestifs', { selector: 'span' })).toBeInTheDocument();
+    expect(screen.getAllByText('common.yes')).toHaveLength(2);
+    expect(screen.getAllByText('common.no')).toHaveLength(1);
+    expect(screen.getByText('5 bouteille(s)')).toBeInTheDocument();
+    expect(screen.getByText('8 cocktail(s)')).toBeInTheDocument();
   });
 
-  it('should show menu type badges', async () => {
-    render(<MenusPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Cocktails')).toBeInTheDocument();
-      expect(screen.getByText('Apéritifs', { selector: 'span' })).toBeInTheDocument();
-      expect(screen.getByText('Digestifs', { selector: 'span' })).toBeInTheDocument();
-    });
+  it('links each menu to its editor, the bottle editor for a bottle menu', async () => {
+    await renderLoadedPage();
+    const editLinks = screen.getAllByRole('link', { name: 'common.edit' });
+    expect(editLinks.map((link) => link.getAttribute('href'))).toEqual([
+      '/admin/menus/1/bottles',
+      '/admin/menus/2/bottles',
+      '/admin/menus/3',
+    ]);
   });
 
-  it('should show public/private status', async () => {
-    render(<MenusPage />);
-    await waitFor(() => {
-      const yesLabels = screen.getAllByText('common.yes');
-      const noLabels = screen.getAllByText('common.no');
-      expect(yesLabels.length).toBe(2); // aperitifs + summer
-      expect(noLabels.length).toBe(1); // digestifs
-    });
+  it('marks the system menus and offers no deletion for them', async () => {
+    await renderLoadedPage();
+    expect(screen.getAllByText('(par défaut)')).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'common.delete' })).toHaveLength(1);
   });
 
-  it('should show content counts', async () => {
-    render(<MenusPage />);
-    await waitFor(() => {
-      expect(screen.getByText('5 bouteille(s)')).toBeInTheDocument();
-      expect(screen.getByText('8 cocktail(s)')).toBeInTheDocument();
-    });
+  it('never shows "no results" while the menus are loading', () => {
+    mockList.mockReturnValue(new Promise(() => {}));
+    renderPage();
+    expect(screen.getByText('common.loading')).toBeInTheDocument();
+    expect(screen.queryByText('common.noResults')).not.toBeInTheDocument();
   });
 
-  it('should show default menu labels', async () => {
-    render(<MenusPage />);
-    await waitFor(() => {
-      const defaults = screen.getAllByText('(par défaut)');
-      expect(defaults.length).toBe(2); // aperitifs + digestifs
-    });
-  });
-
-  it('should not show delete button for default menus', async () => {
-    render(<MenusPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Summer Menu')).toBeInTheDocument();
-    });
-    // Only summer menu (non-default) should have delete
-    await waitFor(() => {
-      const deleteButtons = screen.getAllByTitle('common.delete');
-      expect(deleteButtons.length).toBe(1);
-    });
-  });
-
-  it('should open create modal on add click', async () => {
-    const user = userEvent.setup();
-    render(<MenusPage />);
-    await user.click(screen.getByText('menus.add'));
-    // "menus.slug" and "menus.isPublic" appear in both table header and modal
-    const slugLabels = screen.getAllByText('menus.slug');
-    expect(slugLabels.length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText('common.save')).toBeInTheDocument();
-  });
-
-  it('should call delete with confirm for non-default menu', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-    const user = userEvent.setup();
-    render(<MenusPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Summer Menu')).toBeInTheDocument();
-    });
-    const deleteButton = screen.getByTitle('common.delete');
-    await user.click(deleteButton);
-    expect(window.confirm).toHaveBeenCalled();
-    expect(mockDelete).toHaveBeenCalledWith(3);
-  });
-
-  it('should show empty state when no menus', async () => {
+  it('shows "no results" once loaded without menus', async () => {
     mockList.mockResolvedValue([] as never);
-    render(<MenusPage />);
-    await waitFor(() => {
-      expect(screen.getByText('common.noResults')).toBeInTheDocument();
-    });
+    renderPage();
+    expect(await screen.findByText('common.noResults')).toBeInTheDocument();
+  });
+
+  it('filters the menus by name or slug', async () => {
+    const user = userEvent.setup();
+    await renderLoadedPage();
+
+    await user.type(screen.getByPlaceholderText('common.search'), 'summ');
+
+    expect(screen.getByText('Summer Menu')).toBeInTheDocument();
+    expect(screen.queryByText('(par défaut)')).not.toBeInTheDocument();
+  });
+
+  it('creates a menu with a cleaned slug and confirms with a toast', async () => {
+    const user = userEvent.setup();
+    await renderLoadedPage();
+    await fillCreateForm(user, 'Winter', 'Winter Menu!');
+    await user.type(within(dialog()).getByLabelText('menus.description'), 'Hot drinks');
+    await user.click(within(dialog()).getByRole('switch', { name: 'menus.isPublic' }));
+
+    await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledWith({
+      name: 'Winter',
+      slug: 'winter-menu-',
+      description: 'Hot drinks',
+      isPublic: true,
+    }));
+    expect(await screen.findByText('menus.created')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('shows a slug already taken in a toast and keeps the form open', async () => {
+    const user = userEvent.setup();
+    mockCreate.mockRejectedValue(new ApiError(409, 'This slug is already used'));
+    await renderLoadedPage();
+    await fillCreateForm(user, 'Summer 2', 'summer');
+
+    await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('This slug is already used'));
+    expect(within(dialog()).getByDisplayValue('summer')).toBeInTheDocument();
+  });
+
+  it('sends a single request on a fast double click on save', async () => {
+    const user = userEvent.setup();
+    mockCreate.mockReturnValue(new Promise(() => {}));
+    await renderLoadedPage();
+    await fillCreateForm(user, 'Winter', 'winter');
+    const save = within(dialog()).getByRole('button', { name: 'common.save' });
+
+    fireEvent.click(save);
+    fireEvent.click(save);
+
+    await waitFor(() => expect(save).toBeDisabled());
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts from an empty form after a creation', async () => {
+    const user = userEvent.setup();
+    await renderLoadedPage();
+    await fillCreateForm(user, 'Winter', 'winter');
+    await user.click(within(dialog()).getByRole('button', { name: 'common.cancel' }));
+
+    await user.click(screen.getByRole('button', { name: 'menus.add' }));
+
+    expect(within(dialog()).getByLabelText(/menus\.name/)).toHaveValue('');
+  });
+
+  it('deletes a menu after confirmation and confirms with a toast', async () => {
+    const user = userEvent.setup();
+    await renderLoadedPage();
+
+    await user.click(screen.getByRole('button', { name: 'common.delete' }));
+    const confirmation = screen.getByRole('alertdialog');
+    expect(confirmation).toHaveAccessibleDescription('menus.confirmDelete');
+    await user.click(within(confirmation).getByRole('button', { name: 'common.delete' }));
+
+    await waitFor(() => expect(mockDelete).toHaveBeenCalledWith(3));
+    expect(await screen.findByText('menus.deleted')).toBeInTheDocument();
+  });
+
+  it('does not delete when the dialog is cancelled', async () => {
+    const user = userEvent.setup();
+    await renderLoadedPage();
+
+    await user.click(screen.getByRole('button', { name: 'common.delete' }));
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.cancel' }));
+
+    expect(mockDelete).not.toHaveBeenCalled();
   });
 });
