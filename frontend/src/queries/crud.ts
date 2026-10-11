@@ -20,6 +20,14 @@ interface EntityMutationOptions<Variables> {
 
 export type EntityMutation<Variables> = UseMutationResult<unknown, Error, Variables>;
 
+/** Refreshes every query shown under one of the given keys. */
+export function useInvalidateQueries(): (keys: QueryKey[]) => void {
+  const queryClient = useQueryClient();
+  return (keys) => {
+    for (const queryKey of keys) queryClient.invalidateQueries({ queryKey });
+  };
+}
+
 /**
  * A mutation that refreshes the given queries and reports its outcome in a toast.
  * Only `mutate` honours `ignoreWhilePending`: `mutateAsync` is TanStack Query's own.
@@ -31,14 +39,14 @@ export function useEntityMutation<Variables>({
   ignoreWhilePending = false,
 }: EntityMutationOptions<Variables>): EntityMutation<Variables> {
   const { t } = useTranslation();
-  const queryClient = useQueryClient();
+  const invalidateQueries = useInvalidateQueries();
   const inFlight = useRef(false);
 
   const mutation = useMutation<unknown, Error, Variables>({
     mutationFn,
     onSuccess: () => {
       if (successMessage) toast.success(t(successMessage));
-      for (const queryKey of invalidates) queryClient.invalidateQueries({ queryKey });
+      invalidateQueries(invalidates);
     },
     onError: (error) => {
       toast.error(describeMutationError(error, t));

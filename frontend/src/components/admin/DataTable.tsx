@@ -1,4 +1,4 @@
-import type { Key, ReactNode } from 'react';
+import { Fragment, type Key, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '../ui/classNames';
 import Pagination from '../ui/Pagination';
@@ -14,7 +14,8 @@ export interface Column<T> {
   align?: 'left' | 'right';
   /** Extra classes of the cells, e.g. to mute a secondary column. */
   className?: string;
-  render: (row: T) => ReactNode;
+  /** Content of the cell; unused when the table renders its rows with `renderRow`. */
+  render?: (row: T) => ReactNode;
 }
 
 /** The part of `useSort` the table needs. */
@@ -41,6 +42,12 @@ interface DataTableProps<T> {
   getRowKey: (row: T) => Key;
   sort: SortState;
   pagination: PaginationState;
+  /**
+   * Renders the `<tr>` elements of a row, for rows that are not one line per
+   * item (e.g. a group that expands into sub-rows). Each column's `render` is
+   * used otherwise.
+   */
+  renderRow?: (row: T) => ReactNode;
   isLoading: boolean;
   /** A failed load shows an error with a retry button instead of the empty label. */
   isError: boolean;
@@ -56,10 +63,20 @@ function alignClass(align: Column<unknown>['align']) {
 
 /** Sortable, paginated admin table that never shows its empty label before the data is there. */
 export default function DataTable<T>({
-  columns, rows, getRowKey, sort, pagination, isLoading, isError, onRetry, emptyLabel,
+  columns, rows, getRowKey, sort, pagination, renderRow, isLoading, isError, onRetry, emptyLabel,
 }: DataTableProps<T>) {
   const { t } = useTranslation();
   const isEmpty = !isLoading && !isError && rows.length === 0;
+
+  const renderCells = (row: T) => (
+    <tr className="hover:bg-line/50">
+      {columns.map((column) => (
+        <td key={column.key} className={cx('px-6 py-4', alignClass(column.align), column.className)}>
+          {column.render?.(row)}
+        </td>
+      ))}
+    </tr>
+  );
 
   return (
     <div className="bg-surface border border-line rounded-xl overflow-hidden">
@@ -91,15 +108,7 @@ export default function DataTable<T>({
                 ))}
               </tr>
             ))
-            : rows.map((row) => (
-              <tr key={getRowKey(row)} className="hover:bg-line/50">
-                {columns.map((column) => (
-                  <td key={column.key} className={cx('px-6 py-4', alignClass(column.align), column.className)}>
-                    {column.render(row)}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            : rows.map((row) => <Fragment key={getRowKey(row)}>{(renderRow ?? renderCells)(row)}</Fragment>)}
         </tbody>
       </table>
       {isLoading && <p role="status" className="sr-only">{t('common.loading')}</p>}

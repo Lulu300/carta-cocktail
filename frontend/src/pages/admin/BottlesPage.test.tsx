@@ -1,34 +1,45 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '../../test/test-utils';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
+import { createTestQueryClient, fireEvent, screen, waitFor, within } from '../../test/test-utils';
+import { clearToasts, renderWithFeedback } from '../../test/feedback';
+import { qk } from '../../queries/keys';
+import { useShortages } from '../../queries/shortages';
 import BottlesPage from './BottlesPage';
 
-vi.mock('../../services/api', () => ({
-  bottles: {
-    list: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-    exportFile: vi.fn(),
-    importPreview: vi.fn(),
-    importConfirm: vi.fn(),
-  },
-  categories: { list: vi.fn() },
-  categoryTypes: { list: vi.fn().mockResolvedValue([]) },
-}));
+vi.mock('../../services/api', async () => {
+  const actual = await vi.importActual<typeof import('../../services/api')>('../../services/api');
+  return {
+    ApiError: actual.ApiError,
+    bottles: {
+      list: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      exportFile: vi.fn(),
+      importPreview: vi.fn(),
+      importConfirm: vi.fn(),
+    },
+    categories: { list: vi.fn() },
+    categoryTypes: { list: vi.fn().mockResolvedValue([]) },
+    shortages: { list: vi.fn() },
+  };
+});
 
 vi.mock('../../components/import/ImportBottlesWizard', () => ({
-  default: ({ onClose }: { onClose: () => void }) => (
+  default: ({ onClose, onImported }: { onClose: () => void; onImported?: () => void }) => (
     <div data-testid="import-wizard">
+      <button onClick={onImported}>finish-import</button>
       <button onClick={onClose}>close-wizard</button>
     </div>
   ),
 }));
 
 vi.mock('../../hooks/useLocalizedName', () => ({
-  useLocalizedName: () => (entity: { name: string }) => entity.name,
+  useLocalizedName: () => (entity: { name: string; nameTranslations?: Record<string, string> | null }) =>
+    entity.nameTranslations?.en ?? entity.name,
 }));
 
+// Kept until E-13 replaces the component mocks.
 vi.mock('../../components/ui/MultiSelectDropdown', () => ({
   default: ({ placeholder }: { onChange: (v: string[]) => void; placeholder: string }) => (
     <div data-testid="multi-select">{placeholder}</div>
@@ -41,13 +52,15 @@ vi.mock('../../components/ui/LocationAutocomplete', () => ({
   ),
 }));
 
-import { bottles as api, categories as categoriesApi } from '../../services/api';
+import { ApiError, bottles as api, categories as categoriesApi, shortages as shortagesApi } from '../../services/api';
 
 const mockApiList = vi.mocked(api.list);
 const mockApiCreate = vi.mocked(api.create);
 const mockApiUpdate = vi.mocked(api.update);
 const mockApiDelete = vi.mocked(api.delete);
+const mockExport = vi.mocked(api.exportFile);
 const mockCatList = vi.mocked(categoriesApi.list);
+const mockShortagesList = vi.mocked(shortagesApi.list);
 
 const mockBottles = [
   {
@@ -72,7 +85,7 @@ const mockBottles = [
     category: { id: 2, name: 'Gin', type: 'SPIRIT' },
     capacityMl: 500,
     remainingPercent: 20,
-    openedAt: '2024-06-01',
+    openedAt: '2024-06-01T00:00:00.000Z',
     purchasePrice: null,
     alcoholPercentage: 41.4,
     location: null,
@@ -82,10 +95,48 @@ const mockBottles = [
   },
 ];
 
+const emptyBottle = { ...mockBottles[0], id: 9, name: 'Finished rum', remainingPercent: 0 };
+
 const mockCategories = [
   { id: 1, name: 'Vodka', type: 'SPIRIT', categoryType: { name: 'SPIRIT', color: 'blue' }, desiredStock: 2 },
   { id: 2, name: 'Gin', type: 'SPIRIT', categoryType: { name: 'SPIRIT', color: 'blue' }, desiredStock: 2 },
 ];
+
+type User = ReturnType<typeof userEvent.setup>;
+
+function renderPage() {
+  return renderWithFeedback(<BottlesPage />);
+}
+
+async function renderLoadedPage() {
+  renderPage();
+  await screen.findByText('Absolut');
+}
+
+function dialog() {
+  return screen.getByRole('dialog');
+}
+
+async function openCreateForm(user: User) {
+  await user.click(screen.getByRole('button', { name: 'bottles.add' }));
+}
+
+function nameInput() {
+  return within(dialog()).getByLabelText(/bottles\.name/);
+}
+
+async function confirmDeletion(user: User, index = 0) {
+  await user.click(screen.getAllByRole('button', { name: 'common.delete' })[index]);
+  const confirmation = screen.getByRole('alertdialog');
+  expect(confirmation).toHaveAccessibleDescription('bottles.confirmDelete');
+  await user.click(within(confirmation).getByRole('button', { name: 'common.delete' }));
+}
+
+/** Reads the shortages like the sidebar badge of AdminLayout does. */
+function ShortagesBadge() {
+  const { data } = useShortages();
+  return <span data-testid="shortages-badge">{data?.length ?? '-'}</span>;
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -94,383 +145,400 @@ beforeEach(() => {
   mockApiCreate.mockResolvedValue({} as never);
   mockApiUpdate.mockResolvedValue({} as never);
   mockApiDelete.mockResolvedValue({} as never);
+  mockExport.mockResolvedValue(undefined);
+  mockShortagesList.mockResolvedValue([] as never);
 });
 
-describe('BottlesPage', () => {
-  it('renders title "bottles.title" and add button', async () => {
-    render(<BottlesPage />);
-    await waitFor(() => {
-      expect(screen.getByText('bottles.title')).toBeInTheDocument();
-      expect(screen.getByText('bottles.add')).toBeInTheDocument();
-    });
-  });
+afterEach(clearToasts);
 
-  it('displays bottles in table after loading', async () => {
-    render(<BottlesPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Absolut')).toBeInTheDocument();
+describe('BottlesPage', () => {
+  describe('list', () => {
+    it('renders the title and the header buttons', () => {
+      renderPage();
+      expect(screen.getByText('bottles.title')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'bottles.add' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'bottles.import' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'bottles.export' })).toBeInTheDocument();
+    });
+
+    it('lists the available bottles with their details', async () => {
+      await renderLoadedPage();
       expect(screen.getByText('Hendricks')).toBeInTheDocument();
       expect(screen.getByText('Vodka')).toBeInTheDocument();
-      expect(screen.getByText('Gin')).toBeInTheDocument();
       expect(screen.getByText('700 ml')).toBeInTheDocument();
-      expect(screen.getByText('500 ml')).toBeInTheDocument();
       expect(screen.getByText('25 €')).toBeInTheDocument();
-    });
-  });
-
-  it('shows "common.noResults" when empty list', async () => {
-    mockApiList.mockResolvedValue([] as never);
-    render(<BottlesPage />);
-    await waitFor(() => {
-      expect(screen.getByText('common.noResults')).toBeInTheDocument();
-    });
-  });
-
-  it('opens create modal on "bottles.add" click', async () => {
-    const user = userEvent.setup();
-    render(<BottlesPage />);
-    await waitFor(() => {
-      expect(screen.getByText('bottles.add')).toBeInTheDocument();
-    });
-    await user.click(screen.getByText('bottles.add'));
-    // Modal heading appears (h2 with "bottles.add" text in create mode)
-    const headings = screen.getAllByText('bottles.add');
-    // One is the button, one is the modal h2
-    expect(headings.length).toBeGreaterThanOrEqual(2);
-    // Save button appears in modal
-    expect(screen.getByText('common.save')).toBeInTheDocument();
-  });
-
-  it('opens edit modal with pre-filled data on edit button click', async () => {
-    const user = userEvent.setup();
-    render(<BottlesPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Absolut')).toBeInTheDocument();
-    });
-    const editButtons = screen.getAllByTitle('common.edit');
-    await user.click(editButtons[0]);
-    // Modal should appear with edit title
-    expect(screen.getByText('bottles.edit')).toBeInTheDocument();
-    // Name field should be pre-filled with 'Absolut'
-    const nameInput = screen.getByDisplayValue('Absolut');
-    expect(nameInput).toBeInTheDocument();
-  });
-
-  it('calls delete API with confirm on delete button click', async () => {
-    const user = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-    render(<BottlesPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Absolut')).toBeInTheDocument();
-    });
-    const deleteButtons = screen.getAllByTitle('common.delete');
-    await user.click(deleteButtons[0]);
-    expect(window.confirm).toHaveBeenCalled();
-    await waitFor(() => {
-      expect(mockApiDelete).toHaveBeenCalledWith(1);
-    });
-  });
-
-  it('applies correct color class for remainingPercent: green >50, yellow >20, red <=20', async () => {
-    render(<BottlesPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Absolut')).toBeInTheDocument();
-    });
-    // Absolut has remainingPercent=80 -> green
-    const greenBar = document.querySelector('.bg-green-500');
-    expect(greenBar).not.toBeNull();
-    // Hendricks has remainingPercent=20 -> red
-    const redBar = document.querySelector('.bg-red-500');
-    expect(redBar).not.toBeNull();
-  });
-
-  it('submits create form with correct data', async () => {
-    const user = userEvent.setup();
-    render(<BottlesPage />);
-    await waitFor(() => {
-      expect(screen.getByText('bottles.add')).toBeInTheDocument();
-    });
-    await user.click(screen.getByText('bottles.add'));
-
-    // The modal form's name input has the required attribute
-    const form = document.querySelector('form')!;
-    const nameInput = form.querySelector('input[required]') as HTMLInputElement;
-    await user.type(nameInput, 'New Whisky');
-
-    await user.click(screen.getByText('common.save'));
-    await waitFor(() => {
-      expect(mockApiCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'New Whisky' })
-      );
-    });
-  });
-
-  it('submits edit form and calls api.update', async () => {
-    const user = userEvent.setup();
-    render(<BottlesPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Absolut')).toBeInTheDocument();
-    });
-    const editButtons = screen.getAllByTitle('common.edit');
-    await user.click(editButtons[0]);
-
-    const nameInput = screen.getByDisplayValue('Absolut');
-    await user.clear(nameInput);
-    await user.type(nameInput, 'Absolut Elyx');
-
-    await user.click(screen.getByText('common.save'));
-    await waitFor(() => {
-      expect(mockApiUpdate).toHaveBeenCalledWith(
-        1,
-        expect.objectContaining({ name: 'Absolut Elyx' })
-      );
-    });
-  });
-
-  it('does not call delete when confirm returns false', async () => {
-    const user = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
-    render(<BottlesPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Absolut')).toBeInTheDocument();
-    });
-    const deleteButtons = screen.getAllByTitle('common.delete');
-    await user.click(deleteButtons[0]);
-    expect(window.confirm).toHaveBeenCalled();
-    expect(mockApiDelete).not.toHaveBeenCalled();
-  });
-
-  it('filters by search term', async () => {
-    const user = userEvent.setup();
-    render(<BottlesPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Absolut')).toBeInTheDocument();
-      expect(screen.getByText('Hendricks')).toBeInTheDocument();
-    });
-    // Use placeholder to distinguish search input from location autocomplete
-    const searchInput = screen.getByPlaceholderText('common.search');
-    await user.type(searchInput, 'Absolut');
-    expect(screen.getByText('Absolut')).toBeInTheDocument();
-    expect(screen.queryByText('Hendricks')).not.toBeInTheDocument();
-  });
-
-  it('shows price "-" for bottle with null price', async () => {
-    render(<BottlesPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Hendricks')).toBeInTheDocument();
-    });
-    // Hendricks has purchasePrice: null -> should show '-'
-    // Absolut has 25 -> '25 €'
-    expect(screen.getByText('25 €')).toBeInTheDocument();
-    // The '-' for null price
-    const dashes = screen.getAllByText('-');
-    expect(dashes.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('shows "bottles.opened" badge for opened bottle and "bottles.unopened" for sealed', async () => {
-    render(<BottlesPage />);
-    await waitFor(() => {
       expect(screen.getByText('bottles.opened')).toBeInTheDocument();
       expect(screen.getByText('bottles.unopened')).toBeInTheDocument();
+      expect(screen.getByText('bottles.activeTitle (2)')).toBeInTheDocument();
     });
-  });
 
-  it('shows isApero and isDigestif checkboxes in create modal', async () => {
-    const user = userEvent.setup();
-    render(<BottlesPage />);
-    await waitFor(() => {
-      expect(screen.getByText('bottles.add')).toBeInTheDocument();
+    it('colors the fill level: green above 50 %, red at 20 % or less', async () => {
+      await renderLoadedPage();
+      expect(document.querySelector('.bg-green-500')).not.toBeNull();
+      expect(document.querySelector('.bg-red-500')).not.toBeNull();
     });
-    await user.click(screen.getByText('bottles.add'));
 
-    const checkboxes = screen.getAllByRole('checkbox');
-    // Two checkboxes: isApero and isDigestif
-    expect(checkboxes.length).toBeGreaterThanOrEqual(2);
+    it('never shows "no results" while the bottles are loading', () => {
+      mockApiList.mockReturnValue(new Promise(() => {}));
+      renderPage();
+      expect(screen.getByText('common.loading')).toBeInTheDocument();
+      expect(screen.queryByText('common.noResults')).not.toBeInTheDocument();
+    });
 
-    // Toggle isApero (first checkbox)
-    await user.click(checkboxes[0]);
-    expect((checkboxes[0] as HTMLInputElement).checked).toBe(true);
-  });
+    it('shows "no results" once loaded without bottles', async () => {
+      mockApiList.mockResolvedValue([] as never);
+      renderPage();
+      expect(await screen.findByText('common.noResults')).toBeInTheDocument();
+    });
 
-  it('pre-fills isApero=true in edit modal for Hendricks', async () => {
-    const user = userEvent.setup();
-    render(<BottlesPage />);
-    await waitFor(() => {
+    it('shows a load error with a retry button', async () => {
+      const user = userEvent.setup();
+      mockApiList.mockRejectedValueOnce(new Error('Failed to fetch'));
+      renderPage();
+
+      await user.click(await screen.findByRole('button', { name: 'common.retry' }));
+
+      expect(await screen.findByText('Absolut')).toBeInTheDocument();
+    });
+
+    it('filters by name and by location', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+
+      await user.type(screen.getByPlaceholderText('common.search'), 'abs');
+      expect(screen.queryByText('Hendricks')).not.toBeInTheDocument();
+      await user.clear(screen.getByPlaceholderText('common.search'));
+
+      await user.type(screen.getByTestId('location-autocomplete'), 'bar');
+      expect(screen.getByText('Absolut')).toBeInTheDocument();
+      expect(screen.queryByText('Hendricks')).not.toBeInTheDocument();
+    });
+
+    it('filters by a typed category name', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+
+      await user.type(screen.getByPlaceholderText('bottles.filterByCategory'), 'gin');
+
       expect(screen.getByText('Hendricks')).toBeInTheDocument();
+      expect(screen.queryByText('Absolut')).not.toBeInTheDocument();
     });
-    const editButtons = screen.getAllByTitle('common.edit');
-    // Hendricks is the second bottle (index 1)
-    await user.click(editButtons[1]);
 
-    const checkboxes = screen.getAllByRole('checkbox');
-    // Hendricks has isApero=true
-    expect((checkboxes[0] as HTMLInputElement).checked).toBe(true);
-    // isDigestif=false
-    expect((checkboxes[1] as HTMLInputElement).checked).toBe(false);
-  });
+    it('sorts the category column on the localized name', async () => {
+      const user = userEvent.setup();
+      mockApiList.mockResolvedValue([
+        { ...mockBottles[0], category: { ...mockBottles[0].category, name: 'A-vodka', nameTranslations: { en: 'Zubrowka' } } },
+        { ...mockBottles[1], category: { ...mockBottles[1].category, name: 'Z-gin', nameTranslations: { en: 'Gin' } } },
+      ] as never);
+      renderPage();
+      await screen.findByText('Absolut');
 
-  it('renders import and export buttons in the header', async () => {
-    render(<BottlesPage />);
-    await waitFor(() => {
-      expect(screen.getByText('bottles.import')).toBeInTheDocument();
-      expect(screen.getByText('bottles.export')).toBeInTheDocument();
+      await user.click(screen.getByText('bottles.category'));
+
+      const names = screen.getAllByText(/Absolut|Hendricks/).map((cell) => cell.textContent);
+      expect(names).toEqual(['Hendricks', 'Absolut']);
     });
-  });
 
-  it('opens the import wizard when clicking the import button', async () => {
-    const user = userEvent.setup();
-    render(<BottlesPage />);
-    await waitFor(() => expect(screen.getByText('bottles.import')).toBeInTheDocument());
+    it('groups identical bottles and lists them when the group is opened', async () => {
+      const user = userEvent.setup();
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      mockApiList.mockResolvedValue([mockBottles[0], { ...mockBottles[0], id: 3, remainingPercent: 40 }, mockBottles[1]] as never);
+      try {
+        renderPage();
 
-    expect(screen.queryByTestId('import-wizard')).not.toBeInTheDocument();
-    await user.click(screen.getByText('bottles.import'));
-    expect(screen.getByTestId('import-wizard')).toBeInTheDocument();
+        await user.click(await screen.findByText('x2'));
 
-    await user.click(screen.getByText('close-wizard'));
-    await waitFor(() => {
-      expect(screen.queryByTestId('import-wizard')).not.toBeInTheDocument();
+        expect(screen.getAllByText('Absolut')).toHaveLength(3);
+        expect(screen.getByText('~60%')).toBeInTheDocument();
+        const keyWarnings = consoleError.mock.calls.filter((args) =>
+          args.some((arg) => typeof arg === 'string' && arg.includes('unique "key"')));
+        expect(keyWarnings).toHaveLength(0);
+      } finally {
+        consoleError.mockRestore();
+      }
     });
-  });
 
-  it('shows export format options when clicking the export button', async () => {
-    const user = userEvent.setup();
-    render(<BottlesPage />);
-    await waitFor(() => expect(screen.getByText('bottles.export')).toBeInTheDocument());
+    it('keeps the empty bottles in a collapsed history', async () => {
+      const user = userEvent.setup();
+      mockApiList.mockResolvedValue([...mockBottles, emptyBottle] as never);
+      await renderLoadedPage();
+      expect(screen.queryByText('Finished rum')).not.toBeInTheDocument();
 
-    expect(screen.queryByText('bottles.exportJson')).not.toBeInTheDocument();
-    await user.click(screen.getByText('bottles.export'));
-    expect(screen.getByText('bottles.exportJson')).toBeInTheDocument();
-    expect(screen.getByText('bottles.exportCsv')).toBeInTheDocument();
-  });
+      await user.click(screen.getByRole('button', { name: /bottles\.historyTitle \(1\)/ }));
 
-  it('calls api.exportFile with format=json when JSON option clicked', async () => {
-    const user = userEvent.setup();
-    const mockExport = vi.mocked(api.exportFile).mockResolvedValue(undefined);
-    render(<BottlesPage />);
-    await waitFor(() => expect(screen.getByText('bottles.export')).toBeInTheDocument());
-
-    await user.click(screen.getByText('bottles.export'));
-    await user.click(screen.getByText('bottles.exportJson'));
-
-    await waitFor(() => {
-      expect(mockExport).toHaveBeenCalledWith('json', expect.any(Object));
+      expect(screen.getByText('Finished rum')).toBeInTheDocument();
+      expect(screen.getByText('bottles.activeTitle (2)')).toBeInTheDocument();
     });
   });
 
-  it('calls api.exportFile with format=csv when CSV option clicked', async () => {
-    const user = userEvent.setup();
-    const mockExport = vi.mocked(api.exportFile).mockResolvedValue(undefined);
-    render(<BottlesPage />);
-    await waitFor(() => expect(screen.getByText('bottles.export')).toBeInTheDocument());
+  describe('form', () => {
+    it('disables the add button while no category is loaded', async () => {
+      mockCatList.mockResolvedValue([] as never);
+      await renderLoadedPage();
 
-    await user.click(screen.getByText('bottles.export'));
-    await user.click(screen.getByText('bottles.exportCsv'));
-
-    await waitFor(() => {
-      expect(mockExport).toHaveBeenCalledWith('csv', expect.any(Object));
+      const addButton = screen.getByRole('button', { name: 'bottles.add' });
+      expect(addButton).toBeDisabled();
+      expect(addButton).toHaveAttribute('title', 'bottles.noCategoryHint');
     });
-  });
 
-  it('shows an inline error if export fails', async () => {
-    const user = userEvent.setup();
-    vi.mocked(api.exportFile).mockRejectedValue(new Error('Network down'));
-    render(<BottlesPage />);
-    await waitFor(() => expect(screen.getByText('bottles.export')).toBeInTheDocument());
+    it('creates a bottle in the first category and confirms with a toast', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      await openCreateForm(user);
 
-    await user.click(screen.getByText('bottles.export'));
-    await user.click(screen.getByText('bottles.exportJson'));
+      await user.type(nameInput(), 'New Whisky');
+      await user.click(within(dialog()).getByLabelText('Utilisable comme apéritif'));
+      await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
 
-    await waitFor(() => {
-      expect(screen.getByText('Network down')).toBeInTheDocument();
+      await waitFor(() => expect(mockApiCreate).toHaveBeenCalledWith({
+        name: 'New Whisky',
+        categoryId: 1,
+        purchasePrice: null,
+        capacityMl: 700,
+        remainingPercent: 100,
+        openedAt: null,
+        alcoholPercentage: null,
+        location: null,
+        isApero: true,
+        isDigestif: false,
+        quantity: 1,
+      }));
+      expect(await screen.findByText('bottles.created')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
-  });
 
-  it('does not submit "save and duplicate" when the name is empty', async () => {
-    const user = userEvent.setup();
-    render(<BottlesPage />);
-    await screen.findByText('Absolut');
-    await user.click(screen.getByText('bottles.add'));
+    it('creates several identical bottles at once', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      await openCreateForm(user);
 
-    await user.click(screen.getByText('bottles.saveDuplicate'));
+      await user.type(nameInput(), 'Rum');
+      // An emptied field snaps back to 1, so set the value in one go.
+      fireEvent.change(within(dialog()).getByLabelText('bottles.quantity'), { target: { value: '3' } });
+      expect(within(dialog()).getByText('bottles.quantityHint')).toBeInTheDocument();
+      await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
 
-    expect(mockApiCreate).not.toHaveBeenCalled();
-    const nameInput = document.querySelector('form input[required]') as HTMLInputElement;
-    expect(nameInput.validity.valueMissing).toBe(true);
-  });
-
-  it('creates the bottle and keeps the modal open on "save and duplicate"', async () => {
-    const user = userEvent.setup();
-    render(<BottlesPage />);
-    await screen.findByText('Absolut');
-    await user.click(screen.getByText('bottles.add'));
-
-    const nameInput = document.querySelector('form input[required]') as HTMLInputElement;
-    await user.type(nameInput, 'New Whisky');
-    await user.click(screen.getByText('bottles.saveDuplicate'));
-
-    await waitFor(() => {
-      expect(mockApiCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'New Whisky', categoryId: 1 })
-      );
+      await waitFor(() => expect(mockApiCreate).toHaveBeenCalledWith(expect.objectContaining({ name: 'Rum', quantity: 3 })));
     });
-    expect(screen.getByText('bottles.saveDuplicate')).toBeInTheDocument();
 
-    // The intent is reset: a plain save afterwards closes the modal
-    await user.click(screen.getByText('common.save'));
-    await waitFor(() => {
-      expect(screen.queryByText('bottles.saveDuplicate')).not.toBeInTheDocument();
-    });
-    expect(mockApiCreate).toHaveBeenCalledTimes(2);
-  });
+    it('sends a single request on a fast double click on save', async () => {
+      const user = userEvent.setup();
+      mockApiCreate.mockReturnValue(new Promise(() => {}));
+      await renderLoadedPage();
+      await openCreateForm(user);
+      await user.type(nameInput(), 'Rum');
+      const save = within(dialog()).getByRole('button', { name: 'common.save' });
 
-  it('pressing Enter in the name field saves and closes the modal', async () => {
-    const user = userEvent.setup();
-    render(<BottlesPage />);
-    await screen.findByText('Absolut');
-    await user.click(screen.getByText('bottles.add'));
+      fireEvent.click(save);
+      fireEvent.click(save);
 
-    const nameInput = document.querySelector('form input[required]') as HTMLInputElement;
-    await user.type(nameInput, 'New Whisky{Enter}');
-
-    await waitFor(() => {
+      await waitFor(() => expect(save).toBeDisabled());
       expect(mockApiCreate).toHaveBeenCalledTimes(1);
     });
-    await waitFor(() => {
-      expect(screen.queryByText('bottles.saveDuplicate')).not.toBeInTheDocument();
+
+    it('does not submit "save and duplicate" when the name is empty', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      await openCreateForm(user);
+
+      await user.click(within(dialog()).getByRole('button', { name: 'bottles.saveDuplicate' }));
+
+      expect(mockApiCreate).not.toHaveBeenCalled();
+      expect((nameInput() as HTMLInputElement).validity.valueMissing).toBe(true);
+    });
+
+    it('creates the bottle and keeps the form open on "save and duplicate"', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      await openCreateForm(user);
+
+      await user.type(nameInput(), 'New Whisky');
+      await user.click(within(dialog()).getByRole('button', { name: 'bottles.saveDuplicate' }));
+
+      await waitFor(() => expect(mockApiCreate).toHaveBeenCalledWith(expect.objectContaining({ name: 'New Whisky', categoryId: 1 })));
+      expect(within(dialog()).getByDisplayValue('New Whisky')).toBeInTheDocument();
+
+      // The intent is reset: a plain save afterwards closes the form.
+      await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      expect(mockApiCreate).toHaveBeenCalledTimes(2);
+    });
+
+    it('pressing Enter in the name field saves and closes the form', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      await openCreateForm(user);
+
+      await user.type(nameInput(), 'New Whisky{Enter}');
+
+      await waitFor(() => expect(mockApiCreate).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    });
+
+    it('opens the edit form filled with the bottle', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+
+      await user.click(screen.getAllByRole('button', { name: 'common.edit' })[1]);
+
+      expect(screen.getByText('bottles.edit')).toBeInTheDocument();
+      expect(nameInput()).toHaveValue('Hendricks');
+      expect(within(dialog()).getByLabelText('bottles.openedAt')).toHaveValue('2024-06-01');
+      expect(within(dialog()).getByLabelText('Utilisable comme apéritif')).toBeChecked();
+      expect(within(dialog()).getByLabelText('Utilisable comme digestif')).not.toBeChecked();
+      expect(within(dialog()).queryByRole('button', { name: 'bottles.saveDuplicate' })).not.toBeInTheDocument();
+    });
+
+    it('updates a bottle without a quantity and confirms with a toast', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      await user.click(screen.getAllByRole('button', { name: 'common.edit' })[0]);
+
+      await user.clear(nameInput());
+      await user.type(nameInput(), 'Absolut Elyx');
+      await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
+
+      await waitFor(() => expect(mockApiUpdate).toHaveBeenCalledWith(1, expect.objectContaining({
+        name: 'Absolut Elyx',
+        purchasePrice: 25,
+        alcoholPercentage: 40,
+        location: 'Bar',
+      })));
+      expect(mockApiUpdate.mock.calls[0][1]).not.toHaveProperty('quantity');
+      expect(await screen.findByText('bottles.updated')).toBeInTheDocument();
+    });
+
+    it('refreshes the shortages badge after a bottle is updated, without leaving the page', async () => {
+      const user = userEvent.setup();
+      renderWithFeedback(<><BottlesPage /><ShortagesBadge /></>);
+      await screen.findByText('Absolut');
+      await waitFor(() => expect(mockShortagesList).toHaveBeenCalledTimes(1));
+      mockShortagesList.mockResolvedValue([{ categoryId: 1 }] as never);
+
+      await user.click(screen.getAllByRole('button', { name: 'common.edit' })[0]);
+      await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
+
+      await waitFor(() => expect(screen.getByTestId('shortages-badge')).toHaveTextContent('1'));
+      expect(mockShortagesList).toHaveBeenCalledTimes(2);
     });
   });
 
-  it('disables the add button while no category is loaded', async () => {
-    mockCatList.mockResolvedValue([] as never);
-    render(<BottlesPage />);
-    await screen.findByText('Absolut');
+  describe('deletion', () => {
+    it('deletes a bottle after confirmation and confirms with a toast', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
 
-    const addButton = screen.getByRole('button', { name: 'bottles.add' });
-    expect(addButton).toBeDisabled();
-    expect(addButton).toHaveAttribute('title', 'bottles.noCategoryHint');
+      await confirmDeletion(user);
+
+      await waitFor(() => expect(mockApiDelete).toHaveBeenCalledWith(1));
+      expect(await screen.findByText('bottles.deleted')).toBeInTheDocument();
+    });
+
+    it('deletes an empty bottle from the history', async () => {
+      const user = userEvent.setup();
+      mockApiList.mockResolvedValue([emptyBottle] as never);
+      renderPage();
+      await user.click(await screen.findByRole('button', { name: /bottles\.historyTitle/ }));
+
+      await confirmDeletion(user);
+
+      await waitFor(() => expect(mockApiDelete).toHaveBeenCalledWith(9));
+    });
+
+    it('does not delete when the dialog is cancelled', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+
+      await user.click(screen.getAllByRole('button', { name: 'common.delete' })[0]);
+      await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.cancel' }));
+
+      expect(mockApiDelete).not.toHaveBeenCalled();
+    });
+
+    it('shows the backend message and the cocktails of a bottle in use', async () => {
+      const user = userEvent.setup();
+      mockApiDelete.mockRejectedValue(new ApiError(409, 'This bottle is used by cocktails', {
+        error: 'This bottle is used by cocktails',
+        details: { cocktails: [{ id: 4, name: 'Moscow Mule', removedLines: 1 }], bottles: [] },
+      }));
+      await renderLoadedPage();
+
+      await confirmDeletion(user);
+
+      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('This bottle is used by cocktails'));
+      expect(screen.getByRole('alert')).toHaveTextContent('deletion.usedByCocktails');
+    });
   });
 
-  it('renders grouped bottles without React key warnings', async () => {
-    const user = userEvent.setup();
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    mockApiList.mockResolvedValue([
-      mockBottles[0],
-      { ...mockBottles[0], id: 3 },
-      mockBottles[1],
-    ] as never);
-    try {
-      render(<BottlesPage />);
+  describe('import and export', () => {
+    it('opens and closes the import wizard', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
 
-      await screen.findByText('x2');
-      await user.click(screen.getByText('x2'));
-      expect(screen.getAllByText('Absolut')).toHaveLength(3);
+      await user.click(screen.getByRole('button', { name: 'bottles.import' }));
+      expect(screen.getByTestId('import-wizard')).toBeInTheDocument();
+      await user.click(screen.getByText('close-wizard'));
 
-      const keyWarnings = consoleError.mock.calls.filter((args) =>
-        args.some((arg) => typeof arg === 'string' && arg.includes('unique "key"'))
-      );
-      expect(keyWarnings).toHaveLength(0);
-    } finally {
-      consoleError.mockRestore();
-    }
+      expect(screen.queryByTestId('import-wizard')).not.toBeInTheDocument();
+    });
+
+    it('refreshes the bottles, categories and category types after an import', async () => {
+      const user = userEvent.setup();
+      const queryClient = createTestQueryClient();
+      const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+      renderWithFeedback(<BottlesPage />, { queryClient });
+      await screen.findByText('Absolut');
+
+      await user.click(screen.getByRole('button', { name: 'bottles.import' }));
+      await user.click(screen.getByText('finish-import'));
+
+      const refreshed = invalidate.mock.calls.map(([filters]) => filters?.queryKey);
+      expect(refreshed).toEqual([qk.bottles, qk.shortages, qk.categories, qk.menus, qk.availability, qk.categoryTypes]);
+      await waitFor(() => expect(mockApiList).toHaveBeenCalledTimes(2));
+    });
+
+    it('exports the filtered bottles in the chosen format', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      await user.type(screen.getByPlaceholderText('common.search'), 'abs');
+
+      await user.click(screen.getByRole('button', { name: 'bottles.export' }));
+      await user.click(screen.getByText('bottles.exportCsv'));
+
+      await waitFor(() => expect(mockExport).toHaveBeenCalledWith('csv', { categoryId: undefined, search: 'abs', location: undefined }));
+      expect(screen.queryByText('bottles.exportJson')).not.toBeInTheDocument();
+    });
+
+    it('exports in JSON', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+
+      await user.click(screen.getByRole('button', { name: 'bottles.export' }));
+      await user.click(screen.getByText('bottles.exportJson'));
+
+      await waitFor(() => expect(mockExport).toHaveBeenCalledWith('json', expect.any(Object)));
+    });
+
+    it('closes the export menu on a click outside', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+
+      await user.click(screen.getByRole('button', { name: 'bottles.export' }));
+      expect(screen.getByText('bottles.exportJson')).toBeInTheDocument();
+      await user.click(screen.getByText('bottles.title'));
+
+      expect(screen.queryByText('bottles.exportJson')).not.toBeInTheDocument();
+    });
+
+    it('shows an export failure in an error toast', async () => {
+      const user = userEvent.setup();
+      mockExport.mockRejectedValue(new Error('Network down'));
+      await renderLoadedPage();
+
+      await user.click(screen.getByRole('button', { name: 'bottles.export' }));
+      await user.click(screen.getByText('bottles.exportJson'));
+
+      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Network down'));
+    });
   });
 });
