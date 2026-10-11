@@ -80,6 +80,26 @@ describe('POST /api/categories', () => {
     expect(res.body.minimumPercent).toBe(30);
   });
 
+  it('should keep a desiredStock of 0', async () => {
+    const res = await request.post('/api/categories').set(authHeader())
+      .send({ name: 'Occasional', type: 'SPIRIT', desiredStock: 0 });
+    expect(res.status).toBe(201);
+    const inDb = await prisma.category.findUniqueOrThrow({ where: { id: res.body.id } });
+    expect(inDb.desiredStock).toBe(0);
+  });
+
+  it.each([
+    ['desiredStock', { desiredStock: -1 }],
+    ['minimumPercent', { minimumPercent: 101 }],
+    ['nameTranslations', { nameTranslations: { de: 'Rum' } }],
+  ])('should return 400 for an invalid %s', async (field, invalid) => {
+    const res = await request.post('/api/categories').set(authHeader())
+      .send({ name: 'Rum', type: 'SPIRIT', ...invalid });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe(`body.${field}`);
+    expect(await prisma.category.count()).toBe(0);
+  });
+
   it('should create with custom minimumPercent', async () => {
     const res = await request.post('/api/categories').set(authHeader())
       .send({ name: 'Rum', type: 'SPIRIT', minimumPercent: 50 });
@@ -142,6 +162,14 @@ describe('PUT /api/categories/:id', () => {
       .send({ desiredStock: 5 });
     expect(res.status).toBe(200);
     expect(res.body.desiredStock).toBe(5);
+  });
+
+  it('should return 400 for a blank name instead of ignoring it', async () => {
+    const cat = await seedCategory({ name: 'Rum' });
+    const res = await request.put(`/api/categories/${cat.id}`).set(authHeader())
+      .send({ name: '  ' });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('body.name');
   });
 
   it('should update minimumPercent', async () => {

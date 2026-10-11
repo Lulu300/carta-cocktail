@@ -3,6 +3,8 @@ import { prisma } from '../lib/prisma';
 import bcrypt from 'bcryptjs';
 import { AuthRequest } from '../middleware/auth';
 import { BadRequestError, NotFoundError } from '../errors';
+import { valid, validate } from '../validation/validate';
+import { ProfileUpdate, SiteSettingsUpdate } from '../validation/settings';
 
 const router = Router();
 
@@ -16,37 +18,34 @@ router.get('/', async (_req: AuthRequest, res: Response) => {
 });
 
 // Update site settings
-router.put('/', async (req: AuthRequest, res: Response) => {
-  const { siteName, siteIcon } = req.body;
+const siteSettingsSchemas = { body: SiteSettingsUpdate };
+
+router.put('/', validate(siteSettingsSchemas), async (_req: AuthRequest, res: Response) => {
+  const { siteName, siteIcon } = valid<typeof siteSettingsSchemas>(res).body;
+  // Absent fields are undefined, which Prisma leaves untouched
   const settings = await prisma.siteSettings.upsert({
     where: { id: 1 },
-    update: {
-      ...(siteName !== undefined && { siteName }),
-      ...(siteIcon !== undefined && { siteIcon }),
-    },
-    create: {
-      id: 1,
-      ...(siteName !== undefined && { siteName }),
-      ...(siteIcon !== undefined && { siteIcon }),
-    },
+    update: { siteName, siteIcon },
+    create: { id: 1, siteName, siteIcon },
   });
   res.json(settings);
 });
 
 // Update admin profile
-router.put('/profile', async (req: AuthRequest, res: Response) => {
-  const { email, currentPassword, newPassword } = req.body;
+const profileSchemas = { body: ProfileUpdate };
 
-  if (newPassword && !currentPassword) throw new BadRequestError();
+router.put('/profile', validate(profileSchemas), async (req: AuthRequest, res: Response) => {
+  const { email, currentPassword, newPassword } = valid<typeof profileSchemas>(res).body;
 
   const user = await prisma.user.findUnique({ where: { id: req.userId } });
   if (!user) throw new NotFoundError();
 
   if (newPassword) {
-    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    // The schema only accepts a new password together with the current one
+    const isPasswordValid = await bcrypt.compare(currentPassword ?? '', user.passwordHash);
     // 400, not 401: the session is valid, only the submitted password is wrong.
     // A 401 would make the frontend log the admin out.
-    if (!valid) throw new BadRequestError('errors.invalidCurrentPassword');
+    if (!isPasswordValid) throw new BadRequestError('errors.invalidCurrentPassword');
   }
 
   const updateData: { email?: string; passwordHash?: string } = {};

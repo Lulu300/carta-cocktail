@@ -2,6 +2,8 @@ import { Router, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { parseNameTranslations } from '../utils/translations';
+import { valid, validate } from '../validation/validate';
+import { CategoryTypeCreate, CategoryTypeParams, CategoryTypeUpdate } from '../validation/categoryTypes';
 
 const router = Router();
 
@@ -26,13 +28,11 @@ router.get('/', async (_req: AuthRequest, res: Response) => {
 });
 
 // Create a category type
-router.post('/', async (req: AuthRequest, res: Response) => {
-  const { name, nameTranslations, color } = req.body;
-  if (!name) {
-    res.status(400).json({ error: 'Name is required' });
-    return;
-  }
-  const typeName = name.trim().toUpperCase();
+const createSchemas = { body: CategoryTypeCreate };
+
+router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Response) => {
+  const { name, nameTranslations, color } = valid<typeof createSchemas>(res).body;
+  const typeName = name.toUpperCase();
   const existing = await prisma.categoryType.findUnique({ where: { name: typeName } });
   if (existing) {
     res.status(409).json({ error: 'Type already exists' });
@@ -49,9 +49,10 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 });
 
 // Update a category type
-router.put('/:name', async (req: AuthRequest, res: Response) => {
-  const typeName = String(req.params.name);
-  const { nameTranslations, color } = req.body;
+const updateSchemas = { params: CategoryTypeParams, body: CategoryTypeUpdate };
+
+router.put('/:name', validate(updateSchemas), async (_req: AuthRequest, res: Response) => {
+  const { params: { name: typeName }, body: { nameTranslations, color } } = valid<typeof updateSchemas>(res);
   const existing = await prisma.categoryType.findUnique({ where: { name: typeName } });
   if (!existing) {
     res.status(404).json({ error: 'Type not found' });
@@ -70,8 +71,10 @@ router.put('/:name', async (req: AuthRequest, res: Response) => {
 });
 
 // Delete a category type
-router.delete('/:name', async (req: AuthRequest, res: Response) => {
-  const typeName = String(req.params.name);
+const deleteSchemas = { params: CategoryTypeParams };
+
+router.delete('/:name', validate(deleteSchemas), async (_req: AuthRequest, res: Response) => {
+  const typeName = valid<typeof deleteSchemas>(res).params.name;
   const usageCount = await prisma.category.count({ where: { type: typeName } });
   if (usageCount > 0) {
     res.status(400).json({ error: 'Type is in use by categories' });

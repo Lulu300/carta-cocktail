@@ -1,14 +1,20 @@
 import { Router, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middleware/auth';
-import { BadRequestError, NotFoundError } from '../errors';
+import { NotFoundError } from '../errors';
+import { valid, validate } from '../validation/validate';
+import { IdParams, idRequest, MenuIdParams } from '../validation/common';
+import { MenuBottleCreate, MenuBottleUpdate } from '../validation/menuBottles';
 
 const router = Router();
 
 // Get all bottles for a menu
-router.get('/menu/:menuId', async (req: AuthRequest, res: Response) => {
+const menuSchemas = { params: MenuIdParams };
+
+router.get('/menu/:menuId', validate(menuSchemas), async (_req: AuthRequest, res: Response) => {
   const menuBottles = await prisma.menuBottle.findMany({
-    where: { menuId: parseInt(String(req.params.menuId)) },
+    where: { menuId: valid<typeof menuSchemas>(res).params.menuId },
     include: {
       bottle: {
         include: { category: true },
@@ -20,9 +26,10 @@ router.get('/menu/:menuId', async (req: AuthRequest, res: Response) => {
 });
 
 // Add bottle to menu
-router.post('/', async (req: AuthRequest, res: Response) => {
-  const { menuId, bottleId, position, isHidden } = req.body;
-  if (!menuId || !bottleId) throw new BadRequestError();
+const createSchemas = { body: MenuBottleCreate };
+
+router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Response) => {
+  const { menuId, bottleId, position, isHidden } = valid<typeof createSchemas>(res).body;
   const menuBottle = await prisma.menuBottle.create({
     data: {
       menuId,
@@ -40,15 +47,14 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 });
 
 // Update menu bottle (position or visibility)
-router.put('/:id', async (req: AuthRequest, res: Response) => {
-  const { position, isHidden, menuSectionId } = req.body;
+const updateSchemas = { params: IdParams, body: MenuBottleUpdate };
+
+router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Response) => {
+  const { params: { id }, body: { position, isHidden, menuSectionId } } = valid<typeof updateSchemas>(res);
+  // Absent fields are undefined, which Prisma leaves untouched
   const menuBottle = await prisma.menuBottle.update({
-    where: { id: parseInt(String(req.params.id)) },
-    data: {
-      ...(position !== undefined && { position }),
-      ...(isHidden !== undefined && { isHidden }),
-      ...(menuSectionId !== undefined && { menuSectionId }),
-    },
+    where: { id },
+    data: { position, isHidden, menuSectionId },
     include: {
       bottle: {
         include: { category: true },
@@ -59,14 +65,14 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // Remove bottle from menu
-router.delete('/:id', async (req: AuthRequest, res: Response) => {
-  await prisma.menuBottle.delete({ where: { id: parseInt(String(req.params.id)) } });
+router.delete('/:id', validate(idRequest), async (req: AuthRequest, res: Response) => {
+  await prisma.menuBottle.delete({ where: { id: valid<typeof idRequest>(res).params.id } });
   res.json({ message: req.t('menuBottles.deleted') });
 });
 
 // Sync bottles for a menu based on bottle flags (isApero/isDigestif)
-router.post('/menu/:menuId/sync', async (req: AuthRequest, res: Response) => {
-  const menuId = parseInt(String(req.params.menuId));
+router.post('/menu/:menuId/sync', validate(menuSchemas), async (req: AuthRequest, res: Response) => {
+  const { menuId } = valid<typeof menuSchemas>(res).params;
 
   // Get the menu to check its type
   const menu = await prisma.menu.findUnique({
@@ -76,7 +82,7 @@ router.post('/menu/:menuId/sync', async (req: AuthRequest, res: Response) => {
   if (!menu) throw new NotFoundError();
 
   // Determine which bottles to sync based on menu type
-  let bottleFilter: any = {};
+  let bottleFilter: Prisma.BottleWhereInput;
   if (menu.type === 'APEROS') {
     bottleFilter = { isApero: true };
   } else if (menu.type === 'DIGESTIFS') {

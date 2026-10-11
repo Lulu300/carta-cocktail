@@ -47,12 +47,24 @@ describe('GET /api/bottles', () => {
     expect(res.body).toHaveLength(1);
     expect(res.body[0].name).toBe('Monin');
   });
+
+  it('should return 400 for a non-numeric categoryId', async () => {
+    const res = await request.get('/api/bottles?categoryId=x').set(authHeader());
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('query.categoryId');
+  });
 });
 
 describe('GET /api/bottles/:id', () => {
   it('should return 404 for non-existent bottle', async () => {
     const res = await request.get('/api/bottles/9999').set(authHeader());
     expect(res.status).toBe(404);
+  });
+
+  it('should return 400 for a non-numeric id', async () => {
+    const res = await request.get('/api/bottles/abc').set(authHeader());
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('params.id');
   });
 
   it('should return bottle with category', async () => {
@@ -89,6 +101,40 @@ describe('POST /api/bottles', () => {
     expect(res.body.remainingPercent).toBe(100);
     expect(res.body.isApero).toBe(false);
     expect(res.body.isDigestif).toBe(false);
+  });
+
+  it('should keep a purchase price and an alcohol percentage of 0', async () => {
+    const cat = await seedCategory();
+    const res = await request.post('/api/bottles').set(authHeader())
+      .send({ name: 'Gift', categoryId: cat.id, capacityMl: 700, purchasePrice: 0, alcoholPercentage: 0 });
+    expect(res.status).toBe(201);
+    const inDb = await prisma.bottle.findUniqueOrThrow({ where: { id: res.body.id } });
+    expect(inDb.purchasePrice).toBe(0);
+    expect(inDb.alcoholPercentage).toBe(0);
+  });
+
+  it('should store the opening date sent by the date input', async () => {
+    const cat = await seedCategory();
+    const res = await request.post('/api/bottles').set(authHeader())
+      .send({ name: 'Opened', categoryId: cat.id, capacityMl: 700, openedAt: '2026-10-01' });
+    expect(res.status).toBe(201);
+    expect(res.body.openedAt).toBe('2026-10-01T00:00:00.000Z');
+  });
+
+  it.each([
+    ['remainingPercent', { remainingPercent: 150 }],
+    ['alcoholPercentage', { alcoholPercentage: 101 }],
+    ['purchasePrice', { purchasePrice: -1 }],
+    ['capacityMl', { capacityMl: 0 }],
+    ['openedAt', { openedAt: 'not a date' }],
+    ['categoryId', { categoryId: '1' }],
+  ])('should return 400 for an invalid %s', async (field, invalid) => {
+    const cat = await seedCategory();
+    const res = await request.post('/api/bottles').set(authHeader())
+      .send({ name: 'Bad', categoryId: cat.id, capacityMl: 700, ...invalid });
+    expect(res.status).toBe(400);
+    expect(res.body.details.map((d: { path: string }) => d.path)).toContain(`body.${field}`);
+    expect(await prisma.bottle.count()).toBe(0);
   });
 
   it('should auto-add to aperitifs menu when isApero=true', async () => {
@@ -139,12 +185,21 @@ describe('POST /api/bottles (batch)', () => {
     expect(Array.isArray(res.body)).toBe(false);
   });
 
-  it('should cap quantity at 50', async () => {
+  it('should create up to 50 bottles at once', async () => {
+    const cat = await seedCategory();
+    const res = await request.post('/api/bottles').set(authHeader())
+      .send({ name: 'Shot', categoryId: cat.id, capacityMl: 50, quantity: 50 });
+    expect(res.status).toBe(201);
+    expect(res.body).toHaveLength(50);
+  });
+
+  it('should reject a quantity above 50 instead of capping it', async () => {
     const cat = await seedCategory();
     const res = await request.post('/api/bottles').set(authHeader())
       .send({ name: 'Shot', categoryId: cat.id, capacityMl: 50, quantity: 100 });
-    expect(res.status).toBe(201);
-    expect(res.body).toHaveLength(50);
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('body.quantity');
+    expect(await prisma.bottle.count()).toBe(0);
   });
 
   it('should auto-sync menus for all batch-created bottles', async () => {
@@ -162,6 +217,27 @@ describe('POST /api/bottles (batch)', () => {
 });
 
 describe('PUT /api/bottles/:id', () => {
+  it('should return 400 for remainingPercent above 100 and leave the bottle unchanged', async () => {
+    const bottle = await seedBottle({ remainingPercent: 80 });
+    const res = await request.put(`/api/bottles/${bottle.id}`).set(authHeader())
+      .send({ remainingPercent: 150 });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0]).toMatchObject({ path: 'body.remainingPercent', code: 'too_big' });
+    const inDb = await prisma.bottle.findUniqueOrThrow({ where: { id: bottle.id } });
+    expect(inDb.remainingPercent).toBe(80);
+  });
+
+  it('should set a purchase price of 0 and clear the opening date', async () => {
+    const bottle = await seedBottle({ purchasePrice: 25 });
+    await prisma.bottle.update({ where: { id: bottle.id }, data: { openedAt: new Date('2026-01-01') } });
+    const res = await request.put(`/api/bottles/${bottle.id}`).set(authHeader())
+      .send({ purchasePrice: 0, openedAt: null, location: '' });
+    expect(res.status).toBe(200);
+    expect(res.body.purchasePrice).toBe(0);
+    expect(res.body.openedAt).toBeNull();
+    expect(res.body.location).toBeNull();
+  });
+
   it('should update bottle fields', async () => {
     const bottle = await seedBottle({ name: 'Old Name' });
     const res = await request.put(`/api/bottles/${bottle.id}`).set(authHeader())
@@ -624,6 +700,26 @@ describe('POST /api/bottles/import/confirm', () => {
     expect(res.status).toBe(400);
   });
 
+  it('should return 400 for remainingPercent above 100 and create nothing', async () => {
+    await seedCategory({ name: 'Rhum' });
+    const payload = {
+      version: 1,
+      categories: [],
+      bottles: [{
+        name: 'Havana', categoryName: 'Rhum', capacityMl: 700, remainingPercent: 150,
+        alcoholPercentage: 40, purchasePrice: null, location: null, openedAt: null,
+        isApero: false, isDigestif: false, quantity: 1,
+      }],
+    };
+    const res = await request.post('/api/bottles/import/confirm')
+      .set(authHeader())
+      .send({ payload, resolutions: {} });
+
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('body.payload.bottles.0.remainingPercent');
+    expect(await prisma.bottle.count()).toBe(0);
+  });
+
   it('should create bottles using an existing category', async () => {
     const cat = await seedCategory({ name: 'Rhum', type: 'SPIRIT' });
     const payload = {
@@ -697,7 +793,7 @@ describe('POST /api/bottles/import/confirm', () => {
     expect(bottles).toHaveLength(6);
   });
 
-  it('should cap quantity at 50', async () => {
+  it('should reject a quantity above 50, which the preview never produces', async () => {
     await seedCategory({ name: 'Beer' });
     const payload = {
       version: 1,
@@ -711,7 +807,9 @@ describe('POST /api/bottles/import/confirm', () => {
     const res = await request.post('/api/bottles/import/confirm')
       .set(authHeader())
       .send({ payload, resolutions: {} });
-    expect(res.body.created.bottles).toBe(50);
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('body.payload.bottles.0.quantity');
+    expect(await prisma.bottle.count()).toBe(0);
   });
 
   it('should honor skip action on a bottle resolution', async () => {
