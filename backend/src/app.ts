@@ -3,7 +3,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import path from 'path';
+import { rateLimit } from 'express-rate-limit';
 import { config } from './config';
+import { HttpError } from './errors';
 import { i18nMiddleware } from './i18n';
 import { authMiddleware } from './middleware/auth';
 import { apiNotFoundHandler, errorHandler } from './middleware/errorHandler';
@@ -23,15 +25,33 @@ import availabilityRoutes from './routes/availability';
 import settingsRoutes from './routes/settings';
 import backupRoutes from './routes/backup';
 
+const LOGIN_RATE_WINDOW_MS = 15 * 60_000;
+
 const app = express();
+
+// Proxies (nginx, and any reverse proxy in front of it) forward the client
+// address: req.ip must be that client, so that the login limit applies per
+// client and not to the proxy that every request comes through.
+app.set('trust proxy', config.trustProxy);
 
 // Middleware
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(cors());
-app.use(morgan('dev'));
+app.use(cors({ origin: config.corsOrigin || false }));
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 // i18n first, so that body parsing errors are answered in the client's language
 app.use(i18nMiddleware);
 app.use(express.json());
+
+// Only failed attempts count: the admin who mistypes once and logs in is not held back
+const loginLimiter = rateLimit({
+  windowMs: LOGIN_RATE_WINDOW_MS,
+  limit: config.loginRateLimit,
+  skipSuccessfulRequests: true,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  handler: (_req, _res, next) => next(new HttpError(429, 'errors.tooManyAttempts')),
+});
+app.use('/api/auth/login', loginLimiter);
 
 // Static files for uploads
 app.use('/uploads', express.static(config.uploadDir));

@@ -11,8 +11,15 @@ vi.mock('../../services/api', () => ({
   backup: { exportBackup: vi.fn(), importBackup: vi.fn() },
 }));
 
+// One stable value, as AuthProvider gives: a new user object on each render
+// would make the page reset the email field.
+const mockAuth = vi.hoisted(() => ({
+  user: { id: 1, email: 'admin@test.local' },
+  updateSession: vi.fn(),
+}));
+const mockUpdateSession = mockAuth.updateSession;
 vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ user: { id: 1, email: 'admin@test.local' } }),
+  useAuth: () => mockAuth,
 }));
 
 vi.mock('../../contexts/SiteSettingsContext', () => ({
@@ -177,6 +184,7 @@ describe('SettingsPage', () => {
     const newPasswordInput = screen.getByPlaceholderText('settings.newPasswordPlaceholder');
     const confirmPasswordInput = screen.getByPlaceholderText('settings.confirmPasswordPlaceholder');
 
+    await user.type(screen.getByPlaceholderText('settings.currentPasswordPlaceholder'), 'old-password-1');
     await user.type(newPasswordInput, 'newpass123');
     await user.type(confirmPasswordInput, 'differentpass');
 
@@ -214,6 +222,59 @@ describe('SettingsPage', () => {
       });
       expect(screen.getByText('settings.profileUpdated')).toBeInTheDocument();
     });
+  });
+
+  it('should keep the admin logged in with the token returned after a password change', async () => {
+    mockUpdateProfile.mockResolvedValue({ id: 1, email: 'admin@test.local', token: 'new-token' });
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('admin@test.local')).toBeInTheDocument();
+    });
+
+    await user.type(screen.getByPlaceholderText('settings.currentPasswordPlaceholder'), 'old-password-1');
+    await user.type(screen.getByPlaceholderText('settings.newPasswordPlaceholder'), 'new-password-12');
+    await user.type(screen.getByPlaceholderText('settings.confirmPasswordPlaceholder'), 'new-password-12');
+    await user.click(screen.getAllByText('common.save')[1]);
+
+    await waitFor(() => {
+      expect(mockUpdateSession).toHaveBeenCalledWith({ id: 1, email: 'admin@test.local' }, 'new-token');
+    });
+  });
+
+  it('should send the current password with a new email and update the session', async () => {
+    mockUpdateProfile.mockResolvedValue({ id: 1, email: 'new@test.local' });
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('admin@test.local')).toBeInTheDocument();
+    });
+    const currentPasswordInput = screen.getByPlaceholderText('settings.currentPasswordPlaceholder');
+    expect(currentPasswordInput).not.toBeRequired();
+
+    const emailInput = screen.getByDisplayValue('admin@test.local');
+    await user.clear(emailInput);
+    await user.type(emailInput, 'new@test.local');
+    expect(currentPasswordInput).toBeRequired();
+    await user.type(currentPasswordInput, 'old-password-1');
+    await user.click(screen.getAllByText('common.save')[1]);
+
+    await waitFor(() => {
+      expect(mockUpdateProfile).toHaveBeenCalledWith({ email: 'new@test.local', currentPassword: 'old-password-1' });
+      expect(mockUpdateSession).toHaveBeenCalledWith({ id: 1, email: 'new@test.local' }, undefined);
+    });
+  });
+
+  it('should require the current password with a new password', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('admin@test.local')).toBeInTheDocument();
+    });
+
+    await user.type(screen.getByPlaceholderText('settings.newPasswordPlaceholder'), 'x');
+
+    expect(screen.getByPlaceholderText('settings.currentPasswordPlaceholder')).toBeRequired();
   });
 
   it('should show error on profile save failure', async () => {

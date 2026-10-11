@@ -83,6 +83,7 @@ function signIn(isAdmin: boolean) {
     token: isAdmin ? 'token' : null,
     login: vi.fn(),
     logout: vi.fn(),
+    updateSession: vi.fn(),
     isLoading: false,
   });
 }

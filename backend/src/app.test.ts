@@ -139,3 +139,17 @@ describe('Unknown API paths', () => {
     expectJsonError(res);
   });
 });
+
+describe('CORS', () => {
+  it('does not allow other origins by default', async () => {
+    const res = await request.get('/api/public/menus').set('Origin', 'https://evil.example');
+    expect(res.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
+  it('answers a preflight request without allowing the origin', async () => {
+    const res = await request.options('/api/auth/login')
+      .set('Origin', 'https://evil.example')
+      .set('Access-Control-Request-Method', 'POST');
+    expect(res.headers['access-control-allow-origin']).toBeUndefined();
+  });
+});

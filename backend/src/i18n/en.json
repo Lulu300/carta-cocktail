@@ -17,11 +17,15 @@
     "invalidJson": "The request body is not valid JSON",
     "invalidImportFile": "The import file could not be read",
     "noFileUploaded": "No file uploaded",
-    "backupSchemaTooNew": "This backup comes from a newer version of Carta Cocktail: update the application before restoring it"
+    "backupSchemaTooNew": "This backup comes from a newer version of Carta Cocktail: update the application before restoring it",
+    "tooManyAttempts": "Too many failed login attempts: try again in a few minutes",
+    "passwordTooShort": "The new password must be at least 12 characters long",
+    "invalidEmail": "The email address is not valid"
   },
   "auth": {
     "loginSuccess": "Login successful",
-    "logoutSuccess": "Logout successful"
+    "logoutSuccess": "Logout successful",
+    "loggedOutEverywhere": "Logged out on every device"
   },
   "categories": {
     "created": "Category created successfully",

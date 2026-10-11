@@ -1,13 +1,12 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { hashPassword, MIN_PASSWORD_LENGTH } from './password';
 
 const DEFAULT_ADMIN_EMAIL = 'admin@carta.local';
-const MIN_ADMIN_PASSWORD_LENGTH = 12;
 // The old default, published in this repository
 const FORBIDDEN_ADMIN_PASSWORD = 'admin123';
-const BCRYPT_COST = 12;
 const INVALID_PASSWORD_MESSAGE =
-  `ADMIN_PASSWORD must be set to at least ${MIN_ADMIN_PASSWORD_LENGTH} characters, other than '${FORBIDDEN_ADMIN_PASSWORD}', ` +
+  `ADMIN_PASSWORD must be set to at least ${MIN_PASSWORD_LENGTH} characters, other than '${FORBIDDEN_ADMIN_PASSWORD}', ` +
   'to create or reset the admin user';
 
 export type EnsureAdminResult = 'created' | 'reset' | 'unchanged';
@@ -21,7 +20,7 @@ function readAdminPassword(env: NodeJS.ProcessEnv): string {
   if (!password) {
     throw new Error(INVALID_PASSWORD_MESSAGE);
   }
-  const isWeak = password.length < MIN_ADMIN_PASSWORD_LENGTH || password === FORBIDDEN_ADMIN_PASSWORD;
+  const isWeak = password.length < MIN_PASSWORD_LENGTH || password === FORBIDDEN_ADMIN_PASSWORD;
   if (env.NODE_ENV !== 'test' && isWeak) {
     throw new Error(INVALID_PASSWORD_MESSAGE);
   }
@@ -32,7 +31,7 @@ async function credentialsFromEnv(env: NodeJS.ProcessEnv): Promise<{ email: stri
   const password = readAdminPassword(env);
   return {
     email: env.ADMIN_EMAIL || DEFAULT_ADMIN_EMAIL,
-    passwordHash: await bcrypt.hash(password, BCRYPT_COST),
+    passwordHash: await hashPassword(password),
   };
 }
 

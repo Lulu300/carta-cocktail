@@ -3,7 +3,7 @@ id: C-22
 title: "Restauration : afficher les fichiers ignorés et le redémarrage conseillé"
 phase: C
 lane: frontend
-criticite: basse
+criticite: haute
 effort: S
 status: todo
 owner: agent
@@ -50,3 +50,4 @@ C-05 change la réponse de `POST /api/backup/import` : `{ message, skippedFiles,
 ## Journal
 
 - 2026-10-11 : tâche créée par C-05 (nouvelle forme de la réponse d'import).
+- 2026-10-11 : prérequis de la release qui livre C-11 (décision humaine, revue de la PR #82). C-11 ajoute la colonne `User.tokenVersion` : après la restauration d'une sauvegarde faite avant cette release, la table `User` n'a plus cette colonne jusqu'au redémarrage du backend. La connexion (mot de passe correct ou non), `GET /api/auth/me` et toute route authentifiée répondent 500, et `GET /api/public/menus` aussi pour un navigateur qui envoie un token (`optionalAuth` lit `User`) ; seuls les visiteurs sans token gardent la carte. Côté admin : toast de succès, rechargement après 1,5 s, `/auth/me` en 500, `.catch(logout)`, puis « Internal server error » à chaque essai de connexion, sans rien qui dise de redémarrer. Toutes les sauvegardes antérieures à cette release sont concernées (`restartRecommended` compare avec la dernière migration), y compris celles de v1.8.0 à v1.10.0 pour lesquelles les notes v1.10.0 et `UPGRADING.md` ne demandent aucun redémarrage. Un redémarrage suffit (`migrate deploy` n'a que l'`ADD COLUMN` à appliquer).

@@ -49,7 +49,7 @@ backend/
 │   ├── middleware/
 │   │   └── auth.ts           # JWT Bearer validation, AuthRequest type
 │   ├── routes/               # One file per resource (14 route files)
-│   │   ├── auth.ts           # POST /login, GET /me
+│   │   ├── auth.ts           # POST /login, GET /me, POST /logout-all
 │   │   ├── categoryTypes.ts  # CRUD /api/category-types
 │   │   ├── categories.ts     # CRUD /api/categories
 │   │   ├── bottles.ts        # CRUD /api/bottles
@@ -115,7 +115,17 @@ export default router;
 - Middleware in `auth.ts` extends `Request` as `AuthRequest` with `userId?: number`
 - Public routes: `/api/auth/*`, `/api/public/*` (no middleware)
 - Protected routes: all others (authMiddleware applied in `app.ts`)
-- JWT token in `Authorization: Bearer <token>` header, 7-day expiry
+- JWT token in `Authorization: Bearer <token>` header, HS256, 7-day expiry by default (`JWT_EXPIRES_IN`)
+- Tokens are issued by `signToken()` and checked by `verifyToken()` (`middleware/auth.ts`) only. A token carries
+  `User.tokenVersion` (`tv`): changing the password or `POST /api/auth/logout-all` increments it, which revokes every
+  older token. A token of a deleted user is refused too
+- `POST /api/auth/login` allows `LOGIN_RATE_LIMIT` failed attempts (default 10) per client IP in 15 minutes, then
+  answers 429. `trust proxy` (`TRUST_PROXY`) trusts the proxies on loopback and private networks by default: the
+  client IP is the last public address forwarded by nginx and any reverse proxy in front of it. A successful login
+  rehashes a password hash made at another cost (`needsRehash`)
+- One password rule (`src/bootstrap/password.ts`): `hashPassword()` (bcrypt cost 12) and `MIN_PASSWORD_LENGTH` (12),
+  used by `ensureAdmin` and `PUT /api/settings/profile`. Never call `bcrypt.hash` elsewhere
+- CORS is closed by default (same-origin app); `CORS_ORIGIN` allows one origin
 
 ### Input Validation (zod)
 

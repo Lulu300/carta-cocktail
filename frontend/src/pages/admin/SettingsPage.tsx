@@ -13,7 +13,7 @@ const ICON_OPTIONS = [
 
 export default function SettingsPage() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, updateSession } = useAuth();
   const { refresh: refreshSiteSettings } = useSiteSettings();
   const confirm = useConfirm();
 
@@ -31,6 +31,9 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [profileMessage, setProfileMessage] = useState('');
   const [profileError, setProfileError] = useState('');
+  // The server asks for the current password before changing the login email or the password
+  const isEmailChanged = email !== user?.email;
+  const isCurrentPasswordRequired = isEmailChanged || newPassword !== '';
 
   // Backup settings
   const [backupFile, setBackupFile] = useState<File | null>(null);
@@ -78,13 +81,12 @@ export default function SettingsPage() {
 
     try {
       const data: { email?: string; currentPassword?: string; newPassword?: string } = {};
-      if (email !== user?.email) data.email = email;
-      if (newPassword) {
-        data.currentPassword = currentPassword;
-        data.newPassword = newPassword;
-      }
+      if (isEmailChanged) data.email = email;
+      if (newPassword) data.newPassword = newPassword;
+      if (isCurrentPasswordRequired) data.currentPassword = currentPassword;
 
-      await settingsApi.updateProfile(data);
+      const { token, ...updatedUser } = await settingsApi.updateProfile(data);
+      updateSession(updatedUser, token);
       setProfileMessage(t('settings.profileUpdated'));
       setCurrentPassword('');
       setNewPassword('');
@@ -216,6 +218,7 @@ export default function SettingsPage() {
               type="password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
+              required={isCurrentPasswordRequired}
               className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:border-amber-400 focus:outline-none"
               placeholder={t('settings.currentPasswordPlaceholder')}
             />

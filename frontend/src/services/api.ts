@@ -301,7 +301,8 @@ export const settings = {
   update: (data: { siteName: string; siteIcon: string }) =>
     request<SiteSettings>('/settings', { method: 'PUT', body: JSON.stringify(data) }),
   updateProfile: (data: { email?: string; currentPassword?: string; newPassword?: string }) =>
-    request<{ id: number; email: string }>('/settings/profile', { method: 'PUT', body: JSON.stringify(data) }),
+    // `token` comes back when the password changed: the server revoked the previous one
+    request<{ id: number; email: string; token?: string }>('/settings/profile', { method: 'PUT', body: JSON.stringify(data) }),
 };
 
 // Backup

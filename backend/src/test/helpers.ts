@@ -116,6 +116,8 @@ export interface AuthTokenOptions {
   /** Lifetime in seconds; a negative value gives an already expired token. */
   expiresInSeconds?: number;
   algorithm?: jwt.Algorithm;
+  /** Token version (`tv`); users start at 0, as seeded. */
+  tokenVersion?: number;
 }
 
 /**
@@ -127,8 +129,9 @@ export function getAuthToken(userId: number = 1, options: AuthTokenOptions = {})
     secret = process.env.JWT_SECRET || 'test-secret',
     expiresInSeconds = 3600,
     algorithm = 'HS256',
+    tokenVersion = 0,
   } = options;
-  return jwt.sign({ userId }, secret, { expiresIn: expiresInSeconds, algorithm });
+  return jwt.sign({ userId, tv: tokenVersion }, secret, { expiresIn: expiresInSeconds, algorithm });
 }
 
 /**

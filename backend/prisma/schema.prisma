@@ -12,6 +12,8 @@ model User {
   email        String   @unique
   passwordHash String
   createdAt    DateTime @default(now())
+  // Copied into each token; incrementing it revokes every token issued before
+  tokenVersion Int      @default(0)
 }
 
 model CategoryType {
