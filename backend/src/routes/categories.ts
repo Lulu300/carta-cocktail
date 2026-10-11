@@ -1,10 +1,13 @@
 import { Router, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middleware/auth';
-import { BadRequestError, NotFoundError } from '../errors';
+import { NotFoundError } from '../errors';
 import { parseNameTranslations } from '../utils/translations';
 import { assertUniqueIgnoringCase } from '../utils/uniqueness';
 import { deleteCategory, isForceRequested } from '../services/deletionService';
+import { valid, validate } from '../validation/validate';
+import { deleteRequest, IdParams, idRequest } from '../validation/common';
+import { CategoryCreate, CategoryUpdate } from '../validation/categories';
 
 const router = Router();
 
@@ -42,9 +45,9 @@ router.get('/', async (_req: AuthRequest, res: Response) => {
 });
 
 // Get one category
-router.get('/:id', async (req: AuthRequest, res: Response) => {
+router.get('/:id', validate(idRequest), async (_req: AuthRequest, res: Response) => {
   const category = await prisma.category.findUnique({
-    where: { id: parseInt(String(req.params.id)) },
+    where: { id: valid<typeof idRequest>(res).params.id },
     include: { bottles: true },
   });
   if (!category) throw new NotFoundError();
@@ -53,17 +56,19 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // Create category
-router.post('/', async (req: AuthRequest, res: Response) => {
-  const { name, type, desiredStock, minimumPercent, nameTranslations } = req.body;
-  if (!name || !type) throw new BadRequestError();
+const createSchemas = { body: CategoryCreate };
+
+router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Response) => {
+  const { name, type, desiredStock, minimumPercent, nameTranslations } = valid<typeof createSchemas>(res).body;
   await assertCategoryNameIsFree(name);
   await ensureCategoryType(type);
   const category = await prisma.category.create({
     data: {
       name,
       type,
-      desiredStock: desiredStock || 1,
-      minimumPercent: minimumPercent !== undefined ? minimumPercent : 30,
+      // ?? and not ||: a desired stock of 0 is kept
+      desiredStock: desiredStock ?? 1,
+      minimumPercent: minimumPercent ?? 30,
       nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null,
     },
   });
@@ -71,22 +76,25 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 });
 
 // Update category
-router.put('/:id', async (req: AuthRequest, res: Response) => {
-  const { name, type, desiredStock, minimumPercent, nameTranslations } = req.body;
-  const id = parseInt(String(req.params.id));
-  if (name) {
+const updateSchemas = { params: IdParams, body: CategoryUpdate };
+
+router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Response) => {
+  const { params: { id }, body } = valid<typeof updateSchemas>(res);
+  const { name, type, desiredStock, minimumPercent, nameTranslations } = body;
+  if (name !== undefined) {
     await assertCategoryNameIsFree(name, id);
   }
-  if (type) {
+  if (type !== undefined) {
     await ensureCategoryType(type);
   }
+  // Absent fields are undefined, which Prisma leaves untouched
   const category = await prisma.category.update({
     where: { id },
     data: {
-      ...(name && { name }),
-      ...(type && { type }),
-      ...(desiredStock !== undefined && { desiredStock }),
-      ...(minimumPercent !== undefined && { minimumPercent }),
+      name,
+      type,
+      desiredStock,
+      minimumPercent,
       ...(nameTranslations !== undefined && { nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null }),
     },
   });
@@ -94,8 +102,9 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // Delete category: refused while it holds bottles or recipes use it, unless ?force=true
-router.delete('/:id', async (req: AuthRequest, res: Response) => {
-  const impact = await deleteCategory(parseInt(String(req.params.id)), isForceRequested(req.query.force));
+router.delete('/:id', validate(deleteRequest), async (req: AuthRequest, res: Response) => {
+  const { params: { id }, query } = valid<typeof deleteRequest>(res);
+  const impact = await deleteCategory(id, isForceRequested(query.force));
   res.json({ message: req.t('categories.deleted'), deleted: true, impact });
 });
 

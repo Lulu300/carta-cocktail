@@ -4,19 +4,22 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { BadRequestError, NotFoundError, UnauthorizedError } from '../errors';
+import { NotFoundError, UnauthorizedError } from '../errors';
+import { valid, validate } from '../validation/validate';
+import { LoginBody } from '../validation/auth';
 
 const router = Router();
 
-router.post('/login', async (req: Request, res: Response) => {
-  const { email, password } = req.body;
-  if (!email || !password) throw new BadRequestError();
+const loginSchemas = { body: LoginBody };
+
+router.post('/login', validate(loginSchemas), async (_req: Request, res: Response) => {
+  const { email, password } = valid<typeof loginSchemas>(res).body;
 
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) throw new UnauthorizedError('errors.invalidCredentials');
 
-  const valid = await bcrypt.compare(password, user.passwordHash);
-  if (!valid) throw new UnauthorizedError('errors.invalidCredentials');
+  const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+  if (!isPasswordValid) throw new UnauthorizedError('errors.invalidCredentials');
 
   const token = jwt.sign({ userId: user.id }, config.jwtSecret, { expiresIn: '7d' });
   res.json({ token, user: { id: user.id, email: user.email } });

@@ -1,25 +1,28 @@
 import { Router, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middleware/auth';
-import { BadRequestError } from '../errors';
+import { valid, validate } from '../validation/validate';
+import { IdParams, idRequest, MenuIdParams } from '../validation/common';
+import { MenuSectionCreate, MenuSectionReorder, MenuSectionUpdate } from '../validation/menuSections';
 
 const router = Router();
 
 // List sections for a menu
-router.get('/menu/:menuId/sections', async (req: AuthRequest, res: Response) => {
+const menuSchemas = { params: MenuIdParams };
+
+router.get('/menu/:menuId/sections', validate(menuSchemas), async (_req: AuthRequest, res: Response) => {
   const sections = await prisma.menuSection.findMany({
-    where: { menuId: parseInt(String(req.params.menuId)) },
+    where: { menuId: valid<typeof menuSchemas>(res).params.menuId },
     orderBy: { position: 'asc' },
   });
   res.json(sections);
 });
 
 // Create section
-router.post('/menu/:menuId/sections', async (req: AuthRequest, res: Response) => {
-  const { name } = req.body;
-  const menuId = parseInt(String(req.params.menuId));
+const createSchemas = { params: MenuIdParams, body: MenuSectionCreate };
 
-  if (!name) throw new BadRequestError();
+router.post('/menu/:menuId/sections', validate(createSchemas), async (_req: AuthRequest, res: Response) => {
+  const { params: { menuId }, body: { name } } = valid<typeof createSchemas>(res);
 
   // Get max position for this menu
   const maxSection = await prisma.menuSection.findFirst({
@@ -39,37 +42,36 @@ router.post('/menu/:menuId/sections', async (req: AuthRequest, res: Response) =>
 });
 
 // Update section
-router.put('/sections/:id', async (req: AuthRequest, res: Response) => {
-  const { name, position } = req.body;
+const updateSchemas = { params: IdParams, body: MenuSectionUpdate };
+
+router.put('/sections/:id', validate(updateSchemas), async (_req: AuthRequest, res: Response) => {
+  const { params: { id }, body: { name, position } } = valid<typeof updateSchemas>(res);
+  // Absent fields are undefined, which Prisma leaves untouched
   const section = await prisma.menuSection.update({
-    where: { id: parseInt(String(req.params.id)) },
-    data: {
-      ...(name !== undefined && { name }),
-      ...(position !== undefined && { position }),
-    },
+    where: { id },
+    data: { name, position },
   });
   res.json(section);
 });
 
 // Delete section
-router.delete('/sections/:id', async (req: AuthRequest, res: Response) => {
+router.delete('/sections/:id', validate(idRequest), async (_req: AuthRequest, res: Response) => {
   // When a section is deleted, items will have their menuSectionId set to null (onDelete: SetNull)
   await prisma.menuSection.delete({
-    where: { id: parseInt(String(req.params.id)) },
+    where: { id: valid<typeof idRequest>(res).params.id },
   });
   res.json({ message: 'Section deleted' });
 });
 
 // Reorder sections
-router.post('/menu/:menuId/sections/reorder', async (req: AuthRequest, res: Response) => {
-  const { sectionIds } = req.body; // Array of section IDs in desired order
-  const menuId = parseInt(String(req.params.menuId));
+const reorderSchemas = { params: MenuIdParams, body: MenuSectionReorder };
 
-  if (!Array.isArray(sectionIds)) throw new BadRequestError();
+router.post('/menu/:menuId/sections/reorder', validate(reorderSchemas), async (_req: AuthRequest, res: Response) => {
+  // sectionIds lists the menu's sections in their new order
+  const { params: { menuId }, body: { sectionIds } } = valid<typeof reorderSchemas>(res);
 
-  // Update positions
   await Promise.all(
-    sectionIds.map((id: number, index: number) =>
+    sectionIds.map((id, index) =>
       prisma.menuSection.update({
         where: { id, menuId },
         data: { position: index },

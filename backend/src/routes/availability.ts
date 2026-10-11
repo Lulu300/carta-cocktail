@@ -4,13 +4,14 @@ import {
   calculateCocktailAvailability,
   calculateAllCocktailsAvailability,
 } from '../services/availabilityService';
+import { valid, validate } from '../validation/validate';
+import { idRequest } from '../validation/common';
 
 const router = Router();
 
 // Get availability for a specific cocktail
-router.get('/cocktails/:id', async (req: AuthRequest, res: Response) => {
-  const cocktailId = parseInt(String(req.params.id));
-  const availability = await calculateCocktailAvailability(cocktailId);
+router.get('/cocktails/:id', validate(idRequest), async (_req: AuthRequest, res: Response) => {
+  const availability = await calculateCocktailAvailability(valid<typeof idRequest>(res).params.id);
   res.json(availability);
 });
 

@@ -91,12 +91,14 @@ Handlers never catch errors to answer them. Express 5 forwards rejected promises
 import { Router } from 'express';
 import { prisma } from '../lib/prisma';
 import { NotFoundError } from '../errors';
+import { valid, validate } from '../validation/validate';
+import { idRequest } from '../validation/common';
 
 const router = Router();
 
 // Never create a PrismaClient: import the shared one from src/lib/prisma.ts
-router.get('/:id', async (req, res) => {
-  const item = await prisma.model.findUnique({ where: { id: parseInt(String(req.params.id)) } });
+router.get('/:id', validate(idRequest), async (_req, res) => {
+  const item = await prisma.model.findUnique({ where: { id: valid<typeof idRequest>(res).params.id } });
   if (!item) throw new NotFoundError();
   res.json(item);
 });
@@ -105,7 +107,7 @@ export default router;
 ```
 
 - Throw the classes of `src/errors.ts` (`BadRequestError`, `NotFoundError`, `ConflictError`, `ForbiddenError`…) with an i18n key.
-- Let Prisma errors propagate: the middleware maps P2025 to 404, P2002 to 409, P2003 to 409 on DELETE (400 otherwise) and validation errors (NaN ids) to 400.
+- Let Prisma errors propagate: the middleware maps P2025 to 404, P2002 to 409, P2003 to 409 on DELETE (400 otherwise) and Prisma validation errors to 400.
 - Keep a local handler only for callbacks outside the handler's promise (stream `error` events, multer `destination`): Express never sees those errors.
 
 ### Auth Pattern
@@ -115,12 +117,30 @@ export default router;
 - Protected routes: all others (authMiddleware applied in `app.ts`)
 - JWT token in `Authorization: Bearer <token>` header, 7-day expiry
 
-### Express v5 Params
+### Input Validation (zod)
 
-`req.params` values are `string | string[]` in Express v5. Always parse as:
+Every route that reads `params`, `query` or `body` declares zod schemas and runs `validate(...)`
+(`src/validation/validate.ts`). An invalid request ends in a 400 whose `details[]` lists
+`{ path, code, message }` (e.g. `path: 'body.ingredients.0.bottleId'`). The handler reads the parsed,
+typed values with `valid(res)`, never `req.params`, `req.query` or `req.body` directly:
+
 ```typescript
-const id = parseInt(String(req.params.id));
+const updateSchemas = { params: IdParams, body: UnitUpdate };
+
+router.put('/:id', validate(updateSchemas), async (_req, res) => {
+  const { params: { id }, body } = valid<typeof updateSchemas>(res);
+});
 ```
+
+- One schema file per resource in `src/validation/`, shared building blocks in `common.ts`
+  (`IdParams`, `Percent`, `RequiredText`, `Translations`...). Schemas never import Prisma: the
+  frontend will share them (task F-05).
+- `z.object` drops unknown keys: the schema is the whitelist of what a request can write.
+- Path and query values are strings: coerce them (`z.coerce.number()`). JSON bodies are not coerced.
+- `req.query` is a getter in Express 5 and cannot be assigned: read it through `valid(res)`.
+- One deliberate exception: `routes/public.ts` reads `req.params` itself. An invalid cocktail id
+  answers **404**, not 400, so a guest learns nothing about which ids exist (task A-05); the menu
+  slug is only used as a lookup key.
 
 ### Translations
 
@@ -150,7 +170,7 @@ Entity names support multi-language via JSON strings stored in SQLite:
 
 ## Dependencies
 
-**Runtime**: express 5, bcryptjs, cors, helmet, morgan, jsonwebtoken, multer, i18next, i18next-http-middleware, dotenv
+**Runtime**: express 5, bcryptjs, cors, helmet, morgan, jsonwebtoken, multer, i18next, i18next-http-middleware, dotenv, zod 4
 **Dev**: @prisma/client 6, prisma 6, typescript 5.9, tsx, ts-node
 
 ## Database

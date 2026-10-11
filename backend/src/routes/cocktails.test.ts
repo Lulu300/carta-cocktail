@@ -120,6 +120,43 @@ describe('POST /api/cocktails', () => {
     expect(res.body.instructions[2].stepNumber).toBe(3);
   });
 
+  it('should return 400 for a BOTTLE line without bottleId', async () => {
+    const unit = await seedUnit();
+
+    const res = await request.post('/api/cocktails').set(authHeader()).send({
+      name: 'Broken',
+      ingredients: [{ quantity: 4, unitId: unit.id, sourceType: 'BOTTLE' }],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0]).toMatchObject({ path: 'body.ingredients.0.bottleId', code: 'custom' });
+    expect(await prisma.cocktail.count()).toBe(0);
+  });
+
+  it('should return 400 for an unknown sourceType', async () => {
+    const unit = await seedUnit();
+
+    const res = await request.post('/api/cocktails').set(authHeader()).send({
+      name: 'Broken',
+      ingredients: [{ quantity: 4, unitId: unit.id, sourceType: 'GARNISH' }],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('body.ingredients.0.sourceType');
+  });
+
+  it('should return 400 for an instruction with an empty text', async () => {
+    const res = await request.post('/api/cocktails').set(authHeader())
+      .send({ name: 'Steps', instructions: [{ text: '' }] });
+    expect(res.status).toBe(400);
+    expect(await prisma.cocktail.count()).toBe(0);
+  });
+
+  it('should accept instructions sent as plain strings', async () => {
+    const res = await request.post('/api/cocktails').set(authHeader())
+      .send({ name: 'Steps', instructions: ['Muddle', { text: 'Shake' }] });
+    expect(res.status).toBe(201);
+    expect(res.body.instructions.map((i: { text: string }) => i.text)).toEqual(['Muddle', 'Shake']);
+  });
+
   it('should handle tags as array', async () => {
     const res = await request.post('/api/cocktails').set(authHeader())
       .send({ name: 'Tagged', tags: ['classic', 'fruity'] });
@@ -239,10 +276,11 @@ describe('PUT /api/cocktails/:id', () => {
 
   it('should return 400 and leave the recipe untouched when a unit does not exist', async () => {
     const { id } = await createFullCocktail();
+    const lime = await seedIngredient({ name: 'Lime' });
 
     const res = await request.put(`/api/cocktails/${id}`).set(authHeader()).send({
       name: 'Should Not Be Saved',
-      ingredients: [{ quantity: 1, unitId: 99999, sourceType: 'INGREDIENT' }],
+      ingredients: [{ quantity: 1, unitId: 99999, sourceType: 'INGREDIENT', ingredientId: lime.id }],
       instructions: [{ text: 'Replaced' }],
     });
     expect(res.status).toBe(400);
@@ -273,13 +311,38 @@ describe('PUT /api/cocktails/:id', () => {
     expect(res.status).toBe(404);
   });
 
-  it('should return 400 and leave the recipe untouched when Prisma rejects a field type', async () => {
+  it('should return 400 and leave the recipe untouched for a BOTTLE line without bottleId', async () => {
+    const { id, unit } = await createFullCocktail();
+
+    const res = await request.put(`/api/cocktails/${id}`).set(authHeader()).send({
+      ingredients: [{ quantity: 1, unitId: unit.id, sourceType: 'BOTTLE', bottleId: null }],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0]).toMatchObject({ path: 'body.ingredients.0.bottleId', code: 'custom' });
+
+    const after = await request.get(`/api/cocktails/${id}`).set(authHeader());
+    expectRecipeIntact(after.body);
+  });
+
+  it('should return 400 for an instruction with an empty text', async () => {
     const { id } = await createFullCocktail();
 
-    // A non-string instruction text passes the mapping but is rejected by Prisma validation.
+    const res = await request.put(`/api/cocktails/${id}`).set(authHeader())
+      .send({ instructions: [{ text: '' }] });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('body.instructions.0');
+
+    const after = await request.get(`/api/cocktails/${id}`).set(authHeader());
+    expectRecipeIntact(after.body);
+  });
+
+  it('should return 400 and leave the recipe untouched for a non-string instruction', async () => {
+    const { id } = await createFullCocktail();
+
     const res = await request.put(`/api/cocktails/${id}`).set(authHeader())
       .send({ instructions: [{ text: 42 }] });
     expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('body.instructions.0');
 
     const after = await request.get(`/api/cocktails/${id}`).set(authHeader());
     expectRecipeIntact(after.body);
@@ -523,6 +586,130 @@ describe('POST /api/cocktails/import/confirm', () => {
     const catType = await testPrisma.categoryType.findUnique({ where: { name: 'CUSTOM_AGAVE' } });
     expect(catType).not.toBeNull();
     expect(catType!.color).toBe('gray');
+  });
+
+  it('should ignore id, createdAt and purchasePrice slipped into resolution data', async () => {
+    const res = await request.post('/api/cocktails/import/confirm').set(authHeader()).send({
+      recipe: {
+        version: 1,
+        cocktail: {
+          name: 'Mass Assignment',
+          ingredients: [
+            {
+              sourceType: 'BOTTLE',
+              sourceName: 'Havana',
+              sourceDetail: { categoryName: 'Rum', categoryType: 'SPIRIT' },
+              quantity: 4,
+              unit: { name: 'u', abbreviation: 'u2' },
+            },
+          ],
+        },
+      },
+      resolutions: {
+        units: {
+          u2: { action: 'create', data: { id: 999, name: 'u', abbreviation: 'u2' } },
+        },
+        categories: {
+          rum: { action: 'create', data: { id: 998, name: 'Rum', createdAt: '2000-01-01T00:00:00.000Z' } },
+        },
+        bottles: {
+          havana: {
+            action: 'create',
+            data: { id: 997, name: 'Havana', categoryName: 'Rum', capacityMl: 700, purchasePrice: 1234 },
+          },
+        },
+        ingredients: {},
+      },
+    });
+
+    expect(res.status).toBe(201);
+    const unit = await prisma.unit.findUniqueOrThrow({ where: { abbreviation: 'u2' } });
+    expect(unit.id).not.toBe(999);
+    const category = await prisma.category.findUniqueOrThrow({ where: { name: 'Rum' } });
+    expect(category.id).not.toBe(998);
+    expect(category.type).toBe('SPIRIT');
+    expect(category.createdAt.getFullYear()).not.toBe(2000);
+    const bottle = await prisma.bottle.findFirstOrThrow({ where: { name: 'Havana' } });
+    expect(bottle.id).not.toBe(997);
+    expect(bottle.purchasePrice).toBeNull();
+    expect(res.body.ingredients[0].bottleId).toBe(bottle.id);
+  });
+
+  it('should fall back on the names of the file when the admin clears them in the wizard', async () => {
+    const res = await request.post('/api/cocktails/import/confirm').set(authHeader()).send({
+      recipe: {
+        version: 1,
+        cocktail: {
+          name: 'Blank Names',
+          ingredients: [
+            {
+              sourceType: 'BOTTLE',
+              sourceName: 'Havana Club',
+              sourceDetail: { categoryName: 'Rhum Ambré', categoryType: 'SPIRIT' },
+              quantity: 4,
+              unit: { name: 'Centilitre', abbreviation: 'cL' },
+            },
+            {
+              sourceType: 'INGREDIENT',
+              sourceName: 'Citron Vert',
+              quantity: 1,
+              unit: { name: 'Centilitre', abbreviation: 'cL' },
+            },
+          ],
+        },
+      },
+      resolutions: {
+        units: { cl: { action: 'create', data: { name: '', abbreviation: '  ' } } },
+        categories: { 'rhum ambré': { action: 'create', data: { name: ' ', type: 'SPIRIT' } } },
+        bottles: { 'havana club': { action: 'create', data: { name: '', categoryName: 'Rhum Ambré', capacityMl: 700 } } },
+        ingredients: { 'citron vert': { action: 'create', data: { name: '' } } },
+      },
+    });
+
+    expect(res.status).toBe(201);
+    const unit = await prisma.unit.findUniqueOrThrow({ where: { abbreviation: 'cL' } });
+    expect(unit.name).toBe('Centilitre');
+    expect(await prisma.category.findUnique({ where: { name: 'Rhum Ambré' } })).not.toBeNull();
+    expect(await prisma.bottle.findFirst({ where: { name: 'Havana Club' } })).not.toBeNull();
+    expect(await prisma.ingredient.findUnique({ where: { name: 'Citron Vert' } })).not.toBeNull();
+  });
+
+  it('should name a unit after its abbreviation when neither the admin nor the file gives a name', async () => {
+    const res = await request.post('/api/cocktails/import/confirm').set(authHeader()).send({
+      recipe: {
+        version: 1,
+        cocktail: {
+          name: 'Hand Made',
+          ingredients: [
+            { sourceType: 'CATEGORY', sourceName: 'Rum', quantity: 4, unit: { abbreviation: 'Dash' } },
+          ],
+        },
+      },
+      resolutions: {
+        units: { dash: { action: 'create', data: { name: '' } } },
+        categories: { rum: { action: 'create', data: { name: 'Rum' } } },
+      },
+    });
+
+    expect(res.status).toBe(201);
+    const unit = await prisma.unit.findUniqueOrThrow({ where: { abbreviation: 'Dash' } });
+    expect(unit.name).toBe('Dash');
+    expect(res.body.ingredients[0].unitId).toBe(unit.id);
+  });
+
+  it('should return 400 for a created bottle with remainingPercent above 100', async () => {
+    const res = await request.post('/api/cocktails/import/confirm').set(authHeader()).send({
+      recipe: { version: 1, cocktail: { name: 'Bounds' } },
+      resolutions: {
+        bottles: {
+          havana: { action: 'create', data: { name: 'Havana', categoryName: 'Rum', capacityMl: 700, remainingPercent: 150 } },
+        },
+      },
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('body.resolutions.bottles.havana.data.remainingPercent');
+    expect(await prisma.cocktail.count()).toBe(0);
   });
 
   it('should create cocktail with INGREDIENT resolution via create', async () => {

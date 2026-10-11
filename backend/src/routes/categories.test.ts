@@ -80,6 +80,26 @@ describe('POST /api/categories', () => {
     expect(res.body.minimumPercent).toBe(30);
   });
 
+  it('should keep a desiredStock of 0', async () => {
+    const res = await request.post('/api/categories').set(authHeader())
+      .send({ name: 'Occasional', type: 'SPIRIT', desiredStock: 0 });
+    expect(res.status).toBe(201);
+    const inDb = await prisma.category.findUniqueOrThrow({ where: { id: res.body.id } });
+    expect(inDb.desiredStock).toBe(0);
+  });
+
+  it.each([
+    ['desiredStock', { desiredStock: -1 }],
+    ['minimumPercent', { minimumPercent: 101 }],
+    ['nameTranslations', { nameTranslations: { de: 'Rum' } }],
+  ])('should return 400 for an invalid %s', async (field, invalid) => {
+    const res = await request.post('/api/categories').set(authHeader())
+      .send({ name: 'Rum', type: 'SPIRIT', ...invalid });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe(`body.${field}`);
+    expect(await prisma.category.count()).toBe(0);
+  });
+
   it('should create with custom minimumPercent', async () => {
     const res = await request.post('/api/categories').set(authHeader())
       .send({ name: 'Rum', type: 'SPIRIT', minimumPercent: 50 });
@@ -144,6 +164,14 @@ describe('PUT /api/categories/:id', () => {
     expect(res.body.desiredStock).toBe(5);
   });
 
+  it('should return 400 for a blank name instead of ignoring it', async () => {
+    const cat = await seedCategory({ name: 'Rum' });
+    const res = await request.put(`/api/categories/${cat.id}`).set(authHeader())
+      .send({ name: '  ' });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('body.name');
+  });
+
   it('should update minimumPercent', async () => {
     const cat = await seedCategory();
     const res = await request.put(`/api/categories/${cat.id}`).set(authHeader())
@@ -158,6 +186,14 @@ describe('DELETE /api/categories/:id', () => {
     const cat = await seedCategory();
     const res = await request.delete(`/api/categories/${cat.id}`).set(authHeader());
     expect(res.status).toBe(200);
+  });
+
+  it('should return 400 when force is repeated in the query', async () => {
+    const cat = await seedCategory();
+    const res = await request.delete(`/api/categories/${cat.id}?force=true&force=true`).set(authHeader());
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('query.force');
+    expect(await prisma.category.count({ where: { id: cat.id } })).toBe(1);
   });
 
   it('should refuse with 409 to delete a category that holds bottles', async () => {

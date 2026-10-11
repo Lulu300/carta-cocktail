@@ -3,6 +3,9 @@ import { Menu, Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../errors';
+import { valid, validate } from '../validation/validate';
+import { IdParams, idRequest } from '../validation/common';
+import { MenuCreate, MenuUpdate } from '../validation/menus';
 
 const router = Router();
 
@@ -11,17 +14,7 @@ const router = Router();
 const SYSTEM_MENU_SLUGS = ['aperitifs', 'digestifs'];
 
 interface MenuItemInput {
-  position?: number;
-  isHidden?: boolean;
   menuSectionId?: number | null;
-}
-
-interface MenuCocktailInput extends MenuItemInput {
-  cocktailId: number;
-}
-
-interface MenuBottleInput extends MenuItemInput {
-  bottleId: number;
 }
 
 function isSystemMenu(menu: Pick<Menu, 'slug'>): boolean {
@@ -65,9 +58,9 @@ router.get('/', async (_req: AuthRequest, res: Response) => {
 });
 
 // Get one menu with cocktails and bottles
-router.get('/:id', async (req: AuthRequest, res: Response) => {
+router.get('/:id', validate(idRequest), async (_req: AuthRequest, res: Response) => {
   const menu = await prisma.menu.findUnique({
-    where: { id: parseInt(String(req.params.id)) },
+    where: { id: valid<typeof idRequest>(res).params.id },
     include: {
       sections: {
         orderBy: { position: 'asc' },
@@ -100,27 +93,28 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // Create menu
-router.post('/', async (req: AuthRequest, res: Response) => {
-  const { name, description, slug, isPublic, type } = req.body;
-  if (!name || !slug) throw new BadRequestError();
+const createSchemas = { body: MenuCreate };
+
+router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Response) => {
+  const { name, description, slug, isPublic, type } = valid<typeof createSchemas>(res).body;
   const menu = await prisma.menu.create({
     data: {
       name,
       description: description || null,
       slug: normalizeSlug(slug),
       isPublic: isPublic ?? false,
-      type: type || 'COCKTAILS',
+      type: type ?? 'COCKTAILS',
     },
   });
   res.status(201).json(menu);
 });
 
 // Update menu (info and, when provided, the full list of cocktails / bottles)
-router.put('/:id', async (req: AuthRequest, res: Response) => {
-  const menuId = parseInt(String(req.params.id));
-  const { name, description, slug, isPublic, type } = req.body;
-  const cocktails: MenuCocktailInput[] | undefined = req.body.cocktails;
-  const bottles: MenuBottleInput[] | undefined = req.body.bottles;
+const updateSchemas = { params: IdParams, body: MenuUpdate };
+
+router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Response) => {
+  const { params: { id: menuId }, body } = valid<typeof updateSchemas>(res);
+  const { name, description, slug, isPublic, type, cocktails, bottles } = body;
 
   const existing = await prisma.menu.findUnique({ where: { id: menuId } });
   if (!existing) throw new NotFoundError();
@@ -162,12 +156,13 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 
     return tx.menu.update({
       where: { id: menuId },
+      // Absent fields are undefined, which Prisma leaves untouched
       data: {
-        ...(name && { name }),
-        ...(description !== undefined && { description }),
-        ...(slug && { slug: normalizeSlug(slug) }),
-        ...(isPublic !== undefined && { isPublic }),
-        ...(type && { type }),
+        name,
+        description,
+        slug: slug === undefined ? undefined : normalizeSlug(slug),
+        isPublic,
+        type,
       },
       include: {
         cocktails: {
@@ -185,16 +180,15 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // Delete menu (prevent deletion of default apero/digestif menus)
-router.delete('/:id', async (req: AuthRequest, res: Response) => {
-  const menu = await prisma.menu.findUnique({
-    where: { id: parseInt(String(req.params.id)) },
-  });
+router.delete('/:id', validate(idRequest), async (req: AuthRequest, res: Response) => {
+  const { id } = valid<typeof idRequest>(res).params;
+  const menu = await prisma.menu.findUnique({ where: { id } });
 
   if (!menu) throw new NotFoundError();
 
   if (isSystemMenu(menu)) throw new ForbiddenError('errors.cannotDeleteDefaultMenu');
 
-  await prisma.menu.delete({ where: { id: parseInt(String(req.params.id)) } });
+  await prisma.menu.delete({ where: { id } });
   res.json({ message: req.t('menus.deleted') });
 });
 
