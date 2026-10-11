@@ -260,8 +260,25 @@ carta-cocktail/
 | `ADMIN_PASSWORD` | Admin password, at least 12 characters, used when the admin is created or reset | **required** on first start, no default |
 | `ADMIN_RESET_PASSWORD` | Exactly `true` resets the existing admin's email and password from the two variables above at startup; other values are ignored with a warning | `false` |
 | `SQLITE_WAL` | `false` keeps the rollback journal instead of WAL; required when the database is on a network share (SMB/NFS). Other values use WAL. In Docker, set it in the compose file (see [Database files and network shares](#database-files-and-network-shares)) | `true` |
+| `JWT_EXPIRES_IN` | Lifetime of the admin session token: a number of seconds (`86400`) or a timespan (`24h`, `7d`). Applies to tokens issued after the restart. The backend refuses to start with a value it cannot read | `7d` |
+| `LOGIN_RATE_LIMIT` | Failed logins allowed per client IP address in 15 minutes; beyond that, the login answers 429 (Too Many Requests). Successful logins do not count. A positive integer, otherwise the backend refuses to start | `10` |
+| `TRUST_PROXY` | Proxies whose `X-Forwarded-For` header the API believes, to find the client IP address that `LOGIN_RATE_LIMIT` counts: a number of proxies in front of the API, or a comma-separated list of addresses, subnets or names that Express understands (`loopback`, `linklocal`, `uniquelocal`). The backend refuses to start with a value it cannot read. See [Login limit behind a reverse proxy](#login-limit-behind-a-reverse-proxy) | `loopback, linklocal, uniquelocal` |
+| `CORS_ORIGIN` | Origin allowed to call the API from another site, such as `https://example.com` (a single origin, without a trailing slash). Empty: no other origin is allowed. The app does not need one: nginx, and the Vite proxy in development, serve the frontend and the API on the same origin | empty |
 | `PORT` | Backend port | `3001` |
 | `BACKEND_HOST` | Backend hostname for nginx proxy (frontend container) | `backend` |
+
+The compose files pass only some of these variables to the backend. To set `JWT_EXPIRES_IN`, `LOGIN_RATE_LIMIT`, `TRUST_PROXY` or `CORS_ORIGIN` in Docker, add it to the `environment` list of `carta-cocktail-backend`, as for `SQLITE_WAL` (see [Database files and network shares](#database-files-and-network-shares)), and add it again each time you download a new compose file. The defaults suit a standard install.
+
+### Login limit behind a reverse proxy
+
+The login limit counts failures per client IP address. In Docker, requests reach the API through nginx, so the API reads the client address from the `X-Forwarded-For` header, but only from the proxies that `TRUST_PROXY` trusts. The default trusts the host and private networks: nginx, and a reverse proxy in front of it on a private network (SWAG, Traefik…), work without any setting, and an address forged by a client on the Internet is ignored.
+
+The default has limits:
+
+- A client on your local network connects from a private address, so it is trusted: it can forge its address and get around the limit.
+- In some installs, the first proxy (nginx, or SWAG) sees a client from the Internet under a **private** address: Docker rootless or Podman (through their port forwarder), Docker Desktop, or an IPv6 client on a published port when the Docker daemon has no IPv6 and `docker-proxy` relays the connection. That address is trusted, so the API reads the address the client wrote in `X-Forwarded-For`: the client can change it at each attempt and get around the limit.
+
+In these installs, set `TRUST_PROXY=1` (nginx alone) or `TRUST_PROXY=2` (SWAG or another reverse proxy in front of nginx). The API then uses the address the first proxy sees, which is the same for every client: all clients share one counter. The limit holds, but `LOGIN_RATE_LIMIT` failures from anyone also block the admin for up to 15 minutes. The counters are kept in memory: restarting the backend clears them.
 
 ## Git Workflow
 
