@@ -80,6 +80,21 @@ describe('bundle-budget.mjs CLI', () => {
     assert.doesNotMatch(run.stdout, /DashboardPage|jszip|\.css/);
   });
 
+  it('passes when the entry only references the file names of lazy admin and jszip chunks', () => {
+    writeCompliantBuild();
+    // The entry legitimately holds the paths of its dynamic import() targets.
+    const entryContent = [
+      'const DashboardPage = lazy(() => import("./DashboardPage-jkl.js"));',
+      'const loadZip = () => import("./jszip.min-mno.js");',
+    ].join('\n');
+    writeChunk('index-abc.js', { content: entryContent, sources: PUBLIC_MODULES });
+
+    const run = runCli([distDir, '100']);
+
+    assert.equal(run.status, 0, run.stderr);
+    assert.match(run.stdout, /within the 100 kB budget/);
+  });
+
   it('fails when an admin page is merged into the entry chunk', () => {
     writeCompliantBuild();
     writeChunk('index-abc.js', { sources: [...PUBLIC_MODULES, '../../src/pages/admin/DashboardPage.tsx'] });
@@ -187,7 +202,9 @@ describe('bundle-budget.mjs CLI', () => {
   });
 
   it('rejects missing or invalid arguments', () => {
-    assert.match(runCli([distDir]).stderr, /Usage: bundle-budget\.mjs <dist dir> <budget in kB gzip>/);
+    const missing = runCli([distDir]);
+    assert.equal(missing.status, 1);
+    assert.match(missing.stderr, /Usage: bundle-budget\.mjs <dist dir> <budget in kB gzip>/);
 
     const invalid = runCli([distDir, 'abc']);
     assert.equal(invalid.status, 1);

@@ -107,7 +107,7 @@ jobs:
       - name: Build
         run: npm run build -- --sourcemap hidden
 
-      # Budget: 126.29 kB gzip measured on 2026-10-11 (entry + modulepreload
+      # Budget: 126.31 kB gzip measured on 2026-10-11 (entry + modulepreload
       # chunks) + ~5% margin. Raise it only with a reason written in the PR.
       - name: Bundle budget (initial load of the public menu)
         run: node ../.github/scripts/bundle-budget.mjs dist 133

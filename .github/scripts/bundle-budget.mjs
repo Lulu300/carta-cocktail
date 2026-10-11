@@ -75,6 +75,10 @@ function findTags(html, tagName) {
 /**
  * Lists the chunks index.html loads before the first navigation: the module
  * entry script first, then the modulepreload links, as dist-relative paths.
+ *
+ * Assumes Vite's default `build.modulePreload`: one link per chunk the entry
+ * imports statically, transitively. If modulePreload were disabled, those
+ * chunks would have no link and this check would skip them without warning.
  */
 function initialChunks(distDir) {
   const indexPath = join(distDir, 'index.html');
