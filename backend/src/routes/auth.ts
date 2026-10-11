@@ -10,6 +10,19 @@ const router = Router();
 
 const loginSchemas = { body: LoginBody };
 
+/**
+ * Brings a password hash made at another cost up to the current one. The password
+ * is known only after a successful login. This is an improvement only: a failed
+ * write (database busy or read-only) must not fail a correct login.
+ */
+async function upgradePasswordHash(userId: number, password: string): Promise<void> {
+  try {
+    await prisma.user.update({ where: { id: userId }, data: { passwordHash: await hashPassword(password) } });
+  } catch (err) {
+    console.warn('Could not rehash the admin password at the current bcrypt cost:', err);
+  }
+}
+
 router.post('/login', validate(loginSchemas), async (_req: Request, res: Response) => {
   const { email, password } = valid<typeof loginSchemas>(res).body;
 
@@ -18,9 +31,8 @@ router.post('/login', validate(loginSchemas), async (_req: Request, res: Respons
   const isPasswordValid = await verifyPassword(password, user?.passwordHash);
   if (!user || !isPasswordValid) throw new UnauthorizedError('errors.invalidCredentials');
 
-  // The password is known only now: bring an older hash up to the current cost
   if (needsRehash(user.passwordHash)) {
-    await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(password) } });
+    await upgradePasswordHash(user.id, password);
   }
 
   res.json({ token: signToken(user), user: { id: user.id, email: user.email } });

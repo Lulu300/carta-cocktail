@@ -63,6 +63,21 @@ describe('POST /api/auth/login', () => {
     expect(await bcrypt.compare('testpass123', after.passwordHash)).toBe(true);
   });
 
+  it('should still log in when the rehash cannot be saved', async () => {
+    const update = vi.spyOn(prisma.user, 'update').mockRejectedValueOnce(new Error('database is locked'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const res = await request.post('/api/auth/login').send({ email: 'admin@test.local', password: 'testpass123' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('token');
+    expect(warn).toHaveBeenCalledWith(
+      'Could not rehash the admin password at the current bcrypt cost:', expect.any(Error),
+    );
+    update.mockRestore();
+    warn.mockRestore();
+  });
+
   it('should leave a cost-12 password hash untouched', async () => {
     const hash = await bcrypt.hash('testpass123', 12);
     await prisma.user.update({ where: { id: 1 }, data: { passwordHash: hash } });
