@@ -20,7 +20,10 @@ interface EntityMutationOptions<Variables> {
 
 export type EntityMutation<Variables> = UseMutationResult<unknown, Error, Variables>;
 
-/** A mutation that refreshes the given queries and reports its outcome in a toast. */
+/**
+ * A mutation that refreshes the given queries and reports its outcome in a toast.
+ * Only `mutate` honours `ignoreWhilePending`: `mutateAsync` is TanStack Query's own.
+ */
 export function useEntityMutation<Variables>({
   mutationFn,
   invalidates,

@@ -190,18 +190,12 @@ export default function IngredientsPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold font-serif text-accent">{t('ingredients.title')}</h1>
         <div className="flex gap-3">
-          <button
-            onClick={() => setAllAvailability.mutate(true)}
-            className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg text-sm"
-          >
+          <Button variant="secondary" size="sm" onClick={() => setAllAvailability.mutate(true)}>
             {t('ingredients.allAvailable')}
-          </button>
-          <button
-            onClick={() => setAllAvailability.mutate(false)}
-            className="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg text-sm"
-          >
+          </Button>
+          <Button variant="danger" size="sm" onClick={() => setAllAvailability.mutate(false)}>
             {t('ingredients.allUnavailable')}
-          </button>
+          </Button>
           <Button onClick={() => ingredientForm.open()}>{t('ingredients.add')}</Button>
         </div>
       </div>
@@ -217,7 +211,7 @@ export default function IngredientsPage() {
                 'px-3 py-1.5 rounded-lg text-sm transition-colors border',
                 filter === status
                   ? 'bg-accent/10 text-accent border-accent/50'
-                  : 'text-fg-muted border-line-strong hover:border-gray-500',
+                  : 'text-fg-muted border-line-strong hover:border-fg-muted',
               )}
             >
               {t(`ingredients.filter.${status}`)}

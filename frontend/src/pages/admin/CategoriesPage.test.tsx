@@ -378,6 +378,33 @@ describe('CategoriesPage', () => {
       expect(await screen.findByText('categoryTypes.deleted')).toBeInTheDocument();
     });
 
+    it('empties the form when the type being edited is deleted', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const manager = await openTypesManager(user);
+
+      await user.click(within(manager).getAllByRole('button', { name: 'common.edit' })[2]);
+      expect(within(manager).getByDisplayValue('GARNISH')).toBeDisabled();
+      await user.click(within(manager).getByRole('button', { name: 'common.delete' }));
+      await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.delete' }));
+
+      await waitFor(() => expect(within(manager).getByText('categoryTypes.add')).toBeInTheDocument());
+      expect(within(manager).getByPlaceholderText('GARNISH, MIXER...')).toHaveValue('');
+    });
+
+    it('keeps the form on the type being edited when another type is deleted', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const manager = await openTypesManager(user);
+
+      await user.click(within(manager).getAllByRole('button', { name: 'common.edit' })[0]);
+      await user.click(within(manager).getByRole('button', { name: 'common.delete' }));
+      await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.delete' }));
+
+      expect(await screen.findByText('categoryTypes.deleted')).toBeInTheDocument();
+      expect(within(manager).getByDisplayValue('SPIRIT')).toBeDisabled();
+    });
+
     it('shows the backend message in a toast when a type cannot be deleted', async () => {
       const user = userEvent.setup();
       mockCtApiDelete.mockRejectedValue(new ApiError(400, 'Type is in use by categories'));

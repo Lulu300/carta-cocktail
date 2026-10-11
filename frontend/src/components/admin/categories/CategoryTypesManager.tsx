@@ -95,7 +95,7 @@ function CategoryTypesPanel({ categoryTypes }: { categoryTypes: CategoryType[] }
                 className={cx(
                   'w-8 h-8 rounded-full transition-all',
                   getDotClasses(color),
-                  form.color === color ? 'ring-2 ring-white ring-offset-2 ring-offset-surface scale-110' : 'opacity-60 hover:opacity-100',
+                  form.color === color ? 'ring-2 ring-fg ring-offset-2 ring-offset-surface scale-110' : 'opacity-60 hover:opacity-100',
                 )}
               />
             ))}

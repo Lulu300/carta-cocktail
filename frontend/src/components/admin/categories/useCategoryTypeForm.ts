@@ -74,7 +74,12 @@ export function useCategoryTypeForm() {
     ...typeForm,
     submit,
     resetForm,
-    remove: (name: string) => remove.mutate(name),
+    // A deleted type cannot stay in the form: saving it would fail.
+    remove: (name: string) => remove.mutate(name, {
+      onSuccess: () => {
+        if (editing?.name === name) resetForm();
+      },
+    }),
     isSaving: create.isPending || update.isPending,
   };
 }
