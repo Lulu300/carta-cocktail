@@ -11,42 +11,7 @@ import LocationAutocomplete from '../../components/ui/LocationAutocomplete';
 import SortableHeader from '../../components/ui/SortableHeader';
 import Pagination from '../../components/ui/Pagination';
 import ImportBottlesWizard from '../../components/import/ImportBottlesWizard';
-
-interface BottleGroup {
-  key: string;
-  name: string;
-  capacityMl: number;
-  categoryId: number;
-  alcoholPercentage: number | null;
-  category?: Category;
-  bottles: Bottle[];
-}
-
-function groupBottles(bottles: Bottle[]): (Bottle | BottleGroup)[] {
-  const groups = new Map<string, BottleGroup>();
-
-  for (const bottle of bottles) {
-    const key = `${bottle.name.toLowerCase()}|${bottle.capacityMl}|${bottle.categoryId}|${bottle.alcoholPercentage ?? ''}`;
-    if (!groups.has(key)) {
-      groups.set(key, { key, name: bottle.name, capacityMl: bottle.capacityMl, categoryId: bottle.categoryId, alcoholPercentage: bottle.alcoholPercentage, category: bottle.category, bottles: [] });
-    }
-    groups.get(key)!.bottles.push(bottle);
-  }
-
-  const result: (Bottle | BottleGroup)[] = [];
-  for (const group of groups.values()) {
-    if (group.bottles.length === 1) {
-      result.push(group.bottles[0]);
-    } else {
-      result.push(group);
-    }
-  }
-  return result;
-}
-
-function isGroup(item: Bottle | BottleGroup): item is BottleGroup {
-  return 'bottles' in item && Array.isArray((item as BottleGroup).bottles) && 'key' in item;
-}
+import { groupBottles, isGroup, type BottleGroup } from '../../utils/bottleGrouping';
 
 export default function BottlesPage() {
   const { t } = useTranslation();

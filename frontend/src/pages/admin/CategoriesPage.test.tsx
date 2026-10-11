@@ -1,24 +1,24 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '../../test/test-utils';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
+import { createTestQueryClient, fireEvent, screen, waitFor, within } from '../../test/test-utils';
+import { clearToasts, renderWithFeedback } from '../../test/feedback';
+import { qk } from '../../queries/keys';
 import CategoriesPage from './CategoriesPage';
 
-vi.mock('../../services/api', () => ({
-  categories: { list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
-  categoryTypes: { list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
-}));
+vi.mock('../../services/api', async () => {
+  const actual = await vi.importActual<typeof import('../../services/api')>('../../services/api');
+  return {
+    ApiError: actual.ApiError,
+    categories: { list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
+    categoryTypes: { list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
+  };
+});
 
 vi.mock('../../hooks/useLocalizedName', () => ({
   useLocalizedName: () => (entity: { name: string }) => entity.name,
 }));
 
-vi.mock('../../utils/colors', () => ({
-  getBadgeClasses: () => 'bg-gray-500/20 text-gray-400',
-  CATEGORY_TYPE_COLORS: ['gray', 'red', 'blue'],
-  COLOR_DOT_CLASSES: { gray: 'bg-gray-400', red: 'bg-red-400', blue: 'bg-blue-400' },
-}));
-
-import { categories as api, categoryTypes as ctApi } from '../../services/api';
+import { ApiError, categories as api, categoryTypes as ctApi } from '../../services/api';
 
 const mockApiList = vi.mocked(api.list);
 const mockApiCreate = vi.mocked(api.create);
@@ -36,7 +36,28 @@ const mockCategories = [
 const mockCatTypes = [
   { name: 'SPIRIT', color: 'blue', nameTranslations: null, _count: { categories: 1 } },
   { name: 'SYRUP', color: 'red', nameTranslations: null, _count: { categories: 1 } },
+  { name: 'GARNISH', color: 'green', nameTranslations: null, _count: { categories: 0 } },
 ];
+
+type User = ReturnType<typeof userEvent.setup>;
+
+function renderPage() {
+  return renderWithFeedback(<CategoriesPage />);
+}
+
+async function renderLoadedPage() {
+  renderPage();
+  await screen.findByText('Vodka');
+}
+
+function categoryDialog() {
+  return screen.getByRole('dialog');
+}
+
+async function openTypesManager(user: User) {
+  await user.click(screen.getByRole('button', { name: 'categoryTypes.manage' }));
+  return screen.getByRole('dialog', { name: 'categoryTypes.title' });
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -50,514 +71,370 @@ beforeEach(() => {
   mockCtApiDelete.mockResolvedValue({} as never);
 });
 
+afterEach(clearToasts);
+
 describe('CategoriesPage', () => {
-  it('renders title and action buttons', async () => {
-    render(<CategoriesPage />);
-    await waitFor(() => {
-      expect(screen.getByText('categories.title')).toBeInTheDocument();
-    });
-    expect(screen.getByText('categories.add')).toBeInTheDocument();
-    expect(screen.getByText('categoryTypes.manage')).toBeInTheDocument();
+  it('renders the title and the action buttons', () => {
+    renderPage();
+    expect(screen.getByText('categories.title')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'categories.add' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'categoryTypes.manage' })).toBeInTheDocument();
   });
 
-  it('displays categories in table after loading', async () => {
-    render(<CategoriesPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Vodka')).toBeInTheDocument();
-      expect(screen.getByText('Grenadine')).toBeInTheDocument();
-    });
+  it('lists the categories with their stock settings and bottle count', async () => {
+    await renderLoadedPage();
+    expect(screen.getByText('Grenadine')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
-    expect(screen.getAllByText('1')).toHaveLength(2);
+    expect(screen.getAllByText('30%')).toHaveLength(2);
   });
 
-  it('shows "common.noResults" when categories list is empty', async () => {
+  it('never shows "no results" while the categories are loading', () => {
+    mockApiList.mockReturnValue(new Promise(() => {}));
+    renderPage();
+
+    expect(screen.getByText('common.loading')).toBeInTheDocument();
+    expect(screen.queryByText('common.noResults')).not.toBeInTheDocument();
+  });
+
+  it('shows "no results" once loaded without categories', async () => {
     mockApiList.mockResolvedValue([] as never);
-    render(<CategoriesPage />);
-    await waitFor(() => {
-      expect(screen.getByText('common.noResults')).toBeInTheDocument();
-    });
+    renderPage();
+    expect(await screen.findByText('common.noResults')).toBeInTheDocument();
   });
 
-  it('opens create modal when add button is clicked', async () => {
+  it('filters the categories by name', async () => {
     const user = userEvent.setup();
-    render(<CategoriesPage />);
-    await waitFor(() => expect(screen.getByText('Vodka')).toBeInTheDocument());
+    await renderLoadedPage();
 
-    await user.click(screen.getByText('categories.add'));
+    await user.type(screen.getByPlaceholderText('common.search'), 'Vod');
 
-    expect(screen.getByText('categories.add', { selector: 'h2' })).toBeInTheDocument();
-    expect(screen.getAllByRole('combobox').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Vodka')).toBeInTheDocument();
+    expect(screen.queryByText('Grenadine')).not.toBeInTheDocument();
   });
 
-  it('opens edit modal with pre-filled data when edit button is clicked', async () => {
-    const user = userEvent.setup();
-    render(<CategoriesPage />);
-    await waitFor(() => expect(screen.getByText('Vodka')).toBeInTheDocument());
+  describe('category form', () => {
+    it('creates a category with the first type by default and confirms with a toast', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      await user.click(screen.getByRole('button', { name: 'categories.add' }));
 
-    const editButtons = screen.getAllByTitle('common.edit');
-    await user.click(editButtons[0]);
+      await user.type(within(categoryDialog()).getByLabelText(/categories\.name/), 'Rum');
+      const desiredStock = within(categoryDialog()).getByLabelText('categories.desiredStock');
+      await user.clear(desiredStock);
+      await user.type(desiredStock, '3');
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
 
-    expect(screen.getByText('categories.edit')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Vodka')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('2')).toBeInTheDocument();
-  });
-
-  it('calls api.delete after confirm dialog on delete click', async () => {
-    const user = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-
-    render(<CategoriesPage />);
-    await waitFor(() => expect(screen.getByText('Vodka')).toBeInTheDocument());
-
-    const deleteButtons = screen.getAllByTitle('common.delete');
-    await user.click(deleteButtons[0]);
-
-    expect(window.confirm).toHaveBeenCalledWith('categories.confirmDelete');
-    expect(mockApiDelete).toHaveBeenCalledWith(1);
-  });
-
-  it('opens type management modal when manage types button is clicked', async () => {
-    const user = userEvent.setup();
-    render(<CategoriesPage />);
-    await waitFor(() => expect(screen.getByText('Vodka')).toBeInTheDocument());
-
-    await user.click(screen.getByText('categoryTypes.manage'));
-
-    expect(screen.getByText('categoryTypes.title')).toBeInTheDocument();
-    expect(screen.getAllByText('SPIRIT').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('SYRUP').length).toBeGreaterThan(0);
-  });
-
-  // --- New tests below ---
-
-  it('does not call api.delete when confirm returns false', async () => {
-    const user = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
-
-    render(<CategoriesPage />);
-    await waitFor(() => expect(screen.getByText('Vodka')).toBeInTheDocument());
-
-    const deleteButtons = screen.getAllByTitle('common.delete');
-    await user.click(deleteButtons[0]);
-
-    expect(window.confirm).toHaveBeenCalledWith('categories.confirmDelete');
-    expect(mockApiDelete).not.toHaveBeenCalled();
-  });
-
-  it('submits create form and calls api.create with correct data', async () => {
-    const user = userEvent.setup();
-    render(<CategoriesPage />);
-    await waitFor(() => expect(screen.getByText('Vodka')).toBeInTheDocument());
-
-    await user.click(screen.getByText('categories.add'));
-
-    // name input is the first textbox in the modal (search input is also a textbox)
-    const textboxes = screen.getAllByRole('textbox');
-    // textboxes[0] = search, textboxes[1] = name input in modal
-    const nameInput = textboxes[1];
-    await user.clear(nameInput);
-    await user.type(nameInput, 'Rum');
-
-    // desiredStock input (type=number) — find it by its current value which defaults to 1
-    const desiredStockInput = screen.getByDisplayValue('1');
-    await user.clear(desiredStockInput);
-    await user.type(desiredStockInput, '3');
-
-    await user.click(screen.getByText('common.save'));
-
-    await waitFor(() => {
-      expect(mockApiCreate).toHaveBeenCalledWith({
+      await waitFor(() => expect(mockApiCreate).toHaveBeenCalledWith({
         name: 'Rum',
         type: 'SPIRIT',
         desiredStock: 3,
         minimumPercent: 30,
         nameTranslations: null,
-      });
+      }));
+      expect(await screen.findByText('categories.created')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
-  });
 
-  it('submits edit form and calls api.update with correct data', async () => {
-    const user = userEvent.setup();
-    render(<CategoriesPage />);
-    await waitFor(() => expect(screen.getByText('Vodka')).toBeInTheDocument());
+    it('creates a category of a custom type, upper-cased', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      await user.click(screen.getByRole('button', { name: 'categories.add' }));
 
-    const editButtons = screen.getAllByTitle('common.edit');
-    await user.click(editButtons[0]);
+      await user.type(within(categoryDialog()).getByLabelText(/categories\.name/), 'Tonic');
+      await user.selectOptions(within(categoryDialog()).getByLabelText('categories.type'), '__OTHER__');
+      await user.type(within(categoryDialog()).getByPlaceholderText('categories.customType'), 'mixer');
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
 
-    const nameInput = screen.getByDisplayValue('Vodka');
-    await user.clear(nameInput);
-    await user.type(nameInput, 'Gin');
-
-    await user.click(screen.getByText('common.save'));
-
-    await waitFor(() => {
-      expect(mockApiUpdate).toHaveBeenCalledWith(1, {
-        name: 'Gin',
-        type: 'SPIRIT',
-        desiredStock: 2,
-        minimumPercent: 30,
-        nameTranslations: null,
-      });
-    });
-  });
-
-  it('shows custom type input when __OTHER__ is selected in type dropdown', async () => {
-    const user = userEvent.setup();
-    render(<CategoriesPage />);
-    await waitFor(() => expect(screen.getByText('Vodka')).toBeInTheDocument());
-
-    await user.click(screen.getByText('categories.add'));
-
-    const modal = screen.getByText('categories.add', { selector: 'h2' }).closest('form')!;
-    const typeSelect = within(modal).getByRole('combobox');
-    await user.selectOptions(typeSelect, '__OTHER__');
-
-    expect(screen.getByPlaceholderText('categories.customType')).toBeInTheDocument();
-  });
-
-  it('submits create form with __OTHER__ type using custom type value', async () => {
-    const user = userEvent.setup();
-    render(<CategoriesPage />);
-    await waitFor(() => expect(screen.getByText('Vodka')).toBeInTheDocument());
-
-    await user.click(screen.getByText('categories.add'));
-
-    const textboxes = screen.getAllByRole('textbox');
-    const nameInput = textboxes[1];
-    await user.clear(nameInput);
-    await user.type(nameInput, 'Tonic');
-
-    const modal = screen.getByText('categories.add', { selector: 'h2' }).closest('form')!;
-    const typeSelect = within(modal).getByRole('combobox');
-    await user.selectOptions(typeSelect, '__OTHER__');
-
-    const customTypeInput = screen.getByPlaceholderText('categories.customType');
-    await user.type(customTypeInput, 'mixer');
-
-    await user.click(screen.getByText('common.save'));
-
-    await waitFor(() => {
-      expect(mockApiCreate).toHaveBeenCalledWith({
+      await waitFor(() => expect(mockApiCreate).toHaveBeenCalledWith({
         name: 'Tonic',
         type: 'MIXER',
         desiredStock: 1,
         minimumPercent: 30,
         nameTranslations: null,
-      });
-    });
-  });
-
-  it('opens edit modal with __OTHER__ type when category type is not in catTypes', async () => {
-    const unknownTypeCategory = [
-      { id: 3, name: 'Water', type: 'UNKNOWN', categoryType: { name: 'UNKNOWN', color: 'gray', nameTranslations: null }, desiredStock: 1, minimumPercent: 30, _count: { bottles: 0 } },
-    ];
-    mockApiList.mockResolvedValue(unknownTypeCategory as never);
-
-    const user = userEvent.setup();
-    render(<CategoriesPage />);
-    await waitFor(() => expect(screen.getByText('Water')).toBeInTheDocument());
-
-    const editButtons = screen.getAllByTitle('common.edit');
-    await user.click(editButtons[0]);
-
-    // Should select __OTHER__ since UNKNOWN is not in catTypes
-    const editModal = screen.getByText('categories.edit').closest('form')!;
-    const typeSelect = within(editModal).getByRole('combobox') as HTMLSelectElement;
-    expect(typeSelect.value).toBe('__OTHER__');
-    expect(screen.getByPlaceholderText('categories.customType')).toHaveValue('UNKNOWN');
-  });
-
-  it('shows translation inputs when translations toggle is clicked in category modal', async () => {
-    const user = userEvent.setup();
-    render(<CategoriesPage />);
-    await waitFor(() => expect(screen.getByText('Vodka')).toBeInTheDocument());
-
-    await user.click(screen.getByText('categories.add'));
-
-    expect(screen.queryByText('Français')).not.toBeInTheDocument();
-
-    await user.click(screen.getByText('common.translations'));
-
-    expect(screen.getByText('Français')).toBeInTheDocument();
-    expect(screen.getByText('English')).toBeInTheDocument();
-  });
-
-  it('filters categories by name when typing in search', async () => {
-    const user = userEvent.setup();
-    render(<CategoriesPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Vodka')).toBeInTheDocument();
-      expect(screen.getByText('Grenadine')).toBeInTheDocument();
+      }));
     });
 
-    const searchInput = screen.getByPlaceholderText('common.search');
-    await user.type(searchInput, 'Vod');
+    it('does not send a blank custom type', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      await user.click(screen.getByRole('button', { name: 'categories.add' }));
 
-    await waitFor(() => {
-      expect(screen.getByText('Vodka')).toBeInTheDocument();
-      expect(screen.queryByText('Grenadine')).not.toBeInTheDocument();
-    });
-  });
+      await user.type(within(categoryDialog()).getByLabelText(/categories\.name/), 'Tonic');
+      await user.selectOptions(within(categoryDialog()).getByLabelText('categories.type'), '__OTHER__');
+      await user.type(within(categoryDialog()).getByPlaceholderText('categories.customType'), '   ');
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
 
-  it('shows all categories when search is cleared', async () => {
-    const user = userEvent.setup();
-    render(<CategoriesPage />);
-    await waitFor(() => expect(screen.getByText('Vodka')).toBeInTheDocument());
-
-    const searchInput = screen.getByPlaceholderText('common.search');
-    await user.type(searchInput, 'xyz');
-    await waitFor(() => {
-      expect(screen.queryByText('Vodka')).not.toBeInTheDocument();
+      expect(mockApiCreate).not.toHaveBeenCalled();
+      expect(categoryDialog()).toBeInTheDocument();
     });
 
-    await user.clear(searchInput);
-    await waitFor(() => {
-      expect(screen.getByText('Vodka')).toBeInTheDocument();
-      expect(screen.getByText('Grenadine')).toBeInTheDocument();
+    it('sends a single request on a fast double click on save', async () => {
+      const user = userEvent.setup();
+      mockApiCreate.mockReturnValue(new Promise(() => {}));
+      await renderLoadedPage();
+      await user.click(screen.getByRole('button', { name: 'categories.add' }));
+      await user.type(within(categoryDialog()).getByLabelText(/categories\.name/), 'Rum');
+      const save = within(categoryDialog()).getByRole('button', { name: 'common.save' });
+
+      fireEvent.click(save);
+      fireEvent.click(save);
+
+      await waitFor(() => expect(save).toBeDisabled());
+      expect(mockApiCreate).toHaveBeenCalledTimes(1);
     });
-  });
 
-  it('closes category modal when cancel is clicked', async () => {
-    const user = userEvent.setup();
-    render(<CategoriesPage />);
-    await waitFor(() => expect(screen.getByText('Vodka')).toBeInTheDocument());
+    it('updates a category and confirms with a toast', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      await user.click(screen.getAllByRole('button', { name: 'common.edit' })[0]);
 
-    await user.click(screen.getByText('categories.add'));
-    expect(screen.getByText('categories.add', { selector: 'h2' })).toBeInTheDocument();
+      const name = within(categoryDialog()).getByDisplayValue('Vodka');
+      await user.clear(name);
+      await user.type(name, 'Gin');
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
 
-    await user.click(screen.getByText('common.cancel'));
-    expect(screen.queryByText('categories.add', { selector: 'h2' })).not.toBeInTheDocument();
-  });
-
-  // --- Type management modal tests ---
-
-  it('submits type create form and calls ctApi.create', async () => {
-    const user = userEvent.setup();
-    render(<CategoriesPage />);
-    await waitFor(() => expect(screen.getByText('Vodka')).toBeInTheDocument());
-
-    await user.click(screen.getByText('categoryTypes.manage'));
-    expect(screen.getByText('categoryTypes.title')).toBeInTheDocument();
-
-    // The type name input is the one with placeholder "GARNISH, MIXER..."
-    const typeNameInput = screen.getByPlaceholderText('GARNISH, MIXER...');
-    await user.type(typeNameInput, 'garnish');
-
-    await user.click(screen.getByText('common.create'));
-
-    await waitFor(() => {
-      expect(mockCtApiCreate).toHaveBeenCalledWith({
-        name: 'GARNISH',
+      await waitFor(() => expect(mockApiUpdate).toHaveBeenCalledWith(1, {
+        name: 'Gin',
+        type: 'SPIRIT',
+        desiredStock: 2,
+        minimumPercent: 30,
         nameTranslations: null,
-        color: 'gray',
-      });
+      }));
+      expect(await screen.findByText('categories.updated')).toBeInTheDocument();
+    });
+
+    it('shows a type missing from the list as a custom type', async () => {
+      const user = userEvent.setup();
+      mockApiList.mockResolvedValue([
+        { id: 3, name: 'Water', type: 'UNKNOWN', categoryType: null, desiredStock: 1, minimumPercent: 30, _count: { bottles: 0 } },
+      ] as never);
+      renderPage();
+      await screen.findByText('Water');
+
+      await user.click(screen.getByRole('button', { name: 'common.edit' }));
+
+      expect(within(categoryDialog()).getByLabelText('categories.type')).toHaveValue('__OTHER__');
+      expect(within(categoryDialog()).getByPlaceholderText('categories.customType')).toHaveValue('UNKNOWN');
+    });
+
+    it('collapses the translations block again when another category is opened', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+
+      await user.click(screen.getAllByRole('button', { name: 'common.edit' })[0]);
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.translations' }));
+      expect(within(categoryDialog()).getByLabelText('Français')).toBeInTheDocument();
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.cancel' }));
+
+      await user.click(screen.getAllByRole('button', { name: 'common.edit' })[1]);
+
+      expect(within(categoryDialog()).getByDisplayValue('Grenadine')).toBeInTheDocument();
+      expect(within(categoryDialog()).queryByLabelText('Français')).not.toBeInTheDocument();
     });
   });
 
-  it('does not call ctApi.create when type name is empty', async () => {
-    const user = userEvent.setup();
-    render(<CategoriesPage />);
-    await waitFor(() => expect(screen.getByText('Vodka')).toBeInTheDocument());
+  describe('category deletion', () => {
+    async function deleteFirstCategory(user: User) {
+      await user.click(screen.getAllByRole('button', { name: 'common.delete' })[0]);
+      const confirmation = screen.getByRole('alertdialog');
+      expect(confirmation).toHaveAccessibleDescription('categories.confirmDelete');
+      await user.click(within(confirmation).getByRole('button', { name: 'common.delete' }));
+    }
 
-    await user.click(screen.getByText('categoryTypes.manage'));
+    it('deletes after confirmation and refreshes everything that shows categories', async () => {
+      const user = userEvent.setup();
+      const queryClient = createTestQueryClient();
+      const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+      renderWithFeedback(<CategoriesPage />, { queryClient });
+      await screen.findByText('Vodka');
 
-    // Submit without filling in name
-    await user.click(screen.getByText('common.create'));
+      await deleteFirstCategory(user);
 
-    await waitFor(() => {
+      await waitFor(() => expect(mockApiDelete).toHaveBeenCalledWith(1));
+      expect(await screen.findByText('categories.deleted')).toBeInTheDocument();
+      const refreshed = invalidate.mock.calls.map(([filters]) => filters?.queryKey);
+      expect(refreshed).toEqual([qk.categories, qk.categoryTypes, qk.bottles, qk.shortages, qk.availability]);
+      await waitFor(() => expect(mockApiList).toHaveBeenCalledTimes(2));
+    });
+
+    it('does not delete when the dialog is cancelled', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+
+      await user.click(screen.getAllByRole('button', { name: 'common.delete' })[0]);
+      await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.cancel' }));
+
+      expect(mockApiDelete).not.toHaveBeenCalled();
+    });
+
+    it('shows the backend message and the bottles of a category that still has some', async () => {
+      const user = userEvent.setup();
+      mockApiDelete.mockRejectedValue(new ApiError(409, 'This category still has bottles', {
+        error: 'This category still has bottles',
+        details: { cocktails: [], bottles: [{ id: 7, name: 'Absolut' }] },
+      }));
+      await renderLoadedPage();
+
+      await deleteFirstCategory(user);
+
+      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('This category still has bottles'));
+      expect(screen.getByRole('alert')).toHaveTextContent('deletion.usedByBottles');
+      expect(screen.getByText('Vodka')).toBeInTheDocument();
+    });
+  });
+
+  describe('category types manager', () => {
+    it('lists the types with the number of categories using them', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+
+      const manager = await openTypesManager(user);
+
+      expect(within(manager).getByText('GARNISH', { selector: 'span.font-medium' })).toBeInTheDocument();
+      expect(within(manager).getByText('(0)')).toBeInTheDocument();
+    });
+
+    it('creates a type, upper-cased, and empties the form', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const manager = await openTypesManager(user);
+
+      await user.type(within(manager).getByPlaceholderText('GARNISH, MIXER...'), 'mixer');
+      await user.click(within(manager).getByRole('button', { name: 'common.create' }));
+
+      await waitFor(() => expect(mockCtApiCreate).toHaveBeenCalledWith({ name: 'MIXER', nameTranslations: null, color: 'gray' }));
+      expect(await screen.findByText('categoryTypes.created')).toBeInTheDocument();
+      expect(within(manager).getByPlaceholderText('GARNISH, MIXER...')).toHaveValue('');
+    });
+
+    it('does not create a type without a name', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const manager = await openTypesManager(user);
+
+      await user.type(within(manager).getByPlaceholderText('GARNISH, MIXER...'), '  ');
+      await user.click(within(manager).getByRole('button', { name: 'common.create' }));
+
       expect(mockCtApiCreate).not.toHaveBeenCalled();
     });
-  });
 
-  it('clicks edit on a type and pre-fills the type form', async () => {
-    const user = userEvent.setup();
-    render(<CategoriesPage />);
-    await waitFor(() => expect(screen.getByText('Vodka')).toBeInTheDocument());
+    it('edits a type: name locked, translations open, color and translations sent', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const manager = await openTypesManager(user);
 
-    await user.click(screen.getByText('categoryTypes.manage'));
+      await user.click(within(manager).getAllByRole('button', { name: 'common.edit' })[0]);
+      expect(within(manager).getByText('categoryTypes.edit')).toBeInTheDocument();
+      expect(within(manager).getByDisplayValue('SPIRIT')).toBeDisabled();
+      await user.type(within(manager).getByLabelText('Français'), 'Spiritueux');
+      await user.click(within(manager).getByRole('button', { name: 'common.save' }));
 
-    // Scope to the type management modal to avoid picking up category table buttons
-    const modal = screen.getByText('categoryTypes.title').closest('div.fixed') as HTMLElement;
-    const editButtons = within(modal).getAllByTitle('common.edit');
-    await user.click(editButtons[0]);
-
-    await waitFor(() => {
-      expect(within(modal).getByText('categoryTypes.edit')).toBeInTheDocument();
-    });
-    // The name input should be disabled and pre-filled with the type name
-    const typeNameInput = within(modal).getByDisplayValue('SPIRIT');
-    expect(typeNameInput).toBeDisabled();
-  });
-
-  it('submits type edit form and calls ctApi.update', async () => {
-    const user = userEvent.setup();
-    render(<CategoriesPage />);
-    await waitFor(() => expect(screen.getByText('Vodka')).toBeInTheDocument());
-
-    await user.click(screen.getByText('categoryTypes.manage'));
-
-    const modal = screen.getByText('categoryTypes.title').closest('div.fixed') as HTMLElement;
-    const editButtons = within(modal).getAllByTitle('common.edit');
-    await user.click(editButtons[0]);
-
-    await waitFor(() => {
-      expect(within(modal).getByText('categoryTypes.edit')).toBeInTheDocument();
-    });
-
-    // Translation inputs should be shown (openEditType sets showTypeTranslations to true)
-    const frInput = within(modal).getByText('Français').closest('div')!.querySelector('input')!;
-    await user.type(frInput, 'Spiritueux');
-
-    await user.click(within(modal).getByText('common.save'));
-
-    await waitFor(() => {
-      expect(mockCtApiUpdate).toHaveBeenCalledWith('SPIRIT', {
+      await waitFor(() => expect(mockCtApiUpdate).toHaveBeenCalledWith('SPIRIT', {
         nameTranslations: { fr: 'Spiritueux' },
         color: 'blue',
-      });
-    });
-  });
-
-  it('cancels type edit when cancel button is clicked', async () => {
-    const user = userEvent.setup();
-    render(<CategoriesPage />);
-    await waitFor(() => expect(screen.getByText('Vodka')).toBeInTheDocument());
-
-    await user.click(screen.getByText('categoryTypes.manage'));
-
-    const modal = screen.getByText('categoryTypes.title').closest('div.fixed') as HTMLElement;
-    const editButtons = within(modal).getAllByTitle('common.edit');
-    await user.click(editButtons[0]);
-
-    await waitFor(() => {
-      expect(within(modal).getByText('categoryTypes.edit')).toBeInTheDocument();
+      }));
+      expect(await screen.findByText('categoryTypes.updated')).toBeInTheDocument();
+      expect(within(manager).getByText('categoryTypes.add')).toBeInTheDocument();
     });
 
-    await user.click(within(modal).getByText('common.cancel'));
+    it('cancels the edition of a type', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const manager = await openTypesManager(user);
 
-    await waitFor(() => {
-      expect(within(modal).getByText('categoryTypes.add')).toBeInTheDocument();
+      await user.click(within(manager).getAllByRole('button', { name: 'common.edit' })[0]);
+      await user.click(within(manager).getByRole('button', { name: 'common.cancel' }));
+
+      expect(within(manager).getByText('categoryTypes.add')).toBeInTheDocument();
+      expect(within(manager).getByPlaceholderText('GARNISH, MIXER...')).toHaveValue('');
+      expect(within(manager).queryByLabelText('Français')).not.toBeInTheDocument();
     });
-  });
 
-  it('calls ctApi.delete when deleting a type with 0 categories', async () => {
-    const typesWithZeroCategories = [
-      { name: 'SPIRIT', color: 'blue', nameTranslations: null, _count: { categories: 0 } },
-    ];
-    mockCtApiList.mockResolvedValue(typesWithZeroCategories as never);
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    it('sends the color picked for a new type', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const manager = await openTypesManager(user);
 
-    const user = userEvent.setup();
-    render(<CategoriesPage />);
-    await waitFor(() => expect(screen.getByText('Vodka')).toBeInTheDocument());
+      await user.type(within(manager).getByPlaceholderText('GARNISH, MIXER...'), 'bitter');
+      const colorButtons = within(manager).getByText('categoryTypes.color').parentElement!.querySelectorAll('button');
+      await user.click(colorButtons[0]);
+      await user.click(within(manager).getByRole('button', { name: 'common.create' }));
 
-    await user.click(screen.getByText('categoryTypes.manage'));
-
-    const modal = screen.getByText('categoryTypes.title').closest('div.fixed') as HTMLElement;
-    // With 0 categories the delete button title is 'common.delete' (not 'categoryTypes.cannotDelete')
-    const deleteButton = within(modal).getByTitle('common.delete');
-    expect(deleteButton).not.toBeDisabled();
-    await user.click(deleteButton);
-
-    expect(window.confirm).toHaveBeenCalledWith('categoryTypes.confirmDelete');
-    await waitFor(() => {
-      expect(mockCtApiDelete).toHaveBeenCalledWith('SPIRIT');
+      await waitFor(() => expect(mockCtApiCreate).toHaveBeenCalledWith({ name: 'BITTER', nameTranslations: null, color: 'blue' }));
     });
-  });
 
-  it('does not call ctApi.delete when confirm returns false', async () => {
-    const typesWithZeroCategories = [
-      { name: 'SPIRIT', color: 'blue', nameTranslations: null, _count: { categories: 0 } },
-    ];
-    mockCtApiList.mockResolvedValue(typesWithZeroCategories as never);
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    it('deletes an unused type after confirmation', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const manager = await openTypesManager(user);
 
-    const user = userEvent.setup();
-    render(<CategoriesPage />);
-    await waitFor(() => expect(screen.getByText('Vodka')).toBeInTheDocument());
+      await user.click(within(manager).getByRole('button', { name: 'common.delete' }));
+      const confirmation = screen.getByRole('alertdialog');
+      expect(confirmation).toHaveAccessibleDescription('categoryTypes.confirmDelete');
+      await user.click(within(confirmation).getByRole('button', { name: 'common.delete' }));
 
-    await user.click(screen.getByText('categoryTypes.manage'));
-
-    const modal = screen.getByText('categoryTypes.title').closest('div.fixed') as HTMLElement;
-    const deleteButton = within(modal).getByTitle('common.delete');
-    await user.click(deleteButton);
-
-    expect(window.confirm).toHaveBeenCalledWith('categoryTypes.confirmDelete');
-    expect(mockCtApiDelete).not.toHaveBeenCalled();
-  });
-
-  it('disables delete button for type with categories > 0', async () => {
-    const user = userEvent.setup();
-    render(<CategoriesPage />);
-    await waitFor(() => expect(screen.getByText('Vodka')).toBeInTheDocument());
-
-    await user.click(screen.getByText('categoryTypes.manage'));
-
-    // Both SPIRIT and SYRUP have categories count = 1, so delete buttons should be disabled
-    const deleteButtons = screen.getAllByTitle('categoryTypes.cannotDelete');
-    expect(deleteButtons.length).toBe(2);
-    deleteButtons.forEach((btn) => {
-      expect(btn).toBeDisabled();
+      await waitFor(() => expect(mockCtApiDelete).toHaveBeenCalledWith('GARNISH'));
+      expect(await screen.findByText('categoryTypes.deleted')).toBeInTheDocument();
     });
-  });
 
-  it('shows type translation inputs when type translations toggle is clicked', async () => {
-    const user = userEvent.setup();
-    render(<CategoriesPage />);
-    await waitFor(() => expect(screen.getByText('Vodka')).toBeInTheDocument());
+    it('empties the form when the type being edited is deleted', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const manager = await openTypesManager(user);
 
-    await user.click(screen.getByText('categoryTypes.manage'));
+      await user.click(within(manager).getAllByRole('button', { name: 'common.edit' })[2]);
+      expect(within(manager).getByDisplayValue('GARNISH')).toBeDisabled();
+      await user.click(within(manager).getByRole('button', { name: 'common.delete' }));
+      await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.delete' }));
 
-    // Only one 'common.translations' button present in the type management modal
-    expect(screen.queryByText('Français')).not.toBeInTheDocument();
+      await waitFor(() => expect(within(manager).getByText('categoryTypes.add')).toBeInTheDocument());
+      expect(within(manager).getByPlaceholderText('GARNISH, MIXER...')).toHaveValue('');
+    });
 
-    await user.click(screen.getByText('common.translations'));
+    it('keeps the form on the type being edited when another type is deleted', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const manager = await openTypesManager(user);
 
-    expect(screen.getByText('Français')).toBeInTheDocument();
-    expect(screen.getByText('English')).toBeInTheDocument();
-  });
+      await user.click(within(manager).getAllByRole('button', { name: 'common.edit' })[0]);
+      await user.click(within(manager).getByRole('button', { name: 'common.delete' }));
+      await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.delete' }));
 
-  it('closes type management modal when close button is clicked', async () => {
-    const user = userEvent.setup();
-    render(<CategoriesPage />);
-    await waitFor(() => expect(screen.getByText('Vodka')).toBeInTheDocument());
+      expect(await screen.findByText('categoryTypes.deleted')).toBeInTheDocument();
+      expect(within(manager).getByDisplayValue('SPIRIT')).toBeDisabled();
+    });
 
-    await user.click(screen.getByText('categoryTypes.manage'));
-    expect(screen.getByText('categoryTypes.title')).toBeInTheDocument();
+    it('shows the backend message in a toast when a type cannot be deleted', async () => {
+      const user = userEvent.setup();
+      mockCtApiDelete.mockRejectedValue(new ApiError(400, 'Type is in use by categories'));
+      await renderLoadedPage();
+      const manager = await openTypesManager(user);
 
-    // The X close button is an svg button without text; find by its position near the title
-    const closeButton = screen.getByText('categoryTypes.title')
-      .closest('div')!
-      .querySelector('button')!;
-    await user.click(closeButton);
+      await user.click(within(manager).getByRole('button', { name: 'common.delete' }));
+      await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.delete' }));
 
-    expect(screen.queryByText('categoryTypes.title')).not.toBeInTheDocument();
-  });
+      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Type is in use by categories'));
+    });
 
-  it('submits type create with translations when filled', async () => {
-    const user = userEvent.setup();
-    render(<CategoriesPage />);
-    await waitFor(() => expect(screen.getByText('Vodka')).toBeInTheDocument());
+    it('disables the deletion of a type used by categories', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const manager = await openTypesManager(user);
 
-    await user.click(screen.getByText('categoryTypes.manage'));
+      const usedTypeButtons = within(manager).getAllByRole('button', { name: 'categoryTypes.cannotDelete' });
+      expect(usedTypeButtons).toHaveLength(2);
+      usedTypeButtons.forEach((button) => expect(button).toBeDisabled());
+    });
 
-    const typeNameInput = screen.getByPlaceholderText('GARNISH, MIXER...');
-    await user.type(typeNameInput, 'mixer');
+    it('closes with its close button', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const manager = await openTypesManager(user);
 
-    await user.click(screen.getByText('common.translations'));
+      await user.click(within(manager).getByRole('button', { name: 'common.close' }));
 
-    const frInput = screen.getByText('Français').closest('div')!.querySelector('input')!;
-    await user.type(frInput, 'Mélangeur');
-
-    await user.click(screen.getByText('common.create'));
-
-    await waitFor(() => {
-      expect(mockCtApiCreate).toHaveBeenCalledWith({
-        name: 'MIXER',
-        nameTranslations: { fr: 'Mélangeur' },
-        color: 'gray',
-      });
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
   });
 });
