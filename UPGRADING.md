@@ -424,11 +424,19 @@ Until the database is updated, the app may answer with server errors. From v1.11
 
 ### Signing in after a restore
 
-From v1.11.0 on, a restore signs out every session, the one that ran it included. Sign in again with the admin email and password stored in the backup: a password changed after the backup was made no longer works.
+From v1.11.0 on, a restore signs out every session, the one that ran it included. Sign in again with the admin email and password stored in the backup: a password changed after the backup was made no longer works. If you do not know that password any more, reset it as in [README › "Recovering the admin account"](README.md#recovering-the-admin-account) (`ADMIN_RESET_PASSWORD`).
 
 For a backup made before v1.11.0, the sign-out happens at the next start, once the database is updated. The restore writes a `.session-floor` file next to the database (`/app/data/carta_cocktail.db.session-floor` with `docker-compose.prod.yml`), and the next start applies it, then deletes it. Leave it in place.
 
-- If the file cannot be read, the backend refuses to start and its log names it. Set a new `JWT_SECRET` (this signs out every session), delete the file, then start again.
+- If the file cannot be read, the backend refuses to start and its log names it. Set a new `JWT_SECRET` in `.env` (this signs out every session), delete the file, then start again. With `docker-compose.prod.yml` (the container restarts in a loop until then):
+
+  ```bash
+  docker compose -f docker-compose.prod.yml stop carta-cocktail-backend
+  docker compose -f docker-compose.prod.yml run --rm --no-deps --entrypoint rm carta-cocktail-backend /app/data/carta_cocktail.db.session-floor
+  docker compose -f docker-compose.prod.yml up -d
+  ```
+
+  Without Docker, delete the file next to the database named by `DATABASE_URL`.
 - Without Docker, a start before `npm run db:deploy` stops with a message that asks for it. The file is kept until then.
 
 Putting a database back by hand skips this: the README procedure for a backup made before migrations, the manual restore of a backup larger than 200 MB ([v1.10.0 notes](docs/releases/v1.10.0.md#backups-larger-than-200-mb)), or a `pre-migrate-<date>.db` or `pre-restore-<date>.db` copy put back. The database comes back with its sessions, including those revoked since it was made. Afterwards, set a new `JWT_SECRET` in `.env` (`openssl rand -hex 32`), then run `docker compose -f docker-compose.prod.yml up -d`: this signs out every session.
