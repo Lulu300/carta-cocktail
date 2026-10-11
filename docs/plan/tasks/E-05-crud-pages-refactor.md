@@ -5,13 +5,13 @@ phase: E
 lane: frontend
 criticite: moyenne
 effort: L
-status: todo
+status: done
 owner: agent
 depends_on: [E-02, E-03, E-04]
-touches: [frontend/src/pages/admin/CategoriesPage.tsx, frontend/src/pages/admin/IngredientsPage.tsx, frontend/src/pages/admin/UnitsPage.tsx, frontend/src/pages/admin/BottlesPage.tsx, frontend/src/pages/admin/MenusPage.tsx, frontend/src/components/admin/, frontend/src/queries/, frontend/src/components/layout/AdminLayout.tsx, frontend/src/utils/bottleGrouping.ts, frontend/src/utils/translations.ts, frontend/src/utils/colors.ts, frontend/src/components/ui/Toaster.tsx, frontend/src/i18n/locales/, frontend/src/test/feedback.tsx]
+touches: [frontend/src/pages/admin/CategoriesPage.tsx, frontend/src/pages/admin/IngredientsPage.tsx, frontend/src/pages/admin/UnitsPage.tsx, frontend/src/pages/admin/BottlesPage.tsx, frontend/src/pages/admin/MenusPage.tsx, frontend/src/components/admin/, frontend/src/queries/, frontend/src/components/layout/AdminLayout.tsx, frontend/src/utils/bottleGrouping.ts, frontend/src/utils/translations.ts, frontend/src/utils/colors.ts, frontend/src/components/ui/Toaster.tsx, frontend/src/i18n/locales/, frontend/src/test/feedback.tsx, docs/plan/tasks/E-24-cocktail-import-refresh.md]
 sources: ["05-frontend-archi.md §4.2", "05-frontend-archi.md §H2"]
-branch: feature/E-05-crud-pages-refactor
-pr: "#83 (1/2)"
+branch: feature/E-05-crud-pages-refactor, feature/E-05-crud-pages-refactor-2
+pr: "#83, #84"
 ---
 
 ## Décisions validées (2026-10-08)
@@ -76,16 +76,16 @@ Les textes en dur déplacés (« Alcool % (vol.) », « Facteur de conversion (m
 
 ## Critères d'acceptation
 
-- [ ] Plus aucun `confirm(`, `alert(`, `useEffect(() => { load(); }` dans les 5 pages.
+- [x] Plus aucun `confirm(`, `alert(`, `useEffect(() => { load(); }` dans les 5 pages.
 - [x] Supprimer une catégorie qui a des bouteilles affiche le message d'erreur du backend dans un toast.
-- [ ] Chaque création, modification et suppression réussie affiche le toast `*.created`, `*.updated` ou `*.deleted`.
-- [ ] Double clic rapide sur « Enregistrer » : une seule requête `POST` (onglet Réseau ou test).
-- [ ] Vider une bouteille dans `BottlesPage` met à jour le badge de pénuries sans changer de page.
-- [ ] « Aucun résultat » n'apparaît jamais pendant le chargement.
+- [x] Chaque création, modification et suppression réussie affiche le toast `*.created`, `*.updated` ou `*.deleted`.
+- [x] Double clic rapide sur « Enregistrer » : une seule requête `POST` (onglet Réseau ou test).
+- [x] Vider une bouteille dans `BottlesPage` met à jour le badge de pénuries sans changer de page.
+- [x] « Aucun résultat » n'apparaît jamais pendant le chargement.
 - [x] Rouvrir l'édition après avoir ouvert les traductions d'une autre entité : le bloc revient à son état par défaut.
-- [ ] `BottlesPage.tsx` ≤ 200 lignes, `CategoriesPage.tsx` ≤ 150 lignes.
-- [ ] Plus de `bg-[#…]` dans les fichiers touchés.
-- [ ] Tests et couverture ≥ 80 % sur les lignes modifiées.
+- [x] `BottlesPage.tsx` ≤ 200 lignes, `CategoriesPage.tsx` ≤ 150 lignes.
+- [x] Plus de `bg-[#…]` dans les fichiers touchés.
+- [x] Tests et couverture ≥ 80 % sur les lignes modifiées.
 
 ## Tests à ajouter ou adapter
 
@@ -108,3 +108,5 @@ Les textes en dur déplacés (« Alcool % (vol.) », « Facteur de conversion (m
 - 2026-10-08 : décisions validées par l'humain (voir « Décisions validées »).
 - 2026-10-11 : partie 1/2 (PR #83) : socle commun, `UnitsPage`, `IngredientsPage`, `CategoriesPage`. Socle : `queries/crud.ts` (`useEntityMutation`, `useCrudMutations` ; création et modification ignorent un second appel tant que le premier est en cours, car le bouton n'est désactivé qu'au rendu suivant, que TanStack Query programme après l'événement ; bascules et suppressions restent concurrentes), `queries/deletionImpact.ts` (un 409 avec `details` garde le message du backend et nomme cocktails et bouteilles, 5 noms au plus puis « et N autres » ; `readDeletionImpact` servira à E-15), `components/admin/` (`useEntityForm` avec `formKey`, `TranslationFields`, `DataTable` avec squelette et erreur + réessayer, `LoadError`, `useConfirmDelete`), `utils/translations.ts`, `getDotClasses`, `utils/bottleGrouping.ts` (seul l'import change dans `BottlesPage`). Catégories : 128 lignes, `components/admin/categories/` (`CategoryFormModal`, `CategoryTypesManager`, `useCategoryTypeForm`, `categoryForm.ts` avec `OTHER_TYPE`). Choix : pas de toast de succès pour la bascule de disponibilité et les boutons « tous disponibles / indisponibles » (la carte montre déjà le changement) ; l'erreur de suppression d'un type affiche le message du backend, encore en anglais jusqu'à C-12. Nouvelles clés en/fr : `categoryTypes.created/updated/deleted`, `deletion.*`. Ajouts à `touches` : `components/ui/Toaster.tsx` (remarque 3 de la revue d'E-04 : après fermeture d'un toast au clavier, le focus revient à l'élément d'avant, sinon à un autre toast, au lieu de `<body>`), `i18n/locales/`, `test/feedback.tsx` (`renderWithFeedback`, `clearToasts`, hors de `test-utils` car le store des toasts charge la vraie config i18n). 580 tests, couverture globale 70,74 / 61,25 / 66,92 / 72,13 %, lignes modifiées 98,7 %, chargement initial 134,83 kB gzip. Reste pour la partie 2 : `MenusPage`, `BottlesPage`, retrait de l'invalidation transitoire d'`AdminLayout`, et les critères correspondants. Aucune action requise.
 - 2026-10-11 : suite de la revue de la PR #83. Boutons « tous disponibles / indisponibles » passés sur `Button` (`secondary` / `danger`), `hover:border-fg-muted` sur les filtres, `ring-fg` sur les pastilles de couleur. Supprimer le type en cours d'édition remet le formulaire en mode ajout (testé). Commentaire de `useEntityMutation` : seul `mutate` respecte `ignoreWhilePending`. À faire en partie 2 : quand `BottlesPage` passe sur TanStack Query, l'import de bouteilles (`ImportBottlesWizard`, `onImported`) doit rafraîchir `qk.categories` et `qk.categoryTypes` en plus de `qk.bottles`, `qk.shortages` et `qk.availability`, car il peut créer des catégories. 582 tests, couverture globale 70,76 / 61,29 / 66,95 / 72,14 %, lignes modifiées 98,6 %.
+- 2026-10-11 : fait, partie 2/2 (PR #84). `MenusPage` sur le socle : slug déjà pris (409) affiché en toast, formulaire gardé ouvert ; `isSystemMenu()` dans `components/admin/menus/` (pas de champ `isSystem` dans l'API : même liste de slugs que `SYSTEM_MENU_SLUGS` du backend), pour E-07. `BottlesPage` 482 → 154 lignes : `components/admin/bottles/` (`BottleRow` avec `RemainingBar`, `BottleGroupRow`, `BottleHistoryTable`, `BottleFormModal` qui garde le « Enregistrer et dupliquer » et la clé de fragment d'A-09, `ExportMenu` fermé au clic extérieur, `useBottleFilters`, `bottleForm.ts`) ; tri de la colonne catégorie sur le nom localisé (`categoryName` ajouté par `useBottleFilters`) ; mutations qui rafraîchissent bouteilles, pénuries, catégories, cartes et disponibilité. L'import de bouteilles rafraîchit aussi `qk.categoryTypes` (point 3 de la revue de #83). L'échec d'un export devient un toast d'erreur au lieu du bandeau. Socle : `DataTable` accepte `renderRow` (lignes de groupe dépliables), `useInvalidateQueries()`, `groupBottles` générique. Invalidation transitoire d'`AdminLayout` retirée, et ses trois `bg-[#…]` passés aux jetons. L'import de cocktails (`CocktailsPage`, pas encore migré) peut créer catégories et bouteilles sans rafraîchir le badge de pénuries : tâche E-24 créée (à regrouper avec E-06 si possible). Ajouts à `touches` : `docs/plan/tasks/E-24-cocktail-import-refresh.md`. 593 tests, couverture globale 72,46 / 63,00 / 70,14 / 73,85 %, lignes modifiées 99,4 %, chargement initial 134,88 kB gzip. Aucune action requise.
+- 2026-10-11 : suite de la revue de la PR #84. Couleurs en dur passées aux jetons dans les fichiers touchés : barre de remplissage (`bg-success` / `bg-warning` / `bg-danger`, piste `bg-line-strong`), badge ouverte/scellée sur `Badge`, types de carte via `getBadgeClasses`, et tout `AdminLayout` (`line`, `accent`, `fg-muted`, `fg`, `danger` ; le fond `bg-black/50` du volet mobile reste, faute de jeton). Régression corrigée : l'état déplié des groupes de bouteilles revient dans `BottlesPage` (`Set` de clés), et un groupe reste ouvert après un changement de page ou un filtre qui le masque puis le réaffiche (testé). Le dépliage au clavier de la ligne de groupe reste pour E-09.

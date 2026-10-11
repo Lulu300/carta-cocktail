@@ -77,6 +77,21 @@ describe('DataTable', () => {
     expect(onRetry).toHaveBeenCalled();
   });
 
+  it('lets the caller render the rows, e.g. a row with sub-rows', () => {
+    renderTable({
+      renderRow: (row) => (
+        <>
+          <tr><td>{row.name}</td></tr>
+          <tr><td>{`${row.name} detail`}</td></tr>
+        </>
+      ),
+    });
+
+    expect(screen.getByText('Vodka detail')).toBeInTheDocument();
+    expect(screen.getByText('Rum detail')).toBeInTheDocument();
+    expect(screen.queryByText('edit')).not.toBeInTheDocument();
+  });
+
   it('sorts on the column key when its header is clicked', async () => {
     const user = userEvent.setup();
     const { sort } = renderTable();

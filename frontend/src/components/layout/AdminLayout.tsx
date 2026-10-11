@@ -1,10 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteSettings } from '../../contexts/SiteSettingsContext';
-import { qk } from '../../queries/keys';
 import { useShortages } from '../../queries/shortages';
 import LanguageSelector from '../ui/LanguageSelector';
 import AppVersion from './AppVersion';
@@ -28,17 +26,8 @@ export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const queryClient = useQueryClient();
   const { data: shortageList } = useShortages();
   const shortageCount = shortageList?.length ?? 0;
-
-  // TODO E-05: remove once bottle and category mutations invalidate qk.shortages.
-  // Until then, refresh the badge on every navigation, as before. cancelRefetch: false
-  // joins a request already in flight (a page refetching stale shortages on mount)
-  // instead of cancelling it and sending a second one.
-  useEffect(() => {
-    queryClient.invalidateQueries({ queryKey: qk.shortages }, { cancelRefetch: false });
-  }, [location.pathname, queryClient]);
 
   const handleLogout = () => {
     logout();
@@ -46,15 +35,15 @@ export default function AdminLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f0f1a] text-gray-100 flex">
+    <div className="min-h-screen bg-canvas text-fg flex">
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-64 flex flex-col bg-[#1a1a2e] border-r border-gray-800 transform transition-transform duration-200 lg:translate-x-0 lg:static ${
+        className={`fixed inset-y-0 left-0 z-30 w-64 flex flex-col bg-surface border-r border-line transform transition-transform duration-200 lg:translate-x-0 lg:static ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="p-6 border-b border-gray-800">
-          <Link to="/admin" className="text-xl font-bold text-amber-400 font-serif">
+        <div className="p-6 border-b border-line">
+          <Link to="/admin" className="text-xl font-bold text-accent font-serif">
             {siteSettings.siteIcon && <span className="mr-1">{siteSettings.siteIcon}</span>}
             {siteSettings.siteName}
           </Link>
@@ -71,14 +60,14 @@ export default function AdminLayout() {
                 onClick={() => setSidebarOpen(false)}
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${
                   isActive
-                    ? 'bg-amber-400/10 text-amber-400'
-                    : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                    ? 'bg-accent/10 text-accent'
+                    : 'text-fg-muted hover:bg-line hover:text-fg'
                 }`}
               >
                 <span>{item.icon}</span>
                 <span>{t(`nav.${item.key}`)}</span>
                 {item.key === 'shortages' && shortageCount > 0 && (
-                  <span className="ml-auto bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                  <span className="ml-auto bg-danger text-canvas text-xs font-bold px-2 py-0.5 rounded-full">
                     {shortageCount}
                   </span>
                 )}
@@ -86,7 +75,7 @@ export default function AdminLayout() {
             );
           })}
         </nav>
-        <AppVersion className="mt-auto px-6 py-4 border-t border-gray-800" />
+        <AppVersion className="mt-auto px-6 py-4 border-t border-line" />
       </aside>
 
       {/* Overlay for mobile */}
@@ -100,10 +89,10 @@ export default function AdminLayout() {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-h-screen">
         {/* Top bar */}
-        <header className="bg-[#1a1a2e] border-b border-gray-800 px-6 py-4 flex items-center justify-between">
+        <header className="bg-surface border-b border-line px-6 py-4 flex items-center justify-between">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="lg:hidden text-gray-400 hover:text-white"
+            className="lg:hidden text-fg-muted hover:text-fg"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -114,7 +103,7 @@ export default function AdminLayout() {
             {shortageCount > 0 && (
               <Link
                 to="/admin/shortages"
-                className="flex items-center gap-2 bg-red-500/10 text-red-400 px-3 py-1.5 rounded-lg text-sm hover:bg-red-500/20 transition-colors"
+                className="flex items-center gap-2 bg-danger/10 text-danger px-3 py-1.5 rounded-lg text-sm hover:bg-danger/20 transition-colors"
               >
                 <span>⚠️</span>
                 <span>{t('dashboard.shortageAlert', { count: shortageCount })}</span>
@@ -123,7 +112,7 @@ export default function AdminLayout() {
             <LanguageSelector />
             <button
               onClick={handleLogout}
-              className="text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors"
+              className="text-sm text-fg-muted hover:text-fg px-3 py-1.5 rounded-lg hover:bg-line transition-colors"
             >
               {t('nav.logout')}
             </button>

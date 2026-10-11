@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { render, screen, waitFor, within } from '../../test/test-utils';
-import { useShortages } from '../../queries/shortages';
 import AdminLayout from './AdminLayout';
 
 vi.mock('../../services/api', () => ({
@@ -23,17 +22,11 @@ const mockShortList = vi.mocked(shortages.list);
 
 const twoShortages = [{ category: { id: 1 } }, { category: { id: 2 } }];
 
-/** Stands for an admin page that also reads shortages, like the dashboard. */
-function ShortagesReader() {
-  const { data } = useShortages();
-  return <p>reader:{data?.length ?? 'pending'}</p>;
-}
-
 function renderLayout() {
   return render(
     <Routes>
       <Route path="/admin" element={<AdminLayout />}>
-        <Route index element={<ShortagesReader />} />
+        <Route index element={<p>dashboard page</p>} />
         <Route path="categories" element={<p>categories page</p>} />
         <Route path="units" element={<p>units page</p>} />
       </Route>
@@ -73,31 +66,15 @@ describe('AdminLayout shortages badge', () => {
     expect(screen.queryByText('dashboard.shortageAlert')).not.toBeInTheDocument();
   });
 
-  it('reloads the shortages on each route change, even to a page that does not read them', async () => {
-    const user = userEvent.setup();
-    mockShortList.mockResolvedValueOnce([]);
-    renderLayout();
-    await waitFor(() => expect(mockShortList).toHaveBeenCalledTimes(1));
-
-    await user.click(screen.getByRole('link', { name: /nav\.units/ }));
-
-    expect(await screen.findByText('dashboard.shortageAlert')).toBeInTheDocument();
-    expect(screen.getByText('units page')).toBeInTheDocument();
-    expect(mockShortList).toHaveBeenCalledTimes(2);
-  });
-
-  it('joins the request of a page that reloads shortages on the same navigation', async () => {
+  it('does not reload the shortages on a route change: mutations refresh them', async () => {
     const user = userEvent.setup();
     renderLayout();
     await screen.findByText('dashboard.shortageAlert');
+
+    await user.click(screen.getByRole('link', { name: /nav\.units/ }));
+
+    expect(screen.getByText('units page')).toBeInTheDocument();
     expect(mockShortList).toHaveBeenCalledTimes(1);
-
-    // The page refetches the stale list on mount and the layout invalidates it:
-    // one request, not a cancelled one followed by a second
-    await user.click(screen.getByRole('link', { name: /nav\.dashboard/ }));
-
-    expect(await screen.findByText('reader:2')).toBeInTheDocument();
-    expect(mockShortList).toHaveBeenCalledTimes(2);
   });
 });
 

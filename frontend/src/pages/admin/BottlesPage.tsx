@@ -1,479 +1,162 @@
-import { Fragment, useState, useEffect, useMemo, useRef } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { useSort } from '../../hooks/useSort';
 import { usePagination } from '../../hooks/usePagination';
-import { bottles as api, categories as categoriesApi } from '../../services/api';
-import type { Bottle, Category } from '../../types';
-import SearchInput from '../../components/ui/SearchInput';
+import { bottles as bottlesApi } from '../../services/api';
+import type { Bottle } from '../../types';
+import { qk } from '../../queries/keys';
+import { useBottles } from '../../queries/bottles';
+import { useCategories } from '../../queries/categories';
+import { useCrudMutations, useInvalidateQueries } from '../../queries/crud';
+import { groupBottles, isGroup, type BottleGroup } from '../../utils/bottleGrouping';
+import Button from '../../components/ui/Button';
 import CategoryFilterInput from '../../components/ui/CategoryFilterInput';
 import LocationAutocomplete from '../../components/ui/LocationAutocomplete';
-import SortableHeader from '../../components/ui/SortableHeader';
-import Pagination from '../../components/ui/Pagination';
+import SearchInput from '../../components/ui/SearchInput';
 import ImportBottlesWizard from '../../components/import/ImportBottlesWizard';
-import { groupBottles, isGroup, type BottleGroup } from '../../utils/bottleGrouping';
+import DataTable, { type Column } from '../../components/admin/DataTable';
+import { useConfirmDelete } from '../../components/admin/useConfirmDelete';
+import { useEntityForm } from '../../components/admin/useEntityForm';
+import BottleFormModal from '../../components/admin/bottles/BottleFormModal';
+import BottleGroupRow from '../../components/admin/bottles/BottleGroupRow';
+import BottleHistoryTable from '../../components/admin/bottles/BottleHistoryTable';
+import BottleRow from '../../components/admin/bottles/BottleRow';
+import ExportMenu from '../../components/admin/bottles/ExportMenu';
+import { toBottleForm, type BottleInput } from '../../components/admin/bottles/bottleForm';
+import { useBottleFilters, type ListedBottle } from '../../components/admin/bottles/useBottleFilters';
+
+// Stock levels feed the shortages and the cocktail availability; the apéritif and
+// digestif flags fill the system menus; categories count their bottles.
+const BOTTLE_DEPENDENT_KEYS = [qk.shortages, qk.categories, qk.menus, qk.availability];
+// An import may also create categories, and so change how many use each type.
+const IMPORT_KEYS = [qk.bottles, ...BOTTLE_DEPENDENT_KEYS, qk.categoryTypes];
+
+type BottleListItem = ListedBottle | BottleGroup<ListedBottle>;
 
 export default function BottlesPage() {
   const { t } = useTranslation();
-  const localize = useLocalizedName();
-  const [items, setItems] = useState<Bottle[]>([]);
-  const [cats, setCats] = useState<Category[]>([]);
-  const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
-  const [locationFilter, setLocationFilter] = useState('');
-  const [showHistory, setShowHistory] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState<Bottle | null>(null);
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [quantity, setQuantity] = useState(1);
-  const [showImportWizard, setShowImportWizard] = useState(false);
-  const [showExportMenu, setShowExportMenu] = useState(false);
-  const [exportError, setExportError] = useState<string | null>(null);
-  // Lets "save and duplicate" reuse the form submission (and its native validation)
-  // while "Save" stays the only submit button, i.e. the one triggered by Enter.
-  const submitIntent = useRef<'save' | 'duplicate'>('save');
-
-  const handleExport = async (format: 'json' | 'csv') => {
-    setShowExportMenu(false);
-    setExportError(null);
-    try {
-      await api.exportFile(format, {
-        categoryId: selectedCategoryId ?? undefined,
-        search: search.trim() || undefined,
-        location: locationFilter.trim() || undefined,
-      });
-    } catch (err) {
-      setExportError(err instanceof Error ? err.message : t('common.error'));
-    }
-  };
-  const [form, setForm] = useState({
-    name: '', categoryId: 0, purchasePrice: '', capacityMl: 700,
-    remainingPercent: 100, openedAt: '', alcoholPercentage: '',
-    location: '', isApero: false, isDigestif: false,
+  const confirmDelete = useConfirmDelete();
+  const invalidateQueries = useInvalidateQueries();
+  const bottlesQuery = useBottles();
+  const categories = useCategories().data ?? [];
+  const { create, update, remove } = useCrudMutations<BottleInput>({
+    key: qk.bottles,
+    api: bottlesApi,
+    invalidates: BOTTLE_DEPENDENT_KEYS,
+    messages: { created: 'bottles.created', updated: 'bottles.updated', deleted: 'bottles.deleted' },
   });
+  const bottleForm = useEntityForm((bottle?: Bottle) => toBottleForm(categories, bottle));
+  const filters = useBottleFilters(bottlesQuery.data);
+  const [showImportWizard, setShowImportWizard] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<ReadonlySet<string>>(new Set());
 
-  const load = () => api.list().then(setItems);
-  useEffect(() => { categoriesApi.list().then(setCats); }, []);
-  useEffect(() => { load(); }, []);
+  const sort = useSort<ListedBottle>(filters.activeBottles);
+  const groupedBottles = useMemo(() => groupBottles(sort.sortedItems), [sort.sortedItems]);
+  const pagination = usePagination(groupedBottles);
 
-  const uniqueLocations = useMemo(() =>
-    [...new Set(items.map((b) => b.location).filter((loc): loc is string => !!loc))].sort(),
-    [items]
-  );
+  const handleSubmit = (data: BottleInput, duplicate: boolean) => {
+    if (bottleForm.editing) {
+      update.mutate({ id: bottleForm.editing.id, data }, { onSuccess: bottleForm.close });
+      return;
+    }
+    // "Save and duplicate" keeps the values for the next bottle, one at a time.
+    const onSuccess = duplicate ? () => bottleForm.setField('quantity', 1) : bottleForm.close;
+    create.mutate(data, { onSuccess });
+  };
 
-  const filteredItems = useMemo(() => {
-    return items.filter((item) => {
-      if (search.trim() && !item.name.toLowerCase().includes(search.toLowerCase())) return false;
-      if (selectedCategoryId !== null) {
-        if (item.categoryId !== selectedCategoryId) return false;
-      } else if (categoryFilter.trim()) {
-        const catName = item.category ? localize(item.category).toLowerCase() : '';
-        if (!catName.includes(categoryFilter.toLowerCase())) return false;
-      }
-      if (locationFilter.trim() && (!item.location || !item.location.toLowerCase().includes(locationFilter.toLowerCase()))) return false;
-      return true;
-    });
-  }, [items, search, categoryFilter, selectedCategoryId, locationFilter, localize]);
+  const handleDelete = async (bottle: Bottle) => {
+    if (await confirmDelete(t('bottles.confirmDelete'))) remove.mutate(bottle.id);
+  };
 
-  const activeItems = useMemo(() => filteredItems.filter(i => i.remainingPercent > 0), [filteredItems]);
-  const historyItems = useMemo(() => filteredItems.filter(i => i.remainingPercent === 0), [filteredItems]);
-
-  const { sortedItems: sortedActive, sortKey, sortDirection, toggleSort } = useSort<Bottle>(activeItems);
-  const groupedItems = useMemo(() => groupBottles(sortedActive), [sortedActive]);
-  const { paginatedItems: paginatedGroups, page, pageSize, totalPages, totalItems, setPage, setPageSize } = usePagination(groupedItems);
-
-  const toggleGroup = (key: string) => {
-    setExpandedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
+  const toggleGroup = (groupKey: string) => {
+    setExpandedGroups((current) => {
+      const next = new Set(current);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
       return next;
     });
   };
 
-  const openCreate = () => {
-    setEditing(null);
-    setQuantity(1);
-    setForm({ name: '', categoryId: cats[0]?.id || 0, purchasePrice: '', capacityMl: 700, remainingPercent: 100, openedAt: '', alcoholPercentage: '', location: '', isApero: false, isDigestif: false });
-    setShowModal(true);
-  };
+  const rowActions = { onEdit: bottleForm.open, onDelete: handleDelete };
 
-  const openEdit = (item: Bottle) => {
-    setEditing(item);
-    setForm({
-      name: item.name,
-      categoryId: item.categoryId,
-      purchasePrice: item.purchasePrice?.toString() || '',
-      capacityMl: item.capacityMl,
-      remainingPercent: item.remainingPercent,
-      openedAt: item.openedAt ? item.openedAt.split('T')[0] : '',
-      alcoholPercentage: item.alcoholPercentage?.toString() || '',
-      location: item.location || '',
-      isApero: item.isApero,
-      isDigestif: item.isDigestif,
-    });
-    setShowModal(true);
-  };
+  const renderRow = (item: BottleListItem) => (isGroup(item)
+    ? <BottleGroupRow group={item} expanded={expandedGroups.has(item.key)} onToggle={toggleGroup} {...rowActions} />
+    : <BottleRow bottle={item} {...rowActions} />);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const duplicate = submitIntent.current === 'duplicate';
-    const data = {
-      name: form.name,
-      categoryId: form.categoryId,
-      purchasePrice: form.purchasePrice ? parseFloat(form.purchasePrice) : null,
-      capacityMl: form.capacityMl,
-      remainingPercent: form.remainingPercent,
-      openedAt: form.openedAt || null,
-      alcoholPercentage: form.alcoholPercentage ? parseFloat(form.alcoholPercentage) : null,
-      location: form.location || null,
-      isApero: form.isApero,
-      isDigestif: form.isDigestif,
-    };
-    if (editing) {
-      await api.update(editing.id, data);
-      setShowModal(false);
-    } else {
-      await api.create({ ...data, quantity });
-      if (duplicate) {
-        setQuantity(1);
-      } else {
-        setShowModal(false);
-      }
-    }
-    load();
-  };
-
-  const handleSaveAndDuplicate = (e: React.MouseEvent<HTMLButtonElement>) => {
-    submitIntent.current = 'duplicate';
-    // requestSubmit() checks required fields and dispatches submit synchronously
-    e.currentTarget.form?.requestSubmit();
-    submitIntent.current = 'save';
-  };
-
-  const handleDelete = async (id: number) => {
-    if (!confirm(t('bottles.confirmDelete'))) return;
-    await api.delete(id);
-    load();
-  };
-
-  const remainingColor = (pct: number) => {
-    if (pct > 50) return 'bg-green-500';
-    if (pct > 20) return 'bg-yellow-500';
-    return 'bg-red-500';
-  };
-
-  const renderBottleRow = (item: Bottle, indented = false) => (
-    <tr key={item.id} className={`hover:bg-gray-800/50 ${indented ? 'bg-gray-900/30' : ''}`}>
-      <td className={`py-4 font-medium ${indented ? 'px-12' : 'px-6'}`}>
-        {indented && <span className="text-gray-600 mr-2">└</span>}
-        {item.name}
-      </td>
-      <td className="px-6 py-4 text-gray-400">{item.category ? localize(item.category) : ''}</td>
-      <td className="px-6 py-4">{item.capacityMl} ml</td>
-      <td className="px-6 py-4">
-        <div className="flex items-center gap-2">
-          <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
-            <div className={`h-full ${remainingColor(item.remainingPercent)} rounded-full`} style={{ width: `${item.remainingPercent}%` }} />
-          </div>
-          <span className="text-sm">{item.remainingPercent}%</span>
-        </div>
-      </td>
-      <td className="px-6 py-4 text-gray-400">{item.alcoholPercentage ? `${item.alcoholPercentage}%` : '-'}</td>
-      <td className="px-6 py-4">
-        <span className={`px-2 py-1 rounded text-xs font-medium ${item.openedAt ? 'bg-orange-500/20 text-orange-400' : 'bg-green-500/20 text-green-400'}`}>
-          {item.openedAt ? t('bottles.opened') : t('bottles.unopened')}
-        </span>
-      </td>
-      <td className="px-6 py-4 text-gray-400">{item.purchasePrice ? `${item.purchasePrice} €` : '-'}</td>
-      <td className="px-6 py-4 text-right">
-        <div className="flex items-center justify-end gap-3">
-          <button onClick={() => openEdit(item)} className="text-amber-400 hover:text-amber-300 transition-colors" title={t('common.edit')}>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-          </button>
-          <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 transition-colors" title={t('common.delete')}>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
-        </div>
-      </td>
-    </tr>
-  );
-
-  const renderGroupRow = (group: BottleGroup) => {
-    const expanded = expandedGroups.has(group.key);
-    const avgRemaining = Math.round(group.bottles.reduce((s, b) => s + b.remainingPercent, 0) / group.bottles.length);
-    return (
-      <Fragment key={group.key}>
-        <tr className="hover:bg-gray-800/50 cursor-pointer" onClick={() => toggleGroup(group.key)}>
-          <td className="px-6 py-4 font-medium">
-            <div className="flex items-center gap-2">
-              <svg className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-              {group.name}
-              <span className="bg-amber-400/20 text-amber-400 text-xs font-bold px-2 py-0.5 rounded-full">x{group.bottles.length}</span>
-            </div>
-          </td>
-          <td className="px-6 py-4 text-gray-400">{group.category ? localize(group.category) : ''}</td>
-          <td className="px-6 py-4">{group.capacityMl} ml</td>
-          <td className="px-6 py-4">
-            <div className="flex items-center gap-2">
-              <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
-                <div className={`h-full ${remainingColor(avgRemaining)} rounded-full`} style={{ width: `${avgRemaining}%` }} />
-              </div>
-              <span className="text-sm text-gray-400">~{avgRemaining}%</span>
-            </div>
-          </td>
-          <td className="px-6 py-4 text-gray-400">{group.alcoholPercentage ? `${group.alcoholPercentage}%` : '-'}</td>
-          <td className="px-6 py-4 text-gray-400">-</td>
-          <td className="px-6 py-4 text-gray-400">-</td>
-          <td className="px-6 py-4"></td>
-        </tr>
-        {expanded && group.bottles.map((b) => renderBottleRow(b, true))}
-      </Fragment>
-    );
-  };
+  const columns: Column<BottleListItem>[] = [
+    { key: 'name', header: t('bottles.name'), sortable: true },
+    { key: 'categoryName', header: t('bottles.category'), sortable: true },
+    { key: 'capacityMl', header: t('bottles.capacityMl'), sortable: true },
+    { key: 'remainingPercent', header: t('bottles.remainingPercent'), sortable: true },
+    { key: 'alcoholPercentage', header: 'Alcool', sortable: true },
+    { key: 'openedAt', header: t('bottles.openedAt'), sortable: true },
+    { key: 'purchasePrice', header: t('bottles.purchasePrice'), sortable: true },
+    { key: 'actions', header: t('common.actions'), align: 'right' },
+  ];
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <h1 className="text-2xl font-bold font-serif text-amber-400">{t('bottles.title')}</h1>
+        <h1 className="text-2xl font-bold font-serif text-accent">{t('bottles.title')}</h1>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowImportWizard(true)}
-            className="border border-amber-400/30 text-amber-400 hover:bg-amber-400/10 font-semibold px-4 py-2 rounded-lg transition-colors"
-          >
-            {t('bottles.import')}
-          </button>
-          <div className="relative">
-            <button
-              onClick={() => setShowExportMenu((v) => !v)}
-              className="border border-amber-400/30 text-amber-400 hover:bg-amber-400/10 font-semibold px-4 py-2 rounded-lg transition-colors"
-            >
-              {t('bottles.export')}
-            </button>
-            {showExportMenu && (
-              <div className="absolute right-0 mt-1 bg-[#1a1a2e] border border-gray-700 rounded-lg shadow-lg z-20 min-w-[140px]">
-                <button
-                  onClick={() => handleExport('json')}
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-amber-400/10 hover:text-amber-400"
-                >
-                  {t('bottles.exportJson')}
-                </button>
-                <button
-                  onClick={() => handleExport('csv')}
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-amber-400/10 hover:text-amber-400"
-                >
-                  {t('bottles.exportCsv')}
-                </button>
-              </div>
-            )}
-          </div>
-          <button
-            onClick={openCreate}
-            disabled={cats.length === 0}
-            title={cats.length === 0 ? t('bottles.noCategoryHint') : undefined}
-            className="bg-amber-400 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-[#0f0f1a] font-semibold px-4 py-2 rounded-lg transition-colors"
+          <Button variant="secondary" onClick={() => setShowImportWizard(true)}>{t('bottles.import')}</Button>
+          <ExportMenu filters={filters.exportFilters} />
+          <Button
+            onClick={() => bottleForm.open()}
+            disabled={categories.length === 0}
+            title={categories.length === 0 ? t('bottles.noCategoryHint') : undefined}
           >
             {t('bottles.add')}
-          </button>
+          </Button>
         </div>
       </div>
 
-      {exportError && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg p-3 text-sm mb-4">
-          {exportError}
-        </div>
-      )}
-
       <div className="flex flex-col lg:flex-row gap-3 mb-4">
-        <SearchInput value={search} onChange={setSearch} className="lg:w-64" />
+        <SearchInput value={filters.search} onChange={filters.setSearch} className="lg:w-64" />
         <CategoryFilterInput
-          categories={cats}
-          value={categoryFilter}
-          selectedId={selectedCategoryId}
-          onChange={(text, id) => { setCategoryFilter(text); setSelectedCategoryId(id); }}
+          categories={categories}
+          value={filters.categoryText}
+          selectedId={filters.categoryId}
+          onChange={filters.setCategory}
           placeholder={t('bottles.filterByCategory')}
           className="lg:w-64"
         />
         <LocationAutocomplete
-          value={locationFilter}
-          onChange={setLocationFilter}
-          locations={uniqueLocations}
+          value={filters.location}
+          onChange={filters.setLocation}
+          locations={filters.locations}
           placeholder={t('bottles.filterByLocation')}
           className="lg:w-64"
         />
       </div>
 
-      {/* Active bottles */}
-      <div className="bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden">
-        <div className="bg-[#0f0f1a] px-6 py-3 border-b border-gray-800 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
-            {t('bottles.activeTitle')} ({activeItems.length})
-          </h2>
-        </div>
-        <table className="w-full">
-          <thead className="bg-[#0f0f1a]">
-            <tr>
-              <SortableHeader label={t('bottles.name')} sortKey="name" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
-              <SortableHeader label={t('bottles.category')} sortKey="category.name" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
-              <SortableHeader label={t('bottles.capacityMl')} sortKey="capacityMl" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
-              <SortableHeader label={t('bottles.remainingPercent')} sortKey="remainingPercent" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
-              <SortableHeader label="Alcool" sortKey="alcoholPercentage" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
-              <SortableHeader label={t('bottles.openedAt')} sortKey="openedAt" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
-              <SortableHeader label={t('bottles.purchasePrice')} sortKey="purchasePrice" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
-              <th className="text-right px-6 py-3 text-sm text-gray-400 font-medium">{t('common.actions')}</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-800">
-            {paginatedGroups.map((item) =>
-              isGroup(item) ? renderGroupRow(item) : renderBottleRow(item)
-            )}
-          </tbody>
-        </table>
-        {activeItems.length === 0 && <div className="text-center py-8 text-gray-500">{t('common.noResults')}</div>}
-        <Pagination page={page} totalPages={totalPages} pageSize={pageSize} totalItems={totalItems} onPageChange={setPage} onPageSizeChange={setPageSize} />
-      </div>
+      <h2 className="text-sm font-semibold text-fg-muted uppercase tracking-wider mb-3">
+        {t('bottles.activeTitle')} ({filters.activeBottles.length})
+      </h2>
+      <DataTable
+        columns={columns}
+        rows={pagination.paginatedItems}
+        getRowKey={(item) => (isGroup(item) ? item.key : item.id)}
+        renderRow={renderRow}
+        sort={sort}
+        pagination={pagination}
+        isLoading={bottlesQuery.isPending}
+        isError={bottlesQuery.isError}
+        onRetry={() => bottlesQuery.refetch()}
+        emptyLabel={t('common.noResults')}
+      />
+      <BottleHistoryTable bottles={filters.emptyBottles} {...rowActions} />
 
-      {/* History (empty bottles) */}
-      {historyItems.length > 0 && (
-        <div className="mt-6">
-          <button
-            onClick={() => setShowHistory(!showHistory)}
-            className="flex items-center gap-2 text-gray-500 hover:text-gray-300 transition-colors mb-3"
-          >
-            <svg className={`w-4 h-4 transition-transform ${showHistory ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-            <span className="text-sm font-semibold uppercase tracking-wider">
-              {t('bottles.historyTitle')} ({historyItems.length})
-            </span>
-          </button>
-          {showHistory && (
-            <div className="bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden opacity-60">
-              <table className="w-full">
-                <thead className="bg-[#0f0f1a]">
-                  <tr>
-                    <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('bottles.name')}</th>
-                    <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('bottles.category')}</th>
-                    <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('bottles.capacityMl')}</th>
-                    <th className="text-left px-6 py-3 text-sm text-gray-400 font-medium">{t('bottles.purchasePrice')}</th>
-                    <th className="text-right px-6 py-3 text-sm text-gray-400 font-medium">{t('common.actions')}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-800">
-                  {historyItems.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-800/50">
-                      <td className="px-6 py-4 font-medium text-gray-500">{item.name}</td>
-                      <td className="px-6 py-4 text-gray-500">{item.category ? localize(item.category) : ''}</td>
-                      <td className="px-6 py-4 text-gray-500">{item.capacityMl} ml</td>
-                      <td className="px-6 py-4 text-gray-500">{item.purchasePrice ? `${item.purchasePrice} €` : '-'}</td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-3">
-                          <button onClick={() => openEdit(item)} className="text-amber-400 hover:text-amber-300 transition-colors" title={t('common.edit')}>
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                          <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 transition-colors" title={t('common.delete')}>
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <form onSubmit={handleSubmit} className="bg-[#1a1a2e] border border-gray-800 rounded-xl p-6 w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-lg font-semibold">{editing ? t('bottles.edit') : t('bottles.add')}</h2>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">{t('bottles.name')}</label>
-              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400" />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">{t('bottles.category')}</label>
-              <select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: parseInt(e.target.value) })} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400">
-                {cats.map((c) => {
-                  const typeLabel = c.categoryType ? localize(c.categoryType) : c.type;
-                  return <option key={c.id} value={c.id}>{localize(c)} ({typeLabel})</option>;
-                })}
-              </select>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">{t('bottles.capacityMl')}</label>
-                <input type="number" min="1" value={form.capacityMl} onChange={(e) => setForm({ ...form, capacityMl: parseInt(e.target.value) || 0 })} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400" />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">{t('bottles.purchasePrice')}</label>
-                <input type="number" step="0.01" min="0" value={form.purchasePrice} onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400" placeholder="0.00" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">{t('bottles.remainingPercent')}: {form.remainingPercent}%</label>
-              <input type="range" min="0" max="100" value={form.remainingPercent} onChange={(e) => setForm({ ...form, remainingPercent: parseInt(e.target.value) })} className="w-full accent-amber-400" />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">{t('bottles.openedAt')}</label>
-              <input type="date" value={form.openedAt} onChange={(e) => setForm({ ...form, openedAt: e.target.value })} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400" />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Alcool % (vol.)</label>
-              <input type="number" step="0.1" min="0" max="100" value={form.alcoholPercentage} onChange={(e) => setForm({ ...form, alcoholPercentage: e.target.value })} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400" placeholder="Ex: 40" />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">{t('bottles.location')}</label>
-              <input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400" placeholder={t('bottles.locationPlaceholder')} />
-            </div>
-            <div className="space-y-2">
-              <label className="block text-sm text-gray-400 mb-2">Utilisation</label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={form.isApero} onChange={(e) => setForm({ ...form, isApero: e.target.checked })} className="w-4 h-4 rounded bg-[#0f0f1a] border-gray-700 text-amber-400 focus:ring-amber-400 focus:ring-offset-0" />
-                <span className="text-sm">Utilisable comme apéritif</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={form.isDigestif} onChange={(e) => setForm({ ...form, isDigestif: e.target.checked })} className="w-4 h-4 rounded bg-[#0f0f1a] border-gray-700 text-amber-400 focus:ring-amber-400 focus:ring-offset-0" />
-                <span className="text-sm">Utilisable comme digestif</span>
-              </label>
-            </div>
-            {/* Quantity (create mode only) */}
-            {!editing && (
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">{t('bottles.quantity')}</label>
-                <input type="number" min="1" max="50" value={quantity} onChange={(e) => setQuantity(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400" />
-                {quantity > 1 && <p className="text-xs text-gray-500 mt-1">{t('bottles.quantityHint', { count: quantity })}</p>}
-              </div>
-            )}
-            <div className="flex justify-end gap-3 pt-2">
-              <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-400 hover:text-white">{t('common.cancel')}</button>
-              {!editing && (
-                <button type="button" onClick={handleSaveAndDuplicate} className="border border-amber-400/30 text-amber-400 hover:bg-amber-400/10 font-semibold px-4 py-2 rounded-lg transition-colors">
-                  {t('bottles.saveDuplicate')}
-                </button>
-              )}
-              <button type="submit" className="bg-amber-400 hover:bg-amber-500 text-[#0f0f1a] font-semibold px-4 py-2 rounded-lg">{t('common.save')}</button>
-            </div>
-          </form>
-        </div>
-      )}
-
+      <BottleFormModal
+        entityForm={bottleForm}
+        categories={categories}
+        isSaving={create.isPending || update.isPending}
+        onSubmit={handleSubmit}
+      />
       {showImportWizard && (
         <ImportBottlesWizard
           onClose={() => setShowImportWizard(false)}
-          onImported={load}
+          onImported={() => invalidateQueries(IMPORT_KEYS)}
         />
       )}
     </div>
