@@ -34,6 +34,7 @@ CI runs automatically on PRs: prisma generate → tsc → build → test → cov
 - Use the shared helpers from `src/test/helpers.ts` (DB lifecycle, auth, seed factories). Build test data with the factories (`seedFullCocktail`, `seedMenu`, `seedMenuSection`, `addCocktailToMenu`, `addBottleToMenu`, `seedBottle`…) rather than `prisma.*.create`, and extend them when a test needs more
 - Each test file follows: `setupTestDatabase()` in `beforeAll`, `cleanDatabase() + seedRequiredData()` in `beforeEach`, `teardownTestDatabase()` in `afterAll`
 - Tests run against a real SQLite test DB (`prisma/test.db`), not mocks. `src/test/globalSetup.ts` creates it once per run and deletes it at the end; `cleanDatabase()` empties every table of the schema
+- The test database is shared by every test file of a run: a test that alters the schema (trigger, index, extra table) must restore it in `finally` (or `afterEach`/`afterAll`)
 - Run with coverage locally: `npm test -- --coverage`
 
 ## Structure

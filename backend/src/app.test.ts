@@ -184,7 +184,13 @@ describe('Request logs', () => {
     vi.stubEnv('JWT_SECRET', '3f9c1e7a2b8d4c6e0a1f5b9d7c3e2a4b6d8f0c1e3a5b7d9f');
     vi.resetModules();
     const { default: developmentApp } = await import('./app');
+    // The fresh import created its own PrismaClient: close it with the test
+    const { prisma: developmentPrisma } = await import('./lib/prisma');
 
-    expect(await stdoutDuringRequest(developmentApp, '/api/logged')).toContain('GET /api/logged');
+    try {
+      expect(await stdoutDuringRequest(developmentApp, '/api/logged')).toContain('GET /api/logged');
+    } finally {
+      await developmentPrisma.$disconnect();
+    }
   });
 });
