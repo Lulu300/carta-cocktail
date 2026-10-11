@@ -14,9 +14,21 @@ This guide lists the actions required to upgrade an existing instance, version b
 
 Pre-releases (`vX.Y.Z-rc.N`) are not listed: they use the section of their target version `vX.Y.Z`. The detailed changes of each version are in its [GitHub Release](https://github.com/Lulu300/carta-cocktail/releases) and in [`docs/releases/`](docs/releases/).
 
-We recommend pinning the images to a version (`:1.8.0`) instead of `:latest`, so that an upgrade only happens when you have read this guide.
+We recommend pinning the images to a version (`:1.9.0`) instead of `:latest`, so that an upgrade only happens when you have read this guide.
 
 The commands below assume the default `docker-compose.prod.yml`, run from its folder. Adapt the file name and the service name `carta-cocktail-backend` if yours differ.
+
+## v1.9.0
+
+No required action before upgrading. `docker-compose.prod.yml` has not changed since v1.8.0: pin both images to `:1.9.0` (`:1.9.0-rc.N` to test a pre-release), then pull and restart. The API now refuses invalid requests with a `400`, including a cocktail ingredient line with a quantity of `0` (step 1). Release notes: [`docs/releases/v1.9.0.md`](docs/releases/v1.9.0.md).
+
+Instances older than v1.8.0: upgrade to v1.8.0 first, following the [v1.8.0 section](#v180) (and the sections before it), check that it works, then apply this one.
+
+### After upgrading
+
+1. **Optional, no data loss.** If saving a cocktail from the admin form fails with "Validation error", one of its ingredient lines probably has a quantity of `0` (the form used to save `0` when the field was cleared). Set a positive quantity on that line, or remove it, then save again. Until then, the cocktail is still displayed and served as before.
+
+If the backend logs a `[uploads] WARNING` at startup, follow the guide it links to: the photo folder is not a mount (photos stored there are lost when the container is recreated), or photos referenced by cocktails are missing from it.
 
 ## v1.8.0
 
