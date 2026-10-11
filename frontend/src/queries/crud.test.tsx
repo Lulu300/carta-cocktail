@@ -106,7 +106,9 @@ describe('useEntityMutation', () => {
   it('ignores a second call while the first one is in flight, then accepts a new one', async () => {
     let finish: (value: unknown) => void = () => {};
     const mutationFn = vi.fn(() => new Promise((resolve) => { finish = resolve; }));
-    const { result } = renderHook(() => useEntityMutation<number>({ mutationFn, invalidates: [qk.units] }));
+    const { result } = renderHook(() => useEntityMutation<number>({
+      mutationFn, invalidates: [qk.units], ignoreWhilePending: true,
+    }));
 
     await act(async () => {
       result.current.mutate(1);
@@ -118,6 +120,18 @@ describe('useEntityMutation', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     await act(async () => result.current.mutate(2));
+    expect(mutationFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('runs overlapping calls by default, e.g. toggles on several items', async () => {
+    const mutationFn = vi.fn(() => new Promise(() => {}));
+    const { result } = renderHook(() => useEntityMutation<number>({ mutationFn, invalidates: [qk.units] }));
+
+    await act(async () => {
+      result.current.mutate(1);
+      result.current.mutate(2);
+    });
+
     expect(mutationFn).toHaveBeenCalledTimes(2);
   });
 

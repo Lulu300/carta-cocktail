@@ -10,21 +10,22 @@ interface EntityMutationOptions<Variables> {
   invalidates: QueryKey[];
   /** i18n key of the success toast. Left out when the page already shows the change, e.g. a toggle. */
   successMessage?: string;
+  /**
+   * Ignores a call while the previous one is in flight, for a form submission.
+   * Its button is only disabled once React re-renders, which TanStack Query
+   * schedules after the event: a fast double click would otherwise send twice.
+   */
+  ignoreWhilePending?: boolean;
 }
 
 export type EntityMutation<Variables> = UseMutationResult<unknown, Error, Variables>;
 
-/**
- * A mutation that refreshes the given queries and reports its outcome in a toast.
- *
- * `mutate` ignores a call while the previous one is in flight: the button that
- * triggered it is only disabled once React re-renders, which TanStack Query
- * schedules after the event, so a fast double click would otherwise send twice.
- */
+/** A mutation that refreshes the given queries and reports its outcome in a toast. */
 export function useEntityMutation<Variables>({
   mutationFn,
   invalidates,
   successMessage,
+  ignoreWhilePending = false,
 }: EntityMutationOptions<Variables>): EntityMutation<Variables> {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -45,7 +46,7 @@ export function useEntityMutation<Variables>({
   });
 
   const mutate: EntityMutation<Variables>['mutate'] = (...args) => {
-    if (inFlight.current) return;
+    if (ignoreWhilePending && inFlight.current) return;
     inFlight.current = true;
     mutation.mutate(...args);
   };
@@ -92,11 +93,13 @@ export function useCrudMutations<Input>({
     mutationFn: (data) => api.create(data),
     invalidates: refreshed,
     successMessage: messages.created,
+    ignoreWhilePending: true,
   });
   const update = useEntityMutation<UpdateVariables<Input>>({
     mutationFn: ({ id, data }) => api.update(id, data),
     invalidates: refreshed,
     successMessage: messages.updated,
+    ignoreWhilePending: true,
   });
   const remove = useEntityMutation<number>({
     mutationFn: (id) => api.delete(id),
