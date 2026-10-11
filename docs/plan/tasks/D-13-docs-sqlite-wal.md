@@ -5,13 +5,13 @@ phase: D
 lane: docs
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-02, C-01]
 touches: [README.md, .env.example]
 sources: ["02-backend-data-perf.md §3.4"]
-branch:
-pr:
+branch: docs/D-13-docs-sqlite-wal
+pr: "#81"
 ---
 
 ## Contexte
@@ -32,8 +32,8 @@ C-02 passe la base SQLite en mode WAL au démarrage et ajoute la variable `SQLIT
 
 ## Critères d'acceptation
 
-- [ ] `SQLITE_WAL` figure dans le tableau des variables du README et dans `.env.example`.
-- [ ] La limite « pas de WAL sur un partage réseau » est écrite en clair.
+- [x] `SQLITE_WAL` figure dans le tableau des variables du README et dans `.env.example`.
+- [x] La limite « pas de WAL sur un partage réseau » est écrite en clair.
 
 ## Tests à ajouter ou adapter
 
@@ -47,3 +47,4 @@ C-02 passe la base SQLite en mode WAL au démarrage et ajoute la variable `SQLIT
 ## Journal
 
 - 2026-10-09 : tâche créée pendant C-02 (documentation utilisateur de `SQLITE_WAL` laissée hors de la PR pour éviter un conflit sur `README.md` avec C-01).
+- 2026-10-11 : fait dans la PR #81 (`docs/D-13-docs-sqlite-wal`). README : ligne `SQLITE_WAL` du tableau et nouvelle sous-section « Database files and network shares » dans la partie Docker de production (pas de `docs/operations.md` : D-09 n'est pas faite), hors de « Database migrations » visée par C-18. Vérifié dans le code : seule la valeur exacte `false` donne `delete`, toute autre valeur `wal` ; le mode est stocké dans le fichier ; le log de démarrage affiche le mode, et un avertissement si SQLite ne peut pas changer. Écart : les compose ne transmettent pas `SQLITE_WAL` depuis `.env`, donc le README et `.env.example` indiquent de l'ajouter à la liste `environment` du backend, comme `UPGRADING.md` (v1.6.0). Nouvelle tâche D-23 : transmettre `SQLITE_WAL` depuis `.env` dans les deux compose.
