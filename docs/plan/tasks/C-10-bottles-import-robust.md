@@ -94,3 +94,4 @@ L'import de bouteilles accepte CSV, JSON et ZIP. Il est déjà défensif (transa
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : suivi des revues de la phase A. Ajout de l'étape 5 (limite `express.json()` de 100 Ko qui fait échouer la confirmation d'un gros import), d'un critère et de deux tests ; `backend/src/app.ts` ajouté à `touches`.
+- 2026-10-11 : transmis par C-04. C-04 refuse la confirmation entière en 400 ; C-10 doit signaler les lignes invalides dès l'aperçu. Le schéma de confirmation est `BottleImportConfirm` (`backend/src/validation/bottleImport.ts`), avec `MAX_IMPORT_ROWS = 2000` à réutiliser. La limite de 2 000 lignes n'est atteignable qu'une fois la limite JSON relevée (étape 5).

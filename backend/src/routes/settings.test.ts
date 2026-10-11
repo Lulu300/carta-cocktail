@@ -44,6 +44,16 @@ describe('PUT /api/settings', () => {
     expect(res.body.siteName).toBe('Updated');
     expect(res.body.siteIcon).toBe(''); // unchanged from seed
   });
+
+  it('should return 400 and keep the settings when siteName is not a string', async () => {
+    const before = await prisma.siteSettings.findUniqueOrThrow({ where: { id: 1 } });
+    const res = await request.put('/api/settings').set(authHeader())
+      .send({ siteName: 42 });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('body.siteName');
+    const after = await prisma.siteSettings.findUniqueOrThrow({ where: { id: 1 } });
+    expect(after.siteName).toBe(before.siteName);
+  });
 });
 
 describe('PUT /api/settings/profile', () => {
@@ -58,6 +68,7 @@ describe('PUT /api/settings/profile', () => {
     const res = await request.put('/api/settings/profile').set(authHeader())
       .send({ newPassword: 'newpass123' });
     expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('body.currentPassword');
   });
 
   it('should return 400 with a translated message if currentPassword is wrong', async () => {

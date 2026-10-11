@@ -39,7 +39,8 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Delta coverage script tests
+      # Tests of every CI script in .github/scripts (delta coverage, bundle budget).
+      - name: CI script tests
         run: node --test '../.github/scripts/*.test.mjs'
 
       - name: Tests with coverage
@@ -100,8 +101,19 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Hidden source maps tell the bundle budget which modules each chunk holds.
+      # They do not change the emitted JavaScript, and the Docker image build
+      # (plain `npm run build`) does not produce them.
       - name: Build
-        run: npm run build
+        run: npm run build -- --sourcemap hidden
+
+      # Budget: 132.74 kB gzip measured on 2026-10-11 (entry + modulepreload
+      # chunks) + ~5% margin. Raise it only with a reason written in the PR.
+      # History: 133 kB (D-14, 126.31 kB measured); 140 kB (E-11: the public
+      # pages now use TanStack's useQuery, plus skeletons, error states and
+      # section navigation).
+      - name: Bundle budget (initial load of the public menu)
+        run: node ../.github/scripts/bundle-budget.mjs dist 140
 
       - name: Tests with coverage
         run: npm run test:coverage

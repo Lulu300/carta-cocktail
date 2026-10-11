@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import multer from 'multer';
 import { AuthRequest } from '../middleware/auth';
@@ -7,6 +8,10 @@ import { parseNameTranslations } from '../utils/translations';
 import { buildExportPayload, buildCsvPayload } from '../utils/bottlesExport';
 import { parseImportFile, NormalizedImportPayload } from '../utils/bottlesImport';
 import { deleteBottle, isForceRequested } from '../services/deletionService';
+import { valid, validate } from '../validation/validate';
+import { deleteRequest, IdParams, idRequest } from '../validation/common';
+import { BottleCreate, BottleExportQuery, BottleListQuery, BottleUpdate } from '../validation/bottles';
+import { BottleImportConfirm } from '../validation/bottleImport';
 
 const router = Router();
 
@@ -78,11 +83,13 @@ async function syncBottleMenus(bottleId: number, isApero: boolean, isDigestif: b
   }
 }
 
-router.get('/', async (req: AuthRequest, res: Response) => {
-  const { categoryId, type } = req.query;
-  const where: any = {};
-  if (categoryId) where.categoryId = parseInt(categoryId as string);
-  if (type) where.category = { type: type as string };
+const listSchemas = { query: BottleListQuery };
+
+router.get('/', validate(listSchemas), async (_req: AuthRequest, res: Response) => {
+  const { categoryId, type } = valid<typeof listSchemas>(res).query;
+  const where: Prisma.BottleWhereInput = {};
+  if (categoryId) where.categoryId = categoryId;
+  if (type) where.category = { type };
 
   const bottles = await prisma.bottle.findMany({
     where,
@@ -143,18 +150,10 @@ router.post('/import/preview', importUpload.single('file'), async (req: AuthRequ
   res.json({ payload, categories, bottles });
 });
 
-router.post('/import/confirm', async (req: AuthRequest, res: Response) => {
-  const { payload, resolutions } = req.body as {
-    payload: NormalizedImportPayload;
-    resolutions?: {
-      categories?: Record<string, { action: 'use_existing' | 'create'; existingId?: number; data?: any }>;
-      bottles?: Record<string, { action: 'import' | 'skip'; categoryName?: string }>;
-    };
-  };
+const importConfirmSchemas = { body: BottleImportConfirm };
 
-  if (!payload || payload.version !== 1 || !Array.isArray(payload.bottles)) {
-    throw new BadRequestError();
-  }
+router.post('/import/confirm', validate(importConfirmSchemas), async (_req: AuthRequest, res: Response) => {
+  const { payload, resolutions } = valid<typeof importConfirmSchemas>(res).body;
 
   const created = await prisma.$transaction(async (tx) => {
     const categoryMap = new Map<string, number>(); // lowercased name -> id
@@ -168,18 +167,18 @@ router.post('/import/confirm', async (req: AuthRequest, res: Response) => {
       if (resolution.action === 'use_existing' && resolution.existingId) {
         categoryMap.set(key.toLowerCase(), resolution.existingId);
       } else if (resolution.action === 'create' && resolution.data) {
-        const typeValue = resolution.data.type || 'SPIRIT';
-        const existingType = await tx.categoryType.findUnique({ where: { name: typeValue } });
-        if (!existingType) {
-          await tx.categoryType.create({ data: { name: typeValue, color: 'gray' } });
-        }
+        // The schema fills the type, desired stock and minimum percent defaults
         const { nameTranslations, name, type, desiredStock, minimumPercent } = resolution.data;
+        const existingType = await tx.categoryType.findUnique({ where: { name: type } });
+        if (!existingType) {
+          await tx.categoryType.create({ data: { name: type, color: 'gray' } });
+        }
         const createdCat = await tx.category.create({
           data: {
             name: name || key,
-            type: type || 'SPIRIT',
-            desiredStock: typeof desiredStock === 'number' ? desiredStock : 1,
-            minimumPercent: typeof minimumPercent === 'number' ? minimumPercent : 30,
+            type,
+            desiredStock,
+            minimumPercent,
             nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null,
           },
         });
@@ -222,18 +221,17 @@ router.post('/import/confirm', async (req: AuthRequest, res: Response) => {
         existingDuplicateKey(b.name, b.capacityMl, finalCategoryName)
       );
 
-      const quantity = Math.max(1, Math.min(50, b.quantity || 1));
-      for (let q = 0; q < quantity; q++) {
+      for (let q = 0; q < b.quantity; q++) {
         const newBottle = await tx.bottle.create({
           data: {
             name: b.name,
             categoryId,
             capacityMl: b.capacityMl,
-            remainingPercent: b.remainingPercent ?? 100,
+            remainingPercent: b.remainingPercent,
             alcoholPercentage: b.alcoholPercentage,
             purchasePrice: b.purchasePrice,
             location: b.location,
-            openedAt: b.openedAt ? new Date(b.openedAt) : null,
+            openedAt: b.openedAt,
             isApero: b.isApero,
             isDigestif: b.isDigestif,
           },
@@ -265,16 +263,16 @@ router.post('/import/confirm', async (req: AuthRequest, res: Response) => {
   });
 });
 
-router.get('/export', async (req: AuthRequest, res: Response) => {
-  const { categoryId, type, location, search, format } = req.query;
-  const fmt = (typeof format === 'string' ? format : 'json').toLowerCase();
-  if (fmt !== 'json' && fmt !== 'csv') throw new BadRequestError();
+const exportSchemas = { query: BottleExportQuery };
 
-  const where: any = {};
-  if (categoryId) where.categoryId = parseInt(String(categoryId));
-  if (type) where.category = { type: String(type) };
-  if (location) where.location = { contains: String(location) };
-  if (search) where.name = { contains: String(search) };
+router.get('/export', validate(exportSchemas), async (_req: AuthRequest, res: Response) => {
+  const { categoryId, type, location, search, format } = valid<typeof exportSchemas>(res).query;
+
+  const where: Prisma.BottleWhereInput = {};
+  if (categoryId) where.categoryId = categoryId;
+  if (type) where.category = { type };
+  if (location) where.location = { contains: location };
+  if (search) where.name = { contains: search };
 
   const bottles = await prisma.bottle.findMany({
     where,
@@ -284,7 +282,7 @@ router.get('/export', async (req: AuthRequest, res: Response) => {
 
   const date = new Date().toISOString().slice(0, 10);
 
-  if (fmt === 'csv') {
+  if (format === 'csv') {
     const csv = buildCsvPayload(bottles);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="bottles-${date}.csv"`);
@@ -297,31 +295,33 @@ router.get('/export', async (req: AuthRequest, res: Response) => {
   res.json(payload);
 });
 
-router.get('/:id', async (req: AuthRequest, res: Response) => {
+router.get('/:id', validate(idRequest), async (_req: AuthRequest, res: Response) => {
   const bottle = await prisma.bottle.findUnique({
-    where: { id: parseInt(String(req.params.id)) },
+    where: { id: valid<typeof idRequest>(res).params.id },
     include: { category: true },
   });
   if (!bottle) throw new NotFoundError();
   res.json(parseNameTranslations(bottle));
 });
 
-router.post('/', async (req: AuthRequest, res: Response) => {
-  const { name, categoryId, purchasePrice, capacityMl, remainingPercent, openedAt, alcoholPercentage, location, isApero, isDigestif, quantity } = req.body;
-  if (!name || !categoryId || !capacityMl) throw new BadRequestError();
+const createSchemas = { body: BottleCreate };
 
-  const count = Math.min(Math.max(1, parseInt(quantity) || 1), 50);
+router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Response) => {
+  const { quantity, ...fields } = valid<typeof createSchemas>(res).body;
+
+  const count = quantity ?? 1;
+  // ?? and not ||: a price or an alcohol percentage of 0 is kept
   const data = {
-    name,
-    categoryId,
-    purchasePrice: purchasePrice || null,
-    capacityMl,
-    remainingPercent: remainingPercent ?? 100,
-    openedAt: openedAt ? new Date(openedAt) : null,
-    alcoholPercentage: alcoholPercentage || null,
-    location: location || null,
-    isApero: isApero ?? false,
-    isDigestif: isDigestif ?? false,
+    name: fields.name,
+    categoryId: fields.categoryId,
+    purchasePrice: fields.purchasePrice ?? null,
+    capacityMl: fields.capacityMl,
+    remainingPercent: fields.remainingPercent ?? 100,
+    openedAt: fields.openedAt ?? null,
+    alcoholPercentage: fields.alcoholPercentage ?? null,
+    location: fields.location || null,
+    isApero: fields.isApero ?? false,
+    isDigestif: fields.isDigestif ?? false,
   };
 
   if (count === 1) {
@@ -339,27 +339,23 @@ router.post('/', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.put('/:id', async (req: AuthRequest, res: Response) => {
-  const { name, categoryId, purchasePrice, capacityMl, remainingPercent, openedAt, alcoholPercentage, location, isApero, isDigestif } = req.body;
+const updateSchemas = { params: IdParams, body: BottleUpdate };
+
+router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Response) => {
+  const { params: { id }, body } = valid<typeof updateSchemas>(res);
+  const { location, ...fields } = body;
+  // Absent fields are undefined, which Prisma leaves untouched
   const bottle = await prisma.bottle.update({
-    where: { id: parseInt(String(req.params.id)) },
+    where: { id },
     data: {
-      ...(name && { name }),
-      ...(categoryId && { categoryId }),
-      ...(purchasePrice !== undefined && { purchasePrice }),
-      ...(capacityMl && { capacityMl }),
-      ...(remainingPercent !== undefined && { remainingPercent }),
-      ...(openedAt !== undefined && { openedAt: openedAt ? new Date(openedAt) : null }),
-      ...(alcoholPercentage !== undefined && { alcoholPercentage }),
+      ...fields,
       ...(location !== undefined && { location: location || null }),
-      ...(isApero !== undefined && { isApero }),
-      ...(isDigestif !== undefined && { isDigestif }),
     },
     include: { category: true },
   });
 
   // Auto-sync bottle menus if flags changed
-  if (isApero !== undefined || isDigestif !== undefined) {
+  if (fields.isApero !== undefined || fields.isDigestif !== undefined) {
     await syncBottleMenus(bottle.id, bottle.isApero, bottle.isDigestif);
   }
 
@@ -367,8 +363,9 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // Refused while recipes use the bottle as a source, unless ?force=true
-router.delete('/:id', async (req: AuthRequest, res: Response) => {
-  const impact = await deleteBottle(parseInt(String(req.params.id)), isForceRequested(req.query.force));
+router.delete('/:id', validate(deleteRequest), async (req: AuthRequest, res: Response) => {
+  const { params: { id }, query } = valid<typeof deleteRequest>(res);
+  const impact = await deleteBottle(id, isForceRequested(query.force));
   res.json({ message: req.t('bottles.deleted'), deleted: true, impact });
 });
 

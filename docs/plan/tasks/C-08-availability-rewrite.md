@@ -105,3 +105,4 @@ La disponibilité (nombre de portions possibles avec le stock) s'affiche dans la
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : décisions validées par l'humain (voir « Décisions validées »).
+- 2026-10-11 : E-11 grise sur `isAvailable` seul ; C-08 doit passer le grisé public sur `available` (calcul de `isUnavailable` dans `frontend/src/pages/public/PublicCocktailItem.tsx`, fichier à ajouter aux `touches` de C-08, avec son test `PublicCocktailItem.test.tsx`).

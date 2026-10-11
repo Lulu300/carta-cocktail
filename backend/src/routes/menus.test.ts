@@ -83,6 +83,30 @@ describe('PUT /api/menus/:id', () => {
     expect(res.body.name).toBe('New Name');
   });
 
+  it('should return 400 for an unknown menu type', async () => {
+    const menu = await prisma.menu.create({
+      data: { name: 'Old', slug: 'old', type: 'COCKTAILS' },
+    });
+    const res = await request.put(`/api/menus/${menu.id}`).set(authHeader())
+      .send({ type: 'WINES' });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('body.type');
+  });
+
+  it('should return 400 and keep the associations for a cocktail line without cocktailId', async () => {
+    const menu = await prisma.menu.create({
+      data: { name: 'Test', slug: 'test-menu', type: 'COCKTAILS' },
+    });
+    const cocktail = await seedCocktail({ name: 'Mojito' });
+    await prisma.menuCocktail.create({ data: { menuId: menu.id, cocktailId: cocktail.id, position: 0 } });
+
+    const res = await request.put(`/api/menus/${menu.id}`).set(authHeader())
+      .send({ cocktails: [{ position: 0 }] });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('body.cocktails.0.cocktailId');
+    expect(await prisma.menuCocktail.count({ where: { menuId: menu.id } })).toBe(1);
+  });
+
   it('should update cocktails associations', async () => {
     const menu = await prisma.menu.create({
       data: { name: 'Test', slug: 'test-menu', type: 'COCKTAILS' },

@@ -19,7 +19,11 @@
   "home": {
     "subtitle": "Discover our cocktail menus",
     "noMenus": "No menus available at the moment",
-    "cocktailCount": "cocktails"
+    "cocktailCount_one": "{{count}} cocktail",
+    "cocktailCount_other": "{{count}} cocktails",
+    "bottleCount_one": "{{count}} bottle",
+    "bottleCount_other": "{{count}} bottles",
+    "loadError": "Unable to load the menus"
   },
   "auth": {
     "login": "Login",
@@ -294,7 +298,22 @@
     "instructions": "Preparation",
     "print": "Print",
     "export": "Export recipe",
-    "back": "Back to menu"
+    "back": "Back to menu",
+    "backHome": "Back to home",
+    "menuLoadError": "Unable to load the menu",
+    "cocktailLoadError": "Unable to load the cocktail",
+    "loadErrorHint": "Check your connection and try again.",
+    "emptyMenu": "This menu is empty for now",
+    "noResults": "No results for “{{query}}”",
+    "resultCount_one": "{{count}} result",
+    "resultCount_other": "{{count}} results",
+    "sectionNav": "Menu sections",
+    "moreIngredients_one": "{{count}} more ingredient",
+    "moreIngredients_other": "{{count}} more ingredients",
+    "showAllLocations_one": "Show {{count}} location",
+    "showAllLocations_other": "Show all {{count}} locations",
+    "alcoholPercentage": "{{value}}% vol.",
+    "capacityMl": "{{value}} ml"
   },
   "settings": {
     "title": "Settings",

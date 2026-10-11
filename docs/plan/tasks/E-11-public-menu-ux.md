@@ -5,13 +5,13 @@ phase: E
 lane: frontend
 criticite: haute
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [A-05, E-02, E-03]
-touches: [frontend/src/pages/public/, frontend/src/components/layout/PublicLayout.tsx, frontend/src/utils/cocktailSearch.ts, frontend/src/i18n/locales/]
+touches: [frontend/src/pages/public/, frontend/src/components/layout/PublicLayout.tsx, frontend/src/components/layout/PublicLayout.test.tsx, frontend/src/utils/cocktailSearch.ts, frontend/src/i18n/locales/, frontend/src/queries/, frontend/src/test/, docs/plan/tasks/C-08-availability-rewrite.md, docs/plan/tasks/E-20-not-found-page.md, .github/workflows/ci.yml, docs/plan/tasks/D-14-bundle-budget-ci.md]
 sources: ["06-frontend-ux-perf.md §2", "06-frontend-ux-perf.md §1"]
-branch:
-pr:
+branch: feature/E-11-public-menu-ux
+pr: "#68"
 ---
 
 ## Décisions validées (2026-10-08)
@@ -86,16 +86,16 @@ La carte publique est le produit vu par les invités, sur téléphone, souvent a
 
 ## Critères d'acceptation
 
-- [ ] Décisions du point 0 appliquées.
-- [ ] Carte → fiche → retour : aucune requête `GET /api/public/menus/:slug` (onglet Réseau) et position de défilement conservée à ±50 px.
-- [ ] Backend arrêté : l'accueil affiche une erreur et « Réessayer », jamais « aucun menu ».
-- [ ] Slug inconnu : « menu introuvable » et lien vers l'accueil.
-- [ ] Recherche sans résultat : message et bouton d'effacement.
-- [ ] « apero » trouve « Apéro » dans une carte de bouteilles.
-- [ ] L'ordre des groupes de bouteilles correspond à celui défini dans l'admin.
-- [ ] Carte à 3 sections : la barre de sections apparaît, le clic fait défiler, la puce active suit le défilement.
-- [ ] Squelettes visibles pendant le chargement, plus de texte « Loading… » sur les pages publiques.
-- [ ] Couverture ≥ 80 % sur les lignes modifiées ; `HomePage` (0 test aujourd'hui) testée.
+- [x] Décisions du point 0 appliquées. *(Grisé sur `isAvailable` seul : C-08 n'est pas faite, décision humaine du 2026-10-11, signalé dans la PR et dans le Journal de C-08.)*
+- [x] Carte → fiche → retour : aucune requête `GET /api/public/menus/:slug` (onglet Réseau) et position de défilement conservée à ±50 px. *(Tests unitaires, plus un contrôle dans Chrome headless via Playwright, API simulée par `page.route`, sans backend : 0 requête au retour, défilement 2576 px avant et après, y compris avec `history.scrollRestoration = 'manual'`.)*
+- [x] Backend arrêté : l'accueil affiche une erreur et « Réessayer », jamais « aucun menu ». *(Tests, plus le même contrôle Playwright avec les requêtes coupées.)*
+- [x] Slug inconnu : « menu introuvable » et lien vers l'accueil.
+- [x] Recherche sans résultat : message et bouton d'effacement.
+- [x] « apero » trouve « Apéro » dans une carte de bouteilles.
+- [x] L'ordre des groupes de bouteilles correspond à celui défini dans l'admin. *(Bouteilles dans un bloc, et blocs de catégories d'une carte sans sections selon leur première bouteille : décision humaine du 2026-10-11.)*
+- [x] Carte à 3 sections : la barre de sections apparaît, le clic fait défiler, la puce active suit le défilement. *(Tests avec un `IntersectionObserver` simulé, plus le contrôle Playwright.)*
+- [x] Squelettes visibles pendant le chargement, plus de texte « Loading… » sur les pages publiques. *(Le texte reste en `sr-only` dans la zone `role="status"`, pour les lecteurs d'écran.)*
+- [x] Couverture ≥ 80 % sur les lignes modifiées ; `HomePage` (0 test aujourd'hui) testée. *(Delta 100 %, 232/232 lignes.)*
 
 ## Tests à ajouter ou adapter
 
@@ -118,3 +118,7 @@ La carte publique est le produit vu par les invités, sur téléphone, souvent a
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : décisions validées par l'humain (voir « Décisions validées »).
+- 2026-10-11 : faite dans la PR #68 (`feature/E-11-public-menu-ux`). Hooks publics ajoutés dans `queries/public.ts`, sur le modèle d'E-02, plutôt que dans un `pages/public/queries.ts` séparé. Les clés passent par `qk` et incluent le lecteur (`admin` / `guest`), parce que le serveur ajoute des champs privés pour l'admin. Un invité garde la carte 5 min ; un admin la revalide toujours en arrière-plan (`staleTime: 0`), puisque les pages admin n'invalident pas les requêtes publiques. `useCocktailsAvailability` accepte `enabled`, ce qui ajoute `queries/` aux `touches`. Les aides de test partagées (jeux de données de carte, simulation d'`IntersectionObserver`, `t` qui affiche les valeurs) sont dans `src/test/`, ajouté aussi aux `touches`. Grisé sur `isAvailable` seul (C-08 non faite, ligne ajoutée à son Journal). Les emplacements des bouteilles restent publics et s'ouvrent dans la `Modal` d'E-03. Les blocs de catégories d'une carte de bouteilles sans sections restent triés par nom ; seul l'ordre des bouteilles dans un bloc suit l'admin (question posée dans la PR). Le bouton de retour est un vrai lien, et seul un clic simple venant de la carte fait `navigate(-1)` (un clic avec Ctrl/Cmd ouvre un nouvel onglet). `useScrollRestoration` sert aux trois pages publiques : nouvelle navigation en haut de page, retour à la position enregistrée. La barre de vue grille/liste reste hors de la zone collante, pour économiser de la hauteur sur mobile. Poids de `/menu/:slug` (JS gzip, entrée + vendors préchargés) : 126,47 → 132,98 kB (+6,5 kB). Environ 2,9 kB viennent de l'observateur de TanStack (`useQuery`), qui était dans un chunk admin. Ce chiffre est à reprendre pour le seuil de D-14. Couverture globale avant / après : statements 63,94 → 68,02 %, branches 55,48 → 59,15 %, functions 56,68 → 62,70 %, lines 65,75 → 69,67 %. Contrôle dans Chrome headless (Playwright, API simulée, 360×740) : 0 requête de carte au retour, défilement conservé au pixel près, barre de sections, 404, erreur réseau de l'accueil. Nouvelle tâche E-20 (vraie page 404).
+- 2026-10-11 : Notes de version : aucune action requise. Côté invités : squelettes de chargement, erreurs avec « Réessayer », retour d'une fiche vers la carte sans rechargement et à la même position, barre de sections collante, recherche de bouteilles insensible aux accents. Le lien « Connexion » passe dans le pied de page.
+- 2026-10-11 : décisions humaines sur les questions de la PR, et rebase sur `develop` (656d038 : #65 D-14, #66 C-16, #67 version affichée). (1) Les blocs de catégories d'une carte de bouteilles sans sections suivent maintenant la position de leur première bouteille, et non plus le nom (test dans `useMenuFilter.test.ts`). (2) `staleTime: 0` pour l'admin validé tel quel. (3) Seuil du budget relevé de 133 à **140 kB** dans `.github/workflows/ci.yml` (fichier et tâche D-14 ajoutés aux `touches`). Mesure avec `.github/scripts/bundle-budget.mjs` après `npm run build -- --sourcemap hidden` (gzip niveau 9) : entrée 31,80 kB + `vendor-react` 82,55 kB + `vendor-i18n` 18,40 kB = **132,74 kB**, contre 126,31 kB sur `develop` (entrée 25,35 → 31,80 kB). Calcul : 132,74 × 1,05 = 139,38, arrondi à 140 kB. Pourquoi : les pages publiques utilisent maintenant `useQuery` de TanStack (environ 2,9 kB, qui était dans un chunk admin), plus les squelettes, les états d'erreur, la navigation par sections et les primitives d'E-03 (`Modal`, `Button`, `EmptyState`, `Skeleton`). Couverture globale après rebase : statements 68,08 %, branches 59,23 %, functions 62,74 %, lines 69,74 % ; delta 100 %.
+- 2026-10-11 : corrections après la revue de la PR #68. (1) `useScrollRestoration` : chaque chargement de page commence sur une entrée d'historique de clé `default`, si bien qu'une position enregistrée par un chargement précédent dans l'onglet était restaurée sur une autre page. Elle est désormais oubliée au chargement, sauf lors d'un rechargement de cette même entrée (testé). (2) Les états « introuvable » et « impossible de charger » sont annoncés avec `role="alert"` (assertions dans les tests des trois pages). (3) Le bouton « +N » des emplacements et le résumé « +N » des ingrédients ont un nom accessible en en/fr, avec pluriels. (4) Détails : espace dans un type de retour, paire `observedId`/`setObservedId`. Budget : 132,91 kB (+0,17 kB), sous les 140 kB ; seuil inchangé. Couverture globale : 68,19 / 59,27 / 62,82 / 69,84 % ; delta 100 %.

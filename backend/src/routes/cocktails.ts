@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import multer from 'multer';
 import path from 'path';
@@ -7,6 +8,13 @@ import { AuthRequest } from '../middleware/auth';
 import { BadRequestError, NotFoundError } from '../errors';
 import { config } from '../config';
 import { parseNameTranslations } from '../utils/translations';
+import { valid, validate } from '../validation/validate';
+import { IdParams, idRequest } from '../validation/common';
+import { CocktailCreate, CocktailUpdate, IngredientLine, Tags } from '../validation/cocktails';
+import { ImportConfirm, ImportRecipeV1 } from '../validation/cocktailImport';
+import { refuseNewRecipeDefects } from '../services/recipeDefectsService';
+
+type ImportedRecipe = z.output<typeof ImportRecipeV1>['cocktail'];
 
 const parseNT = (val: any) => {
   if (typeof val === 'string') { try { return JSON.parse(val); } catch { return null; } }
@@ -119,9 +127,9 @@ function buildExportPayload(cocktail: any) {
 }
 
 // Export cocktail as JSON
-router.get('/:id/export', async (req: AuthRequest, res: Response) => {
+router.get('/:id/export', validate(idRequest), async (_req: AuthRequest, res: Response) => {
   const cocktail = await prisma.cocktail.findUnique({
-    where: { id: parseInt(String(req.params.id)) },
+    where: { id: valid<typeof idRequest>(res).params.id },
     include: cocktailIncludes,
   });
   if (!cocktail) throw new NotFoundError();
@@ -131,20 +139,9 @@ router.get('/:id/export', async (req: AuthRequest, res: Response) => {
   res.json(payload);
 });
 
-// Import preview: analyze JSON and return matched/missing entities
-router.post('/import/preview', async (req: AuthRequest, res: Response) => {
-  const data = req.body;
-
-  if (!data || data.version !== 1 || !data.cocktail?.name) throw new BadRequestError();
-
-  const recipe = data.cocktail;
-
-  // Check if cocktail name already exists
-  const existingCocktail = await prisma.cocktail.findFirst({
-    where: { name: { equals: recipe.name } },
-  });
-
-  // Collect unique referenced entities
+// Entities a recipe refers to, keyed like the resolutions: lowercased unit
+// abbreviation, or lowercased name for categories, bottles and ingredients.
+function collectImportReferences(recipe: ImportedRecipe) {
   const unitRefs = new Map<string, any>();
   const categoryRefs = new Map<string, any>();
   const bottleRefs = new Map<string, any>();
@@ -210,6 +207,22 @@ router.post('/import/preview', async (req: AuthRequest, res: Response) => {
     }
   }
 
+  return { unitRefs, categoryRefs, bottleRefs, ingredientRefs };
+}
+
+// Import preview: analyze JSON and return matched/missing entities
+const importPreviewSchemas = { body: ImportRecipeV1 };
+
+router.post('/import/preview', validate(importPreviewSchemas), async (_req: AuthRequest, res: Response) => {
+  const recipe = valid<typeof importPreviewSchemas>(res).body.cocktail;
+
+  // Check if cocktail name already exists
+  const existingCocktail = await prisma.cocktail.findFirst({
+    where: { name: { equals: recipe.name } },
+  });
+
+  const { unitRefs, categoryRefs, bottleRefs, ingredientRefs } = collectImportReferences(recipe);
+
   // Match against existing entities
   const allUnits = await prisma.unit.findMany();
   const allCategories = await prisma.category.findMany();
@@ -250,61 +263,81 @@ router.post('/import/preview', async (req: AuthRequest, res: Response) => {
 });
 
 // Import confirm: create missing entities + cocktail in a transaction
-router.post('/import/confirm', async (req: AuthRequest, res: Response) => {
-  const { recipe: data, resolutions } = req.body;
+const importConfirmSchemas = { body: ImportConfirm };
 
-  if (!data || data.version !== 1 || !data.cocktail?.name) throw new BadRequestError();
-
+router.post('/import/confirm', validate(importConfirmSchemas), async (_req: AuthRequest, res: Response) => {
+  const { recipe: data, resolutions } = valid<typeof importConfirmSchemas>(res).body;
   const recipe = data.cocktail;
+  // A name the admin cleared in the wizard falls back on the one in the file
+  const refs = collectImportReferences(recipe);
 
   const result = await prisma.$transaction(async (tx) => {
     // 1. Resolve units
     const unitMap = new Map<string, number>(); // abbreviation (lowercase) -> id
-    for (const [key, resolution] of Object.entries(resolutions?.units || {})) {
-      const r = resolution as any;
+    for (const [key, r] of Object.entries(resolutions?.units || {})) {
       if (r.action === 'use_existing' && r.existingId) {
         unitMap.set(key.toLowerCase(), r.existingId);
       } else if (r.action === 'create' && r.data) {
-        const { nameTranslations, ...rest } = r.data;
-        const created = await tx.unit.create({ data: { ...rest, nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null } });
+        const { name, abbreviation, conversionFactorToMl, nameTranslations } = r.data;
+        const fileUnit = refs.unitRefs.get(key.toLowerCase());
+        const unitAbbreviation: string = abbreviation || fileUnit?.abbreviation || key;
+        const created = await tx.unit.create({
+          data: {
+            // A hand-made file may give no unit name: the abbreviation names it then
+            name: name || fileUnit?.name || unitAbbreviation,
+            abbreviation: unitAbbreviation,
+            conversionFactorToMl: conversionFactorToMl ?? null,
+            nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null,
+          },
+        });
         unitMap.set(key.toLowerCase(), created.id);
       }
     }
 
     // 2. Resolve categories
     const categoryMap = new Map<string, number>(); // name (lowercase) -> id
-    for (const [key, resolution] of Object.entries(resolutions?.categories || {})) {
-      const r = resolution as any;
+    for (const [key, r] of Object.entries(resolutions?.categories || {})) {
       if (r.action === 'use_existing' && r.existingId) {
         categoryMap.set(key.toLowerCase(), r.existingId);
       } else if (r.action === 'create' && r.data) {
+        // The schema defaults the type to SPIRIT
+        const { name, type, desiredStock, minimumPercent, nameTranslations } = r.data;
         // Auto-create CategoryType if missing
-        const typeValue = r.data.type || 'SPIRIT';
-        const existingType = await tx.categoryType.findUnique({ where: { name: typeValue } });
+        const existingType = await tx.categoryType.findUnique({ where: { name: type } });
         if (!existingType) {
-          await tx.categoryType.create({ data: { name: typeValue, color: 'gray' } });
+          await tx.categoryType.create({ data: { name: type, color: 'gray' } });
         }
-        const { nameTranslations, ...rest } = r.data;
-        const created = await tx.category.create({ data: { ...rest, nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null } });
+        const created = await tx.category.create({
+          data: {
+            name: name || refs.categoryRefs.get(key.toLowerCase())?.name || key,
+            type,
+            desiredStock,
+            minimumPercent,
+            nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null,
+          },
+        });
         categoryMap.set(key.toLowerCase(), created.id);
       }
     }
 
     // 3. Resolve bottles
     const bottleMap = new Map<string, number>(); // name (lowercase) -> id
-    for (const [key, resolution] of Object.entries(resolutions?.bottles || {})) {
-      const r = resolution as any;
+    for (const [key, r] of Object.entries(resolutions?.bottles || {})) {
       if (r.action === 'use_existing' && r.existingId) {
         bottleMap.set(key.toLowerCase(), r.existingId);
       } else if (r.action === 'create' && r.data) {
+        const { name, categoryName, capacityMl, remainingPercent, alcoholPercentage } = r.data;
         // Resolve category for this bottle
-        const catId = r.data.categoryName
-          ? categoryMap.get(r.data.categoryName.toLowerCase())
-          : null;
+        const catId = categoryName ? categoryMap.get(categoryName.toLowerCase()) : null;
         if (!catId) continue; // skip if category not resolved
-        const { categoryName, ...bottleData } = r.data;
         const created = await tx.bottle.create({
-          data: { ...bottleData, categoryId: catId },
+          data: {
+            name: name || refs.bottleRefs.get(key.toLowerCase())?.name || key,
+            categoryId: catId,
+            capacityMl,
+            remainingPercent,
+            alcoholPercentage,
+          },
         });
         bottleMap.set(key.toLowerCase(), created.id);
       }
@@ -313,19 +346,24 @@ router.post('/import/confirm', async (req: AuthRequest, res: Response) => {
 
     // 4. Resolve ingredients
     const ingredientMap = new Map<string, number>(); // name (lowercase) -> id
-    for (const [key, resolution] of Object.entries(resolutions?.ingredients || {})) {
-      const r = resolution as any;
+    for (const [key, r] of Object.entries(resolutions?.ingredients || {})) {
       if (r.action === 'use_existing' && r.existingId) {
         ingredientMap.set(key.toLowerCase(), r.existingId);
       } else if (r.action === 'create' && r.data) {
-        const { nameTranslations, ...rest } = r.data;
-        const created = await tx.ingredient.create({ data: { ...rest, nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null } });
+        const { name, icon, nameTranslations } = r.data;
+        const created = await tx.ingredient.create({
+          data: {
+            name: name || refs.ingredientRefs.get(key.toLowerCase())?.name || key,
+            icon: icon ?? null,
+            nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null,
+          },
+        });
         ingredientMap.set(key.toLowerCase(), created.id);
       }
     }
 
     // 5. Build cocktail ingredients
-    const ingredientsData = (recipe.ingredients || []).map((ing: any, index: number) => {
+    const ingredientsData = (recipe.ingredients || []).map((ing, index) => {
       const unitId = ing.unit
         ? unitMap.get(ing.unit.abbreviation.toLowerCase())
         : null;
@@ -351,7 +389,7 @@ router.post('/import/confirm', async (req: AuthRequest, res: Response) => {
 
       // Preferred bottles for CATEGORY type
       const preferredBottleIds = (ing.preferredBottles || [])
-        .map((pb: any) => bottleMap.get(pb.name.toLowerCase()))
+        .map((pb) => bottleMap.get(pb.name.toLowerCase()))
         .filter(Boolean) as number[];
 
       return {
@@ -378,7 +416,7 @@ router.post('/import/confirm', async (req: AuthRequest, res: Response) => {
         isAvailable: true,
         ingredients: { create: ingredientsData },
         instructions: {
-          create: (recipe.instructions || []).map((inst: any, index: number) => ({
+          create: (recipe.instructions || []).map((inst, index) => ({
             stepNumber: index + 1,
             text: inst.text,
           })),
@@ -403,48 +441,46 @@ router.get('/', async (_req: AuthRequest, res: Response) => {
 });
 
 // Get one cocktail
-router.get('/:id', async (req: AuthRequest, res: Response) => {
+router.get('/:id', validate(idRequest), async (_req: AuthRequest, res: Response) => {
   const cocktail = await prisma.cocktail.findUnique({
-    where: { id: parseInt(String(req.params.id)) },
+    where: { id: valid<typeof idRequest>(res).params.id },
     include: cocktailIncludes,
   });
   if (!cocktail) throw new NotFoundError();
   res.json(parseNameTranslations(cocktail));
 });
 
-// Tags are stored as a comma-separated string; the client may send an array or a string.
-function toTagsString(tags: unknown): string {
-  return Array.isArray(tags) ? tags.join(',') : ((tags as string) || '');
+// Tags are stored as a comma-separated string
+function toTagsString(tags: z.output<typeof Tags> | undefined): string {
+  return Array.isArray(tags) ? tags.join(',') : (tags ?? '');
 }
 
-// Maps a request ingredient to a nested Prisma create. The array index gives the position.
-function mapIngredient(ing: any, index: number) {
+// Maps a validated ingredient line to a nested Prisma create. The array index gives the position.
+function mapIngredient(ing: z.output<typeof IngredientLine>, index: number) {
   return {
     quantity: ing.quantity,
     unitId: ing.unitId,
     sourceType: ing.sourceType,
-    bottleId: ing.bottleId || null,
-    categoryId: ing.categoryId || null,
-    ingredientId: ing.ingredientId || null,
+    bottleId: ing.bottleId ?? null,
+    categoryId: ing.categoryId ?? null,
+    ingredientId: ing.ingredientId ?? null,
     position: index,
     preferredBottles: ing.preferredBottleIds
-      ? { create: ing.preferredBottleIds.map((bid: number) => ({ bottleId: bid })) }
+      ? { create: ing.preferredBottleIds.map((bottleId) => ({ bottleId })) }
       : undefined,
   };
 }
 
-// Maps a request instruction (an object with `text`, or a plain string) to a nested Prisma create.
-function mapInstruction(inst: any, index: number) {
-  return {
-    stepNumber: index + 1,
-    text: inst.text || inst,
-  };
+// Maps a validated instruction text to a nested Prisma create
+function mapInstruction(text: string, index: number) {
+  return { stepNumber: index + 1, text };
 }
 
 // Create cocktail
-router.post('/', async (req: AuthRequest, res: Response) => {
-  const { name, description, notes, tags, isAvailable, ingredients, instructions } = req.body;
-  if (!name) throw new BadRequestError();
+const createSchemas = { body: CocktailCreate };
+
+router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Response) => {
+  const { name, description, notes, tags, isAvailable, ingredients, instructions } = valid<typeof createSchemas>(res).body;
 
   const cocktail = await prisma.cocktail.create({
     data: {
@@ -465,23 +501,28 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 // Update cocktail. Only the fields present in the body are written, so a partial
 // update such as { isAvailable: false } keeps the recipe. Ingredients and instructions
 // are replaced through nested writes, which Prisma runs in a single transaction:
-// if any part fails, the stored recipe is left untouched.
-router.put('/:id', async (req: AuthRequest, res: Response) => {
-  const id = parseInt(String(req.params.id));
-  const { name, description, notes, tags, isAvailable, ingredients, instructions } = req.body;
+// if any part fails, the stored recipe is left untouched. A line may keep a defect the
+// stored recipe already has (deleted source, quantity 0), but not add a new one.
+const updateSchemas = { params: IdParams, body: CocktailUpdate };
 
+router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Response) => {
+  const { params: { id }, body } = valid<typeof updateSchemas>(res);
+  const { name, description, notes, tags, isAvailable, ingredients, instructions } = body;
+  if (ingredients) await refuseNewRecipeDefects(id, ingredients);
+
+  // Absent fields are undefined, which Prisma leaves untouched
   const cocktail = await prisma.cocktail.update({
     where: { id },
     data: {
-      ...(name && { name }),
-      ...(description !== undefined && { description }),
-      ...(notes !== undefined && { notes }),
-      ...(tags !== undefined && { tags: toTagsString(tags) }),
-      ...(isAvailable !== undefined && { isAvailable }),
-      ...(Array.isArray(ingredients) && {
+      name,
+      description,
+      notes,
+      tags: tags === undefined ? undefined : toTagsString(tags),
+      isAvailable,
+      ...(ingredients && {
         ingredients: { deleteMany: {}, create: ingredients.map(mapIngredient) },
       }),
-      ...(Array.isArray(instructions) && {
+      ...(instructions && {
         instructions: { deleteMany: {}, create: instructions.map(mapInstruction) },
       }),
     },
@@ -492,10 +533,9 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // Delete cocktail
-router.delete('/:id', async (req: AuthRequest, res: Response) => {
-  const cocktail = await prisma.cocktail.findUnique({
-    where: { id: parseInt(String(req.params.id)) },
-  });
+router.delete('/:id', validate(idRequest), async (req: AuthRequest, res: Response) => {
+  const { id } = valid<typeof idRequest>(res).params;
+  const cocktail = await prisma.cocktail.findUnique({ where: { id } });
   // Delete image if exists
   if (cocktail?.imagePath) {
     const imagePath = path.join(config.uploadDir, cocktail.imagePath);
@@ -503,18 +543,17 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
       fs.unlinkSync(imagePath);
     }
   }
-  await prisma.cocktail.delete({ where: { id: parseInt(String(req.params.id)) } });
+  await prisma.cocktail.delete({ where: { id } });
   res.json({ message: req.t('cocktails.deleted') });
 });
 
-// Upload image
-router.post('/:id/image', upload.single('image'), async (req: AuthRequest, res: Response) => {
+// Upload image. The id is checked before multer writes the file.
+router.post('/:id/image', validate(idRequest), upload.single('image'), async (req: AuthRequest, res: Response) => {
   if (!req.file) throw new BadRequestError();
+  const { id } = valid<typeof idRequest>(res).params;
 
   // Delete old image if exists
-  const existing = await prisma.cocktail.findUnique({
-    where: { id: parseInt(String(req.params.id)) },
-  });
+  const existing = await prisma.cocktail.findUnique({ where: { id } });
   if (existing?.imagePath) {
     const oldPath = path.join(config.uploadDir, existing.imagePath);
     if (fs.existsSync(oldPath)) {
@@ -523,7 +562,7 @@ router.post('/:id/image', upload.single('image'), async (req: AuthRequest, res: 
   }
 
   const cocktail = await prisma.cocktail.update({
-    where: { id: parseInt(String(req.params.id)) },
+    where: { id },
     data: { imagePath: req.file.filename },
   });
 

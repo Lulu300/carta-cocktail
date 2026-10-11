@@ -1,6 +1,7 @@
 import app from './app';
 import { config } from './config';
 import { configureSqlite, prisma } from './lib/prisma';
+import { reportUploadsCheck } from './services/uploadsCheck';
 
 // In-flight requests get this long to finish before the process is killed
 const SHUTDOWN_TIMEOUT_MS = 10_000;
@@ -8,6 +9,8 @@ const SHUTDOWN_TIMEOUT_MS = 10_000;
 async function main(): Promise<void> {
   const journalMode = await configureSqlite();
   console.log(`SQLite journal mode: ${journalMode}`);
+  // Before listening, so the warnings sit next to the other startup lines. Never throws.
+  await reportUploadsCheck(prisma, { uploadDir: config.uploadDir });
 
   // Express 5 hands listen errors (EADDRINUSE, EACCES) to this callback
   const server = app.listen(config.port, (err?: Error) => {

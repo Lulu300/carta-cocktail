@@ -1,78 +1,96 @@
-import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { publicApi } from '../../services/api';
 import { useSiteSettings } from '../../contexts/SiteSettingsContext';
+import { usePublicMenus } from '../../queries/public';
 import type { Menu } from '../../types';
+import EmptyState from '../../components/ui/EmptyState';
+import Skeleton from '../../components/ui/Skeleton';
+import PublicErrorState from './PublicErrorState';
+import PublicLoading from './PublicLoading';
+import { isBottleMenu } from './useMenuFilter';
+import { useScrollRestoration } from './useScrollRestoration';
+
+const PLACEHOLDER_CARDS = [1, 2, 3, 4];
 
 export default function HomePage() {
   const { t } = useTranslation();
   const { siteSettings } = useSiteSettings();
-  const [menus, setMenus] = useState<Menu[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: menus, error, refetch, isFetching } = usePublicMenus();
+  useScrollRestoration(Boolean(menus));
 
-  useEffect(() => {
-    publicApi.listMenus()
-      .then(setMenus)
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20 text-gray-500">
-        {t('common.loading')}
-      </div>
-    );
-  }
+  const renderMenus = () => {
+    if (menus) {
+      if (menus.length === 0) return <EmptyState icon="🍸" title={t('home.noMenus')} />;
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {menus.map((menu) => <MenuCard key={menu.id} menu={menu} />)}
+        </div>
+      );
+    }
+    if (error) {
+      return (
+        <PublicErrorState
+          error={error}
+          loadErrorTitle={t('home.loadError')}
+          onRetry={() => refetch()}
+          isRetrying={isFetching}
+        />
+      );
+    }
+    return <HomeSkeleton />;
+  };
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
       <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold font-serif text-amber-400 mb-3">
+        <h1 className="text-4xl font-bold font-serif text-accent mb-3">
           {siteSettings.siteIcon && <span className="mr-2">{siteSettings.siteIcon}</span>}
           {siteSettings.siteName}
         </h1>
-        <p className="text-gray-400 text-lg">{t('home.subtitle')}</p>
+        <p className="text-fg-muted text-lg">{t('home.subtitle')}</p>
       </div>
-
-      {menus.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">
-          {t('home.noMenus')}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {menus.map((menu) => {
-            const isBottleMenu = menu.type === 'APEROS' || menu.type === 'DIGESTIFS';
-            const count = isBottleMenu ? (menu._count?.bottles ?? 0) : (menu._count?.cocktails ?? 0);
-            const countLabel = isBottleMenu ? 'bouteille(s)' : t('home.cocktailCount');
-
-            return (
-              <Link
-                key={menu.id}
-                to={`/menu/${menu.slug}`}
-                className="group bg-[#1a1a2e] border border-gray-800 rounded-xl p-6 hover:border-amber-400/50 transition-all hover:shadow-lg hover:shadow-amber-400/5"
-              >
-                <h2 className="text-xl font-bold font-serif text-white group-hover:text-amber-400 transition-colors mb-2">
-                  {menu.name}
-                </h2>
-                {menu.description && (
-                  <p className="text-gray-400 text-sm mb-4 line-clamp-2">
-                    {menu.description}
-                  </p>
-                )}
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                  <span>
-                    {count} {countLabel}
-                  </span>
-                  <span className="text-amber-400 group-hover:translate-x-1 transition-transform">
-                    &rarr;
-                  </span>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      )}
+      {renderMenus()}
     </div>
+  );
+}
+
+function MenuCard({ menu }: { menu: Menu }) {
+  const { t } = useTranslation();
+  const countLabel = isBottleMenu(menu)
+    ? t('home.bottleCount', { count: menu._count?.bottles ?? 0 })
+    : t('home.cocktailCount', { count: menu._count?.cocktails ?? 0 });
+
+  return (
+    <Link
+      to={`/menu/${menu.slug}`}
+      className="group bg-surface border border-line rounded-xl p-6 hover:border-accent/50 transition-all hover:shadow-lg hover:shadow-accent/5"
+    >
+      <h2 className="text-xl font-bold font-serif text-white group-hover:text-accent transition-colors mb-2">
+        {menu.name}
+      </h2>
+      {menu.description && (
+        <p className="text-fg-muted text-sm mb-4 line-clamp-2">{menu.description}</p>
+      )}
+      <div className="flex items-center justify-between text-xs text-fg-muted">
+        <span>{countLabel}</span>
+        <span aria-hidden="true" className="text-accent group-hover:translate-x-1 transition-transform">
+          &rarr;
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+function HomeSkeleton() {
+  return (
+    <PublicLoading className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+      {PLACEHOLDER_CARDS.map((card) => (
+        <div key={card} className="bg-surface border border-line rounded-xl p-6 space-y-3">
+          <Skeleton className="h-7 w-1/2" />
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-3 w-1/4" />
+        </div>
+      ))}
+    </PublicLoading>
   );
 }

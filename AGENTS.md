@@ -123,7 +123,7 @@ SiteSettings            # Site name + favicon emoji
 - **Three ingredient source types**: `CocktailIngredient.sourceType` is `BOTTLE`, `CATEGORY`, or `INGREDIENT` - polymorphic via nullable FKs.
 - **System menus**: "aperitifs" and "digestifs" menus are auto-created and non-deletable. Bottles sync automatically when `isApero`/`isDigestif` flags change.
 - **Position-based ordering**: All list items use a `position` integer field for custom ordering.
-- **Express v5 params**: `req.params` values are `string | string[]`. Always use `parseInt(String(req.params.id))`.
+- **Input validation**: every route validates its `params`, `query` and `body` with zod schemas (`backend/src/validation/`) through the `validate()` middleware, and reads the typed result with `valid(res)` (see `backend/AGENTS.md`, which names the one exception: the public cocktail routes answer 404 for an invalid id).
 
 ## Running Locally
 

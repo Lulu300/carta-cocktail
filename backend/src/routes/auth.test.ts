@@ -19,6 +19,12 @@ describe('POST /api/auth/login', () => {
     expect(res.status).toBe(400);
   });
 
+  it('should return 400 with details when email is not a string', async () => {
+    const res = await request.post('/api/auth/login').send({ email: {}, password: 'x' });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0]).toMatchObject({ path: 'body.email', code: 'invalid_type' });
+  });
+
   it('should return 401 for non-existent email', async () => {
     const res = await request.post('/api/auth/login').send({ email: 'nobody@test.local', password: 'wrong' });
     expect(res.status).toBe(401);

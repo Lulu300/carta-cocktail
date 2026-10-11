@@ -6,6 +6,11 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
+# Version shown in the admin. The release workflow passes the tag version
+# (e.g. 1.8.0); local and other builds keep "dev". Declared after npm ci so a
+# new version does not invalidate the dependency layer.
+ARG APP_VERSION=dev
+ENV VITE_APP_VERSION=$APP_VERSION
 RUN npm run build
 
 # Non-root nginx (uid 101) listening on 8080. Pinned on a minor version of the stable branch.

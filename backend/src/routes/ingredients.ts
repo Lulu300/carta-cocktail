@@ -1,9 +1,12 @@
 import { Router, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middleware/auth';
-import { BadRequestError, NotFoundError } from '../errors';
+import { NotFoundError } from '../errors';
 import { parseNameTranslations } from '../utils/translations';
 import { deleteIngredient, isForceRequested } from '../services/deletionService';
+import { valid, validate } from '../validation/validate';
+import { deleteRequest, IdParams, idRequest } from '../validation/common';
+import { BulkAvailability, IngredientCreate, IngredientUpdate } from '../validation/ingredients';
 
 const router = Router();
 
@@ -12,26 +15,28 @@ router.get('/', async (_req: AuthRequest, res: Response) => {
   res.json(parseNameTranslations(ingredients));
 });
 
-router.post('/bulk-availability', async (req: AuthRequest, res: Response) => {
-  const { available } = req.body;
-  if (typeof available !== 'boolean') throw new BadRequestError();
+const bulkSchemas = { body: BulkAvailability };
+
+router.post('/bulk-availability', validate(bulkSchemas), async (_req: AuthRequest, res: Response) => {
+  const { available } = valid<typeof bulkSchemas>(res).body;
   const result = await prisma.ingredient.updateMany({
     data: { isAvailable: available },
   });
   res.json({ updated: result.count });
 });
 
-router.get('/:id', async (req: AuthRequest, res: Response) => {
+router.get('/:id', validate(idRequest), async (_req: AuthRequest, res: Response) => {
   const ingredient = await prisma.ingredient.findUnique({
-    where: { id: parseInt(String(req.params.id)) },
+    where: { id: valid<typeof idRequest>(res).params.id },
   });
   if (!ingredient) throw new NotFoundError();
   res.json(parseNameTranslations(ingredient));
 });
 
-router.post('/', async (req: AuthRequest, res: Response) => {
-  const { name, icon, nameTranslations } = req.body;
-  if (!name) throw new BadRequestError();
+const createSchemas = { body: IngredientCreate };
+
+router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Response) => {
+  const { name, icon, nameTranslations } = valid<typeof createSchemas>(res).body;
   const ingredient = await prisma.ingredient.create({
     data: {
       name,
@@ -42,24 +47,30 @@ router.post('/', async (req: AuthRequest, res: Response) => {
   res.status(201).json(parseNameTranslations(ingredient));
 });
 
-router.put('/:id', async (req: AuthRequest, res: Response) => {
-  const { name, icon, isAvailable, nameTranslations } = req.body;
-  const updateData: any = {};
-  if (name !== undefined) updateData.name = name;
-  if (icon !== undefined) updateData.icon = icon;
-  if (isAvailable !== undefined) updateData.isAvailable = isAvailable;
-  if (nameTranslations !== undefined) updateData.nameTranslations = nameTranslations ? JSON.stringify(nameTranslations) : null;
+const updateSchemas = { params: IdParams, body: IngredientUpdate };
 
+router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Response) => {
+  const { params: { id }, body } = valid<typeof updateSchemas>(res);
+  const { name, icon, isAvailable, nameTranslations } = body;
+  // Absent fields are undefined, which Prisma leaves untouched
   const ingredient = await prisma.ingredient.update({
-    where: { id: parseInt(String(req.params.id)) },
-    data: updateData,
+    where: { id },
+    data: {
+      name,
+      icon,
+      isAvailable,
+      ...(nameTranslations !== undefined && {
+        nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null,
+      }),
+    },
   });
   res.json(parseNameTranslations(ingredient));
 });
 
 // Refused while recipes use the ingredient, unless ?force=true
-router.delete('/:id', async (req: AuthRequest, res: Response) => {
-  const impact = await deleteIngredient(parseInt(String(req.params.id)), isForceRequested(req.query.force));
+router.delete('/:id', validate(deleteRequest), async (req: AuthRequest, res: Response) => {
+  const { params: { id }, query } = valid<typeof deleteRequest>(res);
+  const impact = await deleteIngredient(id, isForceRequested(query.force));
   res.json({ message: req.t('ingredients.deleted'), deleted: true, impact });
 });
 
