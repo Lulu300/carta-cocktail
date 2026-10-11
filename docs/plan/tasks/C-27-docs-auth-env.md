@@ -5,13 +5,13 @@ phase: C
 lane: docs
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-11, D-13]
 touches: [README.md, .env.example]
 sources: []
-branch:
-pr:
+branch: docs/C-27-docs-auth-env
+pr: https://github.com/Lulu300/carta-cocktail/pull/87
 ---
 
 ## Contexte
@@ -34,7 +34,7 @@ C-11 (PR #82) ajoute quatre variables d'environnement facultatives au backend, l
 
 ## Critères d'acceptation
 
-- [ ] Les quatre variables sont documentées avec leur valeur par défaut et leur format.
+- [x] Les quatre variables sont documentées avec leur valeur par défaut et leur format.
 
 ## Tests à ajouter ou adapter
 
@@ -47,3 +47,5 @@ C-11 (PR #82) ajoute quatre variables d'environnement facultatives au backend, l
 ## Journal
 
 - 2026-10-11 : tâche créée pendant C-11 (PR #82).
+- 2026-10-11 : fait (PR #87). Défauts et formats vérifiés dans `backend/src/config.ts` et `backend/src/app.ts`. `README.md`, section « Environment Variables » seulement : une ligne par variable, une note sur Docker (les fichiers compose ne transmettent pas ces variables : les ajouter à la liste `environment` de `carta-cocktail-backend`, comme `SQLITE_WAL`), sous-section « Login limit behind a reverse proxy » avec les limites de `TRUST_PROXY` et le fait qu'un redémarrage vide les compteurs (en mémoire). `.env.example` : les quatre variables commentées avec leur défaut. Fichiers compose inchangés. Pas d'action utilisateur, pas de ligne « Notes de version ».
+- 2026-10-11 : suites de la revue de la PR #87. (1) Sous-section `TRUST_PROXY` : `TRUST_PROXY=1` ou `2` ne tient que si aucun client ne contourne un proxy ; tant que les fichiers compose publient le port 3001 (D-03 à venir), et derrière SWAG le port de nginx, un client qui s'y connecte directement forge son adresse : ne pas exposer ces ports ou les bloquer au pare-feu. (2) Extrait YAML `- TRUST_PROXY=1` et avertissement sur les guillemets (gardés dans la valeur par compose, refus de démarrer) ; guillemets retirés du défaut dans `.env.example`. Branche rebasée sur `develop` (#86).
