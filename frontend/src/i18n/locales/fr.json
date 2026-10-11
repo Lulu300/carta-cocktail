@@ -366,10 +366,15 @@
     "translationHint": "Optionnel : fournir des noms traduits pour chaque langue",
     "selected": "{{count}} sélectionné(s)",
     "retry": "Réessayer",
-    "close": "Fermer"
+    "close": "Fermer",
+    "undo": "Annuler"
   },
   "pagination": {
     "showing": "{{start}}-{{end}} sur {{total}}",
     "page": "page"
+  },
+  "confirm": {
+    "deleteTitle": "Supprimer ?",
+    "irreversible": "Cette action est définitive."
   }
 }
