@@ -163,25 +163,57 @@ describe('computeAvailability', () => {
     expect(result.ingredients[0]).not.toHaveProperty('preferredAvailable');
   });
 
+  // Orphan lines: the source was deleted before v1.8.0 (key set to NULL) or no longer exists
   it.each([
     ['a BOTTLE line without bottle', () => line({ sourceType: 'BOTTLE', bottleId: null }), 'Invalid ingredient configuration'],
     ['a CATEGORY line without category', () => line({ sourceType: 'CATEGORY', categoryId: null }), 'Invalid ingredient configuration'],
-    ['an unknown source type', () => line({ sourceType: 'GARNISH', bottleId: 1 }), 'Invalid ingredient configuration'],
+    ['an INGREDIENT line without ingredient', () => line({ sourceType: 'INGREDIENT', ingredientId: null }), 'Invalid ingredient configuration'],
+    ['an orphan line with quantity 0', () => line({ sourceType: 'BOTTLE', bottleId: null, quantity: 0 }), 'Invalid ingredient configuration'],
+    ['a BOTTLE line without bottle but with a category key', () => line({ sourceType: 'BOTTLE', bottleId: null, categoryId: RUM.id }), 'Invalid ingredient configuration'],
     ['a line on a missing bottle', () => bottleLine(99, 40), 'Bottle not found'],
     ['a line on a missing category', () => categoryLine(99, 40), 'Category not found'],
     ['a line on a missing ingredient', () => line({ sourceType: 'INGREDIENT', ingredientId: 99 }), 'Ingredient not found'],
-  ])('makes %s unavailable', (_label, buildLine, reason) => {
-    const result = computeAvailability(1, [buildLine()], stock([bottle(1)]));
+  ])('flags %s but keeps the cocktail available from the rest of the stock', (_label, buildLine, reason) => {
+    const result = computeAvailability(1, [bottleLine(1, 350), buildLine()], stock([bottle(1)]));
 
-    expect(result.isAvailable).toBe(false);
-    expect(result.maxServings).toBe(0);
-    expect(result.ingredients[0]).toMatchObject({ name: 'Unknown', isAvailable: false, availableCount: null, reason });
+    expect(result.isAvailable).toBe(true);
+    expect(result.maxServings).toBe(2);
+    expect(result.ingredients[1]).toMatchObject({ name: 'Unknown', isAvailable: false, availableCount: null, reason });
     expect(result.missingIngredients).toEqual(['Unknown']);
   });
 
-  it('makes the cocktail unavailable when a free ingredient is marked unavailable', () => {
+  it('shows unlimited servings when every line is an orphan', () => {
+    const result = computeAvailability(1, [line({ sourceType: 'BOTTLE', bottleId: null })], stock([bottle(1)]));
+
+    expect(result.isAvailable).toBe(true);
+    expect(result.maxServings).toBe(UNLIMITED_SERVINGS);
+  });
+
+  it('keeps a cocktail with an orphan line unavailable when its other source is out of stock', () => {
+    const lines = [bottleLine(1, 40), line({ sourceType: 'CATEGORY', categoryId: null })];
+    const result = computeAvailability(1, lines, stock([bottle(1, { remainingPercent: 0 })]));
+
+    expect(result.isAvailable).toBe(false);
+    expect(result.maxServings).toBe(0);
+    expect(result.missingIngredients).toEqual(['Bottle 1', 'Unknown']);
+  });
+
+  it('makes a line with an unknown source type, and its cocktail, unavailable', () => {
+    const result = computeAvailability(1, [line({ sourceType: 'GARNISH', bottleId: 1 })], stock([bottle(1)]));
+
+    expect(result.isAvailable).toBe(false);
+    expect(result.maxServings).toBe(0);
+    expect(result.ingredients[0]).toMatchObject({
+      name: 'Unknown', isAvailable: false, availableCount: null, reason: 'Invalid ingredient configuration',
+    });
+    expect(result.missingIngredients).toEqual(['Unknown']);
+  });
+
+  it('makes the cocktail unavailable when a free ingredient is marked unavailable, even next to an orphan line', () => {
     const mint = { id: 2, name: 'Mint', icon: null, isAvailable: false };
-    const lines = [bottleLine(1, 40), line({ sourceType: 'INGREDIENT', ingredientId: 2 })];
+    const lines = [
+      bottleLine(1, 40), line({ sourceType: 'INGREDIENT', ingredientId: 2 }), line({ sourceType: 'BOTTLE', bottleId: null }),
+    ];
     const result = computeAvailability(1, lines, stock([bottle(1)], [mint]));
 
     expect(result.isAvailable).toBe(false);
