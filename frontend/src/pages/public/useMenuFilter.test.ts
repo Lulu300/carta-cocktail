@@ -18,10 +18,11 @@ function filter(menu: Menu, query = '') {
 const gin = category({ id: 2, name: 'Gin' });
 
 describe('useMenuFilter on a bottle menu', () => {
-  it('groups bottles by category, sorted by category name, when the menu has no sections', () => {
+  it('groups bottles by category when the menu has no sections', () => {
     const menu = bottleMenu([
-      menuBottle(1, { name: 'Tanqueray', categoryId: 2, category: gin }),
-      menuBottle(2, { name: 'Suze' }),
+      menuBottle(1, { name: 'Suze' }),
+      menuBottle(2, { name: 'Tanqueray', categoryId: 2, category: gin }),
+      menuBottle(3, { name: 'Picon' }),
     ]);
 
     const { bottleBlocks, cocktailBlocks, resultCount, hasItems } = filter(menu);
@@ -31,8 +32,22 @@ describe('useMenuFilter on a bottle menu', () => {
       ['category', 'Amer', 'section-category-1'],
       ['category', 'Gin', 'section-category-2'],
     ]);
-    expect(resultCount).toBe(2);
+    expect(bottleBlocks[0].items.map((row) => row.name)).toEqual(['Suze', 'Picon']);
+    expect(resultCount).toBe(3);
     expect(hasItems).toBe(true);
+  });
+
+  it('orders the category blocks like the admin, by their first bottle, not by name', () => {
+    const menu = bottleMenu([
+      menuBottle(1, { name: 'Tanqueray', categoryId: 2, category: gin }),
+      menuBottle(2, { name: 'Suze' }),
+      menuBottle(3, { name: 'Hendrick\'s', categoryId: 2, category: gin }),
+    ]);
+
+    const { bottleBlocks } = filter(menu);
+
+    expect(bottleBlocks.map((block) => block.title)).toEqual(['Gin', 'Amer']);
+    expect(bottleBlocks[0].items.map((row) => row.name)).toEqual(['Tanqueray', 'Hendrick\'s']);
   });
 
   it('puts bottles without a category under "other"', () => {

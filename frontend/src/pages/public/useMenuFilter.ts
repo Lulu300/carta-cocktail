@@ -81,7 +81,10 @@ function splitBySection<Item extends MenuItem>(
   ];
 }
 
-/** One block per category name, sorted by name. */
+/**
+ * One block per category name. Bottles arrive in the admin's order (position),
+ * so each block takes the place of its first bottle.
+ */
 function splitByCategory(bottles: MenuBottle[], localize: LocalizeName, otherTitle: string): MenuBlock<MenuBottle>[] {
   const blocks = new Map<string, MenuBlock<MenuBottle>>();
   for (const menuBottle of bottles) {
@@ -94,7 +97,7 @@ function splitByCategory(bottles: MenuBottle[], localize: LocalizeName, otherTit
     }
     block.items.push(menuBottle);
   }
-  return [...blocks.values()].sort((a, b) => a.title.localeCompare(b.title));
+  return [...blocks.values()];
 }
 
 function getBottleSearchText(menuBottle: MenuBottle, localize: LocalizeName): string {
