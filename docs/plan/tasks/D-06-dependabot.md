@@ -5,13 +5,13 @@ phase: D
 lane: ci
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [A-07, B-01]
 touches: [.github/dependabot.yml]
 sources: ["07-devops-history.md §3.5"]
-branch:
-pr:
+branch: chore/D-06-dependabot
+pr: "#80"
 ---
 
 ## Contexte
@@ -88,11 +88,11 @@ Aucune dépendance n'a été mise à jour depuis février : les lockfiles datent
 
 ## Critères d'acceptation
 
-- [ ] `.github/dependabot.yml` existe et GitHub l'accepte (aucune erreur dans Insights > Dependency graph > Dependabot).
-- [ ] Les 4 écosystèmes apparaissent (npm backend, npm frontend, docker, github-actions).
-- [ ] Les PR Dependabot ciblent `develop`, pas `main`.
-- [ ] Les mises à jour mineures et patch d'un même paquet npm arrivent en une seule PR groupée.
-- [ ] Les majeures de Prisma, TypeScript et Node ne génèrent pas de PR.
+- [x] `.github/dependabot.yml` existe et GitHub l'accepte (aucune erreur dans Insights > Dependency graph > Dependabot).
+- [x] Les 4 écosystèmes apparaissent (npm backend, npm frontend, docker, github-actions).
+- [x] Les PR Dependabot ciblent `develop`, pas `main`.
+- [x] Les mises à jour mineures et patch d'un même paquet npm arrivent en une seule PR groupée.
+- [x] Les majeures de Prisma, TypeScript et Node ne génèrent pas de PR.
 
 ## Tests à ajouter ou adapter
 
@@ -110,3 +110,5 @@ Aucune dépendance n'a été mise à jour depuis février : les lockfiles datent
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-11 : `.github/dependabot.yml` ajouté (PR #80), validé par `check-jsonschema --builtin-schema vendor.dependabot`. Décision humaine du 2026-10-11 : `open-pull-requests-limit: 0` sur les deux entrées npm tant que la phase B n'est pas terminée ; Docker et GitHub Actions en configuration normale. Nouvelle tâche D-21 (dépend de toutes les tâches B) pour remonter la limite à 5. Les critères côté GitHub (fichier accepté, 4 écosystèmes, PR vers `develop`) se vérifient après merge avec « Check for updates » ; les PR npm n'arrivent qu'après D-21.
+- 2026-10-11 : actions manuelles laissées à l'humain (listées dans la PR) : créer les labels `dependencies`, `backend`, `frontend`, `docker`, `ci` (aucun n'existe, Dependabot ignore un label absent) ; activer, si souhaité, « Dependabot alerts » et « Dependabot security updates » (désactivés). Les PR de sécurité visent toujours la branche par défaut (`main`) et ignorent les options de l'écosystème quand `target-branch` est défini.
