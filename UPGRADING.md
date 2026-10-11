@@ -29,6 +29,7 @@ Instances older than v1.8.0: upgrade to v1.8.0 first, following the [v1.8.0 sect
 Worth checking after the upgrade:
 
 - **Restoring a backup made before v1.11.0.** Restart the backend afterwards (`docker compose -f docker-compose.prod.yml restart carta-cocktail-backend`). Until then, the admin pages answer with a server error; reloading the page signs you out, and signing in then fails with "Internal server error", even with the right password. This applies to every backup made before v1.11.0, v1.8.0 to v1.10.0 included. The restore screen says so. See [Restoring a backup from an older version](#restoring-a-backup-from-an-older-version) for the cases where a restart is not enough.
+- **Every restore signs out.** Restoring any backup ends every session, the one that ran the restore included: sign in again with the email and password stored in the backup. For a backup made before v1.11.0, this happens at the restart above. After putting a database back by hand (manual restore, `pre-migrate` or `pre-restore` copy), set a new `JWT_SECRET`: see [Signing in after a restore](#signing-in-after-a-restore).
 - **Login limit.** After 10 failed logins from one IP address in 15 minutes (`LOGIN_RATE_LIMIT`), the login answers "Too many failed login attempts: try again in a few minutes" for up to 15 minutes. Restarting the backend clears the counters. The login page now shows that message, and "Invalid email or password" only for wrong credentials. Behind a reverse proxy on a private network (SWAG, Traefik…), nothing to set. Read [README › "Login limit behind a reverse proxy"](README.md#login-limit-behind-a-reverse-proxy) if you use Docker rootless, Podman, Docker Desktop, or IPv6 clients relayed by `docker-proxy` when the Docker daemon has no IPv6: clients from the Internet already share one counter there, and a client can get around the limit; `TRUST_PROXY=1` or `2` removes that bypass without adding any risk of blocking the admin. In every install, do not publish the backend port 3001: remove the `ports` entry of `carta-cocktail-backend`, or bind it to `127.0.0.1:3001:3001`, as README shows (and nginx's port behind SWAG).
 - **Admin profile.** Changing the password signs out every other browser and device. Changing the login email asks for the current password. A new password needs at least 12 characters; a shorter one set before still works.
 - **New optional variables.** `LOGIN_RATE_LIMIT`, `TRUST_PROXY`, `JWT_EXPIRES_IN` and `CORS_ORIGIN`: the defaults suit a standard install, see [README › "Environment Variables"](README.md#environment-variables). The compose files do not pass them from `.env`: add the ones you set to the `environment` list of `carta-cocktail-backend`, without quotes. The backend refuses to start when `LOGIN_RATE_LIMIT`, `TRUST_PROXY` or `JWT_EXPIRES_IN` has a value it cannot read; `CORS_ORIGIN` is not checked. The API no longer accepts calls from other websites unless `CORS_ORIGIN` names that site; the app itself does not need it.
@@ -421,6 +422,17 @@ Then reload the page (the "Reload the page once the backend has restarted" butto
 
 Until the database is updated, the app may answer with server errors. From v1.11.0 on, restoring a backup made before v1.11.0 breaks the admin pages and, in a browser where the admin is signed in, the public menu. Reloading the page signs you out, and signing in then fails with "Internal server error", even with the right password. These failures count for the login limit: after 10 attempts the login answers "Too many failed login attempts" until the restart, which clears the counters. Guests can still see the public menu.
 
+### Signing in after a restore
+
+From v1.11.0 on, a restore signs out every session, the one that ran it included. Sign in again with the admin email and password stored in the backup: a password changed after the backup was made no longer works.
+
+For a backup made before v1.11.0, the sign-out happens at the next start, once the database is updated. The restore writes a `.session-floor` file next to the database (`/app/data/carta_cocktail.db.session-floor` with `docker-compose.prod.yml`), and the next start applies it, then deletes it. Leave it in place.
+
+- If the file cannot be read, the backend refuses to start and its log names it. Set a new `JWT_SECRET` (this signs out every session), delete the file, then start again.
+- Without Docker, a start before `npm run db:deploy` stops with a message that asks for it. The file is kept until then.
+
+Putting a database back by hand skips this: the README procedure for a backup made before migrations, the manual restore of a backup larger than 200 MB ([v1.10.0 notes](docs/releases/v1.10.0.md#backups-larger-than-200-mb)), or a `pre-migrate-<date>.db` or `pre-restore-<date>.db` copy put back. The database comes back with its sessions, including those revoked since it was made. Afterwards, set a new `JWT_SECRET` in `.env` (`openssl rand -hex 32`), then run `docker compose -f docker-compose.prod.yml up -d`: this signs out every session.
+
 ### When a restart is not enough
 
 In these cases, the database update fails and the backend does not start (with `docker-compose.prod.yml`, the container restarts in a loop):
@@ -438,7 +450,7 @@ In these cases, the database update fails and the backend does not start (with `
 
 ### Going back to the database you had before the restore
 
-Before switching, the restore copied the database it replaced to `backups/pre-restore-<date>.db`, next to the database (`/app/data/backups/` in the `db-data` volume of `docker-compose.prod.yml`). To go back to it, stop the backend and put that copy back as in [README › "Restoring a pre-migration backup"](README.md#restoring-a-pre-migration-backup), with `pre-restore-<date>.db` in place of `pre-migrate-<date>.db`, then start the backend. Without Docker, copy it over the database file named by `DATABASE_URL`, after removing its `-wal` and `-shm` files.
+Before switching, the restore copied the database it replaced to `backups/pre-restore-<date>.db`, next to the database (`/app/data/backups/` in the `db-data` volume of `docker-compose.prod.yml`). To go back to it, stop the backend and put that copy back as in [README › "Restoring a pre-migration backup"](README.md#restoring-a-pre-migration-backup), with `pre-restore-<date>.db` in place of `pre-migrate-<date>.db`, then start the backend. Without Docker, copy it over the database file named by `DATABASE_URL`, after removing its `-wal` and `-shm` files. A `.session-floor` file left by the restore is applied at that start: it only signs you out. Then set a new `JWT_SECRET`, as in [Signing in after a restore](#signing-in-after-a-restore).
 
 That copy holds the database only: the photos stay those of the restored backup. To get the photos back as well, once the backend runs on that copy, restore a backup you exported with the installed version.
 
