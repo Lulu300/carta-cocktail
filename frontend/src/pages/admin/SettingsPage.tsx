@@ -1,15 +1,44 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { settings as settingsApi, backup as backupApi } from '../../services/api';
+import type { BackupRestoreResult } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteSettings } from '../../contexts/SiteSettingsContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { toast } from '../../components/ui/ToastStore';
+import Button from '../../components/ui/Button';
 
 const ICON_OPTIONS = [
   '', '🍸', '🍹', '🥃', '🍷', '🥂', '🍺', '🧉', '🫗',
   '🍾', '🥤', '🧊', '🔥', '🌿', '🍋', '🫒', '🍒',
 ];
+
+/** A restore result the admin must read before the page reloads. */
+function needsAdminAttention(result: BackupRestoreResult): boolean {
+  return result.restartRecommended || result.skippedFiles > 0;
+}
+
+function RestoreReport({ result }: { result: BackupRestoreResult }) {
+  const { t } = useTranslation();
+  return (
+    <div className="mt-4 space-y-3">
+      {result.restartRecommended && (
+        <div role="alert" className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm text-warning space-y-2">
+          <p className="font-semibold">{t('settings.backup.restartTitle')}</p>
+          <p>{t('settings.backup.restartRequired')}</p>
+          <p>{t('settings.backup.restartHow')}</p>
+          <p>{t('settings.backup.restartMayFail')}</p>
+        </div>
+      )}
+      {result.skippedFiles > 0 && (
+        <p className="text-sm text-fg-muted">{t('settings.backup.skippedFiles', { count: result.skippedFiles })}</p>
+      )}
+      <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>
+        {result.restartRecommended ? t('settings.backup.reloadAfterRestart') : t('settings.backup.reload')}
+      </Button>
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   const { t } = useTranslation();
@@ -41,6 +70,7 @@ export default function SettingsPage() {
   const [backupImporting, setBackupImporting] = useState(false);
   const [backupMessage, setBackupMessage] = useState('');
   const [backupError, setBackupError] = useState('');
+  const [restoreResult, setRestoreResult] = useState<BackupRestoreResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -103,6 +133,9 @@ export default function SettingsPage() {
     try {
       await backupApi.exportBackup();
       setBackupMessage(t('settings.backup.exportSuccess'));
+      // The report of an earlier restore no longer matches the latest message.
+      // A failed export keeps it: the restart warning is often why it failed.
+      setRestoreResult(null);
     } catch (err: unknown) {
       setBackupError(err instanceof Error ? err.message : t('common.error'));
     } finally {
@@ -122,14 +155,25 @@ export default function SettingsPage() {
 
     setBackupMessage('');
     setBackupError('');
+    setRestoreResult(null);
     setBackupImporting(true);
     try {
-      await backupApi.importBackup(backupFile);
-      setBackupMessage(t('settings.backup.importSuccess'));
-      toast.success(t('settings.backup.importSuccess'));
+      const result = await backupApi.importBackup(backupFile);
       setBackupFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
-      setTimeout(() => window.location.reload(), 1500);
+      if (needsAdminAttention(result)) {
+        // No automatic reload: it would hide the report before the admin reads it and,
+        // after an older backup, log the admin out until the backend restarts.
+        setBackupMessage(t('settings.backup.importDone'));
+        // Not a plain success while the backend still has to update the database
+        if (result.restartRecommended) toast.info(t('settings.backup.importDone'));
+        else toast.success(t('settings.backup.importDone'));
+        setRestoreResult(result);
+      } else {
+        setBackupMessage(t('settings.backup.importSuccess'));
+        toast.success(t('settings.backup.importSuccess'));
+        setTimeout(() => window.location.reload(), 1500);
+      }
     } catch (err: unknown) {
       setBackupError(err instanceof Error ? err.message : t('common.error'));
     } finally {
@@ -321,6 +365,7 @@ export default function SettingsPage() {
         </div>
 
         {backupMessage && <p className="mt-4 text-sm text-green-400">{backupMessage}</p>}
+        {restoreResult && <RestoreReport result={restoreResult} />}
         {backupError && <p className="mt-4 text-sm text-red-400">{backupError}</p>}
       </div>
     </div>

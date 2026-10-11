@@ -346,6 +346,15 @@
       "confirmRestore": "Cela remplacera TOUTES les données actuelles (base de données et images). Cette action est irréversible. Continuer ?",
       "exportSuccess": "Sauvegarde exportée avec succès",
       "importSuccess": "Sauvegarde restaurée avec succès. La page va se recharger.",
+      "importDone": "Sauvegarde restaurée.",
+      "restartTitle": "Redémarrez le backend avant de continuer",
+      "restartRequired": "Cette sauvegarde vient d'une version plus ancienne de Carta Cocktail : sa base de données doit être mise à jour. D'ici là, la connexion, les pages d'administration et, dans ce navigateur, la carte publique peuvent échouer avec une erreur serveur.",
+      "restartHow": "Avec Docker, redémarrez le conteneur backend : il met à jour la base à son démarrage. Sans Docker, lancez npm run db:deploy dans le dossier backend, puis redémarrez le backend.",
+      "restartMayFail": "Cela peut ne pas suffire : pour une sauvegarde de la v1.0.x, ou d'avant la v1.8.0 avec des noms de catégories ou des abréviations d'unités en double, ou, sans Docker, de la v1.5.0 ou plus ancienne, la mise à jour de la base échoue. Lisez « Restoring a backup from an older version » dans UPGRADING.md avant de redémarrer.",
+      "skippedFiles_one": "{{count}} fichier du dossier uploads n'a pas été restauré : seules les images JPG, PNG et WebP sont restaurées, une fois par nom de fichier.",
+      "skippedFiles_other": "{{count}} fichiers du dossier uploads n'ont pas été restaurés : seules les images JPG, PNG et WebP sont restaurées, une fois par nom de fichier.",
+      "reload": "Recharger la page",
+      "reloadAfterRestart": "Recharger la page une fois le backend redémarré",
       "invalidBackup": "Fichier de sauvegarde invalide",
       "fileSelected": "Fichier : {{name}}"
     }

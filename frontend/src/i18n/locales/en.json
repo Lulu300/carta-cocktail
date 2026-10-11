@@ -346,6 +346,15 @@
       "confirmRestore": "This will replace ALL current data (database and images). This action cannot be undone. Continue?",
       "exportSuccess": "Backup exported successfully",
       "importSuccess": "Backup restored successfully. The page will reload.",
+      "importDone": "Backup restored.",
+      "restartTitle": "Restart the backend before going on",
+      "restartRequired": "This backup comes from an older version of Carta Cocktail: its database must be updated. Until then, signing in, the admin pages and, in this browser, the public menu may fail with a server error.",
+      "restartHow": "With Docker, restart the backend container: it updates the database when it starts. Without Docker, run npm run db:deploy in the backend folder, then restart the backend.",
+      "restartMayFail": "This may not be enough: for a backup from v1.0.x, or from before v1.8.0 with duplicate category names or unit abbreviations, or, without Docker, from v1.5.0 or older, the database update fails. Read \"Restoring a backup from an older version\" in UPGRADING.md before restarting.",
+      "skippedFiles_one": "{{count}} file of the uploads folder was not restored: only JPG, PNG and WebP images are restored, once per file name.",
+      "skippedFiles_other": "{{count}} files of the uploads folder were not restored: only JPG, PNG and WebP images are restored, once per file name.",
+      "reload": "Reload the page",
+      "reloadAfterRestart": "Reload the page once the backend has restarted",
       "invalidBackup": "Invalid backup file",
       "fileSelected": "File: {{name}}"
     }

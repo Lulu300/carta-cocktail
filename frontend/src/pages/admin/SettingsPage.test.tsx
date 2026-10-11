@@ -6,6 +6,15 @@ import SettingsPage from './SettingsPage';
 import { ConfirmProvider } from '../../contexts/ConfirmContext';
 import { toast } from '../../components/ui/ToastStore';
 
+// Keeps the interpolation values visible, so that a test can check the count of skipped files
+vi.mock('react-i18next', async (importOriginal) => {
+  const { translateWithValues } = await import('../../test/translateWithValues');
+  return {
+    ...await importOriginal<typeof import('react-i18next')>(),
+    useTranslation: () => ({ t: translateWithValues, i18n: { language: 'en' } }),
+  };
+});
+
 vi.mock('../../services/api', () => ({
   settings: { get: vi.fn(), update: vi.fn(), updateProfile: vi.fn() },
   backup: { exportBackup: vi.fn(), importBackup: vi.fn() },
@@ -71,8 +80,9 @@ beforeEach(() => {
   mockUpdate.mockResolvedValue({ id: 1, siteName: 'My Bar', siteIcon: '🍸' } as never);
   mockUpdateProfile.mockResolvedValue({ id: 1, email: 'admin@test.local' } as never);
   mockExportBackup.mockResolvedValue(undefined as never);
-  mockImportBackup.mockResolvedValue(undefined as never);
+  mockImportBackup.mockResolvedValue({ message: 'Backup restored', skippedFiles: 0, restartRecommended: false });
   vi.spyOn(toast, 'success').mockReturnValue('toast-1');
+  vi.spyOn(toast, 'info').mockReturnValue('toast-2');
 });
 
 describe('SettingsPage', () => {
@@ -387,7 +397,7 @@ describe('SettingsPage', () => {
     fireEvent.change(fileInput, { target: { files: [file] } });
 
     await waitFor(() => {
-      expect(screen.getByText('settings.backup.fileSelected')).toBeInTheDocument();
+      expect(screen.getByText('settings.backup.fileSelected(backup.zip)')).toBeInTheDocument();
     });
   });
 
@@ -404,6 +414,97 @@ describe('SettingsPage', () => {
     });
     expect(toast.success).toHaveBeenCalledWith('settings.backup.importSuccess');
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  });
+
+  it('should reload the page by itself when the restore has nothing to report', async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    renderPage();
+    await selectBackupFileAndClickImport();
+    await answerRestoreDialog('settings.backup.import');
+
+    await screen.findByText('settings.backup.importSuccess');
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 1500);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText(/settings\.backup\.skippedFiles/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /settings\.backup\.reload/ })).not.toBeInTheDocument();
+  });
+
+  it('should keep the restart warning and the skipped files on screen after restoring an older backup', async () => {
+    mockImportBackup.mockResolvedValue({ message: 'Backup restored', skippedFiles: 2, restartRecommended: true });
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    renderPage();
+    await selectBackupFileAndClickImport();
+    await answerRestoreDialog('settings.backup.import');
+
+    const warning = await screen.findByRole('alert');
+    expect(warning).toHaveTextContent('settings.backup.restartTitle');
+    expect(warning).toHaveTextContent('settings.backup.restartRequired');
+    expect(warning).toHaveTextContent('settings.backup.restartHow');
+    expect(warning).toHaveTextContent('settings.backup.restartMayFail');
+    expect(screen.getByText('settings.backup.skippedFiles(2)')).toBeInTheDocument();
+    expect(screen.getByText('settings.backup.importDone')).toBeInTheDocument();
+    // Not a plain success while the backend still has to update the database
+    expect(toast.info).toHaveBeenCalledWith('settings.backup.importDone');
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'settings.backup.reloadAfterRestart' })).toBeInTheDocument();
+    // Reloading would log the admin out before the warning is read
+    expect(setTimeoutSpy).not.toHaveBeenCalledWith(expect.any(Function), 1500);
+  });
+
+  it('should show the skipped files without the restart warning when the schema is current', async () => {
+    mockImportBackup.mockResolvedValue({ message: 'Backup restored', skippedFiles: 1, restartRecommended: false });
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    renderPage();
+    await selectBackupFileAndClickImport();
+    await answerRestoreDialog('settings.backup.import');
+
+    expect(await screen.findByText('settings.backup.skippedFiles(1)')).toBeInTheDocument();
+    expect(toast.success).toHaveBeenCalledWith('settings.backup.importDone');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'settings.backup.reload' })).toBeInTheDocument();
+    expect(setTimeoutSpy).not.toHaveBeenCalledWith(expect.any(Function), 1500);
+  });
+
+  it('should clear the restore report after a successful export', async () => {
+    mockImportBackup.mockResolvedValue({ message: 'Backup restored', skippedFiles: 1, restartRecommended: false });
+    renderPage();
+    await selectBackupFileAndClickImport();
+    await answerRestoreDialog('settings.backup.import');
+    await screen.findByText('settings.backup.skippedFiles(1)');
+
+    fireEvent.click(screen.getByText('settings.backup.export'));
+
+    await screen.findByText('settings.backup.exportSuccess');
+    expect(screen.queryByText('settings.backup.skippedFiles(1)')).not.toBeInTheDocument();
+  });
+
+  it('should keep the restart warning when the export fails', async () => {
+    mockImportBackup.mockResolvedValue({ message: 'Backup restored', skippedFiles: 0, restartRecommended: true });
+    mockExportBackup.mockRejectedValue(new Error('Internal server error'));
+    renderPage();
+    await selectBackupFileAndClickImport();
+    await answerRestoreDialog('settings.backup.import');
+    await screen.findByRole('alert');
+
+    fireEvent.click(screen.getByText('settings.backup.export'));
+
+    await screen.findByText('Internal server error');
+    expect(screen.getByRole('alert')).toHaveTextContent('settings.backup.restartTitle');
+  });
+
+  it('should clear the previous restore report when restoring again', async () => {
+    mockImportBackup.mockResolvedValueOnce({ message: 'Backup restored', skippedFiles: 0, restartRecommended: true });
+    renderPage();
+    await selectBackupFileAndClickImport();
+    await answerRestoreDialog('settings.backup.import');
+    await screen.findByRole('alert');
+
+    mockImportBackup.mockRejectedValueOnce(new Error('Import failed'));
+    await selectBackupFileAndClickImport();
+    await answerRestoreDialog('settings.backup.import');
+
+    await screen.findByText('Import failed');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('should not import backup when the dialog is cancelled', async () => {

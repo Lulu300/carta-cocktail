@@ -306,6 +306,14 @@ export const settings = {
 };
 
 // Backup
+export interface BackupRestoreResult {
+  message: string;
+  /** Files of uploads/ that were not restored: not an image, or a file name already restored. */
+  skippedFiles: number;
+  /** The backup has an older database schema: the backend applies the missing migrations when it restarts. */
+  restartRecommended: boolean;
+}
+
 export const backup = {
   exportBackup: async () => {
     const res = await send('/backup/export');
@@ -323,7 +331,7 @@ export const backup = {
   importBackup: (file: File) => {
     const formData = new FormData();
     formData.append('backup', file);
-    return request<{ success: boolean; message: string }>('/backup/import', {
+    return request<BackupRestoreResult>('/backup/import', {
       method: 'POST',
       body: formData,
     });
