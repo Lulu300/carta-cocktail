@@ -720,6 +720,26 @@ describe('POST /api/bottles/import/confirm', () => {
     expect(await prisma.bottle.count()).toBe(0);
   });
 
+  it('should name a created category after its key when the admin clears the name', async () => {
+    const payload = {
+      version: 1,
+      categories: [],
+      bottles: [{
+        name: 'Havana', categoryName: 'Rhum', capacityMl: 700, remainingPercent: 100,
+        alcoholPercentage: null, purchasePrice: null, location: null, openedAt: null,
+        isApero: false, isDigestif: false, quantity: 1,
+      }],
+    };
+    const res = await request.post('/api/bottles/import/confirm')
+      .set(authHeader())
+      .send({ payload, resolutions: { categories: { rhum: { action: 'create', data: { name: '' } } } } });
+
+    expect(res.status).toBe(201);
+    expect(res.body.created.bottles).toBe(1);
+    const category = await prisma.category.findUniqueOrThrow({ where: { name: 'rhum' } });
+    expect(await prisma.bottle.count({ where: { categoryId: category.id } })).toBe(1);
+  });
+
   it('should create bottles using an existing category', async () => {
     const cat = await seedCategory({ name: 'Rhum', type: 'SPIRIT' });
     const payload = {

@@ -6,7 +6,7 @@ import { parseNameTranslations } from '../utils/translations';
 import { assertUniqueIgnoringCase } from '../utils/uniqueness';
 import { deleteCategory, isForceRequested } from '../services/deletionService';
 import { valid, validate } from '../validation/validate';
-import { IdParams, idRequest } from '../validation/common';
+import { deleteRequest, IdParams, idRequest } from '../validation/common';
 import { CategoryCreate, CategoryUpdate } from '../validation/categories';
 
 const router = Router();
@@ -102,9 +102,9 @@ router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Respo
 });
 
 // Delete category: refused while it holds bottles or recipes use it, unless ?force=true
-router.delete('/:id', validate(idRequest), async (req: AuthRequest, res: Response) => {
-  const id = valid<typeof idRequest>(res).params.id;
-  const impact = await deleteCategory(id, isForceRequested(req.query.force));
+router.delete('/:id', validate(deleteRequest), async (req: AuthRequest, res: Response) => {
+  const { params: { id }, query } = valid<typeof deleteRequest>(res);
+  const impact = await deleteCategory(id, isForceRequested(query.force));
   res.json({ message: req.t('categories.deleted'), deleted: true, impact });
 });
 

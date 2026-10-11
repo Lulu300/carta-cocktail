@@ -62,6 +62,14 @@ describe('BottleImportConfirm', () => {
     });
   });
 
+  it('accepts a blank category name, which the route replaces with the key', () => {
+    const parsed = BottleImportConfirm.parse({
+      payload: payloadWith([row]),
+      resolutions: { categories: { rum: { action: 'create', data: { name: '  ' } } } },
+    });
+    expect(parsed.resolutions?.categories?.rum).toMatchObject({ data: { name: '' } });
+  });
+
   it('rejects an unknown action', () => {
     const result = BottleImportConfirm.safeParse({
       payload: payloadWith([row]),

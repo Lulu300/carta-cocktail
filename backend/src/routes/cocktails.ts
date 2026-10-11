@@ -13,6 +13,8 @@ import { IdParams, idRequest } from '../validation/common';
 import { CocktailCreate, CocktailUpdate, IngredientLine, Tags } from '../validation/cocktails';
 import { ImportConfirm, ImportRecipeV1 } from '../validation/cocktailImport';
 
+type ImportedRecipe = z.output<typeof ImportRecipeV1>['cocktail'];
+
 const parseNT = (val: any) => {
   if (typeof val === 'string') { try { return JSON.parse(val); } catch { return null; } }
   return val || null;
@@ -136,18 +138,9 @@ router.get('/:id/export', validate(idRequest), async (_req: AuthRequest, res: Re
   res.json(payload);
 });
 
-// Import preview: analyze JSON and return matched/missing entities
-const importPreviewSchemas = { body: ImportRecipeV1 };
-
-router.post('/import/preview', validate(importPreviewSchemas), async (_req: AuthRequest, res: Response) => {
-  const recipe = valid<typeof importPreviewSchemas>(res).body.cocktail;
-
-  // Check if cocktail name already exists
-  const existingCocktail = await prisma.cocktail.findFirst({
-    where: { name: { equals: recipe.name } },
-  });
-
-  // Collect unique referenced entities
+// Entities a recipe refers to, keyed like the resolutions: lowercased unit
+// abbreviation, or lowercased name for categories, bottles and ingredients.
+function collectImportReferences(recipe: ImportedRecipe) {
   const unitRefs = new Map<string, any>();
   const categoryRefs = new Map<string, any>();
   const bottleRefs = new Map<string, any>();
@@ -213,6 +206,22 @@ router.post('/import/preview', validate(importPreviewSchemas), async (_req: Auth
     }
   }
 
+  return { unitRefs, categoryRefs, bottleRefs, ingredientRefs };
+}
+
+// Import preview: analyze JSON and return matched/missing entities
+const importPreviewSchemas = { body: ImportRecipeV1 };
+
+router.post('/import/preview', validate(importPreviewSchemas), async (_req: AuthRequest, res: Response) => {
+  const recipe = valid<typeof importPreviewSchemas>(res).body.cocktail;
+
+  // Check if cocktail name already exists
+  const existingCocktail = await prisma.cocktail.findFirst({
+    where: { name: { equals: recipe.name } },
+  });
+
+  const { unitRefs, categoryRefs, bottleRefs, ingredientRefs } = collectImportReferences(recipe);
+
   // Match against existing entities
   const allUnits = await prisma.unit.findMany();
   const allCategories = await prisma.category.findMany();
@@ -258,6 +267,8 @@ const importConfirmSchemas = { body: ImportConfirm };
 router.post('/import/confirm', validate(importConfirmSchemas), async (_req: AuthRequest, res: Response) => {
   const { recipe: data, resolutions } = valid<typeof importConfirmSchemas>(res).body;
   const recipe = data.cocktail;
+  // A name the admin cleared in the wizard falls back on the one in the file
+  const refs = collectImportReferences(recipe);
 
   const result = await prisma.$transaction(async (tx) => {
     // 1. Resolve units
@@ -267,10 +278,11 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
         unitMap.set(key.toLowerCase(), r.existingId);
       } else if (r.action === 'create' && r.data) {
         const { name, abbreviation, conversionFactorToMl, nameTranslations } = r.data;
+        const fileUnit = refs.unitRefs.get(key.toLowerCase());
         const created = await tx.unit.create({
           data: {
-            name,
-            abbreviation,
+            name: name || fileUnit?.name,
+            abbreviation: abbreviation || fileUnit?.abbreviation || key,
             conversionFactorToMl: conversionFactorToMl ?? null,
             nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null,
           },
@@ -294,7 +306,7 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
         }
         const created = await tx.category.create({
           data: {
-            name,
+            name: name || refs.categoryRefs.get(key.toLowerCase())?.name || key,
             type,
             desiredStock,
             minimumPercent,
@@ -316,7 +328,13 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
         const catId = categoryName ? categoryMap.get(categoryName.toLowerCase()) : null;
         if (!catId) continue; // skip if category not resolved
         const created = await tx.bottle.create({
-          data: { name, categoryId: catId, capacityMl, remainingPercent, alcoholPercentage },
+          data: {
+            name: name || refs.bottleRefs.get(key.toLowerCase())?.name || key,
+            categoryId: catId,
+            capacityMl,
+            remainingPercent,
+            alcoholPercentage,
+          },
         });
         bottleMap.set(key.toLowerCase(), created.id);
       }
@@ -332,7 +350,7 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
         const { name, icon, nameTranslations } = r.data;
         const created = await tx.ingredient.create({
           data: {
-            name,
+            name: name || refs.ingredientRefs.get(key.toLowerCase())?.name || key,
             icon: icon ?? null,
             nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null,
           },

@@ -635,6 +635,45 @@ describe('POST /api/cocktails/import/confirm', () => {
     expect(res.body.ingredients[0].bottleId).toBe(bottle.id);
   });
 
+  it('should fall back on the names of the file when the admin clears them in the wizard', async () => {
+    const res = await request.post('/api/cocktails/import/confirm').set(authHeader()).send({
+      recipe: {
+        version: 1,
+        cocktail: {
+          name: 'Blank Names',
+          ingredients: [
+            {
+              sourceType: 'BOTTLE',
+              sourceName: 'Havana Club',
+              sourceDetail: { categoryName: 'Rhum Ambré', categoryType: 'SPIRIT' },
+              quantity: 4,
+              unit: { name: 'Centilitre', abbreviation: 'cL' },
+            },
+            {
+              sourceType: 'INGREDIENT',
+              sourceName: 'Citron Vert',
+              quantity: 1,
+              unit: { name: 'Centilitre', abbreviation: 'cL' },
+            },
+          ],
+        },
+      },
+      resolutions: {
+        units: { cl: { action: 'create', data: { name: '', abbreviation: '  ' } } },
+        categories: { 'rhum ambré': { action: 'create', data: { name: ' ', type: 'SPIRIT' } } },
+        bottles: { 'havana club': { action: 'create', data: { name: '', categoryName: 'Rhum Ambré', capacityMl: 700 } } },
+        ingredients: { 'citron vert': { action: 'create', data: { name: '' } } },
+      },
+    });
+
+    expect(res.status).toBe(201);
+    const unit = await prisma.unit.findUniqueOrThrow({ where: { abbreviation: 'cL' } });
+    expect(unit.name).toBe('Centilitre');
+    expect(await prisma.category.findUnique({ where: { name: 'Rhum Ambré' } })).not.toBeNull();
+    expect(await prisma.bottle.findFirst({ where: { name: 'Havana Club' } })).not.toBeNull();
+    expect(await prisma.ingredient.findUnique({ where: { name: 'Citron Vert' } })).not.toBeNull();
+  });
+
   it('should return 400 for a created bottle with remainingPercent above 100', async () => {
     const res = await request.post('/api/cocktails/import/confirm').set(authHeader()).send({
       recipe: { version: 1, cocktail: { name: 'Bounds' } },

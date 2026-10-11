@@ -138,6 +138,9 @@ router.put('/:id', validate(updateSchemas), async (_req, res) => {
 - `z.object` drops unknown keys: the schema is the whitelist of what a request can write.
 - Path and query values are strings: coerce them (`z.coerce.number()`). JSON bodies are not coerced.
 - `req.query` is a getter in Express 5 and cannot be assigned: read it through `valid(res)`.
+- One deliberate exception: `routes/public.ts` reads `req.params` itself. An invalid cocktail id
+  answers **404**, not 400, so a guest learns nothing about which ids exist (task A-05); the menu
+  slug is only used as a lookup key.
 
 ### Translations
 

@@ -13,6 +13,9 @@ export const MenuIdParams = z.object({ menuId: z.coerce.number().int().positive(
 /** Schemas of a route that only reads `:id`, e.g. `validate(idRequest)`. */
 export const idRequest = { params: IdParams };
 
+/** DELETE with an optional `?force=true`; `isForceRequested` reads the value. */
+export const deleteRequest = { params: IdParams, query: z.object({ force: z.string().optional() }) };
+
 export const OptionalIntQuery = z.coerce.number().int().positive().optional();
 
 export const Percent = z.number().int().min(0).max(100);

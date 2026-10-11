@@ -188,6 +188,14 @@ describe('DELETE /api/categories/:id', () => {
     expect(res.status).toBe(200);
   });
 
+  it('should return 400 when force is repeated in the query', async () => {
+    const cat = await seedCategory();
+    const res = await request.delete(`/api/categories/${cat.id}?force=true&force=true`).set(authHeader());
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('query.force');
+    expect(await prisma.category.count({ where: { id: cat.id } })).toBe(1);
+  });
+
   it('should refuse with 409 to delete a category that holds bottles', async () => {
     const cat = await seedCategory();
     const bottle = await seedBottle({ categoryId: cat.id, name: 'Kept' });

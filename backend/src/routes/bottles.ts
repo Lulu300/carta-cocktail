@@ -9,7 +9,7 @@ import { buildExportPayload, buildCsvPayload } from '../utils/bottlesExport';
 import { parseImportFile, NormalizedImportPayload } from '../utils/bottlesImport';
 import { deleteBottle, isForceRequested } from '../services/deletionService';
 import { valid, validate } from '../validation/validate';
-import { IdParams, idRequest } from '../validation/common';
+import { deleteRequest, IdParams, idRequest } from '../validation/common';
 import { BottleCreate, BottleExportQuery, BottleListQuery, BottleUpdate } from '../validation/bottles';
 import { BottleImportConfirm } from '../validation/bottleImport';
 
@@ -175,14 +175,14 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
         }
         const createdCat = await tx.category.create({
           data: {
-            name: name ?? key,
+            name: name || key,
             type,
             desiredStock,
             minimumPercent,
             nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null,
           },
         });
-        categoryMap.set((name ?? key).toLowerCase(), createdCat.id);
+        categoryMap.set((name || key).toLowerCase(), createdCat.id);
       }
     }
 
@@ -363,9 +363,9 @@ router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Respo
 });
 
 // Refused while recipes use the bottle as a source, unless ?force=true
-router.delete('/:id', validate(idRequest), async (req: AuthRequest, res: Response) => {
-  const id = valid<typeof idRequest>(res).params.id;
-  const impact = await deleteBottle(id, isForceRequested(req.query.force));
+router.delete('/:id', validate(deleteRequest), async (req: AuthRequest, res: Response) => {
+  const { params: { id }, query } = valid<typeof deleteRequest>(res);
+  const impact = await deleteBottle(id, isForceRequested(query.force));
   res.json({ message: req.t('bottles.deleted'), deleted: true, impact });
 });
 

@@ -44,7 +44,8 @@ const CategoryResolution = z.discriminatedUnion('action', [
     action: z.literal('create'),
     data: z
       .object({
-        name: RequiredText.optional(),
+        // Blank or absent: the route uses the category name of the file
+        name: z.string().trim().optional(),
         type: RequiredText.default('SPIRIT'),
         desiredStock: DesiredStock.default(1),
         minimumPercent: Percent.default(30),

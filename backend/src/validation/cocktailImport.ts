@@ -33,6 +33,7 @@ const ImportIngredientLine = z.object({
   sourceType: SourceType,
   sourceName: RequiredText,
   sourceDetail: ImportSourceDetail.optional(),
+  // Not bounded like IngredientLine: files exported before C-04 keep importing
   quantity: z.number(),
   unit: ImportUnit.nullish(),
   position: z.number().optional(),
@@ -48,6 +49,7 @@ export const ImportRecipeV1 = z.object({
     notes: z.string().nullish(),
     tags: Tags.optional(),
     ingredients: z.array(ImportIngredientLine).optional(),
+    // Blank steps are accepted, unlike Instruction: files exported before C-04 keep importing
     instructions: z.array(z.object({ stepNumber: z.number().optional(), text: z.string() })).optional(),
   }),
 });
@@ -56,15 +58,18 @@ export const ImportRecipeV1 = z.object({
 // written on creation: anything else in the request (id, createdAt, purchasePrice...)
 // is dropped.
 
+// The admin may clear a name in the wizard: the route then uses the one in the file.
+const NameOrFileName = z.string().trim().optional();
+
 const UnitData = z.object({
-  name: RequiredText,
-  abbreviation: RequiredText,
+  name: NameOrFileName,
+  abbreviation: NameOrFileName,
   conversionFactorToMl: ConversionFactorToMl.optional(),
   nameTranslations: Translations.optional(),
 });
 
 const CategoryData = z.object({
-  name: RequiredText,
+  name: NameOrFileName,
   type: RequiredText.default('SPIRIT'),
   desiredStock: DesiredStock.optional(),
   minimumPercent: Percent.optional(),
@@ -72,7 +77,7 @@ const CategoryData = z.object({
 });
 
 const BottleData = z.object({
-  name: RequiredText,
+  name: NameOrFileName,
   categoryName: z.string().optional(),
   capacityMl: CapacityMl,
   remainingPercent: Percent.optional(),
@@ -80,7 +85,7 @@ const BottleData = z.object({
 });
 
 const IngredientData = z.object({
-  name: RequiredText,
+  name: NameOrFileName,
   icon: z.string().nullish(),
   nameTranslations: Translations.optional(),
 });

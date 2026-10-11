@@ -62,6 +62,15 @@ describe('ImportResolutions', () => {
     expect(resolutions.ingredients?.lime.data).toEqual({ name: 'Lime', icon: null });
   });
 
+  it('accepts a blank name, which the route replaces with the name in the file', () => {
+    const resolutions = ImportResolutions.parse({
+      units: { cl: { action: 'create', data: { name: ' ', abbreviation: '' } } },
+      ingredients: { lime: { action: 'create', data: { name: '' } } },
+    });
+    expect(resolutions.units?.cl.data).toEqual({ name: '', abbreviation: '' });
+    expect(resolutions.ingredients?.lime.data).toEqual({ name: '' });
+  });
+
   it('applies the bounds of a bottle created by hand', () => {
     const result = ImportResolutions.safeParse({
       bottles: { havana: { action: 'create', data: { name: 'Havana', capacityMl: 0, remainingPercent: 150, alcoholPercentage: 120 } } },
