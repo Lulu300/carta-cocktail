@@ -66,6 +66,54 @@ describe('Toaster', () => {
     expect(screen.queryByText('Bottle deleted')).not.toBeInTheDocument();
   });
 
+  it('gives the focus back to where it was after closing a toast from the keyboard', async () => {
+    const user = userEvent.setup();
+    render(<><button type="button">Save</button><Toaster /></>);
+    act(() => {
+      toast.error(new Error('Failed'));
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'common.close' })).toHaveFocus();
+    await user.keyboard('{Enter}');
+
+    expect(screen.queryByText('Failed')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toHaveFocus();
+  });
+
+  it('gives the focus back after running the action from the keyboard', async () => {
+    const user = userEvent.setup();
+    render(<><button type="button">Delete</button><Toaster /></>);
+    act(() => {
+      toast.info('Bottle deleted', { action: { label: 'Undo', onClick: vi.fn() } });
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'Undo' })).toHaveFocus();
+    await user.keyboard('{Enter}');
+
+    expect(screen.getByRole('button', { name: 'Delete' })).toHaveFocus();
+  });
+
+  it('moves the focus to another toast when there is nowhere to go back to', async () => {
+    const user = userEvent.setup();
+    render(<Toaster />);
+    act(() => {
+      toast.error(new Error('First'));
+      toast.error(new Error('Second'));
+    });
+
+    await user.tab();
+    await user.keyboard('{Enter}');
+
+    expect(screen.queryByText('First')).not.toBeInTheDocument();
+    const remainingClose = within(screen.getByText('Second').parentElement as HTMLElement)
+      .getByRole('button', { name: 'common.close' });
+    expect(remainingClose).toHaveFocus();
+  });
+
   it('keeps a toast while the pointer is on it', () => {
     vi.useFakeTimers();
     render(<Toaster />);
