@@ -7,12 +7,6 @@ export default {
   before: [
     { step: 'Pin', action: 'updateCompose', generation: '1.8.0', note: 'compose file unchanged since v1.8.0, own changes kept, images pinned' },
   ],
-  after: [
-    {
-      step: 'After 1',
-      action: 'manual',
-      note: 'optional: fix cocktail lines with a quantity of 0 if saving the cocktail fails; the real-instance fixture has none (checked in C-04)',
-    },
-  ],
+  after: [],
   naiveMayFail: {},
 };

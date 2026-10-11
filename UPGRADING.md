@@ -20,13 +20,9 @@ The commands below assume the default `docker-compose.prod.yml`, run from its fo
 
 ## v1.9.0
 
-No required action before upgrading. `docker-compose.prod.yml` has not changed since v1.8.0: pin both images to `:1.9.0` (`:1.9.0-rc.N` to test a pre-release), then pull and restart. The API now refuses invalid requests with a `400`, including a cocktail ingredient line with a quantity of `0` (step 1). Release notes: [`docs/releases/v1.9.0.md`](docs/releases/v1.9.0.md).
+No required action. `docker-compose.prod.yml` has not changed since v1.8.0: pin both images to `:1.9.0` (`:1.9.0-rc.N` to test a pre-release), then pull and restart. The API now refuses invalid requests with a `400` "Validation error"; recipe lines already saved with a quantity of `0` or a deleted source are kept as they are. Release notes: [`docs/releases/v1.9.0.md`](docs/releases/v1.9.0.md).
 
 Instances older than v1.8.0: upgrade to v1.8.0 first, following the [v1.8.0 section](#v180) (and the sections before it), check that it works, then apply this one.
-
-### After upgrading
-
-1. **Optional, no data loss.** If saving a cocktail from the admin form fails with "Validation error", one of its ingredient lines probably has a quantity of `0` (the form used to save `0` when the field was cleared). Set a positive quantity on that line, or remove it, then save again. Until then, the cocktail is still displayed and served as before.
 
 If the backend logs a `[uploads] WARNING` at startup, follow the guide it links to: the photo folder is not a mount (photos stored there are lost when the container is recreated), or photos referenced by cocktails are missing from it.
 
