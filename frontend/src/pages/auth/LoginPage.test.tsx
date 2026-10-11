@@ -4,6 +4,7 @@ import { render as renderWithoutRouter } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import LoginPage from './LoginPage';
+import { ApiError } from '../../services/api';
 
 const mockLogin = vi.fn();
 const mockNavigate = vi.fn();
@@ -95,19 +96,19 @@ describe('LoginPage', () => {
     });
   });
 
-  it('should display error on failed login', async () => {
-    mockLogin.mockRejectedValueOnce(new Error('Bad credentials'));
-    const user = userEvent.setup();
-
+  it.each([
+    ['wrong credentials (401)', new ApiError(401, 'Invalid credentials'), 'auth.loginError'],
+    ['the attempt limit (429)', new ApiError(429, 'Too many failed login attempts'), 'Too many failed login attempts'],
+    ['a server error (500)', new ApiError(500, 'Internal server error'), 'Internal server error'],
+    ['a network error', new TypeError('Failed to fetch'), 'common.error'],
+    ['an API error without message', new ApiError(502, ''), 'common.error'],
+  ])('should explain %s', async (_label, error, expectedMessage) => {
+    mockLogin.mockRejectedValueOnce(error);
     render(<LoginPage />);
 
-    await user.type(screen.getByPlaceholderText('admin@carta.local'), 'wrong@test.local');
-    await user.type(screen.getByPlaceholderText('admin@carta.local').closest('form')!.querySelector('input[type="password"]')!, 'wrong');
-    await user.click(screen.getByRole('button', { name: 'auth.loginButton' }));
+    await submitValidCredentials();
 
-    await waitFor(() => {
-      expect(screen.getByText('auth.loginError')).toBeInTheDocument();
-    });
+    expect(await screen.findByText(expectedMessage)).toBeInTheDocument();
   });
 
   it('should show loading state during submission', async () => {
