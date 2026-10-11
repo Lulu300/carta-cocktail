@@ -5,28 +5,33 @@ export const SOURCE_TYPES = ['BOTTLE', 'CATEGORY', 'INGREDIENT'] as const;
 export const SourceType = z.enum(SOURCE_TYPES);
 
 // The foreign key each source type points to. The other two must stay empty.
-const SOURCE_KEYS = {
+export const SOURCE_KEYS = {
   BOTTLE: 'bottleId',
   CATEGORY: 'categoryId',
   INGREDIENT: 'ingredientId',
 } as const;
 
-export const IngredientLine = z
-  .object({
-    sourceType: SourceType,
-    bottleId: Id.nullish(),
-    categoryId: Id.nullish(),
-    ingredientId: Id.nullish(),
-    quantity: z.number().positive(),
-    unitId: Id,
-    // Bottles to use first among those of the category: only for CATEGORY lines
-    preferredBottleIds: z.array(Id).optional(),
-  })
-  .superRefine((line, ctx) => {
+export type SourceKey = (typeof SOURCE_KEYS)[keyof typeof SOURCE_KEYS];
+
+const IngredientLineFields = z.object({
+  sourceType: SourceType,
+  bottleId: Id.nullish(),
+  categoryId: Id.nullish(),
+  ingredientId: Id.nullish(),
+  quantity: z.number().positive(),
+  unitId: Id,
+  // Bottles to use first among those of the category: only for CATEGORY lines
+  preferredBottleIds: z.array(Id).optional(),
+});
+
+type IngredientLineValue = z.output<typeof IngredientLineFields>;
+
+function checkLineCoherence({ requireSourceKey }: { requireSourceKey: boolean }) {
+  return (line: IngredientLineValue, ctx: z.RefinementCtx) => {
     const expectedKey = SOURCE_KEYS[line.sourceType];
     for (const key of Object.values(SOURCE_KEYS)) {
       const isSet = line[key] != null;
-      if (key === expectedKey && !isSet) {
+      if (key === expectedKey && !isSet && requireSourceKey) {
         ctx.addIssue({ code: 'custom', path: [key], message: `Required when sourceType is ${line.sourceType}` });
       } else if (key !== expectedKey && isSet) {
         ctx.addIssue({ code: 'custom', path: [key], message: `Must be empty when sourceType is ${line.sourceType}` });
@@ -36,7 +41,20 @@ export const IngredientLine = z
     if (hasPreferredBottles && line.sourceType !== 'CATEGORY') {
       ctx.addIssue({ code: 'custom', path: ['preferredBottleIds'], message: 'Only allowed when sourceType is CATEGORY' });
     }
-  });
+  };
+}
+
+export const IngredientLine = IngredientLineFields.superRefine(checkLineCoherence({ requireSourceKey: true }));
+
+/**
+ * Line of a cocktail update. Recipes stored before v1.9.0 can hold lines whose source was
+ * deleted (key set to NULL) or with a quantity of 0, and the form sends them back as they are.
+ * This variant lets those two defects through; the route then refuses any defect the cocktail
+ * did not already have (`findNewRecipeDefects`). Every other rule stays as strict.
+ */
+export const IngredientLineUpdate = IngredientLineFields.extend({
+  quantity: z.number().nonnegative(),
+}).superRefine(checkLineCoherence({ requireSourceKey: false }));
 
 /** A recipe step, sent as a plain string or as `{ text }`, normalized to its non-blank text. */
 export const Instruction = z
@@ -58,4 +76,6 @@ export const CocktailCreate = z.object({
 });
 
 /** Only the fields present are written; `ingredients` and `instructions` replace the stored lists. */
-export const CocktailUpdate = CocktailCreate.partial();
+export const CocktailUpdate = CocktailCreate.partial().extend({
+  ingredients: z.array(IngredientLineUpdate).optional(),
+});

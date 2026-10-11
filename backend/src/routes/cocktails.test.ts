@@ -143,6 +143,19 @@ describe('POST /api/cocktails', () => {
     expect(res.body.details[0].path).toBe('body.ingredients.0.sourceType');
   });
 
+  it('should return 400 for a line with a quantity of 0', async () => {
+    const unit = await seedUnit();
+    const bottle = await seedBottle();
+
+    const res = await request.post('/api/cocktails').set(authHeader()).send({
+      name: 'Broken',
+      ingredients: [{ quantity: 0, unitId: unit.id, sourceType: 'BOTTLE', bottleId: bottle.id }],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0]).toMatchObject({ path: 'body.ingredients.0.quantity', code: 'too_small' });
+    expect(await prisma.cocktail.count()).toBe(0);
+  });
+
   it('should return 400 for an instruction with an empty text', async () => {
     const res = await request.post('/api/cocktails').set(authHeader())
       .send({ name: 'Steps', instructions: [{ text: '' }] });
@@ -346,6 +359,129 @@ describe('PUT /api/cocktails/:id', () => {
 
     const after = await request.get(`/api/cocktails/${id}`).set(authHeader());
     expectRecipeIntact(after.body);
+  });
+});
+
+// Recipes stored before v1.9.0 can hold lines whose source was deleted (key set to NULL
+// until v1.7.0) or with a quantity of 0 (a cleared field). The form sends them back as they are.
+describe('PUT /api/cocktails/:id - recipe defects already stored', () => {
+  type StoredLine = {
+    sourceType: 'BOTTLE' | 'CATEGORY' | 'INGREDIENT';
+    quantity: number;
+    bottleId?: number;
+    categoryId?: number;
+    ingredientId?: number;
+  };
+
+  async function seedLegacyCocktail(line: StoredLine) {
+    const unit = await seedUnit();
+    const cocktail = await prisma.cocktail.create({
+      data: { name: 'Legacy', ingredients: { create: [{ ...line, unitId: unit.id, position: 0 }] } },
+    });
+    return { id: cocktail.id, unitId: unit.id };
+  }
+
+  // The recipe lines as CocktailFormPage loads them and sends them back on save
+  async function formLines(id: number) {
+    const res = await request.get(`/api/cocktails/${id}`).set(authHeader());
+    return res.body.ingredients.map((ing: any) => ({
+      sourceType: ing.sourceType,
+      bottleId: ing.sourceType === 'BOTTLE' ? ing.bottleId : null,
+      categoryId: ing.sourceType === 'CATEGORY' ? ing.categoryId : null,
+      ingredientId: ing.sourceType === 'INGREDIENT' ? ing.ingredientId : null,
+      quantity: ing.quantity,
+      unitId: ing.unitId,
+      preferredBottleIds: ing.sourceType === 'CATEGORY' ? [] : undefined,
+    }));
+  }
+
+  async function storedLines(id: number) {
+    return prisma.cocktailIngredient.findMany({ where: { cocktailId: id }, orderBy: { position: 'asc' } });
+  }
+
+  it.each(['BOTTLE', 'CATEGORY', 'INGREDIENT'] as const)(
+    'should rename a cocktail whose %s line lost its source and keep the line',
+    async (sourceType) => {
+      const { id } = await seedLegacyCocktail({ sourceType, quantity: 2 });
+
+      const ingredients = await formLines(id);
+      const res = await request.put(`/api/cocktails/${id}`).set(authHeader())
+        .send({ name: 'Renamed', ingredients });
+      expect(res.status).toBe(200);
+      expect(res.body.name).toBe('Renamed');
+      expect(await storedLines(id)).toMatchObject([
+        { sourceType, bottleId: null, categoryId: null, ingredientId: null, quantity: 2 },
+      ]);
+    },
+  );
+
+  it('should rename a cocktail with a quantity-0 line and keep the line', async () => {
+    const bottle = await seedBottle();
+    const { id } = await seedLegacyCocktail({ sourceType: 'BOTTLE', bottleId: bottle.id, quantity: 0 });
+
+    const ingredients = await formLines(id);
+    const res = await request.put(`/api/cocktails/${id}`).set(authHeader())
+      .send({ name: 'Renamed', ingredients });
+    expect(res.status).toBe(200);
+    expect(await storedLines(id)).toMatchObject([{ bottleId: bottle.id, quantity: 0 }]);
+  });
+
+  it('should return 400 and keep the recipe when a new line lost its source', async () => {
+    const { id, unitId } = await seedLegacyCocktail({ sourceType: 'BOTTLE', quantity: 2 });
+    const newLine = { sourceType: 'BOTTLE', bottleId: null, quantity: 1, unitId };
+
+    const ingredients = [...await formLines(id), newLine];
+    const res = await request.put(`/api/cocktails/${id}`).set(authHeader()).send({ ingredients });
+    expect(res.status).toBe(400);
+    expect(res.body.details).toEqual([
+      { path: 'body.ingredients.1.bottleId', code: 'custom', message: 'Required when sourceType is BOTTLE' },
+    ]);
+    expect(await storedLines(id)).toHaveLength(1);
+  });
+
+  it('should return 400 and keep the recipe when a new line has a quantity of 0', async () => {
+    const bottle = await seedBottle();
+    const { id, unitId } = await seedLegacyCocktail({ sourceType: 'BOTTLE', bottleId: bottle.id, quantity: 0 });
+    const newLine = { sourceType: 'BOTTLE', bottleId: bottle.id, quantity: 0, unitId };
+
+    const ingredients = [...await formLines(id), newLine];
+    const res = await request.put(`/api/cocktails/${id}`).set(authHeader()).send({ ingredients });
+    expect(res.status).toBe(400);
+    expect(res.body.details).toHaveLength(1);
+    expect(res.body.details[0]).toMatchObject({ path: 'body.ingredients.1.quantity', code: 'too_small' });
+    expect(await storedLines(id)).toHaveLength(1);
+  });
+
+  it('should return 400 for a line without source on a cocktail that has no stored defect', async () => {
+    const bottle = await seedBottle();
+    const { id, unitId } = await seedLegacyCocktail({ sourceType: 'BOTTLE', bottleId: bottle.id, quantity: 2 });
+
+    const res = await request.put(`/api/cocktails/${id}`).set(authHeader())
+      .send({ ingredients: [{ sourceType: 'INGREDIENT', ingredientId: null, quantity: 1, unitId }] });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0]).toMatchObject({ path: 'body.ingredients.0.ingredientId', code: 'custom' });
+    expect(await storedLines(id)).toMatchObject([{ bottleId: bottle.id }]);
+  });
+
+  it('should return 400 for a quantity of 0 on a cocktail that has no stored defect', async () => {
+    const bottle = await seedBottle();
+    const { id, unitId } = await seedLegacyCocktail({ sourceType: 'BOTTLE', bottleId: bottle.id, quantity: 2 });
+
+    const res = await request.put(`/api/cocktails/${id}`).set(authHeader())
+      .send({ ingredients: [{ sourceType: 'BOTTLE', bottleId: bottle.id, quantity: 0, unitId }] });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0]).toMatchObject({ path: 'body.ingredients.0.quantity', code: 'too_small' });
+    expect(await storedLines(id)).toMatchObject([{ quantity: 2 }]);
+  });
+
+  it('should still return 400 for a negative quantity on a cocktail with a quantity-0 line', async () => {
+    const bottle = await seedBottle();
+    const { id, unitId } = await seedLegacyCocktail({ sourceType: 'BOTTLE', bottleId: bottle.id, quantity: 0 });
+
+    const res = await request.put(`/api/cocktails/${id}`).set(authHeader())
+      .send({ ingredients: [{ sourceType: 'BOTTLE', bottleId: bottle.id, quantity: -1, unitId }] });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('body.ingredients.0.quantity');
   });
 });
 
