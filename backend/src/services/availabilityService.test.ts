@@ -5,7 +5,8 @@ import {
   prisma, seedCategory, seedUnit, seedBottle, seedIngredient, seedCocktailUsing,
 } from '../test/helpers';
 import {
-  calculateCocktailAvailability, calculateAllCocktailsAvailability, computeAvailability, buildStockSnapshot,
+  calculateCocktailAvailability, calculateAllCocktailsAvailability, calculateAvailabilities, computeAvailability,
+  buildStockSnapshot,
   LOW_STOCK_THRESHOLD, UNLIMITED_SERVINGS,
   type RecipeLine, type StockBottle, type StockIngredient, type StockSnapshot,
 } from './availabilityService';
@@ -275,6 +276,15 @@ describe('loading the stock', () => {
     expect(forOne).toBeGreaterThan(0);
     expect(forTwenty).toBe(forOne);
     expect(forTwenty).toBeLessThanOrEqual(8);
+  });
+
+  it('sends no query for an empty list of cocktails', async () => {
+    await seedCocktails(1);
+    let result: Map<number, unknown> | undefined;
+    const queries = await countQueries(async (db) => { result = await calculateAvailabilities(db, []); });
+
+    expect(queries).toBe(0);
+    expect(result?.size).toBe(0);
   });
 
   it('loads the recipe lines in position order, with their preferred bottles', async () => {

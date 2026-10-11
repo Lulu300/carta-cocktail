@@ -372,6 +372,8 @@ export async function calculateAvailabilities(
   db: AvailabilityDb = prisma,
   cocktailIds?: number[],
 ): Promise<Map<number, CocktailAvailability>> {
+  // A bottle menu (apéritifs, digestifs) has no cocktail: skip the stock load
+  if (cocktailIds?.length === 0) return new Map();
   const { recipes, stock } = await loadStock(db, cocktailIds);
   const availabilities = new Map<number, CocktailAvailability>();
   for (const [cocktailId, lines] of recipes) {
