@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: haute
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [C-03]
-touches: [backend/src/validation/, backend/src/routes/, backend/package.json, backend/package-lock.json]
+touches: [backend/src/validation/, backend/src/routes/, backend/package.json, backend/package-lock.json, AGENTS.md, backend/AGENTS.md, docs/plan/tasks/C-10-bottles-import-robust.md, docs/plan/tasks/E-23-validation-error-details.md]
 sources: ["01-backend-routes.md §M4", "01-backend-routes.md §R2", "03-security.md §14"]
-branch:
-pr:
+branch: feature/C-04-zod-validation
+pr: https://github.com/Lulu300/carta-cocktail/pull/69
 ---
 
 ## Contexte
@@ -80,14 +80,14 @@ Aucune route ne valide ses entrées. Un mauvais type finit en erreur Prisma (500
 
 ## Critères d'acceptation
 
-- [ ] Plus aucun `parseInt(String(req.params` dans `src/routes/`.
-- [ ] Plus aucun `any` sur `req.body`, `where` ou `updateData` dans les routes.
-- [ ] Une entrée invalide renvoie 400 avec `details[]` (`path`, `code`, `message`).
-- [ ] `POST /categories` avec `desiredStock: 0` enregistre 0 ; `POST /bottles` avec `purchasePrice: 0` enregistre 0.
-- [ ] `remainingPercent: 150` → 400 (POST, PUT, import confirm).
-- [ ] Ligne `sourceType: 'BOTTLE'` sans `bottleId` → 400 (POST et PUT cocktail).
-- [ ] Import cocktail : `id` ou `purchasePrice` glissés dans `resolutions.*.data` sont ignorés.
-- [ ] Les formulaires admin (bouteille, cocktail, catégorie, unité, réglages) fonctionnent toujours (vérification manuelle).
+- [x] Plus aucun `parseInt(String(req.params` dans `src/routes/`.
+- [x] Plus aucun `any` sur `req.body`, `where` ou `updateData` dans les routes.
+- [x] Une entrée invalide renvoie 400 avec `details[]` (`path`, `code`, `message`).
+- [x] `POST /categories` avec `desiredStock: 0` enregistre 0 ; `POST /bottles` avec `purchasePrice: 0` enregistre 0.
+- [x] `remainingPercent: 150` → 400 (POST, PUT, import confirm).
+- [x] Ligne `sourceType: 'BOTTLE'` sans `bottleId` → 400 (POST et PUT cocktail).
+- [x] Import cocktail : `id` ou `purchasePrice` glissés dans `resolutions.*.data` sont ignorés.
+- [ ] Les formulaires admin (bouteille, cocktail, catégorie, unité, réglages) fonctionnent toujours (vérification manuelle). Non faite dans un navigateur. À la place, les payloads exacts construits par chaque formulaire et par les deux assistants d'import ont été rejoués contre les nouvelles routes (test temporaire) : tous passent, sauf la quantité 0 et un fichier d'import hors bornes, refus acceptés par l'humain.
 
 ## Tests à ajouter ou adapter
 
@@ -114,3 +114,5 @@ Aucune route ne valide ses entrées. Un mauvais type finit en erreur Prisma (500
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : suivi des revues de la phase A. Références à `cocktails.ts` passées des numéros de ligne aux noms de fonction et de handler (`mapInstruction`, `mapIngredient`, `POST /import/confirm`) pour résister aux prochaines modifications. Seules celles de `mapInstruction` et `mapIngredient` (`:490,543`, `:477,528`) étaient périmées depuis A-03 ; celles de l'import étaient encore justes.
+- 2026-10-11 : fait (PR #69). zod 4.6.5 ; middleware `validate()` / `valid(res)` et un fichier de schémas par ressource dans `backend/src/validation/`, sans dépendance à Prisma (plus `categoryTypes`, dont la route lit aussi `params` et `body`). Toutes les routes branchées. `Translations` utilise `z.partialRecord` : avec zod v4, `z.record` sur un enum exige toutes les langues alors que les formulaires n'envoient que celles remplies ; C-14 doit appliquer la même règle (fr/en, chaînes trimées). Contrat frontend vérifié (l'UI envoie des nombres dans les bodies : `z.coerce` seulement sur `params` et `query`) et données réelles contrôlées sur une copie de base (aucune valeur hors bornes). Décisions humaines : `quantity > 0` dès C-04 ; schéma strict à la confirmation de l'import de bouteilles (ligne ajoutée au Journal de C-10) ; création d'E-23 (affichage des `details` d'une 400). `AGENTS.md`, `backend/AGENTS.md` (modèle `validate`/`valid` au lieu de `parseInt(String(req.params.id))`), C-10 et E-23 ajoutés à `touches`.
+- Notes de version : les entrées invalides sont refusées en 400 avec `details[]`. Nouvelles 400 : quantité 0 sur une ligne de cocktail (UI actuelle : 0 saisi ou champ vidé) et ligne laissée sur « -- » ; import de bouteilles d'un fichier fait à la main avec une ligne hors bornes (capacité vide ou 0, pourcentage > 100, prix négatif…) refusé en entier, à corriger puis réimporter (les fichiers exportés par l'app passent) ; valeurs hors bornes (pourcentages hors 0-100, capacité ≤ 0, prix, stock désiré ou facteur de conversion négatifs) ; `quantity` > 50 refusée au lieu d'être plafonnée ; mauvais types, ids non numériques, `?categoryId=x` ; `sourceType` inconnu ou incohérent avec la clé renseignée, bouteilles préférées hors `CATEGORY`, instruction vide ; nom vide au PUT (avant : ignoré) ; type de carte inconnu ; traductions hors fr/en. Valeurs désormais conservées : `desiredStock` 0, `purchasePrice` 0, `alcoholPercentage` 0. Aucune action requise, pas de changement cassant.
