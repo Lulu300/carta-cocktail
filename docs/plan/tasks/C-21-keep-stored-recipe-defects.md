@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: haute
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-04]
 touches: [backend/src/validation/cocktails.ts, backend/src/validation/cocktails.test.ts, backend/src/validation/validate.ts, backend/src/services/recipeDefectsService.ts, backend/src/services/recipeDefectsService.test.ts, backend/src/routes/cocktails.ts, backend/src/routes/cocktails.test.ts]
 sources: []
-branch:
-pr:
+branch: fix/C-21-keep-stored-recipe-defects
+pr: https://github.com/Lulu300/carta-cocktail/pull/71
 ---
 
 ## Contexte
@@ -34,13 +34,13 @@ Décision de l'humain (2026-10-11) : au PUT, un défaut **déjà stocké** pour 
 
 ## Critères d'acceptation
 
-- [ ] Un cocktail avec une ligne orpheline (chaque `sourceType`) se renomme en renvoyant la ligne telle quelle : 200, ligne conservée.
-- [ ] Même chose avec une ligne à quantité 0.
-- [ ] Une nouvelle ligne orpheline ou à quantité 0 à côté d'une ligne stockée : 400 avec le bon `path`, recette inchangée.
-- [ ] Un cocktail sans défaut stocké : ligne orpheline ou à quantité 0 refusée en 400 (comportement de C-04 inchangé).
-- [ ] POST inchangé (400).
-- [ ] Les schémas n'importent pas Prisma ; la variante est dérivée du schéma strict.
-- [ ] `npm test -- --coverage`, `npx tsc --noEmit`, `npm run build` passent dans `backend/` ; couverture des lignes modifiées ≥ 80 %.
+- [x] Un cocktail avec une ligne orpheline (chaque `sourceType`) se renomme en renvoyant la ligne telle quelle : 200, ligne conservée.
+- [x] Même chose avec une ligne à quantité 0.
+- [x] Une nouvelle ligne orpheline ou à quantité 0 à côté d'une ligne stockée : 400 avec le bon `path`, recette inchangée.
+- [x] Un cocktail sans défaut stocké : ligne orpheline ou à quantité 0 refusée en 400 (comportement de C-04 inchangé).
+- [x] POST inchangé (400).
+- [x] Les schémas n'importent pas Prisma ; la variante est dérivée du schéma strict.
+- [x] `npm test -- --coverage`, `npx tsc --noEmit`, `npm run build` passent dans `backend/` ; couverture des lignes modifiées ≥ 80 %.
 
 ## Tests à ajouter ou adapter
 
@@ -57,3 +57,5 @@ Décision de l'humain (2026-10-11) : au PUT, un défaut **déjà stocké** pour 
 ## Journal
 
 - 2026-10-11 : tâche créée à partir de la remarque 1 de la revue de la PR #70 (notes de v1.9.0) et de la décision de l'humain.
+- 2026-10-11 : fait (PR #71). `IngredientLineUpdate` dérivé des champs du schéma strict (`IngredientLineFields`) avec une seule fonction de cohérence paramétrée (`checkLineCoherence`) : quantité `nonnegative`, clé de la source facultative, toutes les autres règles inchangées ; `CocktailUpdate` l'utilise, `CocktailCreate` reste strict. Contrôle dans `services/recipeDefectsService.ts` (`findNewRecipeDefects`, pur, et `refuseNewRecipeDefects`, qui ne lit les lignes stockées que si la requête a un défaut), appelé par le PUT. Les issues refusées sont celles du schéma strict (même `path`, `code`, `message` qu'au POST). Conversion issue zod → `details[]` extraite dans `toValidationIssue` (`validate.ts`) pour être partagée avec le middleware. 641 tests, couverture des lignes modifiées 100 %.
+- Notes de version : enregistrer un cocktail dont la recette a déjà une ligne sans sa bouteille, sa catégorie ou son ingrédient (supprimé avant v1.8.0), ou une ligne à quantité 0, fonctionne de nouveau ; ces lignes sont conservées telles quelles. Ajouter une **nouvelle** ligne de ce genre reste refusé (400), comme à la création. L'action facultative après la mise à jour de v1.9.0 (corriger les lignes à quantité 0 si l'enregistrement échoue) n'est plus nécessaire. Aucune action requise, pas de `breaking: true`.
