@@ -7,7 +7,7 @@ import { PrismaClient } from '@prisma/client';
 import { config } from '../config';
 import { checkpointWal, configureSqlite, prisma } from '../lib/prisma';
 import { BadRequestError } from '../errors';
-import { removeSessionFloor, writeSessionFloor } from './sessionFloor';
+import { hasTokenVersionColumn, writeSessionFloor } from './sessionFloor';
 
 /** Format of the backup archive, written to metadata.json. Every published version wrote 1. */
 export const BACKUP_FORMAT_VERSION = 1;
@@ -235,8 +235,7 @@ async function highestLiveTokenVersion(): Promise<number> {
 async function raiseRestoredTokenVersion(restoredDbPath: string, liveTokenVersion: number): Promise<boolean> {
   const client = new PrismaClient({ datasourceUrl: `file:${restoredDbPath}` });
   try {
-    const columns = await client.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info("User");');
-    if (!columns.some((column) => column.name === 'tokenVersion')) return false;
+    if (!(await hasTokenVersionColumn(client))) return false;
     await client.$executeRaw`UPDATE "User" SET "tokenVersion" = MAX("tokenVersion", ${liveTokenVersion}) + 1`;
     return true;
   } finally {
@@ -369,7 +368,6 @@ export async function restoreBackup(zipPath: string): Promise<RestoreResult> {
   };
 
   let databaseReplaced = false;
-  let sessionFloorWritten = false;
   let result: RestoreResult;
   try {
     fs.writeFileSync(restoredDbPath, readEntry(databaseEntry));
@@ -385,8 +383,9 @@ export async function restoreBackup(zipPath: string): Promise<RestoreResult> {
     const liveTokenVersion = await highestLiveTokenVersion();
     await prisma.$disconnect();
     if (!(await raiseRestoredTokenVersion(restoredDbPath, liveTokenVersion))) {
-      // Set first: a write that fails half way leaves its temporary file to remove
-      sessionFloorWritten = true;
+      // Kept even if the restore fails below: a floor applied over the previous
+      // database only signs the admin out once more, while removing it could
+      // leave a restored file without the column live and its sessions open.
       writeSessionFloor(dbPath, liveTokenVersion);
     }
     fs.mkdirSync(path.dirname(preRestorePath), { recursive: true });
@@ -402,8 +401,6 @@ export async function restoreBackup(zipPath: string): Promise<RestoreResult> {
     const restartRecommended = appSchemaVersion !== null && schemaVersion !== appSchemaVersion;
     result = { skippedFiles, restartRecommended };
   } catch (err) {
-    // The live database keeps its own token version: no floor to apply
-    if (sessionFloorWritten) removeSessionFloor(dbPath);
     // Before the rename the live files are untouched: Prisma reconnects to the
     // database on the next query. After it, put the previous state back.
     if (databaseReplaced) {

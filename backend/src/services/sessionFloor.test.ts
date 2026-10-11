@@ -5,7 +5,11 @@ import path from 'path';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData, prisma,
 } from '../test/helpers';
-import { applySessionFloor, removeSessionFloor, sessionFloorPath, writeSessionFloor } from './sessionFloor';
+import { applySessionFloor, sessionFloorPath, writeSessionFloor } from './sessionFloor';
+
+const TOKEN_VERSION_MIGRATION = path.resolve(
+  __dirname, '../../prisma/migrations/20261011120000_user_token_version/migration.sql',
+);
 
 let dir: string;
 let dbPath: string;
@@ -96,21 +100,23 @@ describe('applySessionFloor', () => {
     expect(fs.existsSync(sessionFloorPath(dbPath))).toBe(true);
   });
 
+  it('should refuse to start and keep the file until the migrations have added the column', async () => {
+    writeSessionFloor(dbPath, 3);
+    await prisma.$executeRawUnsafe('ALTER TABLE "User" DROP COLUMN "tokenVersion"');
+
+    try {
+      await expect(applySessionFloor(dbPath)).rejects.toThrow(/session-floor .*npm run db:deploy/s);
+      expect(fs.existsSync(sessionFloorPath(dbPath))).toBe(true);
+    } finally {
+      // The test database is shared: put the column back as the migration does
+      await prisma.$executeRawUnsafe(fs.readFileSync(TOKEN_VERSION_MIGRATION, 'utf8'));
+    }
+  });
+
   it('should refuse to start when the file cannot be read', async () => {
     // A folder in place of the file: reading it fails (EISDIR)
     fs.mkdirSync(sessionFloorPath(dbPath));
 
     await expect(applySessionFloor(dbPath)).rejects.toThrow(/Cannot read .*EISDIR.*JWT_SECRET/s);
-  });
-});
-
-describe('removeSessionFloor', () => {
-  it('should remove the floor and a temporary file left by a failed write', () => {
-    writeSessionFloor(dbPath, 1);
-    fs.writeFileSync(`${sessionFloorPath(dbPath)}.tmp`, '1');
-
-    removeSessionFloor(dbPath);
-
-    expect(fs.readdirSync(dir)).toEqual([]);
   });
 });

@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { PrismaClient } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 
 /**
@@ -22,13 +23,6 @@ export function writeSessionFloor(dbPath: string, tokenVersion: number): void {
   const floorPath = sessionFloorPath(dbPath);
   fs.writeFileSync(`${floorPath}.tmp`, `${tokenVersion}\n`);
   fs.renameSync(`${floorPath}.tmp`, floorPath);
-}
-
-/** Removes the floor of a restore that did not go through, temporary file included. */
-export function removeSessionFloor(dbPath: string): void {
-  const floorPath = sessionFloorPath(dbPath);
-  fs.rmSync(floorPath, { force: true });
-  fs.rmSync(`${floorPath}.tmp`, { force: true });
 }
 
 function readSessionFloor(floorPath: string): number {
@@ -56,6 +50,12 @@ function unreadableFloorError(floorPath: string, reason: string): Error {
   );
 }
 
+/** False for a database made before v1.11.0, until its migrations have run. */
+export async function hasTokenVersionColumn(client: PrismaClient = prisma): Promise<boolean> {
+  const columns = await client.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info("User");');
+  return columns.some((column) => column.name === 'tokenVersion');
+}
+
 /**
  * Applies the floor left by a restore, if any, then deletes the file. Runs at
  * startup, before the server listens. A file applied twice (crash before the
@@ -66,6 +66,13 @@ export async function applySessionFloor(dbPath: string): Promise<void> {
   if (!fs.existsSync(floorPath)) return;
 
   const floor = readSessionFloor(floorPath);
+  if (!(await hasTokenVersionColumn())) {
+    // Without Docker nothing runs the migrations before the start
+    throw new Error(
+      `${floorPath} must be applied to the User.tokenVersion column, which the database does not have yet. `
+      + 'Run npm run db:deploy in the backend folder first, then start again: the file is kept until then.',
+    );
+  }
   await prisma.$executeRaw`UPDATE "User" SET "tokenVersion" = MAX("tokenVersion", ${floor}) + 1`;
   try {
     fs.rmSync(floorPath);

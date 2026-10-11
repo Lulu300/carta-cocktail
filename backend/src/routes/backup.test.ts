@@ -11,7 +11,7 @@ import {
 import { configureSqlite } from '../lib/prisma';
 import { config } from '../config';
 import { latestAppMigration, resolveDatabasePath, restoreBackup } from '../services/backupService';
-import { applySessionFloor, removeSessionFloor, sessionFloorPath } from '../services/sessionFloor';
+import { applySessionFloor, hasTokenVersionColumn, sessionFloorPath } from '../services/sessionFloor';
 
 const dbPath = resolveDatabasePath();
 const preRestoreDir = path.join(path.dirname(dbPath), 'backups');
@@ -217,7 +217,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await prisma.$executeRawUnsafe('DROP TABLE IF EXISTS _prisma_migrations');
-  removeSessionFloor(dbPath);
+  fs.rmSync(sessionFloorPath(dbPath), { force: true });
 });
 
 describe('backup database path', () => {
@@ -533,11 +533,6 @@ describe('backup restore and sessions', () => {
     return (await prisma.user.findUniqueOrThrow({ where: { id: 1 } })).tokenVersion;
   }
 
-  async function hasTokenVersionColumn(): Promise<boolean> {
-    const columns = await prisma.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info("User");');
-    return columns.some((column) => column.name === 'tokenVersion');
-  }
-
   /** What the restart does after the restore of a backup made before the column existed. */
   async function applyTokenVersionMigration(): Promise<void> {
     await prisma.$executeRawUnsafe(fs.readFileSync(TOKEN_VERSION_MIGRATION, 'utf8'));
@@ -659,7 +654,7 @@ describe('backup restore and sessions', () => {
         .toBe(200);
     });
 
-    it('should remove the session floor when the restore is rolled back', async () => {
+    it('should keep the session floor when the restore is rolled back: one more sign-out, nothing else', async () => {
       const backup = withEntries(await backupWithoutTokenVersion(), { 'uploads/restored.jpg': 'restored bytes' });
       const renameSync = fs.renameSync;
       // Fails after the database rename, when the restored files move in
@@ -674,8 +669,14 @@ describe('backup restore and sessions', () => {
         spy.mockRestore();
       }
       expect(await hasTokenVersionColumn()).toBe(true);
-      expect(fs.existsSync(sessionFloorPath(dbPath))).toBe(false);
+      expect(await cocktailNames()).toEqual([]);
       expect((await requestWithTokenVersion(0)).status).toBe(200);
+      expect(fs.readFileSync(sessionFloorPath(dbPath), 'utf8').trim()).toBe('0');
+
+      const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+      await applySessionFloor(dbPath);
+      log.mockRestore();
+      expect(await statusesForVersions(0, 1)).toEqual([401, 200]);
     });
   });
 });
