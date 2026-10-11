@@ -1,282 +1,259 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { useSort } from '../../hooks/useSort';
 import { usePagination } from '../../hooks/usePagination';
-import { ingredients as api } from '../../services/api';
+import { ingredients as ingredientsApi } from '../../services/api';
 import type { Ingredient } from '../../types';
+import { qk } from '../../queries/keys';
+import { useIngredients } from '../../queries/ingredients';
+import { useCrudMutations, useEntityMutation } from '../../queries/crud';
+import { buildNameTranslations, toTranslationForm, type TranslationForm } from '../../utils/translations';
+import Button from '../../components/ui/Button';
+import Field from '../../components/ui/Field';
+import IconButton from '../../components/ui/IconButton';
 import IconPicker from '../../components/ui/IconPicker';
-import SearchInput from '../../components/ui/SearchInput';
+import Input from '../../components/ui/Input';
+import Modal from '../../components/ui/Modal';
 import Pagination from '../../components/ui/Pagination';
+import SearchInput from '../../components/ui/SearchInput';
+import Skeleton from '../../components/ui/Skeleton';
+import { cx } from '../../components/ui/classNames';
+import LoadError from '../../components/admin/LoadError';
+import TranslationFields from '../../components/admin/TranslationFields';
+import { useConfirmDelete } from '../../components/admin/useConfirmDelete';
+import { useEntityForm } from '../../components/admin/useEntityForm';
+
+type AvailabilityFilter = 'all' | 'available' | 'unavailable';
+
+interface IngredientForm {
+  name: string;
+  icon: string;
+  translations: TranslationForm;
+}
+
+interface IngredientInput {
+  name: string;
+  icon: string | null;
+  nameTranslations: Record<string, string> | null;
+}
+
+function toIngredientForm(ingredient?: Ingredient): IngredientForm {
+  return {
+    name: ingredient?.name ?? '',
+    icon: ingredient?.icon ?? '',
+    translations: toTranslationForm(ingredient?.nameTranslations),
+  };
+}
+
+function toIngredientInput(form: IngredientForm): IngredientInput {
+  return {
+    name: form.name,
+    icon: form.icon || null,
+    nameTranslations: buildNameTranslations(form.translations),
+  };
+}
+
+function matchesAvailability(ingredient: Ingredient, filter: AvailabilityFilter): boolean {
+  if (filter === 'available') return ingredient.isAvailable;
+  if (filter === 'unavailable') return !ingredient.isAvailable;
+  return true;
+}
+
+// An ingredient's availability decides whether the cocktails using it can be made.
+const REFRESHED_KEYS = [qk.ingredients, qk.availability];
+const SKELETON_CARDS = 10;
 
 export default function IngredientsPage() {
   const { t } = useTranslation();
   const localize = useLocalizedName();
-  const [items, setItems] = useState<Ingredient[]>([]);
-  const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState<Ingredient | null>(null);
-  const [name, setName] = useState('');
-  const [icon, setIcon] = useState('');
-  const [nameFr, setNameFr] = useState('');
-  const [nameEn, setNameEn] = useState('');
-  const [showTranslations, setShowTranslations] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'available' | 'unavailable'>('all');
+  const confirmDelete = useConfirmDelete();
+  const ingredientsQuery = useIngredients();
+  const ingredients = ingredientsQuery.data;
+  const { create, update, remove } = useCrudMutations<IngredientInput>({
+    key: qk.ingredients,
+    api: ingredientsApi,
+    invalidates: [qk.availability],
+    messages: { created: 'ingredients.created', updated: 'ingredients.updated', deleted: 'ingredients.deleted' },
+  });
+  const toggleAvailability = useEntityMutation<Ingredient>({
+    mutationFn: (ingredient) => ingredientsApi.update(ingredient.id, { isAvailable: !ingredient.isAvailable }),
+    invalidates: REFRESHED_KEYS,
+  });
+  const setAllAvailability = useEntityMutation<boolean>({
+    mutationFn: (available) => ingredientsApi.bulkAvailability({ available }),
+    invalidates: REFRESHED_KEYS,
+  });
+  const ingredientForm = useEntityForm(toIngredientForm);
+  const { form, setField, editing } = ingredientForm;
+  const [filter, setFilter] = useState<AvailabilityFilter>('all');
   const [search, setSearch] = useState('');
 
-  const load = () => api.list().then(setItems);
-  useEffect(() => { load(); }, []);
+  const filteredIngredients = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return (ingredients ?? []).filter((ingredient) =>
+      matchesAvailability(ingredient, filter) && localize(ingredient).toLowerCase().includes(query),
+    );
+  }, [ingredients, filter, search, localize]);
 
-  const filteredItems = useMemo(() => {
-    return items.filter((i) => {
-      if (filter === 'available' && !i.isAvailable) return false;
-      if (filter === 'unavailable' && i.isAvailable) return false;
-      if (search.trim() && !localize(i).toLowerCase().includes(search.toLowerCase())) return false;
-      return true;
-    });
-  }, [items, filter, search, localize]);
+  const { sortedItems } = useSort<Ingredient>(filteredIngredients, 'name');
+  const pagination = usePagination(sortedItems);
+  const isSaving = create.isPending || update.isPending;
 
-  const { sortedItems } = useSort<Ingredient>(filteredItems, 'name');
-  const { paginatedItems, page, pageSize, totalPages, totalItems, setPage, setPageSize } = usePagination(sortedItems);
-
-  const openCreate = () => {
-    setEditing(null);
-    setName('');
-    setIcon('');
-    setNameFr('');
-    setNameEn('');
-    setShowTranslations(false);
-    setShowModal(true);
+  const handleSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    const data = toIngredientInput(form);
+    const options = { onSuccess: ingredientForm.close };
+    if (editing) update.mutate({ id: editing.id, data }, options);
+    else create.mutate(data, options);
   };
 
-  const openEdit = (item: Ingredient) => {
-    setEditing(item);
-    setName(item.name);
-    setIcon(item.icon || '');
-    setNameFr(item.nameTranslations?.fr || '');
-    setNameEn(item.nameTranslations?.en || '');
-    setShowModal(true);
+  const handleDelete = async (ingredient: Ingredient) => {
+    if (await confirmDelete(t('ingredients.confirmDelete'))) remove.mutate(ingredient.id);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const nameTranslations: Record<string, string> = {};
-    if (nameFr.trim()) nameTranslations.fr = nameFr.trim();
-    if (nameEn.trim()) nameTranslations.en = nameEn.trim();
-    const data = {
-      name,
-      icon: icon || null,
-      nameTranslations: Object.keys(nameTranslations).length > 0 ? nameTranslations : null,
-    };
-    if (editing) {
-      await api.update(editing.id, data);
-    } else {
-      await api.create(data);
+  const countFor = (status: AvailabilityFilter) =>
+    (ingredients ?? []).filter((ingredient) => matchesAvailability(ingredient, status)).length;
+
+  const renderContent = () => {
+    if (ingredientsQuery.isPending) {
+      return (
+        <>
+          <p role="status" className="sr-only">{t('common.loading')}</p>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {Array.from({ length: SKELETON_CARDS }, (_, index) => <Skeleton key={index} className="h-40 rounded-xl" />)}
+          </div>
+        </>
+      );
     }
-    setShowModal(false);
-    load();
-  };
-
-  const handleDelete = async (id: number) => {
-    if (!confirm(t('ingredients.confirmDelete'))) return;
-    await api.delete(id);
-    load();
-  };
-
-  const toggleAvailability = async (item: Ingredient) => {
-    await api.update(item.id, { isAvailable: !item.isAvailable });
-    load();
-  };
-
-  const setAllAvailability = async (available: boolean) => {
-    await api.bulkAvailability({ available });
-    load();
+    if (ingredientsQuery.isError) return <LoadError onRetry={() => ingredientsQuery.refetch()} />;
+    if (filteredIngredients.length === 0) {
+      return <div className="text-center py-12 text-fg-muted">{t('common.noResults')}</div>;
+    }
+    return (
+      <>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {pagination.paginatedItems.map((ingredient) => (
+            <div
+              key={ingredient.id}
+              className={cx(
+                'relative bg-surface border rounded-xl p-4 transition-all cursor-pointer',
+                ingredient.isAvailable
+                  ? 'border-line hover:border-accent/50'
+                  : 'border-danger/30 opacity-60 hover:border-danger/70',
+              )}
+              onClick={() => toggleAvailability.mutate(ingredient)}
+            >
+              <div className={cx('absolute top-2 right-2 w-3 h-3 rounded-full', ingredient.isAvailable ? 'bg-success' : 'bg-danger')} />
+              <div className="text-4xl mb-3 text-center h-12 flex items-center justify-center">
+                {ingredient.icon || '📦'}
+              </div>
+              <div className="text-center mb-3">
+                <p className="font-medium text-fg truncate">{localize(ingredient)}</p>
+                <p className="text-xs text-fg-muted mt-1">
+                  {ingredient.isAvailable ? t('cocktails.available') : t('cocktails.unavailable')}
+                </p>
+              </div>
+              {/* A click on the card toggles the availability: the buttons stop it. */}
+              <div className="flex justify-center gap-1 pt-2 border-t border-line">
+                <IconButton
+                  icon="edit"
+                  label={t('common.edit')}
+                  onClick={(event) => { event.stopPropagation(); ingredientForm.open(ingredient); }}
+                />
+                <IconButton
+                  icon="delete"
+                  label={t('common.delete')}
+                  variant="danger"
+                  onClick={(event) => { event.stopPropagation(); handleDelete(ingredient); }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 bg-surface border border-line rounded-xl overflow-hidden">
+          <Pagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            pageSize={pagination.pageSize}
+            totalItems={pagination.totalItems}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
+        </div>
+      </>
+    );
   };
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold font-serif text-amber-400">{t('ingredients.title')}</h1>
+        <h1 className="text-2xl font-bold font-serif text-accent">{t('ingredients.title')}</h1>
         <div className="flex gap-3">
           <button
-            onClick={() => setAllAvailability(true)}
+            onClick={() => setAllAvailability.mutate(true)}
             className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg text-sm"
           >
             {t('ingredients.allAvailable')}
           </button>
           <button
-            onClick={() => setAllAvailability(false)}
+            onClick={() => setAllAvailability.mutate(false)}
             className="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg text-sm"
           >
             {t('ingredients.allUnavailable')}
           </button>
-          <button
-            onClick={openCreate}
-            className="bg-amber-400 hover:bg-amber-500 text-[#0f0f1a] font-semibold px-4 py-2 rounded-lg"
-          >
-            {t('ingredients.add')}
-          </button>
+          <Button onClick={() => ingredientForm.open()}>{t('ingredients.add')}</Button>
         </div>
       </div>
 
-      {/* Search and availability filter */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <SearchInput value={search} onChange={setSearch} className="sm:max-w-sm" />
         <div className="flex gap-2">
-        {(['all', 'available', 'unavailable'] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-              filter === f
-                ? 'bg-amber-400/10 text-amber-400 border border-amber-400/50'
-                : 'text-gray-400 border border-gray-700 hover:border-gray-500'
-            }`}
-          >
-            {t(`ingredients.filter.${f}`)}
-            {f !== 'all' && (
-              <span className="ml-1.5 text-xs opacity-70">
-                ({items.filter((i) => f === 'available' ? i.isAvailable : !i.isAvailable).length})
-              </span>
-            )}
-          </button>
-        ))}
+          {(['all', 'available', 'unavailable'] as const).map((status) => (
+            <button
+              key={status}
+              onClick={() => setFilter(status)}
+              className={cx(
+                'px-3 py-1.5 rounded-lg text-sm transition-colors border',
+                filter === status
+                  ? 'bg-accent/10 text-accent border-accent/50'
+                  : 'text-fg-muted border-line-strong hover:border-gray-500',
+              )}
+            >
+              {t(`ingredients.filter.${status}`)}
+              {status !== 'all' && <span className="ml-1.5 text-xs opacity-70">({countFor(status)})</span>}
+            </button>
+          ))}
         </div>
       </div>
 
-      {filteredItems.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">
-          {t('common.noResults')}
-        </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {paginatedItems.map((item) => (
-              <div
-                key={item.id}
-                className={`
-                  relative bg-[#1a1a2e] border rounded-xl p-4 transition-all cursor-pointer
-                  ${item.isAvailable
-                    ? 'border-gray-800 hover:border-amber-400/50'
-                    : 'border-red-400/30 opacity-60 hover:border-red-400/70'
-                  }
-                `}
-                onClick={() => toggleAvailability(item)}
-              >
-                {/* Availability indicator */}
-                <div className={`absolute top-2 right-2 w-3 h-3 rounded-full ${item.isAvailable ? 'bg-green-400' : 'bg-red-400'}`} />
+      {renderContent()}
 
-                {/* Icon */}
-                <div className="text-4xl mb-3 text-center h-12 flex items-center justify-center">
-                  {item.icon || '📦'}
-                </div>
-
-                {/* Name */}
-                <div className="text-center mb-3">
-                  <p className="font-medium text-white truncate">{localize(item)}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {item.isAvailable ? t('cocktails.available') : t('cocktails.unavailable')}
-                  </p>
-                </div>
-
-                {/* Action buttons */}
-                <div className="flex justify-center gap-3 pt-2 border-t border-gray-800">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); openEdit(item); }}
-                    className="text-amber-400 hover:text-amber-300 transition-colors p-1"
-                    title={t('common.edit')}
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
-                    className="text-red-400 hover:text-red-300 transition-colors p-1"
-                    title={t('common.delete')}
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            ))}
+      <Modal
+        open={ingredientForm.isOpen}
+        onClose={ingredientForm.close}
+        title={editing ? t('ingredients.edit') : t('ingredients.add')}
+        size="xl"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Field label={t('ingredients.name')} required>
+            <Input value={form.name} onChange={(event) => setField('name', event.target.value)} />
+          </Field>
+          <TranslationFields
+            value={form.translations}
+            onChange={(translations) => setField('translations', translations)}
+            placeholder={form.name}
+          />
+          <div>
+            <p className="block text-sm text-fg-muted mb-2">Icône (optionnel)</p>
+            <IconPicker value={form.icon} onChange={(icon) => setField('icon', icon)} />
           </div>
-          <div className="mt-4 bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden">
-            <Pagination page={page} totalPages={totalPages} pageSize={pageSize} totalItems={totalItems} onPageChange={setPage} onPageSizeChange={setPageSize} />
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="ghost" onClick={ingredientForm.close}>{t('common.cancel')}</Button>
+            <Button type="submit" loading={isSaving}>{t('common.save')}</Button>
           </div>
-        </>
-      )}
-
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <form
-            onSubmit={handleSubmit}
-            className="bg-[#1a1a2e] border border-gray-800 rounded-xl p-6 w-full max-w-2xl space-y-4 max-h-[90vh] overflow-y-auto"
-          >
-            <h2 className="text-lg font-semibold">
-              {editing ? t('ingredients.edit') : t('ingredients.add')}
-            </h2>
-
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">
-                {t('ingredients.name')}
-              </label>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400"
-              />
-            </div>
-
-            <div className="border border-gray-700 rounded-lg p-3 space-y-2">
-              <button type="button" onClick={() => setShowTranslations(!showTranslations)}
-                className="text-sm text-gray-400 flex items-center gap-2 w-full text-left">
-                <svg className={`w-3 h-3 transition-transform ${showTranslations ? 'rotate-90' : ''}`} fill="currentColor" viewBox="0 0 20 20"><path d="M6 6L14 10L6 14V6Z"/></svg>
-                {t('common.translations')}
-              </button>
-              {showTranslations && (
-                <div className="space-y-2 pt-1">
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Français</label>
-                    <input value={nameFr} onChange={(e) => setNameFr(e.target.value)}
-                      placeholder={name || '...'} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400" />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">English</label>
-                    <input value={nameEn} onChange={(e) => setNameEn(e.target.value)}
-                      placeholder={name || '...'} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400" />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">
-                Icône (optionnel)
-              </label>
-              <IconPicker value={icon} onChange={setIcon} />
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4">
-              <button
-                type="button"
-                onClick={() => setShowModal(false)}
-                className="px-4 py-2 text-gray-400 hover:text-white"
-              >
-                {t('common.cancel')}
-              </button>
-              <button
-                type="submit"
-                className="bg-amber-400 hover:bg-amber-500 text-[#0f0f1a] font-semibold px-4 py-2 rounded-lg"
-              >
-                {t('common.save')}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+        </form>
+      </Modal>
     </div>
   );
 }
