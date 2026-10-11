@@ -5,13 +5,13 @@ phase: C
 lane: docs
 criticite: haute
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-22]
 touches: [UPGRADING.md]
 sources: []
-branch:
-pr:
+branch: docs/release-notes-v1.11.0
+pr: "#90"
 ---
 
 ## Contexte
@@ -36,10 +36,10 @@ Ajouter dans `UPGRADING.md` une section indépendante de la version, intitulée 
 
 ## Critères d'acceptation
 
-- [ ] `UPGRADING.md` contient une section intitulée exactement `Restoring a backup from an older version`, et l'ancre `#restoring-a-backup-from-an-older-version` y mène.
-- [ ] La section couvre les points 1 à 3 ci-dessus, avec et sans Docker.
-- [ ] Sans Docker, une sauvegarde de v1.5.0 ou plus ancienne passe d'abord par l'étape de baseline (`npx prisma migrate resolve --applied 0_init`) avant `npm run db:deploy`.
-- [ ] Le texte de `settings.backup.restartMayFail` (en/fr) cite toujours ce titre exact.
+- [x] `UPGRADING.md` contient une section intitulée exactement `Restoring a backup from an older version`, et l'ancre `#restoring-a-backup-from-an-older-version` y mène.
+- [x] La section couvre les points 1 à 3 ci-dessus, avec et sans Docker.
+- [x] Sans Docker, une sauvegarde de v1.5.0 ou plus ancienne passe d'abord par l'étape de baseline (`npx prisma migrate resolve --applied 0_init`) avant `npm run db:deploy`.
+- [x] Le texte de `settings.backup.restartMayFail` (en/fr) cite toujours ce titre exact.
 
 ## Tests à ajouter ou adapter
 
@@ -53,3 +53,6 @@ Aucun (documentation). Vérifier l'ancre dans l'aperçu Markdown de GitHub.
 
 - 2026-10-11 : tâche créée par C-22 (revue de la PR #88, décision du coordinateur sur le titre de la section).
 - 2026-10-11 : revue de la PR #88 : ajout du cas hors Docker d'une sauvegarde de v1.5.0 ou plus ancienne (baseline avant `db:deploy`), formulation « schéma plus ancien » au point 1.
+- 2026-10-11 : fait dans la PR de notes de v1.11.0 (#90). Section `## Restoring a backup from an older version` à la fin d'`UPGRADING.md`, citée par l'introduction, la section v1.11.0 et la puce v1.10.0 (remplacée par un renvoi). Sous-sections : mise à jour de la base après la restauration (Docker : redémarrage ; sans Docker : `npm run db:deploy` puis redémarrage), effet depuis v1.11.0 (connexion refusée avec « Invalid email or password », pages admin et carte publique d'un navigateur connecté en erreur serveur), cas où le redémarrage ne suffit pas (v1.0.x, doublons d'avant v1.8.0, et sans Docker v1.5.0 ou plus ancienne : vérification contre `0_init` puis `migrate resolve --applied 0_init` avant `db:deploy`), retour à la copie `pre-restore-<date>.db` (base seulement, les photos restent celles de la sauvegarde). Le titre cité par `settings.backup.restartMayFail` (en/fr) est inchangé.
+- 2026-10-11 : revue de la PR #90 (points 3, 7, 8 et 9 pour cette section). Après E-25 (#91), la connexion répond « Internal server error » tant que la base n'est pas mise à jour, et ces échecs comptent pour la limite de connexion (429 après 10 essais, jusqu'au redémarrage). Retour à la copie `pre-restore` : l'export de la version installée se restaure seulement une fois le backend relancé sur cette copie. Réparer une ancienne sauvegarde : la restaurer sur une instance de sa version (v1.5.0 pour une v1.0.x), corriger, réexporter ; contrôle des doublons sur le `database.db` de l'archive, avec et sans Docker. Libellé exact du bouton de rechargement.
+- 2026-10-12 : après C-30 (#93), sous-section « Signing in after a restore » : toute restauration déconnecte toutes les sessions, reconnexion avec le mot de passe de la sauvegarde, fichier `.session-floor` appliqué au démarrage suivant pour une sauvegarde antérieure à v1.11.0 (démarrage refusé s'il est illisible, ou sans Docker avant `npm run db:deploy`), nouveau `JWT_SECRET` conseillé après une base remise à la main (y compris la copie `pre-restore`).

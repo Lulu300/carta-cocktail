@@ -14,9 +14,25 @@ This guide lists the actions required to upgrade an existing instance, version b
 
 Pre-releases (`vX.Y.Z-rc.N`) are not listed: they use the section of their target version `vX.Y.Z`. The detailed changes of each version are in its [GitHub Release](https://github.com/Lulu300/carta-cocktail/releases) and in [`docs/releases/`](docs/releases/).
 
-We recommend pinning the images to a version (`:1.10.0`) instead of `:latest`, so that an upgrade only happens when you have read this guide.
+We recommend pinning the images to a version (`:1.11.0`) instead of `:latest`, so that an upgrade only happens when you have read this guide.
+
+To restore a backup made by an older version, see [Restoring a backup from an older version](#restoring-a-backup-from-an-older-version), at the end of this guide.
 
 The commands below assume the default `docker-compose.prod.yml`, run from its folder. Adapt the file name and the service name `carta-cocktail-backend` if yours differ.
+
+## v1.11.0
+
+No required action. `docker-compose.prod.yml` has not changed since v1.8.0: pin both images to `:1.11.0` (`:1.11.0-rc.N` to test a pre-release), then pull and restart. At the first start, the backend copies the database to `backups/pre-migrate-<date>.db` and applies one migration (a new column in the `User` table). Release notes: [`docs/releases/v1.11.0.md`](docs/releases/v1.11.0.md).
+
+Instances older than v1.8.0: upgrade to v1.8.0 first, following the [v1.8.0 section](#v180) (and the sections before it), check that it works, then apply this one.
+
+Worth checking after the upgrade:
+
+- **Restoring a backup made before v1.11.0.** Restart the backend afterwards (`docker compose -f docker-compose.prod.yml restart carta-cocktail-backend`). Until then, the admin pages answer with a server error; reloading the page signs you out, and signing in then fails with "Internal server error", even with the right password. This applies to every backup made before v1.11.0, v1.8.0 to v1.10.0 included. The restore screen says so. See [Restoring a backup from an older version](#restoring-a-backup-from-an-older-version) for the cases where a restart is not enough.
+- **Every restore signs out.** Restoring any backup ends every session, the one that ran the restore included: sign in again with the email and password stored in the backup. For a backup made before v1.11.0, this happens at the restart above. After putting a database back by hand (manual restore, `pre-migrate` or `pre-restore` copy), set a new `JWT_SECRET`: see [Signing in after a restore](#signing-in-after-a-restore).
+- **Login limit.** After 10 failed logins from one IP address in 15 minutes (`LOGIN_RATE_LIMIT`), the login answers "Too many failed login attempts: try again in a few minutes" for up to 15 minutes. Restarting the backend clears the counters. The login page now shows that message, and "Invalid email or password" only for wrong credentials. Behind a reverse proxy on a private network (SWAG, Traefik…), nothing to set. Read [README › "Login limit behind a reverse proxy"](README.md#login-limit-behind-a-reverse-proxy) if you use Docker rootless, Podman, Docker Desktop, or IPv6 clients relayed by `docker-proxy` when the Docker daemon has no IPv6: clients from the Internet already share one counter there, and a client can get around the limit; `TRUST_PROXY=1` or `2` removes that bypass without adding any risk of blocking the admin. In every install, do not publish the backend port 3001: remove the `ports` entry of `carta-cocktail-backend`, or bind it to `127.0.0.1:3001:3001`, as README shows (and nginx's port behind SWAG).
+- **Admin profile.** Changing the password signs out every other browser and device. Changing the login email asks for the current password. A new password needs at least 12 characters; a shorter one set before still works.
+- **New optional variables.** `LOGIN_RATE_LIMIT`, `TRUST_PROXY`, `JWT_EXPIRES_IN` and `CORS_ORIGIN`: the defaults suit a standard install, see [README › "Environment Variables"](README.md#environment-variables). The compose files do not pass them from `.env`: add the ones you set to the `environment` list of `carta-cocktail-backend`, without quotes. The backend refuses to start when `LOGIN_RATE_LIMIT`, `TRUST_PROXY` or `JWT_EXPIRES_IN` has a value it cannot read; `CORS_ORIGIN` is not checked. The API no longer accepts calls from other websites unless `CORS_ORIGIN` names that site; the app itself does not need it.
 
 ## v1.10.0
 
@@ -27,7 +43,7 @@ Instances older than v1.8.0: upgrade to v1.8.0 first, following the [v1.8.0 sect
 Worth checking after the upgrade:
 
 - **Backup size.** A restore now refuses files larger than 200 MB (v1.9.0 accepted 500 MB), and the export does not warn. Check the size of your latest export: above 200 MB, restore it by hand, as described in the release notes ([Backups larger than 200 MB](docs/releases/v1.10.0.md#backups-larger-than-200-mb)). A restore also refuses archives that are too large once uncompressed, damaged or made by a newer version. It needs free disk space for the archive, a copy of the database and the photos, and keeps a copy of the replaced database in `/app/data/backups/pre-restore-<date>.db`, which is not deleted automatically.
-- **Restoring a backup made before v1.8.0.** Restart the backend afterwards (`docker compose -f docker-compose.prod.yml restart carta-cocktail-backend`) so that it applies the migrations. A backup from v1.0.x, or from before v1.8.0 with duplicate category names or unit abbreviations, then stops the backend at startup, as the upgrade from that version would (see the [v1.8.0](#v180) and [v1.6.0](#v160) sections). Put back the `pre-restore-<date>.db` copy to get the previous database, as in [README › "Restoring a pre-migration backup"](README.md#restoring-a-pre-migration-backup).
+- **Restoring a backup made before v1.8.0.** Restart the backend afterwards so that it applies the migrations, and read [Restoring a backup from an older version](#restoring-a-backup-from-an-older-version) first: some old backups stop the backend at startup.
 - **Public menu.** A cocktail is now greyed out, marked "Unavailable" and cannot be opened by guests when it is switched off, short of stock, or uses an ingredient switched off (before, only the switch counted). Restock, or switch the ingredient on, to show it again. A recipe line shown as "--" because its source was deleted before v1.8.0 does not make the cocktail unavailable; the admin cocktail list still lists it under "❌ Manquant". A "--" on a bottle line can also mean an empty bottle (the form lists only bottles that are not empty): that cocktail stays unavailable until the bottle is restocked. Units are now converted with their own factor: a hand-made unit with a factor (a 40 ml "shot") counted 1 ml and now counts its factor, so servings can drop.
 
 ## v1.9.0
@@ -385,3 +401,78 @@ Recommended first: export a backup from Settings > Backup & Restore. A backup ma
    If `.env` sets an `ADMIN_PASSWORD` shorter than 12 characters, it is your current password, for the same reason. The new version starts with it, because an existing admin is left as is, but refuses it to create or reset the admin. Change the password in Settings > Admin Profile, choosing at least 12 characters, then remove `ADMIN_PASSWORD` from `.env` or set it to at least 12 characters.
 
 3. **Assign the cocktails to their sections again.** Saving a cocktail menu with an older version moved every cocktail back to "Without a section", and these assignments cannot be recovered. In Admin > Menus, open each cocktail menu that uses sections and assign its cocktails again. From this version on, sections are kept.
+
+## Restoring a backup from an older version
+
+This section applies to every version. Read it before restoring, in Settings > Backup & Restore, a backup made by an older version of Carta Cocktail.
+
+### Update the database after the restore
+
+A backup whose database schema is older than the one of the installed version restores, but the database keeps its old schema until it is updated. The restore screen says so ("Restart the backend before going on"). A backup made by a version with the same schema needs nothing: the screen then shows no warning.
+
+- **With Docker**, restart the backend: the container updates the database when it starts (`prisma migrate deploy`), after copying it to `backups/pre-migrate-<date>.db`.
+
+  ```bash
+  docker compose -f docker-compose.prod.yml restart carta-cocktail-backend
+  ```
+
+- **Without Docker**, from `backend/`, run `npm run db:deploy`, then restart the backend. For a backup from v1.5.0 or older, see below first.
+
+Then reload the page (the "Reload the page once the backend has restarted" button of the restore screen).
+
+Until the database is updated, the app may answer with server errors. From v1.11.0 on, restoring a backup made before v1.11.0 breaks the admin pages and, in a browser where the admin is signed in, the public menu. Reloading the page signs you out, and signing in then fails with "Internal server error", even with the right password. These failures count for the login limit: after 10 attempts the login answers "Too many failed login attempts" until the restart, which clears the counters. Guests can still see the public menu.
+
+### Signing in after a restore
+
+From v1.11.0 on, a restore signs out every session, the one that ran it included. Sign in again with the admin email and password stored in the backup: a password changed after the backup was made no longer works. If you do not know that password any more, reset it as in [README › "Recovering the admin account"](README.md#recovering-the-admin-account) (`ADMIN_RESET_PASSWORD`).
+
+For a backup made before v1.11.0, the sign-out happens at the next start, once the database is updated. The restore writes a `.session-floor` file next to the database (`/app/data/carta_cocktail.db.session-floor` with `docker-compose.prod.yml`), and the next start applies it, then deletes it. Leave it in place.
+
+- If the file cannot be read, the backend refuses to start and its log names it. Set a new `JWT_SECRET` in `.env` (this signs out every session), delete the file, then start again. With `docker-compose.prod.yml` (the container restarts in a loop until then):
+
+  ```bash
+  docker compose -f docker-compose.prod.yml stop carta-cocktail-backend
+  docker compose -f docker-compose.prod.yml run --rm --no-deps --entrypoint rm carta-cocktail-backend /app/data/carta_cocktail.db.session-floor
+  docker compose -f docker-compose.prod.yml up -d
+  ```
+
+  Without Docker, delete the file next to the database named by `DATABASE_URL`.
+- Without Docker, a start before `npm run db:deploy` stops with a message that asks for it. The file is kept until then.
+
+Putting a database back by hand skips this: the README procedure for a backup made before migrations, the manual restore of a backup larger than 200 MB ([v1.10.0 notes](docs/releases/v1.10.0.md#backups-larger-than-200-mb)), or a `pre-migrate-<date>.db` or `pre-restore-<date>.db` copy put back. The database comes back with its sessions, including those revoked since it was made. Afterwards, set a new `JWT_SECRET` in `.env` (`openssl rand -hex 32`), then run `docker compose -f docker-compose.prod.yml up -d`: this signs out every session.
+
+### When a restart is not enough
+
+In these cases, the database update fails and the backend does not start (with `docker-compose.prod.yml`, the container restarts in a loop):
+
+- **A backup from v1.0.x.** Its schema does not match the first migration, `0_init`. With Docker, the log shows `ERROR: the existing database at … has no migration history and does not match migration 0_init.` The database is not modified.
+- **A backup from before v1.8.0 with two categories of the same name or two units with the same abbreviation.** The `schema_integrity` migration refuses them (`P3018`, then `P3009` on each restart). See the [v1.8.0 section](#v180) for the check and the fix.
+- **Without Docker only, a backup from v1.1 to v1.5.0.** It has no migration history, so `npm run db:deploy` stops on `P3005`. With Docker, the container handles it. Without Docker, first check that the backup matches `0_init`, as in [README › "Checking a production database before the first upgrade"](README.md#checking-a-production-database-before-the-first-upgrade) (step 3; a v1.0.x backup does not match), then, from `backend/`, mark the database and update it:
+
+  ```bash
+  npx prisma migrate resolve --applied 0_init
+  npm run db:deploy
+  ```
+
+  This is the baseline step of [README › "Database migrations"](README.md#database-migrations).
+
+### Going back to the database you had before the restore
+
+Before switching, the restore copied the database it replaced to `backups/pre-restore-<date>.db`, next to the database (`/app/data/backups/` in the `db-data` volume of `docker-compose.prod.yml`). To go back to it, stop the backend and put that copy back as in [README › "Restoring a pre-migration backup"](README.md#restoring-a-pre-migration-backup), with `pre-restore-<date>.db` in place of `pre-migrate-<date>.db`, then start the backend. Without Docker, copy it over the database file named by `DATABASE_URL`, after removing its `-wal` and `-shm` files. A `.session-floor` file left by the restore is applied at that start: it only signs you out. Then set a new `JWT_SECRET`, as in [Signing in after a restore](#signing-in-after-a-restore).
+
+That copy holds the database only: the photos stay those of the restored backup. To get the photos back as well, once the backend runs on that copy, restore a backup you exported with the installed version.
+
+To use the old backup anyway, fix it on the version that made it, then export it again:
+
+1. Start a separate instance of the version that made the backup, with its own data. For a v1.0.x backup, use v1.5.0: it brings the database to `0_init` with `db push` at each start.
+2. Restore the backup there. With v1.5.0, restart the backend afterwards so that it updates the database.
+3. Fix it: for duplicates, rename or merge them in the admin, as in step 1 of the [v1.8.0 section](#v180) (move the bottles and recipe lines to the item you keep, then delete the other one).
+4. Export a new backup from that instance, then restore it on this one.
+
+To check a backup for duplicates before restoring it, unzip it, copy its `database.db` to `carta-db-copy/carta_cocktail.db`, and run the integrity check of the [v1.8.0 section](#v180) (step 1.2) on it. Without Docker, from `backend/` in a checkout of the installed version (after `npm ci`):
+
+```bash
+DATABASE_URL=file:/absolute/path/to/database.db npx tsx scripts/check-integrity.ts
+```
+
+Exit code `0`: no duplicates. Exit code `1`: the output lists them.
