@@ -400,6 +400,38 @@ describe('backup restore', () => {
     expect(res.body.restartRecommended).toBe(false);
   });
 
+  it('should keep a finished restore when the previous uploads cannot be deleted', async () => {
+    const backup = withEntries(await exportBackup(), { 'uploads/restored.jpg': 'restored bytes' });
+    await seedCocktail({ name: 'Replaced' });
+    fs.writeFileSync(path.join(config.uploadDir, 'old.jpg'), 'old bytes');
+    const rmSync = fs.rmSync;
+    const spy = vi.spyOn(fs, 'rmSync').mockImplementation((target, options) => {
+      if (path.basename(String(target)).startsWith('.pre-restore-')) throw new Error('rm failed');
+      rmSync(target, options);
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      const res = await importBackup(backup);
+
+      expect(res.status).toBe(200);
+      expect(await cocktailNames()).toEqual([]);
+      expect((await request.get('/api/cocktails').set(authHeader())).status).toBe(200);
+      const leftover = uploadDirContent().filter((name) => name.startsWith('.pre-restore-'));
+      expect(leftover).toHaveLength(1);
+      expect(uploadDirContent().filter((name) => !name.startsWith('.'))).toEqual(['restored.jpg']);
+      expect(warn).toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+      warn.mockRestore();
+    }
+
+    // The leftover folder is not served, and the next restore removes it
+    expect((await request.get(`/uploads/${uploadDirContent()[0]}/old.jpg`)).status).toBe(404);
+    expect((await importBackup(backup)).status).toBe(200);
+    expect(uploadDirContent()).toEqual(['restored.jpg']);
+  });
+
   describe('when the switch fails after the database rename', () => {
     let backup: Buffer;
 
@@ -469,7 +501,7 @@ describe('backup import validation', () => {
     ['whose database.db data is corrupt', async () => withBadCrc(
       zipWith({ 'metadata.json': validMetadata, 'database.db': 'x'.repeat(1000) }), 'database.db',
     )],
-    ['whose database.db is plain text',async () => zipWith({ 'metadata.json': validMetadata, 'database.db': 'plain text' })],
+    ['whose database.db is plain text', async () => zipWith({ 'metadata.json': validMetadata, 'database.db': 'plain text' })],
     ['whose database.db only has a SQLite header', async () => zipWith({
       'metadata.json': validMetadata,
       'database.db': Buffer.concat([Buffer.from('SQLite format 3\0', 'latin1'), Buffer.alloc(200, 7)]),

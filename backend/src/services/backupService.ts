@@ -281,6 +281,19 @@ function undoUploadsSwap(swap: UploadsSwap): void {
   fs.rmSync(asideDir, { recursive: true, force: true });
 }
 
+/**
+ * Deletes the previous upload entries after a successful restore. A failure
+ * only leaves a dot folder behind: express.static does not serve it, and the
+ * next restore moves it aside and deletes it with the other entries.
+ */
+function removePreviousUploads(asideDir: string): void {
+  try {
+    fs.rmSync(asideDir, { recursive: true, force: true });
+  } catch (err) {
+    console.warn(`Backup restored, but the previous uploads could not be deleted from ${asideDir}:`, err);
+  }
+}
+
 /** Reopens the shared client on the database file currently in place. */
 async function reconnect(): Promise<void> {
   // A request may have reopened a connection on the old file since the first
@@ -326,6 +339,7 @@ export async function restoreBackup(zipPath: string): Promise<RestoreResult> {
   };
 
   let databaseReplaced = false;
+  let result: RestoreResult;
   try {
     fs.writeFileSync(restoredDbPath, readEntry(databaseEntry));
     const schemaVersion = await validateDatabase(restoredDbPath);
@@ -345,11 +359,10 @@ export async function restoreBackup(zipPath: string): Promise<RestoreResult> {
 
     swapUploads(uploadsSwap);
     await reconnect();
-    fs.rmSync(uploadsSwap.asideDir, { recursive: true, force: true });
 
     const appSchemaVersion = latestAppMigration();
     const restartRecommended = appSchemaVersion !== null && schemaVersion !== appSchemaVersion;
-    return { skippedFiles, restartRecommended };
+    result = { skippedFiles, restartRecommended };
   } catch (err) {
     // Before the rename the live files are untouched: Prisma reconnects to the
     // database on the next query. After it, put the previous state back.
@@ -366,4 +379,9 @@ export async function restoreBackup(zipPath: string): Promise<RestoreResult> {
     removeSqliteSideFiles(restoredDbPath);
     fs.rmSync(uploadsSwap.stagingDir, { recursive: true, force: true });
   }
+
+  // The restore is committed once the client has reconnected: from here on, a
+  // failure must not roll it back.
+  removePreviousUploads(uploadsSwap.asideDir);
+  return result;
 }
