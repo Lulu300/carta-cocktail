@@ -276,7 +276,7 @@ The login limit counts failures per client IP address. The frontend's nginx forw
 The default has limits:
 
 - A client on your local network connects from a private address, so it is trusted: it can forge its address and get around the limit.
-- In some installs, the first proxy (nginx, or SWAG) sees a client from the Internet under a **private** address: Docker rootless or Podman (through their port forwarder), Docker Desktop, or an IPv6 client on a published port when the Docker daemon has no IPv6 and `docker-proxy` relays the connection. That address is trusted, so the API reads the address the client wrote in `X-Forwarded-For`: the client can change it at each attempt and get around the limit.
+- In some installs, the first proxy (nginx, or SWAG) sees clients from the Internet under a **private** address: Docker rootless or Podman (through their port forwarder), Docker Desktop, or IPv6 clients on a published port when the Docker daemon has no IPv6 and `docker-proxy` relays the connection. Every client that arrives this way comes from the same address, and that address is trusted. Clients that do not forge `X-Forwarded-For` all get that address, so they already share one counter: `LOGIN_RATE_LIMIT` failures from any of them block every client that arrives this way, the admin included, for up to 15 minutes. A client that writes its own `X-Forwarded-For` gets the address it wrote, so it can change it at each attempt and get around the limit.
 
 In these installs, set `TRUST_PROXY=1` (nginx alone) or `TRUST_PROXY=2` (SWAG or another reverse proxy in front of nginx) in the `environment` list of `carta-cocktail-backend`:
 
@@ -286,9 +286,18 @@ In these installs, set `TRUST_PROXY=1` (nginx alone) or `TRUST_PROXY=2` (SWAG or
 
 Write values without quotes in this list: compose keeps them as part of the value, and the backend refuses to start with `- TRUST_PROXY="loopback, linklocal, uniquelocal"`.
 
-The API then uses the address the first proxy sees, which is the same for every client: all clients share one counter. The limit holds, but `LOGIN_RATE_LIMIT` failures from anyone also block the admin for up to 15 minutes. The counters are kept in memory: restarting the backend clears them.
+The API then uses the address the first proxy sees and ignores what clients write in `X-Forwarded-For`. This removes the bypass and adds no risk of blocking the admin: clients that shared a counter still share it, and the others (IPv4 clients in the `docker-proxy` case) keep their own. Clients that share a counter can still block the admin with their failures; raise `LOGIN_RATE_LIMIT` if that happens too often. The counters are kept in memory: restarting the backend clears them.
 
-These settings hold only when clients cannot skip a proxy. The compose files still publish the backend port 3001: with `TRUST_PROXY=1` or `2`, a client that connects to it directly passes for the first proxy, and the API reads the address that client wrote in `X-Forwarded-For`. Behind SWAG, the same goes for nginx's port when a client reaches it without SWAG. Do not forward these ports from the Internet, or block them at the firewall.
+These settings hold only when clients cannot skip a proxy. The compose files publish the backend port 3001. A client that connects to it directly passes for the first proxy, and the API reads the address that client wrote in `X-Forwarded-For`: with `TRUST_PROXY=1` or `2`, and also with the default when the connection arrives under a private address, as in the installs listed above (in the `docker-proxy` case, only over IPv6). Behind SWAG, the same goes for nginx's port when a client reaches it without SWAG.
+
+Do not publish these ports. Remove the `ports` entry of `carta-cocktail-backend`: nginx reaches the backend over the compose network and does not need it. If you call the API from the host, bind the port to the loopback address instead:
+
+```yaml
+    ports:
+      - "127.0.0.1:3001:3001"
+```
+
+Behind SWAG, do the same with nginx's port: no `ports` entry when SWAG reaches nginx over a Docker network, and a loopback binding when SWAG runs on the host, such as `- "127.0.0.1:8080:8080"` (any free host port; nginx listens on 8080 in the container). A host firewall is not enough with rootful Docker: published ports go through Docker's `PREROUTING`, `FORWARD` and `DOCKER-USER` chains, not `INPUT`, so ufw rules and the usual firewalld zone rules do not filter them. Do not forward these ports from the Internet either.
 
 ## Git Workflow
 
