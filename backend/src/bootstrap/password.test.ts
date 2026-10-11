@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import bcrypt from 'bcryptjs';
-import { hashPassword, MIN_PASSWORD_LENGTH, verifyPassword } from './password';
+import { hashPassword, MIN_PASSWORD_LENGTH, needsRehash, verifyPassword } from './password';
 
 describe('password rule', () => {
   it('requires 12 characters', () => {
@@ -9,6 +9,16 @@ describe('password rule', () => {
 
   it('hashes at bcrypt cost 12', async () => {
     expect(bcrypt.getRounds(await hashPassword('long-enough-password'))).toBe(12);
+  });
+});
+
+describe('needsRehash', () => {
+  it('flags a hash made at another cost', async () => {
+    expect(needsRehash(await bcrypt.hash('any-password', 10))).toBe(true);
+  });
+
+  it('keeps a hash made at the current cost', async () => {
+    expect(needsRehash(await hashPassword('any-password'))).toBe(false);
   });
 });
 

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
-import { verifyPassword } from '../bootstrap/password';
+import { hashPassword, needsRehash, verifyPassword } from '../bootstrap/password';
 import { authMiddleware, AuthRequest, signToken } from '../middleware/auth';
 import { NotFoundError, UnauthorizedError } from '../errors';
 import { valid, validate } from '../validation/validate';
@@ -17,6 +17,11 @@ router.post('/login', validate(loginSchemas), async (_req: Request, res: Respons
   // Runs bcrypt even for an unknown email: the response time must not tell which emails exist
   const isPasswordValid = await verifyPassword(password, user?.passwordHash);
   if (!user || !isPasswordValid) throw new UnauthorizedError('errors.invalidCredentials');
+
+  // The password is known only now: bring an older hash up to the current cost
+  if (needsRehash(user.passwordHash)) {
+    await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(password) } });
+  }
 
   res.json({ token: signToken(user), user: { id: user.id, email: user.email } });
 });

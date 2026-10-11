@@ -29,9 +29,10 @@ const LOGIN_RATE_WINDOW_MS = 15 * 60_000;
 
 const app = express();
 
-// One proxy (nginx) stands in front of the API: req.ip is the client address it
-// forwards, so that the login limit applies per client and not to nginx itself.
-app.set('trust proxy', 1);
+// Proxies (nginx, and any reverse proxy in front of it) forward the client
+// address: req.ip must be that client, so that the login limit applies per
+// client and not to the proxy that every request comes through.
+app.set('trust proxy', config.trustProxy);
 
 // Middleware
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));

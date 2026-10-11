@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import path from 'path';
 import jwt from 'jsonwebtoken';
-import { assertJwtSecret, parseJwtExpiresIn, parseLoginRateLimit, resolveUploadDir } from './config';
+import {
+  assertJwtSecret, parseJwtExpiresIn, parseLoginRateLimit, parseTrustProxy, resolveUploadDir,
+} from './config';
 
 describe('resolveUploadDir', () => {
   it('should use UPLOAD_DIR when it is an absolute path', () => {
@@ -85,6 +87,26 @@ describe('parseJwtExpiresIn', () => {
   it('should reject a value jsonwebtoken cannot read', () => {
     expect(() => parseJwtExpiresIn('one week')).toThrow(
       "JWT_EXPIRES_IN must be a number of seconds or a timespan such as 7d or 24h, got 'one week'",
+    );
+  });
+});
+
+describe('parseTrustProxy', () => {
+  it.each([undefined, ''])('should trust the proxies on private networks for %j', (value) => {
+    expect(parseTrustProxy(value)).toBe('loopback, linklocal, uniquelocal');
+  });
+
+  it('should read a number of proxy hops', () => {
+    expect(parseTrustProxy('2')).toBe(2);
+  });
+
+  it('should read a list of addresses and subnets', () => {
+    expect(parseTrustProxy('loopback, 10.0.0.0/8')).toBe('loopback, 10.0.0.0/8');
+  });
+
+  it.each(['true', 'not-an-address'])('should reject %s', (value) => {
+    expect(() => parseTrustProxy(value)).toThrow(
+      `TRUST_PROXY must be a number of proxies or a list of addresses or subnets, got '${value}'`,
     );
   });
 });

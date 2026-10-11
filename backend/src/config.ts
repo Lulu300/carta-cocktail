@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import express from 'express';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import path from 'path';
 
@@ -75,11 +76,35 @@ export function parseJwtExpiresIn(value: string | undefined): JwtExpiresIn {
   return expiresIn;
 }
 
+// Proxies on the host or a private network: nginx alone, or a reverse proxy
+// such as SWAG in front of it. A client on the internet cannot pass for one.
+const DEFAULT_TRUST_PROXY = 'loopback, linklocal, uniquelocal';
+
+/**
+ * Express `trust proxy` setting (TRUST_PROXY): a number of proxy hops, or a
+ * comma-separated list of addresses, subnets or names (`loopback`, `uniquelocal`…).
+ * An address Express cannot read fails at startup.
+ */
+export function parseTrustProxy(value: string | undefined): number | string {
+  if (!value) {
+    return DEFAULT_TRUST_PROXY;
+  }
+  const trustProxy = /^\d+$/.test(value) ? Number(value) : value;
+  try {
+    // Express compiles the setting when it is set, and throws on a bad address
+    express().set('trust proxy', trustProxy);
+  } catch {
+    throw new Error(`TRUST_PROXY must be a number of proxies or a list of addresses or subnets, got '${value}'`);
+  }
+  return trustProxy;
+}
+
 export const config = {
   port: parseInt(process.env.PORT || '3001', 10),
   jwtSecret: assertJwtSecret(process.env.JWT_SECRET, process.env.NODE_ENV),
   jwtExpiresIn: parseJwtExpiresIn(process.env.JWT_EXPIRES_IN),
   loginRateLimit: parseLoginRateLimit(process.env.LOGIN_RATE_LIMIT),
+  trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   // Empty: no cross-origin access. The SPA calls the API on its own origin,
   // through nginx in production and the Vite proxy in development.
   corsOrigin: process.env.CORS_ORIGIN || '',

@@ -51,6 +51,35 @@ describe('POST /api/auth/login', () => {
     expect(res.body.user).toMatchObject({ email: 'admin@test.local' });
   });
 
+  it('should rehash a cost-10 password hash at cost 12 after a successful login', async () => {
+    const before = await prisma.user.findUniqueOrThrow({ where: { id: 1 } });
+    expect(bcrypt.getRounds(before.passwordHash)).toBe(10); // as seeded, like the old seed
+
+    const res = await request.post('/api/auth/login').send({ email: 'admin@test.local', password: 'testpass123' });
+    expect(res.status).toBe(200);
+
+    const after = await prisma.user.findUniqueOrThrow({ where: { id: 1 } });
+    expect(bcrypt.getRounds(after.passwordHash)).toBe(12);
+    expect(await bcrypt.compare('testpass123', after.passwordHash)).toBe(true);
+  });
+
+  it('should leave a cost-12 password hash untouched', async () => {
+    const hash = await bcrypt.hash('testpass123', 12);
+    await prisma.user.update({ where: { id: 1 }, data: { passwordHash: hash } });
+
+    await request.post('/api/auth/login').send({ email: 'admin@test.local', password: 'testpass123' });
+
+    const after = await prisma.user.findUniqueOrThrow({ where: { id: 1 } });
+    expect(after.passwordHash).toBe(hash);
+  });
+
+  it('should not rehash after a wrong password', async () => {
+    const before = await prisma.user.findUniqueOrThrow({ where: { id: 1 } });
+    await request.post('/api/auth/login').send({ email: 'admin@test.local', password: 'wrongpass' });
+    const after = await prisma.user.findUniqueOrThrow({ where: { id: 1 } });
+    expect(after.passwordHash).toBe(before.passwordHash);
+  });
+
   it('should return an HS256 token carrying the user token version', async () => {
     await prisma.user.update({ where: { id: 1 }, data: { tokenVersion: 3 } });
     const res = await request.post('/api/auth/login').send({ email: 'admin@test.local', password: 'testpass123' });

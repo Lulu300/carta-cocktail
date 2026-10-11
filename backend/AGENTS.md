@@ -120,7 +120,9 @@ export default router;
   `User.tokenVersion` (`tv`): changing the password or `POST /api/auth/logout-all` increments it, which revokes every
   older token. A token of a deleted user is refused too
 - `POST /api/auth/login` allows `LOGIN_RATE_LIMIT` failed attempts (default 10) per client IP in 15 minutes, then
-  answers 429. `trust proxy` is 1: the client IP is the one forwarded by nginx
+  answers 429. `trust proxy` (`TRUST_PROXY`) trusts the proxies on loopback and private networks by default: the
+  client IP is the last public address forwarded by nginx and any reverse proxy in front of it. A successful login
+  rehashes a password hash made at another cost (`needsRehash`)
 - One password rule (`src/bootstrap/password.ts`): `hashPassword()` (bcrypt cost 12) and `MIN_PASSWORD_LENGTH` (12),
   used by `ensureAdmin` and `PUT /api/settings/profile`. Never call `bcrypt.hash` elsewhere
 - CORS is closed by default (same-origin app); `CORS_ORIGIN` allows one origin

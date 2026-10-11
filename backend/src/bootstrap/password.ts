@@ -12,6 +12,15 @@ export function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, BCRYPT_COST);
 }
 
+/**
+ * True for a hash made at another cost: the old seed and the settings page used
+ * cost 10 before this rule. Such a hash must be redone at the next login, or the
+ * check of a known email would be faster than the dummy check of an unknown one.
+ */
+export function needsRehash(passwordHash: string): boolean {
+  return bcrypt.getRounds(passwordHash) !== BCRYPT_COST;
+}
+
 let dummyHash: Promise<string> | undefined;
 
 /**
