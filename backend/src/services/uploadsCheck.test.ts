@@ -149,7 +149,9 @@ describe('formatUploadsWarnings', () => {
     const [warning] = formatUploadsWarnings({ ...healthy, onMount: false });
 
     expect(warning).toContain('/app/uploads is not a mounted volume or host folder');
-    expect(warning).toContain('UPGRADING.md');
+    // Mounting the folder recreates the container: the photos inside must be copied out first
+    expect(warning).toContain('Before recreating it, copy them out with `docker cp <backend container>:/app/uploads/. ./uploads-rescue/`');
+    expect(warning).toContain('UPGRADING.md#v160');
   });
 
   it('gives the number of missing photos, even outside a container', () => {
@@ -157,6 +159,7 @@ describe('formatUploadsWarnings', () => {
 
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain('42 of 42 cocktail photos are missing from /app/uploads');
+    expect(warnings[0]).toContain('UPGRADING.md#v150');
   });
 });
 
@@ -199,6 +202,31 @@ describe('reportUploadsCheck', () => {
     expect(logger.warn).toHaveBeenCalledWith(
       `[uploads] Startup check of ${uploadDir} skipped: no such table: Cocktail`,
     );
+  });
+
+  it('logs only the first line of a multi-line error message', async () => {
+    const logger = { warn: vi.fn() };
+    const failingDb = {
+      cocktail: { findMany: () => Promise.reject(new Error('\nInvalid invocation in\n/app/dist/services/uploadsCheck.js:80:1\n')) },
+    } as unknown as Parameters<typeof reportUploadsCheck>[0];
+
+    await reportUploadsCheck(failingDb, options(), logger);
+
+    expect(logger.warn).toHaveBeenCalledWith(`[uploads] Startup check of ${uploadDir} skipped: Invalid invocation in`);
+  });
+
+  it('logs the error code of a Prisma error instead of its message', async () => {
+    const logger = { warn: vi.fn() };
+    // The cocktail table does not exist in a database that was never migrated
+    const missingTable = await prisma.$queryRawUnsafe('SELECT * FROM "NoSuchTable"').catch((error: unknown) => error);
+    const failingDb = {
+      cocktail: { findMany: () => Promise.reject(missingTable) },
+    } as unknown as Parameters<typeof reportUploadsCheck>[0];
+
+    await reportUploadsCheck(failingDb, options(), logger);
+
+    const [line] = logger.warn.mock.calls[0];
+    expect(line).toMatch(/skipped: PrismaClientKnownRequestError P\d{4}$/);
   });
 
   it('also survives a check that fails with something other than an Error', async () => {

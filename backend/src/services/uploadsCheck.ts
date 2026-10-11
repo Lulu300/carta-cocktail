@@ -39,7 +39,11 @@ export interface UploadsCheckResult {
 
 const DEFAULT_MOUNT_INFO_PATH = '/proc/self/mountinfo';
 const DEFAULT_CONTAINER_MARKERS = ['/.dockerenv', '/run/.containerenv'];
-const UPGRADING_GUIDE = 'https://github.com/Lulu300/carta-cocktail/blob/main/UPGRADING.md#v150';
+const UPGRADING_GUIDE = 'https://github.com/Lulu300/carta-cocktail/blob/main/UPGRADING.md';
+// Moving photos from another mount to the upload folder
+const MOVE_MOUNT_GUIDE = `${UPGRADING_GUIDE}#v150`;
+// Rescuing photos stored inside the container, then mounting the folder
+const RESCUE_PHOTOS_GUIDE = `${UPGRADING_GUIDE}#v160`;
 
 /** The kernel escapes spaces, tabs, newlines and backslashes as octal (`\040`). */
 function unescapeMountPath(field: string): string {
@@ -126,16 +130,34 @@ export function formatUploadsWarnings(result: UploadsCheckResult): string[] {
     warnings.push(
       `[uploads] WARNING: the upload folder ${result.uploadDir} is not a mounted volume or host folder. `
       + 'Photos stored there are lost when the container is recreated (at the next update at the latest). '
-      + `Mount your photo volume or folder on ${result.uploadDir}: see ${UPGRADING_GUIDE} ("Photos mounted on /uploads").`,
+      + `Before recreating it, copy them out with \`docker cp <backend container>:${result.uploadDir}/. ./uploads-rescue/\`, `
+      + `then mount a volume or host folder on ${result.uploadDir} and copy the photos back: `
+      + `see ${RESCUE_PHOTOS_GUIDE} ("Check that the photos are on a mount", then "After upgrading").`,
     );
   }
   if (result.missingPhotos > 0) {
     warnings.push(
       `[uploads] WARNING: ${result.missingPhotos} of ${result.referencedPhotos} cocktail photos are missing from ${result.uploadDir}. `
-      + `If they are in another folder or volume, mount it on ${result.uploadDir}: see ${UPGRADING_GUIDE}.`,
+      + `If they are in another folder or volume, mount it on ${result.uploadDir}: see ${MOVE_MOUNT_GUIDE}.`,
     );
   }
   return warnings;
+}
+
+/**
+ * Short reason for a failed check. Prisma messages span several lines (source
+ * excerpt, file paths), so a Prisma error code wins, then the first line.
+ */
+function describeError(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return String(error);
+  }
+  const code = (error as { code?: unknown }).code;
+  if (typeof code === 'string') {
+    return `${error.name} ${code}`;
+  }
+  const firstLine = error.message.split('\n').map((line) => line.trim()).find(Boolean);
+  return firstLine ?? error.name;
 }
 
 /**
@@ -152,8 +174,7 @@ export async function reportUploadsCheck(
     formatUploadsWarnings(result).forEach((warning) => logger.warn(warning));
     return result;
   } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    logger.warn(`[uploads] Startup check of ${options.uploadDir} skipped: ${reason}`);
+    logger.warn(`[uploads] Startup check of ${options.uploadDir} skipped: ${describeError(error)}`);
     return null;
   }
 }
