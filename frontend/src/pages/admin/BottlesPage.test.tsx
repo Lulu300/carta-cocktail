@@ -307,6 +307,38 @@ describe('BottlesPage', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
+    it('sends every field of the form', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      await openCreateForm(user);
+      const form = within(dialog());
+
+      await user.type(nameInput(), 'Tanqueray');
+      await user.selectOptions(form.getByLabelText('bottles.category'), '2');
+      fireEvent.change(form.getByLabelText('bottles.capacityMl'), { target: { value: '1000' } });
+      await user.type(form.getByLabelText('bottles.purchasePrice'), '32.5');
+      fireEvent.change(form.getByLabelText(/bottles\.remainingPercent/), { target: { value: '60' } });
+      fireEvent.change(form.getByLabelText('bottles.openedAt'), { target: { value: '2026-10-01' } });
+      await user.type(form.getByLabelText('Alcool % (vol.)'), '43.1');
+      await user.type(form.getByLabelText('bottles.location'), 'Shelf');
+      await user.click(form.getByLabelText('Utilisable comme digestif'));
+      await user.click(form.getByRole('button', { name: 'common.save' }));
+
+      await waitFor(() => expect(mockApiCreate).toHaveBeenCalledWith({
+        name: 'Tanqueray',
+        categoryId: 2,
+        purchasePrice: 32.5,
+        capacityMl: 1000,
+        remainingPercent: 60,
+        openedAt: '2026-10-01',
+        alcoholPercentage: 43.1,
+        location: 'Shelf',
+        isApero: false,
+        isDigestif: true,
+        quantity: 1,
+      }));
+    });
+
     it('creates several identical bottles at once', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();

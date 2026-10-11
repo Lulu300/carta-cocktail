@@ -35,10 +35,10 @@ export default function AdminLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f0f1a] text-gray-100 flex">
+    <div className="min-h-screen bg-canvas text-fg flex">
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-64 flex flex-col bg-[#1a1a2e] border-r border-gray-800 transform transition-transform duration-200 lg:translate-x-0 lg:static ${
+        className={`fixed inset-y-0 left-0 z-30 w-64 flex flex-col bg-surface border-r border-line transform transition-transform duration-200 lg:translate-x-0 lg:static ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -89,7 +89,7 @@ export default function AdminLayout() {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-h-screen">
         {/* Top bar */}
-        <header className="bg-[#1a1a2e] border-b border-gray-800 px-6 py-4 flex items-center justify-between">
+        <header className="bg-surface border-b border-line px-6 py-4 flex items-center justify-between">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="lg:hidden text-gray-400 hover:text-white"
