@@ -5,13 +5,13 @@ phase: D
 lane: ci
 criticite: moyenne
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [E-01]
 touches: [.github/workflows/ci.yml, .github/scripts/bundle-budget.mjs]
 sources: ["06-frontend-ux-perf.md §0", "06-frontend-ux-perf.md §1"]
-branch:
-pr:
+branch: chore/D-14-bundle-budget-ci
+pr: "#65"
 ---
 
 ## Contexte
@@ -37,10 +37,10 @@ E-01 a fait passer le JS chargé par un invité sur `/menu/:slug` de 178,83 kB �
 
 ## Critères d'acceptation
 
-- [ ] La CI échoue si une page admin, `LoginPage`, un assistant d'import ou `jszip` se retrouve dans le chargement initial (vérifié en ajoutant temporairement un import statique de `DashboardPage` dans `App.tsx` sur une branche de test).
-- [ ] La CI échoue si l'entrée et les chunks préchargés dépassent le seuil gzip.
-- [ ] Le tableau des tailles apparaît dans les logs du job frontend.
-- [ ] Le script a des tests (`node --test`) sur un `dist/` factice : cas conforme, chunk admin statique, `JSZip` présent, seuil dépassé.
+- [x] La CI échoue si une page admin, `LoginPage`, un assistant d'import ou `jszip` se retrouve dans le chargement initial (vérifié en ajoutant temporairement un import statique de `DashboardPage` dans `App.tsx` sur une branche de test).
+- [x] La CI échoue si l'entrée et les chunks préchargés dépassent le seuil gzip.
+- [x] Le tableau des tailles apparaît dans les logs du job frontend.
+- [x] Le script a des tests (`node --test`) sur un `dist/` factice : cas conforme, chunk admin statique, `JSZip` présent, seuil dépassé.
 
 ## Tests à ajouter ou adapter
 
@@ -55,3 +55,7 @@ E-01 a fait passer le JS chargé par un invité sur `/menu/:slug` de 178,83 kB �
 ## Journal
 
 - 2026-10-09 : tâche créée à la demande de la revue de la PR #43 (E-01).
+- 2026-10-11 : fait (PR #65). Écart avec « Ce qu'il faut faire » : le manifeste Vite liste des chunks, pas des modules ; un import statique de `DashboardPage` dans `App.tsx` fusionne la page dans le chunk d'entrée sans laisser de trace dans le manifeste (vérifié). Le script lit donc les modules de chaque chunk dans ses source maps, produites en CI seulement par `npm run build -- --sourcemap hidden` (JS émis identique au build normal, md5 vérifié ; ni `frontend/package.json`, ni `vite.config.ts`, ni l'image Docker ne changent). Pas de manifeste. Filet `JSZip` textuel conservé. L'étape backend « Delta coverage script tests » devient « CI script tests » (même commande, lance aussi les nouveaux tests).
+- 2026-10-11 : mesure sur `develop` (40a44c8), gzip niveau 9, 1 kB = 1000 octets : entrée 25,35 kB + `vendor-react` 82,54 kB + `vendor-i18n` 18,40 kB = 126,29 kB (Vite affiche 126,47 kB avec son niveau gzip par défaut). Seuil : 126,29 × 1,05 = 132,60, arrondi à **133 kB** (+5,3 %). CSS non compté. Vérifié localement : l'import statique de `DashboardPage` fait échouer le script (129,21 kB, sous le seuil : seul le contrôle des modules l'attrape), un `import JSZip` statique aussi (modules, texte et seuil).
+- 2026-10-11 : Notes de version : aucun changement visible, CI seulement.
+- 2026-10-11 : rebase sur `develop` après #67 (version affichée dans l'admin) : entrée 85,10 kB brut / 25,37 kB gzip (+0,02 kB), total **126,31 kB**. 126,31 × 1,05 = 132,63 : le seuil reste **133 kB**. Revue : test sans faux positif sur les noms des chunks dynamiques, code de sortie vérifié pour un argument manquant, commentaire sur l'hypothèse `build.modulePreload` (réglage par défaut de Vite).
