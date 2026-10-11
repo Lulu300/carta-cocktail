@@ -254,6 +254,19 @@ describe('MenuPublicPage', () => {
       expect(screen.getByPlaceholderText('public.cocktailSearchPlaceholder')).toHaveValue('');
     });
 
+    it('clears the search with the icon inside the search bar', async () => {
+      const user = userEvent.setup();
+      vi.mocked(publicApi.getMenu).mockResolvedValue(mojitoMenu);
+      renderMenu('cocktails');
+      const search = await screen.findByPlaceholderText('public.cocktailSearchPlaceholder');
+      await user.type(search, 'negroni');
+
+      await user.click(screen.getByText('✕'));
+
+      expect(search).toHaveValue('');
+      expect(await screen.findByText('Mojito')).toBeInTheDocument();
+    });
+
     it('says when the menu itself is empty', async () => {
       vi.mocked(publicApi.getMenu).mockResolvedValue(cocktailMenu([]));
       renderMenu('cocktails');
