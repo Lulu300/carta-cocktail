@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma';
 import { parseNameTranslations } from '../utils/translations';
 import { AuthRequest, optionalAuth } from '../middleware/auth';
 import { NotFoundError } from '../errors';
+import { calculateAvailabilities } from '../services/availabilityService';
 
 const parseNT = (val: any) => {
   if (typeof val === 'string') { try { return JSON.parse(val); } catch { return null; } }
@@ -84,6 +85,22 @@ function isAdminRequest(req: AuthRequest): boolean {
   return req.userId !== undefined;
 }
 
+/**
+ * Adds `available` to each cocktail. Decision of 2026-10-08: a guest sees a
+ * cocktail as available only when the manual switch (`isAvailable`, still
+ * returned as is for the admin) is on AND the stock allows one serving.
+ * One stock load for the whole list.
+ */
+async function withPublicAvailability<T extends { id: number; isAvailable: boolean }>(
+  cocktails: T[],
+): Promise<(T & { available: boolean })[]> {
+  const availabilities = await calculateAvailabilities(prisma, cocktails.map(({ id }) => id));
+  return cocktails.map((cocktail) => {
+    const maxServings = availabilities.get(cocktail.id)?.maxServings ?? 0;
+    return { ...cocktail, available: cocktail.isAvailable && maxServings > 0 };
+  });
+}
+
 router.use(optionalAuth);
 
 // List all public menus
@@ -132,7 +149,9 @@ router.get('/menus/:slug', async (req: AuthRequest, res: Response) => {
   // Unpublished menus are only visible to a verified admin (preview)
   if (!menu || (!menu.isPublic && !isAdmin)) throw new NotFoundError();
 
-  res.json(parseNameTranslations(menu));
+  const cocktails = await withPublicAvailability(menu.cocktails.map(({ cocktail }) => cocktail));
+  const menuCocktails = menu.cocktails.map((menuCocktail, index) => ({ ...menuCocktail, cocktail: cocktails[index] }));
+  res.json(parseNameTranslations({ ...menu, cocktails: menuCocktails }));
 });
 
 // Get site settings (public)
@@ -254,7 +273,8 @@ router.get('/cocktails/:id', async (req: AuthRequest, res: Response) => {
 
   if (!cocktail) throw new NotFoundError();
 
-  res.json(parseNameTranslations(cocktail));
+  const [publicCocktail] = await withPublicAvailability([cocktail]);
+  res.json(parseNameTranslations(publicCocktail));
 });
 
 export default router;
