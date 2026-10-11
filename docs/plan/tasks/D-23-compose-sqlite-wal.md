@@ -26,17 +26,18 @@ Trouvé pendant D-13. Les deux fichiers compose listent les variables du backend
 ## Ce qu'il faut faire
 
 1. `docker-compose.yml` et `docker-compose.prod.yml` : ajouter `- SQLITE_WAL=${SQLITE_WAL:-true}` à l'`environment` de `carta-cocktail-backend`.
-2. README, section « Database files and network shares » et ligne `SQLITE_WAL` du tableau : remplacer la consigne d'édition du compose par « dans `.env` ». `.env.example` : retirer la remarque sur Docker.
-3. Noter dans la PR (« Required actions ») qu'une instance qui a déjà ajouté `- SQLITE_WAL=false` à son compose n'a rien à changer.
+2. README, section « Database files and network shares » et ligne `SQLITE_WAL` du tableau : remplacer la consigne d'édition du compose (et la phrase « Add this line again each time you download a new compose file ») par « dans `.env` ». `.env.example` : retirer la remarque sur Docker.
+3. Section « Required actions » de la PR (règle 9) : *before* — une instance qui a ajouté `- SQLITE_WAL=false` à la main dans son compose met `SQLITE_WAL=false` dans `.env` avant la mise à jour. La mise à jour remplace `docker-compose.prod.yml` par un fichier téléchargé (`UPGRADING.md`, v1.6.0, étape 5) : l'ajout à la main disparaît et `${SQLITE_WAL:-true}` repasserait la base en WAL sans prévenir. Ligne « Notes de version » correspondante dans le Journal.
 
 ## Critères d'acceptation
 
 - [ ] `SQLITE_WAL=false` dans `.env` donne `SQLite journal mode: delete` au démarrage du conteneur (`docker compose up`).
 - [ ] Sans la variable, le log affiche `SQLite journal mode: wal`.
+- [ ] Instance qui avait `- SQLITE_WAL=false` ajouté à la main dans son compose : après le passage au nouveau compose téléchargé, avec `SQLITE_WAL=false` dans `.env`, le log affiche toujours `SQLite journal mode: delete`.
 
 ## Tests à ajouter ou adapter
 
-- Aucun test automatique ; essai manuel décrit dans la PR (`docker compose config` puis démarrage avec et sans la variable).
+- Aucun test automatique ; essai manuel décrit dans la PR : `docker compose config`, puis démarrage avec et sans la variable, puis le cas de l'ajout à la main (ancien compose modifié, remplacé par le nouveau, variable déplacée dans `.env`).
 
 ## Points d'attention
 

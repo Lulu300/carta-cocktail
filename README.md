@@ -118,7 +118,7 @@ Some versions require actions before or after the upgrade (new variables in `.en
 
 #### Database files and network shares
 
-The backend runs SQLite in WAL mode. While it runs, the `db-data` volume holds `carta_cocktail.db-wal` and `carta_cocktail.db-shm` next to `carta_cocktail.db`, and the latest changes may only be in the `-wal` file. Never copy `carta_cocktail.db` alone while the backend runs: use the export in Settings > Backup & Restore, which saves a consistent copy of the database with the photos, or stop the backend and copy the `.db` file together with its `-wal` and `-shm` files when they exist.
+By default, the backend runs SQLite in WAL mode. While it runs, the `db-data` volume holds `carta_cocktail.db-wal` and `carta_cocktail.db-shm` next to `carta_cocktail.db`, and the latest changes may only be in the `-wal` file. Never copy `carta_cocktail.db` alone while the backend runs: use the export in Settings > Backup & Restore, which saves a consistent copy of the database with the photos, or stop the backend and copy the `.db` file together with its `-wal` and `-shm` files when they exist. To put a copy back, use the restore in Settings > Backup & Restore, or follow [Restoring a pre-migration backup](#restoring-a-pre-migration-backup), which removes the old `-wal` and `-shm` files: a restored `.db` next to a stale `-wal` file can be corrupted.
 
 WAL does not work on a network share (SMB or NFS, such as a NAS folder bind-mounted as `/app/data`). In that case, set `SQLITE_WAL=false` to keep the rollback journal. The compose files do not pass this variable from `.env`: add it to the `environment` list of `carta-cocktail-backend`, after `- UPLOAD_DIR=/app/uploads`:
 
@@ -126,7 +126,7 @@ WAL does not work on a network share (SMB or NFS, such as a NAS folder bind-moun
       - SQLITE_WAL=false
 ```
 
-The default `db-data` named volume is local and needs nothing. The startup log shows the mode in use: `SQLite journal mode: wal`, or `delete` with `SQLITE_WAL=false`. When SQLite cannot switch, it keeps the previous mode and the log shows a warning: `SQLite journal mode is <mode>, not <mode> as requested (SQLITE_WAL)`.
+Add this line again each time you download a new compose file, for example when upgrading: otherwise the database goes back to WAL. The default `db-data` named volume is local and needs nothing. The startup log shows the mode in use: `SQLite journal mode: wal`, or `delete` with `SQLITE_WAL=false`. When SQLite cannot switch, it keeps the previous mode and the log shows a warning: `SQLite journal mode is <mode>, not <mode> as requested (SQLITE_WAL)`.
 
 #### Recovering the admin account
 
