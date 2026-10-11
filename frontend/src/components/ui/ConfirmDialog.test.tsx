@@ -77,18 +77,25 @@ describe('ConfirmDialog', () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
-  it('unticks the acknowledgment box for the next question', async () => {
+  it('unticks the acknowledgment box when the parent closes and reopens it', async () => {
     const user = userEvent.setup();
-    const { onCancel, rerender } = renderDialog({ acknowledgeLabel: 'I understand the risks' });
+    const props = {
+      title: 'Delete the category?',
+      acknowledgeLabel: 'I understand the risks',
+      onConfirm: vi.fn(),
+      onCancel: vi.fn(),
+    };
+    const { rerender } = render(<ConfirmDialog open {...props} />);
 
     await user.click(screen.getByRole('checkbox', { name: 'I understand the risks' }));
-    await user.click(screen.getByRole('button', { name: 'common.cancel' }));
-    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'common.confirm' })).toBeEnabled();
 
-    rerender(
-      <ConfirmDialog open title="Again?" acknowledgeLabel="I understand the risks" onConfirm={vi.fn()} onCancel={onCancel} />,
-    );
+    // Closed by the parent, without going through Cancel or Confirm.
+    rerender(<ConfirmDialog open={false} {...props} />);
+    rerender(<ConfirmDialog open {...props} />);
+
     expect(screen.getByRole('checkbox', { name: 'I understand the risks' })).not.toBeChecked();
     expect(screen.getByRole('button', { name: 'common.confirm' })).toBeDisabled();
+    expect(props.onCancel).not.toHaveBeenCalled();
   });
 });

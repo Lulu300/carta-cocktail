@@ -36,23 +36,21 @@ export default function ConfirmDialog({
   const { t } = useTranslation();
   const messageId = useId();
   const [acknowledged, setAcknowledged] = useState(false);
+  const [wasOpen, setWasOpen] = useState(open);
   const isDanger = tone === 'danger';
 
-  // Every exit goes through these handlers: untick the box for the next question.
-  const handleConfirm = () => {
+  // The box belongs to one question: untick it whenever the dialog opens or
+  // closes, whoever closed it. A parent that asks a new question without
+  // closing the dialog gives it a new `key` instead.
+  if (open !== wasOpen) {
+    setWasOpen(open);
     setAcknowledged(false);
-    onConfirm();
-  };
-
-  const handleCancel = () => {
-    setAcknowledged(false);
-    onCancel();
-  };
+  }
 
   return (
     <Modal
       open={open}
-      onClose={handleCancel}
+      onClose={onCancel}
       title={title}
       size="sm"
       role="alertdialog"
@@ -60,12 +58,12 @@ export default function ConfirmDialog({
       footer={(
         <>
           {/* A destructive action must not be one Enter key away. */}
-          <Button variant="ghost" onClick={handleCancel} autoFocus={isDanger}>
+          <Button variant="ghost" onClick={onCancel} autoFocus={isDanger}>
             {cancelLabel ?? t('common.cancel')}
           </Button>
           <Button
             variant={isDanger ? 'danger' : 'primary'}
-            onClick={handleConfirm}
+            onClick={onConfirm}
             disabled={Boolean(acknowledgeLabel) && !acknowledged}
             autoFocus={!isDanger}
           >

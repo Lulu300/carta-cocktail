@@ -58,7 +58,8 @@ const REGION_CLASSES = 'flex w-full flex-col items-center gap-2 sm:items-end';
 /**
  * Renders the toasts of the store: bottom right, bottom center under 640 px.
  * Both live regions stay in the page even when empty, so that screen readers
- * already watch them when the first toast arrives.
+ * already watch them when the first toast arrives. Both roles are atomic by
+ * default: aria-atomic="false" announces only the new toast, not the whole stack.
  */
 export default function Toaster() {
   const toasts = useSyncExternalStore(toastStore.subscribe, toastStore.getSnapshot);
@@ -67,10 +68,10 @@ export default function Toaster() {
 
   return (
     <div className="pointer-events-none fixed inset-x-4 bottom-4 z-50 flex flex-col gap-2 sm:left-auto sm:right-4 sm:w-96">
-      <div role="alert" className={REGION_CLASSES}>
+      <div role="alert" aria-atomic="false" className={REGION_CLASSES}>
         {errors.map((item) => <ToastItem key={item.id} item={item} />)}
       </div>
-      <div role="status" aria-live="polite" className={REGION_CLASSES}>
+      <div role="status" aria-live="polite" aria-atomic="false" className={REGION_CLASSES}>
         {notices.map((item) => <ToastItem key={item.id} item={item} />)}
       </div>
     </div>

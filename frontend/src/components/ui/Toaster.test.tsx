@@ -33,6 +33,9 @@ describe('Toaster', () => {
     expect(within(alert).queryByText('Heads up')).not.toBeInTheDocument();
     expect(within(status).getByText('Heads up')).toBeInTheDocument();
     expect(status).toHaveAttribute('aria-live', 'polite');
+    // Only the new toast is announced, not the whole stack.
+    expect(alert).toHaveAttribute('aria-atomic', 'false');
+    expect(status).toHaveAttribute('aria-atomic', 'false');
   });
 
   it('closes a toast with its close button, from the keyboard', async () => {

@@ -132,6 +132,28 @@ describe('ConfirmProvider and useConfirm', () => {
     await expect(second).resolves.toBe(true);
   });
 
+  it('does not carry a ticked acknowledgment box over to the question that replaces it', async () => {
+    const user = userEvent.setup();
+    const { result } = renderPlainHook(() => useConfirm(), { wrapper: ConfirmProvider });
+    const acknowledgeLabel = 'I understand the risks';
+
+    let first: Promise<boolean> | undefined;
+    act(() => {
+      first = result.current({ title: 'First', acknowledgeLabel });
+    });
+    await user.click(screen.getByRole('checkbox', { name: acknowledgeLabel }));
+    expect(screen.getByRole('button', { name: 'common.confirm' })).toBeEnabled();
+
+    act(() => {
+      result.current({ title: 'Second', acknowledgeLabel });
+    });
+
+    await expect(first).resolves.toBe(false);
+    expect(screen.getByRole('alertdialog', { name: 'Second' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: acknowledgeLabel })).not.toBeChecked();
+    expect(screen.getByRole('button', { name: 'common.confirm' })).toBeDisabled();
+  });
+
   it('throws when used outside a ConfirmProvider', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(() => renderHook(() => useConfirm())).toThrow('useConfirm must be used inside a ConfirmProvider');
