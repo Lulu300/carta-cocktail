@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Cocktail } from '../types';
-import { matchesCocktailSearch } from './cocktailSearch';
+import { buildSearchText, matchesCocktailSearch, matchesSearchText, normalize } from './cocktailSearch';
 
 const localize = (entity: { name: string; nameTranslations?: Record<string, string> | null }) =>
   entity.nameTranslations?.fr || entity.name;
@@ -78,5 +78,23 @@ describe('matchesCocktailSearch', () => {
 
   it('accepts an empty query', () => {
     expect(matchesCocktailSearch(cocktail(), '   ', localize)).toBe(true);
+  });
+});
+
+describe('normalize', () => {
+  it('drops accents, case and punctuation', () => {
+    expect(normalize('Apéro-Spritz !')).toBe('apero spritz');
+    expect(normalize('  Crème de Cassis  ')).toBe('creme de cassis');
+  });
+});
+
+describe('matchesSearchText', () => {
+  it('matches every word of the query against a prepared text, whatever the accents', () => {
+    const text = buildSearchText(['Apéro maison', null, 'Amer']);
+
+    expect(text).toBe('apero maison amer');
+    expect(matchesSearchText(text, 'APÉRO amer')).toBe(true);
+    expect(matchesSearchText(text, 'apero gin')).toBe(false);
+    expect(matchesSearchText(text, '')).toBe(true);
   });
 });

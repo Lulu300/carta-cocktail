@@ -107,10 +107,13 @@ jobs:
       - name: Build
         run: npm run build -- --sourcemap hidden
 
-      # Budget: 126.31 kB gzip measured on 2026-10-11 (entry + modulepreload
+      # Budget: 132.74 kB gzip measured on 2026-10-11 (entry + modulepreload
       # chunks) + ~5% margin. Raise it only with a reason written in the PR.
+      # History: 133 kB (D-14, 126.31 kB measured); 140 kB (E-11: the public
+      # pages now use TanStack's useQuery, plus skeletons, error states and
+      # section navigation).
       - name: Bundle budget (initial load of the public menu)
-        run: node ../.github/scripts/bundle-budget.mjs dist 133
+        run: node ../.github/scripts/bundle-budget.mjs dist 140
 
       - name: Tests with coverage
         run: npm run test:coverage

@@ -11,7 +11,14 @@ export function useCocktail(id: number): UseQueryResult<Cocktail, Error> {
   return useQuery({ queryKey: qk.cocktail(id), queryFn: () => cocktailsApi.get(id) });
 }
 
+interface AvailabilityQueryOptions {
+  /** False skips the request, e.g. for a guest who may not read stock levels. */
+  enabled?: boolean;
+}
+
 /** Availability of every cocktail, keyed by cocktail id. */
-export function useCocktailsAvailability(): UseQueryResult<Record<number, CocktailAvailability>, Error> {
-  return useQuery({ queryKey: qk.availability, queryFn: () => availabilityApi.getAllCocktails() });
+export function useCocktailsAvailability(
+  { enabled = true }: AvailabilityQueryOptions = {},
+): UseQueryResult<Record<number, CocktailAvailability>, Error> {
+  return useQuery({ queryKey: qk.availability, queryFn: () => availabilityApi.getAllCocktails(), enabled });
 }

@@ -1,11 +1,11 @@
 import type { Cocktail, CocktailIngredient } from '../types';
 
-type LocalizeName = (entity: {
-  name: string;
-  nameTranslations?: Record<string, string> | null;
-}) => string;
+type NamedEntity = { name: string; nameTranslations?: Record<string, string> | null };
 
-function normalize(value: string): string {
+export type LocalizeName = (entity: NamedEntity) => string;
+
+/** Lower case, without accents or punctuation: "Apéro-Spritz!" becomes "apero spritz". */
+export function normalize(value: string): string {
   return value
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '')
@@ -14,12 +14,21 @@ function normalize(value: string): string {
     .trim();
 }
 
-function getEntityNames(
-  entity: { name: string; nameTranslations?: Record<string, string> | null } | null | undefined,
-  localize: LocalizeName,
-): string[] {
+/** Raw and localized names, so a search matches in any language. */
+export function getEntityNames(entity: NamedEntity | null | undefined, localize: LocalizeName): string[] {
   if (!entity) return [];
   return [entity.name, localize(entity)];
+}
+
+/** Normalized text built from several values, to be matched with `matchesSearchText`. */
+export function buildSearchText(values: (string | null | undefined)[]): string {
+  return normalize(values.filter((value): value is string => Boolean(value)).join(' '));
+}
+
+/** True when every word of the query appears in a text built by `buildSearchText`. */
+export function matchesSearchText(searchText: string, query: string): boolean {
+  const terms = normalize(query).split(/\s+/).filter(Boolean);
+  return terms.every((term) => searchText.includes(term));
 }
 
 function getIngredientNames(ingredient: CocktailIngredient, localize: LocalizeName): string[] {
@@ -36,24 +45,28 @@ interface CocktailSearchOptions {
   includeNotes?: boolean;
 }
 
-export function matchesCocktailSearch(
+/** Searchable text of a cocktail; compute it once per cocktail when filtering on every keystroke. */
+export function getCocktailSearchText(
   cocktail: Cocktail,
-  query: string,
   localize: LocalizeName,
   { includeNotes = false }: CocktailSearchOptions = {},
-): boolean {
-  const terms = normalize(query).split(/\s+/).filter(Boolean);
-  if (terms.length === 0) return true;
-
+): string {
   // Off by default so a guest cannot probe the content of a note by typing words.
-  const searchableText = normalize([
+  return buildSearchText([
     cocktail.name,
     cocktail.description,
     includeNotes ? cocktail.notes : null,
     cocktail.tags,
     ...(cocktail.ingredients || []).flatMap((ingredient) => getIngredientNames(ingredient, localize)),
     ...(cocktail.instructions || []).map((instruction) => instruction.text),
-  ].filter((value): value is string => Boolean(value)).join(' '));
+  ]);
+}
 
-  return terms.every((term) => searchableText.includes(term));
+export function matchesCocktailSearch(
+  cocktail: Cocktail,
+  query: string,
+  localize: LocalizeName,
+  options: CocktailSearchOptions = {},
+): boolean {
+  return matchesSearchText(getCocktailSearchText(cocktail, localize, options), query);
 }
