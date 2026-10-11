@@ -5,13 +5,13 @@ phase: C
 lane: docs
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-11, D-13]
 touches: [README.md, .env.example]
 sources: []
-branch:
-pr:
+branch: docs/C-27-docs-auth-env
+pr: https://github.com/Lulu300/carta-cocktail/pull/87
 ---
 
 ## Contexte
@@ -34,7 +34,7 @@ C-11 (PR #82) ajoute quatre variables d'environnement facultatives au backend, l
 
 ## Critères d'acceptation
 
-- [ ] Les quatre variables sont documentées avec leur valeur par défaut et leur format.
+- [x] Les quatre variables sont documentées avec leur valeur par défaut et leur format.
 
 ## Tests à ajouter ou adapter
 
@@ -47,3 +47,4 @@ C-11 (PR #82) ajoute quatre variables d'environnement facultatives au backend, l
 ## Journal
 
 - 2026-10-11 : tâche créée pendant C-11 (PR #82).
+- 2026-10-11 : fait (PR #87). Défauts et formats vérifiés dans `backend/src/config.ts` et `backend/src/app.ts`. `README.md`, section « Environment Variables » seulement : une ligne par variable, une note sur Docker (les fichiers compose ne transmettent pas ces variables : les ajouter à la liste `environment` de `carta-cocktail-backend`, comme `SQLITE_WAL`), sous-section « Login limit behind a reverse proxy » avec les limites de `TRUST_PROXY` et le fait qu'un redémarrage vide les compteurs (en mémoire). `.env.example` : les quatre variables commentées avec leur défaut. Fichiers compose inchangés. Pas d'action utilisateur, pas de ligne « Notes de version ».
