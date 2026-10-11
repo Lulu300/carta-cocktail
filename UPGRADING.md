@@ -28,10 +28,10 @@ Instances older than v1.8.0: upgrade to v1.8.0 first, following the [v1.8.0 sect
 
 Worth checking after the upgrade:
 
-- **Restoring a backup made before v1.11.0.** Restart the backend afterwards (`docker compose -f docker-compose.prod.yml restart carta-cocktail-backend`). Until then, signing in fails (the login page shows "Invalid email or password", even with the right password) and the admin pages answer with a server error. This applies to every backup made before v1.11.0, v1.8.0 to v1.10.0 included. The restore screen says so. See [Restoring a backup from an older version](#restoring-a-backup-from-an-older-version) for the cases where a restart is not enough.
-- **Login limit.** After 10 failed logins from one IP address in 15 minutes (`LOGIN_RATE_LIMIT`), the login is refused until 15 minutes after the first of them (the login page shows "Invalid email or password" then too). Restarting the backend clears the counters. Behind a reverse proxy on a private network (SWAG, Traefik…), nothing to set. A client on your local network can bypass the limit, and so can any client with Docker rootless, Podman, Docker Desktop, or an IPv6 client relayed by `docker-proxy` when the Docker daemon has no IPv6. [README › "Login limit behind a reverse proxy"](README.md#login-limit-behind-a-reverse-proxy) explains how to set `TRUST_PROXY` in those installs, and why the backend port 3001 must then not be reachable from the Internet.
+- **Restoring a backup made before v1.11.0.** Restart the backend afterwards (`docker compose -f docker-compose.prod.yml restart carta-cocktail-backend`). Until then, the admin pages answer with a server error; reloading the page signs you out, and signing in then fails with "Internal server error", even with the right password. This applies to every backup made before v1.11.0, v1.8.0 to v1.10.0 included. The restore screen says so. See [Restoring a backup from an older version](#restoring-a-backup-from-an-older-version) for the cases where a restart is not enough.
+- **Login limit.** After 10 failed logins from one IP address in 15 minutes (`LOGIN_RATE_LIMIT`), the login answers "Too many failed login attempts: try again in a few minutes" for up to 15 minutes. Restarting the backend clears the counters. The login page now shows that message, and "Invalid email or password" only for wrong credentials. Behind a reverse proxy on a private network (SWAG, Traefik…), nothing to set. Read [README › "Login limit behind a reverse proxy"](README.md#login-limit-behind-a-reverse-proxy) if you use Docker rootless, Podman, Docker Desktop, or IPv6 clients relayed by `docker-proxy` when the Docker daemon has no IPv6: clients from the Internet already share one counter there, and a client can get around the limit; `TRUST_PROXY=1` or `2` removes that bypass without adding any risk of blocking the admin. In every install, do not publish the backend port 3001: remove the `ports` entry of `carta-cocktail-backend`, or bind it to `127.0.0.1:3001:3001`, as README shows (and nginx's port behind SWAG).
 - **Admin profile.** Changing the password signs out every other browser and device. Changing the login email asks for the current password. A new password needs at least 12 characters; a shorter one set before still works.
-- **New optional variables.** `LOGIN_RATE_LIMIT`, `TRUST_PROXY`, `JWT_EXPIRES_IN` and `CORS_ORIGIN`: the defaults suit a standard install, see [README › "Environment Variables"](README.md#environment-variables). The compose files do not pass them from `.env`: add the ones you set to the `environment` list of `carta-cocktail-backend`, without quotes. The backend refuses to start with a value it cannot read. The API no longer accepts calls from other websites unless `CORS_ORIGIN` names that site; the app itself does not need it.
+- **New optional variables.** `LOGIN_RATE_LIMIT`, `TRUST_PROXY`, `JWT_EXPIRES_IN` and `CORS_ORIGIN`: the defaults suit a standard install, see [README › "Environment Variables"](README.md#environment-variables). The compose files do not pass them from `.env`: add the ones you set to the `environment` list of `carta-cocktail-backend`, without quotes. The backend refuses to start when `LOGIN_RATE_LIMIT`, `TRUST_PROXY` or `JWT_EXPIRES_IN` has a value it cannot read; `CORS_ORIGIN` is not checked. The API no longer accepts calls from other websites unless `CORS_ORIGIN` names that site; the app itself does not need it.
 
 ## v1.10.0
 
@@ -417,9 +417,9 @@ A backup whose database schema is older than the one of the installed version re
 
 - **Without Docker**, from `backend/`, run `npm run db:deploy`, then restart the backend. For a backup from v1.5.0 or older, see below first.
 
-Then reload the page (the "Reload the page" button of the restore screen).
+Then reload the page (the "Reload the page once the backend has restarted" button of the restore screen).
 
-Until the database is updated, the app may answer with server errors. From v1.11.0 on, restoring a backup made before v1.11.0 breaks signing in (the login page shows "Invalid email or password", even with the right password), the admin pages, and the public menu in a browser where the admin is signed in. Guests can still see the public menu.
+Until the database is updated, the app may answer with server errors. From v1.11.0 on, restoring a backup made before v1.11.0 breaks the admin pages and, in a browser where the admin is signed in, the public menu. Reloading the page signs you out, and signing in then fails with "Internal server error", even with the right password. These failures count for the login limit: after 10 attempts the login answers "Too many failed login attempts" until the restart, which clears the counters. Guests can still see the public menu.
 
 ### When a restart is not enough
 
@@ -440,6 +440,19 @@ In these cases, the database update fails and the backend does not start (with `
 
 Before switching, the restore copied the database it replaced to `backups/pre-restore-<date>.db`, next to the database (`/app/data/backups/` in the `db-data` volume of `docker-compose.prod.yml`). To go back to it, stop the backend and put that copy back as in [README › "Restoring a pre-migration backup"](README.md#restoring-a-pre-migration-backup), with `pre-restore-<date>.db` in place of `pre-migrate-<date>.db`, then start the backend. Without Docker, copy it over the database file named by `DATABASE_URL`, after removing its `-wal` and `-shm` files.
 
-That copy holds the database only: the photos stay those of the restored backup. If you exported a backup with the installed version, restoring that export instead brings back the database and its photos, with no restart.
+That copy holds the database only: the photos stay those of the restored backup. To get the photos back as well, once the backend runs on that copy, restore a backup you exported with the installed version.
 
-To use the old backup anyway, its database must be fixed first, as for an upgrade from the version that made it: see the [v1.8.0 section](#v180) for duplicates, and the [v1.6.0 section](#v160) for a database that does not match `0_init`.
+To use the old backup anyway, fix it on the version that made it, then export it again:
+
+1. Start a separate instance of the version that made the backup, with its own data. For a v1.0.x backup, use v1.5.0: it brings the database to `0_init` with `db push` at each start.
+2. Restore the backup there. With v1.5.0, restart the backend afterwards so that it updates the database.
+3. Fix it: for duplicates, rename or merge them in the admin, as in step 1 of the [v1.8.0 section](#v180) (move the bottles and recipe lines to the item you keep, then delete the other one).
+4. Export a new backup from that instance, then restore it on this one.
+
+To check a backup for duplicates before restoring it, unzip it, copy its `database.db` to `carta-db-copy/carta_cocktail.db`, and run the integrity check of the [v1.8.0 section](#v180) (step 1.2) on it. Without Docker, from `backend/` in a checkout of the installed version (after `npm ci`):
+
+```bash
+DATABASE_URL=file:/absolute/path/to/database.db npx tsx scripts/check-integrity.ts
+```
+
+Exit code `0`: no duplicates. Exit code `1`: the output lists them.
