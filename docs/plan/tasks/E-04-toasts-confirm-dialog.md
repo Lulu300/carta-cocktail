@@ -5,13 +5,13 @@ phase: E
 lane: frontend
 criticite: moyenne
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [E-03]
 touches: [frontend/src/components/ui/Toast, frontend/src/components/ui/ConfirmDialog, frontend/src/contexts/, frontend/src/main.tsx, frontend/src/i18n/locales/, frontend/src/pages/admin/SettingsPage.tsx]
 sources: ["06-frontend-ux-perf.md §2", "05-frontend-archi.md §H2"]
-branch:
-pr:
+branch: feature/E-04-toasts-confirm-dialog
+pr: https://github.com/Lulu300/carta-cocktail/pull/74
 ---
 
 ## Décisions validées (2026-10-08)
@@ -60,14 +60,14 @@ Répartition des 10 autres `confirm()` / `alert()` : E-05 (Categories ×3, Ingre
 
 ## Critères d'acceptation
 
-- [ ] Avec `acknowledgeLabel`, le bouton de confirmation reste désactivé tant que la case n'est pas cochée ; `details` s'affiche sous le message.
-- [ ] `toast.success('x')` appelé hors composant affiche le toast (testé).
-- [ ] Les erreurs sont annoncées dans une région `role="alert"`, les succès dans `role="status"`.
-- [ ] Un toast d'erreur reste au moins 8 s et peut être fermé au clavier.
-- [ ] `useConfirm()` renvoie `true` sur « Confirmer », `false` sur « Annuler », Échap et clic sur le fond.
-- [ ] La restauration d'une sauvegarde dans `SettingsPage` passe par `ConfirmDialog` ; plus de `confirm(` dans ce fichier.
-- [ ] Les nouvelles clés existent en `en` et `fr`.
-- [ ] Couverture ≥ 80 % sur les fichiers créés et modifiés.
+- [x] Avec `acknowledgeLabel`, le bouton de confirmation reste désactivé tant que la case n'est pas cochée ; `details` s'affiche sous le message.
+- [x] `toast.success('x')` appelé hors composant affiche le toast (testé).
+- [x] Les erreurs sont annoncées dans une région `role="alert"`, les succès dans `role="status"`.
+- [x] Un toast d'erreur reste au moins 8 s et peut être fermé au clavier.
+- [x] `useConfirm()` renvoie `true` sur « Confirmer », `false` sur « Annuler », Échap et clic sur le fond.
+- [x] La restauration d'une sauvegarde dans `SettingsPage` passe par `ConfirmDialog` ; plus de `confirm(` dans ce fichier.
+- [x] Les nouvelles clés existent en `en` et `fr`.
+- [x] Couverture ≥ 80 % sur les fichiers créés et modifiés.
 
 ## Tests à ajouter ou adapter
 
@@ -87,3 +87,4 @@ Répartition des 10 autres `confirm()` / `alert()` : E-05 (Categories ×3, Ingre
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : décisions validées par l'humain (voir « Décisions validées »).
+- 2026-10-11 : fait (PR #74). `ToastStore.ts` (store hors React, `toast.success/info/error/dismiss`, minuteurs 4 s / 8 s avec pause et reprise), `Toaster.tsx` (régions `role="alert"` et `role="status"` toujours présentes, pause au survol et au focus), `ConfirmDialog.tsx` (sur `Modal`, `role="alertdialog"`, `details`, case `acknowledgeLabel`, focus sur « Annuler » en `danger`, sur « Confirmer » sinon), `ConfirmContext.tsx` (`useConfirm()`, une question en attente remplacée par une nouvelle se résout à `false`). `toast.error` affiche le `message` d'une `Error` et `common.error` pour toute autre valeur, chaîne comprise (comme le demande la liste des tests) : un texte personnalisé passe par une `Error`. Pilote `SettingsPage` : titre et bouton « Restaurer une sauvegarde », message `settings.backup.confirmRestore` existant, toast de succès. Chunk d'entrée 32,00 → 33,43 kB gzip, chargement initial 132,91 → 134,34 kB (budget 140). 538 tests, couverture des lignes modifiées 100 %. Aucune action requise.
