@@ -72,6 +72,16 @@ describe('server process', () => {
     expect(fs.readdirSync(tmpDir)).toEqual(['server.db']);
   });
 
+  it('should start even when the uploads check fails', async () => {
+    // The database of these tests has no tables, so the uploads check cannot read the cocktails
+    const server = startServer(0);
+    await waitForOutput(server, 'API running on port');
+
+    expect(server.output()).toContain('[uploads] Startup check of');
+    server.child.kill('SIGTERM');
+    expect(await server.exitCode).toBe(0);
+  });
+
   it('should exit with code 1 when the port is already in use', async () => {
     const blocker = await occupyPort();
     const port = (blocker.address() as net.AddressInfo).port;
