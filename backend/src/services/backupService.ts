@@ -216,6 +216,32 @@ async function validateDatabase(dbPath: string): Promise<string | null> {
   }
 }
 
+/** Highest token version of the live database: every token it issued carries this version or a lower one. */
+async function highestLiveTokenVersion(): Promise<number> {
+  const { _max } = await prisma.user.aggregate({ _max: { tokenVersion: true } });
+  return _max.tokenVersion ?? 0;
+}
+
+/**
+ * Raises the token version of every user of the restored database above both
+ * its own and the live one, so that no token issued before the restore is
+ * accepted after it. Otherwise the backup would bring back an older version and
+ * revive the tokens revoked since (password change, "log out everywhere").
+ *
+ * A backup made before the tokenVersion column existed is left as it is: its
+ * migration adds the column at the next restart, with version 0 (see C-30).
+ */
+async function revokeRestoredSessions(restoredDbPath: string, liveTokenVersion: number): Promise<void> {
+  const client = new PrismaClient({ datasourceUrl: `file:${restoredDbPath}` });
+  try {
+    const columns = await client.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info("User");');
+    if (!columns.some((column) => column.name === 'tokenVersion')) return;
+    await client.$executeRaw`UPDATE "User" SET "tokenVersion" = MAX("tokenVersion", ${liveTokenVersion}) + 1`;
+  } finally {
+    await client.$disconnect();
+  }
+}
+
 /**
  * Extracts the image files of uploads/ to a flat folder; returns how many were
  * skipped. Two entries with the same name in different sub-folders would
@@ -321,7 +347,8 @@ function fileTimestamp(date: Date): string {
  * Everything that can fail on bad input (archive, database checks, extraction)
  * happens before the live files are touched. The switch itself is short, keeps
  * a copy of the replaced database in `<database folder>/backups/`, and puts the
- * previous database and uploads back if it fails.
+ * previous database and uploads back if it fails. The restored database comes
+ * with a raised token version: every session, the restoring one included, ends.
  */
 export async function restoreBackup(zipPath: string): Promise<RestoreResult> {
   const zip = openArchive(zipPath);
@@ -350,9 +377,12 @@ export async function restoreBackup(zipPath: string): Promise<RestoreResult> {
     // Open connections would keep reading the old WAL and later checkpoint its
     // pages over the restored file: flush it and close them all first.
     await checkpointWal();
+    // Read last, right before closing: a token issued earlier carries this version at most
+    const liveTokenVersion = await highestLiveTokenVersion();
     await prisma.$disconnect();
     fs.mkdirSync(path.dirname(preRestorePath), { recursive: true });
     fs.copyFileSync(dbPath, preRestorePath);
+    await revokeRestoredSessions(restoredDbPath, liveTokenVersion);
     removeSqliteSideFiles(dbPath);
     fs.renameSync(restoredDbPath, dbPath);
     databaseReplaced = true;

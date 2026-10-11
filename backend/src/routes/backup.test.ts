@@ -6,7 +6,7 @@ import AdmZip from 'adm-zip';
 import { PrismaClient } from '@prisma/client';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData, seedIngredient, seedCocktail,
-  prisma, request, authHeader,
+  prisma, request, authHeader, getAuthToken,
 } from '../test/helpers';
 import { configureSqlite } from '../lib/prisma';
 import { config } from '../config';
@@ -16,11 +16,17 @@ const dbPath = resolveDatabasePath();
 const preRestoreDir = path.join(path.dirname(dbPath), 'backups');
 const isRoot = process.getuid?.() === 0;
 
+/** Header of a session opened now: a restore revokes the older ones by raising the admin's token version. */
+async function currentSessionHeader(): Promise<{ Authorization: string }> {
+  const { tokenVersion } = await prisma.user.findUniqueOrThrow({ where: { id: 1 } });
+  return { Authorization: `Bearer ${getAuthToken(1, { tokenVersion })}` };
+}
+
 /** Downloads a backup, keeping the zip as a Buffer instead of letting supertest parse it. */
-function requestExport() {
+async function requestExport() {
   return request
     .get('/api/backup/export')
-    .set(authHeader())
+    .set(await currentSessionHeader())
     .buffer(true)
     .parse((response, callback) => {
       const chunks: Buffer[] = [];
@@ -35,8 +41,8 @@ async function exportBackup(): Promise<Buffer> {
   return res.body as Buffer;
 }
 
-function importBackup(backup: Buffer) {
-  return request.post('/api/backup/import').set(authHeader()).attach('backup', backup, 'backup.zip');
+async function importBackup(backup: Buffer) {
+  return request.post('/api/backup/import').set(await currentSessionHeader()).attach('backup', backup, 'backup.zip');
 }
 
 function zipWith(files: Record<string, string | Buffer>): Buffer {
@@ -96,34 +102,49 @@ function withRawEntryName(backup: Buffer, entryName: string, rawName: string): B
   });
 }
 
-/** Writes a SQLite database made by `sql` and returns its bytes. */
-async function sqliteFileWith(sql: string[]): Promise<Buffer> {
+/**
+ * Opens `bytes` (a new database when omitted) with its own client, as a restore
+ * on another machine would, then returns what `use` returned and the file's bytes.
+ */
+async function withDatabaseFile<T>(
+  bytes: Buffer | undefined,
+  use: (client: PrismaClient) => Promise<T>,
+): Promise<{ result: T; bytes: Buffer }> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'carta-backup-'));
   const file = path.join(dir, 'database.db');
+  if (bytes) fs.writeFileSync(file, bytes);
   const client = new PrismaClient({ datasourceUrl: `file:${file}` });
   try {
-    for (const statement of sql) await client.$executeRawUnsafe(statement);
-  } finally {
+    const result = await use(client);
     await client.$disconnect();
-  }
-  const bytes = fs.readFileSync(file);
-  fs.rmSync(dir, { recursive: true, force: true });
-  return bytes;
-}
-
-/** Opens the database.db of a backup on its own, as a restore on another machine would. */
-async function ingredientNamesInBackup(backup: Buffer): Promise<string[]> {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'carta-backup-'));
-  const dbFile = path.join(dir, 'database.db');
-  fs.writeFileSync(dbFile, new AdmZip(backup).getEntry('database.db')!.getData());
-  const client = new PrismaClient({ datasourceUrl: `file:${dbFile}` });
-  try {
-    const ingredients = await client.ingredient.findMany({ orderBy: { name: 'asc' } });
-    return ingredients.map((ingredient) => ingredient.name);
+    return { result, bytes: fs.readFileSync(file) };
   } finally {
     await client.$disconnect();
     fs.rmSync(dir, { recursive: true, force: true });
   }
+}
+
+async function runStatements(client: PrismaClient, sql: string[]): Promise<void> {
+  for (const statement of sql) await client.$executeRawUnsafe(statement);
+}
+
+/** Writes a SQLite database made by `sql` and returns its bytes. */
+async function sqliteFileWith(sql: string[]): Promise<Buffer> {
+  return (await withDatabaseFile(undefined, (client) => runStatements(client, sql))).bytes;
+}
+
+/** Runs `sql` on the database of a backup, for instance to give it the schema of an older version. */
+async function withDatabaseChanged(backup: Buffer, sql: string[]): Promise<Buffer> {
+  const zip = new AdmZip(backup);
+  const { bytes } = await withDatabaseFile(zip.getEntry('database.db')!.getData(), (client) => runStatements(client, sql));
+  zip.updateFile('database.db', bytes);
+  return zip.toBuffer();
+}
+
+async function ingredientNamesInBackup(backup: Buffer): Promise<string[]> {
+  const databaseBytes = new AdmZip(backup).getEntry('database.db')!.getData();
+  const { result } = await withDatabaseFile(databaseBytes, (client) => client.ingredient.findMany({ orderBy: { name: 'asc' } }));
+  return result.map((ingredient) => ingredient.name);
 }
 
 async function ingredientNames(): Promise<string[]> {
@@ -312,7 +333,7 @@ describe('backup restore', () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ message: 'Backup restored successfully', skippedFiles: 0, restartRecommended: true });
     expect(await cocktailNames()).toEqual(['Mojito']);
-    const list = await request.get('/api/cocktails').set(authHeader());
+    const list = await request.get('/api/cocktails').set(await currentSessionHeader());
     expect(list.status).toBe(200);
     expect(preRestoreCopies().length).toBe(copiesBefore.length + 1);
     expect(restoreLeftovers()).toEqual([]);
@@ -416,7 +437,7 @@ describe('backup restore', () => {
 
       expect(res.status).toBe(200);
       expect(await cocktailNames()).toEqual([]);
-      expect((await request.get('/api/cocktails').set(authHeader())).status).toBe(200);
+      expect((await request.get('/api/cocktails').set(await currentSessionHeader())).status).toBe(200);
       const leftover = uploadDirContent().filter((name) => name.startsWith('.pre-restore-'));
       expect(leftover).toHaveLength(1);
       expect(uploadDirContent().filter((name) => !name.startsWith('.'))).toEqual(['restored.jpg']);
@@ -478,6 +499,83 @@ describe('backup restore', () => {
 
       await expectPreviousStateBack(await importBackup(backup));
     });
+  });
+});
+
+describe('backup restore and sessions', () => {
+  const TOKEN_VERSION_MIGRATION = path.resolve(
+    __dirname, '../../prisma/migrations/20261011120000_user_token_version/migration.sql',
+  );
+
+  function requestWithTokenVersion(tokenVersion: number) {
+    return request.get('/api/cocktails').set({ Authorization: `Bearer ${getAuthToken(1, { tokenVersion })}` });
+  }
+
+  async function setTokenVersion(tokenVersion: number): Promise<void> {
+    await prisma.user.update({ where: { id: 1 }, data: { tokenVersion } });
+  }
+
+  async function storedTokenVersion(): Promise<number> {
+    return (await prisma.user.findUniqueOrThrow({ where: { id: 1 } })).tokenVersion;
+  }
+
+  async function hasTokenVersionColumn(): Promise<boolean> {
+    const columns = await prisma.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info("User");');
+    return columns.some((column) => column.name === 'tokenVersion');
+  }
+
+  /** What the restart does after the restore of a backup made before the column existed. */
+  async function applyTokenVersionMigration(): Promise<void> {
+    await prisma.$executeRawUnsafe(fs.readFileSync(TOKEN_VERSION_MIGRATION, 'utf8'));
+  }
+
+  it('should refuse the tokens revoked after the backup was made, and the restoring one', async () => {
+    const backup = await exportBackup();
+    // Password changes or "log out everywhere" since the backup
+    await setTokenVersion(3);
+
+    const res = await importBackup(backup);
+
+    expect(res.status).toBe(200);
+    expect(await storedTokenVersion()).toBe(4);
+    expect((await requestWithTokenVersion(0)).status).toBe(401);
+    expect((await requestWithTokenVersion(3)).status).toBe(401);
+    expect((await requestWithTokenVersion(4)).status).toBe(200);
+  });
+
+  it('should refuse every earlier token when the backup has a higher version than the live database', async () => {
+    await setTokenVersion(5);
+    const backup = await exportBackup();
+    await setTokenVersion(2);
+
+    const res = await importBackup(backup);
+
+    expect(res.status).toBe(200);
+    expect(await storedTokenVersion()).toBe(6);
+    expect((await requestWithTokenVersion(2)).status).toBe(401);
+    expect((await requestWithTokenVersion(5)).status).toBe(401);
+    expect((await requestWithTokenVersion(6)).status).toBe(200);
+  });
+
+  it('should leave the version to the restart migration for a backup made before the column existed', async () => {
+    const backup = await withDatabaseChanged(await exportBackup(), ['ALTER TABLE "User" DROP COLUMN "tokenVersion"']);
+    await setTokenVersion(2);
+
+    try {
+      const res = await importBackup(backup);
+
+      expect(res.status).toBe(200);
+      expect(await hasTokenVersionColumn()).toBe(false);
+
+      await applyTokenVersionMigration();
+      expect((await requestWithTokenVersion(2)).status).toBe(401);
+      // Known limit (C-30): the column starts at 0 again, so a token of version 0
+      // issued before the restore, even revoked since, is accepted until it expires.
+      expect((await requestWithTokenVersion(0)).status).toBe(200);
+    } finally {
+      // The next tests need the column, even when an assertion failed before the migration
+      if (!(await hasTokenVersionColumn())) await applyTokenVersionMigration();
+    }
   });
 });
 
