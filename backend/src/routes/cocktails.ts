@@ -12,6 +12,7 @@ import { valid, validate } from '../validation/validate';
 import { IdParams, idRequest } from '../validation/common';
 import { CocktailCreate, CocktailUpdate, IngredientLine, Tags } from '../validation/cocktails';
 import { ImportConfirm, ImportRecipeV1 } from '../validation/cocktailImport';
+import { refuseNewRecipeDefects } from '../services/recipeDefectsService';
 
 type ImportedRecipe = z.output<typeof ImportRecipeV1>['cocktail'];
 
@@ -500,12 +501,14 @@ router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Respons
 // Update cocktail. Only the fields present in the body are written, so a partial
 // update such as { isAvailable: false } keeps the recipe. Ingredients and instructions
 // are replaced through nested writes, which Prisma runs in a single transaction:
-// if any part fails, the stored recipe is left untouched.
+// if any part fails, the stored recipe is left untouched. A line may keep a defect the
+// stored recipe already has (deleted source, quantity 0), but not add a new one.
 const updateSchemas = { params: IdParams, body: CocktailUpdate };
 
 router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Response) => {
   const { params: { id }, body } = valid<typeof updateSchemas>(res);
   const { name, description, notes, tags, isAvailable, ingredients, instructions } = body;
+  if (ingredients) await refuseNewRecipeDefects(id, ingredients);
 
   // Absent fields are undefined, which Prisma leaves untouched
   const cocktail = await prisma.cocktail.update({

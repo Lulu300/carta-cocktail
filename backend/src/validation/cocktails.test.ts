@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CocktailCreate, CocktailUpdate, IngredientLine, Instruction } from './cocktails';
+import { CocktailCreate, CocktailUpdate, IngredientLine, IngredientLineUpdate, Instruction } from './cocktails';
 
 const bottleLine = { sourceType: 'BOTTLE', bottleId: 3, quantity: 4, unitId: 1 };
 
@@ -47,6 +47,28 @@ describe('IngredientLine', () => {
   });
 });
 
+describe('IngredientLineUpdate', () => {
+  it.each([
+    ['BOTTLE', 'bottleId'],
+    ['CATEGORY', 'categoryId'],
+    ['INGREDIENT', 'ingredientId'],
+  ])('lets a %s line without its %s through, as a stored line whose source was deleted', (sourceType, key) => {
+    expect(IngredientLineUpdate.safeParse({ sourceType, [key]: null, quantity: 1, unitId: 1 }).success).toBe(true);
+  });
+
+  it('lets a quantity of 0 through', () => {
+    expect(IngredientLineUpdate.safeParse({ ...bottleLine, quantity: 0 }).success).toBe(true);
+  });
+
+  it('keeps every other rule of IngredientLine', () => {
+    expect(issues(IngredientLineUpdate.safeParse({ ...bottleLine, quantity: -1 }))).toEqual(['quantity']);
+    expect(issues(IngredientLineUpdate.safeParse({ ...bottleLine, sourceType: 'GARNISH' }))).toEqual(['sourceType']);
+    expect(issues(IngredientLineUpdate.safeParse({ ...bottleLine, categoryId: 2 }))).toEqual(['categoryId']);
+    expect(issues(IngredientLineUpdate.safeParse({ ...bottleLine, preferredBottleIds: [3] }))).toEqual(['preferredBottleIds']);
+    expect(issues(IngredientLineUpdate.safeParse({ ...bottleLine, unitId: '1' }))).toEqual(['unitId']);
+  });
+});
+
 describe('Instruction', () => {
   it('normalizes a plain string and an object to the trimmed text', () => {
     expect(Instruction.parse('Shake')).toBe('Shake');
@@ -62,6 +84,13 @@ describe('CocktailCreate and CocktailUpdate', () => {
   it('requires a name on creation only', () => {
     expect(issues(CocktailCreate.safeParse({}))).toEqual(['name']);
     expect(CocktailUpdate.safeParse({}).success).toBe(true);
+  });
+
+  it('lets the stored recipe defects through on update only', () => {
+    const orphanLine = { ...bottleLine, bottleId: null, quantity: 0 };
+    expect(issues(CocktailCreate.safeParse({ name: 'Mojito', ingredients: [orphanLine] })))
+      .toEqual(['ingredients.0.quantity', 'ingredients.0.bottleId']);
+    expect(CocktailUpdate.safeParse({ ingredients: [orphanLine] }).success).toBe(true);
   });
 
   it('accepts tags as an array, a string or null', () => {

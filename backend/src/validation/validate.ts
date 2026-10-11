@@ -17,6 +17,15 @@ export interface ValidationIssue {
   message: string;
 }
 
+/** A zod issue as sent in `details`, its path prefixed with where the parsed value sits in the request. */
+export function toValidationIssue(prefix: PropertyKey[], issue: z.core.$ZodIssue): ValidationIssue {
+  return {
+    path: [...prefix, ...issue.path].map(String).join('.'),
+    code: issue.code,
+    message: issue.message,
+  };
+}
+
 /**
  * Parses the request parts against their schemas. On success the parsed values are
  * stored in `res.locals.valid` (read them with `valid(res)`); on failure the request
@@ -33,13 +42,7 @@ export function validate(schemas: Schemas): RequestHandler {
       if (result.success) {
         parsed[part] = result.data;
       } else {
-        issues.push(
-          ...result.error.issues.map((issue) => ({
-            path: [part, ...issue.path.map(String)].join('.'),
-            code: issue.code,
-            message: issue.message,
-          })),
-        );
+        issues.push(...result.error.issues.map((issue) => toValidationIssue([part], issue)));
       }
     }
     if (issues.length > 0) {
