@@ -674,6 +674,29 @@ describe('POST /api/cocktails/import/confirm', () => {
     expect(await prisma.ingredient.findUnique({ where: { name: 'Citron Vert' } })).not.toBeNull();
   });
 
+  it('should name a unit after its abbreviation when neither the admin nor the file gives a name', async () => {
+    const res = await request.post('/api/cocktails/import/confirm').set(authHeader()).send({
+      recipe: {
+        version: 1,
+        cocktail: {
+          name: 'Hand Made',
+          ingredients: [
+            { sourceType: 'CATEGORY', sourceName: 'Rum', quantity: 4, unit: { abbreviation: 'Dash' } },
+          ],
+        },
+      },
+      resolutions: {
+        units: { dash: { action: 'create', data: { name: '' } } },
+        categories: { rum: { action: 'create', data: { name: 'Rum' } } },
+      },
+    });
+
+    expect(res.status).toBe(201);
+    const unit = await prisma.unit.findUniqueOrThrow({ where: { abbreviation: 'Dash' } });
+    expect(unit.name).toBe('Dash');
+    expect(res.body.ingredients[0].unitId).toBe(unit.id);
+  });
+
   it('should return 400 for a created bottle with remainingPercent above 100', async () => {
     const res = await request.post('/api/cocktails/import/confirm').set(authHeader()).send({
       recipe: { version: 1, cocktail: { name: 'Bounds' } },

@@ -279,10 +279,12 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
       } else if (r.action === 'create' && r.data) {
         const { name, abbreviation, conversionFactorToMl, nameTranslations } = r.data;
         const fileUnit = refs.unitRefs.get(key.toLowerCase());
+        const unitAbbreviation: string = abbreviation || fileUnit?.abbreviation || key;
         const created = await tx.unit.create({
           data: {
-            name: name || fileUnit?.name,
-            abbreviation: abbreviation || fileUnit?.abbreviation || key,
+            // A hand-made file may give no unit name: the abbreviation names it then
+            name: name || fileUnit?.name || unitAbbreviation,
+            abbreviation: unitAbbreviation,
             conversionFactorToMl: conversionFactorToMl ?? null,
             nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null,
           },
