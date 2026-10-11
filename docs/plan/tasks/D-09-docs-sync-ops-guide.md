@@ -7,7 +7,7 @@ criticite: basse
 effort: S
 status: todo
 owner: agent
-depends_on: [A-01, A-04, C-01]
+depends_on: [A-01, A-04, C-01, D-01, D-03, D-05]
 touches: [AGENTS.md, backend/AGENTS.md, frontend/AGENTS.md, README.md, docs/operations.md, backend/src/bootstrap/ensureAdmin.ts]
 sources: ["07-devops-history.md §5"]
 branch:
@@ -93,3 +93,4 @@ Les `AGENTS.md` sont lus par chaque agent avant une tâche : une affirmation fau
 - 2026-10-09 : D-11 (PR de D-11) transmet l'alignement d'`AGENTS.md` sur le nouveau modèle de release (Points d'attention).
 - 2026-10-09 : revue de la PR #39 (D-11). Libellé « Settings > Admin Profile » à aligner dans `README.md` et dans l'avertissement d'`ensureAdmin` (Points d'attention) ; `backend/src/bootstrap/ensureAdmin.ts` ajouté à `touches`.
 - 2026-10-09 : C-01 (PR #44) transmet l'alignement des `AGENTS.md` sur les migrations (Points d'attention).
+- 2026-10-11 : décision humaine : D-09 passe après D-01, D-03 et D-05 (ajoutées à `depends_on`, première suggestion des Points d'attention), pour documenter l'image finale en une fois. C-16 la remplace dans le lot C-04, E-11, D-14.
