@@ -69,7 +69,10 @@
     "name": "Nom du type",
     "color": "Couleur",
     "confirmDelete": "Supprimer ce type ?",
-    "cannotDelete": "Ce type est utilisé par des catégories et ne peut pas être supprimé."
+    "cannotDelete": "Ce type est utilisé par des catégories et ne peut pas être supprimé.",
+    "created": "Type créé",
+    "updated": "Type modifié",
+    "deleted": "Type supprimé"
   },
   "bottles": {
     "title": "Bouteilles",
@@ -376,5 +379,11 @@
   "confirm": {
     "deleteTitle": "Supprimer ?",
     "irreversible": "Cette action est définitive."
+  },
+  "deletion": {
+    "usedByCocktails": "Utilisé par ces cocktails : {{names}}.",
+    "usedByBottles": "Bouteilles concernées : {{names}}.",
+    "more_one": "et {{count}} autre",
+    "more_other": "et {{count}} autres"
   }
 }

@@ -69,7 +69,10 @@
     "name": "Type Name",
     "color": "Color",
     "confirmDelete": "Delete this type?",
-    "cannotDelete": "This type is used by categories and cannot be deleted."
+    "cannotDelete": "This type is used by categories and cannot be deleted.",
+    "created": "Type created",
+    "updated": "Type updated",
+    "deleted": "Type deleted"
   },
   "bottles": {
     "title": "Bottles",
@@ -376,5 +379,11 @@
   "confirm": {
     "deleteTitle": "Delete?",
     "irreversible": "This action cannot be undone."
+  },
+  "deletion": {
+    "usedByCocktails": "Used by these cocktails: {{names}}.",
+    "usedByBottles": "Bottles in it: {{names}}.",
+    "more_one": "and {{count}} more",
+    "more_other": "and {{count}} more"
   }
 }

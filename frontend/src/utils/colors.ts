@@ -33,3 +33,7 @@ export const COLOR_DOT_CLASSES: Record<string, string> = {
 export function getBadgeClasses(color?: string | null): string {
   return COLOR_BADGE_CLASSES[color || 'gray'] || COLOR_BADGE_CLASSES.gray;
 }
+
+export function getDotClasses(color?: string | null): string {
+  return COLOR_DOT_CLASSES[color || 'gray'] || COLOR_DOT_CLASSES.gray;
+}
