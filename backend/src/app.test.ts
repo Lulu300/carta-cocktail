@@ -1,4 +1,7 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import type { Express } from 'express';
+import supertest from 'supertest';
+import app from './app';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
   request, authHeader, seedUnit, seedCategory, seedBottle, seedIngredient, seedCocktailUsing, prisma,
@@ -151,5 +154,43 @@ describe('CORS', () => {
       .set('Origin', 'https://evil.example')
       .set('Access-Control-Request-Method', 'POST');
     expect(res.headers['access-control-allow-origin']).toBeUndefined();
+  });
+});
+
+describe('Request logs', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  /** What `target` writes to stdout while it answers one request. */
+  async function stdoutDuringRequest(target: Express, url: string): Promise<string> {
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    await supertest(target).get(url);
+    // morgan writes when the response finishes, which can come after supertest resolves
+    await new Promise((resolve) => setImmediate(resolve));
+    const output = write.mock.calls.map(([chunk]) => String(chunk)).join('');
+    write.mockRestore();
+    return output;
+  }
+
+  it('are not written in tests', async () => {
+    expect(await stdoutDuringRequest(app, '/api/quiet-in-tests')).not.toContain('/api/quiet-in-tests');
+  });
+
+  it('are written outside tests', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('JWT_SECRET', '3f9c1e7a2b8d4c6e0a1f5b9d7c3e2a4b6d8f0c1e3a5b7d9f');
+    vi.resetModules();
+    const { default: developmentApp } = await import('./app');
+    // The fresh import created its own PrismaClient: close it with the test
+    const { prisma: developmentPrisma } = await import('./lib/prisma');
+
+    try {
+      expect(await stdoutDuringRequest(developmentApp, '/api/logged')).toContain('GET /api/logged');
+    } finally {
+      await developmentPrisma.$disconnect();
+    }
   });
 });

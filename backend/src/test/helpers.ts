@@ -1,79 +1,58 @@
-import { execSync } from 'child_process';
-import path from 'path';
-import fs from 'fs';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import supertest from 'supertest';
+import { Prisma } from '@prisma/client';
 import app from '../app';
 import { prisma } from '../lib/prisma';
-
-const TEST_DB_PATH = path.resolve(__dirname, '../../prisma/test.db');
 
 // Tests and routes share the server's client, as in production
 export { prisma };
 export const request = supertest(app);
 
 /**
- * Create the test database schema via prisma db push.
+ * Connect to the test database, which globalSetup.ts creates once per run.
  * Call in beforeAll().
  */
 export async function setupTestDatabase(): Promise<void> {
-  // Remove old test DB files
-  for (const suffix of ['', '-wal', '-journal', '-shm']) {
-    const p = TEST_DB_PATH + suffix;
-    if (fs.existsSync(p)) fs.unlinkSync(p);
-  }
-
-  // Push schema to create tables
-  execSync('npx prisma db push --skip-generate --force-reset', {
-    cwd: path.resolve(__dirname, '../..'),
-    env: {
-      ...process.env,
-      DATABASE_URL: `file:./prisma/test.db`,
-      PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION: 'yes',
-    },
-    stdio: 'pipe',
-  });
-
-  // Reconnect prisma after DB recreation
   await prisma.$connect();
 }
 
 /**
- * Disconnect Prisma and remove test DB files.
+ * Disconnect Prisma; globalSetup.ts deletes the database at the end of the run.
  * Call in afterAll().
  */
 export async function teardownTestDatabase(): Promise<void> {
   await prisma.$disconnect();
-  for (const suffix of ['', '-wal', '-journal', '-shm']) {
-    const p = TEST_DB_PATH + suffix;
-    if (fs.existsSync(p)) {
-      try { fs.unlinkSync(p); } catch { /* ignore */ }
-    }
-  }
+}
+
+/** Tables of every model of schema.prisma, so that a model added later is emptied too. */
+export function schemaTables(): string[] {
+  return Prisma.dmmf.datamodel.models.map((model) => model.dbName ?? model.name);
 }
 
 /**
- * Delete all data from all tables in correct FK order.
+ * Delete all data from every table of the schema.
  * Call in beforeEach().
  */
 export async function cleanDatabase(): Promise<void> {
-  // Delete in dependency order (children first)
-  await prisma.menuCocktail.deleteMany();
-  await prisma.menuBottle.deleteMany();
-  await prisma.menuSection.deleteMany();
-  await prisma.cocktailPreferredBottle.deleteMany();
-  await prisma.cocktailInstruction.deleteMany();
-  await prisma.cocktailIngredient.deleteMany();
-  await prisma.cocktail.deleteMany();
-  await prisma.bottle.deleteMany();
-  await prisma.ingredient.deleteMany();
-  await prisma.unit.deleteMany();
-  await prisma.category.deleteMany();
-  await prisma.categoryType.deleteMany();
-  await prisma.menu.deleteMany();
-  await prisma.siteSettings.deleteMany();
-  await prisma.user.deleteMany();
+  // PRAGMA foreign_keys = OFF has no effect inside a transaction. Deferring the
+  // checks to the commit works in any table order: no row is left by then.
+  await prisma.$transaction([
+    prisma.$executeRawUnsafe('PRAGMA defer_foreign_keys = ON'),
+    ...schemaTables().map((table) => prisma.$executeRawUnsafe(`DELETE FROM "${table}"`)),
+  ]);
+}
+
+let adminPasswordHash: Promise<string> | undefined;
+
+/**
+ * Hash of the admin test password, computed once per test file: a bcrypt hash
+ * takes about 50 ms, which added up to most of the run time when every test
+ * hashed it again.
+ */
+function getAdminPasswordHash(): Promise<string> {
+  adminPasswordHash ??= bcrypt.hash('testpass123', 10);
+  return adminPasswordHash;
 }
 
 /**
@@ -82,7 +61,7 @@ export async function cleanDatabase(): Promise<void> {
  */
 export async function seedRequiredData(): Promise<void> {
   // Create admin user
-  const hash = await bcrypt.hash('testpass123', 10);
+  const hash = await getAdminPasswordHash();
   await prisma.user.create({
     data: { id: 1, email: 'admin@test.local', passwordHash: hash },
   });
@@ -251,22 +230,124 @@ export interface RecipeLineSource {
   categoryId?: number;
   ingredientId?: number;
   preferredBottleIds?: number[];
+  /** Defaults to 1. */
+  quantity?: number;
+}
+
+/** Nested create of recipe lines, in the order of `sources`, all in the given unit. */
+function recipeLinesData(unitId: number, sources: RecipeLineSource[]) {
+  return {
+    create: sources.map(({ preferredBottleIds = [], quantity = 1, ...source }, position) => ({
+      ...source,
+      quantity,
+      unitId,
+      position,
+      preferredBottles: { create: preferredBottleIds.map((bottleId) => ({ bottleId })) },
+    })),
+  };
 }
 
 /** Creates a cocktail whose recipe has one line per source, all in the given unit. */
 export async function seedCocktailUsing(name: string, unitId: number, sources: RecipeLineSource[]) {
   return prisma.cocktail.create({
+    data: { name, ingredients: recipeLinesData(unitId, sources) },
+  });
+}
+
+export interface FullCocktailOptions {
+  name?: string;
+  tags?: string;
+  /** Unit of every recipe line: the first unit found, or a new one. */
+  unitId?: number;
+  /** Recipe lines: by default one line on a new bottle. */
+  ingredients?: RecipeLineSource[];
+  /** Step texts, numbered from 1: by default one step. */
+  instructions?: string[];
+}
+
+async function findOrSeedUnitId(): Promise<number> {
+  const unit = (await prisma.unit.findFirst()) ?? (await seedUnit());
+  return unit.id;
+}
+
+/**
+ * Creates a cocktail with its recipe lines and instructions, plus the unit and
+ * bottle it needs, and returns it with these relations.
+ */
+export async function seedFullCocktail(options: FullCocktailOptions = {}) {
+  const unitId = options.unitId ?? await findOrSeedUnitId();
+  const ingredients = options.ingredients
+    ?? [{ sourceType: 'BOTTLE' as const, bottleId: (await seedBottle()).id }];
+  const instructions = options.instructions ?? ['Shake with ice'];
+
+  return prisma.cocktail.create({
     data: {
-      name,
-      ingredients: {
-        create: sources.map(({ preferredBottleIds = [], ...source }, position) => ({
-          ...source,
-          quantity: 1,
-          unitId,
-          position,
-          preferredBottles: { create: preferredBottleIds.map((bottleId) => ({ bottleId })) },
-        })),
-      },
+      name: options.name ?? 'Test Cocktail',
+      tags: options.tags ?? '',
+      ingredients: recipeLinesData(unitId, ingredients),
+      instructions: { create: instructions.map((text, index) => ({ stepNumber: index + 1, text })) },
+    },
+    include: {
+      ingredients: { include: { preferredBottles: true }, orderBy: { position: 'asc' } },
+      instructions: { orderBy: { stepNumber: 'asc' } },
     },
   });
+}
+
+// Each default slug is new, so that a test can create several menus
+let menuCount = 0;
+
+export async function seedMenu(overrides: Partial<{
+  name: string;
+  slug: string;
+  type: 'COCKTAILS' | 'APEROS' | 'DIGESTIFS';
+  isPublic: boolean;
+  description: string | null;
+}> = {}) {
+  menuCount += 1;
+  const slug = overrides.slug ?? `test-menu-${menuCount}`;
+  return prisma.menu.create({
+    data: {
+      name: overrides.name ?? slug,
+      slug,
+      type: overrides.type ?? 'COCKTAILS',
+      isPublic: overrides.isPublic ?? false,
+      description: overrides.description ?? null,
+    },
+  });
+}
+
+export async function seedMenuSection(menuId: number, overrides: Partial<{
+  name: string;
+  position: number;
+}> = {}) {
+  return prisma.menuSection.create({
+    data: {
+      menuId,
+      name: overrides.name ?? 'Test Section',
+      position: overrides.position ?? 0,
+    },
+  });
+}
+
+export interface MenuEntryOptions {
+  position?: number;
+  isHidden?: boolean;
+  menuSectionId?: number | null;
+}
+
+function menuEntryData(options: MenuEntryOptions) {
+  return {
+    position: options.position ?? 0,
+    isHidden: options.isHidden ?? false,
+    menuSectionId: options.menuSectionId ?? null,
+  };
+}
+
+export async function addCocktailToMenu(menuId: number, cocktailId: number, options: MenuEntryOptions = {}) {
+  return prisma.menuCocktail.create({ data: { menuId, cocktailId, ...menuEntryData(options) } });
+}
+
+export async function addBottleToMenu(menuId: number, bottleId: number, options: MenuEntryOptions = {}) {
+  return prisma.menuBottle.create({ data: { menuId, bottleId, ...menuEntryData(options) } });
 }

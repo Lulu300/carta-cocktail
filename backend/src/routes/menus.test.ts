@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
-  request, authHeader, prisma, seedCocktail, seedBottle,
+  request, authHeader, prisma, seedCocktail, seedBottle, seedMenu, seedMenuSection, addCocktailToMenu,
 } from '../test/helpers';
 
 beforeAll(async () => { await setupTestDatabase(); });
@@ -94,11 +94,9 @@ describe('PUT /api/menus/:id', () => {
   });
 
   it('should return 400 and keep the associations for a cocktail line without cocktailId', async () => {
-    const menu = await prisma.menu.create({
-      data: { name: 'Test', slug: 'test-menu', type: 'COCKTAILS' },
-    });
+    const menu = await seedMenu();
     const cocktail = await seedCocktail({ name: 'Mojito' });
-    await prisma.menuCocktail.create({ data: { menuId: menu.id, cocktailId: cocktail.id, position: 0 } });
+    await addCocktailToMenu(menu.id, cocktail.id);
 
     const res = await request.put(`/api/menus/${menu.id}`).set(authHeader())
       .send({ cocktails: [{ position: 0 }] });
@@ -123,8 +121,8 @@ describe('PUT /api/menus/:id', () => {
 
 describe('PUT /api/menus/:id - sections', () => {
   async function createMenuWithSection(slug: string) {
-    const menu = await prisma.menu.create({ data: { name: slug, slug, type: 'COCKTAILS' } });
-    const section = await prisma.menuSection.create({ data: { menuId: menu.id, name: 'Classics' } });
+    const menu = await seedMenu({ slug });
+    const section = await seedMenuSection(menu.id, { name: 'Classics' });
     return { menu, section };
   }
 
