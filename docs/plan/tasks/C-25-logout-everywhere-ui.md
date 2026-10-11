@@ -44,7 +44,7 @@ C-11 ajoute `POST /api/auth/logout-all` : la route incrémente `User.tokenVersio
 ## Points d'attention
 
 - `SettingsPage.tsx` est aussi touché par C-22 : enchaîner.
-- Tokens ramenés par une restauration : traité par C-30 (la restauration révoque toutes les sessions). Reste le cas d'une sauvegarde antérieure à v1.11.0, décrit dans C-30 : après le redémarrage, « Se déconnecter partout » est l'une des parades.
+- Tokens ramenés par une restauration : traité par C-30 (la restauration révoque toutes les sessions, au démarrage suivant pour une sauvegarde antérieure à v1.11.0). Rien à faire ici.
 
 ## Journal
 

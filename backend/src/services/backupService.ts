@@ -7,6 +7,7 @@ import { PrismaClient } from '@prisma/client';
 import { config } from '../config';
 import { checkpointWal, configureSqlite, prisma } from '../lib/prisma';
 import { BadRequestError } from '../errors';
+import { removeSessionFloor, writeSessionFloor } from './sessionFloor';
 
 /** Format of the backup archive, written to metadata.json. Every published version wrote 1. */
 export const BACKUP_FORMAT_VERSION = 1;
@@ -228,15 +229,16 @@ async function highestLiveTokenVersion(): Promise<number> {
  * accepted after it. Otherwise the backup would bring back an older version and
  * revive the tokens revoked since (password change, "log out everywhere").
  *
- * A backup made before the tokenVersion column existed is left as it is: its
- * migration adds the column at the next restart, with version 0 (see C-30).
+ * Returns false for a backup made before the tokenVersion column existed: its
+ * migration adds the column at the next start, and the session floor raises it then.
  */
-async function revokeRestoredSessions(restoredDbPath: string, liveTokenVersion: number): Promise<void> {
+async function raiseRestoredTokenVersion(restoredDbPath: string, liveTokenVersion: number): Promise<boolean> {
   const client = new PrismaClient({ datasourceUrl: `file:${restoredDbPath}` });
   try {
     const columns = await client.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info("User");');
-    if (!columns.some((column) => column.name === 'tokenVersion')) return;
+    if (!columns.some((column) => column.name === 'tokenVersion')) return false;
     await client.$executeRaw`UPDATE "User" SET "tokenVersion" = MAX("tokenVersion", ${liveTokenVersion}) + 1`;
+    return true;
   } finally {
     await client.$disconnect();
   }
@@ -348,7 +350,8 @@ function fileTimestamp(date: Date): string {
  * happens before the live files are touched. The switch itself is short, keeps
  * a copy of the replaced database in `<database folder>/backups/`, and puts the
  * previous database and uploads back if it fails. The restored database comes
- * with a raised token version: every session, the restoring one included, ends.
+ * with a raised token version (at the next start for a backup made before
+ * v1.11.0): every session, the restoring one included, ends.
  */
 export async function restoreBackup(zipPath: string): Promise<RestoreResult> {
   const zip = openArchive(zipPath);
@@ -366,6 +369,7 @@ export async function restoreBackup(zipPath: string): Promise<RestoreResult> {
   };
 
   let databaseReplaced = false;
+  let sessionFloorWritten = false;
   let result: RestoreResult;
   try {
     fs.writeFileSync(restoredDbPath, readEntry(databaseEntry));
@@ -380,9 +384,13 @@ export async function restoreBackup(zipPath: string): Promise<RestoreResult> {
     // Read last, right before closing: a token issued earlier carries this version at most
     const liveTokenVersion = await highestLiveTokenVersion();
     await prisma.$disconnect();
+    if (!(await raiseRestoredTokenVersion(restoredDbPath, liveTokenVersion))) {
+      // Set first: a write that fails half way leaves its temporary file to remove
+      sessionFloorWritten = true;
+      writeSessionFloor(dbPath, liveTokenVersion);
+    }
     fs.mkdirSync(path.dirname(preRestorePath), { recursive: true });
     fs.copyFileSync(dbPath, preRestorePath);
-    await revokeRestoredSessions(restoredDbPath, liveTokenVersion);
     removeSqliteSideFiles(dbPath);
     fs.renameSync(restoredDbPath, dbPath);
     databaseReplaced = true;
@@ -394,6 +402,8 @@ export async function restoreBackup(zipPath: string): Promise<RestoreResult> {
     const restartRecommended = appSchemaVersion !== null && schemaVersion !== appSchemaVersion;
     result = { skippedFiles, restartRecommended };
   } catch (err) {
+    // The live database keeps its own token version: no floor to apply
+    if (sessionFloorWritten) removeSessionFloor(dbPath);
     // Before the rename the live files are untouched: Prisma reconnects to the
     // database on the next query. After it, put the previous state back.
     if (databaseReplaced) {

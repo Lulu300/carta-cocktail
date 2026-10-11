@@ -10,7 +10,8 @@ import {
 } from '../test/helpers';
 import { configureSqlite } from '../lib/prisma';
 import { config } from '../config';
-import { latestAppMigration, resolveDatabasePath } from '../services/backupService';
+import { latestAppMigration, resolveDatabasePath, restoreBackup } from '../services/backupService';
+import { applySessionFloor, removeSessionFloor, sessionFloorPath } from '../services/sessionFloor';
 
 const dbPath = resolveDatabasePath();
 const preRestoreDir = path.join(path.dirname(dbPath), 'backups');
@@ -216,6 +217,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await prisma.$executeRawUnsafe('DROP TABLE IF EXISTS _prisma_migrations');
+  removeSessionFloor(dbPath);
 });
 
 describe('backup database path', () => {
@@ -506,9 +508,21 @@ describe('backup restore and sessions', () => {
   const TOKEN_VERSION_MIGRATION = path.resolve(
     __dirname, '../../prisma/migrations/20261011120000_user_token_version/migration.sql',
   );
+  const ADMIN_PASSWORD = 'testpass123';
+
+  function tokenHeader(tokenVersion: number) {
+    return { Authorization: `Bearer ${getAuthToken(1, { tokenVersion })}` };
+  }
 
   function requestWithTokenVersion(tokenVersion: number) {
-    return request.get('/api/cocktails').set({ Authorization: `Bearer ${getAuthToken(1, { tokenVersion })}` });
+    return request.get('/api/cocktails').set(tokenHeader(tokenVersion));
+  }
+
+  /** Statuses of GET /api/cocktails for the tokens of versions `from` to `to`. */
+  async function statusesForVersions(from: number, to: number): Promise<number[]> {
+    const statuses: number[] = [];
+    for (let version = from; version <= to; version++) statuses.push((await requestWithTokenVersion(version)).status);
+    return statuses;
   }
 
   async function setTokenVersion(tokenVersion: number): Promise<void> {
@@ -529,6 +543,15 @@ describe('backup restore and sessions', () => {
     await prisma.$executeRawUnsafe(fs.readFileSync(TOKEN_VERSION_MIGRATION, 'utf8'));
   }
 
+  /** A backup as v1.10.0 and older wrote it: no User.tokenVersion column. */
+  async function backupWithoutTokenVersion(): Promise<Buffer> {
+    return withDatabaseChanged(await exportBackup(), ['ALTER TABLE "User" DROP COLUMN "tokenVersion"']);
+  }
+
+  function login(password: string) {
+    return request.post('/api/auth/login').send({ email: 'admin@test.local', password });
+  }
+
   it('should refuse the tokens revoked after the backup was made, and the restoring one', async () => {
     const backup = await exportBackup();
     // Password changes or "log out everywhere" since the backup
@@ -538,9 +561,8 @@ describe('backup restore and sessions', () => {
 
     expect(res.status).toBe(200);
     expect(await storedTokenVersion()).toBe(4);
-    expect((await requestWithTokenVersion(0)).status).toBe(401);
-    expect((await requestWithTokenVersion(3)).status).toBe(401);
-    expect((await requestWithTokenVersion(4)).status).toBe(200);
+    expect(await statusesForVersions(0, 4)).toEqual([401, 401, 401, 401, 200]);
+    expect(fs.existsSync(sessionFloorPath(dbPath))).toBe(false);
   });
 
   it('should refuse every earlier token when the backup has a higher version than the live database', async () => {
@@ -557,25 +579,104 @@ describe('backup restore and sessions', () => {
     expect((await requestWithTokenVersion(6)).status).toBe(200);
   });
 
-  it('should leave the version to the restart migration for a backup made before the column existed', async () => {
-    const backup = await withDatabaseChanged(await exportBackup(), ['ALTER TABLE "User" DROP COLUMN "tokenVersion"']);
-    await setTokenVersion(2);
+  it('should bring back the password of the backup', async () => {
+    const backup = await exportBackup();
+    const newPassword = 'a-newer-password';
+    const change = await request.put('/api/settings/profile').set(tokenHeader(0))
+      .send({ currentPassword: ADMIN_PASSWORD, newPassword });
+    expect(change.status).toBe(200);
+
+    expect((await importBackup(backup)).status).toBe(200);
+
+    expect((await login(newPassword)).status).toBe(401);
+    expect((await login(ADMIN_PASSWORD)).status).toBe(200);
+  });
+
+  it('should raise the version above 0 when the live database has no user', async () => {
+    const backup = await exportBackup();
+    await prisma.user.deleteMany();
+    const zipPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'carta-backup-')), 'backup.zip');
+    fs.writeFileSync(zipPath, backup);
 
     try {
+      await restoreBackup(zipPath);
+    } finally {
+      fs.rmSync(path.dirname(zipPath), { recursive: true, force: true });
+    }
+
+    expect(await storedTokenVersion()).toBe(1);
+  });
+
+  it('should keep the live database and its sessions when raising the restored version fails', async () => {
+    const backup = await withDatabaseChanged(await exportBackup(), [
+      'CREATE TRIGGER block_user_update BEFORE UPDATE ON "User" BEGIN SELECT RAISE(ABORT, \'blocked\'); END',
+    ]);
+    await seedCocktail({ name: 'Kept' });
+    const copiesBefore = preRestoreCopies();
+
+    const res = await importBackup(backup);
+
+    expect(res.status).toBe(500);
+    expect(await cocktailNames()).toEqual(['Kept']);
+    expect((await requestWithTokenVersion(0)).status).toBe(200);
+    expect(restoreLeftovers()).toEqual([]);
+    // Nothing was replaced: no copy of the live database to keep
+    expect(preRestoreCopies()).toEqual(copiesBefore);
+  });
+
+  describe('for a backup made before the tokenVersion column existed', () => {
+    afterEach(async () => {
+      // The next tests need the column, even when an assertion failed before the migration
+      if (!(await hasTokenVersionColumn())) await applyTokenVersionMigration();
+    });
+
+    it('should refuse every earlier token once the next start has applied the session floor', async () => {
+      const backup = await backupWithoutTokenVersion();
+      await setTokenVersion(3);
+
       const res = await importBackup(backup);
 
       expect(res.status).toBe(200);
       expect(await hasTokenVersionColumn()).toBe(false);
+      expect(fs.readFileSync(sessionFloorPath(dbPath), 'utf8').trim()).toBe('3');
 
+      // Next start: the entrypoint migrates, then main() applies the floor
       await applyTokenVersionMigration();
-      expect((await requestWithTokenVersion(2)).status).toBe(401);
-      // Known limit (C-30): the column starts at 0 again, so a token of version 0
-      // issued before the restore, even revoked since, is accepted until it expires.
+      const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+      await applySessionFloor(dbPath);
+      log.mockRestore();
+
+      expect(fs.existsSync(sessionFloorPath(dbPath))).toBe(false);
+      expect(await storedTokenVersion()).toBe(4);
+      expect(await statusesForVersions(0, 4)).toEqual([401, 401, 401, 401, 200]);
+
+      // Versions keep going up: a password change does not revive a token issued before the restore
+      const change = await request.put('/api/settings/profile').set(tokenHeader(4))
+        .send({ currentPassword: ADMIN_PASSWORD, newPassword: 'a-newer-password' });
+      expect(change.status).toBe(200);
+      expect(await statusesForVersions(0, 4)).toEqual([401, 401, 401, 401, 401]);
+      expect((await request.get('/api/cocktails').set({ Authorization: `Bearer ${change.body.token}` })).status)
+        .toBe(200);
+    });
+
+    it('should remove the session floor when the restore is rolled back', async () => {
+      const backup = withEntries(await backupWithoutTokenVersion(), { 'uploads/restored.jpg': 'restored bytes' });
+      const renameSync = fs.renameSync;
+      // Fails after the database rename, when the restored files move in
+      const spy = vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+        if (path.basename(path.dirname(String(from))).startsWith('.restore-')) throw new Error('rename failed');
+        renameSync(from, to);
+      });
+
+      try {
+        expect((await importBackup(backup)).status).toBe(500);
+      } finally {
+        spy.mockRestore();
+      }
+      expect(await hasTokenVersionColumn()).toBe(true);
+      expect(fs.existsSync(sessionFloorPath(dbPath))).toBe(false);
       expect((await requestWithTokenVersion(0)).status).toBe(200);
-    } finally {
-      // The next tests need the column, even when an assertion failed before the migration
-      if (!(await hasTokenVersionColumn())) await applyTokenVersionMigration();
-    }
+    });
   });
 });
 

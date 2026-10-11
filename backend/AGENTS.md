@@ -119,8 +119,10 @@ export default router;
 - JWT token in `Authorization: Bearer <token>` header, HS256, 7-day expiry by default (`JWT_EXPIRES_IN`)
 - Tokens are issued by `signToken()` and checked by `verifyToken()` (`middleware/auth.ts`) only. A token carries
   `User.tokenVersion` (`tv`): changing the password or `POST /api/auth/logout-all` increments it, which revokes every
-  older token. A token of a deleted user is refused too. Restoring a backup raises the restored version above both the
-  backup's and the live one (`backupService.ts`), so every session ends, the restoring one included
+  older token. A token of a deleted user is refused too. Restoring a backup made with v1.11.0 or later raises the
+  restored version above both the backup's and the live one (`backupService.ts`), so every session ends, the restoring
+  one included. A backup made before v1.11.0 has no column: the restore writes the live version to
+  `<database>.session-floor`, and the next start applies it after the migrations (`services/sessionFloor.ts`, C-30)
 - `POST /api/auth/login` allows `LOGIN_RATE_LIMIT` failed attempts (default 10) per client IP in 15 minutes, then
   answers 429. `trust proxy` (`TRUST_PROXY`) trusts the proxies on loopback and private networks by default: the
   client IP is the last public address forwarded by nginx and any reverse proxy in front of it. A successful login

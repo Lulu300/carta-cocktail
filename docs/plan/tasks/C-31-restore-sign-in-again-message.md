@@ -16,7 +16,7 @@ pr:
 
 ## Contexte
 
-Depuis C-30, une restauration révoque toutes les sessions, celle qui l'a lancée comprise : le backend pose sur l'admin restauré une `tokenVersion` plus haute que toutes celles en circulation. Le mot de passe valable est celui de la sauvegarde. Relevé pendant C-30.
+Depuis C-30, une restauration révoque toutes les sessions, celle qui l'a lancée comprise : le backend pose sur l'admin restauré une `tokenVersion` plus haute que toutes celles en circulation (au démarrage suivant pour une sauvegarde antérieure à v1.11.0). Le mot de passe valable est celui de la sauvegarde. Relevé pendant C-30.
 
 ## Problème constaté
 
@@ -28,6 +28,7 @@ Depuis C-30, une restauration révoque toutes les sessions, celle qui l'a lancé
 
 1. Dans la confirmation (`settings.backup.confirmRestore`) et dans le message de succès (`importSuccess`, `importDone`), dire que l'admin devra se reconnecter avec le mot de passe en vigueur à la date de la sauvegarde.
 2. Textes en/fr.
+3. `SettingsPage.tsx`, `handleBackupImport` : le commentaire « after an older backup, log the admin out until the backend restarts » ne vaut plus. Toute restauration déconnecte l'admin ; le rechargement automatique cacherait seulement le rapport (relevé à la revue de la PR #93).
 
 ## Critères d'acceptation
 
@@ -40,9 +41,10 @@ Depuis C-30, une restauration révoque toutes les sessions, celle qui l'a lancé
 
 ## Points d'attention
 
-- Sauvegarde antérieure à v1.11.0 : jusqu'au redémarrage, la connexion répond 500 (avertissement de C-22 déjà affiché) ; après le redémarrage, une session de version 0 peut rester ouverte (voir C-30). Le texte ne doit pas promettre une déconnexion dans ce cas : « vous devrez peut-être vous reconnecter » ou une formulation qui reste vraie.
+- Sauvegarde antérieure à v1.11.0 : jusqu'au redémarrage, la connexion répond 500 (avertissement de C-22 déjà affiché) ; la révocation a lieu au démarrage suivant (plancher de session de C-30). Le texte reste vrai dans les deux cas s'il parle de se reconnecter, sans dire quand la session se ferme.
 - `SettingsPage.tsx` est aussi touché par C-25 : enchaîner.
 
 ## Journal
 
 - 2026-10-11 : tâche créée pendant C-30.
+- 2026-10-11 : revue de la PR #93 : ajout du commentaire de `SettingsPage.tsx` à mettre à jour ; la sauvegarde antérieure à v1.11.0 déconnecte aussi l'admin (au démarrage suivant).
