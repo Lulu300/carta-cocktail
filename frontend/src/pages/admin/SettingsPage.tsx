@@ -26,6 +26,7 @@ function RestoreReport({ result }: { result: BackupRestoreResult }) {
         <div role="alert" className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm text-warning space-y-2">
           <p className="font-semibold">{t('settings.backup.restartTitle')}</p>
           <p>{t('settings.backup.restartRequired')}</p>
+          <p>{t('settings.backup.restartHow')}</p>
           <p>{t('settings.backup.restartMayFail')}</p>
         </div>
       )}
@@ -132,6 +133,9 @@ export default function SettingsPage() {
     try {
       await backupApi.exportBackup();
       setBackupMessage(t('settings.backup.exportSuccess'));
+      // The report of an earlier restore no longer matches the latest message.
+      // A failed export keeps it: the restart warning is often why it failed.
+      setRestoreResult(null);
     } catch (err: unknown) {
       setBackupError(err instanceof Error ? err.message : t('common.error'));
     } finally {
@@ -161,7 +165,9 @@ export default function SettingsPage() {
         // No automatic reload: it would hide the report before the admin reads it and,
         // after an older backup, log the admin out until the backend restarts.
         setBackupMessage(t('settings.backup.importDone'));
-        toast.success(t('settings.backup.importDone'));
+        // Not a plain success while the backend still has to update the database
+        if (result.restartRecommended) toast.info(t('settings.backup.importDone'));
+        else toast.success(t('settings.backup.importDone'));
         setRestoreResult(result);
       } else {
         setBackupMessage(t('settings.backup.importSuccess'));
