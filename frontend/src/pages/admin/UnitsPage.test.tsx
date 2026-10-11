@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
-import { clearToasts, fireEvent, renderWithFeedback, screen, waitFor, within } from '../../test/test-utils';
+import { fireEvent, screen, waitFor, within } from '../../test/test-utils';
+import { clearToasts, renderWithFeedback } from '../../test/feedback';
 import UnitsPage from './UnitsPage';
 
 vi.mock('../../services/api', async () => {

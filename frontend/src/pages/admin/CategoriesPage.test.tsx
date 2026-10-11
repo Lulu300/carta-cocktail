@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
-import { clearToasts, createTestQueryClient, fireEvent, renderWithFeedback, screen, waitFor, within } from '../../test/test-utils';
+import { createTestQueryClient, fireEvent, screen, waitFor, within } from '../../test/test-utils';
+import { clearToasts, renderWithFeedback } from '../../test/feedback';
 import { qk } from '../../queries/keys';
 import CategoriesPage from './CategoriesPage';
 
