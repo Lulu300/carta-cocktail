@@ -1,5 +1,6 @@
 import { Prisma, PrismaClient } from '@prisma/client';
 import { BadRequestError, NotFoundError } from '../errors';
+import { nextPosition } from './positions';
 
 /**
  * Bottle menus (task C-06).
@@ -71,14 +72,9 @@ async function findMenu(db: Db, menuId: number): Promise<MenuIdentity> {
   return menu;
 }
 
-async function nextPosition(db: Db, menuId: number): Promise<number> {
-  const last = await db.menuBottle.aggregate({ where: { menuId }, _max: { position: true } });
-  return (last._max.position ?? -1) + 1;
-}
-
 /** Adds the bottle at the end of the menu, visible and outside any section. */
 async function appendBottle(db: Db, menuId: number, bottleId: number): Promise<void> {
-  await db.menuBottle.create({ data: { menuId, bottleId, position: await nextPosition(db, menuId) } });
+  await db.menuBottle.create({ data: { menuId, bottleId, position: await nextPosition(db, 'menuBottle', menuId) } });
 }
 
 /** The type of a system menu, or an error naming why the menu cannot be synchronized. */
@@ -110,7 +106,7 @@ export async function syncMenu(db: Db, menuId: number): Promise<{ added: number;
   const toRemove = entries.filter((entry) => !eligibleSet.has(entry.bottleId));
 
   if (toAdd.length > 0) {
-    const firstPosition = await nextPosition(db, menuId);
+    const firstPosition = await nextPosition(db, 'menuBottle', menuId);
     await db.menuBottle.createMany({
       data: toAdd.map((bottleId, index) => ({ menuId, bottleId, position: firstPosition + index })),
     });

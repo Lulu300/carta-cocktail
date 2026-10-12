@@ -26,7 +26,11 @@
     "cannotSyncPersonalMenu": "Seules les cartes Apéritifs et Digestifs suivent les bouteilles : ajoutez à la main les bouteilles de cette carte",
     "systemMenuBottlesManaged": "Les bouteilles de cette carte suivent leur case apéritif / digestif : retirez une bouteille ou remettez une bouteille retirée",
     "exclusionsSystemMenuOnly": "Seules les cartes Apéritifs et Digestifs gardent une liste de bouteilles retirées",
-    "menuTypeImmutable": "Le type d'une carte ne peut plus changer après sa création"
+    "menuTypeImmutable": "Le type d'une carte ne peut plus changer après sa création",
+    "reorderDuplicateIds": "Le nouvel ordre contient deux fois le même élément",
+    "reorderIncomplete": "Le nouvel ordre doit contenir tous les éléments de la carte",
+    "reorderForeignIds": "Le nouvel ordre contient un élément qui n'est pas dans cette carte",
+    "sectionNotInMenu": "Cette section n'appartient pas à cette carte"
   },
   "auth": {
     "loginSuccess": "Connexion réussie",
@@ -68,7 +72,8 @@
     "deleted": "Bouteille retirée de la carte",
     "synced": "Carte synchronisée avec les bouteilles",
     "excluded": "Bouteilles retirées de la carte",
-    "restored": "Bouteille remise dans la carte"
+    "restored": "Bouteille remise dans la carte",
+    "reordered": "Bouteilles réordonnées"
   },
   "settings": {
     "updated": "Paramètres mis à jour avec succès",

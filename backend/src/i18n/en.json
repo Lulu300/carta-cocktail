@@ -26,7 +26,11 @@
     "cannotSyncPersonalMenu": "Only the Aperitifs and Digestifs menus follow the bottles: add the bottles of this menu by hand",
     "systemMenuBottlesManaged": "The bottles of this menu follow their aperitif / digestif box: remove a bottle or put a removed one back instead",
     "exclusionsSystemMenuOnly": "Only the Aperitifs and Digestifs menus keep a list of removed bottles",
-    "menuTypeImmutable": "The type of a menu cannot be changed after its creation"
+    "menuTypeImmutable": "The type of a menu cannot be changed after its creation",
+    "reorderDuplicateIds": "The new order lists the same item twice",
+    "reorderIncomplete": "The new order must list every item of the menu",
+    "reorderForeignIds": "The new order lists an item that is not in this menu",
+    "sectionNotInMenu": "This section is not one of this menu's sections"
   },
   "auth": {
     "loginSuccess": "Login successful",
@@ -68,7 +72,8 @@
     "deleted": "Bottle removed from the menu",
     "synced": "Menu synchronized with the bottles",
     "excluded": "Bottles removed from the menu",
-    "restored": "Bottle put back in the menu"
+    "restored": "Bottle put back in the menu",
+    "reordered": "Bottles reordered"
   },
   "settings": {
     "updated": "Settings updated successfully",

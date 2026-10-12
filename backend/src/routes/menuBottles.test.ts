@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
   request, authHeader, prisma, seedCategory, seedBottle, seedMenu, addBottleToMenu,
-  excludeBottleFromMenu, findSystemMenu,
+  excludeBottleFromMenu, findSystemMenu, seedMenuSection,
 } from '../test/helpers';
 
 beforeAll(async () => { await setupTestDatabase(); });
@@ -61,6 +61,42 @@ describe('POST /api/menu-bottles', () => {
     expect(res.body.bottle.category).toBeDefined();
   });
 
+  it('should add a bottle without position after the last one', async () => {
+    const menu = await seedMenu({ type: 'APEROS' });
+    const first = await seedBottle({ isApero: true });
+    const second = await seedBottle({ isApero: true });
+
+    const res1 = await request.post('/api/menu-bottles').set(authHeader())
+      .send({ menuId: menu.id, bottleId: first.id });
+    const res2 = await request.post('/api/menu-bottles').set(authHeader())
+      .send({ menuId: menu.id, bottleId: second.id });
+
+    expect(res1.body.position).toBe(0);
+    expect(res2.body.position).toBe(1);
+  });
+
+  it('should add a bottle in a section of the menu', async () => {
+    const menu = await seedMenu({ type: 'APEROS' });
+    const section = await seedMenuSection(menu.id);
+    const bottle = await seedBottle({ isApero: true });
+    const res = await request.post('/api/menu-bottles').set(authHeader())
+      .send({ menuId: menu.id, bottleId: bottle.id, menuSectionId: section.id });
+    expect(res.status).toBe(201);
+    expect(res.body.menuSectionId).toBe(section.id);
+  });
+
+  it('should return 400 for a section of another menu', async () => {
+    const menu = await seedMenu({ type: 'APEROS' });
+    const other = await seedMenu({ type: 'APEROS' });
+    const foreign = await seedMenuSection(other.id);
+    const bottle = await seedBottle({ isApero: true });
+    const res = await request.post('/api/menu-bottles').set(authHeader())
+      .send({ menuId: menu.id, bottleId: bottle.id, menuSectionId: foreign.id });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('This section is not one of this menu\'s sections');
+    expect(await prisma.menuBottle.count()).toBe(0);
+  });
+
   it('should return 400 for a bottle not checked for the menu type', async () => {
     const menu = await seedMenu({ type: 'APEROS' });
     const bottle = await seedBottle({ isDigestif: true });
@@ -109,6 +145,127 @@ describe('PUT /api/menu-bottles/:id', () => {
     expect(res.status).toBe(200);
     expect(res.body.position).toBe(5);
     expect(res.body.isHidden).toBe(true);
+  });
+
+  it('should move the bottle into a section of its menu, then out of it', async () => {
+    const menu = await seedMenu({ type: 'APEROS' });
+    const section = await seedMenuSection(menu.id);
+    const mb = await addBottleToMenu(menu.id, (await seedBottle({ isApero: true })).id);
+
+    const into = await request.put(`/api/menu-bottles/${mb.id}`).set(authHeader()).send({ menuSectionId: section.id });
+    expect(into.status).toBe(200);
+    expect(into.body.menuSectionId).toBe(section.id);
+
+    const out = await request.put(`/api/menu-bottles/${mb.id}`).set(authHeader()).send({ menuSectionId: null });
+    expect(out.status).toBe(200);
+    expect(out.body.menuSectionId).toBeNull();
+  });
+
+  it('should return 400 for a section of another menu and leave the entry unchanged', async () => {
+    const menu = await seedMenu({ type: 'APEROS' });
+    const other = await seedMenu({ type: 'APEROS' });
+    const foreign = await seedMenuSection(other.id);
+    const mb = await addBottleToMenu(menu.id, (await seedBottle({ isApero: true })).id);
+
+    const res = await request.put(`/api/menu-bottles/${mb.id}`).set(authHeader())
+      .send({ menuSectionId: foreign.id, isHidden: true });
+
+    expect(res.status).toBe(400);
+    const entry = await prisma.menuBottle.findUniqueOrThrow({ where: { id: mb.id } });
+    expect(entry.menuSectionId).toBeNull();
+    expect(entry.isHidden).toBe(false);
+  });
+
+  it('should return 404 for an unknown entry', async () => {
+    const res = await request.put('/api/menu-bottles/9999').set(authHeader()).send({ isHidden: true });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('POST /api/menu-bottles/menu/:menuId/reorder', () => {
+  /** A personal menu with three bottles at positions 0, 1, 2. */
+  async function seedMenuWithBottles() {
+    const menu = await seedMenu({ type: 'APEROS' });
+    const entries = [];
+    for (const position of [0, 1, 2]) {
+      entries.push(await addBottleToMenu(menu.id, (await seedBottle({ isApero: true })).id, { position }));
+    }
+    return { menu, ids: entries.map((entry) => entry.id) };
+  }
+
+  async function entryPositions(menuId: number): Promise<number[][]> {
+    const entries = await prisma.menuBottle.findMany({ where: { menuId }, orderBy: { id: 'asc' } });
+    return entries.map((entry) => [entry.id, entry.position]);
+  }
+
+  it('should reorder every bottle of the menu in one request', async () => {
+    const { menu, ids: [a, b, c] } = await seedMenuWithBottles();
+
+    const res = await request.post(`/api/menu-bottles/menu/${menu.id}/reorder`).set(authHeader())
+      .send({ ids: [c, a, b] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Bottles reordered');
+    expect(await entryPositions(menu.id)).toEqual([[a, 1], [b, 2], [c, 0]]);
+  });
+
+  it('should reorder a system menu as well', async () => {
+    const aperitifs = await findSystemMenu('aperitifs');
+    const first = await addBottleToMenu(aperitifs.id, (await seedBottle({ isApero: true })).id, { position: 0 });
+    const second = await addBottleToMenu(aperitifs.id, (await seedBottle({ isApero: true })).id, { position: 1 });
+
+    const res = await request.post(`/api/menu-bottles/menu/${aperitifs.id}/reorder`).set(authHeader())
+      .send({ ids: [second.id, first.id] });
+
+    expect(res.status).toBe(200);
+    expect(await entryPositions(aperitifs.id)).toEqual([[first.id, 1], [second.id, 0]]);
+  });
+
+  it('should return 400 for an entry of another menu and leave the positions unchanged', async () => {
+    const { menu, ids: [a, b] } = await seedMenuWithBottles();
+    const other = await seedMenu({ type: 'APEROS' });
+    const foreign = await addBottleToMenu(other.id, (await seedBottle({ isApero: true })).id, { position: 5 });
+    const before = await entryPositions(menu.id);
+
+    const res = await request.post(`/api/menu-bottles/menu/${menu.id}/reorder`).set(authHeader())
+      .send({ ids: [b, a, foreign.id] });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('The new order lists an item that is not in this menu');
+    expect(await entryPositions(menu.id)).toEqual(before);
+    expect(await entryPositions(other.id)).toEqual([[foreign.id, 5]]);
+  });
+
+  it('should return 400 for a partial list and leave the positions unchanged', async () => {
+    const { menu, ids: [a, b] } = await seedMenuWithBottles();
+    const before = await entryPositions(menu.id);
+
+    const res = await request.post(`/api/menu-bottles/menu/${menu.id}/reorder`).set(authHeader())
+      .send({ ids: [b, a] });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('The new order must list every item of the menu');
+    expect(await entryPositions(menu.id)).toEqual(before);
+  });
+
+  it('should return 400 for a duplicate id', async () => {
+    const { menu, ids: [a, b] } = await seedMenuWithBottles();
+    const res = await request.post(`/api/menu-bottles/menu/${menu.id}/reorder`).set(authHeader())
+      .send({ ids: [a, a, b] });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('The new order lists the same item twice');
+  });
+
+  it('should return 400 when ids is missing', async () => {
+    const menu = await seedMenu({ type: 'APEROS' });
+    const res = await request.post(`/api/menu-bottles/menu/${menu.id}/reorder`).set(authHeader()).send({});
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('body.ids');
+  });
+
+  it('should return 404 for an unknown menu', async () => {
+    const res = await request.post('/api/menu-bottles/menu/9999/reorder').set(authHeader()).send({ ids: [] });
+    expect(res.status).toBe(404);
   });
 });
 

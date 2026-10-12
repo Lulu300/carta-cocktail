@@ -8,8 +8,10 @@ import {
   MenuBottleCreate,
   MenuBottleExclusionCreate,
   MenuBottleExclusionParams,
+  MenuBottleReorder,
   MenuBottleUpdate,
 } from '../validation/menuBottles';
+import { assertSectionInMenu, nextPosition, reorder } from '../services/positions';
 import {
   assertBottlesAllowed,
   excludeBottles,
@@ -38,20 +40,22 @@ router.get('/menu/:menuId', validate(menuSchemas), async (_req: AuthRequest, res
 const createSchemas = { body: MenuBottleCreate };
 
 router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Response) => {
-  const { menuId, bottleId, position, isHidden } = valid<typeof createSchemas>(res).body;
+  const { menuId, bottleId, position, isHidden, menuSectionId } = valid<typeof createSchemas>(res).body;
   const menuBottle = await prisma.$transaction(async (tx) => {
     const menu = await tx.menu.findUnique({ where: { id: menuId } });
     // An unknown id in the body is a bad request, as the foreign key used to answer
     if (!menu) throw new BadRequestError();
     if (isSystemMenu(menu)) throw new BadRequestError('errors.systemMenuBottlesManaged');
     await assertBottlesAllowed(tx, menu, [bottleId]);
+    await assertSectionInMenu(tx, menuSectionId, menuId);
 
     return tx.menuBottle.create({
       data: {
         menuId,
         bottleId,
-        position: position ?? 0,
+        position: position ?? (await nextPosition(tx, 'menuBottle', menuId)),
         isHidden: isHidden ?? false,
+        menuSectionId,
       },
       include: BOTTLE_WITH_CATEGORY,
     });
@@ -64,13 +68,27 @@ const updateSchemas = { params: IdParams, body: MenuBottleUpdate };
 
 router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Response) => {
   const { params: { id }, body: { position, isHidden, menuSectionId } } = valid<typeof updateSchemas>(res);
-  // Absent fields are undefined, which Prisma leaves untouched
-  const menuBottle = await prisma.menuBottle.update({
-    where: { id },
-    data: { position, isHidden, menuSectionId },
-    include: BOTTLE_WITH_CATEGORY,
+  const menuBottle = await prisma.$transaction(async (tx) => {
+    const entry = await tx.menuBottle.findUnique({ where: { id }, select: { menuId: true } });
+    if (!entry) throw new NotFoundError();
+    await assertSectionInMenu(tx, menuSectionId, entry.menuId);
+    // Absent fields are undefined, which Prisma leaves untouched
+    return tx.menuBottle.update({
+      where: { id },
+      data: { position, isHidden, menuSectionId },
+      include: BOTTLE_WITH_CATEGORY,
+    });
   });
   res.json(menuBottle);
+});
+
+// Reorder all the bottles of a menu at once: ids lists every entry of the menu, in its new order
+const reorderSchemas = { params: MenuIdParams, body: MenuBottleReorder };
+
+router.post('/menu/:menuId/reorder', validate(reorderSchemas), async (req: AuthRequest, res: Response) => {
+  const { params: { menuId }, body: { ids } } = valid<typeof reorderSchemas>(res);
+  await prisma.$transaction((tx) => reorder(tx, 'menuBottle', menuId, ids));
+  res.json({ message: req.t('menuBottles.reordered') });
 });
 
 // Remove bottle from menu: on a system menu, the removal is kept as an exclusion
