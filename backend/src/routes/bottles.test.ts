@@ -761,7 +761,7 @@ describe('POST /api/bottles/import/preview', () => {
   });
 
   it('should parse a CSV saved by Excel: BOM and semicolons', async () => {
-    const csv = '﻿name;categoryName;capacityMl;purchasePrice\r\nHavana 7;Rhum;700;25,90\r\n';
+    const csv = '\uFEFFname;categoryName;capacityMl;purchasePrice\r\nHavana 7;Rhum;700;25,90\r\n';
     const res = await request.post('/api/bottles/import/preview').set(authHeader())
       .attach('file', Buffer.from(csv), 'bottles.csv');
 
@@ -778,7 +778,7 @@ describe('POST /api/bottles/import/preview', () => {
       .attach('file', Buffer.from(csv), 'bottles.csv');
 
     expect(res.status).toBe(200);
-    expect(res.body.errors).toEqual([{ line: 2, field: 'capacityMl', code: 'required' }]);
+    expect(res.body.errors).toEqual([{ source: 'bottles', line: 2, field: 'capacityMl', code: 'required' }]);
     expect(res.body.payload.bottles.map((b: { name: string }) => b.name)).toEqual(['Havana']);
     // The errors are not part of the payload sent back to /import/confirm
     expect(res.body.payload.errors).toBeUndefined();

@@ -33,7 +33,7 @@ describe('error classes', () => {
   });
 
   it('keeps optional details', () => {
-    expect(new BadRequestError('errors.invalidImportFile', { reason: 'x' }).details).toEqual({ reason: 'x' });
+    expect(new BadRequestError('errors.import.invalidZip', { code: 'invalidZip' }).details).toEqual({ code: 'invalidZip' });
     expect(new ConflictError('errors.cannotDelete', ['a']).details).toEqual(['a']);
   });
 });
@@ -114,13 +114,13 @@ describe('errorHandler', () => {
     const res = mockResponse();
     const next = vi.fn();
 
-    errorHandler(new BadRequestError('errors.invalidImportFile', { reason: 'bad csv' }),
+    errorHandler(new BadRequestError('errors.import.invalidZip', { code: 'invalidZip' }),
       req as unknown as Request, res as unknown as Response, next);
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({
-      error: 'translated:errors.invalidImportFile',
-      details: { reason: 'bad csv' },
+      error: 'translated:errors.import.invalidZip',
+      details: { code: 'invalidZip' },
     });
     expect(next).not.toHaveBeenCalled();
   });

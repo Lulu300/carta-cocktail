@@ -11,7 +11,7 @@ import {
 } from './bottlesImport';
 import { MAX_IMPORT_ROWS } from '../validation/bottleImport';
 
-const BOM = '﻿';
+const BOM = '\uFEFF';
 const HEADER = 'name,categoryName,categoryType,capacityMl,quantity,remainingPercent,alcoholPercentage,purchasePrice,location,openedAt,isApero,isDigestif';
 
 function csvOf(...rows: string[]): string {
@@ -103,12 +103,17 @@ describe('parseCsvBottles', () => {
     const payload = parseCsvBottles(csvOf('Valid,Rhum,SPIRIT,700,1,,,,,,,', row));
 
     expect(payload.bottles.map((b) => b.name)).toEqual(['Valid']);
-    expect(payload.errors).toEqual([{ line: 3, field, code }]);
+    expect(payload.errors).toEqual([{ source: 'bottles', line: 3, field, code }]);
+  });
+
+  it('keeps a Windows line break inside a quoted field', () => {
+    const payload = parseCsvBottles('name,capacityMl,location\r\nGin,700,"Shelf\r\nleft"\r\nRum,700,\r\n');
+    expect(payload.bottles.map((b) => b.location)).toEqual(['Shelf\r\nleft', null]);
   });
 
   it('reports the file line of a row after a multi-line quoted field', () => {
     const payload = parseCsvBottles(csvOf('"Two\nlines",Rhum,,700,1,,,,,,,', '', 'Bad,Rhum,,,1,,,,,,,'));
-    expect(payload.errors).toEqual([{ line: 5, field: 'capacityMl', code: 'required' }]);
+    expect(payload.errors).toEqual([{ source: 'bottles', line: 5, field: 'capacityMl', code: 'required' }]);
   });
 
   it('refuses a file without a capacityMl column', () => {
@@ -155,9 +160,9 @@ describe('parseJsonBottles', () => {
     });
     expect(payload.bottles).toHaveLength(1);
     expect(payload.errors).toEqual([
-      { line: 2, field: 'remainingPercent', code: 'outOfRange' },
-      { line: 3, field: 'openedAt', code: 'invalidDate' },
-      { line: 4, field: 'name', code: 'required' },
+      { source: 'bottles', line: 2, field: 'remainingPercent', code: 'outOfRange' },
+      { source: 'bottles', line: 3, field: 'openedAt', code: 'invalidDate' },
+      { source: 'bottles', line: 4, field: 'name', code: 'required' },
     ]);
   });
 
@@ -181,8 +186,33 @@ describe('parseJsonBottles', () => {
       { name: 'Rhum', type: 'SPIRIT', desiredStock: 2, minimumPercent: 30, nameTranslations: { fr: 'Rhum' } },
     ]);
     expect(payload.errors).toEqual([
-      { line: 2, field: 'desiredStock', code: 'outOfRange' },
-      { line: 3, field: 'minimumPercent', code: 'outOfRange' },
+      { source: 'categories', line: 2, field: 'desiredStock', code: 'outOfRange' },
+      { source: 'categories', line: 3, field: 'minimumPercent', code: 'outOfRange' },
+    ]);
+  });
+
+  it('drops translations the confirmation would refuse, and keeps the category', () => {
+    const payload = parseJsonBottles({
+      version: 1,
+      categories: [
+        { name: 'Rum', nameTranslations: { de: 'Rum' } },
+        { name: 'Gin', nameTranslations: { en: 'Gin', fr: 42 } },
+      ],
+      bottles: [],
+    });
+    expect(payload.categories.map((c) => c.nameTranslations)).toEqual([null, null]);
+    expect(payload.errors).toEqual([]);
+  });
+
+  it('tells which list a reported line belongs to', () => {
+    const payload = parseJsonBottles({
+      version: 1,
+      categories: [{ name: 'Rhum' }, { name: 'Gin', desiredStock: -1 }],
+      bottles: [jsonBottle(), jsonBottle({ capacityMl: 0 })],
+    });
+    expect(payload.errors).toEqual([
+      { source: 'categories', line: 2, field: 'desiredStock', code: 'outOfRange' },
+      { source: 'bottles', line: 2, field: 'capacityMl', code: 'outOfRange' },
     ]);
   });
 
@@ -240,7 +270,7 @@ describe('parseZipBottles', () => {
     expect(payload.categories).toEqual([
       { name: 'Rhum', type: 'SPIRIT', desiredStock: 3, minimumPercent: 25, nameTranslations: { fr: 'Rhum' } },
     ]);
-    expect(payload.errors).toEqual([{ line: 3, field: 'desiredStock', code: 'outOfRange' }]);
+    expect(payload.errors).toEqual([{ source: 'categories', line: 3, field: 'desiredStock', code: 'outOfRange' }]);
   });
 
   it('ignores a categories.csv without a name column', () => {

@@ -1,6 +1,6 @@
 import AdmZip from 'adm-zip';
 import { z } from 'zod';
-import { NullableDate, Percent } from '../validation/common';
+import { NullableDate, Percent, Translations } from '../validation/common';
 import { AlcoholPercentage, CapacityMl, PurchasePrice } from '../validation/bottles';
 import { DesiredStock } from '../validation/categories';
 import { MAX_IMPORT_BOTTLES, MAX_IMPORT_ROWS, totalQuantity } from '../validation/bottleImport';
@@ -19,7 +19,7 @@ export interface ImportCategoryRecord {
   type: string;
   desiredStock: number;
   minimumPercent: number;
-  nameTranslations: Record<string, string> | null;
+  nameTranslations: z.output<typeof Translations>;
 }
 
 export interface ImportBottleRecord {
@@ -38,11 +38,15 @@ export interface ImportBottleRecord {
 
 export type ImportRowErrorCode = 'required' | 'outOfRange' | 'invalidDate' | 'invalidNumber';
 
+/** The list a row belongs to: a JSON file or a ZIP archive holds both. */
+export type ImportRowSource = 'bottles' | 'categories';
+
 /**
  * A row left out of the import. `line` is the line of the CSV file (header = 1),
- * or the position in the JSON array (first = 1).
+ * or the position in the JSON array (first = 1), within `source`.
  */
 export interface ImportRowError {
+  source: ImportRowSource;
   line: number;
   field: string;
   code: ImportRowErrorCode;
@@ -127,13 +131,17 @@ function splitCsvRecords(csv: string): CsvRecord[] {
       continue;
     }
     if (c === '\n' || c === '\r') {
-      if (c === '\r' && csv[i + 1] === '\n') i++;
+      const newline = c === '\r' && csv[i + 1] === '\n' ? '\r\n' : c;
+      i += newline.length - 1;
       line++;
-      if (!inQuotes) {
+      if (inQuotes) {
+        // Part of the field's value: kept as written
+        current += newline;
+      } else {
         pushCurrent();
         currentLine = line;
-        continue;
       }
+      continue;
     }
     current += c;
   }
@@ -233,10 +241,13 @@ function toText(value: unknown): string {
 class RowReader {
   error: ImportRowError | null = null;
 
-  constructor(private readonly row: NumberedRow) {}
+  constructor(
+    private readonly row: NumberedRow,
+    private readonly source: ImportRowSource,
+  ) {}
 
   private fail(field: string, code: ImportRowErrorCode): void {
-    this.error ??= { line: this.row.line, field, code };
+    this.error ??= { source: this.source, line: this.row.line, field, code };
   }
 
   text(field: string): string {
@@ -300,15 +311,17 @@ class RowReader {
   }
 
   /** An object in JSON, a JSON text in a CSV cell; anything else counts as no translations. */
-  nameTranslations(field: string): Record<string, string> | null {
+  nameTranslations(field: string): ImportCategoryRecord['nameTranslations'] {
     const value = this.row.values[field];
     const translations = typeof value === 'string' ? parseJsonOrNull(value) : value;
-    return isRecord(translations) ? (translations as Record<string, string>) : null;
+    // The confirmation's rule: a language it would refuse (e.g. `de`) drops the translations
+    const result = Translations.safeParse(translations);
+    return result.success ? result.data : null;
   }
 }
 
 function readBottle(row: NumberedRow): { bottle: ImportBottleRecord; error: ImportRowError | null } {
-  const reader = new RowReader(row);
+  const reader = new RowReader(row, 'bottles');
   const bottle: ImportBottleRecord = {
     name: reader.requiredText('name'),
     categoryName: reader.text('categoryName'),
@@ -326,7 +339,7 @@ function readBottle(row: NumberedRow): { bottle: ImportBottleRecord; error: Impo
 }
 
 function readCategory(row: NumberedRow): { category: ImportCategoryRecord; error: ImportRowError | null } {
-  const reader = new RowReader(row);
+  const reader = new RowReader(row, 'categories');
   const category: ImportCategoryRecord = {
     name: reader.text('name'),
     type: reader.text('type') || 'SPIRIT',

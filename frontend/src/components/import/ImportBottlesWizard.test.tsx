@@ -98,7 +98,7 @@ describe('ImportBottlesWizard', () => {
     render(<ImportBottlesWizard onClose={() => undefined} />);
 
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-    const file = new File(['﻿name;capacityMl\nHavana;700'], 'bottles-2026-10-12.csv', { type: 'text/csv' });
+    const file = new File(['\uFEFFname;capacityMl\nHavana;700'], 'bottles-2026-10-12.csv', { type: 'text/csv' });
     await user.upload(input, file);
     await user.click(screen.getByText('bottles.importWizard.next'));
 

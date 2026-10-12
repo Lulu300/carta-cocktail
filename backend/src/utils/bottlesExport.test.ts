@@ -25,7 +25,7 @@ function dataRows(csv: string): string[] {
 }
 
 describe('protectFormula', () => {
-  it.each(['=1+1', '+33 6', '-cellar', '@SUM(A1)', '\tTab', '\rReturn'])(
+  it.each(['=1+1', '+33 6', '-cellar', '@SUM(A1)', '\tTab', '\rReturn', "'=foo", "'+1", "''-x", "'@home"])(
     'prefixes %j with an apostrophe, and unprotectFormula removes it',
     (text) => {
       expect(protectFormula(text)).toBe(`'${text}`);
@@ -35,7 +35,8 @@ describe('protectFormula', () => {
 
   it('leaves other text alone, an apostrophe included', () => {
     expect(protectFormula('Havana 7')).toBe('Havana 7');
-    expect(unprotectFormula("'Havana")).toBe("'Havana");
+    expect(protectFormula("'Ti Punch")).toBe("'Ti Punch");
+    expect(unprotectFormula("'Ti Punch")).toBe("'Ti Punch");
   });
 });
 
@@ -54,6 +55,12 @@ describe('buildCsvPayload', () => {
     const [row] = dataRows(buildCsvPayload([bottle({ purchasePrice: -5 })]));
     expect(row).toContain(',-5,');
     expect(row).not.toContain("'");
+  });
+
+  it('imports back names that already start with an apostrophe', () => {
+    const names = ["'=foo", "''=bar", "'Ti Punch", '-', '+33 cave', '@home'];
+    const payload = parseCsvBottles(buildCsvPayload(names.map((name) => bottle({ name }))));
+    expect(payload.bottles.map((b) => b.name)).toEqual(names);
   });
 
   it('imports back the same bottles', () => {
