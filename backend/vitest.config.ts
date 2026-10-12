@@ -32,6 +32,8 @@ export default defineConfig({
         'dist/**',
         '*.config.*',
         'src/index.ts',
+        // Entry points of their own process (seed, integrity check), like src/index.ts
+        'src/scripts/**',
         'src/**/*.test.ts',
         'src/**/*.d.ts',
       ],

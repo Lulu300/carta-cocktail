@@ -67,6 +67,9 @@ backend/
 │   │   ├── shortages.ts      # GET /api/shortages
 │   │   ├── availability.ts   # GET cocktail availability
 │   │   └── settings.ts       # GET/PUT site settings + admin profile
+│   ├── scripts/              # Commands run in their own process, compiled into dist/scripts/
+│   │   ├── seed.ts           # Admin user, category types, units, menus (each container start)
+│   │   └── check-integrity.ts # Read-only report on a copy of the database before an upgrade
 │   ├── services/
 │   │   └── availabilityService.ts  # Stock-based availability calculation
 │   ├── utils/
@@ -79,10 +82,11 @@ backend/
 ├── prisma.config.ts           # Prisma CLI config: schema, migrations, seed, datasource URL
 ├── prisma/
 │   ├── schema.prisma          # Database schema (14 models)
-│   └── seed.ts                # Admin user, category types, units, menus
+│   └── migrations/            # Versioned migrations, applied at each container start
 ├── package.json
 ├── tsconfig.json
-└── Dockerfile
+├── docker-entrypoint.sh       # Volume owners, backup, migrations, seed, then Node as the node user
+└── Dockerfile                 # Multi-stage: runtime dependencies and dist/ only
 ```
 
 ## Key Patterns
@@ -191,8 +195,10 @@ Entity names support multi-language via JSON strings stored in SQLite:
 ## Dependencies
 
 **Runtime**: express 5, bcryptjs, cors, helmet, morgan, jsonwebtoken, multer, i18next, i18next-http-middleware, dotenv, zod 4
-**Runtime (database)**: @prisma/client 7, @prisma/adapter-better-sqlite3 7, better-sqlite3 12 (native module, prebuilt for linux x64/arm64 musl)
-**Dev**: prisma 7, typescript 5.9, tsx, ts-node, eslint 10, typescript-eslint, prettier 3
+**Runtime (database)**: @prisma/client 7, @prisma/adapter-better-sqlite3 7, better-sqlite3 12 (native module, prebuilt for linux x64/arm64 musl), prisma 7 (the CLI applies the migrations when the container starts)
+**Dev**: typescript 5.9, tsx, eslint 10, typescript-eslint, prettier 3, vitest
+
+The Docker image holds the runtime dependencies only: code that runs there (server, seed, scripts) lives in `src/` and is compiled by `npm run build`. It never relies on `tsx`.
 
 ## Database
 

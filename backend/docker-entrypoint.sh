@@ -1,9 +1,10 @@
 #!/bin/sh
-# Container entrypoint: back up the SQLite database, apply the versioned Prisma
-# migrations, seed, then replace this shell with Node so that it receives SIGTERM.
+# Container entrypoint: give the data folders to the node user and drop root,
+# then back up the SQLite database, apply the versioned Prisma migrations, seed,
+# and replace this shell with Node so that it receives SIGTERM (through tini).
+# A command given to the container (`docker compose run … sh`) runs as the node
+# user instead of those startup steps.
 set -eu
-
-: "${DATABASE_URL:?DATABASE_URL must be set, for example file:/app/data/carta_cocktail.db}"
 
 cd "$(dirname "$0")"
 
@@ -21,6 +22,36 @@ resolve_db_file() {
     *) echo "$PWD/prisma/${path#./}" ;;
   esac
 }
+
+# Earlier images ran as root, so the files they wrote in the volumes belong
+# to root. Only the files the node user does not own yet are changed: after the
+# first start, this is a quick scan. Files written as root later (a restore run
+# with `--entrypoint sh`) are fixed at the next start.
+give_to_node() {
+  dir="$1"
+  if [ ! -d "$dir" ] || [ "$dir" = / ]; then
+    return
+  fi
+  # A network share (SMB, NFS) may refuse chown: the application may still be
+  # able to write there, so warn and let it try.
+  if ! find "$dir" ! -user node -exec chown -h node:node {} +; then
+    echo "WARNING: could not give $dir to the node user (uid 1000). If the backend cannot write there, run: chown -R 1000:1000 <folder mounted on $dir>" >&2
+  fi
+}
+
+if [ "$(id -u)" = 0 ]; then
+  if [ -n "${DATABASE_URL:-}" ]; then
+    give_to_node "$(dirname "$(resolve_db_file)")"
+  fi
+  give_to_node "${UPLOAD_DIR:-/app/uploads}"
+  exec su-exec node "$0" "$@"
+fi
+
+if [ "$#" -gt 0 ]; then
+  exec "$@"
+fi
+
+: "${DATABASE_URL:?DATABASE_URL must be set, for example file:/app/data/carta_cocktail.db}"
 
 DB_FILE="$(resolve_db_file)"
 BACKUP_DIR="$(dirname "$DB_FILE")/backups"
@@ -130,6 +161,14 @@ apply_migrations() {
   fi
 }
 
+# SQLite migrations are not transactional: one stopped halfway is marked as
+# failed, and every later start refuses to go on (P3009). A stop request (tini
+# forwards SIGTERM to this shell only) waits for the current command to end,
+# then the container exits before the seed. Docker still kills it after its
+# stop timeout (10 s by default).
+stop_requested=false
+trap 'stop_requested=true' TERM INT
+
 # `migrate status` fails when migrations are pending or the database has no
 # migration history: the two cases where the next step may change it.
 if [ -f "$DB_FILE" ] && ! npx prisma migrate status; then
@@ -137,5 +176,12 @@ if [ -f "$DB_FILE" ] && ! npx prisma migrate status; then
 fi
 
 apply_migrations
-npm run db:seed
+
+if [ "$stop_requested" = true ]; then
+  echo "Stop requested during the database update: exiting before the seed."
+  exit 143
+fi
+trap - TERM INT
+
+node dist/scripts/seed.js
 exec node dist/index.js

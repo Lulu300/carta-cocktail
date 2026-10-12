@@ -8,7 +8,7 @@ effort: S
 status: todo
 owner: agent
 depends_on: [D-01, B-03]
-touches: [backend/src/config.ts, backend/prisma/seed.ts, backend/Dockerfile]
+touches: [backend/src/config.ts, backend/src/scripts/seed.ts, backend/Dockerfile]
 sources: []
 branch:
 pr:
@@ -50,3 +50,4 @@ Logs de `docker compose logs carta-cocktail-backend` au démarrage de l'image `b
 ## Journal
 
 - 2026-10-10 : tâche créée après la mise à jour en v1.6.0 d'une instance réelle (logs collés par l'humain).
+- 2026-10-12 : D-01 déplace le seed vers `backend/src/scripts/seed.ts` (`touches` mis à jour). Bruit supplémentaire vu avec l'image de D-01 : `npm notice New major version of npm available` après les `npx prisma` de l'entrypoint (le cache npm de l'utilisateur `node` est neuf) ; `ENV NPM_CONFIG_UPDATE_NOTIFIER=false` dans `backend/Dockerfile` le coupe. La ligne `injected env (0) from .env` vient maintenant de `import 'dotenv/config'` dans `backend/prisma.config.ts` (C-15).

@@ -165,10 +165,11 @@ npm run db:check      # exit 0: the migrations match schema.prisma
 
 `backend/docker-entrypoint.sh` runs before the API:
 
-1. If the database exists and `prisma migrate status` reports pending migrations or no migration history, it copies the database to `backups/pre-migrate-<date>.db`, next to the database (`/app/data/backups/` in the `db-data` volume). It keeps the 10 most recent copies, and skips the copy when the database has not changed since the last one.
-2. It applies the pending migrations with `prisma migrate deploy`. A new database is created from scratch.
-3. A database created by `db push` (v1.5.0 and older) has no migration history. If its schema is exactly the one of the first migration, `0_init`, the entrypoint marks `0_init` as applied and continues. Otherwise **it refuses to start**: it prints the differences, leaves the database untouched, and the container exits.
-4. It runs the seed, then starts Node.
+1. Started as root, it gives the database folder and the upload folder to the `node` user (uid 1000), only the files that user does not own yet, then runs everything else as `node`. A command given to the container (`docker compose run carta-cocktail-backend <command>`) runs as `node` instead of the steps below.
+2. If the database exists and `prisma migrate status` reports pending migrations or no migration history, it copies the database to `backups/pre-migrate-<date>.db`, next to the database (`/app/data/backups/` in the `db-data` volume). It keeps the 10 most recent copies, and skips the copy when the database has not changed since the last one.
+3. It applies the pending migrations with `prisma migrate deploy`. A new database is created from scratch.
+4. A database created by `db push` (v1.5.0 and older) has no migration history. If its schema is exactly the one of the first migration, `0_init`, the entrypoint marks `0_init` as applied and continues. Otherwise **it refuses to start**: it prints the differences, leaves the database untouched, and the container exits.
+5. It runs the seed, then starts Node.
 
 ### Checking a production database before the first upgrade
 
@@ -232,10 +233,11 @@ carta-cocktail/
 │   │   ├── services/       # Business logic (availability)
 │   │   ├── middleware/      # JWT auth
 │   │   ├── i18n/           # Backend translations
+│   │   ├── scripts/        # Seed (default data), integrity check
 │   │   └── utils/          # Helpers
 │   └── prisma/
 │       ├── schema.prisma   # Database schema (15 models)
-│       └── seed.ts         # Default data
+│       └── migrations/     # Versioned migrations
 ├── frontend/               # React SPA
 │   ├── src/
 │   │   ├── pages/          # Admin (12) + Public (3) pages

@@ -16,7 +16,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:status": "prisma migrate status",
     "db:check": "DATABASE_URL=file:./db-check.db prisma migrate diff --from-migrations prisma/migrations --to-schema prisma/schema.prisma --exit-code",
-    "db:seed": "tsx prisma/seed.ts",
+    "db:seed": "tsx src/scripts/seed.ts",
     "postinstall": "prisma generate"
   },
   "keywords": [],
@@ -43,6 +43,7 @@
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.12.1",
     "multer": "^2.4.0",
+    "prisma": "7.10.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
@@ -60,7 +61,6 @@
     "eslint": "^10.12.0",
     "globals": "^17.13.0",
     "prettier": "^3.9.10",
-    "prisma": "7.10.0",
     "supertest": "^7.2.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",

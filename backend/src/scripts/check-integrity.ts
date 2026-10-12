@@ -4,19 +4,21 @@
  * lines without their source, unknown category types...). Read-only.
  *
  * Run it on a copy of the database, never on the live one:
- *   DATABASE_URL=file:/path/to/copy.db npx tsx scripts/check-integrity.ts [--counts-only]
+ *   DATABASE_URL=file:/path/to/copy.db npx tsx src/scripts/check-integrity.ts [--counts-only]
+ * The Docker image holds the compiled script only:
+ *   node dist/scripts/check-integrity.js [--counts-only]
  *
  * --counts-only prints counts without any name read from the database.
  * Exit code: 0 without blocking issue, 1 with blocking issues, 2 on error.
  */
 import fs from 'fs';
-import path from 'path';
+import { resolveDatabasePath } from '../lib/databasePath';
 
-// Prisma creates an empty database for a missing file: check the path first.
-// Like Prisma, a relative path is resolved from the prisma/ folder.
+// Prisma creates an empty database for a missing file: check the path first,
+// resolved as the application resolves it.
 function databaseFileExists(url = process.env.DATABASE_URL ?? ''): boolean {
-  const file = url.replace(/^file:/, '').split('?')[0];
-  return file !== '' && fs.existsSync(path.resolve(__dirname, '../prisma', file));
+  if (!url.startsWith('file:')) return false;
+  return fs.statSync(resolveDatabasePath(url), { throwIfNoEntry: false })?.isFile() ?? false;
 }
 
 async function main(): Promise<number> {
@@ -26,9 +28,9 @@ async function main(): Promise<number> {
   }
   // Loaded after the check: the shared client resolves DATABASE_URL when it is
   // imported, and would fail with a stack trace instead of this exit code.
-  const { prisma } = await import('../src/lib/prisma');
+  const { prisma } = await import('../lib/prisma');
   const { findIntegrityIssues, formatIntegrityReport, hasBlockingIssues } = await import(
-    '../src/services/integrityService'
+    '../services/integrityService'
   );
   try {
     const countsOnly = process.argv.includes('--counts-only');
