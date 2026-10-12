@@ -37,6 +37,7 @@ CI runs automatically on PRs: tsc → lint → build → test → coverage check
 - Environment: jsdom via Vitest
 - API calls are mocked (no real backend needed)
 - Run with coverage locally: `npm test -- --coverage`
+- Accessibility: page tests check axe with `expect(await axe(container)).toHaveNoViolations()` (`src/test/axe.ts`, serious and critical violations only). jsdom computes no colors: contrast is checked with Lighthouse in a browser
 
 ## Structure
 
@@ -192,3 +193,4 @@ Uses `@import "tailwindcss"` syntax (not `@tailwind` directives). Dark theme wit
 - Cards: rounded-xl with subtle borders
 - All text via i18n keys, never hardcoded strings
 - Responsive layout with sidebar navigation on admin
+- Accessibility: `index.css` draws the keyboard focus on every element (`:focus-visible`), never remove it with `outline-none`. Form fields go through `Field`/`Input` or get an `aria-label`; icon-only buttons through `IconButton`. Dropdowns use `useDisclosure` (Escape, click outside, `aria-expanded`), autocompletes `useComboboxKeyboard` with `ComboboxListbox`. Informative text uses `text-fg-muted` or lighter, never `text-gray-500`/`600`; transitions get `motion-reduce:transition-none` and scale effects `motion-safe:`

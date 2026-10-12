@@ -112,7 +112,7 @@ function CocktailRecipe({ cocktail, menuPath }: { cocktail: Cocktail; menuPath: 
                 {cocktail.ingredients.map((ing) => (
                   <li key={ing.id} className="rounded-lg border border-transparent print:border-none">
                     <div className="flex items-center gap-3">
-                      <span className="w-1.5 h-1.5 bg-accent print:bg-gray-800 rounded-full flex-shrink-0" />
+                      <span aria-hidden="true" className="w-1.5 h-1.5 bg-accent print:bg-gray-800 rounded-full flex-shrink-0" />
                       <span className="text-gray-300 print:text-black">
                         <UnitConverter quantity={ing.quantity} unit={ing.unit?.abbreviation || ''} />
                         {' '}
@@ -122,7 +122,7 @@ function CocktailRecipe({ cocktail, menuPath }: { cocktail: Cocktail; menuPath: 
 
                     {user && ing.preferredBottles && ing.preferredBottles.length > 0 && (
                       <div className="ml-6 mt-2 flex flex-wrap gap-2">
-                        <span className="text-xs font-medium uppercase tracking-wider text-gray-500 print:text-gray-600">
+                        <span className="text-xs font-medium uppercase tracking-wider text-fg-muted print:text-gray-600">
                           {t('cocktails.preferredBottles')}
                         </span>
                         {ing.preferredBottles.map((preferredBottle) => (

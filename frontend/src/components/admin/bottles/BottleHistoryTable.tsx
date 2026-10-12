@@ -28,7 +28,7 @@ export default function BottleHistoryTable({ bottles, onEdit, onDelete }: Bottle
         aria-expanded={isOpen}
         className="flex items-center gap-2 text-fg-muted hover:text-fg transition-colors mb-3"
       >
-        <svg aria-hidden="true" className={cx('w-4 h-4 transition-transform', isOpen && 'rotate-90')} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg aria-hidden="true" className={cx('w-4 h-4 transition-transform motion-reduce:transition-none', isOpen && 'rotate-90')} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
         <span className="text-sm font-semibold uppercase tracking-wider">

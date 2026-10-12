@@ -30,7 +30,7 @@ export default function ToggleSwitch({
         className={cx('flex items-center w-12 h-6 rounded-full transition-colors', checked ? 'bg-success' : 'bg-gray-600')}
       >
         <span
-          className={cx('size-5 bg-white rounded-full transition-transform', checked ? 'translate-x-6' : 'translate-x-0.5')}
+          className={cx('size-5 bg-white rounded-full transition-transform motion-reduce:transition-none', checked ? 'translate-x-6' : 'translate-x-0.5')}
         />
       </span>
       <span className={hideLabel ? 'sr-only' : 'text-sm text-fg'}>{label}</span>

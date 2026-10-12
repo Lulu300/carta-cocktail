@@ -1,27 +1,35 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
-import { useClickOutside } from '../../hooks/useClickOutside';
 import type { Category } from '../../types';
+import ClearButton from './ClearButton';
+import ComboboxListbox from './ComboboxListbox';
+import Input from './Input';
+import { cx } from './classNames';
+import { useComboboxKeyboard } from './useComboboxKeyboard';
 
 interface CategoryFilterInputProps {
   categories: Category[];
   value: string;
   selectedId: number | null;
   onChange: (text: string, selectedId: number | null) => void;
+  /** Accessible name of the field, which has no visible label. */
+  label: string;
   placeholder: string;
   className?: string;
 }
 
 export default function CategoryFilterInput({
-  categories, value, selectedId, onChange, placeholder, className = '',
+  categories, value, selectedId, onChange, label, placeholder, className = '',
 }: CategoryFilterInputProps) {
+  const { t } = useTranslation();
   const localize = useLocalizedName();
   const [focused, setFocused] = useState(false);
-  const ref = useClickOutside<HTMLDivElement>(useCallback(() => setFocused(false), []));
 
   const matchingCategories = value.trim()
     ? categories.filter((c) => localize(c).toLowerCase().includes(value.toLowerCase()))
     : [];
+  const isListShown = focused && matchingCategories.length > 0 && selectedId === null;
 
   const handleTextChange = (text: string) => {
     onChange(text, null);
@@ -33,49 +41,38 @@ export default function CategoryFilterInput({
     setFocused(false);
   };
 
-  const handleClear = () => {
-    onChange('', null);
-  };
+  const combobox = useComboboxKeyboard({
+    options: matchingCategories,
+    query: value,
+    isOpen: isListShown,
+    onOpen: () => setFocused(true),
+    onClose: () => setFocused(false),
+    onSelect: handleSelect,
+  });
 
   return (
-    <div ref={ref} className={`relative ${className}`}>
-      <div className="relative">
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => handleTextChange(e.target.value)}
-          onFocus={() => setFocused(true)}
-          placeholder={placeholder}
-          className={`w-full bg-[#0f0f1a] border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-amber-400 transition-colors ${
-            selectedId !== null ? 'border-amber-400/50' : 'border-gray-700'
-          }`}
+    <div className={`relative ${className}`}>
+      <Input
+        {...combobox.inputProps}
+        type="text"
+        value={value}
+        onChange={(e) => handleTextChange(e.target.value)}
+        onFocus={() => setFocused(true)}
+        aria-label={label}
+        placeholder={placeholder}
+        // The important flag (!) beats the field's default border colour.
+        className={cx('text-sm pr-10', selectedId !== null && 'border-accent/50!')}
+      />
+      {value && <ClearButton label={t('common.clear')} onClick={() => onChange('', null)} className="right-1" />}
+      {isListShown && (
+        <ComboboxListbox
+          combobox={combobox}
+          options={matchingCategories}
+          getKey={(cat) => cat.id}
+          getLabel={localize}
+          onSelect={handleSelect}
+          className="max-h-60"
         />
-        {value && (
-          <button
-            type="button"
-            onClick={handleClear}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        )}
-      </div>
-
-      {focused && matchingCategories.length > 0 && selectedId === null && (
-        <div className="absolute z-30 mt-1 w-full bg-[#1a1a2e] border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto py-1">
-          {matchingCategories.map((cat) => (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => handleSelect(cat)}
-              className="w-full text-left px-3 py-2 hover:bg-gray-800/50 text-sm text-gray-300 hover:text-white transition-colors"
-            >
-              {localize(cat)}
-            </button>
-          ))}
-        </div>
       )}
     </div>
   );

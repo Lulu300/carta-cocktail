@@ -115,7 +115,7 @@ export default function ImportEntityRow({
           matched={isMatched}
           label={isMatched ? t('cocktails.importWizard.matched') : t('cocktails.importWizard.missing')}
         />
-        <svg aria-hidden="true" className={cx('w-4 h-4 text-fg-muted transition-transform', expanded && 'rotate-180')} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg aria-hidden="true" className={cx('w-4 h-4 text-fg-muted transition-transform motion-reduce:transition-none', expanded && 'rotate-180')} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>

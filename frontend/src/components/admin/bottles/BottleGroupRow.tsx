@@ -22,15 +22,19 @@ export default function BottleGroupRow({ group, expanded, onToggle, onEdit, onDe
 
   return (
     <>
-      <tr className="hover:bg-line/50 cursor-pointer" onClick={() => onToggle(group.key)} aria-expanded={expanded}>
+      {/*
+        The whole row toggles on click. The button gives it a keyboard target and a
+        state for screen readers; its clicks (Enter, Space included) bubble up to the row.
+      */}
+      <tr className="hover:bg-line/50 cursor-pointer" onClick={() => onToggle(group.key)}>
         <td className="px-6 py-4 font-medium">
-          <div className="flex items-center gap-2">
-            <svg aria-hidden="true" className={cx('w-4 h-4 text-fg-muted transition-transform', expanded && 'rotate-90')} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button type="button" aria-expanded={expanded} className="flex items-center gap-2 rounded text-left">
+            <svg aria-hidden="true" className={cx('w-4 h-4 text-fg-muted transition-transform motion-reduce:transition-none', expanded && 'rotate-90')} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
             {group.name}
             <span className="bg-accent/20 text-accent text-xs font-bold px-2 py-0.5 rounded-full">x{group.bottles.length}</span>
-          </div>
+          </button>
         </td>
         <td className="px-6 py-4 text-fg-muted">{group.category ? localize(group.category) : ''}</td>
         <td className="px-6 py-4">{group.capacityMl} ml</td>

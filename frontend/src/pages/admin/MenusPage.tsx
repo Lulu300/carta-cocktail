@@ -154,7 +154,7 @@ export default function MenusPage() {
         <h1 className="text-2xl font-bold font-serif text-accent">{t('menus.title')}</h1>
         <Button onClick={() => menuForm.open()}>{t('menus.add')}</Button>
       </div>
-      <SearchInput value={search} onChange={setSearch} className="max-w-sm mb-4" />
+      <SearchInput value={search} onChange={setSearch} label={t('menus.search')} className="max-w-sm mb-4" />
       <DataTable
         columns={columns}
         rows={pagination.paginatedItems}

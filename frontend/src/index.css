@@ -26,6 +26,17 @@
   --color-info: var(--color-blue-400);
 }
 
+/*
+ * Keyboard focus is always visible, on every control, without a utility on each
+ * element. In the base layer, so a `focus-visible:` utility can still refine it.
+ */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
 /* Print styles for recipe card (bristol format ~10x15cm) */
 @media print {
   @page {

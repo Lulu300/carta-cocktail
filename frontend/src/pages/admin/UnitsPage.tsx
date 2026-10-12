@@ -125,7 +125,7 @@ export default function UnitsPage() {
         <h1 className="text-2xl font-bold font-serif text-accent">{t('units.title')}</h1>
         <Button onClick={() => unitForm.open()}>{t('units.add')}</Button>
       </div>
-      <SearchInput value={search} onChange={setSearch} className="max-w-sm mb-4" />
+      <SearchInput value={search} onChange={setSearch} label={t('units.search')} className="max-w-sm mb-4" />
       <DataTable
         columns={columns}
         rows={pagination.paginatedItems}

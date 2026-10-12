@@ -13,6 +13,7 @@ import {
   section,
 } from '../../test/publicMenuFixtures';
 import type { CocktailIngredient } from '../../types';
+import { axe } from '../../test/axe';
 import MenuPublicPage from './MenuPublicPage';
 
 vi.mock('../../services/api', async () => {
@@ -262,7 +263,7 @@ describe('MenuPublicPage', () => {
       const search = await screen.findByPlaceholderText('public.cocktailSearchPlaceholder');
       await user.type(search, 'negroni');
 
-      await user.click(screen.getByText('✕'));
+      await user.click(screen.getByRole('button', { name: 'public.clearSearch' }));
 
       expect(search).toHaveValue('');
       expect(await screen.findByText('Mojito')).toBeInTheDocument();
@@ -320,5 +321,36 @@ describe('MenuPublicPage', () => {
       await screen.findByText('Mojito');
       expect(availability.getAllCocktails).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('MenuPublicPage accessibility', () => {
+  beforeEach(() => {
+    installIntersectionObserverMock();
+    signIn(false);
+    vi.mocked(availability.getAllCocktails).mockResolvedValue({});
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('has no serious accessibility violation on a cocktail menu, search in progress', async () => {
+    const user = userEvent.setup();
+    vi.mocked(publicApi.getMenu).mockResolvedValue(
+      cocktailMenu([...mojitoMenu.cocktails!, menuCocktail(3, { name: 'Daiquiri', isAvailable: true, available: false })]),
+    );
+    const { container } = renderMenu('cocktails');
+    await user.type(await screen.findByPlaceholderText('public.cocktailSearchPlaceholder'), 'i');
+
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('has no serious accessibility violation on a bottle menu', async () => {
+    vi.mocked(publicApi.getMenu).mockResolvedValue(suzeMenu);
+    const { container } = renderMenu('aperitifs');
+    await screen.findAllByText(/B57/);
+
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

@@ -14,6 +14,7 @@ import Field from '../../components/ui/Field';
 import IconButton from '../../components/ui/IconButton';
 import IconPicker from '../../components/ui/IconPicker';
 import Input from '../../components/ui/Input';
+import LiveResultCount from '../../components/ui/LiveResultCount';
 import Modal from '../../components/ui/Modal';
 import Pagination from '../../components/ui/Pagination';
 import SearchInput from '../../components/ui/SearchInput';
@@ -137,35 +138,42 @@ export default function IngredientsPage() {
             <div
               key={ingredient.id}
               className={cx(
-                'relative bg-surface border rounded-xl p-4 transition-all cursor-pointer',
+                'relative bg-surface border rounded-xl p-4 transition-colors',
                 ingredient.isAvailable
                   ? 'border-line hover:border-accent/50'
-                  : 'border-danger/30 opacity-60 hover:border-danger/70',
+                  : 'border-danger/30 hover:border-danger/70',
               )}
-              onClick={() => toggleAvailability.mutate(ingredient)}
             >
-              <div className={cx('absolute top-2 right-2 w-3 h-3 rounded-full', ingredient.isAvailable ? 'bg-success' : 'bg-danger')} />
-              <div className="text-4xl mb-3 text-center h-12 flex items-center justify-center">
-                {ingredient.icon || '📦'}
-              </div>
-              <div className="text-center mb-3">
-                <p className="font-medium text-fg truncate">{localize(ingredient)}</p>
-                <p className="text-xs text-fg-muted mt-1">
-                  {ingredient.isAvailable ? t('cocktails.available') : t('cocktails.unavailable')}
-                </p>
-              </div>
-              {/* A click on the card toggles the availability: the buttons stop it. */}
+              {/* A switch, so the availability also toggles from the keyboard; its state replaces the status text. */}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={ingredient.isAvailable}
+                onClick={() => toggleAvailability.mutate(ingredient)}
+                className="block w-full rounded-lg cursor-pointer"
+              >
+                <span aria-hidden="true" className={cx('absolute top-2 right-2 w-3 h-3 rounded-full', ingredient.isAvailable ? 'bg-success' : 'bg-danger')} />
+                <span aria-hidden="true" className={cx('text-4xl mb-3 h-12 flex items-center justify-center', !ingredient.isAvailable && 'grayscale opacity-60')}>
+                  {ingredient.icon || '📦'}
+                </span>
+                <span className="block text-center mb-3">
+                  <span className="block font-medium text-fg truncate">{localize(ingredient)}</span>
+                  <span aria-hidden="true" className="block text-xs text-fg-muted mt-1">
+                    {ingredient.isAvailable ? t('cocktails.available') : t('cocktails.unavailable')}
+                  </span>
+                </span>
+              </button>
               <div className="flex justify-center gap-1 pt-2 border-t border-line">
                 <IconButton
                   icon="edit"
                   label={t('common.edit')}
-                  onClick={(event) => { event.stopPropagation(); ingredientForm.open(ingredient); }}
+                  onClick={() => ingredientForm.open(ingredient)}
                 />
                 <IconButton
                   icon="delete"
                   label={t('common.delete')}
                   variant="danger"
-                  onClick={(event) => { event.stopPropagation(); handleDelete(ingredient); }}
+                  onClick={() => handleDelete(ingredient)}
                 />
               </div>
             </div>
@@ -201,12 +209,14 @@ export default function IngredientsPage() {
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <SearchInput value={search} onChange={setSearch} className="sm:max-w-sm" />
+        <SearchInput value={search} onChange={setSearch} label={t('ingredients.search')} className="sm:max-w-sm" />
         <div className="flex gap-2">
           {(['all', 'available', 'unavailable'] as const).map((status) => (
             <button
               key={status}
+              type="button"
               onClick={() => setFilter(status)}
+              aria-pressed={filter === status}
               className={cx(
                 'px-3 py-1.5 rounded-lg text-sm transition-colors border',
                 filter === status
@@ -215,12 +225,13 @@ export default function IngredientsPage() {
               )}
             >
               {t(`ingredients.filter.${status}`)}
-              {status !== 'all' && <span className="ml-1.5 text-xs opacity-70">({countFor(status)})</span>}
+              {status !== 'all' && <span className="ml-1.5 text-xs">({countFor(status)})</span>}
             </button>
           ))}
         </div>
       </div>
 
+      <LiveResultCount count={ingredientsQuery.isSuccess ? filteredIngredients.length : null} />
       {renderContent()}
 
       <Modal

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { fireEvent, screen, waitFor, within } from '../../test/test-utils';
 import { clearToasts, renderWithFeedback } from '../../test/feedback';
+import { axe } from '../../test/axe';
 import UnitsPage from './UnitsPage';
 
 vi.mock('../../services/api', async () => {
@@ -290,5 +291,27 @@ describe('UnitsPage', () => {
     await user.click(within(dialog()).getByRole('button', { name: 'common.cancel' }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+describe('UnitsPage accessibility', () => {
+  it('has no serious accessibility violation with the form modal open', async () => {
+    const user = userEvent.setup();
+    const { container } = renderPage();
+    await screen.findByText('Centiliter');
+    await user.click(screen.getByRole('button', { name: 'units.add' }));
+
+    expect(screen.getByRole('dialog', { name: 'units.add' })).toBeInTheDocument();
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('closes the form modal with Escape', async () => {
+    const user = userEvent.setup();
+    await renderLoadedPage();
+    await user.click(screen.getByRole('button', { name: 'units.add' }));
+
+    fireEvent(dialog(), new Event('cancel', { cancelable: true }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 });

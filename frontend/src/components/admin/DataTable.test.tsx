@@ -100,4 +100,15 @@ describe('DataTable', () => {
 
     expect(sort.toggleSort).toHaveBeenCalledWith('name');
   });
+
+  it('announces the number of items to screen readers once loaded', () => {
+    renderTable();
+    expect(screen.getByText('common.resultCount')).toHaveAttribute('aria-live', 'polite');
+  });
+
+  it('keeps the announcement empty while loading or after a failed load', () => {
+    renderTable({ isLoading: true });
+    expect(screen.queryByText('common.resultCount')).not.toBeInTheDocument();
+    expect(document.querySelector('[aria-live="polite"]')).toBeEmptyDOMElement();
+  });
 });

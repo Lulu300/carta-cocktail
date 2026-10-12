@@ -173,3 +173,46 @@ describe('MultiSelectDropdown', () => {
     expect(screen.queryByText('Alpha')).not.toBeInTheDocument();
   });
 });
+
+describe('MultiSelectDropdown accessibility', () => {
+  function renderDropdown(selected: string[] = []) {
+    render(
+      <MultiSelectDropdown options={options} selected={selected} onChange={vi.fn()} placeholder="Pick one" />,
+    );
+    return screen.getByRole('button', { name: selected.length ? 'common.selected' : 'Pick one' });
+  }
+
+  it('reports its expanded state and the panel it controls', async () => {
+    const user = userEvent.setup();
+    const trigger = renderDropdown();
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+
+    await user.click(trigger);
+
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    const panel = screen.getByRole('group', { name: 'Pick one' });
+    expect(trigger).toHaveAttribute('aria-controls', panel.id);
+    expect(screen.getByRole('searchbox', { name: 'common.filterOptions' })).toHaveFocus();
+  });
+
+  it('closes on Escape, empties the filter and gives the focus back to the button', async () => {
+    const user = userEvent.setup();
+    const trigger = renderDropdown();
+
+    await user.click(trigger);
+    await user.keyboard('Gam');
+    expect(screen.queryByText('Alpha')).not.toBeInTheDocument();
+    await user.keyboard('{Escape}');
+
+    expect(screen.queryByRole('group')).not.toBeInTheDocument();
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger).toHaveFocus();
+    await user.click(trigger);
+    expect(screen.getByText('Alpha')).toBeInTheDocument();
+  });
+
+  it('names the button that removes a selected option', () => {
+    renderDropdown(['a']);
+    expect(screen.getByRole('button', { name: 'common.removeItem' })).toBeInTheDocument();
+  });
+});

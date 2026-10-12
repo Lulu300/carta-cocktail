@@ -22,6 +22,11 @@ beforeEach(() => {
   mockI18n.resolvedLanguage = undefined;
 });
 
+/** Its name is the hidden label followed by the visible language code. */
+function getLanguageButton() {
+  return screen.getByRole('button', { name: /^nav\.changeLanguage/ });
+}
+
 describe('LanguageSelector', () => {
   it('should use the resolved language when the detected one is regional', () => {
     mockI18n.language = 'en-US';
@@ -50,17 +55,15 @@ describe('LanguageSelector', () => {
 
   it('should render current language button', () => {
     render(<LanguageSelector />);
-    const button = screen.getByLabelText('Change language');
-    expect(button).toBeInTheDocument();
-    // CSS handles uppercase, text content is lowercase 'en'
-    expect(screen.getByText('en')).toBeInTheDocument();
+    // The name keeps the visible code (label in name); CSS uppercases it.
+    expect(getLanguageButton()).toHaveAccessibleName('nav.changeLanguage en');
   });
 
   it('should open dropdown on click', async () => {
     const user = userEvent.setup();
     render(<LanguageSelector />);
 
-    await user.click(screen.getByLabelText('Change language'));
+    await user.click(getLanguageButton());
     expect(screen.getByText('Français')).toBeInTheDocument();
     expect(screen.getByText('English')).toBeInTheDocument();
   });
@@ -69,7 +72,7 @@ describe('LanguageSelector', () => {
     const user = userEvent.setup();
     render(<LanguageSelector />);
 
-    await user.click(screen.getByLabelText('Change language'));
+    await user.click(getLanguageButton());
     await user.click(screen.getByText('Français'));
 
     expect(mockChangeLanguage).toHaveBeenCalledWith('fr');
@@ -79,18 +82,72 @@ describe('LanguageSelector', () => {
     const user = userEvent.setup();
     render(<LanguageSelector />);
 
-    await user.click(screen.getByLabelText('Change language'));
+    await user.click(getLanguageButton());
     expect(screen.getByText('Français')).toBeInTheDocument();
 
     await user.click(screen.getByText('Français'));
     expect(screen.queryByText('Français')).not.toBeInTheDocument();
   });
 
+  it('exposes a menu button whose expanded state follows the menu', async () => {
+    const user = userEvent.setup();
+    render(<LanguageSelector />);
+    const button = getLanguageButton();
+    expect(button).toHaveAttribute('aria-haspopup', 'menu');
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+
+    await user.click(button);
+
+    expect(button).toHaveAttribute('aria-expanded', 'true');
+    const menu = screen.getByRole('menu', { name: 'nav.language' });
+    expect(button).toHaveAttribute('aria-controls', menu.id);
+    expect(screen.getByRole('menuitemradio', { name: /English/ })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('menuitemradio', { name: /Français/ })).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('moves the focus into the menu, on the current language, and through it with the arrow keys', async () => {
+    const user = userEvent.setup();
+    render(<LanguageSelector />);
+
+    await user.click(getLanguageButton());
+    expect(screen.getByRole('menuitemradio', { name: /English/ })).toHaveFocus();
+
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getByRole('menuitemradio', { name: /Français/ })).toHaveFocus();
+    await user.keyboard('{ArrowUp}');
+    expect(screen.getByRole('menuitemradio', { name: /English/ })).toHaveFocus();
+    await user.keyboard('{ArrowUp}');
+    expect(screen.getByRole('menuitemradio', { name: /Français/ })).toHaveFocus();
+  });
+
+  it('closes on Escape and gives the focus back to the button', async () => {
+    const user = userEvent.setup();
+    render(<LanguageSelector />);
+    const button = getLanguageButton();
+
+    await user.click(button);
+    await user.keyboard('{Escape}');
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    expect(button).toHaveFocus();
+  });
+
+  it('closes when the focus leaves the menu with Tab', async () => {
+    const user = userEvent.setup();
+    render(<LanguageSelector />);
+
+    await user.click(getLanguageButton());
+    await user.tab();
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
   it('should show checkmark for current language', async () => {
     const user = userEvent.setup();
     render(<LanguageSelector />);
 
-    await user.click(screen.getByLabelText('Change language'));
+    await user.click(getLanguageButton());
     // English is current language, should have checkmark
     const englishButton = screen.getByText('English').closest('button');
     expect(englishButton?.textContent).toContain('✓');

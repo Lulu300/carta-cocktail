@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { render, screen, waitFor } from '../../test/test-utils';
 import { ApiError } from '../../services/api';
+import { axe } from '../../test/axe';
 import CocktailPublicPage from './CocktailPublicPage';
 
 const mockGetCocktail = vi.fn();
@@ -223,5 +224,16 @@ describe('CocktailPublicPage', () => {
 
     expect(print).toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'export' })).toBeInTheDocument();
+  });
+});
+
+describe('CocktailPublicPage accessibility', () => {
+  it('has no serious accessibility violation', async () => {
+    mockGetCocktail.mockResolvedValue(cocktailResponse);
+    mockUseAuth.mockReturnValue({ user: { id: 1, email: 'admin@test.local' } });
+    const { container } = render(<CocktailPublicPage />);
+    await screen.findByText('Negroni');
+
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

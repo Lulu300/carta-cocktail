@@ -8,6 +8,7 @@ import ImportCocktailWizard from '../../components/import/ImportCocktailWizard';
 import { exportCocktailsAsZip } from '../../services/exportZip';
 import Button from '../../components/ui/Button';
 import Icon from '../../components/ui/Icon';
+import LiveResultCount from '../../components/ui/LiveResultCount';
 import MultiSelectDropdown from '../../components/ui/MultiSelectDropdown';
 import Pagination from '../../components/ui/Pagination';
 import SearchInput from '../../components/ui/SearchInput';
@@ -167,7 +168,7 @@ export default function CocktailsPage() {
 
       <div className="flex flex-col lg:flex-row gap-3 mb-4 lg:items-center">
         <div className="flex flex-col sm:flex-row gap-3 flex-1">
-          <SearchInput value={filters.search} onChange={filters.setSearch} className="sm:w-64" />
+          <SearchInput value={filters.search} onChange={filters.setSearch} label={t('cocktails.search')} className="sm:w-64" />
           <MultiSelectDropdown
             options={filters.tagOptions}
             selected={filters.selectedTags}
@@ -180,6 +181,7 @@ export default function CocktailsPage() {
       </div>
 
       {availabilityQuery.isError && <LoadError onRetry={() => availabilityQuery.refetch()} />}
+      <LiveResultCount count={cocktailsQuery.isSuccess ? filteredCocktails.length : null} />
       {renderCocktails()}
 
       {showImport && <ImportCocktailWizard onClose={handleImportClose} />}

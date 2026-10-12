@@ -14,7 +14,12 @@
     "settings": "Paramètres",
     "logout": "Déconnexion",
     "login": "Connexion",
-    "language": "Langue"
+    "language": "Langue",
+    "changeLanguage": "Changer de langue",
+    "menu": "Menu de navigation",
+    "admin": "Administration",
+    "main": "Principale",
+    "skipToContent": "Aller au contenu"
   },
   "home": {
     "subtitle": "Découvrez nos cartes de cocktails",
@@ -59,7 +64,8 @@
     "confirmDelete": "Supprimer cette catégorie ? Toutes les bouteilles associées seront aussi supprimées.",
     "created": "Catégorie créée",
     "updated": "Catégorie mise à jour",
-    "deleted": "Catégorie supprimée"
+    "deleted": "Catégorie supprimée",
+    "search": "Rechercher une catégorie"
   },
   "categoryTypes": {
     "manage": "Gérer les types",
@@ -165,7 +171,8 @@
           "unknown": "{{field}} invalide"
         }
       }
-    }
+    },
+    "search": "Rechercher une bouteille"
   },
   "ingredients": {
     "title": "Ingrédients",
@@ -182,7 +189,8 @@
     },
     "created": "Ingrédient créé",
     "updated": "Ingrédient mis à jour",
-    "deleted": "Ingrédient supprimé"
+    "deleted": "Ingrédient supprimé",
+    "search": "Rechercher un ingrédient"
   },
   "units": {
     "title": "Unités",
@@ -193,7 +201,8 @@
     "confirmDelete": "Supprimer cette unité ?",
     "created": "Unité créée",
     "updated": "Unité mise à jour",
-    "deleted": "Unité supprimée"
+    "deleted": "Unité supprimée",
+    "search": "Rechercher une unité"
   },
   "cocktails": {
     "title": "Cocktails",
@@ -294,7 +303,8 @@
       "resultImported": "importé",
       "resultNotImported": "non importé",
       "mapsTo": "correspond à"
-    }
+    },
+    "search": "Rechercher un cocktail"
   },
   "menus": {
     "title": "Cartes",
@@ -365,7 +375,8 @@
         "hint": "Les bouteilles cochées comme digestif apparaissent automatiquement ici. Utilisez « Synchroniser » pour mettre à jour la liste.",
         "empty": "Aucune bouteille. Cochez des bouteilles comme digestif, puis synchronisez."
       }
-    }
+    },
+    "search": "Rechercher une carte"
   },
   "shortages": {
     "title": "Pénuries",
@@ -450,7 +461,8 @@
       "reloadAfterRestart": "Recharger la page une fois le backend redémarré",
       "invalidBackup": "Fichier de sauvegarde invalide",
       "fileSelected": "Fichier : {{name}}"
-    }
+    },
+    "noIcon": "Aucune icône"
   },
   "common": {
     "save": "Enregistrer",
@@ -472,11 +484,24 @@
     "selected": "{{count}} sélectionné(s)",
     "retry": "Réessayer",
     "close": "Fermer",
-    "undo": "Annuler"
+    "undo": "Annuler",
+    "clear": "Effacer",
+    "clearSearch": "Effacer la recherche",
+    "removeItem": "Retirer {{name}}",
+    "filterOptions": "Filtrer les options",
+    "resultCount_one": "{{count}} résultat",
+    "resultCount_other": "{{count}} résultats"
   },
   "pagination": {
     "showing": "{{start}}-{{end}} sur {{total}}",
-    "page": "page"
+    "page": "page",
+    "label": "Pagination",
+    "first": "Première page",
+    "previous": "Page précédente",
+    "next": "Page suivante",
+    "last": "Dernière page",
+    "goToPage": "Page {{page}}",
+    "pageSize": "Éléments par page"
   },
   "confirm": {
     "deleteTitle": "Supprimer ?",
@@ -492,5 +517,26 @@
     "required": "Obligatoire",
     "positive": "Doit être supérieur à 0",
     "sourceRequired": "Choisissez un élément"
+  },
+  "iconPicker": {
+    "hint": "Choisissez un emoji pour représenter cet ingrédient",
+    "suggestions": "Emojis proposés",
+    "emoji": "Emoji {{emoji}}",
+    "customLabel": "Emoji personnalisé",
+    "customPlaceholder": "Ou collez un emoji personnalisé...",
+    "useCustom": "OK",
+    "selected": "Sélectionné"
+  },
+  "colors": {
+    "blue": "Bleu",
+    "purple": "Violet",
+    "green": "Vert",
+    "red": "Rouge",
+    "orange": "Orange",
+    "yellow": "Jaune",
+    "pink": "Rose",
+    "teal": "Bleu canard",
+    "indigo": "Indigo",
+    "gray": "Gris"
   }
 }

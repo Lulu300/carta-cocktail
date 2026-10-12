@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import userEvent from '@testing-library/user-event';
 import { render, screen, within } from '../../test/test-utils';
+import { axe } from '../../test/axe';
 import PublicLayout from './PublicLayout';
 
 const mockUseAuth = vi.fn();
@@ -44,5 +46,30 @@ describe('PublicLayout', () => {
     render(<PublicLayout />);
 
     expect(within(screen.getByRole('banner')).getByRole('link', { name: /Chez Lulu/ })).toHaveAttribute('href', '/');
+  });
+
+  it('starts with a skip link to the main content, and puts the header links in a navigation landmark', async () => {
+    const user = userEvent.setup();
+    render(<PublicLayout />);
+
+    await user.tab();
+
+    const skipLink = screen.getByRole('link', { name: 'nav.skipToContent' });
+    expect(skipLink).toHaveFocus();
+    expect(skipLink).toHaveAttribute('href', `#${screen.getByRole('main').id}`);
+    const nav = within(screen.getByRole('banner')).getByRole('navigation', { name: 'nav.main' });
+    expect(within(nav).getByRole('link', { name: /Chez Lulu/ })).toBeInTheDocument();
+  });
+
+  it('hides the site icon from screen readers', () => {
+    render(<PublicLayout />);
+
+    expect(within(screen.getByRole('banner')).getByText('🍹')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('has no serious accessibility violation', async () => {
+    const { container } = render(<PublicLayout />);
+
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

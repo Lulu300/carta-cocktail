@@ -36,7 +36,7 @@ export default function CocktailCard({
         )}
       </CocktailThumbnail>
       <div className="p-4">
-        <h3 className="font-semibold mb-2">{cocktail.name}</h3>
+        <h2 className="font-semibold mb-2">{cocktail.name}</h2>
         {cocktail.description && <p className="text-sm text-fg-muted line-clamp-2 mb-2">{cocktail.description}</p>}
         <TagList tags={cocktail.tags} className="mb-2" />
         <AvailabilityWarnings availability={availability} loading={availabilityLoading} />

@@ -17,5 +17,5 @@ function formatAppVersion(version: string | undefined): string {
  * from the release tag (see frontend/Dockerfile and the release workflow).
  */
 export default function AppVersion({ className }: { className?: string }) {
-  return <p className={cx('text-xs text-gray-500', className)}>{formatAppVersion(import.meta.env.VITE_APP_VERSION)}</p>;
+  return <p className={cx('text-xs text-fg-muted', className)}>{formatAppVersion(import.meta.env.VITE_APP_VERSION)}</p>;
 }

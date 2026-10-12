@@ -1,6 +1,7 @@
 import { Fragment, type Key, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '../ui/classNames';
+import LiveResultCount from '../ui/LiveResultCount';
 import Pagination from '../ui/Pagination';
 import Skeleton from '../ui/Skeleton';
 import SortableHeader from '../ui/SortableHeader';
@@ -114,6 +115,7 @@ export default function DataTable<T>({
       {isLoading && <p role="status" className="sr-only">{t('common.loading')}</p>}
       {isError && <LoadError onRetry={onRetry} />}
       {isEmpty && <div className="text-center py-8 text-fg-muted">{emptyLabel}</div>}
+      <LiveResultCount count={isLoading || isError ? null : pagination.totalItems} />
       <Pagination
         page={pagination.page}
         totalPages={pagination.totalPages}

@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '../../test/test-utils';
 import { render as renderWithoutRouter } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
+import { axe } from '../../test/axe';
 import LoginPage from './LoginPage';
 import { ApiError } from '../../services/api';
 
@@ -42,8 +43,8 @@ function renderRedirectedFrom(from: { pathname: string; search?: string; hash?: 
 
 async function submitValidCredentials() {
   const user = userEvent.setup();
-  await user.type(screen.getByPlaceholderText('admin@carta.local'), 'admin@test.local');
-  await user.type(screen.getByPlaceholderText('admin@carta.local').closest('form')!.querySelector('input[type="password"]')!, 'password123');
+  await user.type(screen.getByLabelText('auth.email'), 'admin@test.local');
+  await user.type(screen.getByLabelText('auth.password'), 'password123');
   await user.click(screen.getByRole('button', { name: 'auth.loginButton' }));
 }
 
@@ -51,7 +52,8 @@ describe('LoginPage', () => {
   it('should render login form', () => {
     render(<LoginPage />);
     expect(screen.getByText('auth.login')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('admin@carta.local')).toBeInTheDocument();
+    expect(screen.getByLabelText('auth.email')).toHaveAttribute('placeholder', 'admin@carta.local');
+    expect(screen.getByLabelText('auth.password')).toHaveAttribute('type', 'password');
   });
 
   it('should submit form and navigate on success', async () => {
@@ -60,8 +62,8 @@ describe('LoginPage', () => {
 
     render(<LoginPage />);
 
-    await user.type(screen.getByPlaceholderText('admin@carta.local'), 'admin@test.local');
-    await user.type(screen.getByRole('textbox', { hidden: true }).closest('form')!.querySelector('input[type="password"]')!, 'password123');
+    await user.type(screen.getByLabelText('auth.email'), 'admin@test.local');
+    await user.type(screen.getByLabelText('auth.password'), 'password123');
     await user.click(screen.getByRole('button', { name: 'auth.loginButton' }));
 
     await waitFor(() => {
@@ -118,8 +120,8 @@ describe('LoginPage', () => {
 
     render(<LoginPage />);
 
-    await user.type(screen.getByPlaceholderText('admin@carta.local'), 'admin@test.local');
-    await user.type(screen.getByPlaceholderText('admin@carta.local').closest('form')!.querySelector('input[type="password"]')!, 'pass');
+    await user.type(screen.getByLabelText('auth.email'), 'admin@test.local');
+    await user.type(screen.getByLabelText('auth.password'), 'pass');
     await user.click(screen.getByRole('button', { name: 'auth.loginButton' }));
 
     expect(screen.getByRole('button')).toHaveTextContent('common.loading');
@@ -128,5 +130,16 @@ describe('LoginPage', () => {
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalled();
     });
+  });
+});
+
+describe('LoginPage accessibility', () => {
+  it('has no serious accessibility violation, error shown', async () => {
+    mockLogin.mockRejectedValueOnce(new Error('Network down'));
+    const { container } = render(<LoginPage />);
+    await submitValidCredentials();
+    await screen.findByRole('alert');
+
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

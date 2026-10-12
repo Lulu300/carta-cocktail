@@ -211,7 +211,7 @@ describe('ImportEntityRow', () => {
     const ingredient: ImportEntityResolution = { ref: { name: 'Mint' }, existingMatch: null, status: 'missing' };
     render(<Harness entity={ingredient} type="ingredients" initial={createResolution('ingredients', ingredient)} onChange={onChange} />);
 
-    await user.click(screen.getByRole('button', { name: '🌿' }));
+    await user.click(screen.getByText('🌿'));
 
     expect(onChange).toHaveBeenLastCalledWith({ action: 'create', data: expect.objectContaining({ icon: '🌿' }) });
   });

@@ -83,7 +83,28 @@ describe('PublicCocktailItem', () => {
   it('keeps an available cocktail in color', () => {
     renderItem(menuCocktail(1, { isAvailable: true, available: true }));
 
-    expect(screen.getByRole('link', { name: /Mojito/ })).not.toHaveClass('grayscale');
+    const link = screen.getByRole('link', { name: /Mojito/ });
+    expect(link).not.toHaveClass('grayscale');
+    expect(link).not.toHaveAttribute('aria-disabled');
+    expect(link).not.toHaveAttribute('tabindex');
     expect(screen.queryByText('public.unavailable')).not.toBeInTheDocument();
+  });
+
+  it('takes an unavailable cocktail out of the tab order and announces it as disabled', () => {
+    renderItem(menuCocktail(1, { isAvailable: true, available: false }));
+
+    const link = screen.getByRole('link', { name: /Mojito/ });
+    expect(link).toHaveAttribute('aria-disabled', 'true');
+    expect(link).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('treats the photo and the placeholder emoji as decoration', () => {
+    renderItem(menuCocktail(1, { imagePath: 'mojito.jpg' }));
+    expect(screen.getByRole('link', { name: /Mojito/ }).querySelector('img')).toHaveAttribute('alt', '');
+  });
+
+  it('hides the placeholder emoji from screen readers', () => {
+    renderItem(menuCocktail(1, { imagePath: null }));
+    expect(screen.getByText('🍸')).toHaveAttribute('aria-hidden', 'true');
   });
 });
