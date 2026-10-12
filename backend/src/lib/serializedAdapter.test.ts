@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData, prisma, seedUnit } from '../test/helpers';
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
+import { TEST_DATABASE_URL } from '../test/testDatabase';
+import { createPrismaClient } from './prisma';
 import { Lock, serializeTransactions, withSerializedTransactions } from './serializedAdapter';
 
 type SqliteAdapter = Parameters<typeof serializeTransactions>[0];
@@ -86,6 +88,31 @@ describe('queries during an interactive transaction', () => {
     expect(await prisma.unit.count({ where: { abbreviation: 'cmt' } })).toBe(1);
   });
 
+  it('should leave no SQLite transaction open after a failed commit', async () => {
+    const orphan = 'Bottle of a missing category';
+    // The foreign key is only checked at COMMIT, which then fails
+    const failedCommit = prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe('PRAGMA defer_foreign_keys = ON');
+      await tx.bottle.create({ data: { name: orphan, categoryId: 999_999, capacityMl: 700 } });
+    });
+    await expect(failedCommit).rejects.toThrow();
+
+    expect(await prisma.bottle.count({ where: { name: orphan } })).toBe(0);
+    await prisma.$transaction(async (tx) => {
+      await tx.unit.create({ data: { name: 'Next transaction', abbreviation: 'nxt' } });
+    });
+    await seedUnit({ name: 'Next write', abbreviation: 'nwr' });
+
+    // Another connection only sees committed rows
+    const other = createPrismaClient(TEST_DATABASE_URL);
+    try {
+      const committed = await other.unit.findMany({ where: { abbreviation: { in: ['nxt', 'nwr'] } } });
+      expect(committed.map((unit) => unit.abbreviation).sort()).toEqual(['nwr', 'nxt']);
+    } finally {
+      await other.$disconnect();
+    }
+  });
+
   it('should serialize raw queries too', async () => {
     const transaction = rolledBackTransaction().catch(() => undefined);
     await sleep(50);
@@ -127,6 +154,46 @@ describe('serializeTransactions', () => {
     await script;
 
     expect(events).toEqual(['begin', 'commit', 'script']);
+  });
+
+  /** A transaction whose ROLLBACK statement fails with `message`, recording its calls. */
+  function transactionFailingRollback(events: string[], message: string) {
+    return {
+      executeRaw: async () => {
+        events.push('ROLLBACK');
+        throw new Error(message);
+      },
+      rollback: async () => { events.push('rollback'); },
+    };
+  }
+
+  function adapterWith(transaction: object, events: string[]): SqliteAdapter {
+    return {
+      executeScript: async (script: string) => { events.push(script); },
+      startTransaction: async () => transaction,
+    } as unknown as SqliteAdapter;
+  }
+
+  it('should ignore the error of a ROLLBACK when Prisma has already rolled back', async () => {
+    const events: string[] = [];
+    const transaction = transactionFailingRollback(events, 'cannot rollback - no transaction is active');
+    const adapter = serializeTransactions(adapterWith(transaction, events));
+
+    await (await adapter.startTransaction()).rollback();
+    await adapter.executeScript('script');
+
+    expect(events).toEqual(['ROLLBACK', 'rollback', 'script']);
+  });
+
+  it('should report another ROLLBACK error, and still end the transaction and release the lock', async () => {
+    const events: string[] = [];
+    const transaction = transactionFailingRollback(events, 'disk I/O error');
+    const adapter = serializeTransactions(adapterWith(transaction, events));
+
+    await expect((await adapter.startTransaction()).rollback()).rejects.toThrow('disk I/O error');
+    await adapter.executeScript('script');
+
+    expect(events).toEqual(['ROLLBACK', 'rollback', 'script']);
   });
 
   it('should release the lock when the transaction cannot start', async () => {

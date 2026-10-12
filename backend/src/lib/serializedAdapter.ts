@@ -33,7 +33,27 @@ function override<T extends object>(target: T, replacements: Partial<T>): T {
   });
 }
 
-/** The transaction, which gives the lock back once it is committed or rolled back. */
+const NO_ACTIVE_TRANSACTION = 'no transaction is active';
+
+/**
+ * Ends the SQLite transaction if it is still open. Prisma sends ROLLBACK itself
+ * before a rollback, but not after a failed COMMIT (full disk, I/O error,
+ * deferred foreign key): the connection would then stay inside the failed
+ * transaction, show its rows and swallow every later write.
+ */
+async function rollbackIfOpen(transaction: SqliteTransaction): Promise<void> {
+  try {
+    await transaction.executeRaw({ sql: 'ROLLBACK', args: [], argTypes: [] });
+  } catch (err) {
+    // The usual case: Prisma has already rolled back
+    if (!(err instanceof Error && err.message.includes(NO_ACTIVE_TRANSACTION))) throw err;
+  }
+}
+
+/**
+ * The transaction, which gives the lock back once it is committed or rolled
+ * back, with no SQLite transaction left open on the connection.
+ */
 function releasingOnEnd(transaction: SqliteTransaction, release: () => void): SqliteTransaction {
   const end = (finish: () => Promise<void>) => async () => {
     try {
@@ -44,7 +64,13 @@ function releasingOnEnd(transaction: SqliteTransaction, release: () => void): Sq
   };
   return override(transaction, {
     commit: end(() => transaction.commit()),
-    rollback: end(() => transaction.rollback()),
+    rollback: end(async () => {
+      try {
+        await rollbackIfOpen(transaction);
+      } finally {
+        await transaction.rollback();
+      }
+    }),
   });
 }
 
