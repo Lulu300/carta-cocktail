@@ -12,11 +12,12 @@ permissions:
   contents: read
 
 # A new push to a pull request cancels its running CI. Pushes to main or
-# develop and calls from the release workflow get one group per commit, so a
-# later push never cancels the CI of an earlier commit. The release workflow
-# must keep its own group name: sharing this one would make the two runs block each other.
+# develop get one group per commit, so a later push never cancels the CI of an
+# earlier commit. github.workflow is the caller's name in a call ("Release"),
+# so the release's CI never waits behind, or is cancelled by, the CI of the
+# push on the same commit. The release workflow must keep its own group name.
 concurrency:
-  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -158,8 +159,8 @@ jobs:
 
   # Builds both images without pushing them, so a broken Dockerfile fails the
   # pull request instead of the release. Same cache scopes as the release
-  # workflow; pushes to main and develop warm the cache of the pull requests
-  # that target them.
+  # workflow. Only pushes write the cache: pull requests read the cache of
+  # their base branch, and writing their own layers would evict it (10 GB quota).
   docker:
     name: Docker build (${{ matrix.service }})
     runs-on: ubuntu-latest
@@ -182,4 +183,4 @@ jobs:
           # The image is not used afterwards: keep the result in the build cache only
           outputs: type=cacheonly
           cache-from: type=gha,scope=${{ matrix.service }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          cache-to: ${{ github.event_name == 'push' && format('type=gha,mode=max,scope={0}', matrix.service) || '' }}
