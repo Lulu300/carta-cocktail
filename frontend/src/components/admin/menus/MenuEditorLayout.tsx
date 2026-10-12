@@ -3,15 +3,14 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { menus as menusApi } from '../../../services/api';
 import type { Menu } from '../../../types';
-import { qk } from '../../../queries/keys';
 import { useMenu } from '../../../queries/menus';
-import { useEntityMutation } from '../../../queries/crud';
 import Button from '../../ui/Button';
 import Spinner from '../../ui/Spinner';
 import { cx, focusRingClasses } from '../../ui/classNames';
 import { isSystemMenu } from './isSystemMenu';
 import MenuInfoForm, { type MenuInfoValues } from './MenuInfoForm';
 import MenuSectionsManager from './MenuSectionsManager';
+import { updateMenu, useMenuMutation } from './useMenuMutation';
 
 interface MenuEditorLayoutProps {
   menuId: number;
@@ -35,12 +34,12 @@ function BackToList() {
 export default function MenuEditorLayout({ menuId, itemLabel, title, children }: MenuEditorLayoutProps) {
   const { t } = useTranslation();
   const menuQuery = useMenu(menuId);
-  const saveInfo = useEntityMutation<Partial<MenuInfoValues>>({
+  // Queued with the composition changes of the menu, so its refetch never hides one of them.
+  const saveInfo = useMenuMutation<Partial<MenuInfoValues>>({
+    menuId,
     mutationFn: (values) => menusApi.update(menuId, values),
-    // Prefix of qk.menu(menuId): refreshes the list and this menu.
-    invalidates: [qk.menus],
+    applyConfirmed: (state, values) => updateMenu(state, (menu) => ({ ...menu, ...values })),
     successMessage: 'menus.updated',
-    ignoreWhilePending: true,
   });
 
   if (menuQuery.isPending) {

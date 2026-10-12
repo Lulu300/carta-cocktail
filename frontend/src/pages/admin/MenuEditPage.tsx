@@ -9,7 +9,7 @@ import MenuComposition from '../../components/admin/menus/MenuComposition';
 import MenuEditorLayout from '../../components/admin/menus/MenuEditorLayout';
 import MenuItemRow from '../../components/admin/menus/MenuItemRow';
 import { groupBySection } from '../../components/admin/menus/groupBySection';
-import { useSaveMenuCocktails } from '../../components/admin/menus/useSaveMenuCocktails';
+import { cocktailsEdits, useSaveMenuCocktails } from '../../components/admin/menus/useSaveMenuCocktails';
 
 export default function MenuEditPage() {
   const { t } = useTranslation();
@@ -30,21 +30,13 @@ function MenuCocktails({ menu }: { menu: Menu }) {
   const cocktails = menu.cocktails ?? [];
   const sections = menu.sections ?? [];
 
-  const update = (cocktailId: number, changes: Partial<MenuCocktail>) => {
-    save.mutate(cocktails.map((item) => (item.cocktailId === cocktailId ? { ...item, ...changes } : item)));
-  };
-
-  const remove = (cocktailId: number) => {
-    save.mutate(cocktails.filter((item) => item.cocktailId !== cocktailId));
-  };
-
   const add = (cocktail: Cocktail) => {
     setIsAdding(false);
     // The id comes with the server's answer; the editor never sends it.
     const added: MenuCocktail = {
       id: 0, menuId: menu.id, cocktailId: cocktail.id, cocktail, menuSectionId: null, position: cocktails.length, isHidden: false,
     };
-    save.mutate([...cocktails, added]);
+    save.mutate(cocktailsEdits.add(added));
   };
 
   const nameOf = (item: MenuCocktail) => item.cocktail?.name ?? t('menus.cocktailFallback', { id: item.cocktailId });
@@ -61,17 +53,17 @@ function MenuCocktails({ menu }: { menu: Menu }) {
         <MenuComposition
           groups={groupBySection(cocktails, sections)}
           getKey={(item) => item.cocktailId}
-          onReorder={(items) => save.mutate(items)}
+          onReorder={(items) => save.mutate(cocktailsEdits.order(items.map((item) => item.cocktailId)))}
           renderItem={(item, move) => (
             <MenuItemRow
               label={nameOf(item)}
               isHidden={item.isHidden}
-              onToggleHidden={() => update(item.cocktailId, { isHidden: !item.isHidden })}
+              onToggleHidden={() => save.mutate(cocktailsEdits.update(item.cocktailId, { isHidden: !item.isHidden }))}
               sections={sections}
               sectionId={item.menuSectionId}
-              onSectionChange={(menuSectionId) => update(item.cocktailId, { menuSectionId })}
+              onSectionChange={(menuSectionId) => save.mutate(cocktailsEdits.update(item.cocktailId, { menuSectionId }))}
               move={move}
-              onRemove={() => remove(item.cocktailId)}
+              onRemove={() => save.mutate(cocktailsEdits.remove(item.cocktailId))}
             >
               <span className="font-medium">{nameOf(item)}</span>
             </MenuItemRow>

@@ -1,7 +1,7 @@
 import { menuSections as menuSectionsApi } from '../../../services/api';
 import type { Menu, MenuSection } from '../../../types';
 import { orderByIds } from './moveItem';
-import { useMenuMutation, type MenuMutation } from './useMenuMutation';
+import { updateMenu, useMenuMutation, type MenuMutation } from './useMenuMutation';
 
 interface SectionRename {
   id: number;
@@ -9,15 +9,15 @@ interface SectionRename {
 }
 
 export interface MenuSectionsMutations {
-  create: MenuMutation<string>;
+  create: MenuMutation<string, MenuSection>;
   rename: MenuMutation<SectionRename>;
   remove: MenuMutation<number>;
   /** Takes every section id of the menu, in the new order. */
   reorder: MenuMutation<number[]>;
 }
 
-function withSections(menu: Menu, sections: MenuSection[]): Menu {
-  return { ...menu, sections };
+function withSections(menu: Menu, update: (sections: MenuSection[]) => MenuSection[]): Menu {
+  return { ...menu, sections: update(menu.sections ?? []) };
 }
 
 /** Items of a deleted section move out of any section, as the database does (onDelete: SetNull). */
@@ -27,26 +27,27 @@ function withoutSection<T extends { menuSectionId: number | null }>(items: T[] |
 
 /** The sections of a menu, saved at once like the rest of its composition. */
 export function useMenuSections(menuId: number): MenuSectionsMutations {
-  const create = useMenuMutation<string>({
+  const create = useMenuMutation<string, MenuSection>({
     menuId,
     // Not shown before the server answers: the new section needs its id.
     mutationFn: (name) => menuSectionsApi.create(menuId, { name }),
+    applyConfirmed: (state, _name, section) => updateMenu(state, (menu) => withSections(menu, (sections) => [...sections, section])),
   });
 
   const rename = useMenuMutation<SectionRename>({
     menuId,
     mutationFn: ({ id, name }) => menuSectionsApi.update(id, { name }),
-    applyOptimistic: (cache, { id, name }) => cache.menu((menu) => withSections(
+    applyOptimistic: (state, { id, name }) => updateMenu(state, (menu) => withSections(
       menu,
-      (menu.sections ?? []).map((section) => (section.id === id ? { ...section, name } : section)),
+      (sections) => sections.map((section) => (section.id === id ? { ...section, name } : section)),
     )),
   });
 
   const remove = useMenuMutation<number>({
     menuId,
     mutationFn: (id) => menuSectionsApi.delete(id),
-    applyOptimistic: (cache, id) => cache.menu((menu) => ({
-      ...withSections(menu, (menu.sections ?? []).filter((section) => section.id !== id)),
+    applyOptimistic: (state, id) => updateMenu(state, (menu) => ({
+      ...withSections(menu, (sections) => sections.filter((section) => section.id !== id)),
       cocktails: withoutSection(menu.cocktails, id),
       bottles: withoutSection(menu.bottles, id),
     })),
@@ -55,7 +56,7 @@ export function useMenuSections(menuId: number): MenuSectionsMutations {
   const reorder = useMenuMutation<number[]>({
     menuId,
     mutationFn: (ids) => menuSectionsApi.reorder(menuId, ids),
-    applyOptimistic: (cache, ids) => cache.menu((menu) => withSections(menu, orderByIds(menu.sections ?? [], ids))),
+    applyOptimistic: (state, ids) => updateMenu(state, (menu) => withSections(menu, (sections) => orderByIds(sections, ids))),
   });
 
   return { create, rename, remove, reorder };

@@ -1,3 +1,4 @@
+import type { MenuBottleExclusion } from '../../../services/api';
 import type { Bottle, MenuBottle } from '../../../types';
 import { bottleGroupKey } from '../../../utils/bottleGrouping';
 
@@ -19,6 +20,14 @@ export interface MenuBottleGroup {
   isSaved: boolean;
 }
 
+/** Identical bottles removed from a system menu, shown and put back as one row. */
+export interface ExcludedBottleGroup {
+  key: string;
+  bottle: Bottle;
+  exclusions: MenuBottleExclusion[];
+  isEmpty: boolean;
+}
+
 export function hasBottle(entry: MenuBottle): entry is MenuBottleEntry {
   return entry.bottle !== undefined;
 }
@@ -32,15 +41,21 @@ export function isEmptyBottle(bottle: Bottle): boolean {
   return bottle.remainingPercent === 0;
 }
 
-/** Groups identical bottles, keeping the order of the first bottle of each group. */
-export function groupMenuBottles(entries: MenuBottleEntry[]): MenuBottleGroup[] {
-  const groups = new Map<string, MenuBottleEntry[]>();
-  for (const entry of entries) {
-    const key = `${bottleGroupKey(entry.bottle)}|${entry.menuSectionId ?? ''}`;
-    groups.set(key, [...(groups.get(key) ?? []), entry]);
+/** Groups the items by key, keeping the order of the first item of each group. */
+function groupByKey<T>(items: T[], keyOf: (item: T) => string): [string, T[]][] {
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    const key = keyOf(item);
+    groups.set(key, [...(groups.get(key) ?? []), item]);
   }
+  return [...groups];
+}
 
-  return [...groups].map(([key, groupEntries]) => ({
+/** Groups identical bottles of the same section. */
+export function groupMenuBottles(entries: MenuBottleEntry[]): MenuBottleGroup[] {
+  const sectionAndBottle = (entry: MenuBottleEntry) => `${bottleGroupKey(entry.bottle)}|${entry.menuSectionId ?? ''}`;
+
+  return groupByKey(entries, sectionAndBottle).map(([key, groupEntries]) => ({
     key,
     bottle: groupEntries[0].bottle,
     entries: groupEntries,
@@ -48,5 +63,15 @@ export function groupMenuBottles(entries: MenuBottleEntry[]): MenuBottleGroup[] 
     isHidden: groupEntries.every((entry) => entry.isHidden),
     isEmpty: groupEntries.every((entry) => isEmptyBottle(entry.bottle)),
     isSaved: groupEntries.every(isSavedEntry),
+  }));
+}
+
+/** Groups identical removed bottles. */
+export function groupExcludedBottles(exclusions: MenuBottleExclusion[]): ExcludedBottleGroup[] {
+  return groupByKey(exclusions, (exclusion) => bottleGroupKey(exclusion.bottle)).map(([key, groupExclusions]) => ({
+    key,
+    bottle: groupExclusions[0].bottle,
+    exclusions: groupExclusions,
+    isEmpty: groupExclusions.every((exclusion) => isEmptyBottle(exclusion.bottle)),
   }));
 }

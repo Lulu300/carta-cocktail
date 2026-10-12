@@ -80,6 +80,13 @@ function storeCocktails(items: NonNullable<Partial<MenuInput>['cocktails']>) {
   };
 }
 
+/** The first load answers; every refetch then waits forever, so only the editor itself can fix the screen. */
+function serveOnlyFirstLoad() {
+  vi.mocked(menusApi.get)
+    .mockImplementation(() => new Promise<Menu>(() => {}))
+    .mockImplementationOnce(async () => storedMenu);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   storedMenu = makeMenu([makeEntry(mojito, 0), makeEntry(negroni, 1)]);
@@ -164,13 +171,60 @@ describe('MenuEditPage', () => {
   it('puts the cocktail back and shows the server error when the save fails', async () => {
     const user = userEvent.setup();
     vi.mocked(menusApi.update).mockRejectedValue(new ApiError(400, 'Unknown section'));
+    serveOnlyFirstLoad();
     renderPage();
     await screen.findByText('Mojito');
 
     await user.click(within(rowOf('Mojito')).getByRole('button', { name: 'menus.removeItem' }));
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Unknown section'));
+    // The refetch never answers: the editor put the cocktail back by itself.
     expect(screen.getByText('Mojito')).toBeInTheDocument();
+  });
+
+  it('sends each change on top of the saved list: never a refused change, never a later one', async () => {
+    const user = userEvent.setup();
+    storedMenu = makeMenu([makeEntry(mojito, 0), makeEntry(negroni, 1), makeEntry(spritz, 2)]);
+    const answers: { resolve: () => void; reject: (error: Error) => void }[] = [];
+    vi.mocked(menusApi.update).mockImplementation((_id, data) => new Promise((resolve, reject) => {
+      answers.push({
+        resolve: () => {
+          storeCocktails(data.cocktails ?? []);
+          resolve(storedMenu);
+        },
+        reject,
+      });
+    }));
+    const hiddenFlags = (call: number) => sentCocktails(call).map((item) => item.isHidden);
+    renderPage();
+    await screen.findByText('Mojito');
+
+    await user.click(within(rowOf('Mojito')).getByRole('button', { name: 'menus.hideItem' }));
+    await user.click(within(rowOf('Negroni')).getByRole('button', { name: 'menus.hideItem' }));
+    await user.click(within(rowOf('Spritz')).getByRole('button', { name: 'menus.hideItem' }));
+    expect(within(rowOf('Mojito')).getByRole('button', { name: 'menus.showItem' })).toBeInTheDocument();
+    expect(menusApi.update).toHaveBeenCalledTimes(1);
+
+    answers[0].reject(new ApiError(500, 'Boom'));
+    await waitFor(() => expect(menusApi.update).toHaveBeenCalledTimes(2));
+    // Without the refused Mojito change, and without the Spritz change still waiting.
+    expect(hiddenFlags(1)).toEqual([false, true, false]);
+    // The screen drops the refused change and keeps the ones still waiting.
+    expect(within(rowOf('Mojito')).getByRole('button', { name: 'menus.hideItem' })).toBeInTheDocument();
+    expect(within(rowOf('Negroni')).getByRole('button', { name: 'menus.showItem' })).toBeInTheDocument();
+    expect(within(rowOf('Spritz')).getByRole('button', { name: 'menus.showItem' })).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Boom');
+
+    answers[1].resolve();
+    await waitFor(() => expect(menusApi.update).toHaveBeenCalledTimes(3));
+    expect(hiddenFlags(2)).toEqual([false, true, true]);
+    answers[2].resolve();
+
+    await waitFor(() => expect(menusApi.get).toHaveBeenCalledTimes(2));
+    expect(storedMenu.cocktails?.map((item) => item.isHidden)).toEqual([false, true, true]);
+    expect(within(rowOf('Mojito')).getByRole('button', { name: 'menus.hideItem' })).toBeInTheDocument();
+    expect(within(rowOf('Negroni')).getByRole('button', { name: 'menus.showItem' })).toBeInTheDocument();
+    expect(within(rowOf('Spritz')).getByRole('button', { name: 'menus.showItem' })).toBeInTheDocument();
   });
 
   it('saves the menu info with its button only', async () => {

@@ -2,8 +2,6 @@ import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { menuBottles as menuBottlesApi } from '../../services/api';
 import type { Menu } from '../../types';
-import { qk } from '../../queries/keys';
-import { useEntityMutation } from '../../queries/crud';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
@@ -16,6 +14,7 @@ import { groupBySection } from '../../components/admin/menus/groupBySection';
 import { isSystemMenu } from '../../components/admin/menus/isSystemMenu';
 import { groupMenuBottles, hasBottle, type MenuBottleGroup } from '../../components/admin/menus/menuBottleGroups';
 import { useMenuBottles, type EntryChanges } from '../../components/admin/menus/useMenuBottles';
+import { useMenuMutation } from '../../components/admin/menus/useMenuMutation';
 
 interface MenuTypeTexts {
   title: string;
@@ -50,11 +49,8 @@ function MenuBottles({ menu }: { menu: Menu }) {
   const { t } = useTranslation();
   const confirm = useConfirm();
   const mutations = useMenuBottles(menu.id);
-  const sync = useEntityMutation({
-    mutationFn: () => menuBottlesApi.sync(menu.id),
-    invalidates: [qk.menu(menu.id)],
-    ignoreWhilePending: true,
-  });
+  // Waits for the pending changes of the menu; the refetch that follows shows what it added.
+  const sync = useMenuMutation<void>({ menuId: menu.id, mutationFn: () => menuBottlesApi.sync(menu.id) });
   const isSystem = isSystemMenu(menu);
   const sections = menu.sections ?? [];
   const groups = groupMenuBottles((menu.bottles ?? []).filter(hasBottle));
@@ -112,13 +108,13 @@ function MenuBottles({ menu }: { menu: Menu }) {
                   <span className="text-xs text-fg-muted">{t('menus.bottles.abv', { value: group.bottle.alcoholPercentage })}</span>
                 )}
               >
-                <BottleGroupLabel group={group} />
+                <BottleGroupLabel bottle={group.bottle} count={group.entries.length} isEmpty={group.isEmpty} />
               </MenuItemRow>
             )}
           />
         )}
       </Card>
-      {isSystem && <ExcludedBottles menuId={menu.id} onRestore={(exclusion) => mutations.restore.mutate(exclusion)} />}
+      {isSystem && <ExcludedBottles menuId={menu.id} onRestore={(exclusions) => mutations.restore.mutate(exclusions)} />}
     </>
   );
 }

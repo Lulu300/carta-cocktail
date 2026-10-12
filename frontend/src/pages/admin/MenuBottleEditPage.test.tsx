@@ -50,6 +50,11 @@ const hendricks = makeBottle(1, 'Hendricks', { alcoholPercentage: 41.4 });
 const sameHendricks = makeBottle(2, 'Hendricks', { alcoholPercentage: 41.4 });
 const lillet = makeBottle(3, 'Lillet');
 const campari = makeBottle(6, 'Campari');
+const sameCampari = makeBottle(7, 'Campari');
+
+function removedCamparis(): MenuBottleExclusion[] {
+  return [campari, sameCampari].map((bottle) => ({ menuId: 5, bottleId: bottle.id, bottle, createdAt: '2026-10-12' }));
+}
 
 function makeEntry(id: number, bottle: Bottle, menuSectionId: number | null = null): MenuBottle {
   return { id, menuId: 5, bottleId: bottle.id, bottle, menuSectionId, position: id, isHidden: false };
@@ -114,6 +119,21 @@ function excludedCard(): HTMLElement {
 
 function compositionNames(): string[] {
   return within(compositionCard()).getAllByRole('listitem').map((row) => row.querySelector('.font-medium')?.textContent ?? '');
+}
+
+async function removeGroup(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(within(rowOf(name)).getByRole('button', { name: 'menus.removeItem' }));
+  await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'menus.bottles.exclude' }));
+}
+
+/** The first loads answer; every refetch then waits forever, so only the editor itself can fix the screen. */
+function serveOnlyFirstLoad() {
+  vi.mocked(menusApi.get)
+    .mockImplementation(() => new Promise<Menu>(() => {}))
+    .mockImplementationOnce(async () => stored.menu);
+  vi.mocked(menuBottlesApi.exclusions)
+    .mockImplementation(() => new Promise<MenuBottleExclusion[]>(() => {}))
+    .mockImplementationOnce(async () => stored.exclusions);
 }
 
 beforeEach(() => {
@@ -262,13 +282,31 @@ describe('MenuBottleEditPage', () => {
     await waitFor(() => expect(menuBottlesApi.exclusions).toHaveBeenCalledWith(5));
     expect(within(excludedCard()).getByText('menus.bottles.noExcluded')).toBeInTheDocument();
 
-    await user.click(within(rowOf('Hendricks')).getByRole('button', { name: 'menus.removeItem' }));
-    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'menus.bottles.exclude' }));
+    await removeGroup(user, 'Hendricks');
 
     await waitFor(() => expect(menuBottlesApi.exclude).toHaveBeenCalledTimes(1));
     expect(menuBottlesApi.exclude).toHaveBeenCalledWith(5, [1, 2]);
     expect(within(compositionCard()).queryByText('Hendricks')).not.toBeInTheDocument();
-    await waitFor(() => expect(within(excludedCard()).getAllByText('Hendricks')).toHaveLength(2));
+    // One row for the two identical bottles, as in the menu.
+    await waitFor(() => expect(within(excludedCard()).getAllByText('Hendricks')).toHaveLength(1));
+    expect(within(rowOf('Hendricks', excludedCard())).getByText('menus.bottles.count')).toBeInTheDocument();
+  });
+
+  it('puts both lists back with a toast when the removal fails', async () => {
+    const user = userEvent.setup();
+    vi.mocked(menuBottlesApi.exclude).mockRejectedValue(new ApiError(400, 'Not a system menu'));
+    serveOnlyFirstLoad();
+    renderPage();
+    await screen.findByText('Hendricks');
+    await waitFor(() => expect(within(excludedCard()).getByText('menus.bottles.noExcluded')).toBeInTheDocument());
+
+    await removeGroup(user, 'Hendricks');
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Not a system menu'));
+    // The refetches never answer: the editor put both lists back by itself.
+    expect(within(compositionCard()).getByText('Hendricks')).toBeInTheDocument();
+    expect(within(excludedCard()).queryByText('Hendricks')).not.toBeInTheDocument();
+    expect(within(excludedCard()).getByText('menus.bottles.noExcluded')).toBeInTheDocument();
   });
 
   it('keeps the group when the removal is cancelled', async () => {
@@ -283,28 +321,35 @@ describe('MenuBottleEditPage', () => {
     expect(within(compositionCard()).getByText('Hendricks')).toBeInTheDocument();
   });
 
-  it('puts a removed bottle back at the end of the menu', async () => {
+  it('puts a group of removed bottles back at the end of the menu, one request per bottle', async () => {
     const user = userEvent.setup();
-    storeMenu({}, [{ menuId: 5, bottleId: 6, bottle: campari, createdAt: '2026-10-12' }]);
+    storeMenu({}, removedCamparis());
     renderPage();
 
     await user.click(await within(await screen.findByRole('group')).findByRole('button', { name: 'menus.bottles.restoreLabel' }));
 
     await waitFor(() => expect(compositionNames()).toEqual(['Hendricks', 'Lillet', 'Campari']));
+    expect(menuBottlesApi.restore).toHaveBeenCalledTimes(2);
     expect(menuBottlesApi.restore).toHaveBeenCalledWith(5, 6);
+    expect(menuBottlesApi.restore).toHaveBeenCalledWith(5, 7);
     expect(within(excludedCard()).queryByText('Campari')).not.toBeInTheDocument();
     await waitFor(() => expect(within(rowOf('Campari', compositionCard())).getByRole('button', { name: 'menus.moveUp' })).toBeEnabled());
+    expect(within(rowOf('Campari', compositionCard())).getByText('menus.bottles.count')).toBeInTheDocument();
   });
 
-  it('shows the removed bottle again with a toast when putting it back fails', async () => {
+  it('shows the removed bottles again with a toast when putting one back fails', async () => {
     const user = userEvent.setup();
-    storeMenu({}, [{ menuId: 5, bottleId: 6, bottle: campari, createdAt: '2026-10-12' }]);
-    vi.mocked(menuBottlesApi.restore).mockRejectedValue(new ApiError(404, 'Resource not found'));
+    storeMenu({}, removedCamparis());
+    vi.mocked(menuBottlesApi.restore)
+      .mockResolvedValueOnce({ message: 'ok' })
+      .mockRejectedValueOnce(new ApiError(404, 'Resource not found'));
+    serveOnlyFirstLoad();
     renderPage();
 
     await user.click(await within(await screen.findByRole('group')).findByRole('button', { name: 'menus.bottles.restoreLabel' }));
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Resource not found'));
+    // The refetches never answer: the editor put both lists back by itself.
     expect(within(excludedCard()).getByText('Campari')).toBeInTheDocument();
     expect(within(compositionCard()).queryByText('Campari')).not.toBeInTheDocument();
   });
@@ -324,6 +369,29 @@ describe('MenuBottleEditPage', () => {
     await waitFor(() => expect(menusApi.update).toHaveBeenCalledWith(5, {
       name: 'Apéros', description: 'Before dinner', isPublic: true,
     }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('menus.updated'));
+  });
+
+  it('saves the menu info after the composition changes still waiting', async () => {
+    const user = userEvent.setup();
+    const answers: (() => void)[] = [];
+    vi.mocked(menuBottlesApi.update).mockImplementation((id, changes) => new Promise((resolve) => {
+      answers.push(() => {
+        updateEntry(id, changes);
+        resolve({} as MenuBottle);
+      });
+    }));
+    renderPage();
+    await screen.findByText('Hendricks');
+
+    await user.click(within(rowOf('Lillet')).getByRole('button', { name: 'menus.hideItem' }));
+    await user.click(screen.getByRole('button', { name: 'common.save' }));
+    expect(menusApi.update).not.toHaveBeenCalled();
+
+    answers[0]();
+    await waitFor(() => expect(menusApi.update).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(menusApi.get).toHaveBeenCalledTimes(2));
+    expect(within(rowOf('Lillet')).getByRole('button', { name: 'menus.showItem' })).toBeInTheDocument();
   });
 
   it('reloads the menu after a sync', async () => {
