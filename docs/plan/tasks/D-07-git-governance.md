@@ -76,7 +76,7 @@ Partie humaine (réglages GitHub, à faire après merge) :
 - [x] `.github/pull_request_template.md` et `.github/release.yml` existent.
 - [x] (humain) Un `git push origin main` direct est refusé.
 - [x] (humain) Une PR vers `develop` avec le check `Backend` rouge ne peut pas être mergée (constaté sur la PR #115 : `BLOCKED` tant que les checks requis n'étaient pas verts ; pas de PR rouge volontaire).
-- [ ] (humain) La branche d'une PR mergée est supprimée automatiquement.
+- [x] (humain) La branche d'une PR mergée est supprimée automatiquement (PR #115, mergée sans `--delete-branch`).
 - [x] (humain) `git branch -r` ne liste plus que `main`, `develop` et les branches ouvertes.
 
 ## Tests à ajouter ou adapter
@@ -110,4 +110,5 @@ Partie humaine (réglages GitHub, à faire après merge) :
   - étape 5 : un push direct d'un commit vide sur `main` et sur `develop`, depuis un clone jetable, est refusé avec `GH013` ;
   - étape 7 : les 35 branches distantes mergées dans `main` sont supprimées ; la liste avec les SHA est conservée hors dépôt par l'humain (restauration : `git push origin <sha>:refs/heads/<branche>`) ;
   - étape 8 : CodeQL (configuration par défaut) `configured`, signalement privé des vulnérabilités activé ; le check `CodeQL` n'est pas requis.
-  Restent : critère « branche supprimée automatiquement » à constater au merge de la PR #115 ; étape 6 (`develop` intacte après le premier merge `develop` → `main`) et étape 9 (notes de la première pré-version tirées de `.github/release.yml`) à la prochaine release ; `git config --global user.name "Ludwig SIMON"` facultatif, non fait.
+  Restent : critère « branche supprimée automatiquement » à constater au merge de la PR #115 ; étape 6 (`develop` intacte après le premier merge `develop` → `main`) et étape 9 (notes de la première pré-version tirées de `.github/release.yml`) à la prochaine release . Décision humaine : `user.name` reste `Lulu300` (le nom utilisé sur GitHub et sur les autres serveurs git de l'humain) ; `.mailmap` suffit.
+- 2026-10-12 : PR #115 mergée sans `--delete-branch` : GitHub a supprimé `docs/D-07-pr-ci-ruleset-id` (`delete_branch_on_merge`), critère coché. Restent les étapes 6 et 9, à la prochaine release.
