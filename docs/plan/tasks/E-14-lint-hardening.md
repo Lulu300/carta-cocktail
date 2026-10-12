@@ -80,3 +80,4 @@ La plupart des bugs relevés par la revue frontend (promesses rejetées sans `ca
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-12 : B-05 (PR #98) a monté `eslint-plugin-react-hooks` en 7.1 (E-16 intégrée). La directive `set-state-in-effect` de `SettingsPage` sert de nouveau : l'étape 6 doit corriger le code (initialiser `email` depuis `user`), pas seulement retirer la directive.
