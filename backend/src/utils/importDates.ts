@@ -5,11 +5,11 @@
  * in a way that depends on the JavaScript engine, and reads `12/03/2024` as US English everywhere.
  */
 
+import { FALLBACK_LANGUAGE } from '../i18n';
+
 /** Order of the day and the month in a date written with slashes or dots. */
 type DayMonthOrder = 'dayFirst' | 'monthFirst';
 
-/** Same language as i18next's `fallbackLng`: used for a language the table does not know. */
-const FALLBACK_LANGUAGE = 'en';
 
 /**
  * One entry per application language; a new language adds its order here, with a test.
@@ -28,7 +28,7 @@ const ISO_TIMESTAMP = /^(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3}
 // A four-digit year: `12/03/24` could be 1924 or 2024
 const NUMERIC_DATE = /^(\d{1,2})([/.])(\d{1,2})\2(\d{4})$/;
 
-/** The exact code first (`en-GB`), then its base language (`en`), then the fallback language. */
+/** The exact code first (`en-GB`), then its base language (`en`), then the app's fallback language. */
 function dayMonthOrder(language: string): DayMonthOrder {
   const baseLanguage = language.split('-')[0].toLowerCase();
   return DAY_MONTH_ORDERS.get(language)
@@ -51,8 +51,9 @@ function isCalendarDate(year: number, month: number, day: number): boolean {
 
 function toIsoDate(year: number, month: number, day: number): string | null {
   if (!isCalendarDate(year, month, day)) return null;
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${year}-${pad(month)}-${pad(day)}`;
+  const pad = (value: number, length: number) => String(value).padStart(length, '0');
+  // A short year (`204`) would not be ISO: the confirmation would read it in the server's time zone
+  return `${pad(year, 4)}-${pad(month, 2)}-${pad(day, 2)}`;
 }
 
 function readIsoDate(text: string): string | null {

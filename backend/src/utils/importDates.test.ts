@@ -59,6 +59,10 @@ describe('parseImportDate', () => {
     it('refuses February 29 of a century that is not a leap year', () => {
       expect(parseImportDate('29/02/1900', 'fr')).toBeNull();
     });
+
+    it.each(['0999-03-12', '12/03/0999'])('writes the year of %j on four digits', (text) => {
+      expect(parseImportDate(text, 'fr')).toBe('0999-03-12');
+    });
   });
 
   describe('in en: month/day/year (US English)', () => {
