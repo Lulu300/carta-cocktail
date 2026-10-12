@@ -8,7 +8,7 @@ effort: S
 status: todo
 owner: mixed
 depends_on: [C-35, E-10, E-27]
-touches: [frontend/src/i18n/index.ts, frontend/src/utils/localization.ts, frontend/src/utils/localization.test.ts, frontend/src/components/ui/LanguageSelector.tsx, frontend/src/components/ui/LanguageSelector.test.tsx, frontend/src/services/api.ts, frontend/src/services/api.test.ts, frontend/src/utils/dates.ts, frontend/src/utils/dates.test.ts, backend/src/utils/importDates.ts, backend/src/utils/importDates.test.ts]
+touches: [frontend/src/i18n/index.ts, frontend/src/i18n/index.test.ts, frontend/src/utils/localization.ts, frontend/src/utils/localization.test.ts, frontend/src/components/ui/LanguageSelector.tsx, frontend/src/components/ui/LanguageSelector.test.tsx, frontend/src/services/api.ts, frontend/src/services/api.test.ts, frontend/src/utils/dates.ts, frontend/src/utils/dates.test.ts, backend/src/utils/importDates.ts, backend/src/utils/importDates.test.ts]
 sources: []
 branch:
 pr:
@@ -43,7 +43,7 @@ Un admin britannique ne peut donc ni choisir le format jour/mois en anglais, ni 
 
 1. `frontend/src/i18n/index.ts` : ajouter `en-GB` à `SUPPORTED_LANGUAGES` et à `supportedLngs`, sans ressources propres (le repli d'i18next sert les traductions `en`). Le détecteur garde un code exact supporté (`en-GB`) et réduit les autres à leur langue de base. `<html lang>` reçoit le code complet (`en-GB`).
 2. `frontend/src/services/api.ts` : `Accept-Language` envoie le code choisi (`en-GB`), pas `resolvedLanguage`.
-3. `LanguageSelector` : trois entrées, « Français », « English (US) » (`en`), « English (UK) » (`en-GB`) ; drapeau américain pour `en`, britannique pour `en-GB` ; la langue courante est reconnue par son code exact.
+3. `LanguageSelector` : trois entrées, « Français », « English (US) » (`en`), « English (UK) » (`en-GB`) ; drapeau américain pour `en`, britannique pour `en-GB`. La langue courante est lue dans `i18n.language` et reconnue par son code exact : le composant calcule aujourd'hui `currentCode` à partir de `i18n.resolvedLanguage`, qui vaut `en` pour `en-GB`, comme dans `api.ts`.
 4. `frontend/src/utils/dates.ts` (E-27) : entrée `en-GB` (jour/mois, gabarit `dd/mm/yyyy`) dans la table de formats.
 5. `backend/src/utils/importDates.ts` (C-35) : entrée `en-GB` (`dayFirst`) dans `DAY_MONTH_ORDERS`.
 
@@ -61,7 +61,7 @@ Un admin britannique ne peut donc ni choisir le format jour/mois en anglais, ni 
 - `frontend/src/utils/dates.test.ts` : formats et gabarits `en-GB`.
 - `frontend/src/components/ui/LanguageSelector.test.tsx` : trois entrées, choix de `en-GB`, drapeaux.
 - `frontend/src/services/api.test.ts` : `Accept-Language: en-GB` quand English (UK) est choisi.
-- Test du détecteur : `en-GB` gardé, `fr-FR` réduit à `fr`.
+- `frontend/src/i18n/index.test.ts` : détecteur (`en-GB` gardé, `fr-FR` réduit à `fr`) et `<html lang>` (`en-GB`).
 
 ## Points d'attention
 
@@ -74,3 +74,4 @@ Un admin britannique ne peut donc ni choisir le format jour/mois en anglais, ni 
 ## Journal
 
 - 2026-10-12 : tâche créée par C-35, sur décision de l'humain (`en` = English (US), English (UK) plus tard).
+- 2026-10-13 : relecture de la PR #132 : `frontend/src/i18n/index.test.ts` ajouté à `touches`, `LanguageSelector` lit `i18n.language`.
