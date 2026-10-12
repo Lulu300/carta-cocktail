@@ -1,7 +1,10 @@
 # Literal tags in every FROM: Dependabot does not update a tag built from an ARG.
 
-# All dependencies, to compile the application
-FROM node:24.21-alpine AS deps
+# Compiles the application on the platform of the machine that runs the build
+# ($BUILDPLATFORM): the compiled JavaScript and the generated Prisma client do
+# not depend on the CPU, so the multi-platform release build compiles once,
+# natively, instead of once per platform under QEMU emulation.
+FROM --platform=$BUILDPLATFORM node:24.21-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 # The postinstall script generates the Prisma client from prisma/schema.prisma
@@ -9,18 +12,23 @@ COPY package*.json ./
 # schema alone is enough: a new migration does not invalidate this layer.
 COPY prisma/schema.prisma ./prisma/schema.prisma
 RUN npm ci
-
-FROM deps AS build
 COPY tsconfig.json ./
 COPY src ./src
 # Also compiles src/scripts/ (seed, integrity check): the image has no tsx
 RUN npm run build
 
-# Runtime dependencies only. Pruning keeps what `npm ci` installed and built for
-# this platform (better-sqlite3 binary, Prisma schema engine) without a second download.
+# Runtime dependencies only, installed for the target platform: they hold the
+# native better-sqlite3 binary and the Prisma schema engine. The first steps
+# repeat those of the build stage on purpose: when both platforms are the same
+# (local and CI builds), BuildKit runs them only once.
+# Pruning keeps what `npm ci` installed and built without a second download.
 # The runtime tree has no optional dependency of its own: --omit=optional drops the
 # optional peers that only the dev tooling uses (typescript, for @prisma/client and i18next).
-FROM deps AS prod-deps
+FROM node:24.21-alpine AS prod-deps
+WORKDIR /app
+COPY package*.json ./
+COPY prisma/schema.prisma ./prisma/schema.prisma
+RUN npm ci
 RUN npm prune --omit=dev --omit=optional
 
 FROM node:24.21-alpine AS runtime
@@ -48,6 +56,12 @@ ENV UPLOAD_DIR=/app/uploads
 USER node
 
 EXPOSE 3001
+
+# Version of the running backend, read by the application. The release workflow
+# passes the tag version (e.g. 1.12.0 or 1.12.0-rc.1); local and other builds
+# keep "dev". Declared last so a new version only rebuilds this layer.
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
 
 # Checks that the data folders are writable, backs up the database, applies the
 # Prisma migrations, seeds, then runs Node. A command given to `docker run`

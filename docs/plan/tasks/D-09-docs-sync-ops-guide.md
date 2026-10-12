@@ -94,6 +94,7 @@ Les `AGENTS.md` sont lus par chaque agent avant une tâche : une affirmation fau
   - `backend/AGENTS.md` (ligne 19) : « CI runs automatically on PRs: prisma generate → tsc → build → test → coverage check » oublie le lint, `db:check` et le build Docker ;
   - `frontend/AGENTS.md` (ligne 20) : « tsc → lint → build → test → coverage check » ; préciser `tsc -b`, le budget de bundle et le build Docker.
 - Transmis par B-08 (PR #110) : le commentaire `# Plan d'action : page de suivi générée par docs/plan/build.mjs` de `.gitignore` est encore en français ; le traduire en anglais.
+- Transmis par D-05 (PR #118) : le pipeline de release a changé, `README.md` (section « Release », tableau des tags), `AGENTS.md` (« CI/CD », Release) et `docs/plan/README.md` (« Releases ») ne le décrivent pas encore. À dire : la release lance la CI complète (`ci.yml` par `workflow_call`) avant de pousser une image ; images `linux/amd64` et `linux/arm64` ; une version finale publie `:X.Y.Z`, `:X.Y`, `:X` et `latest`, une pré-version `:X.Y.Z-rc.N` seulement ; SBOM et provenance attachées ; les deux images reçoivent `APP_VERSION` (`dev` hors release). Le paragraphe « Pulling release images » peut recommander `:<majeure>.<mineure>`.
 
 ## Journal
 
@@ -106,3 +107,4 @@ Les `AGENTS.md` sont lus par chaque agent avant une tâche : une affirmation fau
 - 2026-10-11 : décision humaine : D-09 passe après D-01, D-03, D-05 et C-05, ajoutées à `depends_on` comme le suggéraient les Points d'attention (D-02 déjà faite), pour documenter l'image finale et les backups en une fois. Dans le lot C-04, E-11, D-14, l'humain l'a remplacée par C-16 (`--ready` propose D-13 à cette place).
 - 2026-10-12 : relecture de B-08 (PR #110) : le point « `backend/AGENTS.md:151` » de « Problème constaté » est réglé (`@prisma/client` et `prisma` rangés en « Runtime (database) », plus de `ts-node`). Commentaire français de `.gitignore` ajouté aux Points d'attention (fichier ajouté à `touches`).
 - 2026-10-12 : relecture de D-04 (PR #112, seconde passe) : l'étape d'audit est bien dans `ci.yml`, Points d'attention mis à jour.
+- 2026-10-12 : D-05 (PR #118) transmet la description du nouveau pipeline de release (Points d'attention).

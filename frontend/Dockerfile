@@ -1,4 +1,7 @@
-FROM node:24.21-alpine AS build
+# Runs on the platform of the machine that runs the build ($BUILDPLATFORM): the
+# static files do not depend on the CPU, so the multi-platform release build
+# compiles them once, natively, instead of once per platform under QEMU.
+FROM --platform=$BUILDPLATFORM node:24.21-alpine AS build
 
 WORKDIR /app
 
