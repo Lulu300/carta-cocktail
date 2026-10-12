@@ -8,7 +8,7 @@ effort: S
 status: todo
 owner: agent
 depends_on: [C-03]
-touches: [backend/src/utils/translations.ts, backend/src/routes/settings.ts, backend/src/routes/categoryTypes.ts, backend/src/routes/shortages.ts, backend/src/routes/categories.ts, backend/src/routes/units.ts, backend/src/routes/ingredients.ts, backend/src/routes/bottles.ts, backend/src/routes/cocktails.ts, backend/src/routes/public.ts, backend/src/routes/menus.ts, backend/src/services/settingsService.ts, backend/src/services/categoryTypeService.ts, backend/src/i18n/]
+touches: [backend/src/utils/translations.ts, backend/src/routes/settings.ts, backend/src/routes/categoryTypes.ts, backend/src/routes/shortages.ts, backend/src/routes/categories.ts, backend/src/routes/units.ts, backend/src/routes/ingredients.ts, backend/src/routes/bottles.ts, backend/src/routes/cocktails.ts, backend/src/services/cocktail/, backend/src/routes/public.ts, backend/src/routes/menus.ts, backend/src/services/settingsService.ts, backend/src/services/categoryTypeService.ts, backend/src/i18n/]
 sources: ["01-backend-routes.md §M3", "01-backend-routes.md §M5", "01-backend-routes.md §R6", "02-backend-data-perf.md §2.1"]
 branch:
 pr:
@@ -80,3 +80,5 @@ Les traductions des noms (`nameTranslations`) sont stockées en chaîne JSON. L'
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-12 : C-33 (PR #127) déplace l'import de cocktails de `routes/cocktails.ts` vers `services/cocktail/cocktailImport.ts` : la copie d'`ensureCategoryType` et les 3 `JSON.stringify(nameTranslations)` (regroupés dans un `stringifyTranslations` local) y sont désormais ; `backend/src/services/cocktail/` ajouté à `touches`.
+
