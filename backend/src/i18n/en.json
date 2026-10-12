@@ -30,6 +30,8 @@
     "reorderIncomplete": "The new order must list every item of the menu",
     "reorderForeignIds": "The new order lists an item that is not in this menu",
     "sectionNotInMenu": "This section is not one of this menu's sections",
+    "unknownReference": "A recipe line names a unit, bottle, category or ingredient that does not exist (it may have just been deleted): reload the page and check the recipe",
+    "importUnresolved": "The recipe cannot be imported: some of its units, bottles, categories or ingredients are neither matched with an existing one nor created (a new bottle also needs its category)",
     "import": {
       "missingColumn": "The CSV file must have a name column and a capacityMl column",
       "invalidJson": "The file is not valid JSON",

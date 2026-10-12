@@ -169,6 +169,41 @@ describe('POST /api/cocktails', () => {
     expect(res.status).toBe(201);
     expect(res.body.tags).toBe('classic,fruity');
   });
+
+  it('should return 400 unknownReference with the line and the field for a unit that does not exist', async () => {
+    const lime = await seedIngredient({ name: 'Lime' });
+
+    const res = await request.post('/api/cocktails').set(authHeader()).send({
+      name: 'Broken',
+      ingredients: [{ quantity: 1, unitId: 99999, sourceType: 'INGREDIENT', ingredientId: lime.id }],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/does not exist/);
+    expect(res.body.details).toEqual([{ line: 0, field: 'unitId', id: 99999 }]);
+    expect(await prisma.cocktail.count()).toBe(0);
+  });
+
+  // Each case builds the source of the second line from an existing category id
+  it.each([
+    ['bottleId', () => ({ sourceType: 'BOTTLE', bottleId: 99999 })],
+    ['categoryId', () => ({ sourceType: 'CATEGORY', categoryId: 99999 })],
+    ['ingredientId', () => ({ sourceType: 'INGREDIENT', ingredientId: 99999 })],
+    ['preferredBottleIds', (categoryId: number) => ({ sourceType: 'CATEGORY', categoryId, preferredBottleIds: [99999] })],
+  ])('should return 400 unknownReference for a %s that does not exist', async (field, sourceOf) => {
+    const unit = await seedUnit();
+    const category = await seedCategory();
+
+    const res = await request.post('/api/cocktails').set(authHeader()).send({
+      name: 'Broken',
+      ingredients: [
+        { quantity: 1, unitId: unit.id, sourceType: 'CATEGORY', categoryId: category.id },
+        { quantity: 1, unitId: unit.id, ...sourceOf(category.id) },
+      ],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.details).toEqual([{ line: 1, field, id: 99999 }]);
+    expect(await prisma.cocktail.count()).toBe(0);
+  });
 });
 
 describe('PUT /api/cocktails/:id', () => {
@@ -290,6 +325,7 @@ describe('PUT /api/cocktails/:id', () => {
       instructions: [{ text: 'Replaced' }],
     });
     expect(res.status).toBe(400);
+    expect(res.body.details).toEqual([{ line: 0, field: 'unitId', id: 99999 }]);
 
     const after = await request.get(`/api/cocktails/${id}`).set(authHeader());
     expect(after.body.name).toBe('Full Recipe');
@@ -307,6 +343,7 @@ describe('PUT /api/cocktails/:id', () => {
       }],
     });
     expect(res.status).toBe(400);
+    expect(res.body.details).toEqual([{ line: 0, field: 'preferredBottleIds', id: 99999 }]);
 
     const after = await request.get(`/api/cocktails/${id}`).set(authHeader());
     expectRecipeIntact(after.body);
@@ -824,6 +861,25 @@ describe('POST /api/cocktails/import/confirm', () => {
     const unit = await prisma.unit.findUniqueOrThrow({ where: { abbreviation: 'Dash' } });
     expect(unit.name).toBe('Dash');
     expect(res.body.ingredients[0].unitId).toBe(unit.id);
+  });
+
+  it('should return 400 importUnresolved naming the unit when it is not resolved', async () => {
+    const res = await request.post('/api/cocktails/import/confirm').set(authHeader()).send({
+      recipe: {
+        version: 1,
+        cocktail: {
+          name: 'No Unit',
+          ingredients: [{ sourceType: 'INGREDIENT', sourceName: 'Lime', quantity: 1, unit: { abbreviation: 'cl' } }],
+        },
+      },
+      resolutions: { ingredients: { lime: { action: 'create', data: { name: 'Lime' } } } },
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/cannot be imported/);
+    expect(res.body.details).toEqual([{ line: 0, kind: 'unit', name: 'cl' }]);
+    expect(await prisma.cocktail.count()).toBe(0);
+    expect(await prisma.ingredient.count()).toBe(0);
   });
 
   it('should return 400 for a created bottle with remainingPercent above 100', async () => {
