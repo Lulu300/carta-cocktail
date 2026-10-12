@@ -5,13 +5,13 @@ phase: B
 lane: deps
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [B-04, B-05]
-touches: [frontend/package.json, frontend/package-lock.json, frontend/vite.config.ts, frontend/vitest.config.ts]
+touches: [frontend/package.json, frontend/package-lock.json, frontend/vite.config.ts, frontend/vitest.config.ts, .github/scripts/bundle-budget.mjs, .github/scripts/bundle-budget.test.mjs, AGENTS.md, frontend/AGENTS.md, README.md]
 sources: ["08-dependencies.md §3.3", "08-dependencies.md §5"]
-branch:
-pr:
+branch: chore/B-06-deps-vite
+pr: https://github.com/Lulu300/carta-cocktail/pull/105
 ---
 
 ## Décisions validées (2026-10-08)
@@ -41,11 +41,11 @@ Deux commits ou deux PR successives, pour isoler les régressions :
 
 ## Critères d'acceptation
 
-- [ ] Vite 8.3.x et plugin-react 6.1.x installés.
-- [ ] `npm run build`, `npm run lint`, `npm test` verts.
-- [ ] Import et export ZIP vérifiés manuellement (capture ou description dans la PR).
-- [ ] Taille du bundle avant/après dans la PR.
-- [ ] Cible navigateurs par défaut de Vite 8 conservée (décision validée).
+- [x] Vite 8.3.x et plugin-react 6.1.x installés.
+- [x] `npm run build`, `npm run lint`, `npm test` verts.
+- [x] Import et export ZIP vérifiés manuellement (capture ou description dans la PR).
+- [x] Taille du bundle avant/après dans la PR.
+- [x] Cible navigateurs par défaut de Vite 8 conservée (décision validée).
 
 ## Tests à ajouter ou adapter
 
@@ -60,3 +60,6 @@ Aucun test nouveau ; si `jszip` pose problème à l'exécution, ajouter un test 
 
 - 2026-10-08 : tâche créée à partir du rapport de dépendances.
 - 2026-10-08 : décisions validées par l'humain (voir « Décisions validées »).
+- 2026-10-12 : PR #105. Vite 8.3.4 puis plugin-react 6.1.2, en deux commits. `manualChunks` (forme objet) remplacé par `build.rolldownOptions.output.codeSplitting.groups`, avec `react-router` ajouté au groupe `vendor-react` (Rolldown ne le suit pas via `react-router-dom`). Chargement initial du menu public : 137,53 kB → 136,11 kB gzip, en 8 fichiers au lieu de 3. Hors `touches` : `.github/scripts/bundle-budget.mjs` et son test (le chunk `rolldown-runtime` n'a pas de source map), et la version de Vite dans `AGENTS.md`, `frontend/AGENTS.md` et `README.md`. Export puis import ZIP vérifiés dans Chrome headless sur le build de production et sur le serveur de dev, avec un vrai backend. Constat hors périmètre : tâche B-15 (fichiers de même nom écrasés dans l'export ZIP).
+- 2026-10-12 : Notes de version : aucune action requise ; cible navigateurs relevée de Safari/iOS 16.0 à 16.4 (Chrome/Edge 111, Firefox 114).
+- 2026-10-12 : relecture de la PR #105. `bundle-budget.mjs` n'exempte plus que le chunk `rolldown-runtime-*.js` (par son nom) : tout autre chunk préchargé sans source map fait échouer le contrôle, test ajouté. Commentaire dans `vite.config.ts` sur la présence de `react-router` dans `vendor-react`.
