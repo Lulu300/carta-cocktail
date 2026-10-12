@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Id, MenuIdParams, Position } from './common';
+import { Id, MenuIdParams, PathId, Position } from './common';
 
 export const MenuBottleCreate = z.object({
   menuId: Id,
@@ -20,6 +20,4 @@ export const MenuBottleExclusionCreate = z.object({
   bottleIds: z.array(Id).min(1),
 });
 
-export const MenuBottleExclusionParams = MenuIdParams.extend({
-  bottleId: z.coerce.number().int().positive(),
-});
+export const MenuBottleExclusionParams = MenuIdParams.extend({ bottleId: PathId });

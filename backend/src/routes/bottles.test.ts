@@ -970,13 +970,20 @@ describe('bottle menus', () => {
     return entries.map((entry) => entry.bottleId);
   }
 
-  /** Makes every insertion into a menu fail while `action` runs, as a failing sync would. */
-  async function withFailingMenuSync(action: () => Promise<void>): Promise<void> {
+  /**
+   * Sends a valid request while every insertion into a menu fails, as a failing sync would,
+   * and checks that the request failed in the sync.
+   */
+  async function sendWithFailingMenuSync(send: () => Promise<{ status: number; body: { details?: unknown } }>) {
     await prisma.$executeRawUnsafe(
       `CREATE TRIGGER fail_menu_sync BEFORE INSERT ON MenuBottle BEGIN SELECT RAISE(ABORT, 'simulated failure'); END`,
     );
     try {
-      await action();
+      const res = await send();
+      // Prisma reports a trigger abort as a foreign key violation (P2003), answered 400
+      // without details; a validation error would list its details[]
+      expect(res.status).toBe(400);
+      expect(res.body.details).toBeUndefined();
     } finally {
       await prisma.$executeRawUnsafe('DROP TRIGGER fail_menu_sync');
     }
@@ -1104,31 +1111,22 @@ describe('bottle menus', () => {
 
   it('should not create the bottle when the menu sync fails', async () => {
     const category = await seedCategory();
-    await withFailingMenuSync(async () => {
-      const res = await request.post('/api/bottles').set(authHeader())
-        .send({ name: 'Aperol', categoryId: category.id, capacityMl: 700, isApero: true, quantity: 2 });
-      expect(res.status).toBeGreaterThanOrEqual(400);
-    });
+    await sendWithFailingMenuSync(() => request.post('/api/bottles').set(authHeader())
+      .send({ name: 'Aperol', categoryId: category.id, capacityMl: 700, isApero: true, quantity: 2 }));
     expect(await prisma.bottle.count()).toBe(0);
   });
 
   it('should not update the bottle when the menu sync fails', async () => {
     const bottle = await seedBottle({ name: 'Old name' });
-    await withFailingMenuSync(async () => {
-      const res = await request.put(`/api/bottles/${bottle.id}`).set(authHeader())
-        .send({ name: 'New name', isApero: true });
-      expect(res.status).toBeGreaterThanOrEqual(400);
-    });
+    await sendWithFailingMenuSync(() => request.put(`/api/bottles/${bottle.id}`).set(authHeader())
+      .send({ name: 'New name', isApero: true }));
     expect(await prisma.bottle.findUniqueOrThrow({ where: { id: bottle.id } })).toMatchObject({ name: 'Old name', isApero: false });
   });
 
   it('should import nothing when the menu sync fails', async () => {
     await seedCategory({ name: 'Apero' });
-    await withFailingMenuSync(async () => {
-      const res = await request.post('/api/bottles/import/confirm').set(authHeader())
-        .send({ payload: importPayload([{ name: 'Aperol', isApero: true }]), resolutions: {} });
-      expect(res.status).toBeGreaterThanOrEqual(400);
-    });
+    await sendWithFailingMenuSync(() => request.post('/api/bottles/import/confirm').set(authHeader())
+      .send({ payload: importPayload([{ name: 'Aperol', isApero: true }]), resolutions: {} }));
     expect(await prisma.bottle.count()).toBe(0);
   });
 });
