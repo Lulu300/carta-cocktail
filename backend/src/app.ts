@@ -23,6 +23,7 @@ import shortageRoutes from './routes/shortages';
 import availabilityRoutes from './routes/availability';
 import settingsRoutes from './routes/settings';
 import backupRoutes from './routes/backup';
+import healthRoutes from './routes/health';
 
 const LOGIN_RATE_WINDOW_MS = 15 * 60_000;
 
@@ -36,6 +37,9 @@ app.set('trust proxy', config.trustProxy);
 // Middleware
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({ origin: config.corsOrigin || false }));
+// Before the request logger: the Docker healthcheck calls it every 30 s and would fill the logs.
+// Public, like /api/auth and /api/public: Docker calls it without a token.
+app.use('/api/health', healthRoutes);
 // Request logs would bury the test results
 if (process.env.NODE_ENV !== 'test') {
   app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));

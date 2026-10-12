@@ -5,13 +5,14 @@ phase: D
 lane: infra
 criticite: moyenne
 effort: S
-status: todo
+status: done
 owner: agent
+breaking: true
 depends_on: [A-04, D-01]
 touches: [backend/src/app.ts, backend/src/routes/health.ts, docker-compose.yml, docker-compose.prod.yml]
 sources: ["07-devops-history.md §2.7", "07-devops-history.md §2.8", "03-security.md §10"]
-branch:
-pr:
+branch: chore/D-03-healthchecks-compose
+pr: "#117"
 ---
 
 ## Décisions validées (2026-10-10)
@@ -69,13 +70,13 @@ Docker ne sait pas si le backend est prêt : il le considère démarré dès que
 
 ## Critères d'acceptation
 
-- [ ] `GET /api/health` renvoie 200 `{ status: 'ok', version }` sans token.
-- [ ] `GET /api/health` renvoie 503 si la requête SQL échoue.
-- [ ] Les appels à `/api/health` n'apparaissent pas dans les logs morgan.
-- [ ] `docker compose up -d --wait` rend la main quand les deux services sont `healthy`.
-- [ ] `docker compose ps` affiche `healthy` pour les deux services.
-- [ ] Avec le compose prod, `curl http://<hôte>:3001/api/health` échoue, `curl http://<hôte>/api/health` répond.
-- [ ] `npm test`, `npx tsc --noEmit` et la couverture passent dans `backend/`.
+- [x] `GET /api/health` renvoie 200 `{ status: 'ok', version }` sans token.
+- [x] `GET /api/health` renvoie 503 si la requête SQL échoue.
+- [x] Les appels à `/api/health` n'apparaissent pas dans les logs morgan.
+- [x] `docker compose up -d --wait` rend la main quand les deux services sont `healthy`.
+- [x] `docker compose ps` affiche `healthy` pour les deux services.
+- [x] Avec le compose prod, `curl http://<hôte>:3001/api/health` échoue, `curl http://<hôte>/api/health` répond.
+- [x] `npm test`, `npx tsc --noEmit` et la couverture passent dans `backend/`.
 
 ## Tests à ajouter ou adapter
 
@@ -95,3 +96,7 @@ Docker ne sait pas si le backend est prêt : il le considère démarré dès que
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-09 : point d'attention « Notes de version » (règle de D-11 décidée le 2026-10-09) : `breaking: true`, actions attendues, épinglage recommandé.
+- 2026-10-12 : PR #117. `GET /api/health` (singleton Prisma, `SELECT 1`, 200 `{ status, version }` ou 503 `{ status: 'unavailable' }`), montée avant `morgan` et sans `authMiddleware` ; `morgan` passait déjà en `combined` en production. Healthchecks backend et frontend dans les deux compose (frontend : `wget -qO /dev/null` pour ne pas copier la page dans le journal de santé), frontend en `depends_on … service_healthy`. Port 3001 : `expose` seul dans le compose prod, `127.0.0.1:3001:3001` dans le compose de build local. Pas de `start_interval` (Docker Engine ≥ 25 exigé, Compose le refuse sur les NAS plus anciens). Tests : `health.test.ts` (200 sans token, `APP_VERSION`, 503), couverture delta 100 %. Vérifié à la main avec Docker 29 : `up --wait` rend la main avec les deux services `healthy`, appels de santé absents des logs, compose prod sans liaison du port 3001 sur l'hôte et `/api/health` joignable via nginx. Banc de mise à jour non lancé : il utilise ses propres modèles compose (`layouts/*/compose-<génération>.yml`), qui publient `127.0.0.1::3001` pour joindre le backend ; aucun hook temporaire nécessaire. À la release, le hook de cette version peut ajouter une génération `official` avec les healthchecks en gardant cette publication. Doc laissée à D-09 (dépend de D-03) : README « Login limit behind a reverse proxy » (« The compose files publish the backend port 3001 ») et `AGENTS.md` section Docker (« Backend on port 3001 »).
+- Notes de version : `breaking: true`. Le compose prod ne publie plus le port 3001 du backend. Avant : (1) remplacer tout appel direct à `http://<hôte>:3001/api/...` ou `/uploads/...` (scripts, supervision) par `http://<hôte>:<port du frontend>/api/...` via nginx ; (2) un reverse proxy (SWAG, Traefik…) qui visait le port 3001 vise désormais le port du frontend ; si `TRUST_PROXY` est un nombre, l'augmenter de 1 (les requêtes traversent aussi nginx, sinon tous les clients partagent un seul compteur de connexion et 10 échecs bloquent tout le monde, admin compris, pendant 15 min) ; la valeur par défaut ne demande rien ; (3) un proxy qui joint `carta-cocktail-backend:3001` par un réseau Docker partagé n'est pas concerné (`expose` ne change rien entre conteneurs) ; (4) republier le port dans un `docker-compose.override.yml` limité à `127.0.0.1` (`"127.0.0.1:3001:3001"`) ne sert qu'aux processus de l'hôte lui-même : un proxy en conteneur ou sur une autre machine ne l'atteint pas (502) ; (5) un compose personnalisé reprend les blocs `healthcheck` et la condition `depends_on`. Après : `docker compose up -d --wait`, puis vérifier que `docker compose ps` affiche `healthy` pour les deux services et que `http://<hôte>:<port du frontend>/api/health` répond ; si le backend ne démarre pas, le frontend ne démarre pas non plus : lire `docker compose logs carta-cocktail-backend`, corriger, puis relancer `docker compose up -d`. Retour arrière vers une image antérieure (ou nouveau compose avec un tag plus ancien, ou compose récupéré sur `main` avant la publication de l'image `latest`) : l'image n'a pas `/api/health`, le backend reste `unhealthy` et le frontend ne démarre jamais ; revenir aussi au compose précédent, ou retirer le `healthcheck` du backend et la condition `depends_on`. Épinglage recommandé : `:<majeure>.<mineure>` (publié depuis D-05).
+- 2026-10-12 : relecture indépendante de la PR #117 (changements demandés). « Required actions » et ligne « Notes de version » complétées : `TRUST_PROXY` numérique +1 pour un reverse proxy qui visait le port 3001, surcharge `127.0.0.1` réservée aux processus de l'hôte (proxy en conteneur ou distant : viser le port du frontend ; réseau Docker partagé non concerné), retour arrière vers une image sans `/api/health`, port du frontend explicite. Comportement « un backend qui ne démarre pas empêche le frontend de démarrer » (conséquence de `service_healthy`) : décision humaine demandée, phrase « After upgrading » préparée. `APP_VERSION` vide renvoie aussi `dev` (`||`), test ajouté. Tâche D-25 créée (sondes du healthcheck frontend dans l'access log nginx).
+- 2026-10-12 : décision humaine « Accepter + documenter » : on garde `depends_on … condition: service_healthy`, même si un backend qui ne démarre pas empêche maintenant le frontend de démarrer (avant, nginx servait la SPA avec des erreurs d'API). La phrase « After upgrading » est conservée dans la PR et dans la ligne « Notes de version » (lire `docker compose logs carta-cocktail-backend`, corriger, relancer `docker compose up -d`). Rebasée sur `develop` après D-05 (PR #118), qui injecte `APP_VERSION` dans l'image backend (`dev` hors release) : `/api/health` renvoie la version du tag dans les images de release, et l'épinglage recommandé devient `:<majeure>.<mineure>`.
