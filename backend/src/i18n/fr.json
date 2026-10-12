@@ -20,7 +20,13 @@
     "backupSchemaTooNew": "Cette sauvegarde vient d’une version plus récente de Carta Cocktail : mettez l’application à jour avant de la restaurer",
     "tooManyAttempts": "Trop de tentatives de connexion échouées : réessayez dans quelques minutes",
     "passwordTooShort": "Le nouveau mot de passe doit contenir au moins 12 caractères",
-    "invalidEmail": "L’adresse email n’est pas valide"
+    "invalidEmail": "L’adresse email n’est pas valide",
+    "bottleNotAllowedInMenu": "Cette bouteille ne peut pas aller dans cette carte : seules les bouteilles cochées pour le type de la carte (apéritif ou digestif) le peuvent",
+    "cannotSyncCocktailMenu": "Une carte de cocktails n'a pas de bouteilles à synchroniser",
+    "cannotSyncPersonalMenu": "Seules les cartes Apéritifs et Digestifs suivent les bouteilles : ajoutez à la main les bouteilles de cette carte",
+    "systemMenuBottlesManaged": "Les bouteilles de cette carte suivent leur case apéritif / digestif : retirez une bouteille ou remettez une bouteille retirée",
+    "exclusionsSystemMenuOnly": "Seules les cartes Apéritifs et Digestifs gardent une liste de bouteilles retirées",
+    "menuTypeImmutable": "Le type d'une carte ne peut plus changer après sa création"
   },
   "auth": {
     "loginSuccess": "Connexion réussie",
@@ -57,6 +63,12 @@
     "created": "Carte créée avec succès",
     "updated": "Carte mise à jour avec succès",
     "deleted": "Carte supprimée avec succès"
+  },
+  "menuBottles": {
+    "deleted": "Bouteille retirée de la carte",
+    "synced": "Carte synchronisée avec les bouteilles",
+    "excluded": "Bouteilles retirées de la carte",
+    "restored": "Bouteille remise dans la carte"
   },
   "settings": {
     "updated": "Paramètres mis à jour avec succès",

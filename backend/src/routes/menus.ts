@@ -6,19 +6,12 @@ import { BadRequestError, ForbiddenError, NotFoundError } from '../errors';
 import { valid, validate } from '../validation/validate';
 import { IdParams, idRequest } from '../validation/common';
 import { MenuCreate, MenuUpdate } from '../validation/menus';
+import { assertBottlesAllowed, isSystemMenu } from '../services/menuSyncService';
 
 const router = Router();
 
-// Menus created by the seed and kept in sync with the bottles' apero/digestif flags.
-// Their slug and type are what the sync and the delete protection rely on.
-const SYSTEM_MENU_SLUGS = ['aperitifs', 'digestifs'];
-
 interface MenuItemInput {
   menuSectionId?: number | null;
-}
-
-function isSystemMenu(menu: Pick<Menu, 'slug'>): boolean {
-  return SYSTEM_MENU_SLUGS.includes(menu.slug);
 }
 
 function normalizeSlug(slug: string): string {
@@ -119,14 +112,20 @@ router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Respo
   const existing = await prisma.menu.findUnique({ where: { id: menuId } });
   if (!existing) throw new NotFoundError();
 
-  if (isSystemMenu(existing) && changesSystemMenuIdentity(existing, slug, type)) {
-    throw new ForbiddenError('errors.cannotModifySystemMenu');
+  if (isSystemMenu(existing)) {
+    if (changesSystemMenuIdentity(existing, slug, type)) throw new ForbiddenError('errors.cannotModifySystemMenu');
+    // Its bottles follow their flags: removing one goes through an exclusion
+    if (bottles) throw new BadRequestError('errors.systemMenuBottlesManaged');
+  } else if (type && type !== existing.type) {
+    // Another type would leave cocktails in a bottle menu, or bottles not checked for the new type
+    throw new BadRequestError('errors.menuTypeImmutable');
   }
 
   // One transaction: a failure at any step (foreign section, duplicate slug...)
   // must leave the existing associations untouched.
   const menu = await prisma.$transaction(async (tx) => {
     await assertSectionsBelongToMenu(tx, menuId, [...(cocktails ?? []), ...(bottles ?? [])]);
+    if (bottles) await assertBottlesAllowed(tx, existing, bottles.map((b) => b.bottleId));
 
     if (cocktails) {
       await tx.menuCocktail.deleteMany({ where: { menuId } });

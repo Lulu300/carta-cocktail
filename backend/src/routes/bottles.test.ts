@@ -3,6 +3,7 @@ import AdmZip from 'adm-zip';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
   request, authHeader, prisma, seedCategory, seedBottle, seedUnit, seedCocktailUsing,
+  seedMenu, seedMenuSection, addBottleToMenu, excludeBottleFromMenu, findSystemMenu,
 } from '../test/helpers';
 
 beforeAll(async () => { await setupTestDatabase(); });
@@ -960,5 +961,174 @@ describe('POST /api/bottles/import/confirm', () => {
     expect(res.status).toBe(201);
     const types = await prisma.categoryType.findMany({ where: { name: 'BITTER' } });
     expect(types).toHaveLength(1);
+  });
+});
+
+describe('bottle menus', () => {
+  async function bottleIdsOf(menuId: number): Promise<number[]> {
+    const entries = await prisma.menuBottle.findMany({ where: { menuId }, orderBy: { position: 'asc' } });
+    return entries.map((entry) => entry.bottleId);
+  }
+
+  /** Makes every insertion into a menu fail while `action` runs, as a failing sync would. */
+  async function withFailingMenuSync(action: () => Promise<void>): Promise<void> {
+    await prisma.$executeRawUnsafe(
+      `CREATE TRIGGER fail_menu_sync BEFORE INSERT ON MenuBottle BEGIN SELECT RAISE(ABORT, 'simulated failure'); END`,
+    );
+    try {
+      await action();
+    } finally {
+      await prisma.$executeRawUnsafe('DROP TRIGGER fail_menu_sync');
+    }
+  }
+
+  function importPayload(bottles: { name: string; isApero: boolean; quantity?: number }[]) {
+    return {
+      version: 1,
+      categories: [],
+      bottles: bottles.map(({ name, isApero, quantity = 1 }) => ({
+        name, categoryName: 'Apero', capacityMl: 700, remainingPercent: 100,
+        alcoholPercentage: null, purchasePrice: null, location: null, openedAt: null,
+        isApero, isDigestif: false, quantity,
+      })),
+    };
+  }
+
+  it('should keep a bottle emptied without its flags in its menus', async () => {
+    const aperitifs = await findSystemMenu('aperitifs');
+    const personal = await seedMenu({ type: 'APEROS' });
+    const bottle = await seedBottle({ isApero: true });
+    await addBottleToMenu(aperitifs.id, bottle.id);
+    await addBottleToMenu(personal.id, bottle.id);
+
+    const res = await request.put(`/api/bottles/${bottle.id}`).set(authHeader()).send({ remainingPercent: 0 });
+
+    expect(res.status).toBe(200);
+    expect(await bottleIdsOf(aperitifs.id)).toEqual([bottle.id]);
+    expect(await bottleIdsOf(personal.id)).toEqual([bottle.id]);
+  });
+
+  it('should keep the place, section and hidden state of a bottle emptied then refilled', async () => {
+    const aperitifs = await findSystemMenu('aperitifs');
+    const personal = await seedMenu({ type: 'APEROS' });
+    const bottle = await seedBottle({ isApero: true });
+    for (const menu of [aperitifs, personal]) {
+      const section = await seedMenuSection(menu.id, { name: 'Bitters' });
+      await addBottleToMenu(menu.id, bottle.id, { position: 2, isHidden: true, menuSectionId: section.id });
+    }
+    const before = await prisma.menuBottle.findMany({ where: { bottleId: bottle.id }, orderBy: { menuId: 'asc' } });
+
+    for (const remainingPercent of [0, 100]) {
+      await request.put(`/api/bottles/${bottle.id}`).set(authHeader())
+        .send({ remainingPercent, isApero: true, isDigestif: false });
+    }
+
+    const after = await prisma.menuBottle.findMany({ where: { bottleId: bottle.id }, orderBy: { menuId: 'asc' } });
+    expect(after).toEqual(before);
+  });
+
+  it('should remove an unchecked bottle from every APEROS menu, not from the digestifs', async () => {
+    const aperitifs = await findSystemMenu('aperitifs');
+    const digestifs = await findSystemMenu('digestifs');
+    const personal = await seedMenu({ type: 'APEROS' });
+    const bottle = await seedBottle({ isApero: true, isDigestif: true });
+    await addBottleToMenu(aperitifs.id, bottle.id);
+    await addBottleToMenu(digestifs.id, bottle.id);
+    await addBottleToMenu(personal.id, bottle.id);
+
+    await request.put(`/api/bottles/${bottle.id}`).set(authHeader()).send({ isApero: false });
+
+    expect(await bottleIdsOf(aperitifs.id)).toEqual([]);
+    expect(await bottleIdsOf(personal.id)).toEqual([]);
+    expect(await bottleIdsOf(digestifs.id)).toEqual([bottle.id]);
+  });
+
+  it('should delete the exclusions of a deleted bottle', async () => {
+    const aperitifs = await findSystemMenu('aperitifs');
+    const bottle = await seedBottle({ isApero: true });
+    await excludeBottleFromMenu(aperitifs.id, bottle.id);
+
+    const res = await request.delete(`/api/bottles/${bottle.id}`).set(authHeader());
+
+    expect(res.status).toBe(200);
+    expect(await prisma.menuBottleExclusion.count()).toBe(0);
+  });
+
+  it('should delete the exclusions of a deleted menu', async () => {
+    const aperitifs = await findSystemMenu('aperitifs');
+    const bottle = await seedBottle({ isApero: true });
+    await excludeBottleFromMenu(aperitifs.id, bottle.id);
+
+    // The API refuses to delete a system menu: this checks the database cascade
+    await prisma.menu.delete({ where: { id: aperitifs.id } });
+
+    expect(await prisma.menuBottleExclusion.count()).toBe(0);
+  });
+
+  it('should add imported bottles to the aperitifs menu only, not to a personal one', async () => {
+    await seedCategory({ name: 'Apero' });
+    const aperitifs = await findSystemMenu('aperitifs');
+    const personal = await seedMenu({ type: 'APEROS' });
+
+    const res = await request.post('/api/bottles/import/confirm').set(authHeader())
+      .send({ payload: importPayload([{ name: 'Aperol', isApero: true, quantity: 2 }, { name: 'Lillet', isApero: true }]), resolutions: {} });
+
+    expect(res.status).toBe(201);
+    expect(await bottleIdsOf(aperitifs.id)).toHaveLength(3);
+    expect(await bottleIdsOf(personal.id)).toEqual([]);
+  });
+
+  it('should give the same menus whatever the route: POST, PUT, import or sync', async () => {
+    const category = await seedCategory({ name: 'Apero' });
+    const aperitifs = await findSystemMenu('aperitifs');
+    const excluded = await seedBottle({ name: 'Excluded', categoryId: category.id, isApero: true });
+    await excludeBottleFromMenu(aperitifs.id, excluded.id);
+
+    const posted = await request.post('/api/bottles').set(authHeader())
+      .send({ name: 'Posted', categoryId: category.id, capacityMl: 700, remainingPercent: 0, isApero: true });
+    const edited = await seedBottle({ name: 'Edited', categoryId: category.id });
+    await request.put(`/api/bottles/${edited.id}`).set(authHeader()).send({ isApero: true, remainingPercent: 0 });
+    await request.post('/api/bottles/import/confirm').set(authHeader())
+      .send({ payload: importPayload([{ name: 'Imported', isApero: true }]), resolutions: {} });
+    await request.put(`/api/bottles/${excluded.id}`).set(authHeader()).send({ isApero: true });
+    const viaRoutes = await bottleIdsOf(aperitifs.id);
+
+    const sync = await request.post(`/api/menu-bottles/menu/${aperitifs.id}/sync`).set(authHeader());
+
+    expect(sync.body).toMatchObject({ added: 0, removed: 0 });
+    expect(viaRoutes).toHaveLength(3);
+    expect(viaRoutes).toContain(posted.body.id);
+    expect(viaRoutes).toContain(edited.id);
+    expect(viaRoutes).not.toContain(excluded.id);
+  });
+
+  it('should not create the bottle when the menu sync fails', async () => {
+    const category = await seedCategory();
+    await withFailingMenuSync(async () => {
+      const res = await request.post('/api/bottles').set(authHeader())
+        .send({ name: 'Aperol', categoryId: category.id, capacityMl: 700, isApero: true, quantity: 2 });
+      expect(res.status).toBeGreaterThanOrEqual(400);
+    });
+    expect(await prisma.bottle.count()).toBe(0);
+  });
+
+  it('should not update the bottle when the menu sync fails', async () => {
+    const bottle = await seedBottle({ name: 'Old name' });
+    await withFailingMenuSync(async () => {
+      const res = await request.put(`/api/bottles/${bottle.id}`).set(authHeader())
+        .send({ name: 'New name', isApero: true });
+      expect(res.status).toBeGreaterThanOrEqual(400);
+    });
+    expect(await prisma.bottle.findUniqueOrThrow({ where: { id: bottle.id } })).toMatchObject({ name: 'Old name', isApero: false });
+  });
+
+  it('should import nothing when the menu sync fails', async () => {
+    await seedCategory({ name: 'Apero' });
+    await withFailingMenuSync(async () => {
+      const res = await request.post('/api/bottles/import/confirm').set(authHeader())
+        .send({ payload: importPayload([{ name: 'Aperol', isApero: true }]), resolutions: {} });
+      expect(res.status).toBeGreaterThanOrEqual(400);
+    });
+    expect(await prisma.bottle.count()).toBe(0);
   });
 });

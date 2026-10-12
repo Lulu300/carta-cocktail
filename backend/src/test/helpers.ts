@@ -351,3 +351,13 @@ export async function addCocktailToMenu(menuId: number, cocktailId: number, opti
 export async function addBottleToMenu(menuId: number, bottleId: number, options: MenuEntryOptions = {}) {
   return prisma.menuBottle.create({ data: { menuId, bottleId, ...menuEntryData(options) } });
 }
+
+/** One of the two system menus that seedRequiredData creates. */
+export async function findSystemMenu(slug: 'aperitifs' | 'digestifs') {
+  return prisma.menu.findUniqueOrThrow({ where: { slug } });
+}
+
+/** Records that the admin removed the bottle from a system menu, as `DELETE /menu-bottles/:id` does. */
+export async function excludeBottleFromMenu(menuId: number, bottleId: number) {
+  return prisma.menuBottleExclusion.create({ data: { menuId, bottleId } });
+}

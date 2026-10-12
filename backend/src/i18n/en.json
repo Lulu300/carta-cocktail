@@ -20,7 +20,13 @@
     "backupSchemaTooNew": "This backup comes from a newer version of Carta Cocktail: update the application before restoring it",
     "tooManyAttempts": "Too many failed login attempts: try again in a few minutes",
     "passwordTooShort": "The new password must be at least 12 characters long",
-    "invalidEmail": "The email address is not valid"
+    "invalidEmail": "The email address is not valid",
+    "bottleNotAllowedInMenu": "This bottle cannot go in this menu: only bottles checked for the menu's type (aperitif or digestif) can",
+    "cannotSyncCocktailMenu": "A cocktail menu has no bottles to synchronize",
+    "cannotSyncPersonalMenu": "Only the Aperitifs and Digestifs menus follow the bottles: add the bottles of this menu by hand",
+    "systemMenuBottlesManaged": "The bottles of this menu follow their aperitif / digestif box: remove a bottle or put a removed one back instead",
+    "exclusionsSystemMenuOnly": "Only the Aperitifs and Digestifs menus keep a list of removed bottles",
+    "menuTypeImmutable": "The type of a menu cannot be changed after its creation"
   },
   "auth": {
     "loginSuccess": "Login successful",
@@ -57,6 +63,12 @@
     "created": "Menu created successfully",
     "updated": "Menu updated successfully",
     "deleted": "Menu deleted successfully"
+  },
+  "menuBottles": {
+    "deleted": "Bottle removed from the menu",
+    "synced": "Menu synchronized with the bottles",
+    "excluded": "Bottles removed from the menu",
+    "restored": "Bottle put back in the menu"
   },
   "settings": {
     "updated": "Settings updated successfully",

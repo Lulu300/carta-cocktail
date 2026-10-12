@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
   request, authHeader, getAuthToken, prisma, seedCocktail, seedCategory, seedBottle, seedUnit, seedIngredient,
+  seedMenu,
 } from '../test/helpers';
 
 beforeAll(async () => { await setupTestDatabase(); });
@@ -591,6 +592,46 @@ describe('GET /api/public/menus/:slug - menu with cocktails and bottles', () => 
     expect(res.body.bottles[0].bottle.location).toBe('B57');
     expect(res.body.bottles[0].bottle.capacityMl).toBe(700);
     expect(res.body.bottles[0].bottle.categoryId).toBe(category.id);
+  });
+});
+
+describe('GET /api/public/menus/:slug - bottle menus', () => {
+  async function createBottle(name: string, remainingPercent: number) {
+    const category = (await prisma.category.findFirst()) ?? (await seedCategory());
+    const res = await request.post('/api/bottles').set(authHeader())
+      .send({ name, categoryId: category.id, capacityMl: 700, remainingPercent, isApero: true });
+    return res.body as { id: number };
+  }
+
+  async function publicBottleNames(slug: string): Promise<string[]> {
+    const res = await request.get(`/api/public/menus/${slug}`);
+    expect(res.status).toBe(200);
+    return res.body.bottles.map((mb: { bottle: { name: string } }) => mb.bottle.name);
+  }
+
+  it('should never show an empty checked bottle, in the system menu or a personal one', async () => {
+    await prisma.menu.update({ where: { slug: 'aperitifs' }, data: { isPublic: true } });
+    const personal = await seedMenu({ slug: 'summer', type: 'APEROS', isPublic: true });
+    await createBottle('Aperol', 100);
+    const empty = await createBottle('Campari', 0);
+    await request.post('/api/menu-bottles').set(authHeader()).send({ menuId: personal.id, bottleId: empty.id });
+
+    expect(await publicBottleNames('aperitifs')).toEqual(['Aperol']);
+    expect(await publicBottleNames('summer')).toEqual([]);
+    // Still listed, hidden from guests only while empty
+    expect(await prisma.menuBottle.count({ where: { bottleId: empty.id } })).toBe(2);
+  });
+
+  it('should not show a bottle excluded from the system menu', async () => {
+    const aperitifs = await prisma.menu.update({ where: { slug: 'aperitifs' }, data: { isPublic: true } });
+    await createBottle('Aperol', 100);
+    const excluded = await createBottle('Lillet', 100);
+    const entry = await prisma.menuBottle.findFirstOrThrow({ where: { menuId: aperitifs.id, bottleId: excluded.id } });
+    await request.delete(`/api/menu-bottles/${entry.id}`).set(authHeader());
+
+    await request.post(`/api/menu-bottles/menu/${aperitifs.id}/sync`).set(authHeader());
+
+    expect(await publicBottleNames('aperitifs')).toEqual(['Aperol']);
   });
 });
 
