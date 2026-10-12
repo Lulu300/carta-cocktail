@@ -8,9 +8,9 @@ effort: S
 status: todo
 owner: agent
 depends_on: [E-05, E-06, E-07, E-08]
-touches: [frontend/src/i18n/locales/, frontend/src/pages/, frontend/src/components/, frontend/eslint.config.js, frontend/package.json, frontend/package-lock.json]
+touches: [frontend/src/i18n/locales/, frontend/src/pages/, frontend/src/components/, frontend/src/utils/localization.ts, frontend/src/utils/formatPrice.ts, frontend/src/i18n/locales.test.ts, frontend/eslint.config.js, frontend/package.json, frontend/package-lock.json]
 sources: ["05-frontend-archi.md §7", "06-frontend-ux-perf.md §2"]
-branch:
+branch: feature/E-10-frontend-i18n-strings
 pr:
 ---
 
@@ -91,3 +91,4 @@ Autres constats :
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-12 : revue de la PR #107 (E-07) : `i18n/index.ts` importe `en.json` et `fr.json` en entier, donc toutes les chaînes admin des deux langues partent dans le premier chargement de la carte publique (~37 kB de JSON brut ; les clés `menus.*` d'E-07 ont pris +1 kB gzip). Marge du budget de 140 kB après E-07 et Vite 8 : 2,7 kB. Scinder les locales en paquets public et admin (`i18n.addResourceBundle` depuis le chunk admin) ou ne charger que la langue active : à traiter ici ou dans une nouvelle tâche E si le périmètre devient trop gros.
 - 2026-10-12 : relecture d'E-09 (PR #128) : emplacements actuels de textes en dur relevés par la relecture (une partie de ceux du tableau pour `BottlesPage.tsx` a changé de fichier depuis E-05) : `BottlesPage.tsx:91` (« Alcool »), `components/admin/bottles/BottleFormModal.tsx:102` (« Alcool % (vol.) ») et `:121` (« Utilisation »), `IngredientsPage.tsx:254` (« Icône (optionnel) »), `components/ui/UnitConverter.tsx:76` (« Unité originale »). Recompter avant de commencer.
+- 2026-10-12 : inventaire refait (`grep` de l'étape 1, hors tests). Avant : 20 lignes, dont 16 textes réels (4 faux positifs : `Promise<void>`, `assignRef<T>`) ; la règle `i18next/no-literal-string` en `jsx-text-only` relevait 19 erreurs. S'y ajoutaient les textes en dur hors JSX : en-têtes de colonnes, `label`, `hint`, libellés de type de carte, « bouteille(s) », « dose/doses », « Français »/« English ». Après : 8 lignes, les 4 faux positifs et 4 `placeholder` sans langue (`0.00`, `40`, `GARNISH, MIXER...`, `admin@carta.local`) ; 0 erreur de lint. Ajouts hors `touches` : `utils/localization.ts` (`LANGUAGE_NAMES`), `utils/formatPrice.ts` (prix via `Intl.NumberFormat`), `i18n/locales.test.ts`. `home.*Count` deviennent `menus.*Count` (partagés par l'accueil et la liste admin) ; `public.capacityMl`, `public.alcoholPercentage` et `menus.bottles.abv` deviennent `units.ml` et `units.abv`. 18 clés mortes supprimées, dont `cocktails.importWizard.invalidVersion` et `summary` notées au Journal d'E-14. Budget du chargement public : 140,09 kB pour 140 kB (139,94 kB avant) ; les deux locales partent dans le chunk `api`. Question posée à l'humain avant de pousser.
