@@ -5,13 +5,13 @@ phase: D
 lane: infra
 criticite: moyenne
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [B-01, C-01, D-10]
-touches: [backend/Dockerfile, backend/package.json, backend/docker-entrypoint.sh]
+touches: [backend/Dockerfile, backend/package.json, backend/package-lock.json, backend/docker-entrypoint.sh, backend/prisma.config.ts, backend/prisma/seed.ts, backend/scripts/check-integrity.ts, backend/src/checkIntegrityScript.test.ts, backend/src/scripts/, backend/vitest.config.ts, .github/workflows/ci.yml, backend/AGENTS.md, README.md, docs/plan/tasks/C-18-failed-migration-recovery.md, docs/plan/tasks/C-19-imports-case-insensitive-names.md, docs/plan/tasks/D-16-production-log-noise.md]
 sources: ["07-devops-history.md §2.5", "07-devops-history.md §2.6", "03-security.md §11"]
-branch:
-pr:
+branch: chore/D-01-backend-dockerfile
+pr: "#108"
 ---
 
 ## Décisions validées (2026-10-10)
@@ -95,14 +95,14 @@ L'image backend publiée sur ghcr.io est celle qui tourne sur le NAS. Elle embar
 
 ## Critères d'acceptation
 
-- [ ] `docker build backend/` réussit depuis un checkout qui contient un `node_modules` macOS et un `.env` local.
-- [ ] `docker run --rm --entrypoint sh <image> -c 'ls node_modules | grep -E "^(vitest|typescript|tsx|nodemon|ts-node)$"'` ne renvoie rien.
-- [ ] `docker run --rm --entrypoint ls <image> /app` ne montre ni `.env`, ni `src`, ni base `.db`.
-- [ ] Le processus Node tourne sous l'utilisateur `node` (`docker compose exec carta-cocktail-backend ps -o user,args`).
-- [ ] `docker compose stop carta-cocktail-backend` rend la main en moins de 3 s.
-- [ ] Le conteneur démarre sur un volume `db-data` existant créé par l'ancienne image (fichiers root) et l'admin peut se connecter.
-- [ ] `npm test`, `npx tsc --noEmit` et `npm run build` passent dans `backend/`.
-- [ ] Taille de l'image notée dans la PR, nettement inférieure à l'actuelle.
+- [x] `docker build backend/` réussit depuis un checkout qui contient un `node_modules` macOS et un `.env` local.
+- [x] `docker run --rm --entrypoint sh <image> -c 'ls node_modules | grep -E "^(vitest|typescript|tsx|nodemon|ts-node)$"'` ne renvoie rien.
+- [x] `docker run --rm --entrypoint ls <image> /app` ne montre ni `.env`, ni `src`, ni base `.db`. Écart : `src/` ne contient que `lib/databasePath.ts`, chargé par `prisma.config.ts` (C-15) pour la CLI Prisma (voir Journal).
+- [x] Le processus Node tourne sous l'utilisateur `node` (`docker compose exec carta-cocktail-backend ps -o user,args`).
+- [x] `docker compose stop carta-cocktail-backend` rend la main en moins de 3 s.
+- [x] Le conteneur démarre sur un volume `db-data` existant créé par l'ancienne image (fichiers root) et l'admin peut se connecter.
+- [x] `npm test`, `npx tsc --noEmit` et `npm run build` passent dans `backend/`.
+- [x] Taille de l'image notée dans la PR, nettement inférieure à l'actuelle.
 
 ## Tests à ajouter ou adapter
 
@@ -129,3 +129,6 @@ L'image backend publiée sur ghcr.io est celle qui tourne sur le NAS. Elle embar
 - 2026-10-09 : point d'attention « Notes de version » (règle de D-11 décidée le 2026-10-09) : `breaking: true`, actions attendues, épinglage recommandé.
 - 2026-10-09 : C-01 (revue de la PR #44) transmet `exec "$@"` et le SIGTERM pendant les migrations (Points d'attention).
 - 2026-10-12 : C-15 (PR #103) : le `postinstall` du backend lance `prisma generate` et a besoin de la CLI `prisma`, comme l'entrypoint : garder `prisma` dans l'image ou générer dans le stage de build. L'étape « Generate Prisma client » de `ci.yml` refait ce que fait le `postinstall` : la retirer au passage.
+- 2026-10-12 : fait (PR #108). Dockerfile en quatre étapes (`deps`, `build`, `prod-deps` par `npm prune --omit=dev --omit=optional`, `runtime` `node:24.21-alpine` avec tini et su-exec, `NODE_ENV=production`, sans `CMD`). Écarts au plan : (1) pas de `build:seed` : `tsc prisma/seed.ts --outDir dist/seed` recompile tout `src/` sous `dist/seed/src/` et `PRISMA_DIR` y pointe vers `dist/seed/prisma` ; le seed et le contrôle d'intégrité passent dans `src/scripts/` et `npm run build` les compile (`dist/scripts/seed.js`, `dist/scripts/check-integrity.js`), exclus de la couverture comme `src/index.ts` ; (2) `prisma` passe en `dependencies` (CLI de l'entrypoint et du `postinstall`), `nodemon` et `ts-node` étaient déjà partis ; (3) `--omit=optional` retire `typescript`, pair optionnel de `@prisma/client`, `i18next` et `prisma`, que `--omit=dev` garde ; (4) `prisma.config.ts` importe `src/lib/databasePath.ts` (C-15) : l'image garde ce seul fichier de `src/`, la CLI le charge en TypeScript (jiti). Entrypoint : en root, `chown` vers `node` des seuls fichiers qui ne lui appartiennent pas (dossier de la base et `UPLOAD_DIR`, jamais `/`, avertissement si le `chown` échoue), puis `su-exec node` ; une commande passée au conteneur s'exécute à la place des étapes de démarrage ; un SIGTERM pendant la mise à jour de la base attend la fin de la commande en cours puis sort avant le seed. CI : étape « Generate Prisma client » retirée (le `postinstall` le fait). Fichiers ajoutés à `touches` : lockfile, `prisma.config.ts`, déplacements du seed et du contrôle d'intégrité, `vitest.config.ts`, `ci.yml`, `backend/AGENTS.md`, `README.md`, et C-18, C-19, D-16 (chemin du seed, notes transmises).
+- 2026-10-12 : vérifications manuelles (détail dans la PR) : build depuis un checkout avec `node_modules` macOS et `.env` ; image 164 Mo compressée / 719 Mo sur disque contre 361 Mo / 1,29 Go (develop, arm64) ; Node sous `node` ; arrêt en 0,2 s ; reprise de volumes écrits en root par 1.4.0 ; jeu d'essai réel : migrations sans erreur, comptes de lignes identiques, contrôle d'intégrité par la nouvelle commande ; banc `friend` et `official` 1.4.0 → 1.11.0 → local OK en naïf et conforme.
+- 2026-10-12 : Notes de version : `breaking: true`. Le backend tourne sous l'utilisateur `node` (uid 1000). Avant : sauvegarder les volumes `db-data` et `uploads` (ou les dossiers montés). Après : vérifier dans les logs que le conteneur démarre (`API running on port`) ; au premier démarrage, l'entrypoint donne les fichiers des volumes à `node`. Compose qui force `user:` : `chown -R` des volumes vers cet uid avant de démarrer (commande dans la PR). Contrôle d'intégrité : `docker run --rm -v "$PWD/carta-db-copy:/data" -e DATABASE_URL=file:/data/carta_cocktail.db --entrypoint node ghcr.io/lulu300/carta-cocktail/backend:<version> dist/scripts/check-integrity.js` (l'ancienne commande `npx tsx scripts/check-integrity.ts` ne marche plus avec cette image). `docker compose run carta-cocktail-backend <commande>` lance la commande sous `node` sans migrer. Épinglage : `:<version>` (avant D-05).
