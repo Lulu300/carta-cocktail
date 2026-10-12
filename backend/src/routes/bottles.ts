@@ -47,9 +47,9 @@ function duplicateKey(name: string, capacityMl: number, categoryName: string): s
   return `${name.toLowerCase()}|${capacityMl}|${categoryName.toLowerCase()}`;
 }
 
-function parseUploadedFile(file: Express.Multer.File): NormalizedImportPayload {
+function parseUploadedFile(file: Express.Multer.File, language: string): NormalizedImportPayload {
   try {
-    return parseImportFile(file.originalname || '', file.buffer);
+    return parseImportFile(file.originalname || '', file.buffer, language);
   } catch (err) {
     if (!(err instanceof ImportParseError)) throw err;
     throw new BadRequestError(`errors.import.${err.code}`, { code: err.code, ...err.params });
@@ -60,7 +60,8 @@ router.post('/import/preview', importUpload.single('file'), async (req: AuthRequ
   if (!req.file) throw new BadRequestError();
 
   // The rows left out are listed apart: the payload goes back unchanged to /import/confirm
-  const { errors, ...payload } = parseUploadedFile(req.file);
+  // A date typed in a spreadsheet is read in the order of the app's language (Accept-Language)
+  const { errors, ...payload } = parseUploadedFile(req.file, req.language);
 
   const allCategories = await prisma.category.findMany();
   const allBottles = await prisma.bottle.findMany({ include: { category: true } });

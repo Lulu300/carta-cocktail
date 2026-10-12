@@ -1,10 +1,11 @@
 import AdmZip from 'adm-zip';
 import { z } from 'zod';
-import { NullableDate, Percent, Translations } from '../validation/common';
+import { Percent, Translations } from '../validation/common';
 import { AlcoholPercentage, CapacityMl, PurchasePrice } from '../validation/bottles';
 import { DesiredStock } from '../validation/categories';
 import { MAX_IMPORT_BOTTLES, MAX_IMPORT_ROWS, totalQuantity } from '../validation/bottleImport';
 import { unprotectFormula, UTF8_BOM } from './bottlesExport';
+import { parseImportDate } from './importDates';
 
 export const BOTTLE_IMPORT_VERSION = 1;
 
@@ -299,15 +300,16 @@ class RowReader {
     return Math.max(1, Math.min(MAX_ROW_QUANTITY, Math.floor(value)));
   }
 
-  /** Kept as written: the confirmation turns it into a date. */
-  date(field: string): string | null {
+  /**
+   * A date read in the order of `language` (`12/03/2024`), sent on as ISO 8601: the
+   * confirmation reads it without guessing the order again.
+   */
+  date(field: string, language: string): string | null {
     const value = this.row.values[field];
     if (value === null || value === undefined || value === '') return null;
-    if (typeof value !== 'string' || !NullableDate.safeParse(value).success) {
-      this.fail(field, 'invalidDate');
-      return null;
-    }
-    return value;
+    const date = typeof value === 'string' ? parseImportDate(value, language) : null;
+    if (date === null) this.fail(field, 'invalidDate');
+    return date;
   }
 
   /** An object in JSON, a JSON text in a CSV cell; anything else counts as no translations. */
@@ -320,7 +322,7 @@ class RowReader {
   }
 }
 
-function readBottle(row: NumberedRow): { bottle: ImportBottleRecord; error: ImportRowError | null } {
+function readBottle(row: NumberedRow, language: string): { bottle: ImportBottleRecord; error: ImportRowError | null } {
   const reader = new RowReader(row, 'bottles');
   const bottle: ImportBottleRecord = {
     name: reader.requiredText('name'),
@@ -330,7 +332,7 @@ function readBottle(row: NumberedRow): { bottle: ImportBottleRecord; error: Impo
     alcoholPercentage: reader.number('alcoholPercentage', AlcoholPercentage, null),
     purchasePrice: reader.number('purchasePrice', PurchasePrice, null),
     location: reader.optionalText('location'),
-    openedAt: reader.date('openedAt'),
+    openedAt: reader.date('openedAt', language),
     isApero: reader.bool('isApero'),
     isDigestif: reader.bool('isDigestif'),
     quantity: reader.quantity('quantity'),
@@ -360,11 +362,11 @@ interface KeptBottle {
 }
 
 /** Keeps the valid bottles with their row; each invalid row is listed in `errors`. */
-function readBottles(rows: NumberedRow[], errors: ImportRowError[]): KeptBottle[] {
+function readBottles(rows: NumberedRow[], errors: ImportRowError[], language: string): KeptBottle[] {
   assertRowCount(rows.length);
   const kept: KeptBottle[] = [];
   for (const row of rows) {
-    const { bottle, error } = readBottle(row);
+    const { bottle, error } = readBottle(row, language);
     if (error) errors.push(error);
     else kept.push({ bottle, row });
   }
@@ -388,7 +390,11 @@ function readCategories(rows: NumberedRow[], errors: ImportRowError[]): ImportCa
 
 const REQUIRED_CSV_COLUMNS = ['name', 'capacityMl'];
 
-export function parseCsvBottles(csv: string): NormalizedImportPayload {
+/**
+ * `language` is the admin's (`Accept-Language`): it gives the order of a date typed in a
+ * spreadsheet (see importDates.ts).
+ */
+export function parseCsvBottles(csv: string, language: string): NormalizedImportPayload {
   const { headers, rows } = readCsvRows(csv);
   const errors: ImportRowError[] = [];
   if (headers.length === 0) {
@@ -397,7 +403,7 @@ export function parseCsvBottles(csv: string): NormalizedImportPayload {
   const missing = REQUIRED_CSV_COLUMNS.find((column) => !headers.includes(column));
   if (missing) throw new ImportParseError('missingColumn', { column: missing });
 
-  const kept = readBottles(rows, errors);
+  const kept = readBottles(rows, errors, language);
 
   // A CSV has no category list: each category named by a kept row is created with the defaults
   const categories = new Map<string, ImportCategoryRecord>();
@@ -430,7 +436,7 @@ function numberJsonRows(items: unknown[]): NumberedRow[] {
   return items.map((item, index) => ({ line: index + 1, values: isRecord(item) ? item : {} }));
 }
 
-export function parseJsonBottles(json: unknown): NormalizedImportPayload {
+export function parseJsonBottles(json: unknown, language: string): NormalizedImportPayload {
   if (!isRecord(json) || json.version !== BOTTLE_IMPORT_VERSION) {
     throw new ImportParseError('unsupportedVersion');
   }
@@ -438,7 +444,7 @@ export function parseJsonBottles(json: unknown): NormalizedImportPayload {
 
   const errors: ImportRowError[] = [];
   const categories = readCategories(numberJsonRows(Array.isArray(json.categories) ? json.categories : []), errors);
-  const bottles = readBottles(numberJsonRows(json.bottles), errors).map(({ bottle }) => bottle);
+  const bottles = readBottles(numberJsonRows(json.bottles), errors, language).map(({ bottle }) => bottle);
   return { version: BOTTLE_IMPORT_VERSION, categories, bottles, errors };
 }
 
@@ -467,7 +473,7 @@ function readZipEntries(buffer: Buffer): AdmZip.IZipEntry[] {
   }
 }
 
-export function parseZipBottles(buffer: Buffer): NormalizedImportPayload {
+export function parseZipBottles(buffer: Buffer, language: string): NormalizedImportPayload {
   const entries = readZipEntries(buffer).filter((entry) => !entry.isDirectory);
 
   const bottlesEntry = entries.find(
@@ -477,8 +483,8 @@ export function parseZipBottles(buffer: Buffer): NormalizedImportPayload {
 
   const bottlesText = readZipEntryText(bottlesEntry);
   const payload = bottlesEntry.entryName.endsWith('.csv')
-    ? parseCsvBottles(bottlesText)
-    : parseJsonBottles(parseJsonText(bottlesText));
+    ? parseCsvBottles(bottlesText, language)
+    : parseJsonBottles(parseJsonText(bottlesText), language);
 
   const categoriesEntry = entries.find((e) => e.entryName === 'categories.csv');
   if (categoriesEntry) {
@@ -492,16 +498,16 @@ export function parseZipBottles(buffer: Buffer): NormalizedImportPayload {
   return payload;
 }
 
-export function parseImportFile(filename: string, buffer: Buffer): NormalizedImportPayload {
+export function parseImportFile(filename: string, buffer: Buffer, language: string): NormalizedImportPayload {
   const lower = filename.toLowerCase();
   if (lower.endsWith('.zip')) {
-    return parseZipBottles(buffer);
+    return parseZipBottles(buffer, language);
   }
   if (lower.endsWith('.json')) {
-    return parseJsonBottles(parseJsonText(buffer.toString('utf8')));
+    return parseJsonBottles(parseJsonText(buffer.toString('utf8')), language);
   }
   if (lower.endsWith('.csv')) {
-    return parseCsvBottles(buffer.toString('utf8'));
+    return parseCsvBottles(buffer.toString('utf8'), language);
   }
   throw new ImportParseError('unsupportedFormat');
 }
