@@ -42,12 +42,12 @@ jobs:
       # The postinstall script generates the Prisma client
       - run: npm ci
 
-      # critical only until B-11: the Prisma CLI, a runtime dependency, pulls
-      # 4 high advisories (deepmerge-ts, mysql2). B-11 overrides them and raises
-      # this to high. A new advisory is fixed by an upgrade or an override,
-      # never by lowering the threshold.
+      # The Prisma CLI, a runtime dependency, pins vulnerable versions of
+      # deepmerge-ts and mysql2: the `overrides` of package.json replace them
+      # until a Prisma release ships fixed versions (task B-16). A new advisory is fixed by an upgrade or an override, never by lowering
+      # the threshold.
       - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=critical
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Check that migrations match the Prisma schema
         run: npm run db:check
@@ -116,7 +116,7 @@ jobs:
       - run: npm ci
 
       # A new advisory is fixed by an upgrade or an override, never by lowering
-      # the threshold (the backend is at critical until B-11).
+      # the threshold.
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
 
