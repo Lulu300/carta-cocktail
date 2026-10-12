@@ -1,8 +1,11 @@
 // Configuration of the Prisma CLI (generate, migrate, db push, db seed).
-// Prisma 7 no longer reads .env by itself.
-import 'dotenv/config';
+import { config as loadDotenv } from 'dotenv';
 import { defineConfig } from 'prisma/config';
 import { resolveDatabasePath } from './src/lib/databasePath';
+
+// Prisma 7 no longer reads .env by itself. Quiet whatever the dotenv version or
+// DOTENV_QUIET: the container entrypoint runs the CLI at each start, without a .env.
+loadDotenv({ quiet: true });
 
 const databaseUrl = process.env.DATABASE_URL;
 

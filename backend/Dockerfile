@@ -35,6 +35,12 @@ FROM node:24.21-alpine AS runtime
 # tini forwards SIGTERM to the entrypoint, then to Node once the entrypoint has exec'd it
 RUN apk add --no-cache tini
 ENV NODE_ENV=production
+# Keeps the startup logs to the entrypoint, migrations and API lines. The
+# entrypoint runs the Prisma CLI through npx at each start: without these, npx
+# prints an npm update notice (the node user's npm cache is new), and the CLI
+# calls checkpoint.prisma.io (telemetry) and may print a Prisma update box.
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false \
+  CHECKPOINT_DISABLE=1
 WORKDIR /app
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist

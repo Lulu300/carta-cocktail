@@ -5,13 +5,13 @@ phase: D
 lane: infra
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [D-01, B-03]
-touches: [backend/src/config.ts, backend/src/scripts/seed.ts, backend/Dockerfile]
+touches: [backend/src/config.ts, backend/prisma.config.ts, backend/Dockerfile]
 sources: []
-branch:
-pr:
+branch: chore/D-16-production-log-noise
+pr: "#126"
 ---
 
 ## Contexte
@@ -34,8 +34,8 @@ Logs de `docker compose logs carta-cocktail-backend` au démarrage de l'image `b
 
 ## Critères d'acceptation
 
-- [ ] Au démarrage du conteneur, les logs ne contiennent ni l'encadré de mise à jour de Prisma, ni les lignes `injected env` de dotenv, ni la bannière d'i18next.
-- [ ] Les lignes utiles restent : sauvegarde `pre-migrate-*` ou « No pending migrations », `SQLite journal mode`, `Carta Cocktail API running on port`.
+- [x] Au démarrage du conteneur, les logs ne contiennent ni l'encadré de mise à jour de Prisma, ni les lignes `injected env` de dotenv, ni la bannière d'i18next.
+- [x] Les lignes utiles restent : sauvegarde `pre-migrate-*` ou « No pending migrations », `SQLite journal mode`, `Carta Cocktail API running on port`.
 
 ## Tests à ajouter ou adapter
 
@@ -51,3 +51,4 @@ Logs de `docker compose logs carta-cocktail-backend` au démarrage de l'image `b
 
 - 2026-10-10 : tâche créée après la mise à jour en v1.6.0 d'une instance réelle (logs collés par l'humain).
 - 2026-10-12 : D-01 déplace le seed vers `backend/src/scripts/seed.ts` (`touches` mis à jour). Bruit supplémentaire vu avec l'image de D-01 : `npm notice New major version of npm available` après les `npx prisma` de l'entrypoint (le cache npm de l'utilisateur `node` est neuf) ; `ENV NPM_CONFIG_UPDATE_NOTIFIER=false` dans `backend/Dockerfile` le coupe. La ligne `injected env (0) from .env` vient maintenant de `import 'dotenv/config'` dans `backend/prisma.config.ts` (C-15).
+- 2026-10-12 : fait (PR #126). `quiet: true` dans `backend/src/config.ts` et dans `backend/prisma.config.ts`, où `import 'dotenv/config'` devient `config({ quiet: true })` (fichier ajouté à `touches`). `backend/src/scripts/seed.ts` ne charge plus dotenv lui-même depuis D-01 : il passe par `src/lib/prisma.ts`, déjà en `quiet: true` ; il sort de `touches`. Avec dotenv 18.0.7, `dotenv/config` est déjà muet par défaut : la seule ligne `injected env` restante venait de `config.ts`, l'option explicite protège `prisma.config.ts` d'un changement de défaut ou de `DOTENV_QUIET`. `backend/Dockerfile` (stage `runtime`, ENV statiques à côté de `NODE_ENV`) : `NPM_CONFIG_UPDATE_NOTIFIER=false` et `CHECKPOINT_DISABLE=1`. Vérifié sur Prisma 7.10 : le check de mise à jour renvoie `disabled` et l'encadré ne s'affiche plus (il apparaissait au deuxième démarrage du même conteneur, cache du checkpoint), donc pas de `PRISMA_HIDE_UPDATE_MESSAGE`. Bannière i18next absente (B-03). Logs de l'entrypoint et de `prisma migrate deploy` inchangés. Image construite et démarrée sur un volume vide, sur une base existante et en redémarrage du même conteneur : logs avant/après dans la PR. Banc 1.4.0 → local : `friend` OK en naïf et conforme (0 bruit, lignes `pre-migrate-*`, baseline `0_init`, WAL, port trouvées) ; `official` refusé faute de hook `1.12.0` sur develop (le backend non root de D-01 refuse des volumes root, `chownMounts` non appliqué), puis OK en naïf (refus attendu) et conforme avec un hook `1.12.0` temporaire non versionné (`copyDatabase` + `chownMounts`, d'après la ligne « Notes de version » de D-01). Aucune action utilisateur.
