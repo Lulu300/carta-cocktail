@@ -27,13 +27,14 @@ Relevé par la relecture de la PR #128 (E-09), dans Chromium : sur `/admin/bottl
 ## Ce qu'il faut faire
 
 1. `AdminLayout` : `lg:shrink-0` (ou `shrink-0`) sur la barre latérale, `min-w-0` sur la colonne de contenu.
-2. Table : défilement horizontal dans son propre conteneur (`overflow-x-auto` sur un enveloppant, coins arrondis conservés). Toutes les listes admin passent par `DataTable` (y compris les groupes de `BottlesPage`, via `renderRow`) ; la seule autre table est `components/admin/bottles/BottleHistoryTable.tsx`, à vérifier aussi.
-3. Vérifier les autres pages admin à 1024 et 1280 px.
+2. Table : défilement horizontal autour du seul `<table>` (un `div` en `overflow-x-auto`), pas sur l'enveloppant de `DataTable`, qui contient aussi `LoadError`, le message vide, `LiveResultCount` et `Pagination` (la pagination défilerait avec la table). Coins arrondis conservés. Les deux seules tables sont `DataTable` (dont les groupes de `BottlesPage`, via `renderRow`) et `components/admin/bottles/BottleHistoryTable.tsx` (aussi en `overflow-hidden`).
+3. Listes sans `DataTable` : `IngredientsPage.tsx:183` et `CocktailsPage.tsx:101` et `:116` ont leurs propres conteneurs `overflow-hidden` (grilles et cartes, pas de table). Les vérifier ; s'il faut les modifier, les ajouter à `touches` et le noter au Journal (règle 4).
+4. Vérifier toutes les pages admin à 1024 et 1280 px.
 
 ## Critères d'acceptation
 
 - [ ] À 1024 et 1280 px, aucune page admin ne défile horizontalement ; la barre latérale garde 256 px.
-- [ ] Une table plus large que son conteneur défile dans son conteneur, au clavier aussi (conteneur focusable avec un nom, ou cellules focusables).
+- [ ] Une table plus large que son conteneur défile dans son conteneur, au clavier aussi : les boutons de la dernière colonne la font défiler au Tab ; sinon, un conteneur focusable nommé par `aria-labelledby` vers le titre de la page, seulement quand la table déborde (pas d'arrêt de tabulation en plus sur une table qui tient).
 - [ ] Mobile inchangé (tiroir d'E-09, `max-lg:invisible`).
 
 ## Tests à ajouter ou adapter
@@ -43,7 +44,7 @@ Relevé par la relecture de la PR #128 (E-09), dans Chromium : sur `/admin/bottl
 ## Points d'attention
 
 - Ne pas toucher à la transition du tiroir mobile (focus à l'ouverture, E-09).
-- Les fichiers recoupent E-10, E-14 et E-28 : à enchaîner avec ces tâches.
+- Les fichiers recoupent E-15 et E-18 (prêtes), E-10, E-14, puis B-14, F-06, F-09 et F-10 : à enchaîner avec ces tâches.
 
 ## Journal
 
