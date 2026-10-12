@@ -276,7 +276,59 @@
     "created": "Carte créée",
     "updated": "Carte mise à jour",
     "deleted": "Carte supprimée",
-    "noCocktails": "Aucun cocktail dans cette carte"
+    "noCocktails": "Aucun cocktail dans cette carte",
+    "backToList": "Retour à la liste",
+    "loadError": "Impossible de charger cette carte.",
+    "slugLocked": "L'adresse d'une carte système ne peut pas changer.",
+    "moveUp": "Monter {{name}}",
+    "moveDown": "Descendre {{name}}",
+    "showItem": "Afficher {{name}}",
+    "hideItem": "Masquer {{name}}",
+    "removeItem": "Retirer {{name}} de la carte",
+    "cocktailFallback": "Cocktail n° {{id}}",
+    "sections": {
+      "title": "Sections",
+      "add": "Ajouter une section",
+      "create": "Créer une section",
+      "name": "Nom de la section",
+      "none": "Sans section",
+      "select": "Section de {{name}}",
+      "rename": "Renommer {{name}}",
+      "delete": "Supprimer {{name}}",
+      "empty": {
+        "cocktails": "Aucune section personnalisée. Par défaut, les cocktails sont affichés sans groupement.",
+        "bottles": "Aucune section personnalisée. Par défaut, les bouteilles sont groupées par catégorie."
+      },
+      "confirmDelete": {
+        "cocktails": "Supprimer la section « {{name}} » ? Ses cocktails passent dans « Sans section ».",
+        "bottles": "Supprimer la section « {{name}} » ? Ses bouteilles passent dans « Sans section »."
+      }
+    },
+    "bottles": {
+      "title": "Bouteilles",
+      "sync": "Synchroniser",
+      "count": "×{{count}}",
+      "empty": "Vide",
+      "abv": "{{value}} % vol.",
+      "exclude": "Retirer",
+      "excludeTitle": "Retirer de cette carte ?",
+      "excludeMessage": "{{name}} quitte cette carte et la synchronisation ne la remet plus. « Bouteilles retirées » permet de la remettre.",
+      "excludedTitle": "Bouteilles retirées ({{count}})",
+      "noExcluded": "Aucune bouteille retirée de cette carte.",
+      "restore": "Remettre",
+      "restoreLabel": "Remettre {{name}} dans la carte",
+      "cocktailMenu": "Cette carte est une carte de cocktails : elle ne contient pas de bouteilles.",
+      "aperos": {
+        "title": "Gérer la carte des apéritifs",
+        "hint": "Les bouteilles cochées comme apéritif apparaissent automatiquement ici. Utilisez « Synchroniser » pour mettre à jour la liste.",
+        "empty": "Aucune bouteille. Cochez des bouteilles comme apéritif, puis synchronisez."
+      },
+      "digestifs": {
+        "title": "Gérer la carte des digestifs",
+        "hint": "Les bouteilles cochées comme digestif apparaissent automatiquement ici. Utilisez « Synchroniser » pour mettre à jour la liste.",
+        "empty": "Aucune bouteille. Cochez des bouteilles comme digestif, puis synchronisez."
+      }
+    }
   },
   "shortages": {
     "title": "Pénuries",

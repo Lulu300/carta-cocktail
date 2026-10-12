@@ -276,7 +276,59 @@
     "created": "Menu created",
     "updated": "Menu updated",
     "deleted": "Menu deleted",
-    "noCocktails": "No cocktails in this menu yet"
+    "noCocktails": "No cocktails in this menu yet",
+    "backToList": "Back to the list",
+    "loadError": "This menu could not be loaded.",
+    "slugLocked": "The address of a system menu cannot change.",
+    "moveUp": "Move {{name}} up",
+    "moveDown": "Move {{name}} down",
+    "showItem": "Show {{name}}",
+    "hideItem": "Hide {{name}}",
+    "removeItem": "Remove {{name}} from the menu",
+    "cocktailFallback": "Cocktail #{{id}}",
+    "sections": {
+      "title": "Sections",
+      "add": "Add a section",
+      "create": "Create a section",
+      "name": "Section name",
+      "none": "No section",
+      "select": "Section of {{name}}",
+      "rename": "Rename {{name}}",
+      "delete": "Delete {{name}}",
+      "empty": {
+        "cocktails": "No custom section. Cocktails are shown without grouping.",
+        "bottles": "No custom section. Bottles are grouped by category."
+      },
+      "confirmDelete": {
+        "cocktails": "Delete the section \"{{name}}\"? Its cocktails move to \"No section\".",
+        "bottles": "Delete the section \"{{name}}\"? Its bottles move to \"No section\"."
+      }
+    },
+    "bottles": {
+      "title": "Bottles",
+      "sync": "Synchronize",
+      "count": "×{{count}}",
+      "empty": "Empty",
+      "abv": "{{value}}% vol.",
+      "exclude": "Remove",
+      "excludeTitle": "Remove from this menu?",
+      "excludeMessage": "{{name}} leaves this menu and the sync no longer adds it back. \"Removed bottles\" puts it back.",
+      "excludedTitle": "Removed bottles ({{count}})",
+      "noExcluded": "No bottle removed from this menu.",
+      "restore": "Put back",
+      "restoreLabel": "Put {{name}} back in the menu",
+      "cocktailMenu": "This is a cocktail menu: it holds no bottles.",
+      "aperos": {
+        "title": "Manage the aperitifs menu",
+        "hint": "Bottles checked as aperitif appear here automatically. Use \"Synchronize\" to update the list.",
+        "empty": "No bottles. Check bottles as aperitif, then synchronize."
+      },
+      "digestifs": {
+        "title": "Manage the digestifs menu",
+        "hint": "Bottles checked as digestif appear here automatically. Use \"Synchronize\" to update the list.",
+        "empty": "No bottles. Check bottles as digestif, then synchronize."
+      }
+    }
   },
   "shortages": {
     "title": "Shortages",

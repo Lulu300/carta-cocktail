@@ -20,6 +20,8 @@ export const qk = {
   availability: ['availability'] as const,
   menus: ['menus'] as const,
   menu: (id: number) => ['menus', id] as const,
+  // Under qk.menu(id): refreshing a menu also refreshes the bottles removed from it.
+  menuExclusions: (id: number) => ['menus', id, 'exclusions'] as const,
   publicMenus: ['public', 'menus'] as const,
   publicMenu: (slug: string, viewer: PublicViewer) => ['public', 'menu', slug, viewer] as const,
   publicCocktail: (id: number, viewer: PublicViewer) => ['public', 'cocktail', id, viewer] as const,

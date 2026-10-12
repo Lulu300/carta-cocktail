@@ -244,6 +244,14 @@ export const menus = {
     request<{ message: string }>(`/menus/${id}`, { method: 'DELETE' }),
 };
 
+/** A bottle removed from a system menu: the sync never adds it back. */
+export interface MenuBottleExclusion {
+  menuId: number;
+  bottleId: number;
+  bottle: Bottle;
+  createdAt: string;
+}
+
 // Menu Bottles
 export const menuBottles = {
   listByMenu: (menuId: number) => request<MenuBottle[]>(`/menu-bottles/menu/${menuId}`),
@@ -255,6 +263,20 @@ export const menuBottles = {
     request<{ message: string }>(`/menu-bottles/${id}`, { method: 'DELETE' }),
   sync: (menuId: number) =>
     request<{ message: string; added: number; removed: number }>(`/menu-bottles/menu/${menuId}/sync`, { method: 'POST' }),
+  /** `ids` lists every entry (`MenuBottle.id`) of the menu, in the new order: one transaction. */
+  reorder: (menuId: number, ids: number[]) =>
+    request<{ message: string }>(`/menu-bottles/menu/${menuId}/reorder`, { method: 'POST', body: JSON.stringify({ ids }) }),
+  exclusions: (menuId: number) =>
+    request<MenuBottleExclusion[]>(`/menu-bottles/menu/${menuId}/exclusions`),
+  /** Removes these bottles from a system menu, all of them or none. */
+  exclude: (menuId: number, bottleIds: number[]) =>
+    request<{ message: string }>(`/menu-bottles/menu/${menuId}/exclusions`, {
+      method: 'POST',
+      body: JSON.stringify({ bottleIds }),
+    }),
+  /** Puts an excluded bottle back at the end of the menu. */
+  restore: (menuId: number, bottleId: number) =>
+    request<{ message: string }>(`/menu-bottles/menu/${menuId}/exclusions/${bottleId}`, { method: 'DELETE' }),
 };
 
 // Menu Sections
