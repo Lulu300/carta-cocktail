@@ -7,7 +7,7 @@ criticite: basse
 effort: M
 status: todo
 owner: agent
-depends_on: []
+depends_on: [C-35]
 touches: [frontend/src/components/admin/bottles/BottleFormModal.tsx, frontend/src/components/admin/bottles/bottleForm.ts, frontend/src/components/admin/bottles/BottleFormModal.test.tsx, frontend/src/components/ui/DateInput.tsx, frontend/src/components/ui/DateInput.test.tsx, frontend/src/utils/dates.ts, frontend/src/utils/dates.test.ts, frontend/src/i18n/locales/]
 sources: []
 branch:
@@ -57,7 +57,8 @@ La langue de l'application vient de `i18n.language` (sélecteur `LanguageSelecto
 
 ## Points d'attention
 
-- Le format de l'anglais (en-US `mm/dd/yyyy` ou en-GB `dd/mm/yyyy`) est la question posée à l'humain dans C-35. Les deux tâches doivent appliquer la même réponse.
+- Le format de l'anglais (en-US `mm/dd/yyyy` ou en-GB `dd/mm/yyyy`) est la question posée à l'humain dans C-35. Les deux tâches doivent appliquer la même réponse : E-27 attend C-35 (`depends_on`).
+- `openedAt` est stocké à minuit UTC (`new Date('2026-10-11')`, puis renvoyé en `2026-10-11T00:00:00.000Z`). `formatDate` doit formater avec `timeZone: 'UTC'`, ou à partir de la seule partie `aaaa-mm-jj`. Sinon, la date s'affiche la veille pour un admin à l'ouest de UTC (Amériques).
 - Un sélecteur de date tiers ajoute une dépendance (couloir `deps`, `package.json`) : à éviter si un champ texte avec gabarit suffit.
 - `Intl.DateTimeFormat('en', { dateStyle: 'short' })` donne `3/12/24` (année sur deux chiffres) : préférer un format explicite à quatre chiffres.
 

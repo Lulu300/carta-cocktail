@@ -21,7 +21,7 @@ L'import de bouteilles accepte CSV, JSON et ZIP. Il est déjà défensif (transa
 ## Problème constaté
 
 `src/utils/bottlesImport.ts` :
-- BOM UTF-8 non retiré : `:107` et `:209` lisent l'en-tête `﻿name` → « CSV missing required column: name ». Le JSON est aussi touché, ce que le rapport ne dit pas : `JSON.parse` échoue sur un BOM (`:253`, `:276`).
+- BOM UTF-8 non retiré : `:107` et `:209` lisent l'en-tête `\uFEFFname` → « CSV missing required column: name ». Le JSON est aussi touché, ce que le rapport ne dit pas : `JSON.parse` échoue sur un BOM (`:253`, `:276`).
 - Séparateur `,` seul (`:46`) : un CSV Excel en locale française (`;`) est illisible.
 - `:146` : `capacityMl` vaut 0 par défaut (CSV) ; `:188` idem (JSON). `remainingPercent` non borné (`:147`, `:189`) ; `desiredStock`/`minimumPercent` négatifs acceptés (`:177-178`, `:230-231`) ; `openedAt` non validé (`:151`, `:193`).
 - `parseZipBottles` (`:238-268`) : `getData()` sans limite de taille décompressée.
@@ -101,7 +101,7 @@ L'import de bouteilles accepte CSV, JSON et ZIP. Il est déjà défensif (transa
   2. Un `\r\n` dans un champ entre guillemets est gardé tel quel.
   3. Les `nameTranslations` passent par `Translations.safeParse` et valent `null` si la valeur est invalide (`{"de": …}`) : l'aperçu ne laisse plus passer ce que la confirmation refuserait.
   4. Chaque entrée de `errors` porte `source: 'bottles' | 'categories'`.
-  5. Le BOM est écrit `'﻿'` dans le code et les tests.
+  5. Le BOM est écrit `'\uFEFF'` dans le code et les tests.
   6. La clé d'exemple de `errorHandler.test.ts` devient `errors.import.invalidZip` ; fichier ajouté à `touches`.
 
   Dates : décision de l'humain du 2026-10-12 (affichage et saisie selon la langue de l'app, un seul format de stockage), traitée hors de C-10. Deux tâches créées : C-35 (dates d'un import lues selon la langue de l'interface) et E-27 (affichage et saisie dans le frontend).
