@@ -1,5 +1,6 @@
 // Copied alone into the Docker image, where the Prisma CLI loads it through
 // prisma.config.ts: import Node built-ins only, never other files of src/.
+import fs from 'fs';
 import path from 'path';
 
 /**
@@ -23,4 +24,13 @@ export function resolveDatabasePath(url: string = process.env.DATABASE_URL ?? ''
   }
   const filePath = url.slice('file:'.length).split('?')[0];
   return path.resolve(PRISMA_DIR, filePath);
+}
+
+/**
+ * True when a `file:` URL names an existing file. Scripts check it before
+ * opening a client: SQLite creates an empty database for a missing file.
+ */
+export function databaseFileExists(url: string = process.env.DATABASE_URL ?? ''): boolean {
+  if (!url.startsWith('file:')) return false;
+  return fs.statSync(resolveDatabasePath(url), { throwIfNoEntry: false })?.isFile() ?? false;
 }

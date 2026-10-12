@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: moyenne
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-07]
-touches: [backend/docker-entrypoint.sh, README.md]
+touches: [backend/docker-entrypoint.sh, README.md, backend/src/bootstrap/migrationState.ts, backend/src/scripts/migration-state.ts, backend/src/lib/databasePath.ts, backend/src/scripts/check-integrity.ts, backend/vitest.config.ts, .github/workflows/ci.yml, backend/AGENTS.md]
 sources: ["02-backend-data-perf.md §2.4"]
-branch:
-pr:
+branch: feature/C-18-failed-migration-recovery
+pr: "#120"
 ---
 
 ## Contexte
@@ -34,10 +34,10 @@ C-07 place les index uniques en tête de sa migration : un doublon l'arrête ava
 
 ## Critères d'acceptation
 
-- [ ] Une migration en échec affiche au démarrage son nom, la copie à restaurer et le renvoi vers la procédure.
-- [ ] La procédure de reprise est dans le README et a été suivie une fois sur une base jetable.
-- [ ] La règle d'écriture des migrations est documentée.
-- [ ] Après `prisma migrate resolve --rolled-back`, le démarrage suivant fait une copie `pre-migrate` avant d'appliquer la migration.
+- [x] Une migration en échec affiche au démarrage son nom, la copie à restaurer et le renvoi vers la procédure.
+- [x] La procédure de reprise est dans le README et a été suivie une fois sur une base jetable.
+- [x] La règle d'écriture des migrations est documentée.
+- [x] Après `prisma migrate resolve --rolled-back`, le démarrage suivant fait une copie `pre-migrate` avant d'appliquer la migration.
 
 ## Tests à ajouter ou adapter
 
@@ -54,3 +54,9 @@ C-07 place les index uniques en tête de sa migration : un doublon l'arrête ava
 
 - 2026-10-10 : tâche créée pendant C-07 (migrations SQLite non transactionnelles, reprise non documentée).
 - 2026-10-12 : D-01 (PR #108, tini) : un `docker stop` arrive maintenant à l'entrypoint au lieu d'être ignoré. Une demande d'arrêt laisse finir la commande en cours et ne démarre plus aucune nouvelle étape (ni sauvegarde, ni migration, ni étape de la baseline, ni seed) ; une migration plus longue que le délai d'arrêt de Docker (10 s) est tuée comme avant et laisse `P3009` au démarrage suivant (vérifié avec une migration lente). Le script de contrôle d'intégrité est maintenant `src/scripts/check-integrity.ts` (`node dist/scripts/check-integrity.js` dans l'image), et l'image tourne sous `node` : une reprise lancée avec `--entrypoint sh` aussi.
+- 2026-10-12 : implémentation (PR #120). La décision de sauvegarde ne repose plus sur `prisma migrate status` : `src/bootstrap/migrationState.ts` lit `_prisma_migrations` (client partagé, lecture seule) et liste les migrations du dossier sans ligne terminée non annulée (`unapplied`) et les migrations en échec (`failed`) ; `node dist/scripts/migration-state.js` les imprime pour l'entrypoint. Copie `pre-migrate` dès qu'une migration est à appliquer, y compris après `resolve --rolled-back` (point de C-07) ; aucune copie tant qu'une migration est marquée en échec, sinon une copie de la base à moitié migrée deviendrait la plus récente (cas décrit dans UPGRADING › v1.8.0 › Rolling back) ; copie quand même si l'historique est illisible. Sur `P3018`/`P3009`, y compris après la baseline `0_init`, message : nom de la migration (lu dans `_prisma_migrations`), dernière copie `pre-migrate-*`, renvoi au README ; rien n'est restauré. Arrêt de D-01 inchangé : un `docker stop` reçu pendant la lecture de l'état sort avant la sauvegarde (vérifié, exit 143, aucune copie).
+- 2026-10-12 : écarts. `touches` complété : `migrationState.ts` (+ tests), `scripts/migration-state.ts` (+ test), exclusions de couverture du script dans `vitest.config.ts` et `ci.yml`, `backend/AGENTS.md` (structure). `databaseFileExists()` déplacée de `check-integrity.ts` vers `lib/databasePath.ts` pour être partagée par les deux scripts (fs seulement, import Node intégré : compatible avec la copie du fichier dans l'image, voir D-26). Essais Docker sur base synthétique (doublon de catégorie) : (1) base `db push` : copie, baseline, `P3018` + message, redémarrage `P3009` + même copie et aucune nouvelle, restauration par la commande du README, correction, contrôle d'intégrité 0, démarrage OK avec une nouvelle copie ; (2) `0_init` appliquée : `P3018`, `resolve --rolled-back`, l'état liste à nouveau la migration, correction, démarrage : nouvelle copie `pre-migrate` puis migrations appliquées.
+- 2026-10-12 : banc (`--path 1.4.0,1.11.0,local --mode both`, avec le hook temporaire de D-01, PR #108) : `friend` et `official` OK en naïf et conforme. Copie du jeu d'essai avec une catégorie en double, `1.4.0,local` naïf : refus avec le message de C-18, 1 copie `pre-migrate` pour 3 démarrages, aucune perte ; le banc ne reconnaît pas encore ce refus (message attendu de `0_init`, base modifiée par la ligne en échec) : nouvelle tâche C-37.
+- 2026-10-12 : Notes de version : pas d'action obligatoire. Une migration en échec affiche son nom, la copie à restaurer et la procédure (README › « Recovering from a failed migration »). L'entrypoint fait une copie `pre-migrate` avant la nouvelle tentative après `prisma migrate resolve --rolled-back`, et plus aucune copie tant qu'une migration est en échec : les remarques de UPGRADING › v1.8.0 › Rolling back sur ces deux points ne valent plus que pour les images v1.8.0 à v1.11.x.
+- 2026-10-12 : relecture indépendante de la PR #120 (changements demandés), corrections après rebase sur `develop` (D-03, D-05, E-08). Bloquants : (1) avec le compose de D-03, une image sans `/api/health` (v1.11.x et avant) reste `unhealthy` et le frontend ne démarre pas : nouvelle section README « Running a previous version » (compose de la version, ou retrait du `healthcheck` du backend et de la condition `depends_on` ; port 80 du frontend jusqu'à v1.7.0 ; `chown` de « Data folders and the node user » avant de remonter), utilisée par « Restoring a pre-migration backup » et par les étapes 3 et 5 de la reprise ; (2) contrôle d'intégrité repris tel quel des notes de D-01 (`--user "$(id -u):$(id -g)"`, `--entrypoint node`). Non bloquants : nuance « images ≥ v1.6.0 » dans le message et le README, lecture du message par `docker compose … logs carta-cocktail-backend` (site indisponible), pas de relecture de l'état après une demande d'arrêt, une seule ligne (`Cannot read the migration history: …`) au lieu de la pile Prisma sur une base illisible (`summarizeError`, testée). Le deploy après la baseline reste affiché en fin de commande (comme le chemin principal).
+- 2026-10-12 : écart au point transmis par C-07, accepté par la relecture : l'entrypoint ne fait pas de copie tant qu'une migration est marquée en échec, alors que le point demandait une copie dès qu'une migration n'a pas de ligne terminée. Le deploy refuse de toute façon (P3009), et la copie la plus récente reste celle d'avant l'échec.

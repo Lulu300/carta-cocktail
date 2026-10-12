@@ -35,6 +35,7 @@ export default defineConfig({
         // Entry points of their own process, like src/index.ts: their logic is in tested modules
         'src/scripts/seed.ts',
         'src/scripts/check-integrity.ts',
+        'src/scripts/migration-state.ts',
         'src/**/*.test.ts',
         'src/**/*.d.ts',
       ],

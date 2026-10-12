@@ -69,7 +69,8 @@ backend/
 │   │   └── settings.ts       # GET/PUT site settings + admin profile
 │   ├── scripts/              # Thin process entry points, compiled into dist/scripts/ (logic in services/, bootstrap/)
 │   │   ├── seed.ts           # Admin user, category types, units, menus (each container start)
-│   │   └── check-integrity.ts # Read-only report on a copy of the database before an upgrade
+│   │   ├── check-integrity.ts # Read-only report on a copy of the database before an upgrade
+│   │   └── migration-state.ts # Migrations to apply and failed ones, read by docker-entrypoint.sh
 │   ├── services/
 │   │   └── availabilityService.ts  # Stock-based availability calculation
 │   ├── utils/

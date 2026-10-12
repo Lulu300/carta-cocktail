@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import path from 'path';
 import { TEST_DATABASE_PATH } from '../test/testDatabase';
-import { PRISMA_DIR, resolveDatabasePath } from './databasePath';
+import { PRISMA_DIR, databaseFileExists, resolveDatabasePath } from './databasePath';
 
 describe('PRISMA_DIR', () => {
   it('should be the folder of schema.prisma', () => {
@@ -51,5 +51,27 @@ describe('resolveDatabasePath', () => {
 
   it('should refuse an empty URL', () => {
     expect(() => resolveDatabasePath('')).toThrow('DATABASE_URL');
+  });
+});
+
+describe('databaseFileExists', () => {
+  it('should be true for an existing database file', () => {
+    expect(databaseFileExists(`file:${TEST_DATABASE_PATH}`)).toBe(true);
+  });
+
+  it('should read DATABASE_URL by default', () => {
+    expect(databaseFileExists()).toBe(true);
+  });
+
+  it('should be false for a missing file', () => {
+    expect(databaseFileExists('file:./missing.db')).toBe(false);
+  });
+
+  it('should be false for a folder', () => {
+    expect(databaseFileExists(`file:${PRISMA_DIR}`)).toBe(false);
+  });
+
+  it('should be false for a URL that is not a SQLite file', () => {
+    expect(databaseFileExists('')).toBe(false);
   });
 });
