@@ -15,7 +15,6 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - ADMIN_RESET_PASSWORD=${ADMIN_RESET_PASSWORD:-false}
       - PORT=3001
-      - UPLOAD_DIR=/app/uploads
     volumes:
       - db-data:/app/data
       - uploads:/app/uploads

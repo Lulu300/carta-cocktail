@@ -51,7 +51,6 @@ RUN chmod +x docker-entrypoint.sh \
   && chown node:node /app/data /app/uploads
 
 # Compiled code runs from /app/dist, so the default upload path would miss the volume
-ENV UPLOAD_DIR=/app/uploads
 
 USER node
 
