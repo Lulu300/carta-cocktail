@@ -2,14 +2,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '../../test/test-utils';
 import userEvent from '@testing-library/user-event';
 import ImportBottlesWizard from './ImportBottlesWizard';
+import type { BottleImportPreviewResponse } from '../../types';
 
 vi.mock('../../services/api', () => ({
   bottles: { importPreview: vi.fn(), importConfirm: vi.fn() },
-  categories: { list: vi.fn().mockResolvedValue([]) },
-  categoryTypes: { list: vi.fn().mockResolvedValue([]) },
+  categories: { list: vi.fn() },
+  categoryTypes: { list: vi.fn() },
 }));
 
-import { bottles as bottlesApi } from '../../services/api';
+import { bottles as bottlesApi, categories as categoriesApi, categoryTypes as categoryTypesApi } from '../../services/api';
 
 const samplePreview = {
   payload: {
@@ -59,11 +60,24 @@ const samplePreview = {
       potentialDuplicates: [],
     },
   ],
+  errors: [],
 };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(categoriesApi.list).mockResolvedValue([]);
+  vi.mocked(categoryTypesApi.list).mockResolvedValue([]);
 });
+
+async function previewWith(preview: BottleImportPreviewResponse) {
+  const user = userEvent.setup();
+  vi.mocked(bottlesApi.importPreview).mockResolvedValue(preview);
+  const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+  await user.upload(input, new File(['x'], 'bottles.json'));
+  await user.click(screen.getByText('bottles.importWizard.next'));
+  await screen.findByText('bottles.importWizard.bottlesTitle');
+  return user;
+}
 
 describe('ImportBottlesWizard', () => {
   it('renders the upload step initially', () => {
@@ -131,6 +145,7 @@ describe('ImportBottlesWizard', () => {
       payload: { version: 1, categories: [], bottles: [{ ...samplePreview.payload.bottles[0], categoryName: '' }] },
       categories: [],
       bottles: [{ ref: { ...samplePreview.bottles[0].ref, categoryName: '' }, needsCategory: true, potentialDuplicates: [] }],
+      errors: [],
     });
     render(<ImportBottlesWizard onClose={() => undefined} />);
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
@@ -226,5 +241,117 @@ describe('ImportBottlesWizard', () => {
 
     await user.click(screen.getByText('bottles.importWizard.unskip'));
     expect(screen.getByText('bottles.importWizard.skip')).toBeInTheDocument();
+  });
+
+  it('lists the rows the backend left out, with their line and reason', async () => {
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    await previewWith({
+      ...samplePreview,
+      errors: [
+        { source: 'bottles', line: 3, field: 'capacityMl', code: 'required' },
+        { source: 'categories', line: 2, field: 'minimumPercent', code: 'outOfRange' },
+      ],
+    });
+
+    expect(screen.getByText('bottles.importWizard.rowErrors.title')).toBeInTheDocument();
+    expect(screen.getAllByText('bottles.importWizard.rowErrors.position')).toHaveLength(2);
+    expect(screen.getByText('bottles.importWizard.rowErrors.code.required')).toBeInTheDocument();
+    expect(screen.getByText('bottles.importWizard.rowErrors.code.outOfRange')).toBeInTheDocument();
+  });
+
+  it('shows no error list when every row is valid', async () => {
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    await previewWith(samplePreview);
+
+    expect(screen.queryByText('bottles.importWizard.rowErrors.title')).not.toBeInTheDocument();
+  });
+
+  it('edits a category to create, with the types in the interface language', async () => {
+    vi.mocked(categoryTypesApi.list).mockResolvedValue([
+      { name: 'SPIRIT', color: 'amber', nameTranslations: { fr: 'Spiritueux', en: 'Spirits' } },
+      { name: 'LIQUEUR', color: 'purple', nameTranslations: { fr: 'Liqueur', en: 'Liqueur' } },
+    ]);
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    const user = await previewWith(samplePreview);
+
+    const name = screen.getByLabelText('categories.name');
+    await user.clear(name);
+    await user.type(name, 'Rum');
+    expect(name).toHaveValue('Rum');
+
+    expect(await screen.findByRole('option', { name: 'Spirits' })).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('categories.type'), 'Liqueur');
+    expect(screen.getByLabelText('categories.type')).toHaveValue('LIQUEUR');
+  });
+
+  it('maps a category to the existing match and offers the existing categories for each row', async () => {
+    vi.mocked(categoriesApi.list).mockResolvedValue([{ id: 5, name: 'Rhum ambré' }] as never);
+    vi.mocked(bottlesApi.importConfirm).mockResolvedValue({ created: { bottles: 2 }, duplicatesCreated: 1, skippedNoCategory: 1 });
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    const user = await previewWith({
+      ...samplePreview,
+      categories: [{ ...samplePreview.categories[0], existingMatch: { id: 4, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 }, status: 'matched' }],
+    });
+
+    await user.click(screen.getByText('bottles.importWizard.createNew'));
+    expect(screen.getByLabelText('categories.name')).toBeInTheDocument();
+    await user.click(screen.getByText('bottles.importWizard.useExisting'));
+    expect(screen.queryByLabelText('categories.name')).not.toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText('bottles.category'), await screen.findByRole('option', { name: 'Rhum ambré' }));
+    await user.click(screen.getAllByText('bottles.importWizard.next').at(-1)!);
+    await user.click(screen.getByText('bottles.importWizard.confirmImport'));
+
+    await screen.findByText('bottles.importWizard.successCount');
+    expect(bottlesApi.importConfirm).toHaveBeenCalledWith({
+      payload: samplePreview.payload,
+      resolutions: { categories: { rhum: { action: 'use_existing', existingId: 4 } }, bottles: { 0: { action: 'import', categoryName: 'Rhum ambré' } } },
+    });
+    expect(screen.getByText('bottles.importWizard.duplicatesCreatedRecap')).toBeInTheDocument();
+    expect(screen.getByText('bottles.importWizard.skippedRecap')).toBeInTheDocument();
+  });
+
+  it('blocks the next step while a row has no category, and warns about duplicates', async () => {
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    const user = await previewWith({
+      ...samplePreview,
+      bottles: [
+        { ref: { ...samplePreview.bottles[0].ref, categoryName: '' }, needsCategory: true, potentialDuplicates: [] },
+        {
+          ...samplePreview.bottles[0],
+          potentialDuplicates: [{ id: 99, name: 'Havana 7', capacityMl: 700, categoryName: 'Rhum', remainingPercent: 50 }],
+        },
+      ],
+    });
+
+    const next = screen.getAllByText('bottles.importWizard.next').at(-1)!.closest('button')!;
+    expect(next).toBeDisabled();
+
+    // Skipping the row without a category unblocks the import
+    await user.click(screen.getAllByText('bottles.importWizard.skip')[0]);
+    await user.click(next);
+
+    expect(screen.getByText('bottles.importWizard.confirmTitle')).toBeInTheDocument();
+    expect(screen.getByText('bottles.importWizard.duplicatesWarningTitle')).toBeInTheDocument();
+    expect(screen.queryByText('bottles.importWizard.unresolvedWarning')).not.toBeInTheDocument();
+
+    await user.click(screen.getByText('bottles.importWizard.back'));
+    await user.click(screen.getByText('bottles.importWizard.back'));
+    expect(screen.getByText('bottles.importWizard.dropzone')).toBeInTheDocument();
+  });
+
+  it('shows the error screen when the confirmation fails, then closes', async () => {
+    const onClose = vi.fn();
+    vi.mocked(bottlesApi.importConfirm).mockRejectedValue(new Error('Too many bottles'));
+    render(<ImportBottlesWizard onClose={onClose} />);
+    const user = await previewWith(samplePreview);
+
+    await user.click(screen.getAllByText('bottles.importWizard.next').at(-1)!);
+    await user.click(screen.getByText('bottles.importWizard.confirmImport'));
+
+    expect(await screen.findByText('Too many bottles')).toBeInTheDocument();
+    expect(screen.getByText('bottles.importWizard.error')).toBeInTheDocument();
+    await user.click(screen.getByText('bottles.importWizard.close'));
+    expect(onClose).toHaveBeenCalled();
   });
 });

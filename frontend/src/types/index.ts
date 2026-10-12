@@ -267,9 +267,10 @@ export interface ImportEntityRef {
   conversionFactorToMl?: number | null;
   nameTranslations?: Record<string, string> | null;
   type?: string;
-  desiredStock?: number;
+  // null while the admin has cleared the field in the wizard
+  desiredStock?: number | null;
   categoryName?: string;
-  capacityMl?: number;
+  capacityMl?: number | null;
   remainingPercent?: number;
   icon?: string | null;
 }
@@ -344,10 +345,24 @@ export interface BottleRowPreview {
   potentialDuplicates: BottleDuplicateEntry[];
 }
 
+export type BottleImportRowErrorCode = 'required' | 'outOfRange' | 'invalidDate' | 'invalidNumber';
+
+/**
+ * A row of the file left out of the import. `line` is the CSV line (header = 1)
+ * or the position in the JSON list (first = 1), within `source`.
+ */
+export interface BottleImportRowError {
+  source: 'bottles' | 'categories';
+  line: number;
+  field: string;
+  code: BottleImportRowErrorCode;
+}
+
 export interface BottleImportPreviewResponse {
   payload: BottleImportPayload;
   categories: BottleCategoryPreview[];
   bottles: BottleRowPreview[];
+  errors: BottleImportRowError[];
 }
 
 export type BottleCategoryResolution =

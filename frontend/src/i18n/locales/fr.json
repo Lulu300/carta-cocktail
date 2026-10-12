@@ -142,7 +142,26 @@
       "duplicatesCreatedRecap": "{{count}} doublon(s) ajouté(s) en plus de bouteilles existantes",
       "skippedRecap": "{{count}} ligne(s) ignorée(s) faute de catégorie",
       "close": "Fermer",
-      "error": "Erreur lors de l'import"
+      "error": "Erreur lors de l'import",
+      "steps": {
+        "upload": "Choisir un fichier",
+        "resolve": "Vérifier les lignes",
+        "confirm": "Confirmer"
+      },
+      "rowErrors": {
+        "title": "{{count}} ligne(s) écartée(s) de l'import",
+        "position": "{{source}}, ligne {{line}} :",
+        "source": {
+          "bottles": "Bouteilles",
+          "categories": "Catégories"
+        },
+        "code": {
+          "required": "{{field}} manquant",
+          "outOfRange": "{{field}} hors limites",
+          "invalidDate": "{{field}} n'est pas une date valide",
+          "invalidNumber": "{{field}} n'est pas un nombre valide"
+        }
+      }
     }
   },
   "ingredients": {
@@ -256,7 +275,21 @@
       "zipNoRecipes": "Aucun fichier JSON trouvé dans le ZIP",
       "zipNoValidRecipes": "Aucune recette valide trouvée dans le ZIP",
       "zipReadError": "Impossible de lire le fichier ZIP",
-      "desiredStock": "Stock désiré (nb de bouteilles scellées)"
+      "desiredStock": "Stock désiré (nb de bouteilles scellées)",
+      "steps": {
+        "upload": "Choisir un fichier",
+        "resolve": "Vérifier les ingrédients",
+        "confirm": "Confirmer"
+      },
+      "fileReadError": "Le fichier n'a pas pu être lu",
+      "existingEntity": "Élément existant",
+      "fieldRequired": "Obligatoire",
+      "capacityInvalid": "Indiquez un nombre entier de ml, supérieur à 0",
+      "desiredStockInvalid": "Indiquez un nombre entier, 0 ou plus",
+      "listsLoadError": "Certains éléments existants n'ont pas pu être chargés : ils manquent dans les listes.",
+      "showSummary": "Voir le récapitulatif",
+      "resultImported": "importé",
+      "resultNotImported": "non importé"
     }
   },
   "menus": {

@@ -1,260 +1,208 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { EntityResolutionAction, ImportEntityResolution, ImportEntityRef, CategoryType } from '../../types';
+import type { CategoryType, EntityResolutionAction, ImportEntityRef, ImportEntityResolution } from '../../types';
+import { useLocalizedName } from '../../hooks/useLocalizedName';
 import IconPicker from '../ui/IconPicker';
+import Field from '../ui/Field';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
+import { cx } from '../ui/classNames';
+import {
+  defaultCreateData,
+  invalidCreateFields,
+  parseNumberInput,
+  type CreateDataField,
+  type ImportEntityType,
+} from './importResolutions';
+import { existingOptionLabel, type ExistingOption } from './useImportReferenceLists';
+
+type ResolutionChoice = EntityResolutionAction['action'];
 
 interface ImportEntityRowProps {
   entity: ImportEntityResolution;
-  entityType: 'unit' | 'category' | 'bottle' | 'ingredient';
-  existingOptions: Array<{ id: number; name: string; abbreviation?: string; category?: { name?: string } }>;
+  type: ImportEntityType;
+  existingOptions: ExistingOption[];
   resolution: EntityResolutionAction | undefined;
   onChange: (resolution: EntityResolutionAction) => void;
   allowSkip?: boolean;
   categoryTypes?: CategoryType[];
 }
 
+const FIELD_ERROR_KEYS: Record<CreateDataField, string> = {
+  name: 'cocktails.importWizard.fieldRequired',
+  abbreviation: 'cocktails.importWizard.fieldRequired',
+  capacityMl: 'cocktails.importWizard.capacityInvalid',
+  desiredStock: 'cocktails.importWizard.desiredStockInvalid',
+};
+
+/**
+ * The entities the admin can pick. A bottle only maps to a bottle of the same
+ * category. The backend's match stays listed while the lists are loading.
+ */
+function pickableOptions(entity: ImportEntityResolution, type: ImportEntityType, options: ExistingOption[]): ExistingOption[] {
+  const categoryName = entity.ref.categoryName?.toLowerCase();
+  const sameCategory = type === 'bottles' && categoryName
+    ? options.filter((option) => option.category?.name?.toLowerCase() === categoryName)
+    : options;
+  const match = entity.existingMatch;
+  if (!match || sameCategory.some((option) => option.id === match.id)) return sameCategory;
+  return [match, ...sameCategory];
+}
+
+function ChoiceButton({ selected, disabled, onClick, children }: {
+  selected: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={selected}
+      className={cx(
+        'text-xs px-3 py-1.5 rounded-lg transition-colors border disabled:opacity-50 disabled:cursor-not-allowed',
+        selected ? 'bg-accent/10 text-accent border-accent/50' : 'text-fg-muted border-gray-700 hover:border-gray-500',
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
 export default function ImportEntityRow({
   entity,
-  entityType,
+  type,
   existingOptions,
   resolution,
   onChange,
-  allowSkip,
-  categoryTypes,
+  allowSkip = false,
+  categoryTypes = [],
 }: ImportEntityRowProps) {
   const { t } = useTranslation();
+  const localizedName = useLocalizedName();
   const [expanded, setExpanded] = useState(entity.status === 'missing');
 
-  const action = resolution?.action || (entity.status === 'matched' ? 'use_existing' : 'create');
+  const choice: ResolutionChoice = resolution?.action ?? (entity.status === 'matched' ? 'use_existing' : 'create');
+  const options = pickableOptions(entity, type, existingOptions);
+  const createData = (resolution?.action === 'create' && resolution.data) || defaultCreateData(type, entity.ref);
+  const invalidFields = invalidCreateFields(type, createData);
+  const errorOf = (field: CreateDataField) => (invalidFields.includes(field) ? t(FIELD_ERROR_KEYS[field]) : undefined);
 
-  // For bottles, filter existing options to only show bottles from the same category
-  const filteredOptions = entityType === 'bottle' && entity.ref.categoryName
-    ? existingOptions.filter((opt) => opt.category?.name?.toLowerCase() === entity.ref.categoryName?.toLowerCase())
-    : existingOptions;
-
-  const getDisplayName = () => {
-    if (entityType === 'unit') return `${entity.ref.name} (${entity.ref.abbreviation})`;
-    return entity.ref.name;
+  const choose = (next: ResolutionChoice) => {
+    // The button is disabled when `options` is empty
+    if (next === 'use_existing') onChange({ action: 'use_existing', existingId: entity.existingMatch?.id ?? options[0].id });
+    else if (next === 'create') onChange({ action: 'create', data: defaultCreateData(type, entity.ref) });
+    else onChange({ action: 'skip' });
   };
 
-  const handleActionChange = (newAction: 'use_existing' | 'create' | 'skip') => {
-    if (newAction === 'use_existing') {
-      const matchId = entity.existingMatch?.id || filteredOptions[0]?.id;
-      onChange({ action: 'use_existing', existingId: matchId });
-    } else if (newAction === 'create') {
-      onChange({ action: 'create', data: buildDefaultCreateData() });
-    } else {
-      onChange({ action: 'skip' });
-    }
+  const updateCreateData = (field: keyof ImportEntityRef, value: ImportEntityRef[keyof ImportEntityRef]) => {
+    onChange({ action: 'create', data: { ...createData, [field]: value } });
   };
 
-  const buildDefaultCreateData = () => {
-    switch (entityType) {
-      case 'unit':
-        return {
-          name: entity.ref.name,
-          abbreviation: entity.ref.abbreviation,
-          conversionFactorToMl: entity.ref.conversionFactorToMl ?? null,
-          nameTranslations: entity.ref.nameTranslations || null,
-        };
-      case 'category':
-        return {
-          name: entity.ref.name,
-          type: entity.ref.type || 'SPIRIT',
-          desiredStock: entity.ref.desiredStock || 1,
-          nameTranslations: entity.ref.nameTranslations || null,
-        };
-      case 'bottle':
-        return {
-          name: entity.ref.name,
-          categoryName: entity.ref.categoryName || '',
-          capacityMl: 700,
-          remainingPercent: 100,
-        };
-      case 'ingredient':
-        return {
-          name: entity.ref.name,
-          icon: entity.ref.icon || null,
-          nameTranslations: entity.ref.nameTranslations || null,
-        };
-      default:
-        return entity.ref;
-    }
-  };
+  const textField = (field: 'name' | 'abbreviation', label: string) => (
+    <Field label={label} error={errorOf(field)} required>
+      <Input value={createData[field] ?? ''} onChange={(e) => updateCreateData(field, e.target.value)} />
+    </Field>
+  );
 
-  const updateCreateData = (field: string, value: string | number | null) => {
-    onChange({
-      action: 'create',
-      data: { ...(resolution?.data || buildDefaultCreateData()), [field]: value } as ImportEntityRef,
-    });
-  };
+  const numberField = (field: 'capacityMl' | 'desiredStock', label: string, min: number) => (
+    <Field label={label} error={errorOf(field)} required>
+      <Input
+        type="number"
+        min={min}
+        value={createData[field] ?? ''}
+        onChange={(e) => updateCreateData(field, parseNumberInput(e.target.value))}
+      />
+    </Field>
+  );
+
+  const title = type === 'units' ? `${entity.ref.name} (${entity.ref.abbreviation})` : entity.ref.name;
+  const selectedId = resolution?.existingId ?? entity.existingMatch?.id ?? options[0]?.id ?? '';
 
   return (
     <div className="border border-gray-700 rounded-lg overflow-hidden">
-      {/* Header */}
-      <div
-        className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-800/30"
+      <button
+        type="button"
         onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
+        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-800/30"
       >
-        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
-          entity.status === 'matched' ? 'bg-green-400' : 'bg-orange-400'
-        }`} />
-        <span className="flex-1 text-sm font-medium">{getDisplayName()}</span>
-        <span className={`text-xs px-2 py-0.5 rounded ${
-          entity.status === 'matched'
-            ? 'bg-green-500/10 text-green-400'
-            : 'bg-orange-500/10 text-orange-400'
-        }`}>
+        <span aria-hidden="true" className={cx('w-2.5 h-2.5 rounded-full flex-shrink-0', entity.status === 'matched' ? 'bg-green-400' : 'bg-orange-400')} />
+        <span className="flex-1 text-sm font-medium">{title}</span>
+        <span className={cx(
+          'text-xs px-2 py-0.5 rounded',
+          entity.status === 'matched' ? 'bg-green-500/10 text-green-400' : 'bg-orange-500/10 text-orange-400',
+        )}>
           {entity.status === 'matched' ? t('cocktails.importWizard.matched') : t('cocktails.importWizard.missing')}
         </span>
-        <svg className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg aria-hidden="true" className={cx('w-4 h-4 text-fg-muted transition-transform', expanded && 'rotate-180')} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
-      </div>
+      </button>
 
-      {/* Expanded content */}
       {expanded && (
-        <div className="px-4 pb-4 pt-1 border-t border-gray-700/50 space-y-3">
-          {/* Action selector */}
+        <div className="px-4 pb-4 pt-3 border-t border-gray-700/50 space-y-3">
           <div className="flex gap-2">
-            <button
-              onClick={() => handleActionChange('use_existing')}
-              className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
-                action === 'use_existing'
-                  ? 'bg-amber-400/10 text-amber-400 border border-amber-400/50'
-                  : 'text-gray-400 border border-gray-700 hover:border-gray-500'
-              }`}
-            >
+            <ChoiceButton selected={choice === 'use_existing'} disabled={options.length === 0} onClick={() => choose('use_existing')}>
               {t('cocktails.importWizard.useExisting')}
-            </button>
-            <button
-              onClick={() => handleActionChange('create')}
-              className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
-                action === 'create'
-                  ? 'bg-amber-400/10 text-amber-400 border border-amber-400/50'
-                  : 'text-gray-400 border border-gray-700 hover:border-gray-500'
-              }`}
-            >
+            </ChoiceButton>
+            <ChoiceButton selected={choice === 'create'} onClick={() => choose('create')}>
               {t('cocktails.importWizard.createNew')}
-            </button>
+            </ChoiceButton>
             {allowSkip && (
-              <button
-                onClick={() => handleActionChange('skip')}
-                className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
-                  action === 'skip'
-                    ? 'bg-gray-400/10 text-gray-300 border border-gray-500'
-                    : 'text-gray-400 border border-gray-700 hover:border-gray-500'
-                }`}
-              >
+              <ChoiceButton selected={choice === 'skip'} onClick={() => choose('skip')}>
                 {t('cocktails.importWizard.skip')}
-              </button>
+              </ChoiceButton>
             )}
           </div>
 
-          {/* Use existing dropdown */}
-          {action === 'use_existing' && (
-            <select
-              value={resolution?.existingId || entity.existingMatch?.id || ''}
-              onChange={(e) => onChange({ action: 'use_existing', existingId: parseInt(e.target.value) })}
-              className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400"
-            >
-              {filteredOptions.map((opt) => (
-                <option key={opt.id} value={opt.id}>
-                  {entityType === 'unit' ? `${opt.name} (${opt.abbreviation})` : opt.name}
-                </option>
-              ))}
-            </select>
+          {choice === 'use_existing' && (
+            <Field label={t('cocktails.importWizard.existingEntity')}>
+              <Select
+                value={selectedId}
+                onChange={(e) => onChange({ action: 'use_existing', existingId: Number(e.target.value) })}
+              >
+                {options.map((option) => (
+                  <option key={option.id} value={option.id}>{existingOptionLabel(type, option)}</option>
+                ))}
+              </Select>
+            </Field>
           )}
 
-          {/* Create form */}
-          {action === 'create' && (
+          {choice === 'create' && (
             <div className="space-y-2">
-              {entityType === 'unit' && (
+              {textField('name', t(`${type}.name`))}
+              {type === 'units' && textField('abbreviation', t('units.abbreviation'))}
+              {type === 'categories' && (
                 <>
-                  <input
-                    value={resolution?.data?.name || entity.ref.name}
-                    onChange={(e) => updateCreateData('name', e.target.value)}
-                    placeholder={t('units.name')}
-                    className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400"
-                  />
-                  <input
-                    value={resolution?.data?.abbreviation || entity.ref.abbreviation}
-                    onChange={(e) => updateCreateData('abbreviation', e.target.value)}
-                    placeholder={t('units.abbreviation')}
-                    className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400"
-                  />
+                  <Field label={t('categories.type')}>
+                    <Select value={createData.type ?? ''} onChange={(e) => updateCreateData('type', e.target.value)}>
+                      {/* The file's type stays selectable while the types are loading */}
+                      {!categoryTypes.some((ct) => ct.name === createData.type) && (
+                        <option value={createData.type}>{createData.type}</option>
+                      )}
+                      {categoryTypes.map((ct) => (
+                        <option key={ct.name} value={ct.name}>{localizedName(ct)}</option>
+                      ))}
+                    </Select>
+                  </Field>
+                  {numberField('desiredStock', t('cocktails.importWizard.desiredStock'), 0)}
                 </>
               )}
-              {entityType === 'category' && (
-                <>
-                  <input
-                    value={resolution?.data?.name || entity.ref.name}
-                    onChange={(e) => updateCreateData('name', e.target.value)}
-                    placeholder={t('categories.name')}
-                    className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400"
-                  />
-                  <select
-                    value={resolution?.data?.type || entity.ref.type || 'SPIRIT'}
-                    onChange={(e) => updateCreateData('type', e.target.value)}
-                    className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400"
-                  >
-                    {(categoryTypes || []).map(ct => (
-                      <option key={ct.name} value={ct.name}>{ct.nameTranslations?.fr || ct.nameTranslations?.en || ct.name}</option>
-                    ))}
-                  </select>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">
-                      {t('cocktails.importWizard.desiredStock')}
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={resolution?.data?.desiredStock ?? entity.ref.desiredStock ?? 1}
-                      onChange={(e) => updateCreateData('desiredStock', parseInt(e.target.value) || 0)}
-                      className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400"
-                    />
-                  </div>
-                </>
-              )}
-              {entityType === 'bottle' && (
-                <>
-                  <input
-                    value={resolution?.data?.name || entity.ref.name}
-                    onChange={(e) => updateCreateData('name', e.target.value)}
-                    placeholder={t('bottles.name')}
-                    className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400"
-                  />
-                  <input
-                    type="number"
-                    value={resolution?.data?.capacityMl ?? 700}
-                    onChange={(e) => updateCreateData('capacityMl', parseInt(e.target.value))}
-                    placeholder={t('bottles.capacityMl')}
-                    className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400"
-                  />
-                </>
-              )}
-              {entityType === 'ingredient' && (
-                <>
-                  <input
-                    value={resolution?.data?.name || entity.ref.name}
-                    onChange={(e) => updateCreateData('name', e.target.value)}
-                    placeholder={t('ingredients.name')}
-                    className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400"
-                  />
-                  <IconPicker
-                    value={resolution?.data?.icon || entity.ref.icon || ''}
-                    onChange={(icon) => updateCreateData('icon', icon || null)}
-                  />
-                </>
+              {type === 'bottles' && numberField('capacityMl', t('bottles.capacityMl'), 1)}
+              {type === 'ingredients' && (
+                <IconPicker
+                  value={createData.icon ?? ''}
+                  onChange={(icon) => updateCreateData('icon', icon || null)}
+                />
               )}
             </div>
           )}
 
-          {/* Skip info */}
-          {action === 'skip' && (
-            <p className="text-xs text-gray-500 italic">
-              {t('cocktails.importWizard.skip')}
-            </p>
+          {choice === 'skip' && (
+            <p className="text-xs text-fg-muted italic">{t('cocktails.importWizard.skip')}</p>
           )}
         </div>
       )}

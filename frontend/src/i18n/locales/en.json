@@ -142,7 +142,26 @@
       "duplicatesCreatedRecap": "{{count}} duplicate(s) added in addition to existing bottles",
       "skippedRecap": "{{count}} row(s) skipped due to missing category",
       "close": "Close",
-      "error": "Import error"
+      "error": "Import error",
+      "steps": {
+        "upload": "Choose a file",
+        "resolve": "Check the rows",
+        "confirm": "Confirm"
+      },
+      "rowErrors": {
+        "title": "{{count}} row(s) left out of the import",
+        "position": "{{source}}, line {{line}}:",
+        "source": {
+          "bottles": "Bottles",
+          "categories": "Categories"
+        },
+        "code": {
+          "required": "{{field}} is missing",
+          "outOfRange": "{{field}} is out of range",
+          "invalidDate": "{{field}} is not a valid date",
+          "invalidNumber": "{{field}} is not a valid number"
+        }
+      }
     }
   },
   "ingredients": {
@@ -256,7 +275,21 @@
       "zipNoRecipes": "No JSON files found in the ZIP",
       "zipNoValidRecipes": "No valid recipes found in the ZIP",
       "zipReadError": "Unable to read ZIP file",
-      "desiredStock": "Desired stock (sealed bottles)"
+      "desiredStock": "Desired stock (sealed bottles)",
+      "steps": {
+        "upload": "Choose a file",
+        "resolve": "Check the ingredients",
+        "confirm": "Confirm"
+      },
+      "fileReadError": "The file could not be read",
+      "existingEntity": "Existing entry",
+      "fieldRequired": "Required",
+      "capacityInvalid": "Enter a whole number of ml, greater than 0",
+      "desiredStockInvalid": "Enter a whole number, 0 or more",
+      "listsLoadError": "Some existing entries could not be loaded: they are missing from the lists.",
+      "showSummary": "See the summary",
+      "resultImported": "imported",
+      "resultNotImported": "not imported"
     }
   },
   "menus": {
