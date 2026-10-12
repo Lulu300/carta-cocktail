@@ -88,6 +88,40 @@ describe('AuthContext', () => {
     expect(mockMe).not.toHaveBeenCalled();
   });
 
+  it('should store the new token and email after a password change', async () => {
+    localStorage.setItem('token', 'old-token');
+    mockMe.mockResolvedValueOnce({ id: 1, email: 'admin@test.local' });
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => {
+      expect(result.current.user).not.toBeNull();
+    });
+
+    act(() => {
+      result.current.updateSession({ id: 1, email: 'new@test.local' }, 'new-token');
+    });
+
+    expect(result.current.user).toEqual({ id: 1, email: 'new@test.local' });
+    expect(result.current.token).toBe('new-token');
+    expect(localStorage.getItem('token')).toBe('new-token');
+  });
+
+  it('should keep the token when the profile update returns none', async () => {
+    localStorage.setItem('token', 'current-token');
+    mockMe.mockResolvedValueOnce({ id: 1, email: 'admin@test.local' });
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => {
+      expect(result.current.user).not.toBeNull();
+    });
+
+    act(() => {
+      result.current.updateSession({ id: 1, email: 'new@test.local' });
+    });
+
+    expect(result.current.user).toEqual({ id: 1, email: 'new@test.local' });
+    expect(result.current.token).toBe('current-token');
+    expect(localStorage.getItem('token')).toBe('current-token');
+  });
+
   it('should clear user and token when the API reports an unauthorized request', async () => {
     localStorage.setItem('token', 'stored-token');
     mockMe.mockResolvedValueOnce({ id: 1, email: 'admin@test.local' });

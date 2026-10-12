@@ -1,177 +1,177 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { useSort } from '../../hooks/useSort';
 import { usePagination } from '../../hooks/usePagination';
-import { units as api } from '../../services/api';
+import { units as unitsApi } from '../../services/api';
 import type { Unit } from '../../types';
+import { qk } from '../../queries/keys';
+import { useUnits } from '../../queries/units';
+import { useCrudMutations } from '../../queries/crud';
+import { buildNameTranslations, toTranslationForm, type TranslationForm } from '../../utils/translations';
+import Button from '../../components/ui/Button';
+import Field from '../../components/ui/Field';
+import IconButton from '../../components/ui/IconButton';
+import Input from '../../components/ui/Input';
+import Modal from '../../components/ui/Modal';
 import SearchInput from '../../components/ui/SearchInput';
-import SortableHeader from '../../components/ui/SortableHeader';
-import Pagination from '../../components/ui/Pagination';
+import DataTable, { type Column } from '../../components/admin/DataTable';
+import TranslationFields from '../../components/admin/TranslationFields';
+import { useConfirmDelete } from '../../components/admin/useConfirmDelete';
+import { useEntityForm } from '../../components/admin/useEntityForm';
+
+interface UnitForm {
+  name: string;
+  abbreviation: string;
+  /** Kept as typed: empty means the unit cannot be converted to ml. */
+  conversionFactorToMl: string;
+  translations: TranslationForm;
+}
+
+interface UnitInput {
+  name: string;
+  abbreviation: string;
+  conversionFactorToMl: number | null;
+  nameTranslations: Record<string, string> | null;
+}
+
+function toUnitForm(unit?: Unit): UnitForm {
+  return {
+    name: unit?.name ?? '',
+    abbreviation: unit?.abbreviation ?? '',
+    conversionFactorToMl: unit?.conversionFactorToMl != null ? String(unit.conversionFactorToMl) : '',
+    translations: toTranslationForm(unit?.nameTranslations),
+  };
+}
+
+function toUnitInput(form: UnitForm): UnitInput {
+  return {
+    name: form.name,
+    abbreviation: form.abbreviation,
+    conversionFactorToMl: form.conversionFactorToMl === '' ? null : parseFloat(form.conversionFactorToMl),
+    nameTranslations: buildNameTranslations(form.translations),
+  };
+}
 
 export default function UnitsPage() {
   const { t } = useTranslation();
   const localize = useLocalizedName();
-  const [items, setItems] = useState<Unit[]>([]);
-  const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState<Unit | null>(null);
-  const [form, setForm] = useState({ name: '', abbreviation: '', conversionFactorToMl: '', nameFr: '', nameEn: '' });
-  const [showTranslations, setShowTranslations] = useState(false);
+  const confirmDelete = useConfirmDelete();
+  const unitsQuery = useUnits();
+  // A unit's conversion factor decides whether the stock covers a recipe.
+  const { create, update, remove } = useCrudMutations<UnitInput>({
+    key: qk.units,
+    api: unitsApi,
+    invalidates: [qk.availability],
+    messages: { created: 'units.created', updated: 'units.updated', deleted: 'units.deleted' },
+  });
+  const unitForm = useEntityForm(toUnitForm);
+  const { form, setField, editing } = unitForm;
   const [search, setSearch] = useState('');
 
-  const filteredItems = useMemo(() => {
-    if (!search.trim()) return items;
-    const lower = search.toLowerCase();
-    return items.filter((item) =>
-      localize(item).toLowerCase().includes(lower) ||
-      item.abbreviation.toLowerCase().includes(lower)
+  const filteredUnits = useMemo(() => {
+    const units = unitsQuery.data ?? [];
+    const query = search.trim().toLowerCase();
+    if (!query) return units;
+    return units.filter((unit) =>
+      localize(unit).toLowerCase().includes(query) || unit.abbreviation.toLowerCase().includes(query),
     );
-  }, [items, search, localize]);
+  }, [unitsQuery.data, search, localize]);
 
-  const { sortedItems, sortKey, sortDirection, toggleSort } = useSort<Unit>(filteredItems);
-  const { paginatedItems, page, pageSize, totalPages, totalItems, setPage, setPageSize } = usePagination(sortedItems);
+  const sort = useSort<Unit>(filteredUnits);
+  const pagination = usePagination(sort.sortedItems);
+  const isSaving = create.isPending || update.isPending;
 
-  const load = () => api.list().then(setItems);
-  useEffect(() => { load(); }, []);
-
-  const openCreate = () => { setEditing(null); setForm({ name: '', abbreviation: '', conversionFactorToMl: '', nameFr: '', nameEn: '' }); setShowTranslations(false); setShowModal(true); };
-  const openEdit = (item: Unit) => {
-    setEditing(item);
-    setForm({
-      name: item.name,
-      abbreviation: item.abbreviation,
-      conversionFactorToMl: item.conversionFactorToMl !== null ? String(item.conversionFactorToMl) : '',
-      nameFr: item.nameTranslations?.fr || '',
-      nameEn: item.nameTranslations?.en || '',
-    });
-    setShowModal(true);
+  const handleSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    const data = toUnitInput(form);
+    const options = { onSuccess: unitForm.close };
+    if (editing) update.mutate({ id: editing.id, data }, options);
+    else create.mutate(data, options);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const nameTranslations: Record<string, string> = {};
-    if (form.nameFr.trim()) nameTranslations.fr = form.nameFr.trim();
-    if (form.nameEn.trim()) nameTranslations.en = form.nameEn.trim();
-    const data = {
-      name: form.name,
-      abbreviation: form.abbreviation,
-      conversionFactorToMl: form.conversionFactorToMl === '' ? null : parseFloat(form.conversionFactorToMl),
-      nameTranslations: Object.keys(nameTranslations).length > 0 ? nameTranslations : null,
-    };
-    if (editing) { await api.update(editing.id, data); }
-    else { await api.create(data); }
-    setShowModal(false);
-    load();
+  const handleDelete = async (unit: Unit) => {
+    if (await confirmDelete(t('units.confirmDelete'))) remove.mutate(unit.id);
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm(t('units.confirmDelete'))) return;
-    await api.delete(id);
-    load();
-  };
+  const columns: Column<Unit>[] = [
+    { key: 'name', header: t('units.name'), sortable: true, className: 'font-medium', render: (unit) => localize(unit) },
+    { key: 'abbreviation', header: t('units.abbreviation'), sortable: true, className: 'text-fg-muted', render: (unit) => unit.abbreviation },
+    {
+      key: 'conversionFactorToMl',
+      header: 'Facteur de conversion (ml)',
+      sortable: true,
+      className: 'text-fg-muted',
+      render: (unit) => (unit.conversionFactorToMl !== null
+        ? <span>1 {unit.abbreviation} = {unit.conversionFactorToMl} ml</span>
+        : <span className="italic">Non convertible</span>),
+    },
+    {
+      key: 'actions',
+      header: t('common.actions'),
+      align: 'right',
+      render: (unit) => (
+        <div className="flex items-center justify-end gap-1">
+          <IconButton icon="edit" label={t('common.edit')} onClick={() => unitForm.open(unit)} />
+          <IconButton icon="delete" label={t('common.delete')} variant="danger" onClick={() => handleDelete(unit)} />
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold font-serif text-amber-400">{t('units.title')}</h1>
-        <button onClick={openCreate} className="bg-amber-400 hover:bg-amber-500 text-[#0f0f1a] font-semibold px-4 py-2 rounded-lg">{t('units.add')}</button>
+        <h1 className="text-2xl font-bold font-serif text-accent">{t('units.title')}</h1>
+        <Button onClick={() => unitForm.open()}>{t('units.add')}</Button>
       </div>
       <SearchInput value={search} onChange={setSearch} className="max-w-sm mb-4" />
-      <div className="bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-[#0f0f1a]">
-            <tr>
-              <SortableHeader label={t('units.name')} sortKey="name" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
-              <SortableHeader label={t('units.abbreviation')} sortKey="abbreviation" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
-              <SortableHeader label="Facteur de conversion (ml)" sortKey="conversionFactorToMl" currentSortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} />
-              <th className="text-right px-6 py-3 text-sm text-gray-400 font-medium">{t('common.actions')}</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-800">
-            {paginatedItems.map((item) => (
-              <tr key={item.id} className="hover:bg-gray-800/50">
-                <td className="px-6 py-4 font-medium">{localize(item)}</td>
-                <td className="px-6 py-4 text-gray-400">{item.abbreviation}</td>
-                <td className="px-6 py-4 text-gray-400">
-                  {item.conversionFactorToMl !== null ? (
-                    <span>1 {item.abbreviation} = {item.conversionFactorToMl} ml</span>
-                  ) : (
-                    <span className="text-gray-600 italic">Non convertible</span>
-                  )}
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex items-center justify-end gap-3">
-                    <button onClick={() => openEdit(item)} className="text-amber-400 hover:text-amber-300 transition-colors" title={t('common.edit')}>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                    </button>
-                    <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 transition-colors" title={t('common.delete')}>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {filteredItems.length === 0 && <div className="text-center py-8 text-gray-500">{t('common.noResults')}</div>}
-        <Pagination page={page} totalPages={totalPages} pageSize={pageSize} totalItems={totalItems} onPageChange={setPage} onPageSizeChange={setPageSize} />
-      </div>
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <form onSubmit={handleSubmit} className="bg-[#1a1a2e] border border-gray-800 rounded-xl p-6 w-full max-w-md space-y-4">
-            <h2 className="text-lg font-semibold">{editing ? t('units.edit') : t('units.add')}</h2>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">{t('units.name')}</label>
-              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400" />
-            </div>
-            <div className="border border-gray-700 rounded-lg p-3 space-y-2">
-              <button type="button" onClick={() => setShowTranslations(!showTranslations)}
-                className="text-sm text-gray-400 flex items-center gap-2 w-full text-left">
-                <svg className={`w-3 h-3 transition-transform ${showTranslations ? 'rotate-90' : ''}`} fill="currentColor" viewBox="0 0 20 20"><path d="M6 6L14 10L6 14V6Z"/></svg>
-                {t('common.translations')}
-              </button>
-              {showTranslations && (
-                <div className="space-y-2 pt-1">
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Français</label>
-                    <input value={form.nameFr} onChange={(e) => setForm({ ...form, nameFr: e.target.value })}
-                      placeholder={form.name || '...'} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400" />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">English</label>
-                    <input value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })}
-                      placeholder={form.name || '...'} className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400" />
-                  </div>
-                </div>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">{t('units.abbreviation')}</label>
-              <input value={form.abbreviation} onChange={(e) => setForm({ ...form, abbreviation: e.target.value })} required className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400" />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Facteur de conversion vers ml</label>
-              <input
-                type="number"
-                step="any"
-                value={form.conversionFactorToMl}
-                onChange={(e) => setForm({ ...form, conversionFactorToMl: e.target.value })}
-                placeholder="Laisser vide si non convertible"
-                className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-amber-400"
-              />
-              <p className="text-xs text-gray-500 mt-1">Ex: 1 cl = 10 ml, donc facteur = 10. Laisser vide pour les unités de pièce.</p>
-            </div>
-            <div className="flex justify-end gap-3 pt-2">
-              <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-400 hover:text-white">{t('common.cancel')}</button>
-              <button type="submit" className="bg-amber-400 hover:bg-amber-500 text-[#0f0f1a] font-semibold px-4 py-2 rounded-lg">{t('common.save')}</button>
-            </div>
-          </form>
-        </div>
-      )}
+      <DataTable
+        columns={columns}
+        rows={pagination.paginatedItems}
+        getRowKey={(unit) => unit.id}
+        sort={sort}
+        pagination={pagination}
+        isLoading={unitsQuery.isPending}
+        isError={unitsQuery.isError}
+        onRetry={() => unitsQuery.refetch()}
+        emptyLabel={t('common.noResults')}
+      />
+      <Modal
+        open={unitForm.isOpen}
+        onClose={unitForm.close}
+        title={editing ? t('units.edit') : t('units.add')}
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Field label={t('units.name')} required>
+            <Input value={form.name} onChange={(event) => setField('name', event.target.value)} />
+          </Field>
+          <TranslationFields
+            value={form.translations}
+            onChange={(translations) => setField('translations', translations)}
+            placeholder={form.name}
+          />
+          <Field label={t('units.abbreviation')} required>
+            <Input value={form.abbreviation} onChange={(event) => setField('abbreviation', event.target.value)} />
+          </Field>
+          <Field
+            label="Facteur de conversion vers ml"
+            hint="Ex: 1 cl = 10 ml, donc facteur = 10. Laisser vide pour les unités de pièce."
+          >
+            <Input
+              type="number"
+              step="any"
+              value={form.conversionFactorToMl}
+              onChange={(event) => setField('conversionFactorToMl', event.target.value)}
+              placeholder="Laisser vide si non convertible"
+            />
+          </Field>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="ghost" onClick={unitForm.close}>{t('common.cancel')}</Button>
+            <Button type="submit" loading={isSaving}>{t('common.save')}</Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

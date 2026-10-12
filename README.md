@@ -116,6 +116,18 @@ ADMIN_PASSWORD=<at least 12 characters>        # required on first start
 
 Some versions require actions before or after the upgrade (new variables in `.env`, files to copy out of the old container…). **Read [`UPGRADING.md`](UPGRADING.md) before pulling a new version**, and apply the sections of every version newer than yours, in order. Upgrading from v1.4.0 or older to v1.5.0 requires a `JWT_SECRET` and a copy of the existing cocktail photos.
 
+#### Database files and network shares
+
+By default, the backend runs SQLite in WAL mode. While it runs, the `db-data` volume holds `carta_cocktail.db-wal` and `carta_cocktail.db-shm` next to `carta_cocktail.db`, and the latest changes may only be in the `-wal` file. Never copy `carta_cocktail.db` alone while the backend runs: use the export in Settings > Backup & Restore, which saves a consistent copy of the database with the photos, or stop the backend and copy the `.db` file together with its `-wal` and `-shm` files when they exist. To put a copy back, use the restore in Settings > Backup & Restore, or follow [Restoring a pre-migration backup](#restoring-a-pre-migration-backup), which removes the old `-wal` and `-shm` files: a restored `.db` next to a stale `-wal` file can be corrupted. A copy put back by hand also brings back its sessions, including those revoked since it was made: set a new `JWT_SECRET` afterwards, as in [UPGRADING › "Signing in after a restore"](UPGRADING.md#signing-in-after-a-restore).
+
+WAL does not work on a network share (SMB or NFS, such as a NAS folder bind-mounted as `/app/data`). In that case, set `SQLITE_WAL=false` to keep the rollback journal. The compose files do not pass this variable from `.env`: add it to the `environment` list of `carta-cocktail-backend`, after `- UPLOAD_DIR=/app/uploads`:
+
+```yaml
+      - SQLITE_WAL=false
+```
+
+Add this line again each time you download a new compose file, for example when upgrading: otherwise the database goes back to WAL. The default `db-data` named volume is local and needs nothing. The startup log shows the mode in use: `SQLite journal mode: wal`, or `delete` with `SQLITE_WAL=false`. When SQLite cannot switch, it keeps the previous mode and the log shows a warning: `SQLite journal mode is <mode>, not <mode> as requested (SQLITE_WAL)`.
+
 #### Recovering the admin account
 
 If you lose the admin password:
@@ -206,6 +218,8 @@ To roll back an upgrade, pin the images back to the previous version in `docker-
    docker compose -f docker-compose.prod.yml up -d
    ```
 
+The restored copy brings back its sessions, including those revoked since it was made: set a new `JWT_SECRET` afterwards, as in [UPGRADING › "Signing in after a restore"](UPGRADING.md#signing-in-after-a-restore).
+
 ## Project Structure
 
 ```
@@ -247,8 +261,45 @@ carta-cocktail/
 | `ADMIN_EMAIL` | Admin login email, used when the admin is created or reset | `admin@carta.local` |
 | `ADMIN_PASSWORD` | Admin password, at least 12 characters, used when the admin is created or reset | **required** on first start, no default |
 | `ADMIN_RESET_PASSWORD` | Exactly `true` resets the existing admin's email and password from the two variables above at startup; other values are ignored with a warning | `false` |
+| `SQLITE_WAL` | `false` keeps the rollback journal instead of WAL; required when the database is on a network share (SMB/NFS). Other values use WAL. In Docker, set it in the compose file (see [Database files and network shares](#database-files-and-network-shares)) | `true` |
+| `JWT_EXPIRES_IN` | Lifetime of the admin session token: a number of seconds (`86400`) or a timespan (`24h`, `7d`). Applies to tokens issued after the restart. The backend refuses to start with a value it cannot read | `7d` |
+| `LOGIN_RATE_LIMIT` | Failed logins allowed per client IP address in 15 minutes; beyond that, the login answers 429 (Too Many Requests). Successful logins do not count. A positive integer, otherwise the backend refuses to start | `10` |
+| `TRUST_PROXY` | Proxies whose `X-Forwarded-For` header the API believes, to find the client IP address that `LOGIN_RATE_LIMIT` counts: a number of proxies in front of the API, or a comma-separated list of addresses, subnets or names that Express understands (`loopback`, `linklocal`, `uniquelocal`). The backend refuses to start with a value it cannot read. See [Login limit behind a reverse proxy](#login-limit-behind-a-reverse-proxy) | `loopback, linklocal, uniquelocal` |
+| `CORS_ORIGIN` | Origin allowed to call the API from another site, such as `https://example.com` (a single origin, without a trailing slash). Empty: no other origin is allowed. The app does not need one: nginx, and the Vite proxy in development, serve the frontend and the API on the same origin | empty |
 | `PORT` | Backend port | `3001` |
 | `BACKEND_HOST` | Backend hostname for nginx proxy (frontend container) | `backend` |
+
+The compose files pass only some of these variables to the backend. To set `JWT_EXPIRES_IN`, `LOGIN_RATE_LIMIT`, `TRUST_PROXY` or `CORS_ORIGIN` in Docker, add it to the `environment` list of `carta-cocktail-backend`, as for `SQLITE_WAL` (see [Database files and network shares](#database-files-and-network-shares)), and add it again each time you download a new compose file. The defaults suit a standard install.
+
+### Login limit behind a reverse proxy
+
+The login limit counts failures per client IP address. The frontend's nginx forwards requests to the API, so the API reads the client address from the `X-Forwarded-For` header, but only from the proxies that `TRUST_PROXY` trusts. The default trusts the host and private networks: nginx, and a reverse proxy in front of it on a private network (SWAG, Traefik…), work without any setting, and an address forged by a client on the Internet is ignored.
+
+The default has limits:
+
+- A client on your local network connects from a private address, so it is trusted: it can forge its address and get around the limit.
+- In some installs, the first proxy (nginx, or SWAG) sees clients from the Internet under a **private** address: Docker rootless or Podman (through their port forwarder), Docker Desktop, or IPv6 clients on a published port when the Docker daemon has no IPv6 and `docker-proxy` relays the connection. Every client that arrives this way comes from the same address, and that address is trusted. Clients that do not forge `X-Forwarded-For` all get that address, so they already share one counter: `LOGIN_RATE_LIMIT` failures from any of them block every client that arrives this way, the admin included, for up to 15 minutes. A client that writes its own `X-Forwarded-For` gets the address it wrote, so it can change it at each attempt and get around the limit.
+
+In these installs, set `TRUST_PROXY=1` (nginx alone) or `TRUST_PROXY=2` (SWAG or another reverse proxy in front of nginx) in the `environment` list of `carta-cocktail-backend`:
+
+```yaml
+      - TRUST_PROXY=1
+```
+
+Write values without quotes in this list: compose keeps them as part of the value, and the backend refuses to start with `- TRUST_PROXY="loopback, linklocal, uniquelocal"`.
+
+The API then uses the address the first proxy sees and ignores what clients write in `X-Forwarded-For`. This removes the bypass and adds no risk of blocking the admin: clients that shared a counter still share it, and the others (IPv4 clients in the `docker-proxy` case) keep their own. Clients that share a counter can still block the admin with their failures; raise `LOGIN_RATE_LIMIT` if that happens too often. The counters are kept in memory: restarting the backend clears them.
+
+These settings hold only when clients cannot skip a proxy. The compose files publish the backend port 3001. A client that connects to it directly passes for the first proxy, and the API reads the address that client wrote in `X-Forwarded-For`: with `TRUST_PROXY=1` or `2`, and also with the default when the connection arrives under a private address, as in the installs listed above (in the `docker-proxy` case, only over IPv6). Behind SWAG, the same goes for nginx's port when a client reaches it without SWAG.
+
+Do not publish these ports. Remove the `ports` entry of `carta-cocktail-backend`: nginx reaches the backend over the compose network and does not need it. If you call the API from the host, bind the port to the loopback address instead:
+
+```yaml
+    ports:
+      - "127.0.0.1:3001:3001"
+```
+
+Behind SWAG, do the same with nginx's port: no `ports` entry when SWAG reaches nginx over a Docker network, and a loopback binding when SWAG runs on the host, such as `- "127.0.0.1:8080:8080"` (any free host port; nginx listens on 8080 in the container). A host firewall is not enough with rootful Docker: published ports go through Docker's `PREROUTING`, `FORWARD` and `DOCKER-USER` chains, not `INPUT`, so ufw rules and the usual firewalld zone rules do not filter them. Do not forward these ports from the Internet either.
 
 ## Git Workflow
 

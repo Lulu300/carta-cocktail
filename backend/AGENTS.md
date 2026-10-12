@@ -31,9 +31,10 @@ CI runs automatically on PRs: prisma generate → tsc → build → test → cov
 ### Test conventions
 
 - Test files live next to their source: `routes/bottles.test.ts`, `services/availabilityService.test.ts`
-- Use the shared helpers from `src/test/helpers.ts` (DB lifecycle, auth, seed factories)
+- Use the shared helpers from `src/test/helpers.ts` (DB lifecycle, auth, seed factories). Build test data with the factories (`seedFullCocktail`, `seedMenu`, `seedMenuSection`, `addCocktailToMenu`, `addBottleToMenu`, `seedBottle`…) rather than `prisma.*.create`, and extend them when a test needs more
 - Each test file follows: `setupTestDatabase()` in `beforeAll`, `cleanDatabase() + seedRequiredData()` in `beforeEach`, `teardownTestDatabase()` in `afterAll`
-- Tests run against a real SQLite test DB (`prisma/test.db`), not mocks
+- Tests run against a real SQLite test DB (`prisma/test.db`), not mocks. `src/test/globalSetup.ts` creates it once per run and deletes it at the end; `cleanDatabase()` empties every table of the schema
+- The test database is shared by every test file of a run: a test that alters the schema (trigger, index, extra table) must restore it in `finally` (or `afterEach`/`afterAll`)
 - Run with coverage locally: `npm test -- --coverage`
 
 ## Structure
@@ -49,7 +50,7 @@ backend/
 │   ├── middleware/
 │   │   └── auth.ts           # JWT Bearer validation, AuthRequest type
 │   ├── routes/               # One file per resource (14 route files)
-│   │   ├── auth.ts           # POST /login, GET /me
+│   │   ├── auth.ts           # POST /login, GET /me, POST /logout-all
 │   │   ├── categoryTypes.ts  # CRUD /api/category-types
 │   │   ├── categories.ts     # CRUD /api/categories
 │   │   ├── bottles.ts        # CRUD /api/bottles
@@ -115,7 +116,20 @@ export default router;
 - Middleware in `auth.ts` extends `Request` as `AuthRequest` with `userId?: number`
 - Public routes: `/api/auth/*`, `/api/public/*` (no middleware)
 - Protected routes: all others (authMiddleware applied in `app.ts`)
-- JWT token in `Authorization: Bearer <token>` header, 7-day expiry
+- JWT token in `Authorization: Bearer <token>` header, HS256, 7-day expiry by default (`JWT_EXPIRES_IN`)
+- Tokens are issued by `signToken()` and checked by `verifyToken()` (`middleware/auth.ts`) only. A token carries
+  `User.tokenVersion` (`tv`): changing the password or `POST /api/auth/logout-all` increments it, which revokes every
+  older token. A token of a deleted user is refused too. Restoring a backup made with v1.11.0 or later raises the
+  restored version above both the backup's and the live one (`backupService.ts`), so every session ends, the restoring
+  one included. A backup made before v1.11.0 has no column: the restore writes the live version to
+  `<database>.session-floor`, and the next start applies it after the migrations (`services/sessionFloor.ts`, C-30)
+- `POST /api/auth/login` allows `LOGIN_RATE_LIMIT` failed attempts (default 10) per client IP in 15 minutes, then
+  answers 429. `trust proxy` (`TRUST_PROXY`) trusts the proxies on loopback and private networks by default: the
+  client IP is the last public address forwarded by nginx and any reverse proxy in front of it. A successful login
+  rehashes a password hash made at another cost (`needsRehash`)
+- One password rule (`src/bootstrap/password.ts`): `hashPassword()` (bcrypt cost 12) and `MIN_PASSWORD_LENGTH` (12),
+  used by `ensureAdmin` and `PUT /api/settings/profile`. Never call `bcrypt.hash` elsewhere
+- CORS is closed by default (same-origin app); `CORS_ORIGIN` allows one origin
 
 ### Input Validation (zod)
 

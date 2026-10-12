@@ -7,6 +7,8 @@ interface AuthContextType {
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  /** Applies a profile change: the new email, and the new token when the password changed. */
+  updateSession: (user: User, token?: string) => void;
   isLoading: boolean;
 }
 
@@ -38,16 +40,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setIsLoading(false));
   }, [logout]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const data = await authApi.login(email, password);
-    localStorage.setItem('token', data.token);
-    setToken(data.token);
-    setUser(data.user);
+  const storeToken = useCallback((newToken: string) => {
+    localStorage.setItem('token', newToken);
+    setToken(newToken);
   }, []);
 
+  const login = useCallback(async (email: string, password: string) => {
+    const data = await authApi.login(email, password);
+    storeToken(data.token);
+    setUser(data.user);
+  }, [storeToken]);
+
+  // A password change revokes the previous token: keeping the new one keeps the admin logged in.
+  const updateSession = useCallback((updatedUser: User, newToken?: string) => {
+    if (newToken) storeToken(newToken);
+    setUser(updatedUser);
+  }, [storeToken]);
+
   const value = useMemo(
-    () => ({ user, token, login, logout, isLoading }),
-    [user, token, login, logout, isLoading],
+    () => ({ user, token, login, logout, updateSession, isLoading }),
+    [user, token, login, logout, updateSession, isLoading],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

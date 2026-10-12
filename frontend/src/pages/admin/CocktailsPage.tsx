@@ -14,10 +14,26 @@ import Pagination from '../../components/ui/Pagination';
 import { getUploadUrl } from '../../utils/uploads';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { matchesCocktailSearch } from '../../utils/cocktailSearch';
+import { useInvalidateQueries } from '../../queries/crud';
+import { qk } from '../../queries/keys';
+
+// An import may create units, categories, bottles and ingredients, which the other
+// admin pages and the sidebar shortage badge read from the query cache.
+const IMPORT_KEYS = [
+  qk.cocktails,
+  qk.availability,
+  qk.units,
+  qk.categories,
+  qk.categoryTypes,
+  qk.bottles,
+  qk.ingredients,
+  qk.shortages,
+];
 
 export default function CocktailsPage() {
   const { t } = useTranslation();
   const localize = useLocalizedName();
+  const invalidateQueries = useInvalidateQueries();
   const [items, setItems] = useState<Cocktail[]>([]);
   const [availabilities, setAvailabilities] = useState<Record<number, CocktailAvailability>>({});
   const [loadingAvailability, setLoadingAvailability] = useState(true);
@@ -79,6 +95,15 @@ export default function CocktailsPage() {
     if (!confirm(t('cocktails.confirmDelete'))) return;
     await api.delete(id);
     load();
+  };
+
+  // The wizard does not report whether a recipe was imported, so every close refreshes.
+  // This page still loads its own lists outside the query cache.
+  const handleImportClose = () => {
+    setShowImport(false);
+    load();
+    loadAvailability();
+    invalidateQueries(IMPORT_KEYS);
   };
 
   const allFilteredSelected = filteredItems.length > 0 && filteredItems.every((i) => selectedIds.has(i.id));
@@ -443,7 +468,7 @@ export default function CocktailsPage() {
       )}
 
       {showImport && (
-        <ImportCocktailWizard onClose={() => { setShowImport(false); load(); loadAvailability(); }} />
+        <ImportCocktailWizard onClose={handleImportClose} />
       )}
     </div>
   );

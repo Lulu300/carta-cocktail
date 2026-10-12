@@ -6,13 +6,29 @@ import SettingsPage from './SettingsPage';
 import { ConfirmProvider } from '../../contexts/ConfirmContext';
 import { toast } from '../../components/ui/ToastStore';
 
+// Keeps the interpolation values visible, so that a test can check the count of skipped files
+vi.mock('react-i18next', async (importOriginal) => {
+  const { translateWithValues } = await import('../../test/translateWithValues');
+  return {
+    ...await importOriginal<typeof import('react-i18next')>(),
+    useTranslation: () => ({ t: translateWithValues, i18n: { language: 'en' } }),
+  };
+});
+
 vi.mock('../../services/api', () => ({
   settings: { get: vi.fn(), update: vi.fn(), updateProfile: vi.fn() },
   backup: { exportBackup: vi.fn(), importBackup: vi.fn() },
 }));
 
+// One stable value, as AuthProvider gives: a new user object on each render
+// would make the page reset the email field.
+const mockAuth = vi.hoisted(() => ({
+  user: { id: 1, email: 'admin@test.local' },
+  updateSession: vi.fn(),
+}));
+const mockUpdateSession = mockAuth.updateSession;
 vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ user: { id: 1, email: 'admin@test.local' } }),
+  useAuth: () => mockAuth,
 }));
 
 vi.mock('../../contexts/SiteSettingsContext', () => ({
@@ -64,8 +80,9 @@ beforeEach(() => {
   mockUpdate.mockResolvedValue({ id: 1, siteName: 'My Bar', siteIcon: '🍸' } as never);
   mockUpdateProfile.mockResolvedValue({ id: 1, email: 'admin@test.local' } as never);
   mockExportBackup.mockResolvedValue(undefined as never);
-  mockImportBackup.mockResolvedValue(undefined as never);
+  mockImportBackup.mockResolvedValue({ message: 'Backup restored', skippedFiles: 0, restartRecommended: false });
   vi.spyOn(toast, 'success').mockReturnValue('toast-1');
+  vi.spyOn(toast, 'info').mockReturnValue('toast-2');
 });
 
 describe('SettingsPage', () => {
@@ -177,6 +194,7 @@ describe('SettingsPage', () => {
     const newPasswordInput = screen.getByPlaceholderText('settings.newPasswordPlaceholder');
     const confirmPasswordInput = screen.getByPlaceholderText('settings.confirmPasswordPlaceholder');
 
+    await user.type(screen.getByPlaceholderText('settings.currentPasswordPlaceholder'), 'old-password-1');
     await user.type(newPasswordInput, 'newpass123');
     await user.type(confirmPasswordInput, 'differentpass');
 
@@ -214,6 +232,59 @@ describe('SettingsPage', () => {
       });
       expect(screen.getByText('settings.profileUpdated')).toBeInTheDocument();
     });
+  });
+
+  it('should keep the admin logged in with the token returned after a password change', async () => {
+    mockUpdateProfile.mockResolvedValue({ id: 1, email: 'admin@test.local', token: 'new-token' });
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('admin@test.local')).toBeInTheDocument();
+    });
+
+    await user.type(screen.getByPlaceholderText('settings.currentPasswordPlaceholder'), 'old-password-1');
+    await user.type(screen.getByPlaceholderText('settings.newPasswordPlaceholder'), 'new-password-12');
+    await user.type(screen.getByPlaceholderText('settings.confirmPasswordPlaceholder'), 'new-password-12');
+    await user.click(screen.getAllByText('common.save')[1]);
+
+    await waitFor(() => {
+      expect(mockUpdateSession).toHaveBeenCalledWith({ id: 1, email: 'admin@test.local' }, 'new-token');
+    });
+  });
+
+  it('should send the current password with a new email and update the session', async () => {
+    mockUpdateProfile.mockResolvedValue({ id: 1, email: 'new@test.local' });
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('admin@test.local')).toBeInTheDocument();
+    });
+    const currentPasswordInput = screen.getByPlaceholderText('settings.currentPasswordPlaceholder');
+    expect(currentPasswordInput).not.toBeRequired();
+
+    const emailInput = screen.getByDisplayValue('admin@test.local');
+    await user.clear(emailInput);
+    await user.type(emailInput, 'new@test.local');
+    expect(currentPasswordInput).toBeRequired();
+    await user.type(currentPasswordInput, 'old-password-1');
+    await user.click(screen.getAllByText('common.save')[1]);
+
+    await waitFor(() => {
+      expect(mockUpdateProfile).toHaveBeenCalledWith({ email: 'new@test.local', currentPassword: 'old-password-1' });
+      expect(mockUpdateSession).toHaveBeenCalledWith({ id: 1, email: 'new@test.local' }, undefined);
+    });
+  });
+
+  it('should require the current password with a new password', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('admin@test.local')).toBeInTheDocument();
+    });
+
+    await user.type(screen.getByPlaceholderText('settings.newPasswordPlaceholder'), 'x');
+
+    expect(screen.getByPlaceholderText('settings.currentPasswordPlaceholder')).toBeRequired();
   });
 
   it('should show error on profile save failure', async () => {
@@ -326,7 +397,7 @@ describe('SettingsPage', () => {
     fireEvent.change(fileInput, { target: { files: [file] } });
 
     await waitFor(() => {
-      expect(screen.getByText('settings.backup.fileSelected')).toBeInTheDocument();
+      expect(screen.getByText('settings.backup.fileSelected(backup.zip)')).toBeInTheDocument();
     });
   });
 
@@ -343,6 +414,97 @@ describe('SettingsPage', () => {
     });
     expect(toast.success).toHaveBeenCalledWith('settings.backup.importSuccess');
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  });
+
+  it('should reload the page by itself when the restore has nothing to report', async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    renderPage();
+    await selectBackupFileAndClickImport();
+    await answerRestoreDialog('settings.backup.import');
+
+    await screen.findByText('settings.backup.importSuccess');
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 1500);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText(/settings\.backup\.skippedFiles/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /settings\.backup\.reload/ })).not.toBeInTheDocument();
+  });
+
+  it('should keep the restart warning and the skipped files on screen after restoring an older backup', async () => {
+    mockImportBackup.mockResolvedValue({ message: 'Backup restored', skippedFiles: 2, restartRecommended: true });
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    renderPage();
+    await selectBackupFileAndClickImport();
+    await answerRestoreDialog('settings.backup.import');
+
+    const warning = await screen.findByRole('alert');
+    expect(warning).toHaveTextContent('settings.backup.restartTitle');
+    expect(warning).toHaveTextContent('settings.backup.restartRequired');
+    expect(warning).toHaveTextContent('settings.backup.restartHow');
+    expect(warning).toHaveTextContent('settings.backup.restartMayFail');
+    expect(screen.getByText('settings.backup.skippedFiles(2)')).toBeInTheDocument();
+    expect(screen.getByText('settings.backup.importDone')).toBeInTheDocument();
+    // Not a plain success while the backend still has to update the database
+    expect(toast.info).toHaveBeenCalledWith('settings.backup.importDone');
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'settings.backup.reloadAfterRestart' })).toBeInTheDocument();
+    // Reloading would log the admin out before the warning is read
+    expect(setTimeoutSpy).not.toHaveBeenCalledWith(expect.any(Function), 1500);
+  });
+
+  it('should show the skipped files without the restart warning when the schema is current', async () => {
+    mockImportBackup.mockResolvedValue({ message: 'Backup restored', skippedFiles: 1, restartRecommended: false });
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    renderPage();
+    await selectBackupFileAndClickImport();
+    await answerRestoreDialog('settings.backup.import');
+
+    expect(await screen.findByText('settings.backup.skippedFiles(1)')).toBeInTheDocument();
+    expect(toast.success).toHaveBeenCalledWith('settings.backup.importDone');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'settings.backup.reload' })).toBeInTheDocument();
+    expect(setTimeoutSpy).not.toHaveBeenCalledWith(expect.any(Function), 1500);
+  });
+
+  it('should clear the restore report after a successful export', async () => {
+    mockImportBackup.mockResolvedValue({ message: 'Backup restored', skippedFiles: 1, restartRecommended: false });
+    renderPage();
+    await selectBackupFileAndClickImport();
+    await answerRestoreDialog('settings.backup.import');
+    await screen.findByText('settings.backup.skippedFiles(1)');
+
+    fireEvent.click(screen.getByText('settings.backup.export'));
+
+    await screen.findByText('settings.backup.exportSuccess');
+    expect(screen.queryByText('settings.backup.skippedFiles(1)')).not.toBeInTheDocument();
+  });
+
+  it('should keep the restart warning when the export fails', async () => {
+    mockImportBackup.mockResolvedValue({ message: 'Backup restored', skippedFiles: 0, restartRecommended: true });
+    mockExportBackup.mockRejectedValue(new Error('Internal server error'));
+    renderPage();
+    await selectBackupFileAndClickImport();
+    await answerRestoreDialog('settings.backup.import');
+    await screen.findByRole('alert');
+
+    fireEvent.click(screen.getByText('settings.backup.export'));
+
+    await screen.findByText('Internal server error');
+    expect(screen.getByRole('alert')).toHaveTextContent('settings.backup.restartTitle');
+  });
+
+  it('should clear the previous restore report when restoring again', async () => {
+    mockImportBackup.mockResolvedValueOnce({ message: 'Backup restored', skippedFiles: 0, restartRecommended: true });
+    renderPage();
+    await selectBackupFileAndClickImport();
+    await answerRestoreDialog('settings.backup.import');
+    await screen.findByRole('alert');
+
+    mockImportBackup.mockRejectedValueOnce(new Error('Import failed'));
+    await selectBackupFileAndClickImport();
+    await answerRestoreDialog('settings.backup.import');
+
+    await screen.findByText('Import failed');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('should not import backup when the dialog is cancelled', async () => {

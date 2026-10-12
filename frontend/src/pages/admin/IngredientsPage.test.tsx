@@ -1,11 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '../../test/test-utils';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
+import { fireEvent, screen, waitFor, within } from '../../test/test-utils';
+import { clearToasts, renderWithFeedback } from '../../test/feedback';
 import IngredientsPage from './IngredientsPage';
 
-vi.mock('../../services/api', () => ({
-  ingredients: { list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn(), bulkAvailability: vi.fn() },
-}));
+vi.mock('../../services/api', async () => {
+  const actual = await vi.importActual<typeof import('../../services/api')>('../../services/api');
+  return {
+    ApiError: actual.ApiError,
+    ingredients: { list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn(), bulkAvailability: vi.fn() },
+  };
+});
 
 vi.mock('../../hooks/useLocalizedName', () => ({
   useLocalizedName: () => (entity: { name: string }) => entity.name,
@@ -19,7 +24,7 @@ vi.mock('../../components/ui/IconPicker', () => ({
   ),
 }));
 
-import { ingredients as api } from '../../services/api';
+import { ApiError, ingredients as api } from '../../services/api';
 
 const mockApiList = vi.mocked(api.list);
 const mockApiCreate = vi.mocked(api.create);
@@ -29,8 +34,26 @@ const mockApiBulkAvailability = vi.mocked(api.bulkAvailability);
 
 const mockIngredients = [
   { id: 1, name: 'Lime', nameTranslations: null, icon: '🍋', isAvailable: true, createdAt: '2024-01-01' },
-  { id: 2, name: 'Sugar', nameTranslations: null, icon: null, isAvailable: false, createdAt: '2024-01-01' },
+  { id: 2, name: 'Sugar', nameTranslations: { fr: 'Sucre' }, icon: null, isAvailable: false, createdAt: '2024-01-01' },
 ];
+
+function renderPage() {
+  return renderWithFeedback(<IngredientsPage />);
+}
+
+async function renderLoadedPage() {
+  renderPage();
+  await screen.findByText('Lime');
+}
+
+function dialog() {
+  return screen.getByRole('dialog');
+}
+
+async function confirmDeletion(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getAllByRole('button', { name: 'common.delete' })[0]);
+  await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.delete' }));
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -38,219 +61,205 @@ beforeEach(() => {
   mockApiCreate.mockResolvedValue({} as never);
   mockApiUpdate.mockResolvedValue({} as never);
   mockApiDelete.mockResolvedValue({} as never);
-  mockApiBulkAvailability.mockResolvedValue({} as never);
+  mockApiBulkAvailability.mockResolvedValue({ updated: 2 } as never);
 });
 
+afterEach(clearToasts);
+
 describe('IngredientsPage', () => {
-  it('renders title "ingredients.title" and action buttons', async () => {
-    render(<IngredientsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('ingredients.title')).toBeInTheDocument();
-      expect(screen.getByText('ingredients.allAvailable')).toBeInTheDocument();
-      expect(screen.getByText('ingredients.allUnavailable')).toBeInTheDocument();
-      expect(screen.getByText('ingredients.add')).toBeInTheDocument();
-    });
+  it('renders the title and the action buttons', () => {
+    renderPage();
+    expect(screen.getByText('ingredients.title')).toBeInTheDocument();
+    expect(screen.getByText('ingredients.allAvailable')).toBeInTheDocument();
+    expect(screen.getByText('ingredients.allUnavailable')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ingredients.add' })).toBeInTheDocument();
   });
 
-  it('displays ingredient cards after loading', async () => {
-    render(<IngredientsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Lime')).toBeInTheDocument();
-      expect(screen.getByText('Sugar')).toBeInTheDocument();
-      expect(screen.getByText('🍋')).toBeInTheDocument();
-      expect(screen.getByText('📦')).toBeInTheDocument();
-    });
+  it('shows a card per ingredient, with a default icon', async () => {
+    await renderLoadedPage();
+    expect(screen.getByText('Sugar')).toBeInTheDocument();
+    expect(screen.getByText('🍋')).toBeInTheDocument();
+    expect(screen.getByText('📦')).toBeInTheDocument();
   });
 
-  it('shows "common.noResults" when empty list', async () => {
+  it('never shows "no results" while the ingredients are loading', () => {
+    mockApiList.mockReturnValue(new Promise(() => {}));
+    renderPage();
+
+    expect(screen.getByText('common.loading')).toBeInTheDocument();
+    expect(screen.queryByText('common.noResults')).not.toBeInTheDocument();
+  });
+
+  it('shows "no results" once loaded without ingredients', async () => {
     mockApiList.mockResolvedValue([] as never);
-    render(<IngredientsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('common.noResults')).toBeInTheDocument();
-    });
+    renderPage();
+    expect(await screen.findByText('common.noResults')).toBeInTheDocument();
   });
 
-  it('shows availability filter buttons with counts', async () => {
-    render(<IngredientsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('ingredients.filter.all')).toBeInTheDocument();
-      expect(screen.getByText('ingredients.filter.available')).toBeInTheDocument();
-      expect(screen.getByText('ingredients.filter.unavailable')).toBeInTheDocument();
-      // available count: 1 (Lime), unavailable count: 1 (Sugar)
-      const counts = screen.getAllByText('(1)');
-      expect(counts).toHaveLength(2);
-    });
-  });
-
-  it('opens create modal on add click', async () => {
+  it('shows a load error with a retry button', async () => {
     const user = userEvent.setup();
-    render(<IngredientsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('ingredients.add')).toBeInTheDocument();
-    });
-    await user.click(screen.getByText('ingredients.add'));
-    const headings = screen.getAllByText('ingredients.add');
-    expect(headings.length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText('common.save')).toBeInTheDocument();
-    expect(screen.getByTestId('icon-picker')).toBeInTheDocument();
+    mockApiList.mockRejectedValueOnce(new Error('Failed to fetch'));
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'common.retry' }));
+
+    expect(await screen.findByText('Lime')).toBeInTheDocument();
   });
 
-  it('calls bulkAvailability when clicking "all available" button', async () => {
-    const user = userEvent.setup();
-    render(<IngredientsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('ingredients.allAvailable')).toBeInTheDocument();
-    });
-    await user.click(screen.getByText('ingredients.allAvailable'));
-    await waitFor(() => {
-      expect(mockApiBulkAvailability).toHaveBeenCalledWith({ available: true });
-    });
+  it('shows the availability filters with their counts', async () => {
+    await renderLoadedPage();
+    expect(screen.getByText('ingredients.filter.all')).toBeInTheDocument();
+    expect(screen.getAllByText('(1)')).toHaveLength(2);
   });
 
-  it('calls delete API with confirm on delete button click', async () => {
+  it('filters the available and the unavailable ingredients', async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-    render(<IngredientsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Lime')).toBeInTheDocument();
-    });
-    const deleteButtons = screen.getAllByTitle('common.delete');
-    await user.click(deleteButtons[0]);
-    expect(window.confirm).toHaveBeenCalled();
-    await waitFor(() => {
-      expect(mockApiDelete).toHaveBeenCalledWith(1);
-    });
-  });
+    await renderLoadedPage();
 
-  it('opens edit modal pre-filled with ingredient data', async () => {
-    const user = userEvent.setup();
-    render(<IngredientsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Lime')).toBeInTheDocument();
-    });
-    const editButtons = screen.getAllByTitle('common.edit');
-    await user.click(editButtons[0]);
-    expect(screen.getByText('ingredients.edit')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Lime')).toBeInTheDocument();
-  });
-
-  it('submits update when editing an ingredient', async () => {
-    const user = userEvent.setup();
-    render(<IngredientsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Lime')).toBeInTheDocument();
-    });
-    const editButtons = screen.getAllByTitle('common.edit');
-    await user.click(editButtons[0]);
-    const nameInput = screen.getByDisplayValue('Lime');
-    await user.clear(nameInput);
-    await user.type(nameInput, 'Lemon');
-    await user.click(screen.getByText('common.save'));
-    await waitFor(() => {
-      expect(mockApiUpdate).toHaveBeenCalledWith(
-        1,
-        expect.objectContaining({ name: 'Lemon' })
-      );
-    });
-  });
-
-  it('submits create form with filled name', async () => {
-    const user = userEvent.setup();
-    render(<IngredientsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('ingredients.add')).toBeInTheDocument();
-    });
-    await user.click(screen.getByText('ingredients.add'));
-    // The modal form contains the name input; find it via the form element
-    const form = document.querySelector('form')!;
-    const nameInput = form.querySelector('input[required]') as HTMLInputElement;
-    await user.type(nameInput, 'Mint');
-    await user.click(screen.getByText('common.save'));
-    await waitFor(() => {
-      expect(mockApiCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'Mint' })
-      );
-    });
-  });
-
-  it('does not call delete when confirm returns false', async () => {
-    const user = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
-    render(<IngredientsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Lime')).toBeInTheDocument();
-    });
-    const deleteButtons = screen.getAllByTitle('common.delete');
-    await user.click(deleteButtons[0]);
-    expect(window.confirm).toHaveBeenCalled();
-    expect(mockApiDelete).not.toHaveBeenCalled();
-  });
-
-  it('calls bulkAvailability with false when clicking "all unavailable" button', async () => {
-    const user = userEvent.setup();
-    render(<IngredientsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('ingredients.allUnavailable')).toBeInTheDocument();
-    });
-    await user.click(screen.getByText('ingredients.allUnavailable'));
-    await waitFor(() => {
-      expect(mockApiBulkAvailability).toHaveBeenCalledWith({ available: false });
-    });
-  });
-
-  it('filters by available when clicking available filter', async () => {
-    const user = userEvent.setup();
-    render(<IngredientsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Lime')).toBeInTheDocument();
-      expect(screen.getByText('Sugar')).toBeInTheDocument();
-    });
     await user.click(screen.getByText('ingredients.filter.available'));
-    // Only Lime (isAvailable=true) should be visible
     expect(screen.getByText('Lime')).toBeInTheDocument();
     expect(screen.queryByText('Sugar')).not.toBeInTheDocument();
-  });
 
-  it('filters by unavailable when clicking unavailable filter', async () => {
-    const user = userEvent.setup();
-    render(<IngredientsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Lime')).toBeInTheDocument();
-      expect(screen.getByText('Sugar')).toBeInTheDocument();
-    });
     await user.click(screen.getByText('ingredients.filter.unavailable'));
-    // Only Sugar (isAvailable=false) should be visible
     expect(screen.getByText('Sugar')).toBeInTheDocument();
     expect(screen.queryByText('Lime')).not.toBeInTheDocument();
   });
 
   it('filters by search term', async () => {
     const user = userEvent.setup();
-    render(<IngredientsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Lime')).toBeInTheDocument();
-      expect(screen.getByText('Sugar')).toBeInTheDocument();
-    });
-    const searchInput = screen.getByRole('textbox');
-    await user.type(searchInput, 'Lime');
+    await renderLoadedPage();
+
+    await user.type(screen.getByPlaceholderText('common.search'), 'lim');
+
     expect(screen.getByText('Lime')).toBeInTheDocument();
     expect(screen.queryByText('Sugar')).not.toBeInTheDocument();
   });
 
-  it('calls update when clicking ingredient card to toggle availability', async () => {
+  it('marks every ingredient available or unavailable, then reloads the list', async () => {
     const user = userEvent.setup();
-    render(<IngredientsPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Lime')).toBeInTheDocument();
-    });
-    // Clicking the card (not buttons) triggers toggleAvailability
-    // Find the card by its text, then click the card container
-    const limeCard = screen.getByText('Lime').closest('div[class*="relative"]');
-    if (limeCard) {
-      await user.click(limeCard);
-      await waitFor(() => {
-        expect(mockApiUpdate).toHaveBeenCalledWith(1, { isAvailable: false });
-      });
-    }
+    await renderLoadedPage();
+
+    await user.click(screen.getByText('ingredients.allAvailable'));
+    await waitFor(() => expect(mockApiBulkAvailability).toHaveBeenCalledWith({ available: true }));
+    await user.click(screen.getByText('ingredients.allUnavailable'));
+    await waitFor(() => expect(mockApiBulkAvailability).toHaveBeenCalledWith({ available: false }));
+    await waitFor(() => expect(mockApiList).toHaveBeenCalledTimes(3));
+  });
+
+  it('toggles the availability of an ingredient by clicking its card', async () => {
+    const user = userEvent.setup();
+    await renderLoadedPage();
+
+    await user.click(screen.getByText('Lime'));
+
+    await waitFor(() => expect(mockApiUpdate).toHaveBeenCalledWith(1, { isAvailable: false }));
+    await waitFor(() => expect(mockApiList).toHaveBeenCalledTimes(2));
+  });
+
+  it('shows an error toast when the toggle fails', async () => {
+    const user = userEvent.setup();
+    mockApiUpdate.mockRejectedValue(new ApiError(500, 'Server down'));
+    await renderLoadedPage();
+
+    await user.click(screen.getByText('Sugar'));
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Server down'));
+  });
+
+  it('creates an ingredient with its icon and confirms with a toast', async () => {
+    const user = userEvent.setup();
+    await renderLoadedPage();
+    await user.click(screen.getByRole('button', { name: 'ingredients.add' }));
+
+    await user.type(within(dialog()).getByLabelText(/ingredients\.name/), 'Mint');
+    await user.type(within(dialog()).getByTestId('icon-input'), '🌿');
+    await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
+
+    await waitFor(() => expect(mockApiCreate).toHaveBeenCalledWith({ name: 'Mint', icon: '🌿', nameTranslations: null }));
+    expect(await screen.findByText('ingredients.created')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('sends a single request on a fast double click on save', async () => {
+    const user = userEvent.setup();
+    mockApiCreate.mockReturnValue(new Promise(() => {}));
+    await renderLoadedPage();
+    await user.click(screen.getByRole('button', { name: 'ingredients.add' }));
+    await user.type(within(dialog()).getByLabelText(/ingredients\.name/), 'Mint');
+    const save = within(dialog()).getByRole('button', { name: 'common.save' });
+
+    fireEvent.click(save);
+    fireEvent.click(save);
+
+    await waitFor(() => expect(save).toBeDisabled());
+    expect(mockApiCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it('updates an ingredient, keeping its translations, and confirms with a toast', async () => {
+    const user = userEvent.setup();
+    await renderLoadedPage();
+    await user.click(screen.getAllByRole('button', { name: 'common.edit' })[1]);
+
+    const name = within(dialog()).getByDisplayValue('Sugar');
+    await user.clear(name);
+    await user.type(name, 'Cane sugar');
+    await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
+
+    await waitFor(() => expect(mockApiUpdate).toHaveBeenCalledWith(2, {
+      name: 'Cane sugar',
+      icon: null,
+      nameTranslations: { fr: 'Sucre' },
+    }));
+    expect(await screen.findByText('ingredients.updated')).toBeInTheDocument();
+    // The edit button does not toggle the card it sits on.
+    expect(mockApiUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it('deletes an ingredient after confirmation and confirms with a toast', async () => {
+    const user = userEvent.setup();
+    await renderLoadedPage();
+
+    await confirmDeletion(user);
+
+    await waitFor(() => expect(mockApiDelete).toHaveBeenCalledWith(1));
+    expect(await screen.findByText('ingredients.deleted')).toBeInTheDocument();
+    expect(mockApiUpdate).not.toHaveBeenCalled();
+  });
+
+  it('does not delete when the dialog is cancelled', async () => {
+    const user = userEvent.setup();
+    await renderLoadedPage();
+
+    await user.click(screen.getAllByRole('button', { name: 'common.delete' })[0]);
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.cancel' }));
+
+    expect(mockApiDelete).not.toHaveBeenCalled();
+  });
+
+  it('shows the backend message when the deletion is refused', async () => {
+    const user = userEvent.setup();
+    mockApiDelete.mockRejectedValue(new ApiError(409, 'This ingredient is used by cocktails', {
+      error: 'This ingredient is used by cocktails',
+      details: { cocktails: [{ id: 5, name: 'Mojito', removedLines: 1 }], bottles: [] },
+    }));
+    await renderLoadedPage();
+
+    await confirmDeletion(user);
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('This ingredient is used by cocktails'));
+  });
+
+  it('collapses the translations block again when another ingredient is opened', async () => {
+    const user = userEvent.setup();
+    await renderLoadedPage();
+
+    await user.click(screen.getAllByRole('button', { name: 'common.edit' })[1]);
+    await user.click(within(dialog()).getByRole('button', { name: 'common.translations' }));
+    expect(within(dialog()).getByLabelText('Français')).toHaveValue('Sucre');
+    await user.click(within(dialog()).getByRole('button', { name: 'common.cancel' }));
+
+    await user.click(screen.getAllByRole('button', { name: 'common.edit' })[0]);
+
+    expect(within(dialog()).queryByLabelText('Français')).not.toBeInTheDocument();
   });
 });

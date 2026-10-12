@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
-  request, authHeader, prisma, seedCategory, seedBottle,
+  request, authHeader, prisma, seedCategory, seedBottle, addBottleToMenu,
 } from '../test/helpers';
 
 beforeAll(async () => { await setupTestDatabase(); });
@@ -57,9 +57,7 @@ describe('PUT /api/menu-bottles/:id', () => {
   it('should update position and isHidden', async () => {
     const menu = await prisma.menu.findUnique({ where: { slug: 'aperitifs' } });
     const bottle = await seedBottle();
-    const mb = await prisma.menuBottle.create({
-      data: { menuId: menu!.id, bottleId: bottle.id, position: 0 },
-    });
+    const mb = await addBottleToMenu(menu!.id, bottle.id);
 
     const res = await request.put(`/api/menu-bottles/${mb.id}`).set(authHeader())
       .send({ position: 5, isHidden: true });

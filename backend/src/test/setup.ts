@@ -2,9 +2,10 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterAll } from 'vitest';
+import { TEST_DATABASE_URL } from './testDatabase';
 
-// Set env vars BEFORE any app imports
-process.env.DATABASE_URL = 'file:./prisma/test.db';
+// Set env vars BEFORE any app imports. globalSetup.ts creates this database once per run.
+process.env.DATABASE_URL = TEST_DATABASE_URL;
 process.env.JWT_SECRET = 'test-secret';
 process.env.ADMIN_EMAIL = 'admin@test.local';
 process.env.ADMIN_PASSWORD = 'testpass123';

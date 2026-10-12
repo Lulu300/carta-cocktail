@@ -301,10 +301,19 @@ export const settings = {
   update: (data: { siteName: string; siteIcon: string }) =>
     request<SiteSettings>('/settings', { method: 'PUT', body: JSON.stringify(data) }),
   updateProfile: (data: { email?: string; currentPassword?: string; newPassword?: string }) =>
-    request<{ id: number; email: string }>('/settings/profile', { method: 'PUT', body: JSON.stringify(data) }),
+    // `token` comes back when the password changed: the server revoked the previous one
+    request<{ id: number; email: string; token?: string }>('/settings/profile', { method: 'PUT', body: JSON.stringify(data) }),
 };
 
 // Backup
+export interface BackupRestoreResult {
+  message: string;
+  /** Files of uploads/ that were not restored: not an image, or a file name already restored. */
+  skippedFiles: number;
+  /** The backup has an older database schema: the backend applies the missing migrations when it restarts. */
+  restartRecommended: boolean;
+}
+
 export const backup = {
   exportBackup: async () => {
     const res = await send('/backup/export');
@@ -322,7 +331,7 @@ export const backup = {
   importBackup: (file: File) => {
     const formData = new FormData();
     formData.append('backup', file);
-    return request<{ success: boolean; message: string }>('/backup/import', {
+    return request<BackupRestoreResult>('/backup/import', {
       method: 'POST',
       body: formData,
     });

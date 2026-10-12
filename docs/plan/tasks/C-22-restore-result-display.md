@@ -3,15 +3,15 @@ id: C-22
 title: "Restauration : afficher les fichiers ignorés et le redémarrage conseillé"
 phase: C
 lane: frontend
-criticite: basse
+criticite: haute
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-05, E-04]
 touches: [frontend/src/pages/admin/SettingsPage.tsx, frontend/src/services/api.ts, frontend/src/i18n/locales/]
 sources: []
-branch:
-pr:
+branch: fix/C-22-restore-result-display
+pr: "#88"
 ---
 
 ## Contexte
@@ -33,9 +33,9 @@ C-05 change la réponse de `POST /api/backup/import` : `{ message, skippedFiles,
 
 ## Critères d'acceptation
 
-- [ ] `skippedFiles > 0` affiche le nombre de fichiers ignorés.
-- [ ] `restartRecommended: true` affiche l'avertissement de redémarrage.
-- [ ] Aucun texte en dur.
+- [x] `skippedFiles > 0` affiche le nombre de fichiers ignorés.
+- [x] `restartRecommended: true` affiche l'avertissement de redémarrage.
+- [x] Aucun texte en dur.
 
 ## Tests à ajouter ou adapter
 
@@ -50,3 +50,6 @@ C-05 change la réponse de `POST /api/backup/import` : `{ message, skippedFiles,
 ## Journal
 
 - 2026-10-11 : tâche créée par C-05 (nouvelle forme de la réponse d'import).
+- 2026-10-11 : prérequis de la release qui livre C-11 (décision humaine, revue de la PR #82). C-11 ajoute la colonne `User.tokenVersion` : après la restauration d'une sauvegarde faite avant cette release, la table `User` n'a plus cette colonne jusqu'au redémarrage du backend. La connexion (mot de passe correct ou non), `GET /api/auth/me` et toute route authentifiée répondent 500, et `GET /api/public/menus` aussi pour un navigateur qui envoie un token (`optionalAuth` lit `User`) ; seuls les visiteurs sans token gardent la carte. Côté admin : toast de succès, rechargement après 1,5 s, `/auth/me` en 500, `.catch(logout)`, puis « Internal server error » à chaque essai de connexion, sans rien qui dise de redémarrer. Toutes les sauvegardes antérieures à cette release sont concernées (`restartRecommended` compare avec la dernière migration), y compris celles de v1.8.0 à v1.10.0 pour lesquelles les notes v1.10.0 et `UPGRADING.md` ne demandent aucun redémarrage. Un redémarrage suffit (`migrate deploy` n'a que l'`ADD COLUMN` à appliquer).
+- 2026-10-11 : fait (PR #88). Sans rien à signaler, la page se recharge comme avant. Sinon, pas de rechargement automatique : il cacherait le rapport et, après une sauvegarde ancienne, déconnecterait l'admin jusqu'au redémarrage. Le rapport affiche l'avertissement de redémarrage (connexion et admin en erreur d'ici là, renvoi vers `UPGRADING.md` pour v1.0.x et les doublons d'avant v1.8.0), le nombre de fichiers ignorés et un bouton « Recharger la page ». Aucune action utilisateur nouvelle.
+- 2026-10-11 : revue de la PR #88. L'avertissement renvoie à la section « Restoring a backup from an older version » d'`UPGRADING.md`, à écrire dans la PR de notes de v1.11.0 (tâche C-28 créée). Le texte reste vrai après une future migration (« peuvent échouer ») et hors Docker (`npm run db:deploy`, puis redémarrage). Toast d'information au lieu de succès quand un redémarrage est demandé. Un export réussi efface le rapport ; un export en échec le garde.

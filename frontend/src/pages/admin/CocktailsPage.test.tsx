@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '../../test/test-utils';
+import { render, screen, waitFor, createTestQueryClient } from '../../test/test-utils';
 import userEvent from '@testing-library/user-event';
 import CocktailsPage from './CocktailsPage';
+import { qk } from '../../queries/keys';
 
 vi.mock('../../services/api', () => ({
   cocktails: { list: vi.fn(), delete: vi.fn(), exportRecipe: vi.fn() },
@@ -265,5 +266,30 @@ describe('CocktailsPage', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('import-wizard')).not.toBeInTheDocument();
     });
+  });
+
+  it('refreshes every list an import may change when the import wizard closes', async () => {
+    const user = userEvent.setup();
+    const queryClient = createTestQueryClient();
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+    render(<CocktailsPage />, { queryClient });
+    await screen.findAllByText('Mojito');
+
+    await user.click(screen.getByText('cocktails.import'));
+    await user.click(screen.getByText('close'));
+
+    const refreshed = invalidate.mock.calls.map(([filters]) => filters?.queryKey);
+    expect(refreshed).toEqual([
+      qk.cocktails,
+      qk.availability,
+      qk.units,
+      qk.categories,
+      qk.categoryTypes,
+      qk.bottles,
+      qk.ingredients,
+      qk.shortages,
+    ]);
+    await waitFor(() => expect(api.list).toHaveBeenCalledTimes(2));
+    expect(availabilityApi.getAllCocktails).toHaveBeenCalledTimes(2);
   });
 });
