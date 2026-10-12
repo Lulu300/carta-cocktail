@@ -82,3 +82,4 @@ La plupart des bugs relevés par la revue frontend (promesses rejetées sans `ca
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-12 : B-05 (PR #98) a monté `eslint-plugin-react-hooks` en 7.1 (E-16 intégrée). La directive `set-state-in-effect` de `SettingsPage` sert de nouveau : l'étape 6 doit corriger le code (initialiser `email` depuis `user`), pas seulement retirer la directive.
 - 2026-10-12 : relevé par la relecture d'E-08 (PR #119) : les clés `cocktails.importWizard.invalidVersion` et `cocktails.importWizard.summary` ne sont plus utilisées (déjà avant E-08). À supprimer avec le code mort.
+- 2026-10-12 : relecture d'E-08 (PR #119) : `KNOWN_CODES` (`frontend/src/components/import/BottleImportRowErrors.tsx`) recopie l'union `BottleImportRowErrorCode` de `types/index.ts` ; dériver le type d'un tableau `as const`, ou passer un tableau de clés à `t()` avec la clé `unknown` en repli.
