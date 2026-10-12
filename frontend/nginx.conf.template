@@ -13,7 +13,6 @@ server {
 
     # nginx defaults to 1 MB. Must cover the backend upload limits:
     # cocktail image 5 MB, bottle import 10 MB (backup restore has its own location).
-    client_max_body_size 20m;
 
     # The nginx base image ships with gzip disabled. Proxied API responses are compressed too.
     gzip on;
