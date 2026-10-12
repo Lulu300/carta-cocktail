@@ -2,7 +2,7 @@
 
 ## Overview
 
-React 19 SPA with Vite 7, TailwindCSS 4, React Router 7, and react-i18next. Dark theme UI with admin panel and public menu display.
+React 19 SPA with Vite 8, TailwindCSS 4, React Router 7, and react-i18next. Dark theme UI with admin panel and public menu display.
 
 ## Development Workflow
 
@@ -183,7 +183,7 @@ Uses `@import "tailwindcss"` syntax (not `@tailwind` directives). Dark theme wit
 ## Dependencies
 
 **Runtime**: react 19, react-dom 19, react-router-dom 7, i18next 25, react-i18next 16, i18next-browser-languagedetector 8, jszip 3
-**Dev**: vite 7, @vitejs/plugin-react, tailwindcss 4, @tailwindcss/vite, typescript 5.9, eslint 10, prettier 3
+**Dev**: vite 8, @vitejs/plugin-react 6, tailwindcss 4, @tailwindcss/vite, typescript 5.9, eslint 10, prettier 3
 
 ## Styling Conventions
 
