@@ -11,7 +11,7 @@ Before committing any change:
 1. Create a branch from `develop` (`feature/xxx` or `fix/xxx`)
 2. **Add or update tests** for any new or modified feature (see Testing section below)
 3. Ensure TypeScript compiles: `npx tsc --noEmit`
-4. Ensure build passes: `npm run build`
+4. Ensure lint and build pass: `npm run lint` (config in `eslint.config.js`), `npm run build`
 5. Run tests: `npm test`
 6. **Verify coverage thresholds are met**: `npm test -- --coverage`
 7. Commit, push, open PR to `develop`
@@ -178,6 +178,8 @@ Entity names support multi-language via JSON strings stored in SQLite:
 | `npm run dev` | Watch mode with tsx (port 3001) |
 | `npm run build` | TypeScript compilation to dist/ |
 | `npm start` | Run compiled JS from dist/ |
+| `npm run lint` | ESLint |
+| `npm run format:check` | Prettier check (fails until the repository reformat) |
 | `npm run db:push` | Sync Prisma schema to SQLite |
 | `npm run db:seed` | Seed admin, types, units, menus |
 | `npm run db:migrate` | Create Prisma migration |
@@ -185,7 +187,7 @@ Entity names support multi-language via JSON strings stored in SQLite:
 ## Dependencies
 
 **Runtime**: express 5, bcryptjs, cors, helmet, morgan, jsonwebtoken, multer, i18next, i18next-http-middleware, dotenv, zod 4
-**Dev**: @prisma/client 6, prisma 6, typescript 5.9, tsx, ts-node
+**Dev**: @prisma/client 6, prisma 6, typescript 5.9, tsx, ts-node, eslint 10, typescript-eslint, prettier 3
 
 ## Database
 

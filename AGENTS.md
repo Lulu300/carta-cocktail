@@ -51,7 +51,7 @@ For every change:
 1. Create a branch from `develop` (`feature/xxx`, `fix/xxx`)
 2. Make changes
 3. **Add or update tests** for any new or modified feature (see Testing section below)
-4. Ensure lint and tests pass: `cd frontend && npm run lint && npm test` / `cd backend && npm test`
+4. Ensure lint and tests pass: `cd frontend && npm run lint && npm test` / `cd backend && npm run lint && npm test`. Formatting follows the root `.editorconfig` and `.prettierrc`; `npm run format:check` exists in both packages but still fails until the one-off repository reformat is done, so do not reformat files outside your change
 5. Ensure TypeScript compiles: `cd frontend && npx tsc --noEmit` / `cd backend && npx tsc --noEmit`
 6. **Verify coverage thresholds are met** (see Testing section below)
 7. Commit (Conventional Commits, in English) and push the branch
