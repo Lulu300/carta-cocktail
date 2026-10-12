@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: moyenne
 effort: L
-status: todo
+status: done
 owner: agent
 depends_on: [C-04]
 touches: [backend/src/routes/cocktails.ts, backend/src/routes/public.ts, backend/src/services/cocktail, backend/src/routes/cocktails.test.ts, backend/src/i18n/]
 sources: ["01-backend-routes.md §H4", "01-backend-routes.md §H5", "01-backend-routes.md §M2", "01-backend-routes.md §M8", "02-backend-data-perf.md §2.2", "03-security.md §13"]
-branch:
-pr:
+branch: feature/C-09-cocktail-service
+pr: https://github.com/Lulu300/carta-cocktail/pull/106
 ---
 
 ## Décisions validées (2026-10-08)
@@ -67,15 +67,15 @@ CRUD et images :
 
 ## Critères d'acceptation
 
-- [ ] `cocktails.ts` < 200 lignes ; aucun handler > 30 lignes.
-- [ ] Un seul mapping de lignes d'ingrédient, un seul builder d'export ; plus de `parseNT`.
-- [ ] Import avec une unité non résolue → 400 qui nomme l'unité ; rien n'est créé.
-- [ ] Aucun import ne crée de ligne `CocktailIngredient` dont la FK de `sourceType` est nulle.
-- [ ] Exports admin et public identiques pour un même cocktail, `notes` mises à part.
-- [ ] « Piña Colada » → `cocktail-pina-colada.json`.
-- [ ] Upload sur id inexistant → 404, aucun fichier ajouté dans `uploadDir`.
-- [ ] DELETE avec `imagePath = '../x'` ne supprime rien hors de `uploadDir`.
-- [ ] Contrat HTTP inchangé (mêmes routes, mêmes formes de réponse).
+- [ ] `cocktails.ts` < 200 lignes ; aucun handler > 30 lignes. *Reporté à C-33.*
+- [x] Un seul builder d'export ; plus de `parseNT`. (Le mapping unique des lignes d'ingrédient est reporté à C-33.)
+- [ ] Import avec une unité non résolue → 400 qui nomme l'unité ; rien n'est créé. *Reporté à C-33.*
+- [ ] Aucun import ne crée de ligne `CocktailIngredient` dont la FK de `sourceType` est nulle. *Reporté à C-33.*
+- [x] Exports admin et public identiques pour un même cocktail, `notes` (et bouteilles préférées, depuis A-05) mises à part.
+- [x] « Piña Colada » → `cocktail-pina-colada.json`.
+- [x] Upload sur id inexistant → 404, aucun fichier ajouté dans `uploadDir`.
+- [x] DELETE avec `imagePath = '../x'` ne supprime rien hors de `uploadDir`.
+- [x] Contrat HTTP inchangé (mêmes routes, mêmes formes de réponse), sauf `sourceDetail.desiredStock` retiré de l'export (décision de l'humain du 2026-10-12).
 
 ## Tests à ajouter ou adapter
 
@@ -103,3 +103,6 @@ CRUD et images :
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : décisions validées par l'humain (voir « Décisions validées »).
 - 2026-10-08 : précision ajoutée par A-05 (PR #33) à l'étape 5 : export public sans `preferredBottles` pour l'invité, passage au `select` public (plus de `category.desiredStock`).
+- 2026-10-12 : découpage décidé par l'humain (diff estimé à ~1 800 lignes). C-09 livre l'export partagé, les images et `cocktailService.removeCocktail` ; le service CRUD, l'import fiable, les clés `errors.importUnresolved` et `errors.unknownReference` et `cocktailImport.test.ts` passent à C-33 (C-19 en dépend désormais).
+- 2026-10-12 : `desiredStock` retiré du format d'export (décision de l'humain) : les exports admin et public lisent le `select` public de A-05. L'import accepte encore le champ des anciens fichiers, repli à 1. Option nommée `includePrivate` (notes et bouteilles préférées) au lieu de `includeNotes`.
+- 2026-10-12 : PR #106 (branche `feature/C-09-cocktail-service`), couverture des lignes modifiées 100 %.
