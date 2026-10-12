@@ -13,7 +13,8 @@ Task: <!-- e.g. A-02, docs/plan/tasks/A-02-menu-sections-save.md; "none" outside
 ## Required actions
 
 <!-- Only if users must act on upgrade (new variable, port, manual migration) or the change is breaking:
-before / after upgrade, `breaking: true`, recommended pinning. Delete this section otherwise. -->
+before / after upgrade, `breaking: true`, recommended pinning, and a matching "Notes de version" line in the task's Journal
+(docs/plan/README.md, rule 9). Delete this section otherwise. -->
 
 ## Checklist
 

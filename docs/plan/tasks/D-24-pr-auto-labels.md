@@ -39,14 +39,16 @@ D-07 a ajouté `.github/release.yml` : la liste des PR des notes de release (job
 
 ## Tests à ajouter ou adapter
 
-- Pas de test automatisé. Ouvrir la PR de la tâche elle-même depuis une branche `chore/` puis une PR brouillon depuis une branche `fix/`, vérifier les labels, fermer la seconde.
+- Pas de test automatisé.
+- `pull_request_target` exécute le workflow tel qu'il est sur la branche de base : il ne tourne donc pas sur la PR de D-24 elle-même, et rien ne prouve qu'il fonctionne avant le merge. Le contrôle se fait **après le merge dans `develop`** : ouvrir une PR brouillon depuis une branche `fix/` vers `develop`, vérifier qu'elle reçoit le label `fix`, puis la fermer.
 
 ## Points d'attention
 
 - `pull_request_target` s'exécute avec les droits de la branche de base : ne jamais y ajouter un checkout ou un `run` qui utilise le code de la PR.
 - Si le ruleset de D-07 rend des checks obligatoires, ne pas y ajouter ce workflow : un label manquant ne doit pas bloquer un merge.
-- Avec un merge en squash, la branche disparaît après merge ; le label, lui, reste sur la PR, ce qui suffit aux notes.
+- Avec la suppression automatique des branches (réglage de D-07), la branche disparaît après le merge ; le label, lui, reste sur la PR, ce qui suffit aux notes.
 
 ## Journal
 
 - 2026-10-12 : tâche créée par D-07 : `.github/release.yml` classe les PR par label, mais aucune PR du plan n'en porte.
+- 2026-10-12 : revue de la PR #97 (D-07) : le contrôle du labeler se fait après le merge de D-24 (`pull_request_target`) ; la branche disparaît par suppression automatique, pas par squash (merge commit retenu partout).

@@ -21,6 +21,13 @@ pr: "#97"
 - **`.mailmap`** : identité canonique `Ludwig SIMON <ludwig@simonl.fr>`.
 - Les réglages GitHub (protection de `main` et `develop`, suppression automatique des branches) restent à faire par l'humain après le merge.
 
+## Décisions validées (2026-10-12)
+
+- **Mode de merge** : merge commit partout (feature → `develop` et `develop` → `main`) ; squash et rebase désactivés.
+- **Rulesets** : un ruleset pour `main` et `develop` avec `pull_request` (`allowed_merge_methods: ["merge"]`, 0 approbation) et `required_status_checks` (`Backend`, `Frontend`, `strict_required_status_checks_policy: false`), contournable par le rôle admin en mode `pull_request` seulement. `deletion` et `non_fast_forward` sont dans un ruleset distinct, sans contournement, pour que la suppression automatique des branches ne puisse jamais supprimer `develop`.
+- **Contournement admin** conservé pour les urgences ; les agents n'utilisent jamais `gh pr merge --admin` (transmis à D-09).
+- **Sécurité** : CodeQL en « default setup » (check non obligatoire au début) et signalement privé des vulnérabilités activés.
+
 ## Contexte
 
 Le repo est public et rien n'empêche un push direct sur `main` ni le merge d'une PR rouge. Avec plusieurs agents qui ouvrent des PR en parallèle (cf. `docs/plan/README.md`), la protection des branches et des checks obligatoires deviennent le dernier garde-fou. Le reste (identités, conventions, branches mortes) rend l'historique et les notes de release lisibles.
@@ -92,3 +99,4 @@ Partie humaine (réglages GitHub, à faire après merge) :
 - 2026-10-09 : les notes de release (liste des PR classée par labels) relèvent désormais de D-11, plus de D-05 : renvoi corrigé.
 - 2026-10-12 : partie agent faite (PR #97) : `.mailmap`, `.github/pull_request_template.md`, `.github/release.yml` (catégories par label ; `bug`, `enhancement` et `documentation` acceptés comme alias ; catégorie « Other changes » pour les PR sans label ; label `skip-changelog` exclu). La partie humaine (étapes 5 à 10) est décrite dans la PR, avec l'état actuel relevé en lecture seule et les commandes prêtes à copier. Les critères « (humain) » restent à cocher après les réglages.
 - 2026-10-12 : état relevé en lecture seule. `user.email` global vaut déjà `ludwig@simonl.fr` (étape 9 faite) ; `user.name` vaut `Lulu300`, ramené à `Ludwig SIMON` par le `.mailmap`. Secret scanning et push protection actifs, Dependabot alerts actives, security updates désactivées (décision de D-21), CodeQL non configuré. 35 branches distantes mergées dans `main`. Aucune PR du plan ne porte de label : création de D-24 (labels automatiques depuis le préfixe de branche). Convention de commit transmise à D-09 (Points d'attention) ; `AGENTS.md` la contient déjà.
+- 2026-10-12 : décisions humaines sur la partie humaine (voir « Décisions validées (2026-10-12) ») : merge commit partout, un ruleset contournable (PR + checks) et un ruleset sans contournement (`deletion`, `non_fast_forward`), `strict` à `false`, CodeQL et signalement privé activés. Revue de la PR #97 traitée : procédure de reprise si `develop` est supprimée au premier merge `develop` → `main` (les PR ouvertes sur `develop` sont alors reciblées vers `main`), test de push direct sur `main` et `develop` après lecture de `rules/branches/<branche>`, suppression des branches distantes depuis la liste prévisualisée (avec SHA), contrôle à la première pré-version que les notes lisent bien `.github/release.yml`, contrôle de D-24 après son merge, et passage de relais à D-09 complété (corps de PR à partir du modèle, jamais `gh pr merge --admin`).
