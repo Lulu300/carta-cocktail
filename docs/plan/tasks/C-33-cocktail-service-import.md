@@ -73,3 +73,4 @@ CRUD :
 ## Journal
 
 - 2026-10-12 : tâche créée par découpage de C-09 (décision de l'humain) : service CRUD et import fiable, critères et tests repris de C-09.
+- 2026-10-12 : revue de la PR #106 (C-09) : `services/uploadsCheck.ts:96` construit encore `path.join(uploadDir, imagePath)` (simple `existsSync` pour le comptage au démarrage, sans risque). À faire passer par `safeUploadPath` de `cocktailImage.ts` si cette tâche touche ce fichier ; sinon, à reprendre par la prochaine tâche qui le modifie.

@@ -47,3 +47,4 @@ L'export par lot (admin → Cocktails → Export par lot → Exporter ZIP) écri
 ## Journal
 
 - 2026-10-12 : tâche créée par B-06 (constat pendant la vérification manuelle de l'export ZIP, hors périmètre de sa PR).
+- 2026-10-12 : revue de la PR #106 (C-09) : même cause côté export unitaire. `ExportCocktailButton.tsx:25` et `services/exportZip.ts:17` recalculent l'ancien slug au lieu d'utiliser le nom du serveur (`exportFilename` de C-09, en-tête `Content-Disposition`) : accents perdus (`cocktail-pi-a-colada.json`), nom non latin → `cocktail-.json`, d'où des collisions supplémentaires dans le ZIP. Reprendre la règle de `exportFilename` (repli `cocktail-<id>`) ou lire l'en-tête ; ajouter `ExportCocktailButton.tsx` à `touches` si besoin.
