@@ -33,7 +33,7 @@ export default function CocktailListItem({
           <div className="min-w-0 flex-1">
             <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
               <div className="min-w-0">
-                <h3 className="font-semibold text-lg truncate">{cocktail.name}</h3>
+                <h2 className="font-semibold text-lg truncate">{cocktail.name}</h2>
                 {cocktail.description && <p className="mt-1 text-sm text-fg-muted">{cocktail.description}</p>}
               </div>
               <div className="shrink-0">

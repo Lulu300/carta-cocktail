@@ -1,7 +1,10 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { publicApi } from '../../services/api';
 import { isConvertible, getAllConversions } from '../../utils/unitConverter';
 import type { Unit } from '../../types';
+import { cx } from './classNames';
+import Icon from './Icon';
+import { useDisclosure } from './useDisclosure';
 
 interface UnitConverterProps {
   quantity: number;
@@ -9,11 +12,10 @@ interface UnitConverterProps {
 }
 
 export default function UnitConverter({ quantity, unit: unitAbbr }: UnitConverterProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const { isOpen, closeAndFocusTrigger, panelId, containerRef, handleKeyDown, triggerProps } = useDisclosure();
   const [units, setUnits] = useState<Unit[]>([]);
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
   const [selectedQuantity, setSelectedQuantity] = useState(quantity);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Fetch units on mount
   useEffect(() => {
@@ -24,22 +26,6 @@ export default function UnitConverter({ quantity, unit: unitAbbr }: UnitConverte
   const currentUnit = units.find(u => u.abbreviation === unitAbbr);
 
   const canConvert = currentUnit && isConvertible(currentUnit);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isOpen]);
 
   if (!currentUnit || !canConvert) {
     // Non-convertible units or units not loaded yet
@@ -55,71 +41,71 @@ export default function UnitConverter({ quantity, unit: unitAbbr }: UnitConverte
   const handleUnitSelect = (newUnit: Unit, formatted: string) => {
     setSelectedUnit(newUnit);
     setSelectedQuantity(parseFloat(formatted));
-    setIsOpen(false);
+    closeAndFocusTrigger();
   };
 
   const handleReset = () => {
     setSelectedUnit(currentUnit);
     setSelectedQuantity(quantity);
-    setIsOpen(false);
+    closeAndFocusTrigger();
   };
 
   const isChanged = selectedUnit !== null && selectedUnit.id !== currentUnit.id;
   const displayUnit = selectedUnit || currentUnit;
 
   return (
-    <div className="relative inline-block" ref={dropdownRef}>
+    <div className="relative inline-block" ref={containerRef} onKeyDown={handleKeyDown}>
       <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="font-medium inline-flex items-center gap-1 transition-colors text-amber-400 hover:text-amber-300 cursor-pointer print:text-black"
+        {...triggerProps}
+        className="font-medium inline-flex items-center gap-1 transition-colors text-accent hover:text-accent-soft cursor-pointer print:text-black"
       >
         <span>{selectedQuantity} {displayUnit.abbreviation}</span>
-        <svg
-          className={`w-3 h-3 transition-transform print:hidden ${isOpen ? 'rotate-180' : ''}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        <Icon
+          name="chevron-down"
+          className={cx('size-3 transition-transform motion-reduce:transition-none print:hidden', isOpen && 'rotate-180')}
+        />
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full mt-1 w-48 bg-[#1a1a2e] border border-gray-700 rounded-lg shadow-lg overflow-hidden z-50">
+        <div
+          id={panelId}
+          className="absolute left-0 top-full mt-1 w-48 bg-surface border border-line-strong rounded-lg shadow-lg overflow-hidden z-50"
+        >
           {/* Original value */}
-          <div className="px-3 py-2 bg-gray-800/50 border-b border-gray-700">
-            <div className="text-xs text-gray-400 mb-1">Unité originale</div>
+          <div className="px-3 py-2 bg-line/50 border-b border-line-strong">
+            <div className="text-xs text-fg-muted mb-1">Unité originale</div>
             <button
+              type="button"
               onClick={handleReset}
-              className={`w-full text-left text-sm ${
-                isChanged
-                  ? 'text-gray-300 hover:text-amber-400'
-                  : 'text-amber-400 font-medium'
-              }`}
+              aria-pressed={!isChanged}
+              className={cx('w-full text-left text-sm', isChanged ? 'text-fg hover:text-accent' : 'text-accent font-medium')}
             >
               {quantity} {currentUnit.abbreviation}
-              {!isChanged && <span className="ml-2">✓</span>}
+              {!isChanged && <span aria-hidden="true" className="ml-2">✓</span>}
             </button>
           </div>
 
           {/* Conversions */}
           <div className="py-1">
-            <div className="px-3 py-1 text-xs text-gray-500">Convertir en:</div>
-            {conversions.map((conv) => (
-              <button
-                key={conv.unit.id}
-                onClick={() => handleUnitSelect(conv.unit, conv.formatted)}
-                className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between ${
-                  selectedUnit?.id === conv.unit.id
-                    ? 'bg-amber-400/10 text-amber-400'
-                    : 'text-gray-300 hover:bg-gray-800'
-                }`}
-              >
-                <span>{conv.formatted} {conv.unit.abbreviation}</span>
-                {selectedUnit?.id === conv.unit.id && <span className="text-amber-400">✓</span>}
-              </button>
-            ))}
+            <div className="px-3 py-1 text-xs text-fg-muted">Convertir en:</div>
+            {conversions.map((conv) => {
+              const isSelected = selectedUnit?.id === conv.unit.id;
+              return (
+                <button
+                  key={conv.unit.id}
+                  type="button"
+                  onClick={() => handleUnitSelect(conv.unit, conv.formatted)}
+                  aria-pressed={isSelected}
+                  className={cx(
+                    'w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between',
+                    isSelected ? 'bg-accent/10 text-accent' : 'text-fg hover:bg-line',
+                  )}
+                >
+                  <span>{conv.formatted} {conv.unit.abbreviation}</span>
+                  {isSelected && <span aria-hidden="true" className="text-accent">✓</span>}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

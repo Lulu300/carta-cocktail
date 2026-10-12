@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useId, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { settings as settingsApi, backup as backupApi } from '../../services/api';
 import type { BackupRestoreResult } from '../../services/api';
@@ -7,6 +7,10 @@ import { useSiteSettings } from '../../contexts/SiteSettingsContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { toast } from '../../components/ui/ToastStore';
 import Button from '../../components/ui/Button';
+import Field from '../../components/ui/Field';
+import Icon from '../../components/ui/Icon';
+import Input from '../../components/ui/Input';
+import { cx } from '../../components/ui/classNames';
 
 const ICON_OPTIONS = [
   '', '🍸', '🍹', '🥃', '🍷', '🥂', '🍺', '🧉', '🫗',
@@ -72,6 +76,7 @@ export default function SettingsPage() {
   const [backupError, setBackupError] = useState('');
   const [restoreResult, setRestoreResult] = useState<BackupRestoreResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const siteIconHintId = useId();
 
   useEffect(() => {
     settingsApi.get().then((data) => {
@@ -182,162 +187,130 @@ export default function SettingsPage() {
   };
 
   if (siteLoading) {
-    return <div className="text-gray-500">{t('common.loading')}</div>;
+    return <div role="status" className="text-fg-muted">{t('common.loading')}</div>;
   }
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold font-serif text-amber-400 mb-8">{t('settings.title')}</h1>
+      <h1 className="text-2xl font-bold font-serif text-accent mb-8">{t('settings.title')}</h1>
 
       {/* Site Settings */}
-      <form onSubmit={handleSiteSave} className="bg-[#1a1a2e] border border-gray-800 rounded-xl p-6 mb-8">
-        <h2 className="text-lg font-semibold text-white mb-4">{t('settings.siteConfig')}</h2>
+      <form onSubmit={handleSiteSave} className="bg-surface border border-line rounded-xl p-6 mb-8">
+        <h2 className="text-lg font-semibold text-fg mb-4">{t('settings.siteConfig')}</h2>
 
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">{t('settings.siteName')}</label>
-            <input
-              type="text"
-              value={siteName}
-              onChange={(e) => setSiteName(e.target.value)}
-              className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:border-amber-400 focus:outline-none"
-              required
-            />
-          </div>
+          <Field label={t('settings.siteName')} required>
+            <Input type="text" value={siteName} onChange={(e) => setSiteName(e.target.value)} />
+          </Field>
 
-          <div>
-            <label className="block text-sm text-gray-400 mb-2">{t('settings.siteIcon')}</label>
+          <fieldset aria-describedby={siteIconHintId}>
+            <legend className="block text-sm text-fg-muted mb-2">{t('settings.siteIcon')}</legend>
             <div className="flex flex-wrap gap-2">
               {ICON_OPTIONS.map((icon) => (
                 <button
                   key={icon || '__none__'}
                   type="button"
                   onClick={() => setSiteIcon(icon)}
-                  className={`w-10 h-10 rounded-lg border-2 flex items-center justify-center text-xl transition-colors ${
-                    siteIcon === icon
-                      ? 'border-amber-400 bg-amber-400/10'
-                      : 'border-gray-700 hover:border-gray-500 bg-[#0f0f1a]'
-                  }`}
+                  aria-pressed={siteIcon === icon}
+                  aria-label={icon || t('settings.noIcon')}
+                  className={cx(
+                    'w-10 h-10 rounded-lg border-2 flex items-center justify-center text-xl transition-colors',
+                    siteIcon === icon ? 'border-accent bg-accent/10' : 'border-line-strong hover:border-fg-muted bg-canvas',
+                  )}
                 >
-                  {icon || <span className="text-xs text-gray-500">-</span>}
+                  {icon || <span aria-hidden="true" className="text-xs text-fg-muted">-</span>}
                 </button>
               ))}
             </div>
-            <p className="text-xs text-gray-500 mt-2">{t('settings.siteIconHint')}</p>
-          </div>
+            <p id={siteIconHintId} className="text-xs text-fg-muted mt-2">{t('settings.siteIconHint')}</p>
+          </fieldset>
         </div>
 
         {siteMessage && <p className="mt-4 text-sm text-green-400">{siteMessage}</p>}
         {siteError && <p className="mt-4 text-sm text-red-400">{siteError}</p>}
 
-        <button
-          type="submit"
-          className="mt-6 bg-amber-400 text-black font-medium px-6 py-2.5 rounded-lg hover:bg-amber-300 transition-colors"
-        >
-          {t('common.save')}
-        </button>
+        <Button type="submit" className="mt-6">{t('common.save')}</Button>
       </form>
 
       {/* Profile Settings */}
-      <form onSubmit={handleProfileSave} className="bg-[#1a1a2e] border border-gray-800 rounded-xl p-6 mb-8">
-        <h2 className="text-lg font-semibold text-white mb-4">{t('settings.profileConfig')}</h2>
+      <form onSubmit={handleProfileSave} className="bg-surface border border-line rounded-xl p-6 mb-8">
+        <h2 className="text-lg font-semibold text-fg mb-4">{t('settings.profileConfig')}</h2>
 
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">{t('settings.email')}</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:border-amber-400 focus:outline-none"
-              required
-            />
-          </div>
+          <Field label={t('settings.email')} required>
+            <Input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </Field>
 
-          <hr className="border-gray-800" />
+          <hr className="border-line" />
 
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">{t('settings.currentPassword')}</label>
-            <input
+          <Field label={t('settings.currentPassword')}>
+            <Input
               type="password"
+              autoComplete="current-password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               required={isCurrentPasswordRequired}
-              className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:border-amber-400 focus:outline-none"
               placeholder={t('settings.currentPasswordPlaceholder')}
             />
-          </div>
+          </Field>
 
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">{t('settings.newPassword')}</label>
-            <input
+          <Field label={t('settings.newPassword')}>
+            <Input
               type="password"
+              autoComplete="new-password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:border-amber-400 focus:outline-none"
               placeholder={t('settings.newPasswordPlaceholder')}
             />
-          </div>
+          </Field>
 
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">{t('settings.confirmPassword')}</label>
-            <input
+          <Field label={t('settings.confirmPassword')}>
+            <Input
               type="password"
+              autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:border-amber-400 focus:outline-none"
               placeholder={t('settings.confirmPasswordPlaceholder')}
             />
-          </div>
+          </Field>
         </div>
 
         {profileMessage && <p className="mt-4 text-sm text-green-400">{profileMessage}</p>}
         {profileError && <p className="mt-4 text-sm text-red-400">{profileError}</p>}
 
-        <button
-          type="submit"
-          className="mt-6 bg-amber-400 text-black font-medium px-6 py-2.5 rounded-lg hover:bg-amber-300 transition-colors"
-        >
-          {t('common.save')}
-        </button>
+        <Button type="submit" className="mt-6">{t('common.save')}</Button>
       </form>
 
       {/* Backup & Restore */}
-      <div className="bg-[#1a1a2e] border border-gray-800 rounded-xl p-6">
-        <h2 className="text-lg font-semibold text-white mb-2">{t('settings.backup.title')}</h2>
-        <p className="text-sm text-gray-400 mb-6">{t('settings.backup.description')}</p>
+      <div className="bg-surface border border-line rounded-xl p-6">
+        <h2 className="text-lg font-semibold text-fg mb-2">{t('settings.backup.title')}</h2>
+        <p className="text-sm text-fg-muted mb-6">{t('settings.backup.description')}</p>
 
         <div className="space-y-4">
           {/* Export */}
           <div>
-            <button
-              onClick={handleBackupExport}
-              disabled={backupExporting}
-              className="bg-amber-400 text-black font-medium px-6 py-2.5 rounded-lg hover:bg-amber-300 transition-colors disabled:opacity-50 inline-flex items-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
+            <Button onClick={handleBackupExport} disabled={backupExporting}>
+              <Icon name="download" />
               {backupExporting ? t('settings.backup.exporting') : t('settings.backup.export')}
-            </button>
+            </Button>
           </div>
 
-          <hr className="border-gray-800" />
+          <hr className="border-line" />
 
           {/* Import */}
           <div className="space-y-3">
             <div className="flex items-center gap-3">
-              <button
-                type="button"
+              <Button
+                variant="ghost"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={backupImporting}
-                className="border border-gray-600 text-gray-300 hover:text-white hover:border-gray-400 font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+                className="border border-line-strong"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg aria-hidden="true" className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                 </svg>
                 {t('settings.backup.selectFile')}
-              </button>
+              </Button>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -346,20 +319,16 @@ export default function SettingsPage() {
                 className="hidden"
               />
               {backupFile && (
-                <span className="text-sm text-gray-400">
+                <span className="text-sm text-fg-muted">
                   {t('settings.backup.fileSelected', { name: backupFile.name })}
                 </span>
               )}
             </div>
 
             {backupFile && (
-              <button
-                onClick={handleBackupImport}
-                disabled={backupImporting}
-                className="bg-red-600 hover:bg-red-700 text-white font-medium px-6 py-2.5 rounded-lg transition-colors disabled:opacity-50"
-              >
+              <Button variant="danger" onClick={handleBackupImport} disabled={backupImporting}>
                 {backupImporting ? t('settings.backup.importing') : t('settings.backup.import')}
-              </button>
+              </Button>
             )}
           </div>
         </div>

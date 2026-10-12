@@ -14,7 +14,12 @@
     "settings": "Settings",
     "logout": "Logout",
     "login": "Login",
-    "language": "Language"
+    "language": "Language",
+    "changeLanguage": "Change language",
+    "menu": "Navigation menu",
+    "admin": "Administration",
+    "main": "Main navigation",
+    "skipToContent": "Skip to content"
   },
   "home": {
     "subtitle": "Discover our cocktail menus",
@@ -59,7 +64,8 @@
     "confirmDelete": "Delete this category? All associated bottles will also be deleted.",
     "created": "Category created",
     "updated": "Category updated",
-    "deleted": "Category deleted"
+    "deleted": "Category deleted",
+    "search": "Search categories"
   },
   "categoryTypes": {
     "manage": "Manage Types",
@@ -165,7 +171,8 @@
           "unknown": "{{field}} is invalid"
         }
       }
-    }
+    },
+    "search": "Search bottles"
   },
   "ingredients": {
     "title": "Ingredients",
@@ -182,7 +189,8 @@
     },
     "created": "Ingredient created",
     "updated": "Ingredient updated",
-    "deleted": "Ingredient deleted"
+    "deleted": "Ingredient deleted",
+    "search": "Search ingredients"
   },
   "units": {
     "title": "Units",
@@ -193,7 +201,8 @@
     "confirmDelete": "Delete this unit?",
     "created": "Unit created",
     "updated": "Unit updated",
-    "deleted": "Unit deleted"
+    "deleted": "Unit deleted",
+    "search": "Search units"
   },
   "cocktails": {
     "title": "Cocktails",
@@ -294,7 +303,8 @@
       "resultImported": "imported",
       "resultNotImported": "not imported",
       "mapsTo": "maps to"
-    }
+    },
+    "search": "Search cocktails"
   },
   "menus": {
     "title": "Menus",
@@ -365,7 +375,8 @@
         "hint": "Bottles checked as digestif appear here automatically. Use \"Synchronize\" to update the list.",
         "empty": "No bottles. Check bottles as digestif, then synchronize."
       }
-    }
+    },
+    "search": "Search menus"
   },
   "shortages": {
     "title": "Shortages",
@@ -385,7 +396,6 @@
     "unavailable": "Currently unavailable",
     "bottleSearchPlaceholder": "Search for a bottle...",
     "cocktailSearchPlaceholder": "Search recipes...",
-    "clearSearch": "Clear search",
     "withoutSection": "Without a section",
     "other": "Other",
     "servings_one": "{{count}} serving",
@@ -401,8 +411,6 @@
     "loadErrorHint": "Check your connection and try again.",
     "emptyMenu": "This menu is empty for now",
     "noResults": "No results for “{{query}}”",
-    "resultCount_one": "{{count}} result",
-    "resultCount_other": "{{count}} results",
     "sectionNav": "Menu sections",
     "moreIngredients_one": "{{count}} more ingredient",
     "moreIngredients_other": "{{count}} more ingredients",
@@ -450,7 +458,8 @@
       "reloadAfterRestart": "Reload the page once the backend has restarted",
       "invalidBackup": "Invalid backup file",
       "fileSelected": "File: {{name}}"
-    }
+    },
+    "noIcon": "No icon"
   },
   "common": {
     "save": "Save",
@@ -472,11 +481,24 @@
     "selected": "{{count}} selected",
     "retry": "Retry",
     "close": "Close",
-    "undo": "Undo"
+    "undo": "Undo",
+    "clear": "Clear",
+    "clearSearch": "Clear search",
+    "removeItem": "Remove {{name}}",
+    "filterOptions": "Filter the options",
+    "resultCount_one": "{{count}} result",
+    "resultCount_other": "{{count}} results"
   },
   "pagination": {
     "showing": "{{start}}-{{end}} of {{total}}",
-    "page": "page"
+    "page": "page",
+    "label": "Pagination",
+    "first": "First page",
+    "previous": "Previous page",
+    "next": "Next page",
+    "last": "Last page",
+    "goToPage": "Page {{page}}",
+    "pageSize": "Items per page"
   },
   "confirm": {
     "deleteTitle": "Delete?",
@@ -492,5 +514,26 @@
     "required": "Required",
     "positive": "Must be greater than 0",
     "sourceRequired": "Choose an item"
+  },
+  "iconPicker": {
+    "hint": "Pick an emoji to represent this ingredient",
+    "suggestions": "Suggested emojis",
+    "emoji": "Emoji {{emoji}}",
+    "customLabel": "Custom emoji",
+    "customPlaceholder": "Or paste a custom emoji...",
+    "useCustom": "OK",
+    "selected": "Selected"
+  },
+  "colors": {
+    "blue": "Blue",
+    "purple": "Purple",
+    "green": "Green",
+    "red": "Red",
+    "orange": "Orange",
+    "yellow": "Yellow",
+    "pink": "Pink",
+    "teal": "Teal",
+    "indigo": "Indigo",
+    "gray": "Gray"
   }
 }

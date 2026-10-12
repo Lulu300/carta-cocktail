@@ -121,7 +121,7 @@ export default function ImportStepUpload({ recipes, onLoaded, onNext }: ImportSt
               <li key={i} className="text-sm text-gray-300 flex items-center gap-2">
                 <span className="text-accent font-mono text-xs w-5 text-right">#{i + 1}</span>
                 <span className="font-serif">{r.cocktail.name}</span>
-                <span className="text-gray-500 text-xs">
+                <span className="text-fg-muted text-xs">
                   ({t('cocktails.importWizard.ingredientCount', { count: r.cocktail.ingredients.length })})
                 </span>
               </li>

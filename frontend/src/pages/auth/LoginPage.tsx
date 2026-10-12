@@ -4,6 +4,9 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { ApiError } from '../../services/api';
+import Button from '../../components/ui/Button';
+import Field from '../../components/ui/Field';
+import Input from '../../components/ui/Input';
 import LanguageSelector from '../../components/ui/LanguageSelector';
 
 const ADMIN_HOME = '/admin';
@@ -59,61 +62,55 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f0f1a] flex items-center justify-center px-4">
+    <main className="min-h-screen bg-canvas text-fg flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-amber-400 font-serif mb-2">Carta Cocktail</h1>
-          <p className="text-gray-400">{t('auth.welcome')}</p>
+          <h1 className="text-4xl font-bold text-accent font-serif mb-2">Carta Cocktail</h1>
+          <p className="text-fg-muted">{t('auth.welcome')}</p>
         </div>
 
         <form
           onSubmit={handleSubmit}
-          className="bg-[#1a1a2e] rounded-xl border border-gray-800 p-8 space-y-6"
+          className="bg-surface rounded-xl border border-line p-8 space-y-6"
         >
           <h2 className="text-xl font-semibold text-center">{t('auth.login')}</h2>
 
           {error && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg text-sm">
+            <div role="alert" className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg text-sm">
               {error}
             </div>
           )}
 
-          <div>
-            <label className="block text-sm text-gray-400 mb-2">{t('auth.email')}</label>
-            <input
+          <Field label={t('auth.email')}>
+            <Input
               type="email"
+              autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-amber-400 transition-colors"
               placeholder="admin@carta.local"
             />
-          </div>
+          </Field>
 
-          <div>
-            <label className="block text-sm text-gray-400 mb-2">{t('auth.password')}</label>
-            <input
+          <Field label={t('auth.password')}>
+            <Input
               type="password"
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-amber-400 transition-colors"
             />
-          </div>
+          </Field>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-amber-400 hover:bg-amber-500 text-[#0f0f1a] font-semibold py-2.5 rounded-lg transition-colors disabled:opacity-50"
-          >
+          <Button type="submit" disabled={loading} className="w-full">
             {loading ? t('common.loading') : t('auth.loginButton')}
-          </button>
+          </Button>
 
           <div className="flex justify-center">
             <LanguageSelector />
           </div>
         </form>
       </div>
-    </div>
+    </main>
   );
 }

@@ -259,6 +259,20 @@ describe('BottlesPage', () => {
       }
     });
 
+    it('opens a group from the keyboard with a button that reports its state', async () => {
+      const user = userEvent.setup();
+      mockApiList.mockResolvedValue([mockBottles[0], { ...mockBottles[0], id: 3 }, mockBottles[1]] as never);
+      renderPage();
+      const toggle = await screen.findByRole('button', { name: /x2/ });
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+      toggle.focus();
+      await user.keyboard('{Enter}');
+
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getAllByText('Absolut')).toHaveLength(3);
+    });
+
     it('keeps a group open after a page change and back', async () => {
       const user = userEvent.setup();
       const singles = Array.from({ length: 25 }, (_, index) => ({ ...mockBottles[1], id: 100 + index, name: `Bottle ${index + 1}` }));
@@ -267,11 +281,11 @@ describe('BottlesPage', () => {
       renderPage();
       await screen.findByText('Bottle 1');
 
-      await user.click(screen.getByRole('button', { name: '2' }));
+      await user.click(screen.getByText('2', { selector: 'nav button' }));
       await user.click(screen.getByText('x2'));
       expect(screen.getAllByText('Absolut')).toHaveLength(3);
-      await user.click(screen.getByRole('button', { name: '1' }));
-      await user.click(screen.getByRole('button', { name: '2' }));
+      await user.click(screen.getByText('1', { selector: 'nav button' }));
+      await user.click(screen.getByText('2', { selector: 'nav button' }));
 
       expect(screen.getAllByText('Absolut')).toHaveLength(3);
     });
@@ -592,6 +606,8 @@ describe('BottlesPage', () => {
       await user.click(screen.getByText('bottles.exportJson'));
 
       await waitFor(() => expect(mockExport).toHaveBeenCalledWith('json', expect.any(Object)));
+      // The menu closes: its button takes the focus back.
+      expect(screen.getByRole('button', { name: 'bottles.export' })).toHaveFocus();
     });
 
     it('closes the export menu on a click outside', async () => {
@@ -603,6 +619,31 @@ describe('BottlesPage', () => {
       await user.click(screen.getByText('bottles.title'));
 
       expect(screen.queryByText('bottles.exportJson')).not.toBeInTheDocument();
+    });
+
+    it('closes the export menu on Escape and gives the focus back to its button', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const exportButton = screen.getByRole('button', { name: 'bottles.export' });
+
+      await user.click(exportButton);
+      expect(exportButton).toHaveAttribute('aria-expanded', 'true');
+      await user.keyboard('{Escape}');
+
+      expect(screen.queryByText('bottles.exportJson')).not.toBeInTheDocument();
+      expect(exportButton).toHaveAttribute('aria-expanded', 'false');
+      expect(exportButton).toHaveFocus();
+    });
+
+    it('names its filter fields and announces the number of bottles once filtered', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const search = screen.getByRole('searchbox', { name: 'bottles.search' });
+      expect(screen.getByRole('combobox', { name: 'bottles.filterByCategory' })).toBeInTheDocument();
+
+      await user.type(search, 'abs');
+
+      expect(await screen.findByText('common.resultCount')).toHaveAttribute('aria-live', 'polite');
     });
 
     it('shows an export failure in an error toast', async () => {

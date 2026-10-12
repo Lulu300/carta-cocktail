@@ -14,7 +14,7 @@ function StatCount({ query }: { query: UseQueryResult<unknown[], Error> }) {
 
   if (query.isPending) {
     return (
-      <div className="text-3xl font-bold text-gray-500">
+      <div className="text-3xl font-bold text-fg-muted">
         <Spinner />
       </div>
     );
@@ -22,12 +22,12 @@ function StatCount({ query }: { query: UseQueryResult<unknown[], Error> }) {
   if (query.isError) {
     return (
       <>
-        <div aria-hidden="true" className="text-3xl font-bold text-gray-500">–</div>
+        <div aria-hidden="true" className="text-3xl font-bold text-fg-muted">–</div>
         <div className="text-xs text-red-400">{t('common.error')}</div>
       </>
     );
   }
-  return <div className="text-3xl font-bold text-white">{query.data.length}</div>;
+  return <div className="text-3xl font-bold text-fg">{query.data.length}</div>;
 }
 
 export default function DashboardPage() {
@@ -48,14 +48,14 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold font-serif text-amber-400 mb-6">{t('dashboard.title')}</h1>
+      <h1 className="text-2xl font-bold font-serif text-accent mb-6">{t('dashboard.title')}</h1>
 
       {shortageCount > 0 && (
         <Link
           to="/admin/shortages"
-          className="block mb-6 bg-red-500/10 border border-red-500/30 text-red-400 px-6 py-4 rounded-xl hover:bg-red-500/20 transition-colors"
+          className="block mb-6 bg-danger/10 border border-danger/30 text-danger px-6 py-4 rounded-xl hover:bg-danger/20 transition-colors"
         >
-          ⚠️ {t('dashboard.shortageAlert', { count: shortageCount })}
+          <span aria-hidden="true">⚠️</span> {t('dashboard.shortageAlert', { count: shortageCount })}
         </Link>
       )}
 
@@ -64,11 +64,11 @@ export default function DashboardPage() {
           <Link
             key={card.path}
             to={card.path}
-            className="bg-[#1a1a2e] border border-gray-800 rounded-xl p-6 hover:border-amber-400/30 transition-colors"
+            className="bg-surface border border-line rounded-xl p-6 hover:border-accent/30 transition-colors"
           >
-            <div className="text-3xl mb-2">{card.icon}</div>
+            <div aria-hidden="true" className="text-3xl mb-2">{card.icon}</div>
             <StatCount query={card.query} />
-            <div className="text-sm text-gray-400 mt-1">{card.label}</div>
+            <div className="text-sm text-fg-muted mt-1">{card.label}</div>
           </Link>
         ))}
       </div>

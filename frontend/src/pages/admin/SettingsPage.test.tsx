@@ -102,6 +102,23 @@ describe('SettingsPage', () => {
     });
   });
 
+  it('labels every field and marks the chosen site icon', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByLabelText(/settings\.siteName/)).toHaveValue('My Bar');
+    expect(screen.getByLabelText(/settings\.email/)).toHaveValue('admin@test.local');
+    expect(screen.getByLabelText('settings.currentPassword')).toHaveAttribute('type', 'password');
+    expect(screen.getByLabelText('settings.newPassword')).toHaveAttribute('autocomplete', 'new-password');
+    expect(screen.getByLabelText('settings.confirmPassword')).toHaveAttribute('autocomplete', 'new-password');
+
+    const icons = screen.getByRole('group', { name: 'settings.siteIcon' });
+    expect(within(icons).getByRole('button', { name: '🍸' })).toHaveAttribute('aria-pressed', 'true');
+    await user.click(within(icons).getByRole('button', { name: 'settings.noIcon' }));
+    expect(within(icons).getByRole('button', { name: 'settings.noIcon' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(icons).getByRole('button', { name: '🍸' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
   it('should display site settings after loading', async () => {
     renderPage();
     await waitFor(() => {

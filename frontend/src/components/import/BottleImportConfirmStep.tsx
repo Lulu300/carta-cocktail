@@ -18,7 +18,7 @@ export default function BottleImportConfirmStep({ preview, resolutions }: Bottle
   const counts = [
     { label: t('bottles.importWizard.categoriesToCreate'), value: categoriesToCreate, className: 'text-accent' },
     { label: t('bottles.importWizard.bottlesToImport'), value: countBottlesToCreate(preview, resolutions), className: 'text-accent' },
-    { label: t('bottles.importWizard.bottlesToSkip'), value: skippedRows, className: 'text-gray-500' },
+    { label: t('bottles.importWizard.bottlesToSkip'), value: skippedRows, className: 'text-fg-muted' },
   ];
 
   return (

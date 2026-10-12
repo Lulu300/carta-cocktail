@@ -357,11 +357,11 @@ describe('CategoriesPage', () => {
       const manager = await openTypesManager(user);
 
       await user.type(within(manager).getByPlaceholderText('GARNISH, MIXER...'), 'bitter');
-      const colorButtons = within(manager).getByText('categoryTypes.color').parentElement!.querySelectorAll('button');
-      await user.click(colorButtons[0]);
+      await user.click(within(manager).getByRole('button', { name: 'colors.red' }));
+      expect(within(manager).getByRole('button', { name: 'colors.red' })).toHaveAttribute('aria-pressed', 'true');
       await user.click(within(manager).getByRole('button', { name: 'common.create' }));
 
-      await waitFor(() => expect(mockCtApiCreate).toHaveBeenCalledWith({ name: 'BITTER', nameTranslations: null, color: 'blue' }));
+      await waitFor(() => expect(mockCtApiCreate).toHaveBeenCalledWith({ name: 'BITTER', nameTranslations: null, color: 'red' }));
     });
 
     it('deletes an unused type after confirmation', async () => {

@@ -33,7 +33,7 @@ export function BatchProgress({ state }: { state: CocktailImportState }) {
         <span>{Object.keys(state.results).length}/{total}</span>
       </div>
       <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
-        <div className="h-full bg-accent transition-all duration-300" style={{ width: `${(state.currentIndex / total) * 100}%` }} />
+        <div className="h-full bg-accent transition-all duration-300 motion-reduce:transition-none" style={{ width: `${(state.currentIndex / total) * 100}%` }} />
       </div>
     </div>
   );

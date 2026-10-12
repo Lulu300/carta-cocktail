@@ -34,5 +34,7 @@ export function useCocktailFilters(cocktails: Cocktail[]) {
     [cocktails, search, selectedTags, localize],
   );
 
-  return { search, setSearch, selectedTags, setSelectedTags, tagOptions, filteredCocktails };
+  const isFiltered = search.trim() !== '' || selectedTags.length > 0;
+
+  return { search, setSearch, selectedTags, setSelectedTags, tagOptions, filteredCocktails, isFiltered };
 }

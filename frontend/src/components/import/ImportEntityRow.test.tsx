@@ -211,7 +211,9 @@ describe('ImportEntityRow', () => {
     const ingredient: ImportEntityResolution = { ref: { name: 'Mint' }, existingMatch: null, status: 'missing' };
     render(<Harness entity={ingredient} type="ingredients" initial={createResolution('ingredients', ingredient)} onChange={onChange} />);
 
-    await user.click(screen.getByRole('button', { name: '🌿' }));
+    // The i18n mock gives every emoji the same name: pick the 🌿 button among them.
+    const emojiButtons = screen.getAllByRole('button', { name: 'iconPicker.emoji' });
+    await user.click(emojiButtons.find((button) => button.textContent === '🌿')!);
 
     expect(onChange).toHaveBeenLastCalledWith({ action: 'create', data: expect.objectContaining({ icon: '🌿' }) });
   });

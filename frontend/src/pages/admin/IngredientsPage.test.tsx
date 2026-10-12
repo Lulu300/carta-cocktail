@@ -156,6 +156,29 @@ describe('IngredientsPage', () => {
     await waitFor(() => expect(mockApiList).toHaveBeenCalledTimes(2));
   });
 
+  it('toggles the availability from the keyboard with a switch named after the ingredient', async () => {
+    const user = userEvent.setup();
+    await renderLoadedPage();
+    const limeSwitch = screen.getByRole('switch', { name: 'Lime' });
+    expect(limeSwitch).toHaveAttribute('aria-checked', 'true');
+
+    limeSwitch.focus();
+    await user.keyboard(' ');
+
+    await waitFor(() => expect(mockApiUpdate).toHaveBeenCalledWith(1, { isAvailable: false }));
+  });
+
+  it('names the search field, marks the active filter and announces the number of ingredients', async () => {
+    const user = userEvent.setup();
+    await renderLoadedPage();
+
+    expect(screen.getByRole('searchbox', { name: 'ingredients.search' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ingredients.filter.all' })).toHaveAttribute('aria-pressed', 'true');
+    await user.click(screen.getByRole('button', { name: /ingredients\.filter\.available/ }));
+    expect(screen.getByRole('button', { name: /ingredients\.filter\.available/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(await screen.findByText('common.resultCount')).toHaveAttribute('aria-live', 'polite');
+  });
+
   it('shows an error toast when the toggle fails', async () => {
     const user = userEvent.setup();
     mockApiUpdate.mockRejectedValue(new ApiError(500, 'Server down'));

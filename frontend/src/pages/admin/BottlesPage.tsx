@@ -112,12 +112,13 @@ export default function BottlesPage() {
       </div>
 
       <div className="flex flex-col lg:flex-row gap-3 mb-4">
-        <SearchInput value={filters.search} onChange={filters.setSearch} className="lg:w-64" />
+        <SearchInput value={filters.search} onChange={filters.setSearch} label={t('bottles.search')} className="lg:w-64" />
         <CategoryFilterInput
           categories={categories}
           value={filters.categoryText}
           selectedId={filters.categoryId}
           onChange={filters.setCategory}
+          label={t('bottles.filterByCategory')}
           placeholder={t('bottles.filterByCategory')}
           className="lg:w-64"
         />
@@ -125,6 +126,7 @@ export default function BottlesPage() {
           value={filters.location}
           onChange={filters.setLocation}
           locations={filters.locations}
+          label={t('bottles.filterByLocation')}
           placeholder={t('bottles.filterByLocation')}
           className="lg:w-64"
         />
@@ -144,6 +146,7 @@ export default function BottlesPage() {
         isError={bottlesQuery.isError}
         onRetry={() => bottlesQuery.refetch()}
         emptyLabel={t('common.noResults')}
+        isFiltered={filters.isFiltered}
       />
       <BottleHistoryTable bottles={filters.emptyBottles} {...rowActions} />
 

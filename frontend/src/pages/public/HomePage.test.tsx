@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { render, screen } from '../../test/test-utils';
 import { bottleMenu, cocktailMenu } from '../../test/publicMenuFixtures';
+import { axe } from '../../test/axe';
 import HomePage from './HomePage';
 
 vi.mock('../../services/api', () => ({
@@ -84,5 +85,15 @@ describe('HomePage', () => {
 
     expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
     expect(screen.queryByText('home.noMenus')).not.toBeInTheDocument();
+  });
+});
+
+describe('HomePage accessibility', () => {
+  it('has no serious accessibility violation', async () => {
+    vi.mocked(publicApi.listMenus).mockResolvedValue([cocktailMenu([], { slug: 'summer', name: 'Summer' })]);
+    const { container } = render(<HomePage />);
+    await screen.findByRole('link', { name: /Summer/ });
+
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

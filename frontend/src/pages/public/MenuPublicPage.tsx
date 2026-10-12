@@ -65,7 +65,7 @@ function MenuContent({ menu, slug }: { menu: Menu; slug: string }) {
       <EmptyState
         icon="🔍"
         title={t('public.noResults', { query: searchQuery.trim() })}
-        action={<Button variant="secondary" onClick={() => setSearchQuery('')}>{t('public.clearSearch')}</Button>}
+        action={<Button variant="secondary" onClick={() => setSearchQuery('')}>{t('common.clearSearch')}</Button>}
       />
     );
   };
@@ -88,8 +88,12 @@ function MenuContent({ menu, slug }: { menu: Menu; slug: string }) {
         {navItems.length >= 2 && <SectionNav items={navItems} />}
       </div>
 
+      {/*
+        Not LiveResultCount: this page is in the initial load, whose gzip budget
+        (140 kB, ci.yml) the component and its delay would exceed. Same region, no delay.
+      */}
       <p className="sr-only" aria-live="polite">
-        {isSearching ? t('public.resultCount', { count: resultCount }) : ''}
+        {isSearching ? t('common.resultCount', { count: resultCount }) : ''}
       </p>
 
       {resultCount === 0 ? renderNoResults() : (

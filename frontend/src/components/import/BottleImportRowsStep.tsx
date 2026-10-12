@@ -38,7 +38,7 @@ export default function BottleImportRowsStep({ rows, resolutions, categoryOption
             >
               <div className="flex items-center gap-2">
                 <span className="flex-1 text-sm font-medium">{entry.ref.name}</span>
-                <span className="text-xs text-gray-500">{entry.ref.capacityMl} ml</span>
+                <span className="text-xs text-fg-muted">{entry.ref.capacityMl} ml</span>
                 {entry.ref.quantity > 1 && (
                   <span className="bg-accent/20 text-accent text-xs font-bold px-2 py-0.5 rounded-full">
                     ×{entry.ref.quantity}

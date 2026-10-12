@@ -60,10 +60,12 @@ export function useBottleFilters(bottles: Bottle[] | undefined) {
     setCategoryId(id);
   };
 
+  const isFiltered = [search, categoryText, location].some((value) => value.trim() !== '');
+
   return {
     search, setSearch,
     categoryText, categoryId, setCategory,
     location, setLocation,
-    locations, activeBottles, emptyBottles, exportFilters,
+    locations, activeBottles, emptyBottles, exportFilters, isFiltered,
   };
 }

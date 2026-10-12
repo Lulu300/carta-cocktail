@@ -119,7 +119,7 @@ describe('ShortagesPage', () => {
     render(<ShortagesPage />);
     await screen.findByText('Vodka');
 
-    const bar = document.querySelector('.bg-red-500') as HTMLElement;
+    const bar = document.querySelector('.bg-danger') as HTMLElement;
     expect(bar.style.width).toBe('100%');
   });
 });

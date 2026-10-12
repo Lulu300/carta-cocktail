@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { render, screen, waitFor, within } from '../../test/test-utils';
+import { axe } from '../../test/axe';
 import AdminLayout from './AdminLayout';
 
 vi.mock('../../services/api', () => ({
@@ -87,6 +88,112 @@ describe('AdminLayout logout', () => {
 
     expect(mockLogout).toHaveBeenCalledTimes(1);
     expect(await screen.findByText('login page')).toBeInTheDocument();
+  });
+});
+
+describe('AdminLayout accessibility', () => {
+  function getMenuButton() {
+    return screen.getByRole('button', { name: 'nav.menu' });
+  }
+
+  it('starts with a skip link to the main content', async () => {
+    const user = userEvent.setup();
+    renderLayout();
+
+    await user.tab();
+
+    const skipLink = screen.getByRole('link', { name: 'nav.skipToContent' });
+    expect(skipLink).toHaveFocus();
+    expect(skipLink).toHaveAttribute('href', `#${screen.getByRole('main').id}`);
+    await waitFor(() => expect(mockShortList).toHaveBeenCalled());
+  });
+
+  it('marks the current page in the navigation and hides the emojis', async () => {
+    renderLayout();
+    const nav = screen.getByRole('navigation', { name: 'nav.admin' });
+
+    expect(within(nav).getByRole('link', { name: 'nav.categories' })).toHaveAttribute('aria-current', 'page');
+    expect(within(nav).getByRole('link', { name: 'nav.dashboard' })).not.toHaveAttribute('aria-current');
+    expect(within(nav).getByText('🏷️')).toHaveAttribute('aria-hidden', 'true');
+    await waitFor(() => expect(mockShortList).toHaveBeenCalled());
+  });
+
+  it('opens the mobile drawer from a named menu button, focusing its first link', async () => {
+    const user = userEvent.setup();
+    renderLayout();
+    const menuButton = getMenuButton();
+    const sidebar = screen.getByRole('complementary');
+    expect(menuButton).toHaveAttribute('aria-expanded', 'false');
+    expect(menuButton).toHaveAttribute('aria-controls', sidebar.id);
+    // Closed on small screens: off screen and out of the tab order.
+    expect(sidebar).toHaveClass('max-lg:invisible');
+
+    await user.click(menuButton);
+
+    expect(menuButton).toHaveAttribute('aria-expanded', 'true');
+    expect(sidebar).not.toHaveClass('max-lg:invisible');
+    expect(within(sidebar).getByRole('link', { name: /Carta/ })).toHaveFocus();
+  });
+
+  // jsdom runs no transition: the real-browser cause of a lost focus is the
+  // visibility transition, so the test checks it is not delayed on opening.
+  it('shows the drawer at once on opening and hides it only after the slide on closing', async () => {
+    const user = userEvent.setup();
+    renderLayout();
+    const sidebar = screen.getByRole('complementary');
+    expect(sidebar.className).toContain('visibility_0s_200ms');
+
+    await user.click(getMenuButton());
+
+    expect(sidebar.className).toContain('[transition:translate_200ms,visibility_0s]');
+    expect(sidebar.className).not.toContain('visibility_0s_200ms');
+  });
+
+  it('gives the focus back to the menu button when the overlay is clicked', async () => {
+    const user = userEvent.setup();
+    const { container } = renderLayout();
+    await user.click(getMenuButton());
+
+    await user.click(container.querySelector('.bg-black\\/50')!);
+
+    expect(getMenuButton()).toHaveAttribute('aria-expanded', 'false');
+    expect(getMenuButton()).toHaveFocus();
+  });
+
+  it('lets the skip link move the focus to the main content', () => {
+    renderLayout();
+    expect(screen.getByRole('main')).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('closes the drawer on Escape and gives the focus back to the menu button', async () => {
+    const user = userEvent.setup();
+    renderLayout();
+    await user.click(getMenuButton());
+
+    await user.keyboard('{Escape}');
+
+    expect(getMenuButton()).toHaveAttribute('aria-expanded', 'false');
+    expect(getMenuButton()).toHaveFocus();
+    expect(screen.getByRole('complementary')).toHaveClass('max-lg:invisible');
+  });
+
+  it('closes the drawer when a page is chosen', async () => {
+    const user = userEvent.setup();
+    renderLayout();
+    await user.click(getMenuButton());
+
+    await user.click(screen.getByRole('link', { name: /nav\.units/ }));
+
+    expect(getMenuButton()).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('has no serious accessibility violation, drawer open', async () => {
+    const user = userEvent.setup();
+    const { container } = renderLayout();
+    await screen.findByText('dashboard.shortageAlert');
+    await user.click(getMenuButton());
+
+    expect(await axe(container)).toHaveNoViolations();
   });
 });
 

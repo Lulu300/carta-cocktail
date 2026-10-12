@@ -100,7 +100,7 @@ export default function CategoriesPage() {
         </div>
         <Button onClick={() => categoryForm.open()}>{t('categories.add')}</Button>
       </div>
-      <SearchInput value={search} onChange={setSearch} className="max-w-sm mb-4" />
+      <SearchInput value={search} onChange={setSearch} label={t('categories.search')} className="max-w-sm mb-4" />
       <DataTable
         columns={columns}
         rows={pagination.paginatedItems}
@@ -111,6 +111,7 @@ export default function CategoriesPage() {
         isError={categoriesQuery.isError}
         onRetry={() => categoriesQuery.refetch()}
         emptyLabel={t('common.noResults')}
+        isFiltered={search.trim() !== ''}
       />
       <CategoryFormModal
         entityForm={categoryForm}
