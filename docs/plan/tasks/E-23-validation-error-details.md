@@ -55,3 +55,4 @@ Depuis C-04, le backend valide toutes les entrées avec zod. Une requête invali
 ## Journal
 
 - 2026-10-11 : tâche créée par C-04 (décision humaine sur la question 3 de C-04) : le frontend n'affiche pas les `details` des 400 de validation.
+- 2026-10-12 : C-33 (PR #127) ajoute deux 400 dont les `details` n'ont pas la forme zod `{ path, code, message }` : `errors.unknownReference` → `[{ line, field, id }]` (POST/PUT d'un cocktail) et `errors.importUnresolved` → `[{ line, kind, name }]` (confirmation d'import). C-38 (qui dépend de cette tâche) les affiche : prévoir dans `ApiError` un accès aux `details` qui ne suppose pas la forme zod.
