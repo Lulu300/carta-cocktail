@@ -4,9 +4,10 @@
 FROM node:24.21-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
-COPY prisma ./prisma
 # The postinstall script generates the Prisma client from prisma/schema.prisma
-# into src/generated/, which `npm run build` compiles with the sources
+# into src/generated/, which `npm run build` compiles with the sources. The
+# schema alone is enough: a new migration does not invalidate this layer.
+COPY prisma/schema.prisma ./prisma/schema.prisma
 RUN npm ci
 
 FROM deps AS build
@@ -20,12 +21,11 @@ RUN npm run build
 # The runtime tree has no optional dependency of its own: --omit=optional drops the
 # optional peers that only the dev tooling uses (typescript, for @prisma/client and i18next).
 FROM deps AS prod-deps
-RUN npm prune --omit=dev --omit=optional && npm cache clean --force
+RUN npm prune --omit=dev --omit=optional
 
 FROM node:24.21-alpine AS runtime
-# tini forwards signals to the entrypoint and then Node; su-exec drops root
-# once the entrypoint has given the volumes to the node user
-RUN apk add --no-cache tini su-exec
+# tini forwards SIGTERM to the entrypoint, then to Node once the entrypoint has exec'd it
+RUN apk add --no-cache tini
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=prod-deps /app/node_modules ./node_modules
@@ -36,7 +36,8 @@ COPY package.json prisma.config.ts ./
 COPY src/lib/databasePath.ts ./src/lib/
 COPY prisma ./prisma
 COPY docker-entrypoint.sh ./
-# The executable bit can be lost on checkouts that do not keep file modes
+# The executable bit can be lost on checkouts that do not keep file modes.
+# The code stays owned by root: the node user only writes to the two data folders.
 RUN chmod +x docker-entrypoint.sh \
   && mkdir -p /app/data /app/uploads \
   && chown node:node /app/data /app/uploads
@@ -44,8 +45,11 @@ RUN chmod +x docker-entrypoint.sh \
 # Compiled code runs from /app/dist, so the default upload path would miss the volume
 ENV UPLOAD_DIR=/app/uploads
 
+USER node
+
 EXPOSE 3001
 
-# Backs up the database, applies the Prisma migrations, seeds, then runs Node as
-# the node user. A command given to `docker run` replaces those steps.
+# Checks that the data folders are writable, backs up the database, applies the
+# Prisma migrations, seeds, then runs Node. A command given to `docker run`
+# replaces those steps.
 ENTRYPOINT ["/sbin/tini", "--", "/app/docker-entrypoint.sh"]

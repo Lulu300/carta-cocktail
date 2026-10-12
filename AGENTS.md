@@ -77,7 +77,7 @@ Coverage is enforced automatically by CI. Run `npm test -- --coverage` in either
 ## CI/CD (GitHub Actions)
 
 **CI** (`.github/workflows/ci.yml`) — runs on PRs and pushes to `main`/`develop`:
-- **Backend job**: `npm ci` → `prisma generate` → `tsc --noEmit` → `npm run build` → `npm test`
+- **Backend job**: `npm ci` (postinstall: `prisma generate`) → `tsc --noEmit` → `npm run build` → `npm test`
 - **Frontend job**: `npm ci` → `tsc --noEmit` → `npm run lint` → `npm run build` → `npm test`
 - Both jobs run in parallel on Node 24, the version used by the Docker images (`.nvmrc`); `engines` in both `package.json` require Node >= 24
 

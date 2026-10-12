@@ -65,6 +65,7 @@ A layout is a folder in `layouts/` with a `layout.mjs`, one compose template per
   - `requireStarted`: the version started earlier on the path, or `directFrom` allows a direct jump from that release line;
   - `copyDatabase`, `checkDatabaseCopy`: copy of the database files with the backend stopped (volume or data folder), and check of a second copy with the new image;
   - `changeWeakAdminPassword`: an admin password that is `admin123` or shorter than 12 characters is changed through Settings > Admin Profile, and a short `ADMIN_PASSWORD` is removed from the env file. The bench then logs in with the new password;
+  - `chownMounts`: gives the volumes and host folders mounted on `destinations` (for example `/app/data` and `/app/uploads`) to `owner` (`uid:gid`) with the helper image, before a jump to an image that no longer runs as root;
   - `manual`: reported, not automated.
 - `naiveMayFail`: what the notes say breaks when the actions are skipped. In naive mode, these failures, and the ones already present at the previous step, are reported as expected and do not change the exit code. When the layout mounts the photos on a folder that the version no longer reads (`friend` from v1.5.0), the report gives that cause instead of the reason of the notes.
 

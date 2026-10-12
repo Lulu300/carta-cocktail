@@ -67,7 +67,7 @@ backend/
 │   │   ├── shortages.ts      # GET /api/shortages
 │   │   ├── availability.ts   # GET cocktail availability
 │   │   └── settings.ts       # GET/PUT site settings + admin profile
-│   ├── scripts/              # Commands run in their own process, compiled into dist/scripts/
+│   ├── scripts/              # Thin process entry points, compiled into dist/scripts/ (logic in services/, bootstrap/)
 │   │   ├── seed.ts           # Admin user, category types, units, menus (each container start)
 │   │   └── check-integrity.ts # Read-only report on a copy of the database before an upgrade
 │   ├── services/
@@ -85,7 +85,7 @@ backend/
 │   └── migrations/            # Versioned migrations, applied at each container start
 ├── package.json
 ├── tsconfig.json
-├── docker-entrypoint.sh       # Volume owners, backup, migrations, seed, then Node as the node user
+├── docker-entrypoint.sh       # As the node user: writable check, backup, migrations, seed, then Node
 └── Dockerfile                 # Multi-stage: runtime dependencies and dist/ only
 ```
 
@@ -198,7 +198,7 @@ Entity names support multi-language via JSON strings stored in SQLite:
 **Runtime (database)**: @prisma/client 7, @prisma/adapter-better-sqlite3 7, better-sqlite3 12 (native module, prebuilt for linux x64/arm64 musl), prisma 7 (the CLI applies the migrations when the container starts)
 **Dev**: typescript 5.9, tsx, eslint 10, typescript-eslint, prettier 3, vitest
 
-The Docker image holds the runtime dependencies only: code that runs there (server, seed, scripts) lives in `src/` and is compiled by `npm run build`. It never relies on `tsx`.
+The Docker image holds the runtime dependencies only and runs as the `node` user (uid 1000): code that runs there (server, seed, scripts) lives in `src/` and is compiled by `npm run build`. It never relies on `tsx`. `src/lib/databasePath.ts` is the only source file copied into the image (for `prisma.config.ts`): it imports Node built-ins only. A new file in `src/scripts/` stays a thin entry point and is added to the coverage exclusions (`vitest.config.ts` and `ci.yml`).
 
 ## Database
 

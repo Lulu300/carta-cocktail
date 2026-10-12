@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-05]
-touches: [backend/scripts/check-integrity.ts, backend/src/services/backupService.ts]
+touches: [backend/src/scripts/check-integrity.ts, backend/src/services/backupService.ts]
 sources: []
-branch:
-pr:
+branch: chore/D-01-backend-dockerfile
+pr: "#108"
 ---
 
 ## Contexte
@@ -30,8 +30,8 @@ C-05 ajoute `resolveDatabasePath(url)` dans `backend/src/services/backupService.
 
 ## Critères d'acceptation
 
-- [ ] Une seule implémentation de la conversion URL → chemin.
-- [ ] `check-integrity` garde son message « Database file not found » pour un fichier absent.
+- [x] Une seule implémentation de la conversion URL → chemin.
+- [x] `check-integrity` garde son message « Database file not found » pour un fichier absent.
 
 ## Tests à ajouter ou adapter
 
@@ -44,3 +44,4 @@ C-05 ajoute `resolveDatabasePath(url)` dans `backend/src/services/backupService.
 ## Journal
 
 - 2026-10-11 : tâche créée à partir de la revue de la PR #76 (C-05).
+- 2026-10-12 : faite par D-01 (PR #108). Le script passe dans `backend/src/scripts/check-integrity.ts` (compilé dans `dist/`, lancé par `node dist/scripts/check-integrity.js` dans l'image) et `databaseFileExists` appelle `resolveDatabasePath()` de `src/lib/databasePath.ts` (déjà partagé avec `backupService.ts` depuis C-15). Message « Database file not found » et code 2 conservés ; test ajouté pour un chemin qui désigne un dossier.
