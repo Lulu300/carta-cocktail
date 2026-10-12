@@ -64,16 +64,21 @@ export default function MenuBottleEditPage() {
   const [editingSectionId, setEditingSectionId] = useState<number | null>(null);
   const [editingSectionName, setEditingSectionName] = useState('');
 
-  const load = useCallback(async () => {
-    if (!id) return;
-    const m = await menusApi.get(parseInt(id));
+  const applyMenu = useCallback((m: Menu) => {
     setMenu(m);
     setName(m.name);
     setDescription(m.description || '');
     setIsPublic(m.isPublic);
     setSections(m.sections || []);
     setMenuBottlesList(m.bottles || []);
-  }, [id]);
+  }, []);
+
+  // State is set in the promise callback, so the load effect below never sets state
+  // synchronously (react-hooks/set-state-in-effect).
+  const load = useCallback(async () => {
+    if (!id) return;
+    await menusApi.get(parseInt(id)).then(applyMenu);
+  }, [id, applyMenu]);
 
   useEffect(() => { load(); }, [load]);
 

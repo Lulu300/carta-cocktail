@@ -74,21 +74,24 @@ export default function CocktailsPage() {
 
   const load = () => api.list().then(setItems);
 
-  const loadAvailability = async () => {
-    try {
-      setLoadingAvailability(true);
-      const data = await availabilityApi.getAllCocktails();
-      setAvailabilities(data);
-    } catch (error) {
-      console.error('Failed to load availability:', error);
-    } finally {
-      setLoadingAvailability(false);
-    }
+  // State only changes in promise callbacks, so the initial-load effect never sets
+  // state synchronously (react-hooks/set-state-in-effect).
+  const fetchAvailability = () =>
+    availabilityApi
+      .getAllCocktails()
+      .then(setAvailabilities)
+      .catch((error) => console.error('Failed to load availability:', error))
+      .finally(() => setLoadingAvailability(false));
+
+  // The loading flag starts at true, so only a reload needs to raise it again.
+  const reloadAvailability = () => {
+    setLoadingAvailability(true);
+    fetchAvailability();
   };
 
   useEffect(() => {
     load();
-    loadAvailability();
+    fetchAvailability();
   }, []);
 
   const handleDelete = async (id: number) => {
@@ -102,7 +105,7 @@ export default function CocktailsPage() {
   const handleImportClose = () => {
     setShowImport(false);
     load();
-    loadAvailability();
+    reloadAvailability();
     invalidateQueries(IMPORT_KEYS);
   };
 

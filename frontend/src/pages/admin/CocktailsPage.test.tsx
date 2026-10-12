@@ -164,6 +164,37 @@ describe('CocktailsPage', () => {
     expect(screen.getByText('Indisponible')).toBeInTheDocument();
   });
 
+  it('still lists cocktails, without availability badges, when availability fails to load', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(availabilityApi.getAllCocktails).mockRejectedValue(new Error('offline'));
+    render(<CocktailsPage />);
+
+    await screen.findAllByText('Mojito');
+    await waitFor(() => expect(consoleError).toHaveBeenCalled());
+    expect(screen.queryByText('5 doses')).not.toBeInTheDocument();
+    expect(screen.queryByText('Indisponible')).not.toBeInTheDocument();
+    consoleError.mockRestore();
+  });
+
+  it('hides availability while it reloads after an import', async () => {
+    const user = userEvent.setup();
+    let resolveReload: (value: typeof mockAvailabilities) => void = () => {};
+    render(<CocktailsPage />);
+    expect(await screen.findByText('5 doses')).toBeInTheDocument();
+
+    vi.mocked(availabilityApi.getAllCocktails).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveReload = resolve;
+      }),
+    );
+    await user.click(screen.getByText('cocktails.import'));
+    await user.click(screen.getByText('close'));
+
+    expect(screen.queryByText('5 doses')).not.toBeInTheDocument();
+    resolveReload(mockAvailabilities);
+    expect(await screen.findByText('5 doses')).toBeInTheDocument();
+  });
+
   it('shows missing ingredients warning on unavailable cocktails', async () => {
     render(<CocktailsPage />);
 
