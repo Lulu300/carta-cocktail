@@ -76,8 +76,7 @@ export default function CocktailsPage() {
   const handleBatchExport = async () => {
     setIsExporting(true);
     try {
-      const selected = cocktails.filter((cocktail) => selection.isSelected(cocktail.id));
-      await exportCocktailsAsZip([...selection.selected], selected);
+      await exportCocktailsAsZip([...selection.selected]);
       exitSelectionMode();
     } catch (error) {
       toast.error(error);

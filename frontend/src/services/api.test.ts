@@ -32,6 +32,16 @@ function mockOk(data: unknown = {}) {
   });
 }
 
+/** A JSON response sent as an attachment, with or without a Content-Disposition header. */
+function mockAttachment(data: unknown, disposition: string | null) {
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve(data),
+    headers: { get: (key: string) => (key.toLowerCase() === 'content-disposition' ? disposition : null) },
+  });
+}
+
 function mockError(status: number, data: unknown) {
   mockFetch.mockResolvedValueOnce({
     ok: false,
@@ -358,9 +368,27 @@ describe('cocktails API', () => {
     await api.cocktails.update(1, { name: 'Negroni' });
     mockOk({ message: 'ok' });
     await api.cocktails.delete(1);
-    mockOk({ version: 1 });
+    mockAttachment({ version: 1 }, 'attachment; filename="cocktail-mojito.json"');
     await api.cocktails.exportRecipe(1);
     expect(mockFetch.mock.calls[5][0]).toBe('/api/cocktails/1/export');
+  });
+
+  it('should return the export with the file name chosen by the server', async () => {
+    const api = await getApi();
+    mockAttachment({ version: 1 }, 'attachment; filename="cocktail-pina-colada.json"');
+
+    const file = await api.cocktails.exportRecipe(7);
+
+    expect(file).toEqual({ filename: 'cocktail-pina-colada.json', data: { version: 1 } });
+  });
+
+  it('should fall back on the id-based export name without a Content-Disposition header', async () => {
+    const api = await getApi();
+    mockAttachment({ version: 1 }, null);
+
+    const file = await api.cocktails.exportRecipe(42);
+
+    expect(file.filename).toBe('cocktail-42.json');
   });
 
   it('should upload image with FormData', async () => {
@@ -486,9 +514,10 @@ describe('public API', () => {
 
     mockOk({});
     await api.publicApi.getCocktail(1);
-    mockOk({});
-    await api.publicApi.exportCocktail(1);
+    mockAttachment({}, 'attachment; filename="cocktail-negroni.json"');
+    const file = await api.publicApi.exportCocktail(1);
     expect(mockFetch.mock.calls[3][0]).toBe('/api/public/cocktails/1/export');
+    expect(file.filename).toBe('cocktail-negroni.json');
 
     mockOk({});
     await api.publicApi.getSettings();

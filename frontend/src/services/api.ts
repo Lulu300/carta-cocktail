@@ -88,6 +88,28 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
+/** File name suggested by the Content-Disposition header, or `fallback` when the server sends none. */
+function attachmentFilename(res: Response, fallback: string): string {
+  const disposition = res.headers.get('Content-Disposition') ?? '';
+  const match = disposition.match(/filename="?([^";]+)"?/);
+  return match ? match[1] : fallback;
+}
+
+/** A cocktail export with the file name chosen by the server. */
+export interface CocktailExportFile {
+  filename: string;
+  data: CocktailExportFormat;
+}
+
+/**
+ * The backend names the file (accents removed, `cocktail-<id>.json` when the name has
+ * no latin letter): the fallback only covers a response without the header.
+ */
+async function requestCocktailExport(url: string, id: number): Promise<CocktailExportFile> {
+  const res = await send(url);
+  return { filename: attachmentFilename(res, `cocktail-${id}.json`), data: await res.json() };
+}
+
 // Auth
 export const auth = {
   login: (email: string, password: string) =>
@@ -149,10 +171,7 @@ export const bottles = {
     const res = await send(`/bottles/export?${searchParams.toString()}`);
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
-    const disposition = res.headers.get('Content-Disposition') || '';
-    const match = disposition.match(/filename="?([^";]+)"?/);
-    const fallback = `bottles-${new Date().toISOString().slice(0, 10)}.${format}`;
-    const filename = match ? match[1] : fallback;
+    const filename = attachmentFilename(res, `bottles-${new Date().toISOString().slice(0, 10)}.${format}`);
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
@@ -218,8 +237,7 @@ export const cocktails = {
       body: formData,
     });
   },
-  exportRecipe: (id: number) =>
-    request<CocktailExportFormat>(`/cocktails/${id}/export`),
+  exportRecipe: (id: number) => requestCocktailExport(`/cocktails/${id}/export`, id),
   importPreview: (data: CocktailExportFormat) =>
     request<ImportPreviewResponse>('/cocktails/import/preview', {
       method: 'POST',
@@ -300,8 +318,7 @@ export const publicApi = {
   listMenus: () => request<Menu[]>('/public/menus'),
   getMenu: (slug: string) => request<Menu>(`/public/menus/${slug}`),
   getCocktail: (id: number) => request<Cocktail>(`/public/cocktails/${id}`),
-  exportCocktail: (id: number) =>
-    request<CocktailExportFormat>(`/public/cocktails/${id}/export`),
+  exportCocktail: (id: number) => requestCocktailExport(`/public/cocktails/${id}/export`, id),
   getSettings: () => request<SiteSettings>('/public/settings'),
   listUnits: () => request<Unit[]>('/public/units'),
 };
@@ -341,9 +358,7 @@ export const backup = {
     const res = await send('/backup/export');
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
-    const disposition = res.headers.get('Content-Disposition') || '';
-    const match = disposition.match(/filename=(.+)/);
-    const filename = match ? match[1] : `backup-${new Date().toISOString().slice(0, 10)}.zip`;
+    const filename = attachmentFilename(res, `backup-${new Date().toISOString().slice(0, 10)}.zip`);
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;

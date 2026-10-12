@@ -26,7 +26,7 @@ export default function CocktailActions({ cocktail, onDelete, className }: Cockt
       >
         <Icon name="edit" />
       </Link>
-      <ExportCocktailButton cocktailId={cocktail.id} cocktailName={cocktail.name} />
+      <ExportCocktailButton cocktailId={cocktail.id} />
       <IconButton icon="delete" label={t('common.delete')} variant="danger" onClick={() => onDelete(cocktail)} />
     </div>
   );

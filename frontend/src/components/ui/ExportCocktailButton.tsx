@@ -3,29 +3,27 @@ import { cocktails as cocktailsApi, publicApi } from '../../services/api';
 
 interface ExportCocktailButtonProps {
   cocktailId: number;
-  cocktailName: string;
   isPublic?: boolean;
   className?: string;
 }
 
-export default function ExportCocktailButton({ cocktailId, cocktailName, isPublic, className }: ExportCocktailButtonProps) {
+export default function ExportCocktailButton({ cocktailId, isPublic, className }: ExportCocktailButtonProps) {
   const { t } = useTranslation();
 
   const handleExport = async (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     try {
-      const data = isPublic
+      const { filename, data } = isPublic
         ? await publicApi.exportCocktail(cocktailId)
         : await cocktailsApi.exportRecipe(cocktailId);
 
       const json = JSON.stringify(data, null, 2);
       const blob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
-      const slug = cocktailName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
       const a = document.createElement('a');
       a.href = url;
-      a.download = `cocktail-${slug}.json`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

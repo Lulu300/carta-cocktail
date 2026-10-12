@@ -15,8 +15,8 @@ vi.mock('../../services/exportZip', () => ({
 }));
 
 vi.mock('../../components/ui/ExportCocktailButton', () => ({
-  default: ({ cocktailName }: { cocktailName: string }) => (
-    <button data-testid={`export-${cocktailName}`}>export</button>
+  default: ({ cocktailId }: { cocktailId: number }) => (
+    <button data-testid={`export-${cocktailId}`}>export</button>
   ),
 }));
 
@@ -250,10 +250,7 @@ describe('CocktailsPage', () => {
     await user.click(screen.getByText(/cocktails.exportZip/));
 
     await waitFor(() => {
-      expect(exportCocktailsAsZip).toHaveBeenCalledWith(
-        [1],
-        [expect.objectContaining({ id: 1 })],
-      );
+      expect(exportCocktailsAsZip).toHaveBeenCalledWith([1]);
     });
   });
 
@@ -280,10 +277,7 @@ describe('CocktailsPage', () => {
     // Negroni stays selected: the export button still counts one cocktail
     await user.click(screen.getByText(/cocktails.exportZip/));
     await waitFor(() => {
-      expect(exportCocktailsAsZip).toHaveBeenCalledWith(
-        [2],
-        [expect.objectContaining({ id: 2 })],
-      );
+      expect(exportCocktailsAsZip).toHaveBeenCalledWith([2]);
     });
   });
 
@@ -386,7 +380,7 @@ describe('CocktailsPage', () => {
     await user.click(screen.getByText(/cocktails.exportZip/));
 
     await waitFor(() => {
-      expect(exportCocktailsAsZip).toHaveBeenCalledWith([2], [expect.objectContaining({ id: 2 })]);
+      expect(exportCocktailsAsZip).toHaveBeenCalledWith([2]);
     });
   });
 
