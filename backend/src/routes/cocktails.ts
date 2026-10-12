@@ -1,142 +1,29 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
 import { AuthRequest } from '../middleware/auth';
 import { BadRequestError, NotFoundError } from '../errors';
-import { config } from '../config';
 import { parseNameTranslations } from '../utils/translations';
 import { valid, validate } from '../validation/validate';
 import { IdParams, idRequest } from '../validation/common';
 import { CocktailCreate, CocktailUpdate, IngredientLine, Tags } from '../validation/cocktails';
 import { ImportConfirm, ImportRecipeV1 } from '../validation/cocktailImport';
 import { refuseNewRecipeDefects } from '../services/recipeDefectsService';
+import { cocktailInclude } from '../services/cocktail/includes';
+import { exportCocktail } from '../services/cocktail/cocktailExport';
+import { imageUpload, setImage } from '../services/cocktail/cocktailImage';
+import { removeCocktail } from '../services/cocktail/cocktailService';
 
 type ImportedRecipe = z.output<typeof ImportRecipeV1>['cocktail'];
 
-const parseNT = (val: any) => {
-  if (typeof val === 'string') { try { return JSON.parse(val); } catch { return null; } }
-  return val || null;
-};
-
 const router = Router();
 
-// Multer config for image upload
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    if (!fs.existsSync(config.uploadDir)) {
-      fs.mkdirSync(config.uploadDir, { recursive: true });
-    }
-    cb(null, config.uploadDir);
-  },
-  filename: (_req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  },
-});
-
-const upload = multer({
-  storage,
-  fileFilter: (_req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|webp/;
-    const ext = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mime = allowedTypes.test(file.mimetype);
-    cb(null, ext && mime);
-  },
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-});
-
-const cocktailIncludes = {
-  ingredients: {
-    include: {
-      unit: true,
-      bottle: { include: { category: true } },
-      category: true,
-      ingredient: true,
-      preferredBottles: { include: { bottle: true } },
-    },
-    orderBy: { position: 'asc' as const },
-  },
-  instructions: { orderBy: { stepNumber: 'asc' as const } },
-};
-
-// Helper: transform a cocktail DB object into the portable export format
-function buildExportPayload(cocktail: any) {
-  return {
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    cocktail: {
-      name: cocktail.name,
-      description: cocktail.description || null,
-      notes: cocktail.notes || null,
-      tags: cocktail.tags ? cocktail.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [],
-      ingredients: (cocktail.ingredients || []).map((ing: any) => {
-        let sourceName = '';
-        let sourceDetail: any = {};
-
-        if (ing.sourceType === 'BOTTLE' && ing.bottle) {
-          sourceName = ing.bottle.name;
-          sourceDetail = {
-            categoryName: ing.bottle.category?.name || '',
-            categoryType: ing.bottle.category?.type || 'SPIRIT',
-            categoryNameTranslations: parseNT(ing.bottle.category?.nameTranslations),
-          };
-        } else if (ing.sourceType === 'CATEGORY' && ing.category) {
-          sourceName = ing.category.name;
-          sourceDetail = {
-            type: ing.category.type,
-            desiredStock: ing.category.desiredStock,
-            nameTranslations: parseNT(ing.category.nameTranslations),
-          };
-        } else if (ing.sourceType === 'INGREDIENT' && ing.ingredient) {
-          sourceName = ing.ingredient.name;
-          sourceDetail = {
-            icon: ing.ingredient.icon || null,
-            nameTranslations: parseNT(ing.ingredient.nameTranslations),
-          };
-        }
-
-        return {
-          sourceType: ing.sourceType,
-          sourceName,
-          sourceDetail,
-          quantity: ing.quantity,
-          unit: ing.unit
-            ? {
-                name: ing.unit.name,
-                abbreviation: ing.unit.abbreviation,
-                conversionFactorToMl: ing.unit.conversionFactorToMl,
-                nameTranslations: parseNT(ing.unit.nameTranslations),
-              }
-            : null,
-          position: ing.position,
-          preferredBottles: (ing.preferredBottles || []).map((pb: any) => ({
-            name: pb.bottle?.name || '',
-            categoryName: pb.bottle?.category?.name || ing.category?.name || '',
-          })),
-        };
-      }),
-      instructions: (cocktail.instructions || []).map((inst: any) => ({
-        stepNumber: inst.stepNumber,
-        text: inst.text,
-      })),
-    },
-  };
-}
-
-// Export cocktail as JSON
+// Export cocktail as JSON (notes and preferred bottles included: the admin owns them)
 router.get('/:id/export', validate(idRequest), async (_req: AuthRequest, res: Response) => {
-  const cocktail = await prisma.cocktail.findUnique({
-    where: { id: valid<typeof idRequest>(res).params.id },
-    include: cocktailIncludes,
-  });
-  if (!cocktail) throw new NotFoundError();
-  const payload = buildExportPayload(cocktail);
-  const slug = cocktail.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-  res.setHeader('Content-Disposition', `attachment; filename="cocktail-${slug}.json"`);
-  res.json(payload);
+  const { id } = valid<typeof idRequest>(res).params;
+  const exported = await exportCocktail({ id }, { includePrivate: true });
+  if (!exported) throw new NotFoundError();
+  res.attachment(exported.filename).json(exported.payload);
 });
 
 // Entities a recipe refers to, keyed like the resolutions: lowercased unit
@@ -422,7 +309,7 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
           })),
         },
       },
-      include: cocktailIncludes,
+      include: cocktailInclude,
     });
 
     return cocktail;
@@ -434,7 +321,7 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
 // List all cocktails
 router.get('/', async (_req: AuthRequest, res: Response) => {
   const cocktails = await prisma.cocktail.findMany({
-    include: cocktailIncludes,
+    include: cocktailInclude,
     orderBy: { name: 'asc' },
   });
   res.json(parseNameTranslations(cocktails));
@@ -444,7 +331,7 @@ router.get('/', async (_req: AuthRequest, res: Response) => {
 router.get('/:id', validate(idRequest), async (_req: AuthRequest, res: Response) => {
   const cocktail = await prisma.cocktail.findUnique({
     where: { id: valid<typeof idRequest>(res).params.id },
-    include: cocktailIncludes,
+    include: cocktailInclude,
   });
   if (!cocktail) throw new NotFoundError();
   res.json(parseNameTranslations(cocktail));
@@ -492,7 +379,7 @@ router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Respons
       ingredients: { create: (ingredients || []).map(mapIngredient) },
       instructions: { create: (instructions || []).map(mapInstruction) },
     },
-    include: cocktailIncludes,
+    include: cocktailInclude,
   });
 
   res.status(201).json(parseNameTranslations(cocktail));
@@ -526,7 +413,7 @@ router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Respo
         instructions: { deleteMany: {}, create: instructions.map(mapInstruction) },
       }),
     },
-    include: cocktailIncludes,
+    include: cocktailInclude,
   });
 
   res.json(parseNameTranslations(cocktail));
@@ -534,39 +421,14 @@ router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Respo
 
 // Delete cocktail
 router.delete('/:id', validate(idRequest), async (req: AuthRequest, res: Response) => {
-  const { id } = valid<typeof idRequest>(res).params;
-  const cocktail = await prisma.cocktail.findUnique({ where: { id } });
-  // Delete image if exists
-  if (cocktail?.imagePath) {
-    const imagePath = path.join(config.uploadDir, cocktail.imagePath);
-    if (fs.existsSync(imagePath)) {
-      fs.unlinkSync(imagePath);
-    }
-  }
-  await prisma.cocktail.delete({ where: { id } });
+  await removeCocktail(valid<typeof idRequest>(res).params.id);
   res.json({ message: req.t('cocktails.deleted') });
 });
 
 // Upload image. The id is checked before multer writes the file.
-router.post('/:id/image', validate(idRequest), upload.single('image'), async (req: AuthRequest, res: Response) => {
+router.post('/:id/image', validate(idRequest), imageUpload.single('image'), async (req: AuthRequest, res: Response) => {
   if (!req.file) throw new BadRequestError();
-  const { id } = valid<typeof idRequest>(res).params;
-
-  // Delete old image if exists
-  const existing = await prisma.cocktail.findUnique({ where: { id } });
-  if (existing?.imagePath) {
-    const oldPath = path.join(config.uploadDir, existing.imagePath);
-    if (fs.existsSync(oldPath)) {
-      fs.unlinkSync(oldPath);
-    }
-  }
-
-  const cocktail = await prisma.cocktail.update({
-    where: { id },
-    data: { imagePath: req.file.filename },
-  });
-
-  res.json(cocktail);
+  res.json(await setImage(valid<typeof idRequest>(res).params.id, req.file));
 });
 
 export default router;

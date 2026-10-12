@@ -1017,3 +1017,119 @@ describe('POST /api/cocktails/:id/image - upload replacing existing', () => {
     expect(fs.existsSync(path.join(config.uploadDir, res.body.imagePath))).toBe(true);
   });
 });
+
+describe('GET /api/cocktails/:id/export - file name', () => {
+  it('should keep the base letter of accented names', async () => {
+    const cocktail = await seedCocktail({ name: 'Piña Colada' });
+    const res = await request.get(`/api/cocktails/${cocktail.id}/export`).set(authHeader());
+    expect(res.status).toBe(200);
+    expect(res.headers['content-disposition']).toBe('attachment; filename="cocktail-pina-colada.json"');
+  });
+
+  it('should name a cocktail without latin letters after its id', async () => {
+    const cocktail = await seedCocktail({ name: 'モヒート' });
+    const res = await request.get(`/api/cocktails/${cocktail.id}/export`).set(authHeader());
+    expect(res.headers['content-disposition']).toContain(`cocktail-${cocktail.id}.json`);
+  });
+});
+
+function uploadedFiles(): string[] {
+  return fs.existsSync(config.uploadDir) ? fs.readdirSync(config.uploadDir) : [];
+}
+
+function uploadImage(id: number, filename: string, contentType: string) {
+  return request
+    .post(`/api/cocktails/${id}/image`)
+    .set(authHeader())
+    .attach('image', Buffer.from('image-data'), { filename, contentType });
+}
+
+describe('POST /api/cocktails/:id/image - file checks', () => {
+  it('should return 404 and keep no file for a cocktail that does not exist', async () => {
+    const before = uploadedFiles();
+
+    const res = await uploadImage(99999, 'photo.png', 'image/png');
+
+    expect(res.status).toBe(404);
+    expect(uploadedFiles()).toEqual(before);
+  });
+
+  it.each([
+    ['an extension that only contains an accepted one', 'photo.xjpg', 'image/jpeg'],
+    ['an extension that does not match the MIME type', 'photo.png', 'image/jpeg'],
+    ['a MIME type that only starts like an accepted one', 'photo.png', 'image/png-whatever'],
+    ['a file that is not an image', 'notes.txt', 'text/plain'],
+  ])('should return 400 for %s', async (_case, filename, contentType) => {
+    const cocktail = await seedCocktail();
+    const before = uploadedFiles();
+
+    const res = await uploadImage(cocktail.id, filename, contentType);
+
+    expect(res.status).toBe(400);
+    expect(uploadedFiles()).toEqual(before);
+  });
+
+  it('should store the image under a random name with the lowercased extension', async () => {
+    const cocktail = await seedCocktail();
+
+    const res = await uploadImage(cocktail.id, '../My Photo.JPEG', 'image/jpeg');
+
+    expect(res.status).toBe(200);
+    expect(res.body.imagePath).toMatch(/^[0-9a-f-]{36}\.jpeg$/);
+    expect(fs.existsSync(path.join(config.uploadDir, res.body.imagePath))).toBe(true);
+  });
+});
+
+describe('DELETE /api/cocktails/:id - image file', () => {
+  it('should return 404 for a cocktail that does not exist', async () => {
+    const res = await request.delete('/api/cocktails/99999').set(authHeader());
+    expect(res.status).toBe(404);
+  });
+
+  it('should delete the image file with the cocktail', async () => {
+    const cocktail = await seedCocktail();
+    const upload = await uploadImage(cocktail.id, 'photo.webp', 'image/webp');
+    const imageFile = path.join(config.uploadDir, upload.body.imagePath);
+    expect(fs.existsSync(imageFile)).toBe(true);
+
+    const res = await request.delete(`/api/cocktails/${cocktail.id}`).set(authHeader());
+
+    expect(res.status).toBe(200);
+    expect(await prisma.cocktail.findUnique({ where: { id: cocktail.id } })).toBeNull();
+    expect(fs.existsSync(imageFile)).toBe(false);
+  });
+
+  it('should keep the image file when the cocktail cannot be deleted', async () => {
+    const cocktail = await seedCocktail();
+    const upload = await uploadImage(cocktail.id, 'photo.png', 'image/png');
+    const imageFile = path.join(config.uploadDir, upload.body.imagePath);
+    // Makes the deletion itself fail, as a locked database would
+    await prisma.$executeRawUnsafe(
+      `CREATE TRIGGER refuse_cocktail_delete BEFORE DELETE ON "Cocktail" BEGIN SELECT RAISE(ABORT, 'refused'); END`,
+    );
+    try {
+      const res = await request.delete(`/api/cocktails/${cocktail.id}`).set(authHeader());
+      expect(res.status).not.toBe(200);
+    } finally {
+      await prisma.$executeRawUnsafe('DROP TRIGGER refuse_cocktail_delete');
+    }
+    expect(await prisma.cocktail.findUnique({ where: { id: cocktail.id } })).not.toBeNull();
+    expect(fs.existsSync(imageFile)).toBe(true);
+  });
+
+  it('should never delete a file outside the upload folder', async () => {
+    const witness = path.join(path.dirname(config.uploadDir), `carta-witness-${process.pid}.txt`);
+    fs.writeFileSync(witness, 'keep me');
+    try {
+      const cocktail = await seedCocktail();
+      await prisma.cocktail.update({ where: { id: cocktail.id }, data: { imagePath: `../${path.basename(witness)}` } });
+
+      const res = await request.delete(`/api/cocktails/${cocktail.id}`).set(authHeader());
+
+      expect(res.status).toBe(200);
+      expect(fs.existsSync(witness)).toBe(true);
+    } finally {
+      fs.rmSync(witness, { force: true });
+    }
+  });
+});
