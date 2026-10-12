@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { containerLogs, containerState, docker } from './docker.mjs';
+import { containerLogs, containerState, docker, lastExitCode } from './docker.mjs';
 
 export const BACKEND_SERVICE = 'carta-cocktail-backend';
 export const FRONTEND_SERVICE = 'carta-cocktail-frontend';
@@ -158,7 +158,7 @@ export async function waitForStart(container, timeoutMs) {
     if (logs.includes(READY_LINE)) return { started: true, logs };
     const state = containerState(container);
     if (state && (state.RestartCount > 0 || state.Status === 'exited' || state.Status === 'restarting')) {
-      return { started: false, exitCode: state.ExitCode, restarts: state.RestartCount, logs };
+      return { started: false, exitCode: lastExitCode(container) ?? state.ExitCode, restarts: state.RestartCount, logs };
     }
     await sleep(POLL_INTERVAL_MS);
   }

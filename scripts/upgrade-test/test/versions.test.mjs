@@ -73,8 +73,21 @@ test('hooksForJump returns every crossed release, oldest first', () => {
 });
 
 test('profileOf merges the profiles of all releases up to the version', () => {
-  assert.deepEqual(profileOf(HOOKS, '1.5.1'), { uploadDir: '/app/uploads', migrations: false });
-  assert.deepEqual(profileOf(HOOKS, '1.6.0-rc.1'), { uploadDir: '/app/uploads', migrations: true });
+  assert.deepEqual(profileOf(HOOKS, '1.5.1'), { uploadDir: '/app/uploads', migrations: false, refusals: [] });
+  assert.deepEqual(profileOf(HOOKS, '1.6.0-rc.1'), { uploadDir: '/app/uploads', migrations: true, refusals: [] });
+});
+
+test('profileOf adds up the refusals of the releases up to the version', () => {
+  const baseline = { log: 'does not match migration 0_init', database: 'untouched' };
+  const failedMigration = { log: 'failed. The backend will not start.', database: 'backupBeforeJump' };
+  const hookFiles = [
+    ...HOOKS.map((hooks) => (hooks.version === '1.6.0' ? { ...hooks, profile: { ...hooks.profile, refusals: [baseline] } } : hooks)),
+    { version: '1.7.0', profile: {} },
+    { version: '1.8.0', profile: { refusals: [failedMigration] } },
+  ];
+  assert.deepEqual(profileOf(hookFiles, '1.5.0').refusals, []);
+  assert.deepEqual(profileOf(hookFiles, '1.7.0').refusals, [baseline]);
+  assert.deepEqual(profileOf(hookFiles, '1.8.0-rc.1').refusals, [baseline, failedMigration]);
 });
 
 test('latestHookVersion picks the newest hook file', () => {
