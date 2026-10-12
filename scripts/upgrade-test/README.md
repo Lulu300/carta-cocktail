@@ -5,7 +5,7 @@ Replays Carta Cocktail upgrades with Docker on a copy of a real production datab
 ```bash
 node scripts/upgrade-test/run.mjs --fixture ~/carta-fixtures/ami --layout friend --path 1.4.0,1.5.0,1.6.0-rc.1
 node scripts/upgrade-test/run.mjs --fixture ~/carta-fixtures/ami --layout official --path 1.4.0,1.6.0-rc.1 --mode conformant
-node scripts/upgrade-test/run.mjs --fixture ~/carta-fixtures/ami --layout friend --path 1.6.0-rc.1,local
+node scripts/upgrade-test/run.mjs --fixture ~/carta-fixtures/ami --layout friend --path 1.11.0,local
 node scripts/upgrade-test/run.mjs --clean-all      # remove what a --keep or killed run left behind
 node --test scripts/upgrade-test/test/*.test.mjs  # unit tests of the bench
 ```
@@ -31,11 +31,13 @@ The bench never writes to the fixture. It works on copies in the system temp fol
 | `--layout <name>` | `friend` or `official`, see below (required) |
 | `--path <list>` | versions in order, e.g. `1.4.0,1.5.0,1.6.0-rc.1` (required). `local` builds the backend and frontend images from the checkout |
 | `--mode <mode>` | `naive`, `conformant` or `both` (default) |
-| `--local-version <v>` | release notes followed by a `local` step (default: the newest hook file) |
+| `--local-version <v>` | release notes followed by a `local` step, see below |
 | `--report-dir <dir>` | default `<fixture>/../upgrade-test-reports/<date>/` |
 | `--timeout <s>` | wait for each backend start, default 300 |
 | `--keep` | keep the containers, volumes and work folder of a run that failed |
 | `--clean-all` | remove every `carta-ut-*` container, volume and network and `$TMPDIR/carta-upgrade-test/`, then exit |
+
+**`local` step.** It builds the images from the checkout, which is newer than any published version: by default it follows the notes of the minor release after the newest hook file and the newest version of the path (`1.12.0` when the newest hook file is `1.11.0`). The jump to it therefore goes up and crosses every hook file, including one already added for a release in preparation. `--local-version` forces another version (`--local-version 1.12.0`); it takes priority over the default and must still be newer than the step before `local`. A path that goes down is refused, and when a `local` step is involved the message points to `--local-version`.
 
 Exit code: `0` when every check gives the expected result, `1` when a check or a required action fails unexpectedly, `2` for a setup error (wrong option, missing fixture, image not found), `130` when the run was interrupted (Ctrl+C or `SIGTERM`).
 
