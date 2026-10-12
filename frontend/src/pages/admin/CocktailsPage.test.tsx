@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, createTestQueryClient } from '../../test/test-utils';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { screen, waitFor, within, createTestQueryClient } from '../../test/test-utils';
+import { clearToasts, renderWithFeedback } from '../../test/feedback';
 import userEvent from '@testing-library/user-event';
 import CocktailsPage from './CocktailsPage';
 import { qk } from '../../queries/keys';
@@ -74,7 +75,12 @@ const mockAvailabilities = {
   },
 };
 
+// The page asks for confirmation and reports through toasts.
+const render = renderWithFeedback;
+
 describe('CocktailsPage', () => {
+  afterEach(clearToasts);
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(api.list).mockResolvedValue(mockCocktails);
@@ -165,15 +171,15 @@ describe('CocktailsPage', () => {
   });
 
   it('still lists cocktails, without availability badges, when availability fails to load', async () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.mocked(availabilityApi.getAllCocktails).mockRejectedValue(new Error('offline'));
+    const user = userEvent.setup();
+    vi.mocked(availabilityApi.getAllCocktails).mockRejectedValueOnce(new Error('offline'));
     render(<CocktailsPage />);
 
     await screen.findAllByText('Mojito');
-    await waitFor(() => expect(consoleError).toHaveBeenCalled());
-    expect(screen.queryByText('5 doses')).not.toBeInTheDocument();
-    expect(screen.queryByText('Indisponible')).not.toBeInTheDocument();
-    consoleError.mockRestore();
+    await user.click(await screen.findByRole('button', { name: 'common.retry' }));
+
+    expect(await screen.findByText('5 doses')).toBeInTheDocument();
+    expect(screen.getByText('Indisponible')).toBeInTheDocument();
   });
 
   it('hides availability while it reloads after an import', async () => {
@@ -322,5 +328,124 @@ describe('CocktailsPage', () => {
     ]);
     await waitFor(() => expect(api.list).toHaveBeenCalledTimes(2));
     expect(availabilityApi.getAllCocktails).toHaveBeenCalledTimes(2);
+  });
+
+  it('deletes a cocktail once the dialog is confirmed, then refreshes the list', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.delete).mockResolvedValue({ message: 'ok' });
+    render(<CocktailsPage />);
+    await screen.findByText('Mojito');
+
+    await user.click(screen.getAllByRole('button', { name: 'common.delete' })[0]);
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.cancel' }));
+    expect(api.delete).not.toHaveBeenCalled();
+
+    await user.click(screen.getAllByRole('button', { name: 'common.delete' })[0]);
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.delete' }));
+
+    await waitFor(() => expect(api.delete).toHaveBeenCalledWith(1));
+    expect(await screen.findByText('cocktails.deleted')).toBeInTheDocument();
+    await waitFor(() => expect(api.list).toHaveBeenCalledTimes(2));
+  });
+
+  it('reports a failed batch export in a toast and keeps the selection', async () => {
+    const user = userEvent.setup();
+    vi.mocked(exportCocktailsAsZip).mockRejectedValue(new Error('Export failed'));
+    render(<CocktailsPage />);
+    await screen.findByText('Mojito');
+
+    await user.click(screen.getByText('cocktails.batchExport'));
+    await user.click(screen.getByRole('checkbox', { name: 'Mojito' }));
+    await user.click(screen.getByText(/cocktails.exportZip/));
+
+    expect(await screen.findByText('Export failed')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Mojito' })).toBeChecked();
+  });
+
+  it('leaves the selection mode and clears the selection on cancel', async () => {
+    const user = userEvent.setup();
+    render(<CocktailsPage />);
+    await screen.findByText('Mojito');
+
+    await user.click(screen.getByText('cocktails.batchExport'));
+    await user.click(screen.getByRole('checkbox', { name: 'Mojito' }));
+    await user.click(screen.getByRole('button', { name: 'common.cancel' }));
+    await user.click(screen.getByText('cocktails.batchExport'));
+
+    expect(screen.getByRole('checkbox', { name: 'Mojito' })).not.toBeChecked();
+  });
+
+  it('selects a cocktail with a click on its row in the list view', async () => {
+    const user = userEvent.setup();
+    render(<CocktailsPage />);
+    await screen.findByText('Mojito');
+    await user.click(screen.getByRole('button', { name: 'cocktails.viewList' }));
+    await user.click(screen.getByText('cocktails.batchExport'));
+
+    await user.click(screen.getByText('Negroni'));
+    await user.click(screen.getByText(/cocktails.exportZip/));
+
+    await waitFor(() => {
+      expect(exportCocktailsAsZip).toHaveBeenCalledWith([2], [expect.objectContaining({ id: 2 })]);
+    });
+  });
+
+  it('lists the stock warnings, among them the category lines without an available preferred bottle', async () => {
+    vi.mocked(availabilityApi.getAllCocktails).mockResolvedValue({
+      ...mockAvailabilities,
+      1: {
+        ...mockAvailabilities[1],
+        lowStockWarnings: ['Rum is running low'],
+        missingIngredients: ['Mint', 'Lime', 'Soda'],
+        ingredients: [{
+          cocktailIngredientId: 1, sourceType: 'CATEGORY', name: 'White rum', icon: null, quantity: 5,
+          unit: 'cl', isAvailable: true, availableCount: 5, preferredAvailable: false,
+        }],
+      },
+    });
+    render(<CocktailsPage />);
+
+    expect(await screen.findByText('White rum')).toBeInTheDocument();
+    expect(screen.getByText('⚠️ cocktails.noPreferredAvailable')).toBeInTheDocument();
+    expect(screen.getByText('Rum is running low')).toBeInTheDocument();
+    expect(screen.getByText('+1 autre(s)')).toBeInTheDocument();
+  });
+
+  it('filters the cocktails by tag, ignoring case', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.list).mockResolvedValue([mockCocktails[0], { ...mockCocktails[1], tags: 'Bitter, RUM' }, { ...mockCocktails[1], id: 3, name: 'Spritz', tags: 'bitter' }]);
+    render(<CocktailsPage />);
+    await screen.findByText('Spritz');
+
+    await user.click(screen.getByRole('button', { name: 'cocktails.filterByTags' }));
+    await user.click(screen.getByRole('checkbox', { name: 'rum' }));
+
+    expect(screen.getByText('Mojito')).toBeInTheDocument();
+    expect(screen.getByText('Negroni')).toBeInTheDocument();
+    expect(screen.queryByText('Spritz')).not.toBeInTheDocument();
+  });
+
+  it('toggles a cocktail with its checkbox in the list view', async () => {
+    const user = userEvent.setup();
+    render(<CocktailsPage />);
+    await screen.findByText('Mojito');
+    await user.click(screen.getByRole('button', { name: 'cocktails.viewList' }));
+    await user.click(screen.getByText('cocktails.batchExport'));
+
+    const checkbox = screen.getByRole('checkbox', { name: 'Mojito' });
+    await user.click(checkbox);
+    expect(checkbox).toBeChecked();
+    await user.click(checkbox);
+    expect(checkbox).not.toBeChecked();
+  });
+
+  it('offers to retry when the list fails to load', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.list).mockRejectedValueOnce(new Error('offline'));
+    render(<CocktailsPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'common.retry' }));
+
+    expect(await screen.findByText('Mojito')).toBeInTheDocument();
   });
 });

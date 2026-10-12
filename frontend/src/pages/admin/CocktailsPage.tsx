@@ -1,19 +1,25 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useSort } from '../../hooks/useSort';
 import { usePagination } from '../../hooks/usePagination';
-import { cocktails as api, availability as availabilityApi } from '../../services/api';
-import type { Cocktail, CocktailAvailability } from '../../types';
-import ExportCocktailButton from '../../components/ui/ExportCocktailButton';
+import type { Cocktail } from '../../types';
 import ImportCocktailWizard from '../../components/import/ImportCocktailWizard';
 import { exportCocktailsAsZip } from '../../services/exportZip';
-import SearchInput from '../../components/ui/SearchInput';
+import Button from '../../components/ui/Button';
+import Icon from '../../components/ui/Icon';
 import MultiSelectDropdown from '../../components/ui/MultiSelectDropdown';
 import Pagination from '../../components/ui/Pagination';
-import { getUploadUrl } from '../../utils/uploads';
-import { useLocalizedName } from '../../hooks/useLocalizedName';
-import { matchesCocktailSearch } from '../../utils/cocktailSearch';
+import SearchInput from '../../components/ui/SearchInput';
+import { toast } from '../../components/ui/ToastStore';
+import LoadError from '../../components/admin/LoadError';
+import { useConfirmDelete } from '../../components/admin/useConfirmDelete';
+import CocktailCard from '../../components/admin/cocktails/CocktailCard';
+import CocktailListItem from '../../components/admin/cocktails/CocktailListItem';
+import ViewModeToggle, { type ViewMode } from '../../components/admin/cocktails/ViewModeToggle';
+import { useCocktailFilters } from '../../components/admin/cocktails/useCocktailFilters';
+import { useSelection } from '../../components/admin/cocktails/useSelection';
+import { useCocktails, useCocktailsAvailability, useDeleteCocktail } from '../../queries/cocktails';
 import { useInvalidateQueries } from '../../queries/crud';
 import { qk } from '../../queries/keys';
 
@@ -32,171 +38,91 @@ const IMPORT_KEYS = [
 
 export default function CocktailsPage() {
   const { t } = useTranslation();
-  const localize = useLocalizedName();
   const invalidateQueries = useInvalidateQueries();
-  const [items, setItems] = useState<Cocktail[]>([]);
-  const [availabilities, setAvailabilities] = useState<Record<number, CocktailAvailability>>({});
-  const [loadingAvailability, setLoadingAvailability] = useState(true);
+  const confirmDelete = useConfirmDelete();
+  const cocktailsQuery = useCocktails();
+  const availabilityQuery = useCocktailsAvailability();
+  const remove = useDeleteCocktail();
+  const selection = useSelection<number>();
   const [showImport, setShowImport] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [isExporting, setIsExporting] = useState(false);
-  const [search, setSearch] = useState('');
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
 
-  const tagOptions = useMemo(() => {
-    const tagSet = new Set<string>();
-    items.forEach((item) => {
-      if (item.tags) {
-        item.tags.split(',').forEach((tag) => {
-          const trimmed = tag.trim();
-          if (trimmed) tagSet.add(trimmed);
-        });
-      }
-    });
-    return [...tagSet].sort().map((tag) => ({ value: tag, label: tag }));
-  }, [items]);
+  const cocktails = useMemo(() => cocktailsQuery.data ?? [], [cocktailsQuery.data]);
+  const filters = useCocktailFilters(cocktails);
+  const { filteredCocktails } = filters;
+  const { sortedItems } = useSort<Cocktail>(filteredCocktails, 'name');
+  const pagination = usePagination(sortedItems);
 
-  const filteredItems = useMemo(() => {
-    return items.filter((item) => {
-      if (!matchesCocktailSearch(item, search, localize, { includeNotes: true })) return false;
-      if (selectedTags.length > 0) {
-        const itemTags = item.tags ? item.tags.split(',').map((t) => t.trim().toLowerCase()) : [];
-        if (!selectedTags.some((st) => itemTags.includes(st.toLowerCase()))) return false;
-      }
-      return true;
-    });
-  }, [items, search, selectedTags, localize]);
+  const filteredIds = filteredCocktails.map((cocktail) => cocktail.id);
+  const allFilteredSelected = filteredIds.length > 0 && filteredIds.every(selection.isSelected);
 
-  const { sortedItems } = useSort<Cocktail>(filteredItems, 'name');
-  const { paginatedItems, page, pageSize, totalPages, totalItems, setPage, setPageSize } = usePagination(sortedItems);
-
-  const load = () => api.list().then(setItems);
-
-  // State only changes in promise callbacks, so the initial-load effect never sets
-  // state synchronously (react-hooks/set-state-in-effect).
-  const fetchAvailability = () =>
-    availabilityApi
-      .getAllCocktails()
-      .then(setAvailabilities)
-      .catch((error) => console.error('Failed to load availability:', error))
-      .finally(() => setLoadingAvailability(false));
-
-  // The loading flag starts at true, so only a reload needs to raise it again.
-  const reloadAvailability = () => {
-    setLoadingAvailability(true);
-    fetchAvailability();
-  };
-
-  useEffect(() => {
-    load();
-    fetchAvailability();
-  }, []);
-
-  const handleDelete = async (id: number) => {
-    if (!confirm(t('cocktails.confirmDelete'))) return;
-    await api.delete(id);
-    load();
+  const handleDelete = async (cocktail: Cocktail) => {
+    if (await confirmDelete(t('cocktails.confirmDelete'))) remove.mutate(cocktail.id);
   };
 
   // The wizard does not report whether a recipe was imported, so every close refreshes.
-  // This page still loads its own lists outside the query cache.
   const handleImportClose = () => {
     setShowImport(false);
-    load();
-    reloadAvailability();
     invalidateQueries(IMPORT_KEYS);
   };
 
-  const allFilteredSelected = filteredItems.length > 0 && filteredItems.every((i) => selectedIds.has(i.id));
-
-  // "Select all" only acts on the cocktails matching the current filters
-  const toggleSelectAllFiltered = (checked: boolean) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      for (const item of filteredItems) {
-        if (checked) next.add(item.id);
-        else next.delete(item.id);
-      }
-      return next;
-    });
-  };
-
-  const toggleSelection = (id: number) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const exitSelectionMode = () => {
+    setSelectionMode(false);
+    selection.clear();
   };
 
   const handleBatchExport = async () => {
-    if (selectedIds.size === 0) return;
     setIsExporting(true);
     try {
-      await exportCocktailsAsZip(
-        Array.from(selectedIds),
-        items.filter((i) => selectedIds.has(i.id)),
-      );
-      setSelectionMode(false);
-      setSelectedIds(new Set());
+      const selected = cocktails.filter((cocktail) => selection.isSelected(cocktail.id));
+      await exportCocktailsAsZip([...selection.selected], selected);
+      exitSelectionMode();
     } catch (error) {
-      console.error('Batch export failed:', error);
+      toast.error(error);
     } finally {
       setIsExporting(false);
     }
   };
 
-  const getAvailabilityBadge = (cocktailId: number) => {
-    const avail = availabilities[cocktailId];
-    if (!avail || loadingAvailability) {
-      return <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-500/20 text-gray-400">...</span>;
-    }
+  const renderCocktails = () => {
+    if (cocktailsQuery.isPending) return <p role="status" className="text-center py-12 text-fg-muted">{t('common.loading')}</p>;
+    if (cocktailsQuery.isError) return <LoadError onRetry={() => cocktailsQuery.refetch()} />;
+    if (filteredCocktails.length === 0) return <div className="text-center py-12 text-fg-muted">{t('common.noResults')}</div>;
 
-    if (!avail.isAvailable) {
-      return (
-        <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-400">
-          Indisponible
-        </span>
-      );
-    }
-
-    const servingsText = avail.maxServings >= 999 ? '∞' : avail.maxServings;
-    const colorClass = avail.maxServings <= 3 ? 'bg-orange-500/20 text-orange-400' : 'bg-green-500/20 text-green-400';
-
-    return (
-      <span className={`px-2 py-0.5 rounded text-xs font-medium ${colorClass}`}>
-        {servingsText} {avail.maxServings === 1 ? 'dose' : 'doses'}
-      </span>
-    );
-  };
-
-  const renderWarnings = (avail?: CocktailAvailability) => {
-    if (!avail || loadingAvailability) return null;
-
+    const Item = viewMode === 'grid' ? CocktailCard : CocktailListItem;
     return (
       <>
-        {avail.lowStockWarnings.length > 0 && (
-          <div className="mb-2 p-2 bg-orange-500/10 border border-orange-500/20 rounded text-xs text-orange-400">
-            <div className="font-medium mb-1">⚠️ Stock faible</div>
-            {avail.lowStockWarnings.slice(0, 2).map((warn, i) => (
-              <div key={i} className="text-orange-300/80">{warn}</div>
-            ))}
-          </div>
-        )}
-        {avail.missingIngredients.length > 0 && (
-          <div className="mb-2 p-2 bg-red-500/10 border border-red-500/20 rounded text-xs text-red-400">
-            <div className="font-medium mb-1">❌ Manquant</div>
-            {avail.missingIngredients.slice(0, 2).map((miss, i) => (
-              <div key={i} className="text-red-300/80 truncate">{miss}</div>
-            ))}
-            {avail.missingIngredients.length > 2 && (
-              <div className="text-red-300/60">+{avail.missingIngredients.length - 2} autre(s)</div>
-            )}
-          </div>
-        )}
+        <div
+          data-testid={`cocktails-${viewMode}-view`}
+          className={viewMode === 'grid'
+            ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'
+            : 'bg-surface border border-line rounded-xl overflow-hidden'}
+        >
+          {pagination.paginatedItems.map((cocktail) => (
+            <Item
+              key={cocktail.id}
+              cocktail={cocktail}
+              availability={availabilityQuery.data?.[cocktail.id]}
+              availabilityLoading={availabilityQuery.isFetching}
+              selectionMode={selectionMode}
+              isSelected={selection.isSelected(cocktail.id)}
+              onToggle={selection.toggle}
+              onDelete={handleDelete}
+            />
+          ))}
+        </div>
+        <div className="mt-4 bg-surface border border-line rounded-xl overflow-hidden">
+          <Pagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            pageSize={pagination.pageSize}
+            totalItems={pagination.totalItems}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
+        </div>
       </>
     );
   };
@@ -204,54 +130,35 @@ export default function CocktailsPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold font-serif text-amber-400">{t('cocktails.title')}</h1>
+        <h1 className="text-2xl font-bold font-serif text-accent">{t('cocktails.title')}</h1>
         <div className="flex gap-2 items-center">
           {selectionMode ? (
             <>
-              <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+              <label className="flex items-center gap-2 text-sm text-fg-muted cursor-pointer">
                 <input
                   type="checkbox"
                   checked={allFilteredSelected}
-                  onChange={(e) => toggleSelectAllFiltered(e.target.checked)}
-                  className="w-4 h-4 rounded bg-[#0f0f1a] border-gray-700 text-amber-400 accent-amber-400"
+                  onChange={(event) => selection.setAll(filteredIds, event.target.checked)}
+                  className="size-4 rounded bg-canvas border-line-strong accent-accent"
                 />
                 {t('cocktails.selectAll')}
               </label>
-              <button
-                onClick={handleBatchExport}
-                disabled={selectedIds.size === 0 || isExporting}
-                className="bg-amber-400 hover:bg-amber-500 disabled:opacity-50 text-[#0f0f1a] font-semibold px-4 py-2 rounded-lg transition-colors"
-              >
-                {isExporting
-                  ? t('common.loading')
-                  : t('cocktails.exportZip', { count: selectedIds.size })}
-              </button>
-              <button
-                onClick={() => { setSelectionMode(false); setSelectedIds(new Set()); }}
-                className="border border-gray-600 text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors"
-              >
-                {t('common.cancel')}
-              </button>
+              <Button onClick={handleBatchExport} disabled={selection.selected.size === 0} loading={isExporting}>
+                {t('cocktails.exportZip', { count: selection.selected.size })}
+              </Button>
+              <Button variant="ghost" onClick={exitSelectionMode}>{t('common.cancel')}</Button>
             </>
           ) : (
             <>
-              <button
-                onClick={() => setSelectionMode(true)}
-                className="border border-gray-600 text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors"
-                title={t('cocktails.batchExport')}
-              >
-                <svg className="w-5 h-5 inline-block mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
+              <Button variant="ghost" onClick={() => setSelectionMode(true)}>
+                <Icon name="download" />
                 {t('cocktails.batchExport')}
-              </button>
-              <button
-                onClick={() => setShowImport(true)}
-                className="border border-amber-400/30 text-amber-400 hover:bg-amber-400/10 font-semibold px-4 py-2 rounded-lg transition-colors"
+              </Button>
+              <Button variant="secondary" onClick={() => setShowImport(true)}>{t('cocktails.import')}</Button>
+              <Link
+                to="/admin/cocktails/new"
+                className="bg-accent hover:bg-accent-hover text-on-accent font-semibold px-4 py-2 rounded-lg transition-colors"
               >
-                {t('cocktails.import')}
-              </button>
-              <Link to="/admin/cocktails/new" className="bg-amber-400 hover:bg-amber-500 text-[#0f0f1a] font-semibold px-4 py-2 rounded-lg transition-colors">
                 {t('cocktails.add')}
               </Link>
             </>
@@ -261,218 +168,22 @@ export default function CocktailsPage() {
 
       <div className="flex flex-col lg:flex-row gap-3 mb-4 lg:items-center">
         <div className="flex flex-col sm:flex-row gap-3 flex-1">
-          <SearchInput value={search} onChange={setSearch} className="sm:w-64" />
+          <SearchInput value={filters.search} onChange={filters.setSearch} className="sm:w-64" />
           <MultiSelectDropdown
-            options={tagOptions}
-            selected={selectedTags}
-            onChange={setSelectedTags}
+            options={filters.tagOptions}
+            selected={filters.selectedTags}
+            onChange={filters.setSelectedTags}
             placeholder={t('cocktails.filterByTags')}
             className="sm:w-64"
           />
         </div>
-
-        <div className="inline-flex rounded-lg border border-gray-700 bg-[#1a1a2e] p-1 self-start">
-          <button
-            type="button"
-            onClick={() => setViewMode('grid')}
-            aria-pressed={viewMode === 'grid'}
-            className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-              viewMode === 'grid'
-                ? 'bg-amber-400 text-[#0f0f1a] font-semibold'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            {t('cocktails.viewGrid')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('list')}
-            aria-pressed={viewMode === 'list'}
-            className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-              viewMode === 'list'
-                ? 'bg-amber-400 text-[#0f0f1a] font-semibold'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            {t('cocktails.viewList')}
-          </button>
-        </div>
+        <ViewModeToggle value={viewMode} onChange={setViewMode} />
       </div>
 
-      {viewMode === 'grid' ? (
-        <div data-testid="cocktails-grid-view" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {paginatedItems.map((item) => {
-            const avail = availabilities[item.id];
-            const isSelected = selectedIds.has(item.id);
-            const imageUrl = getUploadUrl(item.imagePath);
+      {availabilityQuery.isError && <LoadError onRetry={() => availabilityQuery.refetch()} />}
+      {renderCocktails()}
 
-            return (
-              <div
-                key={item.id}
-                className={`bg-[#1a1a2e] border rounded-xl overflow-hidden transition-colors ${
-                  selectionMode
-                    ? isSelected
-                      ? 'border-amber-400 ring-1 ring-amber-400/30'
-                      : 'border-gray-800 hover:border-gray-600 cursor-pointer'
-                    : 'border-gray-800 hover:border-amber-400/30'
-                }`}
-                onClick={selectionMode ? () => toggleSelection(item.id) : undefined}
-              >
-                <div className="aspect-video bg-[#0f0f1a] flex items-center justify-center relative">
-                  {imageUrl ? (
-                    <img src={imageUrl} alt={item.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-4xl">🍸</span>
-                  )}
-                  {selectionMode && (
-                    <div className="absolute top-2 left-2 z-10">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleSelection(item.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-5 h-5 rounded bg-[#0f0f1a] border-gray-700 text-amber-400 accent-amber-400 cursor-pointer"
-                      />
-                    </div>
-                  )}
-                  {avail && !loadingAvailability && (
-                    <div className="absolute top-2 right-2">
-                      {getAvailabilityBadge(item.id)}
-                    </div>
-                  )}
-                </div>
-                <div className="p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="font-semibold flex-1">{item.name}</h3>
-                  </div>
-
-                  {item.description && <p className="text-sm text-gray-400 line-clamp-2 mb-2">{item.description}</p>}
-
-                  {item.tags && (
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {item.tags.split(',').map((tag, i) => (
-                        <span key={i} className="bg-amber-400/10 text-amber-400 text-xs px-2 py-0.5 rounded-full">{tag.trim()}</span>
-                      ))}
-                    </div>
-                  )}
-
-                  {renderWarnings(avail)}
-
-                  {!selectionMode && (
-                    <div className="flex justify-center gap-3 pt-2 border-t border-gray-800">
-                      <Link to={`/admin/cocktails/${item.id}`} className="text-amber-400 hover:text-amber-300 transition-colors p-1" title={t('common.edit')}>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </Link>
-                      <ExportCocktailButton cocktailId={item.id} cocktailName={item.name} />
-                      <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 transition-colors p-1" title={t('common.delete')}>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div data-testid="cocktails-list-view" className="bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden">
-          {paginatedItems.map((item, index) => {
-            const avail = availabilities[item.id];
-            const isSelected = selectedIds.has(item.id);
-            const imageUrl = getUploadUrl(item.imagePath);
-
-            return (
-              <div
-                key={item.id}
-                className={`p-4 transition-colors ${
-                  index > 0 ? 'border-t border-gray-800' : ''
-                } ${
-                  selectionMode
-                    ? isSelected
-                      ? 'bg-amber-400/10 border-amber-400/20 cursor-pointer'
-                      : 'hover:bg-white/2 cursor-pointer'
-                    : ''
-                }`}
-                onClick={selectionMode ? () => toggleSelection(item.id) : undefined}
-              >
-                <div className="flex flex-col gap-4 md:flex-row md:items-start">
-                  <div className="flex items-start gap-4 flex-1 min-w-0">
-                    {selectionMode && (
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleSelection(item.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="mt-1 w-5 h-5 rounded bg-[#0f0f1a] border-gray-700 text-amber-400 accent-amber-400 cursor-pointer"
-                      />
-                    )}
-
-                    <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-[#0f0f1a] flex items-center justify-center">
-                      {imageUrl ? (
-                        <img src={imageUrl} alt={item.name} className="h-full w-full object-cover" />
-                      ) : (
-                        <span className="text-3xl">🍸</span>
-                      )}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                        <div className="min-w-0">
-                          <h3 className="font-semibold text-lg truncate">{item.name}</h3>
-                          {item.description && (
-                            <p className="mt-1 text-sm text-gray-400">{item.description}</p>
-                          )}
-                        </div>
-                        <div className="shrink-0">{getAvailabilityBadge(item.id)}</div>
-                      </div>
-
-                      {item.tags && (
-                        <div className="mt-3 flex flex-wrap gap-1">
-                          {item.tags.split(',').map((tag, i) => (
-                            <span key={i} className="bg-amber-400/10 text-amber-400 text-xs px-2 py-0.5 rounded-full">{tag.trim()}</span>
-                          ))}
-                        </div>
-                      )}
-
-                      <div className="mt-3">{renderWarnings(avail)}</div>
-                    </div>
-                  </div>
-
-                  {!selectionMode && (
-                    <div className="flex items-center justify-end gap-3 md:pl-4">
-                      <Link to={`/admin/cocktails/${item.id}`} className="text-amber-400 hover:text-amber-300 transition-colors p-1" title={t('common.edit')}>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </Link>
-                      <ExportCocktailButton cocktailId={item.id} cocktailName={item.name} />
-                      <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 transition-colors p-1" title={t('common.delete')}>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-      {filteredItems.length === 0 && <div className="text-center py-12 text-gray-500">{t('common.noResults')}</div>}
-      {filteredItems.length > 0 && (
-        <div className="mt-4 bg-[#1a1a2e] border border-gray-800 rounded-xl overflow-hidden">
-          <Pagination page={page} totalPages={totalPages} pageSize={pageSize} totalItems={totalItems} onPageChange={setPage} onPageSizeChange={setPageSize} />
-        </div>
-      )}
-
-      {showImport && (
-        <ImportCocktailWizard onClose={handleImportClose} />
-      )}
+      {showImport && <ImportCocktailWizard onClose={handleImportClose} />}
     </div>
   );
 }

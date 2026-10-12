@@ -175,8 +175,8 @@ export interface CocktailIngredientInput {
 
 export interface CocktailInput {
   name: string;
-  description?: string;
-  notes?: string;
+  description?: string | null;
+  notes?: string | null;
   tags?: string[];
   isAvailable?: boolean;
   ingredients?: CocktailIngredientInput[];
