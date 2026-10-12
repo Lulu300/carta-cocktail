@@ -3,11 +3,17 @@
 # The Vitest suites call Express directly, so they miss what only the real stack shows:
 # the nginx body size limit, gzip, and photos written outside the uploads volume.
 #
-# Start the stack from docker-compose.yml, then run this script with the same environment:
+# Start the stack from docker-compose.yml in a dedicated compose project, then run this
+# script with the same environment:
+#   export COMPOSE_PROJECT_NAME=carta-smoke JWT_SECRET=$(openssl rand -hex 32) ADMIN_PASSWORD=$(openssl rand -hex 16)
 #   docker compose up -d --build --wait && ./scripts/smoke/smoke.sh
 #   docker compose down -v
+# Never the default project (the folder name): it is the local stack of a plain
+# `docker compose up`. `down -v` would delete its database and photos, the script would add
+# its test cocktail there, and the login fails when that admin was created with another
+# password on its first start.
 # Step 10 recreates the backend container with `docker compose`: keep the same
-# COMPOSE_PROJECT_NAME (or -p value) and JWT_SECRET as the `up` command.
+# COMPOSE_PROJECT_NAME and JWT_SECRET as the `up` command.
 #
 # Variables: BASE_URL (default http://localhost), ADMIN_EMAIL (default admin@carta.local),
 # ADMIN_PASSWORD (required: the one the backend received on its first start).
@@ -46,8 +52,9 @@ status=""
 request() {
   local method="$1" path="$2"
   shift 2
-  status="$(curl -sS -X "$method" -o "$BODY" -D "$HEADERS" -w '%{http_code}' "$@" "$BASE_URL$path")" \
-    || fail "$method $path: no response from $BASE_URL"
+  # --max-time: a stuck request fails this step instead of waiting for the job timeout
+  status="$(curl -sS --max-time 60 -X "$method" -o "$BODY" -D "$HEADERS" -w '%{http_code}' "$@" "$BASE_URL$path")" \
+    || fail "$method $path: no complete response from $BASE_URL (connection failed, or over 60 s)"
 }
 
 # Value of a response header, without the trailing carriage return. Empty when absent.
