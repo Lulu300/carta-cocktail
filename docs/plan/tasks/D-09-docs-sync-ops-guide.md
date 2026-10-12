@@ -84,6 +84,11 @@ Les `AGENTS.md` sont lus par chaque agent avant une tâche : une affirmation fau
 - Transmis par D-11 : `AGENTS.md` décrit encore l'ancien modèle de release (« Git Workflow », étape 10 : `git tag v1.0.0 && git push --tags` ; « CI/CD », Release : tout tag `v*` publie les images et déplace `latest`). L'aligner sur `README.md` (section « Release ») et `docs/plan/README.md` (section « Releases ») : pré-versions `vX.Y.Z-rc.N` sur `develop`, versions finales sur `main`, notes `docs/releases/vX.Y.Z.md` et `UPGRADING.md` mergées avant le tag, branche poussée avant le tag.
 - Transmis par D-11 (revue de la PR #39) : le libellé de l'interface est « Settings > Admin Profile » (`settings.profileConfig`), repris dans les notes de release et `UPGRADING.md`. `README.md` (« change the password from Settings > Profile ») et l'avertissement de `backend/src/bootstrap/ensureAdmin.ts` (« Change it in Settings > Profile ») disent encore « Profile » : les aligner (fichier ajouté à `touches` ; aucun test ne vérifie ce texte).
 - Transmis par C-01 (PR #44) : `npm run db:push` n'existe plus (remplacé par `db:deploy`, `db:status`, `db:check`). `AGENTS.md` (« Running Locally » : `npx prisma db push`) et `backend/AGENTS.md` (tableau « Scripts » : `db:push` ; `prisma/migrations/` absent de « Structure ») sont à aligner sur la section « Database migrations » du `README.md`.
+- Transmis par D-07 : la convention de commit (Conventional Commits) est déjà dans « Coding Conventions » d'`AGENTS.md`, ainsi que le format `ID: titre` des PR. Reste à décrire dans « Git Workflow » (étapes 7 et 8) :
+  - le modèle de PR `.github/pull_request_template.md` : `gh pr create --body-file` l'ignore, donc un agent part de ce fichier pour écrire le corps de sa PR ;
+  - le label de PR qui la classe dans les notes de release (`breaking`, `feature`, `fix`, `dependencies`, `ci`, `docs`, voir `.github/release.yml`) ;
+  - le mode de merge décidé le 2026-10-12 : merge commit partout (feature → `develop` et `develop` → `main`), squash et rebase désactivés ;
+  - les rulesets de D-07 : push direct sur `main` et `develop` refusé, PR et checks `Backend` / `Frontend` obligatoires. Le contournement admin reste possible sur une PR, mais **les agents n'utilisent jamais `gh pr merge --admin`** : seul l'humain contourne, en cas d'urgence.
 
 ## Journal
 

@@ -104,7 +104,7 @@ Aucun test ne traverse nginx → Express → SQLite → volume. Les deux bugs le
 - Le smoke utilise `docker-compose.yml` (build local). `docker-compose.prod.yml` tire `:latest` et ne teste pas le code de la PR. Une variante qui construit les images puis lance le compose prod avec ces tags est possible plus tard.
 - Si F-01 transforme les images à l'upload, `imagePath` et le type renvoyé changent. Le script ne doit vérifier que le code 200 et `image/*`, pas la taille exacte.
 - Le contrat de `POST /api/cocktails` peut changer avec C-04 (zod) et C-09 : garder un corps minimal et adapter le script dans ces tâches.
-- Le check « Smoke » pourra devenir obligatoire dans le ruleset de D-07 une fois stable (2 ou 3 semaines sans faux positif).
+- Le check « Smoke » pourra devenir obligatoire dans le ruleset de D-07 une fois stable (2 ou 3 semaines sans faux positif). Ce ruleset s'appelle « Require PR and CI on main and develop » ; son id est noté dans le Journal de D-07 ; à défaut : `gh api repos/Lulu300/carta-cocktail/rulesets --jq '.[] | select(.name == "Require PR and CI on main and develop") | .id'`. L'ajout est une action humaine : lire le ruleset, compléter `required_status_checks`, puis `gh api -X PUT repos/Lulu300/carta-cocktail/rulesets/<id> --input <fichier>`.
 - Le cache Docker n'est pas partagé avec le job « Docker build » de D-04. Si la durée pose problème, utiliser `docker buildx bake` avec `cache-from: type=gha`.
 
 ## Journal
