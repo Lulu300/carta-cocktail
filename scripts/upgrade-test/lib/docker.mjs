@@ -59,27 +59,34 @@ export function containerState(container) {
   return { ...JSON.parse(stateJson), RestartCount: Number(restartCount) };
 }
 
-// `docker events --until` must not stop before the daemon has logged the last event: the daemon
-// clock (a VM with Docker Desktop) may run slightly behind the host.
+// `docker events --until` is read on the daemon clock and the command waits until then. The margin
+// covers a daemon clock ahead of the host (up to 2 s) and the short delay before the `die` event
+// of a stop is published.
 const EVENTS_CLOCK_MARGIN_MS = 2_000;
 
-/** Exit code of the last `die` event in the output of `docker events --format '{{.Actor.Attributes.exitCode}}'`. */
-export function parseLastExitCode(eventsOutput) {
-  const codes = eventsOutput.split('\n').map((line) => line.trim()).filter((line) => /^\d+$/.test(line));
+/**
+ * Exit code of the last `die` event, from the result of `docker events --format
+ * '{{.Actor.Attributes.exitCode}}'`; null when the command failed or listed no event.
+ */
+export function parseLastExitCode({ status, stdout }) {
+  if (status !== 0) return null;
+  const codes = stdout.split('\n').map((line) => line.trim()).filter((line) => /^\d+$/.test(line));
   return codes.length ? Number(codes.at(-1)) : null;
 }
 
 /**
  * Exit code of the last stop of a container, or null when it has not stopped since it was
- * created. Under a restart policy, `State.ExitCode` belongs to the attempt that runs now (0
- * while it runs), not to the one that stopped: the `die` events keep the code of each stop.
+ * created or Docker cannot tell: the caller then falls back to `State.ExitCode`. Under a restart
+ * policy, `State.ExitCode` belongs to the attempt that runs now (0 while it runs), not to the one
+ * that stopped: the `die` events keep the code of each stop.
  */
 export function lastExitCode(container) {
-  const created = docker(['inspect', '--format', '{{.Created}}', container]).stdout.trim();
+  const inspect = docker(['inspect', '--format', '{{.Created}}', container], { allowFailure: true });
+  if (inspect.status !== 0) return null;
   const until = new Date(Date.now() + EVENTS_CLOCK_MARGIN_MS).toISOString();
-  const events = docker(['events', '--since', created, '--until', until, '--filter', `container=${container}`,
-    '--filter', 'event=die', '--format', '{{.Actor.Attributes.exitCode}}']);
-  return parseLastExitCode(events.stdout);
+  return parseLastExitCode(docker(['events', '--since', inspect.stdout.trim(), '--until', until,
+    '--filter', `container=${container}`, '--filter', 'event=die', '--format', '{{.Actor.Attributes.exitCode}}'],
+  { allowFailure: true }));
 }
 
 export function containerMounts(container) {

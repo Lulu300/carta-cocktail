@@ -94,9 +94,13 @@ test('checkRefusedDatabase: a failed migration must leave a pre-migrate copy of 
 });
 
 test('parseLastExitCode keeps the code of the last die event', () => {
-  assert.equal(parseLastExitCode('1\n1\n0\n'), 0);
-  assert.equal(parseLastExitCode('0\n1\n'), 1);
-  assert.equal(parseLastExitCode(''), null);
+  assert.equal(parseLastExitCode({ status: 0, stdout: '1\n1\n0\n' }), 0);
+  assert.equal(parseLastExitCode({ status: 0, stdout: '0\n1\n' }), 1);
+  assert.equal(parseLastExitCode({ status: 0, stdout: '' }), null);
+});
+
+test('parseLastExitCode gives null when docker events failed, so the caller falls back to State.ExitCode', () => {
+  assert.equal(parseLastExitCode({ status: 1, stdout: '3\n' }), null);
 });
 
 test('checkRowCounts fails on a lost row and reports new tables', () => {
