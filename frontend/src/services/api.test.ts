@@ -422,6 +422,36 @@ describe('menuBottles API', () => {
     await api.menuBottles.sync(1);
     expect(mockFetch.mock.calls[4][0]).toBe('/api/menu-bottles/menu/1/sync');
   });
+
+  it('should reorder every entry of a menu in one request', async () => {
+    const api = await getApi();
+    mockOk({ message: 'ok' });
+    await api.menuBottles.reorder(5, [12, 7, 9]);
+
+    const [url, init] = mockFetch.mock.calls[0];
+    expect(url).toBe('/api/menu-bottles/menu/5/reorder');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual({ ids: [12, 7, 9] });
+  });
+
+  it('should list, create and lift the exclusions of a system menu', async () => {
+    const api = await getApi();
+    mockOk([]);
+    await api.menuBottles.exclusions(5);
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/menu-bottles/menu/5/exclusions');
+
+    mockOk({ message: 'ok' });
+    await api.menuBottles.exclude(5, [3, 4]);
+    const [excludeUrl, excludeInit] = mockFetch.mock.calls[1];
+    expect(excludeUrl).toBe('/api/menu-bottles/menu/5/exclusions');
+    expect(excludeInit.method).toBe('POST');
+    expect(JSON.parse(excludeInit.body)).toEqual({ bottleIds: [3, 4] });
+
+    mockOk({ message: 'ok' });
+    await api.menuBottles.restore(5, 3);
+    expect(mockFetch.mock.calls[2][0]).toBe('/api/menu-bottles/menu/5/exclusions/3');
+    expect(mockFetch.mock.calls[2][1].method).toBe('DELETE');
+  });
 });
 
 describe('menuSections API', () => {

@@ -24,6 +24,7 @@ import DataTable, { type Column } from '../../components/admin/DataTable';
 import { useConfirmDelete } from '../../components/admin/useConfirmDelete';
 import { useEntityForm } from '../../components/admin/useEntityForm';
 import { isSystemMenu } from '../../components/admin/menus/isSystemMenu';
+import { toSlug } from '../../components/admin/menus/menuSlug';
 
 interface MenuForm {
   name: string;
@@ -42,11 +43,6 @@ const TYPE_BADGES: Record<Menu['type'], { label: string; color: string }> = {
 
 function isBottleMenu(menu: Menu): boolean {
   return menu.type === 'APEROS' || menu.type === 'DIGESTIFS';
-}
-
-/** A slug holds lowercase letters, digits and dashes only. */
-function toSlug(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9-]/g, '-');
 }
 
 export default function MenusPage() {
