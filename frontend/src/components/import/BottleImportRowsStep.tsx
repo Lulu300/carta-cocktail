@@ -68,6 +68,10 @@ export default function BottleImportRowsStep({ rows, resolutions, categoryOption
                 </Select>
                 <button
                   type="button"
+                  aria-pressed={isSkipped}
+                  aria-label={isSkipped
+                    ? t('bottles.importWizard.unskipRow', { name: entry.ref.name })
+                    : t('bottles.importWizard.skipRow', { name: entry.ref.name })}
                   onClick={() => onChange(key, isSkipped ? { action: 'import', categoryName: category } : { action: 'skip' })}
                   className={cx(
                     'text-xs px-3 py-1.5 rounded-lg transition-colors border',

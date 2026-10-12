@@ -6,6 +6,7 @@ import {
   createsEntities,
   defaultCreateData,
   emptyResolutions,
+  referenceLabel,
   invalidCreateFields,
   isResolutionComplete,
   parseNumberInput,
@@ -39,6 +40,20 @@ describe('resolutionKey', () => {
   });
 });
 
+describe('referenceLabel', () => {
+  it('shows the abbreviation of a unit, and never "undefined"', () => {
+    expect(referenceLabel('units', { name: 'Centilitre', abbreviation: 'cl' })).toBe('Centilitre (cl)');
+    expect(referenceLabel('units', { abbreviation: 'cl' })).toBe('cl');
+    expect(referenceLabel('units', { name: 'Dash' })).toBe('Dash');
+    expect(referenceLabel('units', {})).toBe('');
+  });
+
+  it('shows the name of other entities', () => {
+    expect(referenceLabel('ingredients', { name: 'Mint', abbreviation: 'M' })).toBe('Mint');
+    expect(referenceLabel('ingredients', {})).toBe('');
+  });
+});
+
 describe('defaultCreateData', () => {
   it('keeps the unit fields of the file', () => {
     expect(defaultCreateData('units', { name: 'Centilitre', abbreviation: 'cl', conversionFactorToMl: 10 })).toEqual({
@@ -47,6 +62,12 @@ describe('defaultCreateData', () => {
       conversionFactorToMl: 10,
       nameTranslations: null,
     });
+  });
+
+  it('names a unit without a name after its abbreviation, as the backend does', () => {
+    expect(defaultCreateData('units', { abbreviation: 'cl' })).toMatchObject({ name: 'cl', abbreviation: 'cl' });
+    expect(defaultCreateData('units', {})).toMatchObject({ name: '', abbreviation: '' });
+    expect(invalidCreateFields('units', defaultCreateData('units', { abbreviation: 'cl' }))).toEqual([]);
   });
 
   it('gives a category the backend defaults and keeps a desired stock of 0', () => {

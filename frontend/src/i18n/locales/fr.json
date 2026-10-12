@@ -125,6 +125,8 @@
       "createNew": "Créer",
       "skip": "Ignorer",
       "unskip": "Réactiver",
+      "skipRow": "Ignorer {{name}}",
+      "unskipRow": "Réactiver {{name}}",
       "pickCategory": "— Choisir une catégorie —",
       "willCreate": "à créer",
       "categoryRequired": "Catégorie obligatoire pour cette bouteille",
@@ -159,7 +161,8 @@
           "required": "{{field}} manquant",
           "outOfRange": "{{field}} hors limites",
           "invalidDate": "{{field}} n'est pas une date valide",
-          "invalidNumber": "{{field}} n'est pas un nombre valide"
+          "invalidNumber": "{{field}} n'est pas un nombre valide",
+          "unknown": "{{field}} invalide"
         }
       }
     }
@@ -289,7 +292,8 @@
       "listsLoadError": "Certains éléments existants n'ont pas pu être chargés : ils manquent dans les listes.",
       "showSummary": "Voir le récapitulatif",
       "resultImported": "importé",
-      "resultNotImported": "non importé"
+      "resultNotImported": "non importé",
+      "mapsTo": "correspond à"
     }
   },
   "menus": {

@@ -47,16 +47,17 @@ describe('ImportStepConfirm', () => {
     renderConfirm();
 
     const rhum = screen.getByText('Rhum').closest('li');
-    expect(rhum).toHaveTextContent('Rhum→Rhum ambré');
-    expect(screen.getByText('Centilitre (cl)')).toBeInTheDocument();
+    expect(rhum).toHaveTextContent('Rhum→cocktails.importWizard.mapsToRhum ambré');
+    // A unit is named with its abbreviation on both sides
+    expect(screen.getAllByText('Centilitre (cl)')).toHaveLength(2);
   });
 
   it('falls back on the backend match while the lists are loading', () => {
     renderConfirm({ lists: { ...lists, units: [], categories: [] } });
 
-    expect(screen.getAllByText('Centilitre')[0].closest('li')).toHaveTextContent('Centilitre→Centilitre');
+    expect(screen.getByText('Centilitre (cl)').closest('li')).toHaveTextContent('Centilitre (cl)→cocktails.importWizard.mapsToCentilitre');
     // Another entity than the match: its name is unknown until the lists arrive
-    expect(screen.getByText('Rhum').closest('li')).toHaveTextContent('Rhum→?');
+    expect(screen.getByText('Rhum').closest('li')).toHaveTextContent('Rhum→cocktails.importWizard.mapsTo?');
   });
 
   it('lists the entities to create under their edited name, and the skipped ones', () => {

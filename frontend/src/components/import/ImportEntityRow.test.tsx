@@ -172,6 +172,16 @@ describe('ImportEntityRow', () => {
     expect(screen.getByLabelText(/categories\.type/)).toHaveValue('BITTER');
   });
 
+  it('accepts a unit without a name: titled and named after its abbreviation', () => {
+    const unit: ImportEntityResolution = { ref: { abbreviation: 'cl' }, existingMatch: null, status: 'missing' };
+    render(<Harness entity={unit} type="units" initial={createResolution('units', unit)} />);
+
+    expect(screen.getByRole('button', { name: /^cl/ })).toBeInTheDocument();
+    expect(screen.queryByText(/undefined/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/units\.name/)).toHaveValue('cl');
+    expect(screen.queryByText('cocktails.importWizard.fieldRequired')).not.toBeInTheDocument();
+  });
+
   it('edits the abbreviation of a unit to create', async () => {
     const user = userEvent.setup();
     const unit: ImportEntityResolution = { ref: { name: 'Dash', abbreviation: 'dash' }, existingMatch: null, status: 'missing' };

@@ -14,9 +14,10 @@ export type CreateDataField = 'name' | 'abbreviation' | 'capacityMl' | 'desiredS
 // A recipe never gives the capacity of a bottle: a standard 70 cl bottle is assumed.
 const DEFAULT_BOTTLE_CAPACITY_ML = 700;
 const DEFAULT_REMAINING_PERCENT = 100;
-const DEFAULT_CATEGORY_TYPE = 'SPIRIT';
+// Shared with the bottle import, which gives a category file the same defaults
+export const DEFAULT_CATEGORY_TYPE = 'SPIRIT';
 // Files exported since C-09 no longer carry `desiredStock`; the backend uses the same fallback.
-const DEFAULT_DESIRED_STOCK = 1;
+export const DEFAULT_DESIRED_STOCK = 1;
 
 /**
  * Key of an entity in the resolutions, as the backend reads it: the lowercased
@@ -26,6 +27,16 @@ export function resolutionKey(type: ImportEntityType, ref: Pick<ImportEntityRef,
   // `||`: a blank abbreviation falls back on the unit name
   const label = type === 'units' ? ref.abbreviation || ref.name : ref.name;
   return label?.toLowerCase() ?? '';
+}
+
+/**
+ * How the wizard names a referenced entity. A unit shows its abbreviation too;
+ * a hand-made file may give a unit without a name.
+ */
+export function referenceLabel(type: ImportEntityType, ref: Pick<ImportEntityRef, 'name' | 'abbreviation'>): string {
+  if (type !== 'units') return ref.name ?? '';
+  if (ref.name && ref.abbreviation) return `${ref.name} (${ref.abbreviation})`;
+  return ref.name || ref.abbreviation || '';
 }
 
 export function emptyResolutions(): ImportResolutions {
@@ -42,7 +53,8 @@ export function defaultCreateData(type: ImportEntityType, ref: ImportEntityRef):
   switch (type) {
     case 'units':
       return {
-        name,
+        // The backend names a unit without a name after its abbreviation
+        name: ref.name || ref.abbreviation || '',
         abbreviation: ref.abbreviation ?? '',
         conversionFactorToMl: ref.conversionFactorToMl ?? null,
         nameTranslations,

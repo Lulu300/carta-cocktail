@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import type { ImportEntityResolution, ImportPreviewResponse } from '../../types';
 import Button from '../ui/Button';
-import { IMPORT_ENTITY_TYPES, resolutionKey, type ImportEntityType, type ImportResolutions } from './importResolutions';
+import { IMPORT_ENTITY_TYPES, referenceLabel, resolutionKey, type ImportEntityType, type ImportResolutions } from './importResolutions';
 import { existingOptionLabel, type ImportReferenceLists } from './useImportReferenceLists';
 
 interface ImportStepConfirmProps {
@@ -52,7 +52,7 @@ function buildSummary(
     for (const entity of preview[type]) {
       const key = resolutionKey(type, entity.ref);
       const resolution = resolutions[type][key];
-      const line = { key: `${type}-${key}`, type: typeLabel(type), name: entity.ref.name ?? '' };
+      const line = { key: `${type}-${key}`, type: typeLabel(type), name: referenceLabel(type, entity.ref) };
       if (resolution?.action === 'create') {
         summary.created.push({ ...line, name: resolution.data?.name ?? line.name });
       } else if (resolution?.action === 'skip') {
@@ -71,6 +71,7 @@ function SummarySection({ title, lines, marker, className }: {
   marker: string;
   className: string;
 }) {
+  const { t } = useTranslation();
   if (lines.length === 0) return null;
   return (
     <section>
@@ -84,6 +85,7 @@ function SummarySection({ title, lines, marker, className }: {
             {line.mappedTo !== undefined && (
               <>
                 <span aria-hidden="true">→</span>
+                <span className="sr-only">{t('cocktails.importWizard.mapsTo')}</span>
                 <span className="text-fg">{line.mappedTo}</span>
               </>
             )}

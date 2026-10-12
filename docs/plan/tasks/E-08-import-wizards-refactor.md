@@ -97,3 +97,10 @@ Duplication :
   - Le réducteur a trois actions de plus (`PREVIEW_REQUESTED`, `RESOLUTIONS_CHANGED`, `NEXT`) et une étape `previewing`, l'aperçu étant envoyé par un effet. `FileDropzone` a une prop `onReject`. Echap ferme désormais les assistants (`Modal`), pas un clic sur le fond.
   - `frontend/src/types/index.ts` ajouté à `touches` (type des `errors`, nombres `null` pendant la saisie).
   - Couverture des lignes modifiées : 95,8 % (toutes les lignes exécutables, le reste est dans `types/index.ts`). Budget du bundle : 138,29 kB sur 140.
+- 2026-10-12 : suivi de la relecture de la PR #119.
+  1. Erreurs de lignes : un `code` ou une `source` que le front ne connaît pas affichent « {{field}} invalide » (clé `rowErrors.code.unknown`) ou la source brute, jamais une clé i18n.
+  2. Une unité sans nom est nommée d'après son abréviation, comme le fait la route, et ne bloque plus l'import ; son titre n'affiche plus `undefined` (`referenceLabel`).
+  3. `ChoiceButton`, `CategoryTypeSelect` et la pastille `MatchDot` / `MatchBadge` (sur `ui/Badge`) sont communs aux deux assistants ; `DEFAULT_CATEGORY_TYPE` et `DEFAULT_DESIRED_STOCK` sont définis une fois.
+  4. Le test du lot de 10 recettes avance l'horloge de 31 s entre deux recettes avec le `staleTime` de l'app : il échoue si une étape recharge les listes à son montage (vérifié).
+  5. Flèche de l'écran de confirmation lue « correspond à » ; Ignorer / Réactiver avec `aria-pressed` et le nom de la bouteille ; nom du fichier affiché seulement après un chargement réussi ; invalidation des listes dans les options de `useMutation`, donc même si l'assistant est fermé pendant la requête.
+  6. Nouvelle tâche E-28 (primitive `ui/Alert`). Clés mortes `invalidVersion` et `summary` notées dans le Journal d'E-14.

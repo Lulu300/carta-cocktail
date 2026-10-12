@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '../../test/test-utils';
 import userEvent from '@testing-library/user-event';
+import { QueryClient } from '@tanstack/react-query';
 import type { CocktailExportFormat, ImportPreviewResponse } from '../../types';
 import ImportCocktailWizard from './ImportCocktailWizard';
 
@@ -213,20 +214,28 @@ describe('ImportCocktailWizard', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('loads the lists once for a batch of 10 recipes', async () => {
+  it('loads the lists once for a batch of 10 recipes, however long it takes', async () => {
     const names = Array.from({ length: 10 }, (_, i) => `Cocktail ${i + 1}`);
-    render(<ImportCocktailWizard onClose={vi.fn()} />);
+    // The app's stale time (createQueryClient): a step that loaded the lists on
+    // each mount would reload them once the cache has gone stale
+    const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: false } } });
+    render(<ImportCocktailWizard onClose={vi.fn()} />, { queryClient });
 
-    uploadZip(names);
-    await screen.findByText('cocktails.importWizard.batchPreview');
-    await goToConfirmation();
-    await confirmImport();
-    for (let i = 1; i < names.length; i++) {
-      await goToConfirmationFromResolve();
+    try {
+      uploadZip(names);
+      await screen.findByText('cocktails.importWizard.batchPreview');
+      await goToConfirmation();
       await confirmImport();
-    }
+      for (let i = 1; i < names.length; i++) {
+        vi.setSystemTime(Date.now() + 31_000);
+        await goToConfirmationFromResolve();
+        await confirmImport();
+      }
 
-    expect(await screen.findByText('cocktails.importWizard.batchComplete')).toBeInTheDocument();
+      expect(await screen.findByText('cocktails.importWizard.batchComplete')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
     expect(api.cocktails.importConfirm).toHaveBeenCalledTimes(10);
     for (const list of LIST_CALLS) expect(list).toHaveBeenCalledTimes(1);
   });

@@ -6,11 +6,9 @@ import type {
   BottleRowResolution,
   Category,
 } from '../../types';
-import { resolutionKey } from './importResolutions';
+import { DEFAULT_CATEGORY_TYPE, DEFAULT_DESIRED_STOCK, resolutionKey } from './importResolutions';
 
-// The backend gives these defaults to a category file that leaves them out
-const DEFAULT_CATEGORY_TYPE = 'SPIRIT';
-const DEFAULT_DESIRED_STOCK = 1;
+// The backend gives this default to a category file that leaves it out
 const DEFAULT_MINIMUM_PERCENT = 30;
 
 /** Data of a category created by the import, from the file's values. */

@@ -235,11 +235,14 @@ describe('ImportBottlesWizard', () => {
 
     await waitFor(() => expect(screen.getByText('Havana 7')).toBeInTheDocument());
 
-    const skipButton = screen.getByText('bottles.importWizard.skip');
+    const skipButton = screen.getByRole('button', { name: 'bottles.importWizard.skipRow' });
+    expect(skipButton).toHaveAttribute('aria-pressed', 'false');
     await user.click(skipButton);
-    expect(screen.getByText('bottles.importWizard.unskip')).toBeInTheDocument();
+    const restoreButton = screen.getByRole('button', { name: 'bottles.importWizard.unskipRow' });
+    expect(restoreButton).toHaveAttribute('aria-pressed', 'true');
+    expect(restoreButton).toHaveTextContent('bottles.importWizard.unskip');
 
-    await user.click(screen.getByText('bottles.importWizard.unskip'));
+    await user.click(restoreButton);
     expect(screen.getByText('bottles.importWizard.skip')).toBeInTheDocument();
   });
 

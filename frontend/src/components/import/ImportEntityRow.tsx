@@ -1,7 +1,6 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { CategoryType, EntityResolutionAction, ImportEntityRef, ImportEntityResolution } from '../../types';
-import { useLocalizedName } from '../../hooks/useLocalizedName';
 import IconPicker from '../ui/IconPicker';
 import Field from '../ui/Field';
 import Input from '../ui/Input';
@@ -11,10 +10,14 @@ import {
   defaultCreateData,
   invalidCreateFields,
   parseNumberInput,
+  referenceLabel,
   type CreateDataField,
   type ImportEntityType,
 } from './importResolutions';
 import { existingOptionLabel, type ExistingOption } from './useImportReferenceLists';
+import ChoiceButton from './ChoiceButton';
+import CategoryTypeSelect from './CategoryTypeSelect';
+import { MatchBadge, MatchDot } from './MatchStatus';
 
 type ResolutionChoice = EntityResolutionAction['action'];
 
@@ -49,28 +52,6 @@ function pickableOptions(entity: ImportEntityResolution, type: ImportEntityType,
   return [match, ...sameCategory];
 }
 
-function ChoiceButton({ selected, disabled, onClick, children }: {
-  selected: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-pressed={selected}
-      className={cx(
-        'text-xs px-3 py-1.5 rounded-lg transition-colors border disabled:opacity-50 disabled:cursor-not-allowed',
-        selected ? 'bg-accent/10 text-accent border-accent/50' : 'text-fg-muted border-gray-700 hover:border-gray-500',
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
 export default function ImportEntityRow({
   entity,
   type,
@@ -81,10 +62,10 @@ export default function ImportEntityRow({
   categoryTypes = [],
 }: ImportEntityRowProps) {
   const { t } = useTranslation();
-  const localizedName = useLocalizedName();
-  const [expanded, setExpanded] = useState(entity.status === 'missing');
+  const isMatched = entity.status === 'matched';
+  const [expanded, setExpanded] = useState(!isMatched);
 
-  const choice: ResolutionChoice = resolution?.action ?? (entity.status === 'matched' ? 'use_existing' : 'create');
+  const choice: ResolutionChoice = resolution?.action ?? (isMatched ? 'use_existing' : 'create');
   const options = pickableOptions(entity, type, existingOptions);
   const createData = (resolution?.action === 'create' && resolution.data) || defaultCreateData(type, entity.ref);
   const invalidFields = invalidCreateFields(type, createData);
@@ -118,7 +99,6 @@ export default function ImportEntityRow({
     </Field>
   );
 
-  const title = type === 'units' ? `${entity.ref.name} (${entity.ref.abbreviation})` : entity.ref.name;
   const selectedId = resolution?.existingId ?? entity.existingMatch?.id ?? options[0]?.id ?? '';
 
   return (
@@ -129,14 +109,12 @@ export default function ImportEntityRow({
         aria-expanded={expanded}
         className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-800/30"
       >
-        <span aria-hidden="true" className={cx('w-2.5 h-2.5 rounded-full flex-shrink-0', entity.status === 'matched' ? 'bg-green-400' : 'bg-orange-400')} />
-        <span className="flex-1 text-sm font-medium">{title}</span>
-        <span className={cx(
-          'text-xs px-2 py-0.5 rounded',
-          entity.status === 'matched' ? 'bg-green-500/10 text-green-400' : 'bg-orange-500/10 text-orange-400',
-        )}>
-          {entity.status === 'matched' ? t('cocktails.importWizard.matched') : t('cocktails.importWizard.missing')}
-        </span>
+        <MatchDot matched={isMatched} />
+        <span className="flex-1 text-sm font-medium">{referenceLabel(type, entity.ref)}</span>
+        <MatchBadge
+          matched={isMatched}
+          label={isMatched ? t('cocktails.importWizard.matched') : t('cocktails.importWizard.missing')}
+        />
         <svg aria-hidden="true" className={cx('w-4 h-4 text-fg-muted transition-transform', expanded && 'rotate-180')} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
@@ -178,15 +156,11 @@ export default function ImportEntityRow({
               {type === 'categories' && (
                 <>
                   <Field label={t('categories.type')}>
-                    <Select value={createData.type ?? ''} onChange={(e) => updateCreateData('type', e.target.value)}>
-                      {/* The file's type stays selectable while the types are loading */}
-                      {!categoryTypes.some((ct) => ct.name === createData.type) && (
-                        <option value={createData.type}>{createData.type}</option>
-                      )}
-                      {categoryTypes.map((ct) => (
-                        <option key={ct.name} value={ct.name}>{localizedName(ct)}</option>
-                      ))}
-                    </Select>
+                    <CategoryTypeSelect
+                      value={createData.type ?? ''}
+                      onChange={(categoryType) => updateCreateData('type', categoryType)}
+                      categoryTypes={categoryTypes}
+                    />
                   </Field>
                   {numberField('desiredStock', t('cocktails.importWizard.desiredStock'), 0)}
                 </>

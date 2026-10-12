@@ -52,7 +52,7 @@ export default function ImportStepUpload({ recipes, onLoaded, onNext }: ImportSt
       return;
     }
     const recipe = parseRecipe(text);
-    if (recipe) onLoaded([recipe]);
+    if (recipe) loaded(file, [recipe]);
     else setError(t('cocktails.importWizard.invalidFile'));
   };
 
@@ -70,15 +70,20 @@ export default function ImportStepUpload({ recipes, onLoaded, onNext }: ImportSt
       // Invalid files of the archive are left out; the others are imported
       const validRecipes = texts.map(parseRecipe).filter((recipe) => recipe !== null);
       if (validRecipes.length === 0) setError(t('cocktails.importWizard.zipNoValidRecipes'));
-      else onLoaded(validRecipes);
+      else loaded(file, validRecipes);
     } catch {
       setError(t('cocktails.importWizard.zipReadError'));
     }
   };
 
+  // The name shown is the one of the recipes listed below, not of a refused file
+  const loaded = (file: File, recipes: CocktailExportFormat[]) => {
+    setFileName(file.name);
+    onLoaded(recipes);
+  };
+
   const handleFile = (file: File) => {
     setError(null);
-    setFileName(file.name);
     if (file.name.toLowerCase().endsWith('.zip')) loadZip(file);
     else loadJson(file);
   };

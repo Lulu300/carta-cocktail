@@ -2,6 +2,7 @@ import { useEffect, useReducer } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation } from '@tanstack/react-query';
 import { cocktails as api } from '../../services/api';
+import type { CocktailExportFormat } from '../../types';
 import { useInvalidateQueries } from '../../queries/crud';
 import Spinner from '../ui/Spinner';
 import WizardModal from './WizardModal';
@@ -17,8 +18,13 @@ import {
   isBatch,
   type CocktailImportStep,
 } from './importCocktailReducer';
-import { createsEntities } from './importResolutions';
+import { createsEntities, type ImportResolutions } from './importResolutions';
 import { IMPORT_REFERENCE_KEYS, useImportReferenceLists } from './useImportReferenceLists';
+
+interface ConfirmVariables {
+  recipe: CocktailExportFormat;
+  resolutions: ImportResolutions;
+}
 
 interface ImportCocktailWizardProps {
   onClose: () => void;
@@ -41,7 +47,14 @@ export default function ImportCocktailWizard({ onClose }: ImportCocktailWizardPr
   const [state, dispatch] = useReducer(importCocktailReducer, initialCocktailImportState);
   const lists = useImportReferenceLists();
   const invalidateQueries = useInvalidateQueries();
-  const confirmMutation = useMutation({ mutationFn: api.importConfirm });
+  const confirmMutation = useMutation({
+    mutationFn: (variables: ConfirmVariables) => api.importConfirm(variables),
+    // Here rather than in mutate(): it still runs if the wizard is closed meanwhile.
+    // The next recipes of a batch must be able to pick what this one created.
+    onSuccess: (_cocktail, { resolutions }) => {
+      if (createsEntities(resolutions)) invalidateQueries(IMPORT_REFERENCE_KEYS);
+    },
+  });
   const recipe = currentRecipe(state);
   const fallbackError = t('common.error');
 
@@ -64,13 +77,8 @@ export default function ImportCocktailWizard({ onClose }: ImportCocktailWizardPr
 
   const handleConfirm = () => {
     if (!recipe || confirmMutation.isPending) return;
-    const { resolutions } = state;
-    confirmMutation.mutate({ recipe, resolutions }, {
-      onSuccess: (cocktail) => {
-        // The next recipes of a batch must be able to pick what this one created
-        if (createsEntities(resolutions)) invalidateQueries(IMPORT_REFERENCE_KEYS);
-        dispatch({ type: 'CONFIRM_OK', cocktail });
-      },
+    confirmMutation.mutate({ recipe, resolutions: state.resolutions }, {
+      onSuccess: (cocktail) => dispatch({ type: 'CONFIRM_OK', cocktail }),
       onError: (error) => dispatch({ type: 'CONFIRM_FAILED', message: messageOf(error, fallbackError) }),
     });
   };

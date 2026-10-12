@@ -125,6 +125,8 @@
       "createNew": "Create",
       "skip": "Skip",
       "unskip": "Restore",
+      "skipRow": "Skip {{name}}",
+      "unskipRow": "Restore {{name}}",
       "pickCategory": "— Pick a category —",
       "willCreate": "will be created",
       "categoryRequired": "Category required for this bottle",
@@ -159,7 +161,8 @@
           "required": "{{field}} is missing",
           "outOfRange": "{{field}} is out of range",
           "invalidDate": "{{field}} is not a valid date",
-          "invalidNumber": "{{field}} is not a valid number"
+          "invalidNumber": "{{field}} is not a valid number",
+          "unknown": "{{field}} is invalid"
         }
       }
     }
@@ -289,7 +292,8 @@
       "listsLoadError": "Some existing entries could not be loaded: they are missing from the lists.",
       "showSummary": "See the summary",
       "resultImported": "imported",
-      "resultNotImported": "not imported"
+      "resultNotImported": "not imported",
+      "mapsTo": "maps to"
     }
   },
   "menus": {

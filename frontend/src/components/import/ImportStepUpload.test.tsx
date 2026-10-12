@@ -142,6 +142,19 @@ describe('ImportStepUpload with a JSON file', () => {
     readAsText.mockRestore();
   });
 
+  it('keeps showing the name of the loaded file when the next one is refused', async () => {
+    const { container } = render(<ImportStepUpload {...props} />);
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+
+    fireEvent.change(input, { target: { files: [new File([recipeJson('Mojito')], 'mojito.json', { type: 'application/json' })] } });
+    expect(await screen.findByText('mojito.json')).toBeInTheDocument();
+
+    fireEvent.change(input, { target: { files: [new File(['{not json'], 'broken.json', { type: 'application/json' })] } });
+    expect(await screen.findByText('cocktails.importWizard.invalidFile')).toBeInTheDocument();
+    expect(screen.getByText('mojito.json')).toBeInTheDocument();
+    expect(screen.queryByText('broken.json')).not.toBeInTheDocument();
+  });
+
   it('refuses an extension other than .json and .zip', async () => {
     upload(new File(['x'], 'recipe.txt', { type: 'text/plain' }));
 
