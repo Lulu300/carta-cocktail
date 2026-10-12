@@ -5,13 +5,13 @@ phase: B
 lane: docs
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: []
-touches: [.gitignore, backend/.gitignore, .env.example, backend/package.json, backend/package-lock.json]
+touches: [.gitignore, .env.example, backend/package.json, backend/package-lock.json]
 sources: ["07-devops-history.md §1.4", "07-devops-history.md §4.3"]
-branch:
-pr:
+branch: docs/B-08-repo-hygiene
+pr: "#110"
 ---
 
 ## Contexte
@@ -55,11 +55,11 @@ Hors périmètre : retrait de la ligne `migrations/` (C-01) ; suppression de `fr
 
 ## Critères d'acceptation
 
-- [ ] Après `npm test -- --coverage` dans `backend/` et `frontend/`, puis `node docs/plan/build.mjs`, `git status` n'affiche ni `coverage/`, ni `.omc/`, ni `docs/plan/index.html`.
-- [ ] `backend/.gitignore` ne contient plus `/src/generated/prisma`.
-- [ ] `.env.example` ne contient plus `VITE_API_URL`.
-- [ ] `backend/package.json` : `private`, licence MIT, plus de `main` ; `nodemon` et `ts-node` absents de `package.json` et du lockfile.
-- [ ] `npm ci`, `npm run build`, `npm run dev` et `npm test` fonctionnent toujours dans `backend/`.
+- [x] Après `npm test -- --coverage` dans `backend/` et `frontend/`, puis `node docs/plan/build.mjs`, `git status` n'affiche ni `coverage/`, ni `.omc/`, ni `docs/plan/index.html`.
+- [x] `backend/.gitignore` ne contient plus `/src/generated/prisma`. Caduc : C-15 a remplacé l'entrée par `/src/generated/`, désormais nécessaire (voir Journal).
+- [x] `.env.example` ne contient plus `VITE_API_URL`.
+- [x] `backend/package.json` : `private`, licence MIT, plus de `main` ; `nodemon` et `ts-node` absents de `package.json` et du lockfile.
+- [x] `npm ci`, `npm run build`, `npm run dev` et `npm test` fonctionnent toujours dans `backend/`.
 
 ## Tests à ajouter ou adapter
 
@@ -78,3 +78,4 @@ Aucun code applicatif modifié, donc pas de test unitaire. Vérifications à col
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-09 : renvoi `.dockerignore` mis à jour vers D-10 (sorti de D-01 en revue de la PR #37).
+- 2026-10-12 : fait (PR #110). `.gitignore` racine : `coverage/` et `.omc/` ajoutés (valables dans tous les paquets) ; `docs/plan/index.html` était déjà ignoré. `.env.example` : bloc `# Frontend` et `VITE_API_URL` retirés, variables de secrets d'A-04 intactes. `backend/package.json` : `private`, licence MIT, description, `main` retiré ; lockfile régénéré par `npm install --package-lock-only`, seule la licence de `packages[""]` change, `npm ci` OK. Écarts : `backend/.gitignore` non modifié et retiré de `touches`, car C-15 (PR #103) génère le client Prisma dans `src/generated/prisma` et l'entrée `/src/generated/` est nécessaire ; `nodemon` et `ts-node` déjà absents ; `backend/prisma/dev.db` absent. `npm ci`, `tsc`, build, lint, tests avec couverture OK dans les deux paquets, `npm run dev` répond ; `git status` propre après les couvertures et `build.mjs`. Pas de code applicatif, delta n/a. Aucune action utilisateur, pas de note de version.
