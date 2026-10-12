@@ -180,12 +180,24 @@ describe('MenuEditPage', () => {
 
     await user.clear(name);
     await user.type(name, 'Winter');
+    const slug = screen.getByDisplayValue('summer');
+    await user.clear(slug);
+    await user.type(slug, 'Winter Menu');
+    await user.type(screen.getByRole('textbox', { name: 'menus.description' }), 'Hot drinks');
+    await user.click(screen.getByRole('switch', { name: 'menus.isPublic' }));
     expect(menusApi.update).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'common.save' }));
 
     await waitFor(() => expect(menusApi.update).toHaveBeenCalledWith(3, {
-      name: 'Winter', slug: 'summer', description: '', isPublic: false,
+      name: 'Winter', slug: 'winter-menu', description: 'Hot drinks', isPublic: true,
     }));
+  });
+
+  it('links to the public page of a published menu', async () => {
+    storedMenu = { ...storedMenu, isPublic: true };
+    renderPage();
+
+    expect(await screen.findByRole('link', { name: '/menu/summer' })).toHaveAttribute('href', '/menu/summer');
   });
 
   it('shows an error with a way back when the menu does not exist', async () => {
