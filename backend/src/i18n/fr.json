@@ -30,6 +30,8 @@
     "reorderIncomplete": "Le nouvel ordre doit contenir tous les éléments de la carte",
     "reorderForeignIds": "Le nouvel ordre contient un élément qui n'est pas dans cette carte",
     "sectionNotInMenu": "Cette section n'appartient pas à cette carte",
+    "unknownReference": "Une ligne de la recette désigne une unité, une bouteille, une catégorie ou un ingrédient qui n'existe pas (peut-être supprimé entre-temps) : rechargez la page et vérifiez la recette",
+    "importUnresolved": "La recette ne peut pas être importée : certaines unités, bouteilles, catégories ou certains ingrédients ne sont ni associés à un élément existant ni créés (une nouvelle bouteille a aussi besoin de sa catégorie)",
     "import": {
       "missingColumn": "Le fichier CSV doit avoir une colonne name et une colonne capacityMl",
       "invalidJson": "Le fichier n'est pas un JSON valide",
