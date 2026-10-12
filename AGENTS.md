@@ -81,6 +81,10 @@ Coverage is enforced automatically by CI. Run `npm test -- --coverage` in either
 - **Frontend job**: `npm ci` → `tsc --noEmit` → `npm run lint` → `npm run build` → `npm test`
 - Both jobs run in parallel on Node 24, the version used by the Docker images (`.nvmrc`); `engines` in both `package.json` require Node >= 24
 
+**Smoke** (`.github/workflows/smoke.yml`) — runs on PRs to `main`/`develop` and on demand:
+- Builds and starts `docker-compose.yml`, then runs `scripts/smoke/smoke.sh` through nginx: login, 2.4 MB photo upload, photo still served after the backend container is recreated, backup export
+- Locally: `docker compose up -d --build --wait && ./scripts/smoke/smoke.sh`, then `docker compose down -v` (`ADMIN_PASSWORD` and `JWT_SECRET` as for the `up`)
+
 **Release** (`.github/workflows/release.yml`) — runs on tag push `v*`:
 - Builds backend and frontend Docker images
 - Pushes to `ghcr.io/<repo>/backend:<version>` and `ghcr.io/<repo>/frontend:<version>` (+ `latest`)
