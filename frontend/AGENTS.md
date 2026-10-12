@@ -177,12 +177,13 @@ Uses `@import "tailwindcss"` syntax (not `@tailwind` directives). Dark theme wit
 | `npm run dev` | Vite dev server (port 5173, proxies /api to :3001) |
 | `npm run build` | TypeScript check + Vite production build |
 | `npm run lint` | ESLint |
+| `npm run format:check` | Prettier check (fails until the repository reformat) |
 | `npm run preview` | Preview production build |
 
 ## Dependencies
 
 **Runtime**: react 19, react-dom 19, react-router-dom 7, i18next 25, react-i18next 16, i18next-browser-languagedetector 8, jszip 3
-**Dev**: vite 7, @vitejs/plugin-react, tailwindcss 4, @tailwindcss/vite, typescript 5.9, eslint 9
+**Dev**: vite 7, @vitejs/plugin-react, tailwindcss 4, @tailwindcss/vite, typescript 5.9, eslint 10, prettier 3
 
 ## Styling Conventions
 
