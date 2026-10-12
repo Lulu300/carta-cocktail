@@ -100,10 +100,18 @@ function initialChunks(distDir) {
   ];
 }
 
-/** Source modules of a chunk, relative to the frontend folder, from its source map. */
-function chunkModules(distDir, chunkPath) {
-  const mapPath = join(distDir, `${chunkPath}.map`);
+/**
+ * Source modules of a chunk, relative to the frontend folder, from its source map.
+ *
+ * Rolldown emits no source map for a chunk made only of generated code, such as
+ * its `rolldown-runtime` helpers chunk, so a preload chunk without a map holds no
+ * source module. The entry chunk always holds source modules: its map is required,
+ * which also proves the build was made with source maps.
+ */
+function chunkModules(distDir, chunk) {
+  const mapPath = join(distDir, `${chunk.path}.map`);
   if (!existsSync(mapPath)) {
+    if (chunk.role === 'preload') return [];
     throw new Error(`Source map not found: ${mapPath}. Build with: npm run build -- --sourcemap hidden`);
   }
   const map = JSON.parse(readFileSync(mapPath, 'utf-8'));
@@ -126,7 +134,7 @@ function inspectChunk(distDir, chunk) {
     ...chunk,
     rawBytes: content.length,
     gzipBytes: gzipSync(content, { level: 9 }).length,
-    forbiddenModules: chunkModules(distDir, chunk.path).filter(isForbiddenModule),
+    forbiddenModules: chunkModules(distDir, chunk).filter(isForbiddenModule),
     hasForbiddenText: content.includes(FORBIDDEN_TEXT),
   };
 }

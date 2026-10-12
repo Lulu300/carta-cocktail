@@ -165,14 +165,36 @@ describe('bundle-budget.mjs CLI', () => {
     assert.match(run.stderr, new RegExp(`Initial load is ${expectedTotal.replace('.', '\\.')} gzip, over the ${budgetKb} kB budget`));
   });
 
-  it('fails with a build hint when a source map is missing', () => {
+  it('fails with a build hint when the entry source map is missing', () => {
     writeCompliantBuild();
-    rmSync(join(distDir, 'assets', 'vendor-react-def.js.map'));
+    rmSync(join(distDir, 'assets', 'index-abc.js.map'));
 
     const run = runCli([distDir, '100']);
 
     assert.equal(run.status, 1);
-    assert.match(run.stderr, /Source map not found: .*vendor-react-def\.js\.map\. Build with: npm run build -- --sourcemap hidden/);
+    assert.match(run.stderr, /Source map not found: .*index-abc\.js\.map\. Build with: npm run build -- --sourcemap hidden/);
+  });
+
+  it('counts a preloaded chunk without source map, such as the Rolldown runtime, as generated code', () => {
+    writeCompliantBuild();
+    writeIndexHtml({ preloads: ['rolldown-runtime-stu.js', 'vendor-react-def.js'] });
+    writeChunk('rolldown-runtime-stu.js', { content: 'var e=Object.create;export{e as t};\n' });
+
+    const run = runCli([distDir, '100']);
+
+    assert.equal(run.status, 0, run.stderr);
+    assert.match(run.stdout, /assets\/rolldown-runtime-stu\.js \(preload\)/);
+  });
+
+  it('still applies the text check to a preloaded chunk without source map', () => {
+    writeCompliantBuild();
+    writeIndexHtml({ preloads: ['rolldown-runtime-stu.js', 'vendor-react-def.js'] });
+    writeChunk('rolldown-runtime-stu.js', { content: 'const zip = new JSZip();\n' });
+
+    const run = runCli([distDir, '100']);
+
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /assets\/rolldown-runtime-stu\.js contains the text "JSZip"/);
   });
 
   it('fails when index.html has no module entry script', () => {
