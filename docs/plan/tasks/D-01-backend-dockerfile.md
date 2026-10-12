@@ -128,3 +128,4 @@ L'image backend publiée sur ghcr.io est celle qui tourne sur le NAS. Elle embar
 - 2026-10-09 : suivi des revues de la phase A (PR #37). Étapes 3 et 4 (`.dockerignore`) déplacées dans la nouvelle tâche D-10, plus urgente depuis A-04 ; étape 3 remplacée par un renvoi, étapes suivantes renumérotées ; D-10 ajoutée à `depends_on`, les deux fichiers retirés de `touches` et du titre.
 - 2026-10-09 : point d'attention « Notes de version » (règle de D-11 décidée le 2026-10-09) : `breaking: true`, actions attendues, épinglage recommandé.
 - 2026-10-09 : C-01 (revue de la PR #44) transmet `exec "$@"` et le SIGTERM pendant les migrations (Points d'attention).
+- 2026-10-12 : C-15 (PR #103) : le `postinstall` du backend lance `prisma generate` et a besoin de la CLI `prisma`, comme l'entrypoint : garder `prisma` dans l'image ou générer dans le stage de build. L'étape « Generate Prisma client » de `ci.yml` refait ce que fait le `postinstall` : la retirer au passage.

@@ -51,3 +51,4 @@ D-06 a ajouté `.github/dependabot.yml`. Décision humaine du 2026-10-11 : pour 
 
 - 2026-10-11 : tâche créée par D-06 pour relever la limite npm à la fin de la phase B (décision humaine du 2026-10-11).
 - 2026-10-11 : `owner: mixed` : « Check for updates » et la décision sur les security updates demandent l'humain.
+- 2026-10-12 : relecture de C-15 (PR #103) : la majeure Prisma 8 doit aussi être ignorée (ou groupée) pour `@prisma/adapter-better-sqlite3`, sinon elle arrive seule, décalée du client ; `better-sqlite3` 13 sort de la plage `^12.6` de l'adapter.
