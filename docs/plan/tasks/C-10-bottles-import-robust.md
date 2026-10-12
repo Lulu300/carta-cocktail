@@ -8,7 +8,7 @@ effort: M
 status: done
 owner: agent
 depends_on: [C-04, C-06]
-touches: [backend/src/app.ts, backend/src/app.test.ts, backend/src/routes/bottles.ts, backend/src/utils/bottlesImport.ts, backend/src/utils/bottlesExport.ts, backend/src/utils/bottlesImport.test.ts, backend/src/utils/bottlesExport.test.ts, backend/src/validation/bottleImport.ts, backend/src/validation/bottleImport.test.ts, backend/src/routes/bottles.test.ts, backend/src/i18n/, frontend/src/services/api.test.ts, frontend/src/components/import/ImportBottlesWizard.test.tsx]
+touches: [backend/src/app.ts, backend/src/app.test.ts, backend/src/middleware/errorHandler.test.ts, backend/src/routes/bottles.ts, backend/src/utils/bottlesImport.ts, backend/src/utils/bottlesExport.ts, backend/src/utils/bottlesImport.test.ts, backend/src/utils/bottlesExport.test.ts, backend/src/validation/bottleImport.ts, backend/src/validation/bottleImport.test.ts, backend/src/routes/bottles.test.ts, backend/src/i18n/, frontend/src/services/api.test.ts, frontend/src/components/import/ImportBottlesWizard.test.tsx]
 sources: ["02-backend-data-perf.md §4.2", "02-backend-data-perf.md §3.5"]
 branch: feature/C-10-bottles-import-robust
 pr: "#113"
@@ -96,3 +96,14 @@ L'import de bouteilles accepte CSV, JSON et ZIP. Il est déjà défensif (transa
 - 2026-10-08 : suivi des revues de la phase A. Ajout de l'étape 5 (limite `express.json()` de 100 Ko qui fait échouer la confirmation d'un gros import), d'un critère et de deux tests ; `backend/src/app.ts` ajouté à `touches`.
 - 2026-10-11 : transmis par C-04. C-04 refuse la confirmation entière en 400 ; C-10 doit signaler les lignes invalides dès l'aperçu. Le schéma de confirmation est `BottleImportConfirm` (`backend/src/validation/bottleImport.ts`), avec `MAX_IMPORT_ROWS = 2000` à réutiliser. La limite de 2 000 lignes n'est atteignable qu'une fois la limite JSON relevée (étape 5).
 - 2026-10-12 : terminée (PR #113). Les lignes CSV et JSON passent par un même lecteur, qui reprend les bornes zod du schéma de confirmation. `errors` est renvoyé à côté de `payload`, pas dedans. Plafond de 2 000 bouteilles, quantités comprises (`MAX_IMPORT_BOTTLES`, dans le parseur et dans le schéma). Limite de 5 Mo pour la confirmation, mesurée à environ 2 Mo pour 2 000 lignes complètes. Écart : `POST /bottles` garde `syncBottle` par bouteille créée (synchro de C-06, limitée aux nouvelles bouteilles) au lieu d'une synchro globale. Sont aussi acceptés les décimales à virgule et `VRAI`/`OUI` d'Excel. L'apostrophe de protection des formules est retirée à l'import. Tests frontend (BOM conservé au téléchargement et envoyé tel quel à l'aperçu), `validation/bottleImport.ts` et les fichiers de test ajoutés à `touches`. Vérifié sur une copie de l'instance réelle : 149 bouteilles exportées puis réimportées en CSV, 0 erreur ; même résultat en JSON. Nouvelle tâche C-34 : CSV Excel en Windows-1252.
+- 2026-10-12 : suivi de la relecture de la PR #113 (approuvée, rien de bloquant).
+  1. Un texte qui commence déjà par des apostrophes suivies de `=`, `+`, `-` ou `@` (`'=foo`) est protégé lui aussi : il revient intact après un aller-retour.
+  2. Un `\r\n` dans un champ entre guillemets est gardé tel quel.
+  3. Les `nameTranslations` passent par `Translations.safeParse` et valent `null` si la valeur est invalide (`{"de": …}`) : l'aperçu ne laisse plus passer ce que la confirmation refuserait.
+  4. Chaque entrée de `errors` porte `source: 'bottles' | 'categories'`.
+  5. Le BOM est écrit `'﻿'` dans le code et les tests.
+  6. La clé d'exemple de `errorHandler.test.ts` devient `errors.import.invalidZip` ; fichier ajouté à `touches`.
+
+  Dates : décision de l'humain du 2026-10-12 (affichage et saisie selon la langue de l'app, un seul format de stockage), traitée hors de C-10. Deux tâches créées : C-35 (dates d'un import lues selon la langue de l'interface) et E-27 (affichage et saisie dans le frontend).
+
+  Restent pour le coordinateur, hors périmètre : un `"` isolé au milieu d'un champ ouvre une zone entre guillemets (comportement antérieur à C-10) ; `errorHandler` ne passe pas `details` à i18next pour l'interpolation.
