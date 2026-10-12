@@ -146,6 +146,7 @@ export default function BottlesPage() {
         isError={bottlesQuery.isError}
         onRetry={() => bottlesQuery.refetch()}
         emptyLabel={t('common.noResults')}
+        isFiltered={filters.isFiltered}
       />
       <BottleHistoryTable bottles={filters.emptyBottles} {...rowActions} />
 

@@ -181,7 +181,7 @@ export default function CocktailsPage() {
       </div>
 
       {availabilityQuery.isError && <LoadError onRetry={() => availabilityQuery.refetch()} />}
-      <LiveResultCount count={cocktailsQuery.isSuccess ? filteredCocktails.length : null} />
+      <LiveResultCount count={cocktailsQuery.isSuccess && filters.isFiltered ? filteredCocktails.length : null} />
       {renderCocktails()}
 
       {showImport && <ImportCocktailWizard onClose={handleImportClose} />}

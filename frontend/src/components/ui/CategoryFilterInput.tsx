@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
 import type { Category } from '../../types';
@@ -25,6 +25,7 @@ export default function CategoryFilterInput({
   const { t } = useTranslation();
   const localize = useLocalizedName();
   const [focused, setFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const matchingCategories = value.trim()
     ? categories.filter((c) => localize(c).toLowerCase().includes(value.toLowerCase()))
@@ -54,6 +55,7 @@ export default function CategoryFilterInput({
     <div className={`relative ${className}`}>
       <Input
         {...combobox.inputProps}
+        ref={inputRef}
         type="text"
         value={value}
         onChange={(e) => handleTextChange(e.target.value)}
@@ -63,7 +65,7 @@ export default function CategoryFilterInput({
         // The important flag (!) beats the field's default border colour.
         className={cx('text-sm pr-10', selectedId !== null && 'border-accent/50!')}
       />
-      {value && <ClearButton label={t('common.clear')} onClick={() => onChange('', null)} className="right-1" />}
+      {value && <ClearButton label={t('common.clear')} onClick={() => onChange('', null)} fieldRef={inputRef} className="right-1" />}
       {isListShown && (
         <ComboboxListbox
           combobox={combobox}

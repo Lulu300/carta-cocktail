@@ -47,11 +47,15 @@ export default function MultiSelectDropdown({
         {...triggerProps}
         className={cx(controlClasses, 'text-left text-sm flex items-center justify-between')}
       >
-        <span className={selected.length > 0 ? 'text-fg' : 'text-fg-muted'}>
-          {selected.length > 0
-            ? t('common.selected', { count: selected.length })
-            : placeholder}
-        </span>
+        {selected.length > 0 ? (
+          <span className="text-fg">
+            {/* The count alone would lose what the button filters on. */}
+            <span className="sr-only">{placeholder}</span>{' '}
+            {t('common.selected', { count: selected.length })}
+          </span>
+        ) : (
+          <span className="text-fg-muted">{placeholder}</span>
+        )}
         <Icon
           name="chevron-down"
           className={cx('size-4 text-fg-muted transition-transform motion-reduce:transition-none', isOpen && 'rotate-180')}

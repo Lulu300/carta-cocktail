@@ -89,6 +89,7 @@ export default function IngredientsPage() {
   const { form, setField, editing } = ingredientForm;
   const [filter, setFilter] = useState<AvailabilityFilter>('all');
   const [search, setSearch] = useState('');
+  const isFiltered = filter !== 'all' || search.trim() !== '';
 
   const filteredIngredients = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -231,7 +232,7 @@ export default function IngredientsPage() {
         </div>
       </div>
 
-      <LiveResultCount count={ingredientsQuery.isSuccess ? filteredIngredients.length : null} />
+      <LiveResultCount count={ingredientsQuery.isSuccess && isFiltered ? filteredIngredients.length : null} />
       {renderContent()}
 
       <Modal

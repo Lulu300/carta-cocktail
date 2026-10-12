@@ -18,7 +18,7 @@
     "changeLanguage": "Changer de langue",
     "menu": "Menu de navigation",
     "admin": "Administration",
-    "main": "Principale",
+    "main": "Navigation principale",
     "skipToContent": "Aller au contenu"
   },
   "home": {
@@ -396,7 +396,6 @@
     "unavailable": "Actuellement indisponible",
     "bottleSearchPlaceholder": "Rechercher une bouteille...",
     "cocktailSearchPlaceholder": "Rechercher dans les recettes...",
-    "clearSearch": "Effacer la recherche",
     "withoutSection": "Sans section",
     "other": "Autres",
     "servings_one": "{{count}} dose",
@@ -412,8 +411,6 @@
     "loadErrorHint": "Vérifiez votre connexion puis réessayez.",
     "emptyMenu": "Cette carte est vide pour le moment",
     "noResults": "Aucun résultat pour « {{query}} »",
-    "resultCount_one": "{{count}} résultat",
-    "resultCount_other": "{{count}} résultats",
     "sectionNav": "Sections de la carte",
     "moreIngredients_one": "{{count}} autre ingrédient",
     "moreIngredients_other": "{{count}} autres ingrédients",

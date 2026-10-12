@@ -36,7 +36,7 @@ export default function PublicLayout() {
           </div>
         </nav>
       </header>
-      <main id={MAIN_CONTENT_ID} className="flex-1">
+      <main id={MAIN_CONTENT_ID} tabIndex={-1} className="flex-1">
         <Outlet />
       </main>
       {/* Guests come for the menu: the admin sign-in link stays discreet, down here. */}

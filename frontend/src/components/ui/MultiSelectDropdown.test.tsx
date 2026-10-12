@@ -179,7 +179,8 @@ describe('MultiSelectDropdown accessibility', () => {
     render(
       <MultiSelectDropdown options={options} selected={selected} onChange={vi.fn()} placeholder="Pick one" />,
     );
-    return screen.getByRole('button', { name: selected.length ? 'common.selected' : 'Pick one' });
+    // Once options are chosen, the name keeps the placeholder in front of the count.
+    return screen.getByRole('button', { name: selected.length ? 'Pick one common.selected' : 'Pick one' });
   }
 
   it('reports its expanded state and the panel it controls', async () => {
@@ -214,5 +215,10 @@ describe('MultiSelectDropdown accessibility', () => {
   it('names the button that removes a selected option', () => {
     renderDropdown(['a']);
     expect(screen.getByRole('button', { name: 'common.removeItem' })).toBeInTheDocument();
+  });
+
+  it('keeps what it filters on in the name of its button once options are chosen', () => {
+    const trigger = renderDropdown(['a', 'b']);
+    expect(trigger).toHaveAccessibleName('Pick one common.selected');
   });
 });

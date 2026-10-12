@@ -98,7 +98,7 @@ describe('PublicCocktailItem', () => {
     expect(link).toHaveAttribute('tabindex', '-1');
   });
 
-  it('treats the photo and the placeholder emoji as decoration', () => {
+  it('treats the photo as decoration: the heading already names the link', () => {
     renderItem(menuCocktail(1, { imagePath: 'mojito.jpg' }));
     expect(screen.getByRole('link', { name: /Mojito/ }).querySelector('img')).toHaveAttribute('alt', '');
   });

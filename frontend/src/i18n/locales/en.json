@@ -18,7 +18,7 @@
     "changeLanguage": "Change language",
     "menu": "Navigation menu",
     "admin": "Administration",
-    "main": "Main",
+    "main": "Main navigation",
     "skipToContent": "Skip to content"
   },
   "home": {
@@ -396,7 +396,6 @@
     "unavailable": "Currently unavailable",
     "bottleSearchPlaceholder": "Search for a bottle...",
     "cocktailSearchPlaceholder": "Search recipes...",
-    "clearSearch": "Clear search",
     "withoutSection": "Without a section",
     "other": "Other",
     "servings_one": "{{count}} serving",
@@ -412,8 +411,6 @@
     "loadErrorHint": "Check your connection and try again.",
     "emptyMenu": "This menu is empty for now",
     "noResults": "No results for “{{query}}”",
-    "resultCount_one": "{{count}} result",
-    "resultCount_other": "{{count}} results",
     "sectionNav": "Menu sections",
     "moreIngredients_one": "{{count}} more ingredient",
     "moreIngredients_other": "{{count}} more ingredients",

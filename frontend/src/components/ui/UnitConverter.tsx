@@ -12,7 +12,7 @@ interface UnitConverterProps {
 }
 
 export default function UnitConverter({ quantity, unit: unitAbbr }: UnitConverterProps) {
-  const { isOpen, close, panelId, containerRef, handleKeyDown, triggerProps } = useDisclosure();
+  const { isOpen, closeAndFocusTrigger, panelId, containerRef, handleKeyDown, triggerProps } = useDisclosure();
   const [units, setUnits] = useState<Unit[]>([]);
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
   const [selectedQuantity, setSelectedQuantity] = useState(quantity);
@@ -41,13 +41,13 @@ export default function UnitConverter({ quantity, unit: unitAbbr }: UnitConverte
   const handleUnitSelect = (newUnit: Unit, formatted: string) => {
     setSelectedUnit(newUnit);
     setSelectedQuantity(parseFloat(formatted));
-    close();
+    closeAndFocusTrigger();
   };
 
   const handleReset = () => {
     setSelectedUnit(currentUnit);
     setSelectedQuantity(quantity);
-    close();
+    closeAndFocusTrigger();
   };
 
   const isChanged = selectedUnit !== null && selectedUnit.id !== currentUnit.id;

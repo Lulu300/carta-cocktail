@@ -135,6 +135,36 @@ describe('AdminLayout accessibility', () => {
     expect(within(sidebar).getByRole('link', { name: /Carta/ })).toHaveFocus();
   });
 
+  // jsdom runs no transition: the real-browser cause of a lost focus is the
+  // visibility transition, so the test checks it is not delayed on opening.
+  it('shows the drawer at once on opening and hides it only after the slide on closing', async () => {
+    const user = userEvent.setup();
+    renderLayout();
+    const sidebar = screen.getByRole('complementary');
+    expect(sidebar.className).toContain('visibility_0s_200ms');
+
+    await user.click(getMenuButton());
+
+    expect(sidebar.className).toContain('[transition:translate_200ms,visibility_0s]');
+    expect(sidebar.className).not.toContain('visibility_0s_200ms');
+  });
+
+  it('gives the focus back to the menu button when the overlay is clicked', async () => {
+    const user = userEvent.setup();
+    const { container } = renderLayout();
+    await user.click(getMenuButton());
+
+    await user.click(container.querySelector('.bg-black\\/50')!);
+
+    expect(getMenuButton()).toHaveAttribute('aria-expanded', 'false');
+    expect(getMenuButton()).toHaveFocus();
+  });
+
+  it('lets the skip link move the focus to the main content', () => {
+    renderLayout();
+    expect(screen.getByRole('main')).toHaveAttribute('tabindex', '-1');
+  });
+
   it('closes the drawer on Escape and gives the focus back to the menu button', async () => {
     const user = userEvent.setup();
     renderLayout();

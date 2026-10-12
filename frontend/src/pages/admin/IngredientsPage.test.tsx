@@ -176,7 +176,7 @@ describe('IngredientsPage', () => {
     expect(screen.getByRole('button', { name: 'ingredients.filter.all' })).toHaveAttribute('aria-pressed', 'true');
     await user.click(screen.getByRole('button', { name: /ingredients\.filter\.available/ }));
     expect(screen.getByRole('button', { name: /ingredients\.filter\.available/ })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByText('common.resultCount')).toHaveAttribute('aria-live', 'polite');
+    expect(await screen.findByText('common.resultCount')).toHaveAttribute('aria-live', 'polite');
   });
 
   it('shows an error toast when the toggle fails', async () => {

@@ -311,14 +311,11 @@ export default function SettingsPage() {
                 </svg>
                 {t('settings.backup.selectFile')}
               </Button>
-              {/* Opened by the button above: hidden from keyboard and screen readers. */}
               <input
                 ref={fileInputRef}
                 type="file"
                 accept=".zip"
                 onChange={(e) => setBackupFile(e.target.files?.[0] || null)}
-                tabIndex={-1}
-                aria-hidden="true"
                 className="hidden"
               />
               {backupFile && (

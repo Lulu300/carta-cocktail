@@ -46,7 +46,7 @@ function focusSiblingItem(menu: HTMLElement, step: 1 | -1) {
 
 export default function LanguageSelector() {
   const { t, i18n } = useTranslation();
-  const { isOpen, close, panelId, containerRef, handleKeyDown, triggerProps } = useDisclosure();
+  const { isOpen, close, closeAndFocusTrigger, panelId, containerRef, handleKeyDown, triggerProps } = useDisclosure();
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Defensive: i18n config already yields "fr" or "en", but never trust a regional or unknown code
@@ -63,7 +63,8 @@ export default function LanguageSelector() {
 
   const handleLanguageChange = (langCode: string) => {
     i18n.changeLanguage(langCode);
-    close();
+    // Menu button pattern: the chosen item disappears, the focus goes back to the button.
+    closeAndFocusTrigger();
   };
 
   const handleMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {

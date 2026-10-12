@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import ClearButton from './ClearButton';
 import ComboboxListbox from './ComboboxListbox';
@@ -20,6 +20,7 @@ export default function LocationAutocomplete({
 }: LocationAutocompleteProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(() => {
     if (!value) return locations;
@@ -47,6 +48,7 @@ export default function LocationAutocomplete({
     <div className={`relative ${className}`}>
       <Input
         {...combobox.inputProps}
+        ref={inputRef}
         type="text"
         value={value}
         onChange={(e) => { onChange(e.target.value); setOpen(true); }}
@@ -55,7 +57,7 @@ export default function LocationAutocomplete({
         placeholder={placeholder}
         className="text-sm pr-10"
       />
-      {value && <ClearButton label={t('common.clear')} onClick={() => select('')} className="right-1" />}
+      {value && <ClearButton label={t('common.clear')} onClick={() => select('')} fieldRef={inputRef} className="right-1" />}
       {isListShown && (
         <ComboboxListbox
           combobox={combobox}

@@ -47,6 +47,7 @@ describe('UnitConverter', () => {
 
     const button = screen.getByRole('button', { name: '30 ml' });
     expect(button).toHaveAttribute('aria-expanded', 'false');
+    expect(button).toHaveFocus();
     await user.click(button);
     expect(screen.getByRole('button', { name: /30 ml/, pressed: true })).toBeInTheDocument();
   });

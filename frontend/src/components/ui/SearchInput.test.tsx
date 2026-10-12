@@ -33,4 +33,17 @@ describe('SearchInput', () => {
 
     expect(screen.getByLabelText('Search units')).toHaveValue('');
   });
+
+  it('gives the focus back to the field once cleared from the keyboard', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    const input = screen.getByLabelText('Search units');
+    await user.type(input, 'cl');
+
+    await user.tab();
+    await user.keyboard('{Enter}');
+
+    expect(input).toHaveValue('');
+    expect(input).toHaveFocus();
+  });
 });

@@ -30,7 +30,12 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   // On small screens the sidebar is a drawer opened by the menu button.
   const {
-    isOpen: isSidebarOpen, close: closeSidebar, panelId: sidebarId, handleKeyDown, triggerProps: menuButtonProps,
+    isOpen: isSidebarOpen,
+    close: closeSidebar,
+    closeAndFocusTrigger: closeSidebarAndFocusButton,
+    panelId: sidebarId,
+    handleKeyDown,
+    triggerProps: menuButtonProps,
   } = useDisclosure();
   const sidebarRef = useRef<HTMLElement>(null);
   const { data: shortageList } = useShortages();
@@ -55,9 +60,13 @@ export default function AdminLayout() {
         id={sidebarId}
         className={cx(
           'fixed inset-y-0 left-0 z-30 w-64 flex flex-col bg-surface border-r border-line',
-          'transition-[translate,visibility] duration-200 motion-reduce:transition-none lg:translate-x-0 lg:static',
+          'motion-reduce:transition-none lg:translate-x-0 lg:static',
           // A closed drawer is only moved off screen: invisible keeps its links out of the tab order.
-          isSidebarOpen ? 'translate-x-0' : '-translate-x-full max-lg:invisible',
+          // Opening shows it at once, or focus() would land on a still hidden element;
+          // closing hides it only once the slide is over.
+          isSidebarOpen
+            ? 'translate-x-0 [transition:translate_200ms,visibility_0s]'
+            : '-translate-x-full max-lg:invisible [transition:translate_200ms,visibility_0s_200ms]',
         )}
       >
         <div className="p-6 border-b border-line">
@@ -101,7 +110,7 @@ export default function AdminLayout() {
         <div
           aria-hidden="true"
           className="fixed inset-0 z-20 bg-black/50 lg:hidden"
-          onClick={closeSidebar}
+          onClick={closeSidebarAndFocusButton}
         />
       )}
 
@@ -140,7 +149,7 @@ export default function AdminLayout() {
           </div>
         </header>
 
-        <main id={MAIN_CONTENT_ID} className="flex-1 p-6">
+        <main id={MAIN_CONTENT_ID} tabIndex={-1} className="flex-1 p-6">
           <Outlet />
         </main>
       </div>

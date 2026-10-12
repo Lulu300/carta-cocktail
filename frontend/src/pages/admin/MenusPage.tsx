@@ -165,6 +165,7 @@ export default function MenusPage() {
         isError={menusQuery.isError}
         onRetry={() => menusQuery.refetch()}
         emptyLabel={t('common.noResults')}
+        isFiltered={search.trim() !== ''}
       />
       <Modal open={menuForm.isOpen} onClose={menuForm.close} title={t('menus.add')}>
         <form onSubmit={handleSubmit} className="space-y-4">

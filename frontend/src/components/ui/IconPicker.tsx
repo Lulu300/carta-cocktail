@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import Button from './Button';
 import Input from './Input';
@@ -49,6 +49,13 @@ export default function IconPicker({ value, onChange }: IconPickerProps) {
     }
   };
 
+  // The picker sits inside forms: Enter uses the custom emoji instead of submitting the form.
+  const handleCustomKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    handleCustomSubmit();
+  };
+
   return (
     <div className="space-y-3">
       <p className="text-xs text-fg-muted">{t('iconPicker.hint')}</p>
@@ -88,7 +95,7 @@ export default function IconPicker({ value, onChange }: IconPickerProps) {
           type="text"
           value={customInput}
           onChange={(e) => setCustomInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleCustomSubmit())}
+          onKeyDown={handleCustomKeyDown}
           aria-label={t('iconPicker.customLabel')}
           placeholder={t('iconPicker.customPlaceholder')}
           className="flex-1"

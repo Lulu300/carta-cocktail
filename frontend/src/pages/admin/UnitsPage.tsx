@@ -136,6 +136,7 @@ export default function UnitsPage() {
         isError={unitsQuery.isError}
         onRetry={() => unitsQuery.refetch()}
         emptyLabel={t('common.noResults')}
+        isFiltered={search.trim() !== ''}
       />
       <Modal
         open={unitForm.isOpen}

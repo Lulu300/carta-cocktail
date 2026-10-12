@@ -57,6 +57,9 @@ describe('PublicLayout', () => {
     const skipLink = screen.getByRole('link', { name: 'nav.skipToContent' });
     expect(skipLink).toHaveFocus();
     expect(skipLink).toHaveAttribute('href', `#${screen.getByRole('main').id}`);
+    // The link moves the focus to the main content, and is never printed.
+    expect(screen.getByRole('main')).toHaveAttribute('tabindex', '-1');
+    expect(skipLink).toHaveClass('print:hidden');
     const nav = within(screen.getByRole('banner')).getByRole('navigation', { name: 'nav.main' });
     expect(within(nav).getByRole('link', { name: /Chez Lulu/ })).toBeInTheDocument();
   });

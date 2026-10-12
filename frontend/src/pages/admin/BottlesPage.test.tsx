@@ -606,6 +606,8 @@ describe('BottlesPage', () => {
       await user.click(screen.getByText('bottles.exportJson'));
 
       await waitFor(() => expect(mockExport).toHaveBeenCalledWith('json', expect.any(Object)));
+      // The menu closes: its button takes the focus back.
+      expect(screen.getByRole('button', { name: 'bottles.export' })).toHaveFocus();
     });
 
     it('closes the export menu on a click outside', async () => {
@@ -633,12 +635,15 @@ describe('BottlesPage', () => {
       expect(exportButton).toHaveFocus();
     });
 
-    it('names its filter fields and announces the number of bottles', async () => {
+    it('names its filter fields and announces the number of bottles once filtered', async () => {
+      const user = userEvent.setup();
       await renderLoadedPage();
-
-      expect(screen.getByRole('searchbox', { name: 'bottles.search' })).toBeInTheDocument();
+      const search = screen.getByRole('searchbox', { name: 'bottles.search' });
       expect(screen.getByRole('combobox', { name: 'bottles.filterByCategory' })).toBeInTheDocument();
-      expect(screen.getAllByText('common.resultCount')[0]).toHaveAttribute('aria-live', 'polite');
+
+      await user.type(search, 'abs');
+
+      expect(await screen.findByText('common.resultCount')).toHaveAttribute('aria-live', 'polite');
     });
 
     it('shows an export failure in an error toast', async () => {

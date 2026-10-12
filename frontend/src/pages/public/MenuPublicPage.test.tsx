@@ -237,7 +237,7 @@ describe('MenuPublicPage', () => {
 
       await waitFor(() => expect(screen.queryByText('Negroni')).not.toBeInTheDocument());
       expect(screen.getByText('Mojito')).toBeInTheDocument();
-      expect(screen.getByText('public.resultCount(1)')).toHaveAttribute('aria-live', 'polite');
+      expect(await screen.findByText('common.resultCount(1)')).toHaveAttribute('aria-live', 'polite');
     });
 
     it('says when nothing matches and clears the search on request', async () => {
@@ -248,24 +248,25 @@ describe('MenuPublicPage', () => {
       await user.type(await screen.findByPlaceholderText('public.cocktailSearchPlaceholder'), 'whisky');
 
       expect(await screen.findByText('public.noResults(whisky)')).toBeInTheDocument();
-      expect(screen.getByText('public.resultCount(0)')).toBeInTheDocument();
+      expect(await screen.findByText('common.resultCount(0)')).toBeInTheDocument();
 
-      await user.click(screen.getByText('public.clearSearch', { selector: 'button' }));
+      await user.click(screen.getByText('common.clearSearch', { selector: 'button' }));
 
       expect(await screen.findByText('Negroni')).toBeInTheDocument();
       expect(screen.getByPlaceholderText('public.cocktailSearchPlaceholder')).toHaveValue('');
     });
 
-    it('clears the search with the icon inside the search bar', async () => {
+    it('clears the search with the icon inside the search bar, and gives the focus back to the field', async () => {
       const user = userEvent.setup();
       vi.mocked(publicApi.getMenu).mockResolvedValue(mojitoMenu);
       renderMenu('cocktails');
       const search = await screen.findByPlaceholderText('public.cocktailSearchPlaceholder');
       await user.type(search, 'negroni');
 
-      await user.click(screen.getByRole('button', { name: 'public.clearSearch' }));
+      await user.click(screen.getByRole('button', { name: 'common.clearSearch' }));
 
       expect(search).toHaveValue('');
+      expect(search).toHaveFocus();
       expect(await screen.findByText('Mojito')).toBeInTheDocument();
     });
 

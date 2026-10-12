@@ -154,4 +154,18 @@ describe('LocationAutocomplete', () => {
     expect(onChange).toHaveBeenLastCalledWith('');
     expect(getCombobox()).toHaveValue('');
   });
+
+  it('gives the focus back to the field once cleared from the keyboard', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.type(getCombobox(), 'Bar');
+    await user.keyboard('{Escape}');
+
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'common.clear' })).toHaveFocus();
+    await user.keyboard('{Enter}');
+
+    expect(getCombobox()).toHaveValue('');
+    expect(getCombobox()).toHaveFocus();
+  });
 });

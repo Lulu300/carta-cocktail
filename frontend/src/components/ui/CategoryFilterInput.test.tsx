@@ -117,5 +117,7 @@ describe('CategoryFilterInput', () => {
     await user.click(screen.getByRole('button', { name: 'common.clear' }));
     expect(onChange).toHaveBeenLastCalledWith('', null);
     expect(getCombobox()).toHaveValue('');
+    // The button disappears with the text: the field takes the focus back.
+    expect(getCombobox()).toHaveFocus();
   });
 });

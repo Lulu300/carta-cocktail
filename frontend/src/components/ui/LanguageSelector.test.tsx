@@ -78,6 +78,19 @@ describe('LanguageSelector', () => {
     expect(mockChangeLanguage).toHaveBeenCalledWith('fr');
   });
 
+  it('gives the focus back to the button after a language is chosen from the keyboard', async () => {
+    const user = userEvent.setup();
+    render(<LanguageSelector />);
+    getLanguageButton().focus();
+
+    await user.keyboard('{Enter}');
+    await user.keyboard('{ArrowDown}{Enter}');
+
+    expect(mockChangeLanguage).toHaveBeenCalledWith('fr');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(getLanguageButton()).toHaveFocus();
+  });
+
   it('should close dropdown after selection', async () => {
     const user = userEvent.setup();
     render(<LanguageSelector />);

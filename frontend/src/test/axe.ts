@@ -20,4 +20,6 @@ declare module 'vitest' {
 export const axe = configureAxe({
   impactLevels: ['serious', 'critical'],
   rules: { 'color-contrast': { enabled: false } },
+  // The cast is needed: impactLevels is not an axe-core option. axe-core passes it
+  // through to the results, where the toHaveNoViolations matcher reads it.
 } as Parameters<typeof configureAxe>[0]);

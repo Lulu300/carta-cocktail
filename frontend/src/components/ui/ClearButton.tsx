@@ -1,3 +1,4 @@
+import type { RefObject } from 'react';
 import { cx } from './classNames';
 import Icon from './Icon';
 
@@ -5,15 +6,22 @@ interface ClearButtonProps {
   /** Accessible name: the cross alone says nothing to a screen reader. */
   label: string;
   onClick: () => void;
+  /** The field it empties: it takes the focus back, since the button disappears with the text. */
+  fieldRef: RefObject<HTMLInputElement | null>;
   className?: string;
 }
 
 /** Cross that empties a text field, placed over the right end of the field. */
-export default function ClearButton({ label, onClick, className }: ClearButtonProps) {
+export default function ClearButton({ label, onClick, fieldRef, className }: ClearButtonProps) {
+  const handleClick = () => {
+    onClick();
+    fieldRef.current?.focus();
+  };
+
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={handleClick}
       aria-label={label}
       title={label}
       className={cx(

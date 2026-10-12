@@ -7,6 +7,7 @@ import { useCocktailsAvailability } from '../../queries/cocktails';
 import type { Menu } from '../../types';
 import Button from '../../components/ui/Button';
 import EmptyState from '../../components/ui/EmptyState';
+import LiveResultCount from '../../components/ui/LiveResultCount';
 import Modal from '../../components/ui/Modal';
 import { cx } from '../../components/ui/classNames';
 import BottleGroupRow from './BottleGroupRow';
@@ -65,7 +66,7 @@ function MenuContent({ menu, slug }: { menu: Menu; slug: string }) {
       <EmptyState
         icon="🔍"
         title={t('public.noResults', { query: searchQuery.trim() })}
-        action={<Button variant="secondary" onClick={() => setSearchQuery('')}>{t('public.clearSearch')}</Button>}
+        action={<Button variant="secondary" onClick={() => setSearchQuery('')}>{t('common.clearSearch')}</Button>}
       />
     );
   };
@@ -88,9 +89,7 @@ function MenuContent({ menu, slug }: { menu: Menu; slug: string }) {
         {navItems.length >= 2 && <SectionNav items={navItems} />}
       </div>
 
-      <p className="sr-only" aria-live="polite">
-        {isSearching ? t('public.resultCount', { count: resultCount }) : ''}
-      </p>
+      <LiveResultCount count={isSearching ? resultCount : null} />
 
       {resultCount === 0 ? renderNoResults() : (
         <div className={bottleMenu ? 'space-y-8' : 'space-y-10'}>

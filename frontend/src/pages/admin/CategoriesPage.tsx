@@ -111,6 +111,7 @@ export default function CategoriesPage() {
         isError={categoriesQuery.isError}
         onRetry={() => categoriesQuery.refetch()}
         emptyLabel={t('common.noResults')}
+        isFiltered={search.trim() !== ''}
       />
       <CategoryFormModal
         entityForm={categoryForm}
