@@ -17,6 +17,7 @@ pr:
 ## Décisions validées (2026-10-12)
 
 - **Dates** : toutes les dates sont affichées et saisies selon la langue de l'application (fr : format français, en : format anglais, une future langue : son propre format), quelle que soit leur origine (saisie à la main ou import). Un seul format de stockage en base. La lecture des dates d'un fichier importé est traitée par C-35.
+- **Format anglais (2026-10-12)** : `en` est l'anglais américain (English (US)) : `mm/dd/yyyy`, `12/03/2024` = 3 décembre 2024. La variante English (UK) (`en-GB`, `dd/mm/yyyy`) viendra avec C-39, qui ajoutera son entrée à la table de formats de `dates.ts`.
 
 ## Contexte
 
@@ -44,7 +45,7 @@ La langue de l'application vient de `i18n.language` (sélecteur `LanguageSelecto
 ## Critères d'acceptation
 
 - [ ] App en français : la date d'ouverture s'affiche et se saisit en `jj/mm/aaaa`, quelle que soit la langue du navigateur.
-- [ ] App en anglais : elle s'affiche et se saisit au format anglais retenu (celui de C-35).
+- [ ] App en anglais : elle s'affiche et se saisit en `mm/dd/yyyy` (anglais américain, comme C-35).
 - [ ] `31/02/2024` ou `abc` affiche une erreur traduite et n'est pas envoyé.
 - [ ] L'API reçoit toujours `aaaa-mm-jj` ; une bouteille enregistrée puis rouverte garde sa date.
 - [ ] Changer de langue réaffiche la date saisie dans le nouveau format.
@@ -57,7 +58,7 @@ La langue de l'application vient de `i18n.language` (sélecteur `LanguageSelecto
 
 ## Points d'attention
 
-- Le format de l'anglais (en-US `mm/dd/yyyy` ou en-GB `dd/mm/yyyy`) est la question posée à l'humain dans C-35. Les deux tâches doivent appliquer la même réponse : E-27 attend C-35 (`depends_on`).
+- Le format de l'anglais est tranché (2026-10-12) : en-US `mm/dd/yyyy`, le même que C-35. Prévoir la table de formats de `dates.ts` indexée par langue (code exact, puis langue de base, puis repli `en`), comme `importDates.ts` : C-39 y ajoutera `en-GB` sans changer la recherche.
 - `openedAt` est stocké à minuit UTC (`new Date('2026-10-11')`, puis renvoyé en `2026-10-11T00:00:00.000Z`). `formatDate` doit formater avec `timeZone: 'UTC'`, ou à partir de la seule partie `aaaa-mm-jj`. Sinon, la date s'affiche la veille pour un admin à l'ouest de UTC (Amériques).
 - Un sélecteur de date tiers ajoute une dépendance (couloir `deps`, `package.json`) : à éviter si un champ texte avec gabarit suffit.
 - `Intl.DateTimeFormat('en', { dateStyle: 'short' })` donne `3/12/24` (année sur deux chiffres) : préférer un format explicite à quatre chiffres.
@@ -65,3 +66,4 @@ La langue de l'application vient de `i18n.language` (sélecteur `LanguageSelecto
 ## Journal
 
 - 2026-10-12 : tâche créée par C-10, après la revue de la PR #113 et la décision de l'humain sur les dates.
+- 2026-10-12 : décision de l'humain reportée par C-35 : le format anglais retenu est en-US (`mm/dd/yyyy`) ; English (UK) suivra avec C-39.
