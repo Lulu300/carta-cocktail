@@ -89,3 +89,4 @@ Autres constats :
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-12 : revue de la PR #107 (E-07) : `i18n/index.ts` importe `en.json` et `fr.json` en entier, donc toutes les chaînes admin des deux langues partent dans le premier chargement de la carte publique (~37 kB de JSON brut ; les clés `menus.*` d'E-07 ont pris +1 kB gzip). Marge du budget de 140 kB après E-07 et Vite 8 : 2,7 kB. Scinder les locales en paquets public et admin (`i18n.addResourceBundle` depuis le chunk admin) ou ne charger que la langue active : à traiter ici ou dans une nouvelle tâche E si le périmètre devient trop gros.

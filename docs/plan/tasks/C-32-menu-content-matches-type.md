@@ -47,3 +47,4 @@ C-06 a figé le type d'une carte non système après sa création (décision « 
 ## Journal
 
 - 2026-10-12 : tâche créée à partir de la revue de la PR #99 (C-06, point 7).
+- 2026-10-12 : revue de la PR #107 (E-07) : côté frontend, `MenuEditPage` s'ouvre aussi sur une carte de bouteilles (`/admin/menus/1`) et y enverrait `cocktails`. Avec le refus backend de cette tâche, rediriger selon `menu.type` vers l'éditeur de bouteilles (ou le faire dans F-08).

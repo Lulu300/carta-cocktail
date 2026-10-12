@@ -48,3 +48,4 @@ Aucun : la suite backend utilise la CLI Prisma pour créer la base de test.
 
 - 2026-10-08 : tâche créée par A-07 après l'audit complet du backend.
 - 2026-10-12 : relecture de C-15 (PR #103) : la CLI Prisma 7 amène `mysql2@3.15.3` (GHSA-3f6p-5ww8-9rcr, GHSA-rgwj-5xj2-c3m3), jamais utilisé avec SQLite ; `npm audit` backend passe de 3 à 4 `high`. À traiter avec l'alerte deepmerge-ts.
+- 2026-10-12 : D-01 (PR #108) passe `prisma` dans `dependencies` (la CLI applique les migrations au démarrage) : `npm audit --omit=dev` voit désormais les 4 `high` (`mysql2`, `deepmerge-ts`). La CLI était déjà dans l'image avant D-01 ; le risque réel ne change pas, mais l'alerte apparaît maintenant dans l'audit de production.
