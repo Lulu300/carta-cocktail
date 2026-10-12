@@ -17,13 +17,13 @@ export default defineConfig({
       // counts as 0% instead of disappearing from the report.
       // Keep `exclude` in sync with the delta coverage `--ignore` flags in ci.yml.
       include: ['src/**/*.{ts,tsx}'],
+      // Ratchet: each threshold is the measured coverage rounded down (B-10).
+      // Raise them when coverage goes up; never lower them.
       thresholds: {
-        lines: 60,
-        // Ratchet: set to the coverage measured once untested files entered the
-        // report (B-02). Never lower these; task B-10 raises them back to 60.
-        functions: 54,
-        branches: 54,
-        statements: 60,
+        lines: 74,
+        functions: 70,
+        branches: 63,
+        statements: 73,
       },
       exclude: [
         'src/test/**',
