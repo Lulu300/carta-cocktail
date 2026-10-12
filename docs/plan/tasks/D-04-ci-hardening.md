@@ -5,7 +5,7 @@ phase: D
 lane: ci
 criticite: moyenne
 effort: S
-status: review
+status: done
 owner: agent
 depends_on: [B-02, B-05, D-01]
 touches: [.github/workflows/ci.yml, docs/plan/tasks/D-05-release-pipeline.md, docs/plan/tasks/D-09-docs-sync-ops-guide.md]
@@ -81,7 +81,7 @@ La CI est verte sur toutes les PR depuis février, mais une partie de ses étape
 - [x] Une erreur de type volontaire dans un fichier `frontend/src/**` fait échouer l'étape « TypeScript check ».
 - [x] Une erreur ESLint volontaire dans `backend/src/**` fait échouer le job Backend.
 - [x] Le job « Docker build » tourne sur chaque PR, pour les deux images, et échoue si un Dockerfile est cassé.
-- [ ] `npm audit --omit=dev --audit-level=high` tourne dans les deux jobs.
+- [x] `npm audit --omit=dev` tourne dans les deux jobs : `--audit-level=high` côté frontend, `--audit-level=critical` côté backend jusqu'à B-11 (décision humaine du 2026-10-12, option 3).
 - [x] Deux pushes successifs sur la même PR : le premier run est annulé.
 - [x] Le jeton du workflow est en `contents: read`.
 - [x] Le workflow est appelable par `uses: ./.github/workflows/ci.yml`.
@@ -108,3 +108,4 @@ La CI est verte sur toutes les PR depuis février, mais une partie de ses étape
 - 2026-10-12 : audit. `npm audit --omit=dev` : backend 4 high (`deepmerge-ts` via `@prisma/config`, `prisma`, `mysql2`), 0 critical ; frontend 0. Seuil `high` impossible sans exception tant que B-11 n'est pas faite : question posée au coordinateur, critère non coché, tâche en `review` jusqu'à la décision.
 - 2026-10-12 : transmis. À D-09 : `AGENTS.md` et `frontend/AGENTS.md` recommandent `npx tsc --noEmit` côté frontend (ne vérifie rien, utiliser `npx tsc -b`), et la ligne « CI runs… » de `backend/AGENTS.md` ne cite ni le lint ni le build Docker. À D-05 (Points d'attention) : épingler les actions de `release.yml` par SHA comme `ci.yml`, groupe de concurrence `release-*` à garder distinct. Ajout des checks Docker au ruleset : action humaine, procédure dans la PR.
 - 2026-10-12 : relecture de la PR #112 (APPROVE, 4 points non bloquants traités). (1) Procédure du ruleset dans la PR : garde si le ruleset « Require PR and CI on main and develop » n'existe pas encore (partie humaine de D-07 pas faite), cas de la création directe avec les quatre checks, contrôle de `.bypass_actors` avant le `PUT`, `integration_id` recopié par jq ; une PR ouverte obtient les checks Docker à son prochain push. (2) `cache-to` seulement sur push : les PR lisent le cache de leur base sans l'écrire (cache GHA du dépôt à 11,2 Go pour un quota de 10 Go). (3) Groupe de concurrence `ci-${{ github.workflow }}-…` : appelée par la release, la CI (`ci-Release-<sha>`) ne partage plus le groupe de la CI du push sur le même commit ; D-05 averti de ne pas donner `permissions: {}` à son job `ci`. (4) Descriptions de la CI devenues fausses (`AGENTS.md`, `backend/AGENTS.md`, `frontend/AGENTS.md`) écrites dans les Points d'attention de D-09, fichier ajouté à `touches`.
+- 2026-10-12 : audit, décision humaine (option 3) : étape « Audit production dependencies » après `npm ci`, `--omit=dev --audit-level=high` dans le job Frontend (0 vulnérabilité), `--audit-level=critical` dans le job Backend (4 high, 0 critical : passe) avec renvoi à B-11, qui remontera le backend à `high` (étape, critère, `touches` et `depends_on` ajoutés à B-11, avec la conduite à tenir : PR de montée de version ou de surcharge, jamais de baisse du seuil). Tâche terminée.
