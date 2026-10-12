@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import { Prisma, PrismaClient } from '../generated/prisma/client';
 import { resolveDatabasePath } from './databasePath';
+import { withSerializedTransactions } from './serializedAdapter';
 
 // Prisma 7 no longer reads .env: load backend/.env before DATABASE_URL is read
 // below, whatever the import order of the entry point (server, seed, scripts).
@@ -23,14 +24,15 @@ export type SqliteClientOptions = Omit<Prisma.PrismaClientOptionsWithAdapter, 'a
  *   one format, so existing databases still sort and compare dates correctly.
  * - better-sqlite3 waits 5 s on a locked database (its `timeout` option) on its
  *   single connection. URL parameters are ignored.
+ * - On that single connection, queries outside a transaction wait for the open
+ *   interactive transaction to end, as with Prisma 6 (withSerializedTransactions).
  */
 export function createPrismaClient<Options extends SqliteClientOptions = SqliteClientOptions>(
   databaseUrl: string = process.env.DATABASE_URL ?? '',
   options?: Options,
 ) {
-  const adapter = new PrismaBetterSqlite3(
-    { url: resolveDatabasePath(databaseUrl) },
-    { timestampFormat: 'unixepoch-ms' },
+  const adapter = withSerializedTransactions(
+    new PrismaBetterSqlite3({ url: resolveDatabasePath(databaseUrl) }, { timestampFormat: 'unixepoch-ms' }),
   );
   type ClientOptions = Options & { adapter: PrismaBetterSqlite3 };
   return new PrismaClient<ClientOptions>({ ...options, adapter } as Prisma.PrismaClientConstructorArgs<ClientOptions>);

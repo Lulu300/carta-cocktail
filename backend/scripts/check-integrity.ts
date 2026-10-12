@@ -11,8 +11,6 @@
  */
 import fs from 'fs';
 import path from 'path';
-import { prisma } from '../src/lib/prisma';
-import { findIntegrityIssues, formatIntegrityReport, hasBlockingIssues } from '../src/services/integrityService';
 
 // Prisma creates an empty database for a missing file: check the path first.
 // Like Prisma, a relative path is resolved from the prisma/ folder.
@@ -26,10 +24,20 @@ async function main(): Promise<number> {
     console.error('Database file not found: set DATABASE_URL=file:/path/to/copy.db');
     return 2;
   }
-  const countsOnly = process.argv.includes('--counts-only');
-  const issues = await findIntegrityIssues(prisma);
-  console.log(formatIntegrityReport(issues, countsOnly));
-  return hasBlockingIssues(issues) ? 1 : 0;
+  // Loaded after the check: the shared client resolves DATABASE_URL when it is
+  // imported, and would fail with a stack trace instead of this exit code.
+  const { prisma } = await import('../src/lib/prisma');
+  const { findIntegrityIssues, formatIntegrityReport, hasBlockingIssues } = await import(
+    '../src/services/integrityService'
+  );
+  try {
+    const countsOnly = process.argv.includes('--counts-only');
+    const issues = await findIntegrityIssues(prisma);
+    console.log(formatIntegrityReport(issues, countsOnly));
+    return hasBlockingIssues(issues) ? 1 : 0;
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
 main()
@@ -39,5 +47,4 @@ main()
   .catch((err) => {
     console.error(err);
     process.exitCode = 2;
-  })
-  .finally(() => prisma.$disconnect());
+  });
