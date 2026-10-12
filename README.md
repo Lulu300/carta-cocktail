@@ -18,7 +18,7 @@ A cocktail menu management system with admin panel and public-facing menu displa
 | Layer | Technology |
 | --- | --- |
 | Backend | Express 5, TypeScript, Prisma 7, SQLite |
-| Frontend | React 19, Vite 7, TailwindCSS 4, React Router 7 |
+| Frontend | React 19, Vite 8, TailwindCSS 4, React Router 7 |
 | Auth | JWT (single admin) |
 | i18n | i18next |
 | Deploy | Docker Compose |
