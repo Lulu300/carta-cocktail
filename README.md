@@ -167,6 +167,7 @@ npm run db:check      # exit 0: the migrations match schema.prisma
 ```
 
 - Review the generated `migration.sql` before committing it: a column rename, for example, is generated as a drop and an add, which loses data.
+- SQLite does not run a migration in a transaction: when a statement fails, the ones before it stay applied. Move the statements that can fail on existing data (unique indexes, `CHECK` constraints) to the top of `migration.sql`, before any table is rebuilt, and write them so that they can run twice (`CREATE UNIQUE INDEX IF NOT EXISTS`). A failure then leaves the data as it was, and the migration can run again after `prisma migrate resolve --rolled-back` (see [Recovering from a failed migration](#recovering-from-a-failed-migration)). `20261010173910_schema_integrity` is an example.
 - Never use `prisma db push` outside the test suite. The CI runs `npm run db:check` and fails when `schema.prisma` changes without a migration.
 - Other scripts: `npm run db:deploy` applies pending migrations without creating any, `npm run db:status` shows which ones are applied.
 - A development database created with `db push` (before migrations existed) must be marked as baselined once: `npx prisma migrate resolve --applied 0_init`.
@@ -176,8 +177,8 @@ npm run db:check      # exit 0: the migrations match schema.prisma
 `backend/docker-entrypoint.sh` runs before the API:
 
 1. The container runs as the `node` user (uid 1000). The entrypoint first checks that it can write to the database folder and the upload folder. Otherwise it stops and prints the `chown` command to run (see [Data folders and the node user](#data-folders-and-the-node-user)). A command given to the container (`docker compose run carta-cocktail-backend <command>`) runs instead of the steps below.
-2. If the database exists and `prisma migrate status` reports pending migrations or no migration history, it copies the database to `backups/pre-migrate-<date>.db`, next to the database (`/app/data/backups/` in the `db-data` volume). It keeps the 10 most recent copies, and skips the copy when the database has not changed since the last one.
-3. It applies the pending migrations with `prisma migrate deploy`. A new database is created from scratch.
+2. If the database exists and a migration of the image is not applied yet (no migration history, a new migration, or one marked rolled back with `prisma migrate resolve --rolled-back`), it copies the database to `backups/pre-migrate-<date>.db`, next to the database (`/app/data/backups/` in the `db-data` volume). It keeps the 10 most recent copies, and skips the copy when the database has not changed since the last one. It makes no copy while a migration is marked failed: the newest copy stays the one made before the failed attempt.
+3. It applies the pending migrations with `prisma migrate deploy`. A new database is created from scratch. If a migration fails, **it refuses to start** and names the migration and the copy to restore: see [Recovering from a failed migration](#recovering-from-a-failed-migration).
 4. A database created by `db push` (v1.5.0 and older) has no migration history. If its schema is exactly the one of the first migration, `0_init`, the entrypoint marks `0_init` as applied and continues. Otherwise **it refuses to start**: it prints the differences, leaves the database untouched, and the container exits.
 5. It runs the seed, then starts Node.
 
@@ -232,6 +233,50 @@ To roll back an upgrade, pin the images back to the previous version in `docker-
    ```
 
 The restored copy brings back its sessions, including those revoked since it was made: set a new `JWT_SECRET` afterwards, as in [UPGRADING › "Signing in after a restore"](UPGRADING.md#signing-in-after-a-restore).
+
+### Recovering from a failed migration
+
+SQLite does not run a migration in a transaction: when a statement fails, the statements before it stay applied, and Prisma marks the migration as failed in the `_prisma_migrations` table. The backend then stops at every start, on `P3018` the first time and `P3009` after, with this message under the Prisma error:
+
+```
+ERROR: migration 20261010173910_schema_integrity failed. The backend will not start.
+SQLite does not run a migration in a transaction: the statements before the one that failed stay applied.
+Prisma applies no migration until this one is resolved: the previous image stops on P3009 too.
+Newest copy made before a migration: /app/data/backups/pre-migrate-20261012-101500.db (with its -wal file when there is one).
+Nothing was restored. Follow "Recovering from a failed migration" in README.md (section "Database migrations").
+```
+
+The Prisma error just above gives the cause, for example `UNIQUE constraint failed: Category.name` (two categories with the same name). Going back to the previous image does not help: Prisma refuses to apply anything while a migration is marked failed, whatever the version. The entrypoint never restores anything by itself, and makes no new copy while a migration is marked failed: the copy named in the message is the one made before the failed attempt.
+
+**Restore the copy.** This works whatever statement failed.
+
+1. Stop the backend, otherwise the restart policy keeps trying: `docker compose -f docker-compose.prod.yml stop carta-cocktail-backend`.
+2. Put back the copy named in the message, with its `-wal` file: run the `run … sh -c` command of step 2 of [Restoring a pre-migration backup](#restoring-a-pre-migration-backup), not its `up -d` yet.
+3. Pin both images back to the version you upgraded from, start it (`docker compose -f docker-compose.prod.yml up -d`), and fix the cause in its admin. For duplicates, keep one item, move its bottles and recipe lines to it, then delete the others.
+4. When the cause is a duplicate, check the fixed database with the integrity check of the new image. Stop the backend, copy the database out of its volume into `carta-db-copy` (step 2 of [Checking a production database before the first upgrade](#checking-a-production-database-before-the-first-upgrade)), then run, with your new version:
+
+   ```bash
+   docker run --rm -v "$PWD/carta-db-copy:/data" -e DATABASE_URL=file:/data/carta_cocktail.db \
+     ghcr.io/lulu300/carta-cocktail/backend:<new version> node dist/scripts/check-integrity.js
+   ```
+
+   Exit code `0`: nothing blocks the migration. Exit code `1`: the output lists what is left to fix. Repeat steps 3 and 4 until it exits `0`.
+5. Pin both images to the new version again and start. The entrypoint copies the fixed database to a new `pre-migrate-<date>.db`, then runs the migration again.
+
+**Without restoring.** Only when the migration failed before changing anything: the statement in the error is one of those at the top of its `migration.sql`, before any table is rebuilt (for `20261010173910_schema_integrity`, the unique indexes: `UNIQUE constraint failed: Category.name` or `Unit.abbreviation`). If in doubt, restore the copy.
+
+1. Stop the backend while the compose file still names the new version.
+2. Mark the migration as rolled back, with the new image:
+
+   ```bash
+   docker compose -f docker-compose.prod.yml run --rm --no-deps carta-cocktail-backend \
+     npx prisma migrate resolve --rolled-back <migration>
+   ```
+
+3. Fix the cause with the previous version, as in steps 3 and 4 above.
+4. Pin both images to the new version again and start. The entrypoint copies the database, fixes included, to a new `pre-migrate-<date>.db` before running the migration again: if it fails again, that copy is the one to restore.
+
+A restored copy brings back its sessions: afterwards, set a new `JWT_SECRET`, as in [UPGRADING › "Signing in after a restore"](UPGRADING.md#signing-in-after-a-restore).
 
 ## Project Structure
 

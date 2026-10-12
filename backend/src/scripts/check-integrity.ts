@@ -11,15 +11,7 @@
  * --counts-only prints counts without any name read from the database.
  * Exit code: 0 without blocking issue, 1 with blocking issues, 2 on error.
  */
-import fs from 'fs';
-import { resolveDatabasePath } from '../lib/databasePath';
-
-// Prisma creates an empty database for a missing file: check the path first,
-// resolved as the application resolves it.
-function databaseFileExists(url = process.env.DATABASE_URL ?? ''): boolean {
-  if (!url.startsWith('file:')) return false;
-  return fs.statSync(resolveDatabasePath(url), { throwIfNoEntry: false })?.isFile() ?? false;
-}
+import { databaseFileExists } from '../lib/databasePath';
 
 async function main(): Promise<number> {
   if (!databaseFileExists()) {

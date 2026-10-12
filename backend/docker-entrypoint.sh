@@ -156,6 +156,41 @@ backup_database() {
   prune_backups
 }
 
+# Lines "unapplied <name>" and "failed <name>" read from the migration history
+# (src/bootstrap/migrationState.ts). Read-only.
+migration_state() {
+  node dist/scripts/migration-state.js
+}
+
+# Back up before any migration runs, including one marked rolled back with
+# `prisma migrate resolve --rolled-back`, which `migrate status` reports as up to
+# date. No copy while a migration is marked failed: the deploy refuses to run
+# (P3009), and a copy of the half-migrated database would become the newest one,
+# ahead of the copy made before the failed attempt. When the history cannot be
+# read, back up anyway: the deploy reports the error.
+needs_backup() {
+  state="$(migration_state)" || return 0
+  echo "$state" | grep -q '^unapplied ' && ! echo "$state" | grep -q '^failed '
+}
+
+# Never restores anything: which copy to put back, and when, is the admin's call.
+refuse_failed_migration() {
+  failed="$(migration_state | sed -n 's/^failed //p' | tr '\n' ' ')"
+  backup="$(latest_backup)"
+  {
+    echo "ERROR: migration ${failed:-(see the Prisma error above) }failed. The backend will not start."
+    echo "SQLite does not run a migration in a transaction: the statements before the one that failed stay applied."
+    echo "Prisma applies no migration until this one is resolved: the previous image stops on P3009 too."
+    if [ -n "$backup" ]; then
+      echo "Newest copy made before a migration: $backup (with its -wal file when there is one)."
+    else
+      echo "No pre-migrate copy in $BACKUP_DIR."
+    fi
+    echo "Nothing was restored. Follow \"Recovering from a failed migration\" in README.md (section \"Database migrations\")."
+  } >&2
+  exit 1
+}
+
 refuse_baseline() {
   baseline_dir="$1"
   {
@@ -189,21 +224,35 @@ baseline_existing_database() {
   echo "Existing database matches $BASELINE_MIGRATION: marking it as applied."
   npx prisma migrate resolve --applied "$BASELINE_MIGRATION"
   exit_if_stop_requested "the migrations after $BASELINE_MIGRATION"
-  npx prisma migrate deploy
+  deploy_migrations || exit_after_failed_deploy
 }
 
-apply_migrations() {
+# Runs `migrate deploy`, prints its output and keeps it in deploy_output.
+deploy_migrations() {
   deploy_status=0
   deploy_output="$(npx prisma migrate deploy 2>&1)" || deploy_status=$?
   echo "$deploy_output"
-  if [ "$deploy_status" -eq 0 ]; then
+  [ "$deploy_status" -eq 0 ]
+}
+
+# P3018: a migration failed during this deploy. P3009: one failed at an earlier
+# start, and Prisma applies nothing until it is resolved.
+exit_after_failed_deploy() {
+  if echo "$deploy_output" | grep -qE 'P3018|P3009'; then
+    refuse_failed_migration
+  fi
+  exit "$deploy_status"
+}
+
+apply_migrations() {
+  if deploy_migrations; then
     return
   fi
   # P3005: the database is not empty but has no migration history.
   if echo "$deploy_output" | grep -q P3005; then
     baseline_existing_database
   else
-    exit "$deploy_status"
+    exit_after_failed_deploy
   fi
 }
 
@@ -211,9 +260,7 @@ require_writable "$DB_DIR" "$DB_DIR" "$DB_FILE" "$DB_FILE-wal" "$DB_FILE-shm" "$
 require_writable "$UPLOAD_DIR" "$UPLOAD_DIR"
 require_writable_upload_dirs || exit 1
 
-# `migrate status` fails when migrations are pending or the database has no
-# migration history: the two cases where the next step may change it.
-if [ -f "$DB_FILE" ] && ! npx prisma migrate status; then
+if [ -f "$DB_FILE" ] && needs_backup; then
   exit_if_stop_requested "the backup"
   backup_database
 fi
