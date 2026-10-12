@@ -1,8 +1,10 @@
 services:
   carta-cocktail-backend:
     image: ghcr.io/lulu300/carta-cocktail/backend:latest
-    ports:
-      - "3001:3001"
+    # Not published on the host: nginx (frontend service) proxies /api and /uploads over the
+    # compose network, so its headers and limits always apply.
+    expose:
+      - "3001"
     environment:
       - DATABASE_URL=file:/app/data/carta_cocktail.db
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set (openssl rand -hex 32)}
@@ -15,6 +17,14 @@ services:
     volumes:
       - db-data:/app/data
       - uploads:/app/uploads
+    healthcheck:
+      # busybox wget, in the node alpine image; /api/health runs a query on the database
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # Covers the start sequence of the entrypoint: database backup, migrations and seed
+      start_period: 60s
     restart: unless-stopped
 
   carta-cocktail-frontend:
@@ -24,7 +34,14 @@ services:
     environment:
       - BACKEND_HOST=carta-cocktail-backend
     depends_on:
-      - carta-cocktail-backend
+      carta-cocktail-backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
 
 volumes:
