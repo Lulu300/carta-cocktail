@@ -11,7 +11,7 @@ depends_on: [C-10]
 touches: [backend/src/utils/bottlesImport.ts, backend/src/utils/bottlesImport.test.ts, backend/src/utils/importDates.ts, backend/src/utils/importDates.test.ts, backend/src/routes/bottles.ts, backend/src/routes/bottles.test.ts, backend/src/utils/bottlesExport.test.ts, backend/src/test/helpers.ts]
 sources: []
 branch: feature/C-35-import-dates-ui-language
-pr: "#PRNUM"
+pr: https://github.com/Lulu300/carta-cocktail/pull/132
 ---
 
 ## Décisions validées (2026-10-12)
@@ -73,5 +73,5 @@ Relevé par la revue de la PR #113 (C-10).
 
 - 2026-10-12 : tâche créée par C-10, après la revue de la PR #113 et la décision de l'humain sur les dates.
 - 2026-10-12 : décisions de l'humain : `en` = anglais américain (mois/jour), export CSV en ISO inchangé, variante English (UK) reportée à C-39 (créée). Table de formats indexée par langue (code exact, langue de base, repli `en`), sans entrée `en-GB`.
-- 2026-10-12 : faite (PR #PRNUM). `parseImportDate` (`importDates.ts`), langue passée par `parseImportFile` depuis `req.language`. Fichiers ajoutés à `touches` : `bottlesExport.test.ts` (appelle `parseCsvBottles`, qui prend la langue) et `test/helpers.ts` (`seedBottle` accepte `openedAt`, pour l'aller-retour daté). Vérifié sur une copie de l'instance réelle (149 bouteilles, aucune avec `openedAt`) : aller-retour export CSV → import identique en `fr` et en `en`, sans date puis avec une date synthétique sur chaque bouteille ; seul écart, un nom entouré d'espaces que l'import rogne (comportement antérieur). La copie ne couvre pas les dates tapées à la main dans Excel.
+- 2026-10-12 : faite (PR #132). `parseImportDate` (`importDates.ts`), langue passée par `parseImportFile` depuis `req.language`. Fichiers ajoutés à `touches` : `bottlesExport.test.ts` (appelle `parseCsvBottles`, qui prend la langue) et `test/helpers.ts` (`seedBottle` accepte `openedAt`, pour l'aller-retour daté). Vérifié sur une copie de l'instance réelle (149 bouteilles, aucune avec `openedAt`) : aller-retour export CSV → import identique en `fr` et en `en`, sans date puis avec une date synthétique sur chaque bouteille ; seul écart, un nom entouré d'espaces que l'import rogne (comportement antérieur). La copie ne couvre pas les dates tapées à la main dans Excel.
 - 2026-10-12 : Notes de version : aucune action requise. Changement de comportement de l'import de bouteilles : une date à barres ou à points est lue selon la langue de l'interface (fr : jour/mois/année, en : mois/jour/année) ; une date dans un autre format (`2024`, `March 2024`, `12-03-24`) ou impossible (`31/02/2024`) écarte la ligne avec `invalidDate`, au lieu d'être devinée.
