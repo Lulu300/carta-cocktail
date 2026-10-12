@@ -5,13 +5,13 @@ phase: B
 lane: frontend
 criticite: moyenne
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [B-02]
 touches: [frontend/src/**/*.test.tsx, frontend/src/**/*.test.ts, frontend/vitest.config.ts, backend/vitest.config.ts]
 sources: ["04-tests.md §2", "04-tests.md §6", "04-tests.md §8"]
-branch:
-pr:
+branch: chore/B-10-coverage-ratchet-up
+pr: "#96"
 ---
 
 ## Décisions validées (2026-10-08)
@@ -41,9 +41,9 @@ Fichiers sans aucun test d'après la revue (`04-tests.md §2`), par ordre de pri
 
 ## Critères d'acceptation
 
-- [ ] Statements, branches, functions et lines ≥ 60 % dans les deux paquets, seuils remis à 60 dans `vitest.config.ts`.
-- [ ] Chaque PR relève le seuil et ne le baisse jamais.
-- [ ] Aucun test qui vérifie une classe CSS ou un détail d'implémentation.
+- [x] Statements, branches, functions et lines ≥ 60 % dans les deux paquets, seuils remis à 60 dans `vitest.config.ts`.
+- [x] Chaque PR relève le seuil et ne le baisse jamais.
+- [x] Aucun test qui vérifie une classe CSS ou un détail d'implémentation.
 
 ## Tests à ajouter ou adapter
 
@@ -61,3 +61,4 @@ Fichiers sans aucun test d'après la revue (`04-tests.md §2`), par ordre de pri
 
 - 2026-10-08 : tâche créée suite à la décision « cliquet » sur B-02.
 - 2026-10-10 : point de départ fixé par B-02 (PR #52), remesuré sur `develop` après le merge d'E-03 (8c2af71). Seul le frontend est sous 60 %, sur deux métriques : `branches: 54` (mesuré 54,62 %, 1051/1924) et `functions: 54` (mesuré 54,74 %, 467/853) dans `frontend/vitest.config.ts`. `statements` (62,82 %) et `lines` (64,71 %) restent à 60. Backend au-dessus de 60 % partout, seuils inchangés. Il manque 104 branches et 45 fonctions couvertes pour revenir à 60 %. La tâche se limite donc à remonter ces deux seuils frontend jusqu'à 60.
+- 2026-10-12 : mesuré sur `develop` (295b31b), les deux paquets dépassent déjà 60 % sur les quatre métriques grâce aux tests ajoutés depuis B-02 ; aucun test à écrire. Frontend : lines 74,35 % (1902/2558), statements 73,08 % (2094/2865), functions 70,83 % (753/1063), branches 63,80 % (1294/2028). Backend : lines 97,65 % (1623/1662), statements 96,43 % (1759/1824), functions 99,16 % (355/358), branches 85,50 % (1026/1200). Décision humaine du 2026-10-12 (revue de la PR #96) : seuils à 60 partout, comme le prévoit le critère, et non à la mesure arrondie, ce qui aurait créé une nouvelle règle. Frontend : functions et branches passent de 54 à 60, lines et statements restent à 60 ; backend inchangé à 60. Aucun seuil abaissé. Le commentaire de cliquet de `frontend/vitest.config.ts` est retiré, le cliquet étant soldé. PR #96.
