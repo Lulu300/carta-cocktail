@@ -5,13 +5,13 @@ phase: D
 lane: ci
 criticite: moyenne
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [A-01, A-06, D-03]
-touches: [.github/workflows/, scripts/smoke]
+touches: [.github/workflows/, scripts/smoke, AGENTS.md]
 sources: ["07-devops-history.md §3.3", "04-tests.md §7"]
-branch:
-pr:
+branch: chore/D-08-smoke-e2e-compose
+pr: 122
 ---
 
 ## Contexte
@@ -87,12 +87,12 @@ Aucun test ne traverse nginx → Express → SQLite → volume. Les deux bugs le
 
 ## Critères d'acceptation
 
-- [ ] Le workflow « Smoke » passe sur la PR qui l'introduit.
-- [ ] Sur une branche de test où `client_max_body_size` est retiré, le smoke échoue à l'étape 8 avec un message qui mentionne 413.
-- [ ] Sur une branche de test où `UPLOAD_DIR` n'est plus passé au backend, le smoke échoue à l'étape 10.
-- [ ] Le script tourne aussi en local : `docker compose up -d --build --wait && ./scripts/smoke/smoke.sh`.
-- [ ] En cas d'échec, les logs des conteneurs sont disponibles en artefact.
-- [ ] Le job dure moins de 10 minutes avec le cache Docker froid.
+- [x] Le workflow « Smoke » passe sur la PR qui l'introduit.
+- [x] Sur une branche de test où `client_max_body_size` est retiré, le smoke échoue à l'étape 8 avec un message qui mentionne 413.
+- [x] Sur une branche de test où `UPLOAD_DIR` n'est plus passé au backend, le smoke échoue à l'étape 10. (Depuis D-02, sans `UPLOAD_DIR` il échoue dès l'étape 8 : voir le Journal. L'étape 10 est validée avec `UPLOAD_DIR` hors du volume.)
+- [x] Le script tourne aussi en local : `docker compose up -d --build --wait && ./scripts/smoke/smoke.sh`.
+- [x] En cas d'échec, les logs des conteneurs sont disponibles en artefact.
+- [x] Le job dure moins de 10 minutes avec le cache Docker froid.
 
 ## Tests à ajouter ou adapter
 
@@ -104,9 +104,21 @@ Aucun test ne traverse nginx → Express → SQLite → volume. Les deux bugs le
 - Le smoke utilise `docker-compose.yml` (build local). `docker-compose.prod.yml` tire `:latest` et ne teste pas le code de la PR. Une variante qui construit les images puis lance le compose prod avec ces tags est possible plus tard.
 - Si F-01 transforme les images à l'upload, `imagePath` et le type renvoyé changent. Le script ne doit vérifier que le code 200 et `image/*`, pas la taille exacte.
 - Le contrat de `POST /api/cocktails` peut changer avec C-04 (zod) et C-09 : garder un corps minimal et adapter le script dans ces tâches.
-- Le check « Smoke » pourra devenir obligatoire dans le ruleset de D-07 une fois stable (2 ou 3 semaines sans faux positif). Ce ruleset s'appelle « Require PR and CI on main and develop » ; son id est noté dans le Journal de D-07 ; à défaut : `gh api repos/Lulu300/carta-cocktail/rulesets --jq '.[] | select(.name == "Require PR and CI on main and develop") | .id'`. L'ajout est une action humaine : lire le ruleset, compléter `required_status_checks`, puis `gh api -X PUT repos/Lulu300/carta-cocktail/rulesets/<id> --input <fichier>`.
+- Le check « Smoke » pourra devenir obligatoire dans le ruleset de D-07 une fois stable (2 ou 3 semaines sans faux positif). Ce ruleset s'appelle « Require PR and CI on main and develop » ; son id est noté dans le Journal de D-07 ; à défaut : `gh api repos/Lulu300/carta-cocktail/rulesets --jq '.[] | select(.name == "Require PR and CI on main and develop") | .id'`. L'ajout est une action humaine. Avec l'id 24936910 (Journal de D-07), la commande ajoute le check avec `integration_id: 15368` (GitHub Actions, comme les quatre checks existants : sans lui, n'importe quelle source pourrait satisfaire le check) et garde les champs modifiables du ruleset :
+  ```bash
+  f=$(mktemp)
+  gh api repos/Lulu300/carta-cocktail/rulesets/24936910 \
+    | jq '{name, target, enforcement, conditions, bypass_actors,
+           rules: (.rules | map(if .type == "required_status_checks"
+             then .parameters.required_status_checks += [{context: "Smoke (docker compose)", integration_id: 15368}]
+             else . end))}' > "$f"
+  gh api -X PUT repos/Lulu300/carta-cocktail/rulesets/24936910 --input "$f"
+  rm -f "$f"
+  ```
 - Le cache Docker n'est pas partagé avec le job « Docker build » de D-04. Si la durée pose problème, utiliser `docker buildx bake` avec `cache-from: type=gha`.
 
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-12 : PR #122. `scripts/smoke/smoke.sh` (11 étapes numérotées comme ci-dessus, message `FAIL at step N (...)`, `shellcheck` propre) et `.github/workflows/smoke.yml` (actions épinglées par SHA comme `ci.yml`, `COMPOSE_PROJECT_NAME: carta-smoke`, `concurrency`, logs `ps` + `logs` en artefact `compose-logs` sur échec, `down -v --remove-orphans` en `if: always()`). Écarts au texte : l'étape 12 devient un contrôle bloquant de `X-Content-Type-Options: nosniff` dans l'étape 1 (D-02 est mergé) ; `POST /api/cocktails` répond 201 (schéma zod `CocktailCreate`, corps `{"name":"Smoke test"}`) ; l'étape 10 ajoute `--no-deps` et réessaie sur 502 pendant 30 s au plus (nginx garde l'adresse du backend 30 s) ; l'upload ne vérifie que 200 et `image/*`. Run vert : 64 s, cache froid (build et démarrage 51 s, smoke 7 s). Régressions volontaires sur branches jetables (PR brouillons #123 à #125 fermées, branches supprimées ; `workflow_dispatch` impossible tant que le workflow n'est pas sur `main`) : sans `client_max_body_size` → étape 8, « HTTP 413 » ; sans `UPLOAD_DIR` (compose et Dockerfile) → étape 8, HTTP 500, car le backend non-root (D-02) ne peut pas créer `/uploads` (`EACCES` dans les logs de l'artefact) ; `UPLOAD_DIR=/tmp/uploads` (photos hors du volume, le bug d'A-01) → étape 10, « HTTP 404 after the recreation ». `AGENTS.md` (section CI/CD) décrit le workflow, ajouté à `touches`. Check non obligatoire : l'ajout au ruleset reste une action humaine (Points d'attention).
+- 2026-10-12 : relecture de la PR #122 (changes requested). Commande locale dans `AGENTS.md` et dans l'en-tête de `smoke.sh` avec un projet compose dédié (`COMPOSE_PROJECT_NAME=carta-smoke`) : le projet par défaut est la pile locale, que `down -v` viderait. `--max-time 60` sur les appels curl. Commande du ruleset (mktemp, `jq`, `integration_id: 15368`) dans les Points d'attention et dans la PR.
