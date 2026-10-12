@@ -1,128 +1,138 @@
 import { useTranslation } from 'react-i18next';
-import type { ImportPreviewResponse, EntityResolutionAction } from '../../types';
+import type { ImportEntityResolution, ImportPreviewResponse } from '../../types';
+import Button from '../ui/Button';
+import { IMPORT_ENTITY_TYPES, referenceLabel, resolutionKey, type ImportEntityType, type ImportResolutions } from './importResolutions';
+import { existingOptionLabel, type ImportReferenceLists } from './useImportReferenceLists';
 
 interface ImportStepConfirmProps {
   preview: ImportPreviewResponse;
-  resolutions: Record<string, Record<string, EntityResolutionAction>>;
+  resolutions: ImportResolutions;
+  lists: ImportReferenceLists;
   isLoading: boolean;
   onBack: () => void;
   onConfirm: () => void;
 }
 
-export default function ImportStepConfirm({ preview, resolutions, isLoading, onBack, onConfirm }: ImportStepConfirmProps) {
-  const { t } = useTranslation();
+interface SummaryLine {
+  key: string;
+  type: string;
+  name: string;
+  mappedTo?: string;
+}
 
-  const entitiesToCreate: { type: string; name: string }[] = [];
-  const entitiesMapped: { type: string; name: string; mappedTo: string }[] = [];
-  const entitiesSkipped: { type: string; name: string }[] = [];
+interface Summary {
+  created: SummaryLine[];
+  mapped: SummaryLine[];
+  skipped: SummaryLine[];
+}
 
-  const processSection = (type: string, label: string, entities: ImportPreviewResponse['units']) => {
-    for (const entity of entities) {
-      const key = type === 'units'
-        ? (entity.ref.abbreviation?.toLowerCase() || entity.ref.name?.toLowerCase() || '')
-        : (entity.ref.name?.toLowerCase() || '');
-      const resolution = resolutions[type]?.[key];
-      const refName = entity.ref.name || '';
+/** Name of the existing entity the admin picked, which may differ from the backend's match. */
+function mappedName(
+  type: ImportEntityType,
+  entity: ImportEntityResolution,
+  existingId: number | undefined,
+  lists: ImportReferenceLists,
+): string {
+  const picked = lists[type].find((option) => option.id === existingId);
+  if (picked) return existingOptionLabel(type, picked);
+  // The lists are still loading: the backend's match is the only name known
+  const match = entity.existingMatch;
+  if (match && match.id === existingId) return match.name;
+  return '?';
+}
 
+function buildSummary(
+  preview: ImportPreviewResponse,
+  resolutions: ImportResolutions,
+  lists: ImportReferenceLists,
+  typeLabel: (type: ImportEntityType) => string,
+): Summary {
+  const summary: Summary = { created: [], mapped: [], skipped: [] };
+  for (const type of IMPORT_ENTITY_TYPES) {
+    for (const entity of preview[type]) {
+      const key = resolutionKey(type, entity.ref);
+      const resolution = resolutions[type][key];
+      const line = { key: `${type}-${key}`, type: typeLabel(type), name: referenceLabel(type, entity.ref) };
       if (resolution?.action === 'create') {
-        entitiesToCreate.push({ type: label, name: resolution.data?.name || refName });
+        summary.created.push({ ...line, name: resolution.data?.name ?? line.name });
       } else if (resolution?.action === 'skip') {
-        entitiesSkipped.push({ type: label, name: refName });
-      } else if (entity.status === 'matched' || resolution?.action === 'use_existing') {
-        entitiesMapped.push({
-          type: label,
-          name: refName,
-          mappedTo: entity.existingMatch?.name || '?',
-        });
+        summary.skipped.push(line);
+      } else if (resolution?.action === 'use_existing') {
+        summary.mapped.push({ ...line, mappedTo: mappedName(type, entity, resolution.existingId, lists) });
       }
     }
-  };
+  }
+  return summary;
+}
 
-  processSection('units', t('cocktails.importWizard.units'), preview.units);
-  processSection('categories', t('cocktails.importWizard.categories'), preview.categories);
-  processSection('bottles', t('cocktails.importWizard.bottles'), preview.bottles);
-  processSection('ingredients', t('cocktails.importWizard.ingredients'), preview.ingredients);
+function SummarySection({ title, lines, marker, className }: {
+  title: string;
+  lines: SummaryLine[];
+  marker: string;
+  className: string;
+}) {
+  const { t } = useTranslation();
+  if (lines.length === 0) return null;
+  return (
+    <section>
+      <h3 className="text-sm font-semibold mb-2">{title} ({lines.length})</h3>
+      <ul className="space-y-1">
+        {lines.map((line) => (
+          <li key={line.key} className={`flex items-center gap-2 text-sm rounded px-3 py-1.5 border ${className}`}>
+            <span aria-hidden="true">{marker}</span>
+            <span className="text-xs text-fg-muted w-20">{line.type}</span>
+            <span>{line.name}</span>
+            {line.mappedTo !== undefined && (
+              <>
+                <span aria-hidden="true">→</span>
+                <span className="sr-only">{t('cocktails.importWizard.mapsTo')}</span>
+                <span className="text-fg">{line.mappedTo}</span>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+export default function ImportStepConfirm({ preview, resolutions, lists, isLoading, onBack, onConfirm }: ImportStepConfirmProps) {
+  const { t } = useTranslation();
+  const summary = buildSummary(preview, resolutions, lists, (type) => t(`cocktails.importWizard.${type}`));
 
   return (
     <div className="space-y-6">
-      {/* Cocktail summary */}
-      <div className="bg-[#0f0f1a] border border-gray-700 rounded-xl p-5">
-        <p className="text-xl font-bold font-serif text-amber-400">{preview.cocktail.name}</p>
+      <div className="bg-canvas border border-gray-700 rounded-xl p-5">
+        <p className="text-xl font-bold font-serif text-accent">{preview.cocktail.name}</p>
         {preview.cocktail.description && (
-          <p className="text-sm text-gray-400 mt-1 italic">{preview.cocktail.description}</p>
+          <p className="text-sm text-fg-muted mt-1 italic">{preview.cocktail.description}</p>
         )}
       </div>
 
-      {/* Entities to create */}
-      {entitiesToCreate.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-green-400 mb-2">
-            {t('cocktails.importWizard.entitiesToCreate')} ({entitiesToCreate.length})
-          </h3>
-          <div className="space-y-1">
-            {entitiesToCreate.map((e, i) => (
-              <div key={i} className="flex items-center gap-2 text-sm text-gray-300 bg-green-500/5 border border-green-500/10 rounded px-3 py-1.5">
-                <span className="text-green-400">+</span>
-                <span className="text-xs text-gray-500 w-20">{e.type}</span>
-                <span>{e.name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <SummarySection
+        title={t('cocktails.importWizard.entitiesToCreate')}
+        lines={summary.created}
+        marker="+"
+        className="text-green-400 bg-green-500/5 border-green-500/10"
+      />
+      <SummarySection
+        title={t('cocktails.importWizard.entitiesMapped')}
+        lines={summary.mapped}
+        marker="~"
+        className="text-blue-400 bg-blue-500/5 border-blue-500/10"
+      />
+      <SummarySection
+        title={t('cocktails.importWizard.skip')}
+        lines={summary.skipped}
+        marker="-"
+        className="text-fg-muted bg-gray-500/5 border-gray-500/10"
+      />
 
-      {/* Entities mapped */}
-      {entitiesMapped.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-blue-400 mb-2">
-            {t('cocktails.importWizard.entitiesMapped')} ({entitiesMapped.length})
-          </h3>
-          <div className="space-y-1">
-            {entitiesMapped.map((e, i) => (
-              <div key={i} className="flex items-center gap-2 text-sm text-gray-300 bg-blue-500/5 border border-blue-500/10 rounded px-3 py-1.5">
-                <span className="text-blue-400">~</span>
-                <span className="text-xs text-gray-500 w-20">{e.type}</span>
-                <span>{e.name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Entities skipped */}
-      {entitiesSkipped.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-gray-400 mb-2">
-            {t('cocktails.importWizard.skip')} ({entitiesSkipped.length})
-          </h3>
-          <div className="space-y-1">
-            {entitiesSkipped.map((e, i) => (
-              <div key={i} className="flex items-center gap-2 text-sm text-gray-500 bg-gray-500/5 border border-gray-500/10 rounded px-3 py-1.5">
-                <span>-</span>
-                <span className="text-xs w-20">{e.type}</span>
-                <span className="line-through">{e.name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Navigation */}
       <div className="flex justify-between">
-        <button
-          onClick={onBack}
-          disabled={isLoading}
-          className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
-        >
-          {t('cocktails.importWizard.back')}
-        </button>
-        <button
-          onClick={onConfirm}
-          disabled={isLoading}
-          className="bg-amber-400 hover:bg-amber-500 disabled:opacity-50 text-[#0f0f1a] font-semibold px-6 py-2 rounded-lg transition-colors"
-        >
+        <Button variant="ghost" onClick={onBack} disabled={isLoading}>{t('cocktails.importWizard.back')}</Button>
+        <Button onClick={onConfirm} loading={isLoading}>
           {isLoading ? t('cocktails.importWizard.importing') : t('cocktails.importWizard.confirmImport')}
-        </button>
+        </Button>
       </div>
     </div>
   );
