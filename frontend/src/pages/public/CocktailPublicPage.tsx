@@ -165,7 +165,6 @@ function CocktailRecipe({ cocktail, menuPath }: { cocktail: Cocktail; menuPath: 
       <div className="flex justify-center gap-3 mt-6 print:hidden">
         <ExportCocktailButton
           cocktailId={cocktail.id}
-          cocktailName={cocktail.name}
           isPublic
           className="inline-flex items-center justify-center rounded-lg border border-accent/30 px-3 py-1.5 text-sm text-accent hover:bg-accent/10 transition-colors"
         />

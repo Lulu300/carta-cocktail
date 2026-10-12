@@ -5,13 +5,13 @@ phase: B
 lane: frontend
 criticite: moyenne
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: []
-touches: [frontend/src/services/exportZip.ts, frontend/src/services/exportZip.test.ts]
+touches: [frontend/src/services/exportZip.ts, frontend/src/services/exportZip.test.ts, frontend/src/services/api.ts, frontend/src/services/api.test.ts, frontend/src/components/ui/ExportCocktailButton.tsx, frontend/src/components/ui/ExportCocktailButton.test.tsx, frontend/src/components/admin/cocktails/CocktailActions.tsx, frontend/src/pages/public/CocktailPublicPage.tsx, frontend/src/pages/admin/CocktailsPage.tsx, frontend/src/pages/admin/CocktailsPage.test.tsx]
 sources: ["02-backend-data-perf.md §4.3"]
-branch:
-pr:
+branch: feature/B-15-zip-export-name-collision
+pr: "#111"
 ---
 
 ## Contexte
@@ -31,9 +31,9 @@ L'export par lot (admin → Cocktails → Export par lot → Exporter ZIP) écri
 
 ## Critères d'acceptation
 
-- [ ] Un export de N cocktails produit toujours N fichiers, noms identiques compris.
-- [ ] Un nom sans lettre latine donne un nom de fichier non vide.
-- [ ] L'archive se réimporte entière (N recettes trouvées).
+- [x] Un export de N cocktails produit toujours N fichiers, noms identiques compris.
+- [x] Un nom sans lettre latine donne un nom de fichier non vide.
+- [x] L'archive se réimporte entière (N recettes trouvées).
 
 ## Tests à ajouter ou adapter
 
@@ -48,3 +48,4 @@ L'export par lot (admin → Cocktails → Export par lot → Exporter ZIP) écri
 
 - 2026-10-12 : tâche créée par B-06 (constat pendant la vérification manuelle de l'export ZIP, hors périmètre de sa PR).
 - 2026-10-12 : revue de la PR #106 (C-09) : même cause côté export unitaire. `ExportCocktailButton.tsx:25` et `services/exportZip.ts:17` recalculent l'ancien slug au lieu d'utiliser le nom du serveur (`exportFilename` de C-09, en-tête `Content-Disposition`) : accents perdus (`cocktail-pi-a-colada.json`), nom non latin → `cocktail-.json`, d'où des collisions supplémentaires dans le ZIP. Reprendre la règle de `exportFilename` (repli `cocktail-<id>`) ou lire l'en-tête ; ajouter `ExportCocktailButton.tsx` à `touches` si besoin.
+- 2026-10-12 : PR #111 « B-15: name ZIP entries after the server export filename ». Le frontend ne recalcule plus de slug : `cocktails.exportRecipe` et `publicApi.exportCocktail` renvoient `{ filename, data }`, le nom venant de l'en-tête `Content-Disposition` posé par `exportFilename` (C-09), avec le même repli `cocktail-<id>.json` si l'en-tête manque. Une seule règle de nommage, côté backend. `exportZip` ajoute `-2`, `-3`… aux noms déjà pris dans l'archive. `ExportCocktailButton` utilise le même nom (prop `cocktailName` supprimée) ; `exportCocktailsAsZip` ne prend plus la liste des cocktails. Lecture de l'en-tête factorisée dans `attachmentFilename` (`api.ts`), reprise par les exports bouteilles et sauvegarde. `touches` élargi : `api.ts`, `ExportCocktailButton.tsx` (aussi listé par E-26), `CocktailActions.tsx`, `CocktailPublicPage.tsx`, `CocktailsPage.tsx` et leurs tests.
