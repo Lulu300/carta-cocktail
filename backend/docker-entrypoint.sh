@@ -39,7 +39,8 @@ refuse_unwritable() {
   {
     echo "ERROR: the backend runs as uid $(id -u) and cannot write to $1."
     echo "Images before this version ran as root, so the files of an existing install belong to root."
-    echo "Stop the backend, give the volume or host folder mounted on $2 to $owner, then start again:"
+    echo "The folder may also belong to another uid (see \`user:\` in the compose file), or be mounted read-only."
+    echo "Stop the backend, give the volume or host folder mounted on $2 to $owner (mounted read-write), then start again:"
     echo "  named volume: docker run --rm -v <volume>:/data alpine chown -R $owner /data"
     echo "  host folder:  sudo chown -R $owner <host folder>"
     echo "See the required actions of this version in UPGRADING.md."
@@ -47,14 +48,39 @@ refuse_unwritable() {
   exit 1
 }
 
-# require_writable <mount point> <path>...: every existing path must be writable.
-# Without this check, the first write fails later, deep inside Prisma or SQLite.
+# Real write tests: busybox `test -w` only compares mode bits, so it misses
+# read-only mounts, ACLs and the uid mapping of network shares. They change
+# nothing and leave nothing behind.
+can_write_dir() {
+  probe="$(mktemp -p "$1" .write-test.XXXXXX 2>/dev/null)" && rm -f "$probe"
+}
+
+# Opens the file for appending and writes nothing: content and mtime unchanged.
+can_write_file() {
+  (: >>"$1") 2>/dev/null
+}
+
+# require_writable <mount point> <path>...: every existing folder or file must be
+# writable. Without this check, the first write fails later, deep inside Prisma
+# or SQLite, or only when a photo is uploaded.
 require_writable() {
   mount_point="$1"
+  shift
   for path in "$@"; do
-    if [ -e "$path" ] && [ ! -w "$path" ]; then
-      refuse_unwritable "$path" "$mount_point"
+    if [ -d "$path" ]; then
+      can_write_dir "$path" || refuse_unwritable "$path" "$mount_point"
+    elif [ -e "$path" ]; then
+      can_write_file "$path" || refuse_unwritable "$path" "$mount_point"
     fi
+  done
+}
+
+# A backup restore renames the folders directly in UPLOAD_DIR: a subfolder left
+# to root by a non-recursive chown would make it fail. Photos only need their
+# folder to be writable.
+require_writable_upload_dirs() {
+  find "$UPLOAD_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r dir; do
+    require_writable "$UPLOAD_DIR" "$dir"
   done
 }
 
@@ -181,8 +207,9 @@ apply_migrations() {
   fi
 }
 
-require_writable "$DB_DIR" "$DB_FILE" "$DB_FILE-wal" "$DB_FILE-shm" "$BACKUP_DIR"
-require_writable "$UPLOAD_DIR"
+require_writable "$DB_DIR" "$DB_DIR" "$DB_FILE" "$DB_FILE-wal" "$DB_FILE-shm" "$BACKUP_DIR"
+require_writable "$UPLOAD_DIR" "$UPLOAD_DIR"
+require_writable_upload_dirs || exit 1
 
 # `migrate status` fails when migrations are pending or the database has no
 # migration history: the two cases where the next step may change it.

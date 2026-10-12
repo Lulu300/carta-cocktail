@@ -27,13 +27,14 @@ D-01 (PR #108) ne met dans l'image backend que `dist/`, `prisma/`, `package.json
 
 1. Rendre la configuration de la CLI autonome sans dupliquer la règle « chemin relatif résolu depuis `prisma/` » (une seule implémentation, voir C-26). Pistes : compiler la configuration dans `dist/` et la charger avec `--config`, ou faire de la règle un module sans dépendance qui reste chargé au même chemin relatif en développement et dans l'image.
 2. Retirer `COPY src/lib/databasePath.ts` du Dockerfile.
-3. Vérifier dans l'image : `migrate status`, `migrate deploy`, la baseline `0_init` et les commandes `--entrypoint` du README.
+3. Vérifier dans l'image : `migrate status`, `migrate deploy`, la baseline `0_init` et les commandes `--entrypoint` du README ; depuis un checkout : une `DATABASE_URL` relative.
 
 ## Critères d'acceptation
 
 - [ ] `docker run --rm --entrypoint ls <image> /app` ne montre pas `src`.
 - [ ] Une seule implémentation de la conversion `DATABASE_URL` → chemin.
-- [ ] L'entrypoint applique les migrations avec une `DATABASE_URL` absolue et avec une `DATABASE_URL` relative.
+- [ ] Dans l'image, l'entrypoint applique les migrations avec une `DATABASE_URL` absolue. Une `DATABASE_URL` relative y reste refusée par le contrôle d'écriture (`/app/prisma` appartient à root).
+- [ ] Depuis un checkout, la CLI résout une `DATABASE_URL` relative comme l'application (même fichier dans `prisma/`).
 
 ## Tests à ajouter ou adapter
 
