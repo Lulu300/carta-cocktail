@@ -44,8 +44,8 @@ jobs:
 
       # The Prisma CLI, a runtime dependency, pins vulnerable versions of
       # deepmerge-ts and mysql2: the `overrides` of package.json replace them
-      # until a Prisma release ships fixed versions (task B-16). A new advisory is fixed by an upgrade or an override, never by lowering
-      # the threshold.
+      # until a Prisma release ships fixed versions (task B-16). A new advisory
+      # is fixed by an upgrade or an override, never by lowering the threshold.
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
 

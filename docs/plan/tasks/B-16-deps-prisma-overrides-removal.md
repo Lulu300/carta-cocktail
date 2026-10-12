@@ -25,8 +25,8 @@ B-11 a ajouté dans `backend/package.json` les surcharges `"overrides": { "deepm
 
 ## Ce qu'il faut faire
 
-1. À chaque montée de `prisma` (Dependabot ignore les majeures de Prisma : montée manuelle), vérifier `npm view prisma@<version> dependencies` et `npm view @prisma/config@<version> dependencies`.
-2. Quand `deepmerge-ts` ≥ 8.0.0 et `mysql2` ≥ 3.23.1 y sont épinglés, retirer les surcharges devenues inutiles, régénérer le lockfile et relancer `npm audit --omit=dev`.
+1. À chaque montée de `prisma` (Dependabot ignore les majeures de Prisma : montée manuelle), tester chaque surcharge séparément, sans se fier à `npm view … dependencies` : à partir de Prisma 8, les dépendances passent par d'autres paquets (`@prisma/orm-toolchain`…), et `deepmerge-ts` ou `mysql2` peut même sortir de l'arbre.
+2. Pour une surcharge : sur une copie de `backend/`, la retirer de `package.json`, régénérer le lockfile (`npm install --package-lock-only`), puis lancer `npm ls deepmerge-ts mysql2` et `npm audit --omit=dev`. S'il reste une alerte `high` ou plus, garder la surcharge. Sinon, la retirer dans le dépôt et régénérer le lockfile.
 3. Mettre à jour le commentaire de l'étape d'audit du job Backend de `ci.yml`.
 
 ## Critères d'acceptation
