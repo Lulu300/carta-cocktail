@@ -5,13 +5,13 @@ phase: E
 lane: frontend
 criticite: moyenne
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [E-01, E-03]
 touches: [frontend/src/components/import/, frontend/src/i18n/locales/, frontend/src/types/index.ts]
 sources: ["05-frontend-archi.md §4.4"]
-branch:
-pr:
+branch: feature/E-08-import-wizards-refactor
+pr: "#119"
 ---
 
 ## Contexte
@@ -59,16 +59,16 @@ Duplication :
 
 ## Critères d'acceptation
 
-- [ ] Lot de 3 recettes, échec de la 2ᵉ, « Réessayer » puis succès : le récapitulatif affiche 3 lignes et « 3/3 ».
-- [ ] Lot dont l'aperçu de la recette suivante échoue : un écran d'erreur s'affiche avec un bouton, jamais une modale vide.
-- [ ] Vider le champ nom d'une entité à créer laisse le champ vide et bloque la confirmation.
-- [ ] Aucun `NaN` dans le corps envoyé à `importConfirm` (test).
-- [ ] L'écran de confirmation affiche la correspondance choisie pour chaque entité existante.
-- [ ] La zone de dépôt s'ouvre au clavier (Tab puis Entrée).
-- [ ] Un import de lot de 10 recettes ne déclenche qu'une série de 5 requêtes de listes.
-- [ ] `resolutionKey` est défini à un seul endroit.
-- [ ] `ImportBottlesWizard.tsx` ≤ 200 lignes.
-- [ ] Couverture ≥ 80 % sur les lignes modifiées (les fichiers `ImportCocktailWizard`, `ImportStep*`, `ImportEntityRow` n'ont aucun test aujourd'hui).
+- [x] Lot de 3 recettes, échec de la 2ᵉ, « Réessayer » puis succès : le récapitulatif affiche 3 lignes et « 3/3 ».
+- [x] Lot dont l'aperçu de la recette suivante échoue : un écran d'erreur s'affiche avec un bouton, jamais une modale vide.
+- [x] Vider le champ nom d'une entité à créer laisse le champ vide et bloque la confirmation.
+- [x] Aucun `NaN` dans le corps envoyé à `importConfirm` (test).
+- [x] L'écran de confirmation affiche la correspondance choisie pour chaque entité existante.
+- [x] La zone de dépôt s'ouvre au clavier (Tab puis Entrée).
+- [x] Un import de lot de 10 recettes ne déclenche qu'une série de 5 requêtes de listes.
+- [x] `resolutionKey` est défini à un seul endroit.
+- [x] `ImportBottlesWizard.tsx` ≤ 200 lignes.
+- [x] Couverture ≥ 80 % sur les lignes modifiées (les fichiers `ImportCocktailWizard`, `ImportStep*`, `ImportEntityRow` n'ont aucun test aujourd'hui).
 
 ## Tests à ajouter ou adapter
 
@@ -90,3 +90,10 @@ Duplication :
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-12 : C-10 (PR #113) : l'aperçu d'import des bouteilles renvoie `errors: { line, field, code, source }[]` à côté de `payload` (lignes écartées ; `source` vaut `bottles` ou `categories`, `line` est la ligne du fichier en CSV et la position dans la liste en JSON). Le type `BottleImportPreviewResponse` du frontend ne le déclare pas et l'assistant ne l'affiche pas : une ligne écartée n'apparaît que comme une ligne manquante. L'afficher (« ligne N du fichier de bouteilles / de catégories : champ, raison »), avec les clés i18n associées (`frontend/src/types/index.ts` ajouté à `touches`).
+- 2026-10-12 : PR #119 (branche `feature/E-08-import-wizards-refactor`).
+  - Erreurs de l'aperçu d'import de bouteilles (contrat de C-10 : `source`, `line`, `field`, `code`) listées à l'étape de résolution, clés en/fr `bottles.importWizard.rowErrors.*`.
+  - `defaultCreateData` vérifié contre `ImportResolutions` (C-04, inchangé par C-09) : mêmes champs ; `desiredStock ?? 1` (repli du backend depuis le retrait du champ de l'export par C-09, 0 conservé) ; un nombre vidé ou un `use_existing` sans id bloque l'envoi au lieu de partir en `null`/`NaN` ou d'être ignoré par la route.
+  - Écart avec le point 6 : les hooks d'E-02 sont appelés une fois dans l'assistant (`useImportReferenceLists`) et non dans `ImportStepResolve`, qui est remonté à chaque recette ; avec le `staleTime` de 30 s, un lot plus long rechargerait les listes. Les listes sont invalidées après une confirmation qui crée une entité.
+  - Le réducteur a trois actions de plus (`PREVIEW_REQUESTED`, `RESOLUTIONS_CHANGED`, `NEXT`) et une étape `previewing`, l'aperçu étant envoyé par un effet. `FileDropzone` a une prop `onReject`. Echap ferme désormais les assistants (`Modal`), pas un clic sur le fond.
+  - `frontend/src/types/index.ts` ajouté à `touches` (type des `errors`, nombres `null` pendant la saisie).
+  - Couverture des lignes modifiées : 95,8 % (toutes les lignes exécutables, le reste est dans `types/index.ts`). Budget du bundle : 138,29 kB sur 140.
