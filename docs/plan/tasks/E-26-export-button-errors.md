@@ -46,3 +46,5 @@ E-06 a remplacé les `console.error` de `CocktailsPage` par des toasts et regrou
 ## Journal
 
 - 2026-10-12 : tâche créée par E-06 (hors périmètre de sa PR).
+- 2026-10-12 : B-15 (PR #111) a changé ce bouton : la prop `cocktailName` est supprimée, `exportRecipe` et `exportCocktail` renvoient `{ filename, data }` (nom lu dans l'en-tête `Content-Disposition`). Partir de `develop` après #111.
+- 2026-10-12 : relecture de B-15 (PR #111) : le téléchargement d'un fichier (Blob → URL d'objet → `<a download>` temporaire → clic → révocation) est écrit quatre fois : `services/exportZip.ts`, `components/ui/ExportCocktailButton.tsx`, `bottles.exportFile` et `backup.exportBackup` dans `services/api.ts`. L'extraire dans `frontend/src/utils/` à l'occasion de cette tâche (ajouter alors `services/api.ts` et `services/exportZip.ts` à `touches`), ou en faire une petite tâche E.

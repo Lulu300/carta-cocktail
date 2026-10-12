@@ -89,3 +89,4 @@ Duplication :
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-12 : C-10 (PR #113) : l'aperçu d'import des bouteilles renvoie `errors: { line, field, code, source }[]` à côté de `payload` (lignes écartées ; `source` vaut `bottles` ou `categories`, `line` est la ligne du fichier en CSV et la position dans la liste en JSON). Le type `BottleImportPreviewResponse` du frontend ne le déclare pas et l'assistant ne l'affiche pas : une ligne écartée n'apparaît que comme une ligne manquante. L'afficher (« ligne N du fichier de bouteilles / de catégories : champ, raison »), avec les clés i18n associées.

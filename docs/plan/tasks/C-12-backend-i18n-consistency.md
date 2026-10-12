@@ -71,3 +71,4 @@ Les messages d'erreur passent par `req.t()`, mais trois clés appelées n'existe
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-12 : C-13 (PR #100) a modifié `menuSections.ts` : les numéros de ligne cités (`:79`, `:107`) sont à relire ; le message `'Sections reordered'` est toujours en dur.
+- 2026-10-12 : relecture de C-10 (PR #113) : `errorHandler` (`src/middleware/errorHandler.ts`) renvoie `details` dans la réponse mais ne le passe pas à i18next comme valeurs d'interpolation. Les limites de l'import (« 2 000 » lignes ou bouteilles, « 20 Mo » par entrée ZIP) sont donc écrites en dur dans les clés `errors.import.*` en et fr. Si cette tâche ajoute l'interpolation, y passer ces limites (`MAX_IMPORT_ROWS`, `MAX_IMPORT_BOTTLES`).

@@ -8,7 +8,7 @@ effort: S
 status: todo
 owner: agent
 depends_on: [A-01, A-04, C-01, C-05, D-01, D-03, D-05]
-touches: [AGENTS.md, backend/AGENTS.md, frontend/AGENTS.md, README.md, docs/operations.md, backend/src/bootstrap/ensureAdmin.ts]
+touches: [AGENTS.md, backend/AGENTS.md, frontend/AGENTS.md, README.md, docs/operations.md, backend/src/bootstrap/ensureAdmin.ts, .gitignore]
 sources: ["07-devops-history.md §5"]
 branch:
 pr:
@@ -89,7 +89,7 @@ Les `AGENTS.md` sont lus par chaque agent avant une tâche : une affirmation fau
   - le label de PR qui la classe dans les notes de release (`breaking`, `feature`, `fix`, `dependencies`, `ci`, `docs`, voir `.github/release.yml`) ;
   - le mode de merge décidé le 2026-10-12 : merge commit partout (feature → `develop` et `develop` → `main`), squash et rebase désactivés ;
   - les rulesets de D-07 : push direct sur `main` et `develop` refusé, PR et checks `Backend` / `Frontend` obligatoires. Le contournement admin reste possible sur une PR, mais **les agents n'utilisent jamais `gh pr merge --admin`** : seul l'humain contourne, en cas d'urgence.
-- Transmis par D-04 (PR #112) : les descriptions de la CI ne correspondent plus à `.github/workflows/ci.yml`. Les réécrire d'après le `ci.yml` du moment (l'étape d'audit des dépendances peut y avoir été ajoutée entre-temps) :
+- Transmis par D-04 (PR #112) : les descriptions de la CI ne correspondent plus à `.github/workflows/ci.yml`. Les réécrire d'après le `ci.yml` du moment (les deux jobs lancent aussi `npm audit --omit=dev` : `critical` côté backend jusqu'à B-11, `high` côté frontend) :
   - `AGENTS.md`, section « CI/CD » (lignes 80-82 au 2026-10-12) : le job Backend lance aussi `npm run db:check` et `npm run lint` ; le job Frontend lance `npx tsc -b` (pas `tsc --noEmit`, qui ne vérifie aucun fichier côté frontend) ; quatre jobs en parallèle et non deux : `Backend`, `Frontend`, `Docker build (backend)` et `Docker build (frontend)` (build des images sans push) ; le workflow est aussi appelable par `workflow_call` (release, D-05) ;
   - `backend/AGENTS.md` (ligne 19) : « CI runs automatically on PRs: prisma generate → tsc → build → test → coverage check » oublie le lint, `db:check` et le build Docker ;
   - `frontend/AGENTS.md` (ligne 20) : « tsc → lint → build → test → coverage check » ; préciser `tsc -b`, le budget de bundle et le build Docker.
@@ -103,3 +103,5 @@ Les `AGENTS.md` sont lus par chaque agent avant une tâche : une affirmation fau
 - 2026-10-09 : revue de la PR #39 (D-11). Libellé « Settings > Admin Profile » à aligner dans `README.md` et dans l'avertissement d'`ensureAdmin` (Points d'attention) ; `backend/src/bootstrap/ensureAdmin.ts` ajouté à `touches`.
 - 2026-10-09 : C-01 (PR #44) transmet l'alignement des `AGENTS.md` sur les migrations (Points d'attention).
 - 2026-10-11 : décision humaine : D-09 passe après D-01, D-03, D-05 et C-05, ajoutées à `depends_on` comme le suggéraient les Points d'attention (D-02 déjà faite), pour documenter l'image finale et les backups en une fois. Dans le lot C-04, E-11, D-14, l'humain l'a remplacée par C-16 (`--ready` propose D-13 à cette place).
+- 2026-10-12 : relecture de B-08 (PR #110) : `backend/AGENTS.md` ne mentionne plus `ts-node` (le point « `backend/AGENTS.md:151` » de « Problème constaté » est peut-être réglé pour `ts-node` : à revérifier). Le commentaire `# Plan d'action : page de suivi générée par docs/plan/build.mjs` de `.gitignore` est encore en français : le traduire (fichier ajouté à `touches`).
+- 2026-10-12 : relecture de D-04 (PR #112, seconde passe) : l'étape d'audit est bien dans `ci.yml`, Points d'attention mis à jour.

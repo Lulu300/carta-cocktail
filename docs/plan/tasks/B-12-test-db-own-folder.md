@@ -55,3 +55,4 @@ Hors périmètre : la variable `DATABASE_URL` de `.github/workflows/ci.yml` (D-0
 ## Journal
 
 - 2026-10-11 : tâche créée à partir de la revue de la PR #89 (B-03, remarque 2), hors revue du 2026-10-08.
+- 2026-10-12 : D-04 (PR #112) a retiré le bloc `env:` de l'étape de tests backend de `ci.yml` : la variable `DATABASE_URL` citée « hors périmètre » n'existe plus (`src/test/setup.ts` impose la sienne).

@@ -118,6 +118,7 @@ Le NAS tire les images publiées sur ghcr.io, en `:latest` d'après `docker-comp
 - Architectures à confirmer par l'humain : le modèle du NAS (x86 ou ARM) décide si arm64 est nécessaire. armv7 est hors périmètre.
 - Transmis par D-04 : `ci.yml` épingle ses actions par SHA, avec la version en commentaire (`uses: actions/checkout@<sha> # v7.0.1`), suivies par Dependabot. Faire de même dans `release.yml` (les versions de l'exemple ci-dessus sont anciennes : reprendre celles de `ci.yml`). Son groupe de concurrence (`ci-<github.workflow>-<ref de PR ou sha>`, soit `ci-Release-<sha>` dans un appel depuis la release) ne doit jamais être repris par `release.yml`. Le job `ci` de la release ne doit pas recevoir `permissions: {}` : un workflow appelé ne peut pas demander plus que son appelant, et `ci.yml` a besoin de `contents: read`.
 - Les versions de `package.json` restent à `1.0.0` et `0.0.0`. Décision à prendre : les synchroniser à chaque release (commit sur `main` avant le tag) ou assumer que `APP_VERSION` fait foi.
+- Transmis par D-04 (PR #112) : `ci.yml` lance `npm audit --omit=dev` (frontend `high`, backend `critical` jusqu'à B-11). Appelée par la release, cette étape peut bloquer une release si un avis est publié entre le merge et le tag. C'est voulu : la réponse est une PR de montée de version ou de surcharge, jamais une baisse du seuil.
 
 ## Journal
 
