@@ -89,6 +89,10 @@ Les `AGENTS.md` sont lus par chaque agent avant une tâche : une affirmation fau
   - le label de PR qui la classe dans les notes de release (`breaking`, `feature`, `fix`, `dependencies`, `ci`, `docs`, voir `.github/release.yml`) ;
   - le mode de merge décidé le 2026-10-12 : merge commit partout (feature → `develop` et `develop` → `main`), squash et rebase désactivés ;
   - les rulesets de D-07 : push direct sur `main` et `develop` refusé, PR et checks `Backend` / `Frontend` obligatoires. Le contournement admin reste possible sur une PR, mais **les agents n'utilisent jamais `gh pr merge --admin`** : seul l'humain contourne, en cas d'urgence.
+- Transmis par D-04 (PR #112) : les descriptions de la CI ne correspondent plus à `.github/workflows/ci.yml`. Les réécrire d'après le `ci.yml` du moment (l'étape d'audit des dépendances peut y avoir été ajoutée entre-temps) :
+  - `AGENTS.md`, section « CI/CD » (lignes 80-82 au 2026-10-12) : le job Backend lance aussi `npm run db:check` et `npm run lint` ; le job Frontend lance `npx tsc -b` (pas `tsc --noEmit`, qui ne vérifie aucun fichier côté frontend) ; quatre jobs en parallèle et non deux : `Backend`, `Frontend`, `Docker build (backend)` et `Docker build (frontend)` (build des images sans push) ; le workflow est aussi appelable par `workflow_call` (release, D-05) ;
+  - `backend/AGENTS.md` (ligne 19) : « CI runs automatically on PRs: prisma generate → tsc → build → test → coverage check » oublie le lint, `db:check` et le build Docker ;
+  - `frontend/AGENTS.md` (ligne 20) : « tsc → lint → build → test → coverage check » ; préciser `tsc -b`, le budget de bundle et le build Docker.
 
 ## Journal
 
