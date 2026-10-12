@@ -111,6 +111,7 @@ Les composants communs utilisent des clés i18n (`menus.sections.*`). Les textes
 - La carte publique trie les groupes de bouteilles par nom (`MenuPublicPage.tsx:44`) et ignore l'ordre défini ici, alors que le backend renvoie bien les bouteilles par `position` (`backend/src/routes/public.ts:61`). Réordonner dans l'admin n'a donc aucun effet visible pour l'invité. Correction prévue dans E-11.
 - E-14 retire le code mort de `api.ts` : garder `menuSections.reorder`, désormais utilisé.
 - Cartes système (décision du 2026-10-09) : renommables et dépubliables. Aujourd'hui `isDefaultMenu` (`MenuBottleEditPage.tsx:206`) désactive le champ **nom** (`:267`), alors qu'A-02 ne verrouille côté serveur que le slug et le type (`changesSystemMenuIdentity`). Sur une carte système, le nom, la description et `isPublic` restent modifiables ; seuls le slug et le type sont verrouillés : `MenuInfoForm` avec `lockedFields={['slug']}` (le type n'est pas un champ du formulaire). Remplacer `isDefaultMenu` par `isSystemMenu()`.
+- **Doit sortir dans la même release que C-06** (décision du 2026-10-12) : après C-06, les cartes système contiennent toutes les bouteilles cochées, vides comprises, et seule l'interface de cette tâche permet d'en retirer une (exclusion) ou de la remettre. Pas de release qui contienne C-06 sans E-07.
 
 ## Journal
 
@@ -119,3 +120,4 @@ Les composants communs utilisent des clés i18n (`menus.sections.*`). Les textes
 - 2026-10-09 : décision « bouteilles vides » reprise ; badge « vide » ajouté à l'étape 3.
 - 2026-10-09 : décision « liste d'exclusions » reprise : bouton « Retirer » et section « Bouteilles retirées » avec « Remettre » sur les cartes système (étape 3, critère, tests). C-06 ajoutée à `depends_on` : ces routes viennent de C-06.
 - 2026-10-09 : revue de la PR #38. Cartes système : nom, description et `isPublic` modifiables, seuls le slug et le type verrouillés (point d'attention réécrit, critère et test ajoutés). « Retirer » un groupe passe par la route d'exclusion en lot de C-06 (une requête).
+- 2026-10-12 : revue de la PR #99 (C-06), décision humaine : C-06 et E-07 sortent dans la même release (point d'attention ajouté).

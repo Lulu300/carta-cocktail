@@ -6,9 +6,11 @@ import { z } from 'zod';
 /** Database id sent in a JSON body. The UI always sends numbers, never strings. */
 export const Id = z.number().int().positive();
 
-/** Path segments are strings: they are coerced to numbers. */
-export const IdParams = z.object({ id: z.coerce.number().int().positive() });
-export const MenuIdParams = z.object({ menuId: z.coerce.number().int().positive() });
+/** Database id in the path. Path segments are strings: they are coerced to numbers. */
+export const PathId = z.coerce.number().int().positive();
+
+export const IdParams = z.object({ id: PathId });
+export const MenuIdParams = z.object({ menuId: PathId });
 
 /** Schemas of a route that only reads `:id`, e.g. `validate(idRequest)`. */
 export const idRequest = { params: IdParams };

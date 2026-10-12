@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData, prisma, schemaTables,
   seedCategory, seedBottle, seedIngredient, seedFullCocktail, seedMenu, seedMenuSection,
-  addCocktailToMenu, addBottleToMenu,
+  addCocktailToMenu, addBottleToMenu, excludeBottleFromMenu, findSystemMenu,
 } from './helpers';
 
 beforeAll(async () => { await setupTestDatabase(); });
@@ -34,6 +34,7 @@ async function seedEveryModel() {
   const section = await seedMenuSection(menu.id);
   await addCocktailToMenu(menu.id, cocktail.id, { menuSectionId: section.id });
   await addBottleToMenu(menu.id, bottle.id, { menuSectionId: section.id });
+  await excludeBottleFromMenu((await findSystemMenu('aperitifs')).id, bottle.id);
 }
 
 describe('cleanDatabase', () => {

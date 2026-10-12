@@ -55,6 +55,7 @@ model Bottle {
   cocktailIngredients CocktailIngredient[]
   preferredFor        CocktailPreferredBottle[]
   menuBottles         MenuBottle[]
+  menuExclusions      MenuBottleExclusion[]
 
   @@index([categoryId])
 }
@@ -155,6 +156,8 @@ model Menu {
   cocktails MenuCocktail[]
   bottles   MenuBottle[]
   sections  MenuSection[]
+
+  bottleExclusions MenuBottleExclusion[]
 }
 
 model MenuCocktail {
@@ -187,6 +190,19 @@ model MenuBottle {
   @@unique([menuId, bottleId])
   @@index([bottleId])
   @@index([menuSectionId])
+}
+
+// Bottle the admin removed from a system menu: the sync never adds it back.
+// A table rather than a MenuBottle flag, so MenuBottle only holds the bottles shown.
+model MenuBottleExclusion {
+  menuId    Int
+  menu      Menu     @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  bottleId  Int
+  bottle    Bottle   @relation(fields: [bottleId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([menuId, bottleId])
+  @@index([bottleId])
 }
 
 model MenuSection {

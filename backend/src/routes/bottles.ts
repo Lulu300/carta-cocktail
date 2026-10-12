@@ -8,6 +8,7 @@ import { parseNameTranslations } from '../utils/translations';
 import { buildExportPayload, buildCsvPayload } from '../utils/bottlesExport';
 import { parseImportFile, NormalizedImportPayload } from '../utils/bottlesImport';
 import { deleteBottle, isForceRequested } from '../services/deletionService';
+import { syncAllBottleMenus, syncBottle } from '../services/menuSyncService';
 import { valid, validate } from '../validation/validate';
 import { deleteRequest, IdParams, idRequest } from '../validation/common';
 import { BottleCreate, BottleExportQuery, BottleListQuery, BottleUpdate } from '../validation/bottles';
@@ -19,69 +20,6 @@ const importUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
 });
-
-// Helper function to auto-sync bottle menus when bottle flags change
-async function syncBottleMenus(bottleId: number, isApero: boolean, isDigestif: boolean) {
-  // Fetch bottle to check if empty
-  const bottle = await prisma.bottle.findUnique({ where: { id: bottleId }, select: { remainingPercent: true } });
-  const isEmpty = !bottle || bottle.remainingPercent === 0;
-
-  // Get apero and digestif menus
-  const aperoMenu = await prisma.menu.findUnique({ where: { slug: 'aperitifs' } });
-  const digestifMenu = await prisma.menu.findUnique({ where: { slug: 'digestifs' } });
-
-  // Sync apero menu
-  if (aperoMenu) {
-    const existsInApero = await prisma.menuBottle.findFirst({
-      where: { menuId: aperoMenu.id, bottleId },
-    });
-
-    if (isApero && !existsInApero && !isEmpty) {
-      // Add to apero menu (only non-empty bottles)
-      const maxPosition = await prisma.menuBottle.findFirst({
-        where: { menuId: aperoMenu.id },
-        orderBy: { position: 'desc' },
-      });
-      await prisma.menuBottle.create({
-        data: {
-          menuId: aperoMenu.id,
-          bottleId,
-          position: (maxPosition?.position ?? -1) + 1,
-          isHidden: false,
-        },
-      });
-    } else if ((!isApero || isEmpty) && existsInApero) {
-      // Remove from apero menu
-      await prisma.menuBottle.delete({ where: { id: existsInApero.id } });
-    }
-  }
-
-  // Sync digestif menu
-  if (digestifMenu) {
-    const existsInDigestif = await prisma.menuBottle.findFirst({
-      where: { menuId: digestifMenu.id, bottleId },
-    });
-
-    if (isDigestif && !existsInDigestif && !isEmpty) {
-      // Add to digestif menu (only non-empty bottles)
-      const maxPosition = await prisma.menuBottle.findFirst({
-        where: { menuId: digestifMenu.id },
-        orderBy: { position: 'desc' },
-      });
-      await prisma.menuBottle.create({
-        data: {
-          menuId: digestifMenu.id,
-          bottleId,
-          position: (maxPosition?.position ?? -1) + 1,
-          isHidden: false,
-        },
-      });
-    } else if ((!isDigestif || isEmpty) && existsInDigestif) {
-      // Remove from digestif menu
-      await prisma.menuBottle.delete({ where: { id: existsInDigestif.id } });
-    }
-  }
-}
 
 const listSchemas = { query: BottleListQuery };
 
@@ -186,7 +124,6 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
       }
     }
 
-    const createdBottleRefs: { id: number; isApero: boolean; isDigestif: boolean }[] = [];
     let createdCount = 0;
     let skippedNoCategory = 0;
     let duplicatesCreated = 0;
@@ -222,7 +159,7 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
       );
 
       for (let q = 0; q < b.quantity; q++) {
-        const newBottle = await tx.bottle.create({
+        await tx.bottle.create({
           data: {
             name: b.name,
             categoryId,
@@ -236,25 +173,15 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
             isDigestif: b.isDigestif,
           },
         });
-        createdBottleRefs.push({
-          id: newBottle.id,
-          isApero: newBottle.isApero,
-          isDigestif: newBottle.isDigestif,
-        });
         createdCount++;
         if (isDuplicate) duplicatesCreated++;
       }
     }
 
-    return { createdBottleRefs, createdCount, skippedNoCategory, duplicatesCreated };
+    // Inside the transaction: a failed sync also cancels the import
+    await syncAllBottleMenus(tx);
+    return { createdCount, skippedNoCategory, duplicatesCreated };
   });
-
-  // Sync menus after the transaction commits so bottles are visible
-  for (const ref of created.createdBottleRefs) {
-    if (ref.isApero || ref.isDigestif) {
-      await syncBottleMenus(ref.id, ref.isApero, ref.isDigestif);
-    }
-  }
 
   res.status(201).json({
     created: { bottles: created.createdCount },
@@ -324,19 +251,17 @@ router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Respons
     isDigestif: fields.isDigestif ?? false,
   };
 
-  if (count === 1) {
-    const bottle = await prisma.bottle.create({ data, include: { category: true } });
-    await syncBottleMenus(bottle.id, bottle.isApero, bottle.isDigestif);
-    res.status(201).json(parseNameTranslations(bottle));
-  } else {
-    const bottles = [];
+  // A failed menu sync also cancels the creation of the bottles
+  const bottles = await prisma.$transaction(async (tx) => {
+    const created = [];
     for (let i = 0; i < count; i++) {
-      const bottle = await prisma.bottle.create({ data, include: { category: true } });
-      await syncBottleMenus(bottle.id, bottle.isApero, bottle.isDigestif);
-      bottles.push(bottle);
+      const bottle = await tx.bottle.create({ data, include: { category: true } });
+      await syncBottle(tx, bottle.id);
+      created.push(bottle);
     }
-    res.status(201).json(parseNameTranslations(bottles));
-  }
+    return created;
+  });
+  res.status(201).json(parseNameTranslations(count === 1 ? bottles[0] : bottles));
 });
 
 const updateSchemas = { params: IdParams, body: BottleUpdate };
@@ -344,20 +269,20 @@ const updateSchemas = { params: IdParams, body: BottleUpdate };
 router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Response) => {
   const { params: { id }, body } = valid<typeof updateSchemas>(res);
   const { location, ...fields } = body;
-  // Absent fields are undefined, which Prisma leaves untouched
-  const bottle = await prisma.bottle.update({
-    where: { id },
-    data: {
-      ...fields,
-      ...(location !== undefined && { location: location || null }),
-    },
-    include: { category: true },
+  const bottle = await prisma.$transaction(async (tx) => {
+    // Absent fields are undefined, which Prisma leaves untouched
+    const updated = await tx.bottle.update({
+      where: { id },
+      data: {
+        ...fields,
+        ...(location !== undefined && { location: location || null }),
+      },
+      include: { category: true },
+    });
+    // Always: the result must not depend on which fields the client sent
+    await syncBottle(tx, updated.id);
+    return updated;
   });
-
-  // Auto-sync bottle menus if flags changed
-  if (fields.isApero !== undefined || fields.isDigestif !== undefined) {
-    await syncBottleMenus(bottle.id, bottle.isApero, bottle.isDigestif);
-  }
 
   res.json(parseNameTranslations(bottle));
 });

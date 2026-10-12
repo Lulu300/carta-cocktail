@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
   request, authHeader, prisma, seedCocktail, seedBottle, seedMenu, seedMenuSection, addCocktailToMenu,
+  addBottleToMenu,
 } from '../test/helpers';
 
 beforeAll(async () => { await setupTestDatabase(); });
@@ -148,9 +149,10 @@ describe('PUT /api/menus/:id - sections', () => {
   });
 
   it('should keep menuSectionId of bottles', async () => {
-    const { menu, section } = await createMenuWithSection('sections-bottles');
-    const rum = await seedBottle({ name: 'Rum' });
-    const gin = await seedBottle({ name: 'Gin' });
+    const menu = await seedMenu({ slug: 'sections-bottles', type: 'APEROS' });
+    const section = await seedMenuSection(menu.id, { name: 'Bitters' });
+    const rum = await seedBottle({ name: 'Rum', isApero: true });
+    const gin = await seedBottle({ name: 'Gin', isApero: true });
 
     const put = await request.put(`/api/menus/${menu.id}`).set(authHeader()).send({
       bottles: [
@@ -249,6 +251,84 @@ describe('PUT /api/menus/:id - system menus', () => {
       .send({ name: 'Aperitifs', slug: 'aperitifs', type: 'APEROS' });
     expect(res.status).toBe(200);
     expect(res.body.slug).toBe('aperitifs');
+  });
+
+  it('should return 400 and keep the bottles when bottles are sent for aperitifs', async () => {
+    const menu = await aperitifsMenu();
+    const kept = await seedBottle({ isApero: true });
+    const other = await seedBottle({ isApero: true });
+    await addBottleToMenu(menu.id, kept.id);
+
+    const res = await request.put(`/api/menus/${menu.id}`).set(authHeader())
+      .send({ bottles: [{ bottleId: other.id }] });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/follow their aperitif \/ digestif box/);
+    const entries = await prisma.menuBottle.findMany({ where: { menuId: menu.id } });
+    expect(entries.map((entry) => entry.bottleId)).toEqual([kept.id]);
+  });
+});
+
+describe('Personal bottle menus', () => {
+  it('should create an empty APEROS menu, never filled by the sync, and delete it', async () => {
+    await seedBottle({ isApero: true });
+    const created = await request.post('/api/menus').set(authHeader())
+      .send({ name: 'Summer aperitifs', slug: 'summer', type: 'APEROS' });
+    expect(created.status).toBe(201);
+    expect(created.body.type).toBe('APEROS');
+
+    await request.post('/api/bottles').set(authHeader())
+      .send({ name: 'Aperol', categoryId: (await prisma.category.findFirstOrThrow()).id, capacityMl: 700, isApero: true });
+    expect(await prisma.menuBottle.count({ where: { menuId: created.body.id } })).toBe(0);
+
+    const deleted = await request.delete(`/api/menus/${created.body.id}`).set(authHeader());
+    expect(deleted.status).toBe(200);
+  });
+
+  it('should accept bottles checked for its type', async () => {
+    const menu = await seedMenu({ type: 'DIGESTIFS' });
+    const cognac = await seedBottle({ isDigestif: true });
+    const emptyArmagnac = await seedBottle({ isDigestif: true, remainingPercent: 0 });
+
+    const res = await request.put(`/api/menus/${menu.id}`).set(authHeader())
+      .send({ bottles: [{ bottleId: cognac.id }, { bottleId: emptyArmagnac.id }] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.bottles.map((mb: { bottleId: number }) => mb.bottleId)).toEqual([cognac.id, emptyArmagnac.id]);
+  });
+
+  it('should return 400 and keep the composition for a bottle not checked for its type', async () => {
+    const menu = await seedMenu({ type: 'DIGESTIFS' });
+    const cognac = await seedBottle({ isDigestif: true });
+    const aperol = await seedBottle({ isApero: true });
+    await addBottleToMenu(menu.id, cognac.id);
+
+    const res = await request.put(`/api/menus/${menu.id}`).set(authHeader())
+      .send({ bottles: [{ bottleId: cognac.id }, { bottleId: aperol.id }] });
+
+    expect(res.status).toBe(400);
+    const entries = await prisma.menuBottle.findMany({ where: { menuId: menu.id } });
+    expect(entries.map((entry) => entry.bottleId)).toEqual([cognac.id]);
+  });
+
+  it.each([
+    ['COCKTAILS', 'APEROS'],
+    ['APEROS', 'DIGESTIFS'],
+    ['DIGESTIFS', 'COCKTAILS'],
+  ] as const)('should return 400 when changing the type from %s to %s', async (from, to) => {
+    const menu = await seedMenu({ type: from });
+    const res = await request.put(`/api/menus/${menu.id}`).set(authHeader()).send({ type: to });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('The type of a menu cannot be changed after its creation');
+    expect((await prisma.menu.findUniqueOrThrow({ where: { id: menu.id } })).type).toBe(from);
+  });
+
+  it('should accept the unchanged type', async () => {
+    const menu = await seedMenu({ type: 'APEROS' });
+    const res = await request.put(`/api/menus/${menu.id}`).set(authHeader())
+      .send({ name: 'Renamed', type: 'APEROS' });
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe('Renamed');
   });
 });
 

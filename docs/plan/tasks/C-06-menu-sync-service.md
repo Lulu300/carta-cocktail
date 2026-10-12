@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: moyenne
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [C-03, C-01]
-touches: [backend/src/services/menuSyncService.ts, backend/src/routes/bottles.ts, backend/src/routes/menuBottles.ts, backend/src/routes/menus.ts, backend/src/i18n/, backend/prisma/schema.prisma, backend/prisma/migrations/]
+touches: [backend/src/services/menuSyncService.ts, backend/src/routes/bottles.ts, backend/src/routes/menuBottles.ts, backend/src/routes/menus.ts, backend/src/validation/menuBottles.ts, backend/src/validation/common.ts, backend/src/test/helpers.ts, docs/plan/tasks/E-07-menu-editors-refactor.md, backend/src/i18n/, backend/prisma/schema.prisma, backend/prisma/migrations/]
 sources: ["01-backend-routes.md §H3", "02-backend-data-perf.md §3.5"]
-branch:
-pr:
+branch: feature/C-06-menu-sync-service
+pr: "#99"
 ---
 
 ## Décisions validées (2026-10-09)
@@ -112,22 +112,22 @@ Les menus « Apéritifs » et « Digestifs » reflètent les bouteilles marquée
 
 ## Critères d'acceptation
 
-- [ ] `syncBottleMenus` n'existe plus ; toute synchro passe par `menuSyncService`.
-- [ ] `isSystemMenu` n'est défini qu'à un endroit (`menuSyncService.ts`) et `menus.ts` l'importe.
-- [ ] La migration `menu_bottle_exclusion` est versionnée ; `npm run db:check` passe.
-- [ ] POST, PUT, import et `/sync` donnent le même résultat pour une même bouteille.
-- [ ] `PUT /bottles/:id { remainingPercent: 0 }` sans flags laisse la bouteille dans ses cartes.
-- [ ] Une bouteille vidée puis rechargée garde position, section et `isHidden`, dans les cartes système comme personnelles.
-- [ ] Une erreur pendant la synchro annule aussi la création ou la modification de la bouteille.
-- [ ] Le menu public n'affiche jamais une bouteille vide.
-- [ ] Une bouteille retirée de la carte « Apéritifs » n'y revient ni à la synchro, ni après décochage puis recochage ; elle reste dans « Digestifs » si elle y était, et reste disponible pour les cartes personnelles.
-- [ ] Remettre une bouteille exclue la replace en fin de liste de la carte système.
-- [ ] L'exclusion en lot (`POST .../exclusions`) est atomique : une erreur n'exclut aucune bouteille du lot.
-- [ ] Supprimer une bouteille ou une carte supprime ses exclusions.
-- [ ] Une carte personnelle `APEROS` peut être créée, n'est jamais remplie automatiquement, accepte une bouteille `isApero`, refuse (400) une bouteille non cochée et peut être supprimée.
-- [ ] Décocher `isApero` retire la bouteille de la carte système et de toutes les cartes personnelles `APEROS`, sans toucher aux cartes `DIGESTIFS`.
-- [ ] Les cartes système restent non supprimables ; leur composition ne se modifie ni par `PUT /menus/:id`, ni par `POST /menu-bottles` ; `DELETE /menu-bottles/:id` y crée une exclusion.
-- [ ] Le type d'une carte non système ne change plus après sa création.
+- [x] `syncBottleMenus` n'existe plus ; toute synchro passe par `menuSyncService`.
+- [x] `isSystemMenu` n'est défini qu'à un endroit (`menuSyncService.ts`) et `menus.ts` l'importe.
+- [x] La migration `menu_bottle_exclusion` est versionnée ; `npm run db:check` passe.
+- [x] POST, PUT, import et `/sync` donnent le même résultat pour une même bouteille.
+- [x] `PUT /bottles/:id { remainingPercent: 0 }` sans flags laisse la bouteille dans ses cartes.
+- [x] Une bouteille vidée puis rechargée garde position, section et `isHidden`, dans les cartes système comme personnelles.
+- [x] Une erreur pendant la synchro annule aussi la création ou la modification de la bouteille.
+- [x] Le menu public n'affiche jamais une bouteille vide.
+- [x] Une bouteille retirée de la carte « Apéritifs » n'y revient ni à la synchro, ni après décochage puis recochage ; elle reste dans « Digestifs » si elle y était, et reste disponible pour les cartes personnelles.
+- [x] Remettre une bouteille exclue la replace en fin de liste de la carte système.
+- [x] L'exclusion en lot (`POST .../exclusions`) est atomique : une erreur n'exclut aucune bouteille du lot.
+- [x] Supprimer une bouteille ou une carte supprime ses exclusions.
+- [x] Une carte personnelle `APEROS` peut être créée, n'est jamais remplie automatiquement, accepte une bouteille `isApero`, refuse (400) une bouteille non cochée et peut être supprimée.
+- [x] Décocher `isApero` retire la bouteille de la carte système et de toutes les cartes personnelles `APEROS`, sans toucher aux cartes `DIGESTIFS`.
+- [x] Les cartes système restent non supprimables ; leur composition ne se modifie ni par `PUT /menus/:id`, ni par `POST /menu-bottles` ; `DELETE /menu-bottles/:id` y crée une exclusion.
+- [x] Le type d'une carte non système ne change plus après sa création.
 
 ## Tests à ajouter ou adapter
 
@@ -165,9 +165,11 @@ Les menus « Apéritifs » et « Digestifs » reflètent les bouteilles marquée
 ## Points d'attention
 
 - Effet visible des décisions : l'éditeur admin `MenuBottleEditPage` listera les bouteilles vides (badge « vide ») et une section « bouteilles retirées » avec l'action « remettre » : E-07.
-- Au premier déploiement, les cartes système ne contiennent pas encore les bouteilles vides cochées (l'ancienne synchro les retirait), et aucune exclusion n'existe. La première synchro (`/sync`, ou modification d'une bouteille) ajoute en fin de liste toutes les bouteilles cochées, vides comprises (masquées sur la carte publique). L'admin retire ensuite celles qu'il ne veut pas.
+- Au premier déploiement, les cartes système ne contiennent pas encore les bouteilles vides cochées (l'ancienne synchro les retirait), et aucune exclusion n'existe. Seuls le bouton « Synchroniser » (`/sync`, cette carte) et l'import de bouteilles (`syncAllBottleMenus`, les deux cartes) ajoutent en fin de liste toutes les bouteilles cochées absentes, vides comprises (masquées sur la carte publique) ; créer ou modifier une bouteille ne synchronise que celle-ci. L'admin retire ensuite celles qu'il ne veut pas, avec l'interface d'E-07.
+- **Même release qu'E-07** (décision du 2026-10-12) : l'éditeur actuel n'a pas d'action « retirer » (il n'appelle jamais `DELETE /menu-bottles/:id`) ; l'exclusion et la remise passent par l'interface d'E-07. Pas de release qui contienne C-06 sans E-07.
+- Restauration d'une sauvegarde antérieure à cette version : `validateDatabase` l'accepte avec `restartRecommended: true`, et la table `MenuBottleExclusion` n'est créée qu'au démarrage suivant (`migrate deploy`). D'ici là, les routes qui lisent cette table (création, modification et import de bouteilles, retrait d'une bouteille d'une carte, synchro, exclusions) répondent 500. Les notes de version demandent de redémarrer avant d'utiliser bouteilles et cartes.
 - **Notes de version** (règle de D-11 : la PR ne touche ni `docs/releases/` ni `UPGRADING.md`). Changement non cassant (`breaking: false`). La description de la PR a une section « Required actions » et le Journal une ligne « Notes de version ». Action attendue : *after* — vérifier les cartes « Apéritifs » et « Digestifs », qui contiennent désormais toutes les bouteilles cochées, vides comprises (masquées sur la carte publique), et retirer celles qui ne doivent pas y figurer. Épinglage recommandé : `:<version>` avant D-05, `:<majeure>.<mineure>` ensuite.
-- Vérification en production (action humaine) : avant le merge, l'agent s'arrête et demande à l'humain d'exécuter sur une copie de la base de production `SELECT id, slug, name, type FROM Menu WHERE type IN ('APEROS', 'DIGESTIFS') AND slug NOT IN ('aperitifs', 'digestifs');` (l'UI ne permettait pas ces cartes, l'API si). Si une ligne sort, cette carte devient une carte personnelle : ses bouteilles non cochées y restent jusqu'à la prochaine synchro (`syncAllBottleMenus` à l'import, ou modification de la bouteille). Le signaler dans la PR.
+- Vérification au banc de la prochaine release (décision du 2026-10-12 : le jeu d'essai suffit, pas de vérification humaine avant le merge). Sur la copie de la base : `SELECT id, slug, name, type FROM Menu WHERE type IN ('APEROS', 'DIGESTIFS') AND slug NOT IN ('aperitifs', 'digestifs');` (l'UI ne permettait pas ces cartes, l'API si) et `SELECT COUNT(*) FROM Bottle WHERE (isApero = 1 OR isDigestif = 1) AND remainingPercent = 0;` (bouteilles que la première synchro ajoutera). Jeu d'essai : 0 ligne et 0. Si une carte sort, elle devient une carte personnelle : ses bouteilles non cochées y restent jusqu'à leur modification ou au prochain import de bouteilles, et le bouton « Synchroniser » (affiché jusqu'à F-08) reçoit un 400 que `handleSync` ne fait que journaliser : il ne fait plus rien, en silence. Rien de bloquant : l'admin garde la carte comme carte personnelle ou la supprime.
 - Schéma : une seule tâche de schéma à la fois (README, « Ce qui doit rester séquentiel »). C-07 et C-11 ajoutent aussi des migrations : régénérer celle-ci après rebase.
 - A-05 doit garder le filtre `remainingPercent > 0` de `public.ts` en réécrivant les `select`.
 - `menuBottles.ts` est aussi modifié par C-13 : enchaîner ; si C-13 passe avant, utiliser son `nextPosition` dans `syncBottle` et `restoreBottle`. C-10 réutilise `syncAllBottleMenus` et ne doit pas réécrire la synchro.
@@ -180,3 +182,6 @@ Les menus « Apéritifs » et « Digestifs » reflètent les bouteilles marquée
 - 2026-10-09 : décisions validées par l'humain (cartes de bouteilles personnelles, bouteilles vides conservées). Étapes 1, 2, 4, 5 et 6 réécrites, critères et tests adaptés. Ajouts : `assertBottlesAllowed` sur `POST /menu-bottles` et `PUT /menus/:id`, `DELETE /menu-bottles/:id` refusé sur une carte système, type d'une carte non système figé après création. L'écran des cartes personnelles part dans F-08. `owner: agent`.
 - 2026-10-09 : réponses de l'humain. Le retrait d'une carte système passe par une liste d'exclusions (table `MenuBottleExclusion`, migration) au lieu d'un refus : `excludeBottle`, `restoreBottle`, routes `GET`/`DELETE .../exclusions`, `isAvailableFor` + `isEligible` avec exclusions. Type figé validé. `depends_on` : C-01 ajoutée (première migration) ; `touches` : `schema.prisma` et `migrations/`.
 - 2026-10-09 : revue de la PR #38. Relations inverses Prisma ajoutées ; route d'exclusion en lot `POST /menu-bottles/menu/:menuId/exclusions` (`excludeBottles`, en transaction) utilisée par E-07 ; vérification en production formulée comme une requête SQL à faire exécuter par l'humain ; point d'attention « Notes de version » (règle de D-11).
+- 2026-10-12 : fait (PR #99). `menuSyncService.ts` (règle unique `isAvailableFor` / `isEligible`, `isSystemMenu` déplacé depuis `menus.ts`), table `MenuBottleExclusion` (migration `menu_bottle_exclusion`, index sur `bottleId` en plus de la clé `(menuId, bottleId)` pour la cascade à la suppression d'une bouteille). `syncMenu` lève lui-même 404, `errors.cannotSyncCocktailMenu` et `errors.cannotSyncPersonalMenu` ; `excludeBottles` lève `errors.exclusionsSystemMenuOnly` (nouvelle clé pour la 400 prévue à l'étape 5). `POST /menu-bottles` sur un menu inconnu reste un 400 (comme la clé étrangère avant). `assertBottlesAllowed` accepte une liste vide (vider un menu reste possible). Clés `menuBottles.*` ajoutées : elles manquaient. `touches` : `validation/menuBottles.ts` (schémas des routes d'exclusion) et `test/helpers.ts` (fabriques `findSystemMenu`, `excludeBottleFromMenu`). Mesure sur une copie du jeu d'essai : migration appliquée sans perte, 0 carte personnelle `APEROS`/`DIGESTIFS`, aucune bouteille vide cochée, première synchro sans effet ; banc Docker 1.11.0 → local sans nouvel échec.
+- 2026-10-12 : revue de la PR #99 (7 points). (1) Décision humaine : C-06 et E-07 sortent dans la même release (point d'attention ici et dans E-07, ajouté à `touches`) ; « Notes de version » corrigée : seuls « Synchroniser » et l'import ajoutent toutes les bouteilles cochées. (2) Décision humaine : pas de vérification avant le merge, les deux requêtes passent au banc de la prochaine release (point d'attention réécrit). (3) Restauration d'une sauvegarde antérieure : redémarrer avant d'utiliser bouteilles et cartes (point d'attention, notes). (5) Les tests de synchro en échec ne peuvent pas attendre un 500 : Prisma rapporte l'arrêt du trigger comme une violation de clé étrangère (P2003), que le middleware traduit en 400. Ils attendent désormais un 400 **sans** `details` (une erreur de validation en porte toujours), dans un helper commun. (6) `PathId` partagé dans `validation/common.ts` (ajouté à `touches`). (7) Nouvelle tâche C-32 (`PUT /menus/:id` accepte encore `cocktails` sur une carte de bouteilles). Rebasé sur `develop` (B-10, #96), migration régénérée.
+- Notes de version : à publier avec E-07 (même release). Après la mise à jour, le bouton « Synchroniser » d'une carte « Apéritifs » ou « Digestifs », ou un import de bouteilles, ajoute toutes les bouteilles cochées pour son type, vides comprises (masquées sur la carte publique tant qu'elles sont vides) ; créer ou modifier une bouteille ne synchronise que celle-ci. Vérifier ces cartes et retirer avec l'éditeur les bouteilles qui ne doivent pas y figurer : une bouteille retirée n'y revient plus, et la section « Bouteilles retirées » permet de la remettre. Après la restauration d'une sauvegarde faite avec une version antérieure, redémarrer le backend avant d'utiliser bouteilles et cartes. `breaking: false`, épinglage `:<version>`.

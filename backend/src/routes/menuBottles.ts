@@ -1,13 +1,26 @@
 import { Router, Response } from 'express';
-import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middleware/auth';
-import { NotFoundError } from '../errors';
+import { BadRequestError, NotFoundError } from '../errors';
 import { valid, validate } from '../validation/validate';
 import { IdParams, idRequest, MenuIdParams } from '../validation/common';
-import { MenuBottleCreate, MenuBottleUpdate } from '../validation/menuBottles';
+import {
+  MenuBottleCreate,
+  MenuBottleExclusionCreate,
+  MenuBottleExclusionParams,
+  MenuBottleUpdate,
+} from '../validation/menuBottles';
+import {
+  assertBottlesAllowed,
+  excludeBottles,
+  isSystemMenu,
+  restoreBottle,
+  syncMenu,
+} from '../services/menuSyncService';
 
 const router = Router();
+
+const BOTTLE_WITH_CATEGORY = { bottle: { include: { category: true } } };
 
 // Get all bottles for a menu
 const menuSchemas = { params: MenuIdParams };
@@ -15,33 +28,33 @@ const menuSchemas = { params: MenuIdParams };
 router.get('/menu/:menuId', validate(menuSchemas), async (_req: AuthRequest, res: Response) => {
   const menuBottles = await prisma.menuBottle.findMany({
     where: { menuId: valid<typeof menuSchemas>(res).params.menuId },
-    include: {
-      bottle: {
-        include: { category: true },
-      },
-    },
+    include: BOTTLE_WITH_CATEGORY,
     orderBy: { position: 'asc' },
   });
   res.json(menuBottles);
 });
 
-// Add bottle to menu
+// Add bottle to a personal menu: the system menus follow the bottles' flags
 const createSchemas = { body: MenuBottleCreate };
 
 router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Response) => {
   const { menuId, bottleId, position, isHidden } = valid<typeof createSchemas>(res).body;
-  const menuBottle = await prisma.menuBottle.create({
-    data: {
-      menuId,
-      bottleId,
-      position: position ?? 0,
-      isHidden: isHidden ?? false,
-    },
-    include: {
-      bottle: {
-        include: { category: true },
+  const menuBottle = await prisma.$transaction(async (tx) => {
+    const menu = await tx.menu.findUnique({ where: { id: menuId } });
+    // An unknown id in the body is a bad request, as the foreign key used to answer
+    if (!menu) throw new BadRequestError();
+    if (isSystemMenu(menu)) throw new BadRequestError('errors.systemMenuBottlesManaged');
+    await assertBottlesAllowed(tx, menu, [bottleId]);
+
+    return tx.menuBottle.create({
+      data: {
+        menuId,
+        bottleId,
+        position: position ?? 0,
+        isHidden: isHidden ?? false,
       },
-    },
+      include: BOTTLE_WITH_CATEGORY,
+    });
   });
   res.status(201).json(menuBottle);
 });
@@ -55,93 +68,59 @@ router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Respo
   const menuBottle = await prisma.menuBottle.update({
     where: { id },
     data: { position, isHidden, menuSectionId },
-    include: {
-      bottle: {
-        include: { category: true },
-      },
-    },
+    include: BOTTLE_WITH_CATEGORY,
   });
   res.json(menuBottle);
 });
 
-// Remove bottle from menu
+// Remove bottle from menu: on a system menu, the removal is kept as an exclusion
 router.delete('/:id', validate(idRequest), async (req: AuthRequest, res: Response) => {
-  await prisma.menuBottle.delete({ where: { id: valid<typeof idRequest>(res).params.id } });
+  const { id } = valid<typeof idRequest>(res).params;
+  await prisma.$transaction(async (tx) => {
+    const entry = await tx.menuBottle.findUnique({ where: { id }, include: { menu: true } });
+    if (!entry) throw new NotFoundError();
+    if (isSystemMenu(entry.menu)) {
+      await excludeBottles(tx, entry.menuId, [entry.bottleId]);
+    } else {
+      await tx.menuBottle.delete({ where: { id } });
+    }
+  });
   res.json({ message: req.t('menuBottles.deleted') });
 });
 
-// Sync bottles for a menu based on bottle flags (isApero/isDigestif)
+// Sync a system menu with the bottles' flags (isApero/isDigestif) and its exclusions
 router.post('/menu/:menuId/sync', validate(menuSchemas), async (req: AuthRequest, res: Response) => {
   const { menuId } = valid<typeof menuSchemas>(res).params;
+  const { added, removed } = await prisma.$transaction((tx) => syncMenu(tx, menuId));
+  res.json({ message: req.t('menuBottles.synced'), added, removed });
+});
 
-  // Get the menu to check its type
-  const menu = await prisma.menu.findUnique({
-    where: { id: menuId },
+// Bottles removed from a system menu; a personal menu has none
+router.get('/menu/:menuId/exclusions', validate(menuSchemas), async (_req: AuthRequest, res: Response) => {
+  const exclusions = await prisma.menuBottleExclusion.findMany({
+    where: { menuId: valid<typeof menuSchemas>(res).params.menuId },
+    include: BOTTLE_WITH_CATEGORY,
+    orderBy: { bottle: { name: 'asc' } },
   });
+  res.json(exclusions);
+});
 
-  if (!menu) throw new NotFoundError();
+// Remove several bottles from a system menu at once: all of them or none
+const excludeSchemas = { params: MenuIdParams, body: MenuBottleExclusionCreate };
 
-  // Determine which bottles to sync based on menu type
-  let bottleFilter: Prisma.BottleWhereInput;
-  if (menu.type === 'APEROS') {
-    bottleFilter = { isApero: true };
-  } else if (menu.type === 'DIGESTIFS') {
-    bottleFilter = { isDigestif: true };
-  } else {
-    res.status(400).json({ error: 'Cannot sync bottles for cocktail menus' });
-    return;
-  }
+router.post('/menu/:menuId/exclusions', validate(excludeSchemas), async (req: AuthRequest, res: Response) => {
+  const { params: { menuId }, body: { bottleIds } } = valid<typeof excludeSchemas>(res);
+  await prisma.$transaction((tx) => excludeBottles(tx, menuId, bottleIds));
+  res.json({ message: req.t('menuBottles.excluded') });
+});
 
-  // Get all bottles matching the menu type
-  const bottles = await prisma.bottle.findMany({
-    where: bottleFilter,
-    include: { category: true },
-    orderBy: [{ category: { name: 'asc' } }, { name: 'asc' }],
-  });
+// Put an excluded bottle back at the end of its system menu
+const restoreSchemas = { params: MenuBottleExclusionParams };
 
-  // Get existing menu-bottle associations
-  const existingMenuBottles = await prisma.menuBottle.findMany({
-    where: { menuId },
-  });
-
-  const existingBottleIds = new Set(existingMenuBottles.map(mb => mb.bottleId));
-
-  // Add new bottles that aren't already in the menu
-  const newBottles = bottles.filter(b => !existingBottleIds.has(b.id));
-
-  if (newBottles.length > 0) {
-    // Get the max position
-    const maxPosition = existingMenuBottles.length > 0
-      ? Math.max(...existingMenuBottles.map(mb => mb.position))
-      : -1;
-
-    await prisma.menuBottle.createMany({
-      data: newBottles.map((b, index) => ({
-        menuId,
-        bottleId: b.id,
-        position: maxPosition + 1 + index,
-        isHidden: false,
-      })),
-    });
-  }
-
-  // Remove bottles that no longer have the appropriate flag
-  const validBottleIds = new Set(bottles.map(b => b.id));
-  const toRemove = existingMenuBottles.filter(mb => !validBottleIds.has(mb.bottleId));
-
-  if (toRemove.length > 0) {
-    await prisma.menuBottle.deleteMany({
-      where: {
-        id: { in: toRemove.map(mb => mb.id) },
-      },
-    });
-  }
-
-  res.json({
-    message: req.t('menuBottles.synced'),
-    added: newBottles.length,
-    removed: toRemove.length,
-  });
+router.delete('/menu/:menuId/exclusions/:bottleId', validate(restoreSchemas), async (req: AuthRequest, res: Response) => {
+  const { menuId, bottleId } = valid<typeof restoreSchemas>(res).params;
+  await prisma.$transaction((tx) => restoreBottle(tx, menuId, bottleId));
+  res.json({ message: req.t('menuBottles.restored') });
 });
 
 export default router;
