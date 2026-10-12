@@ -5,6 +5,20 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  # Lets the release workflow run this CI before it pushes images (D-05)
+  workflow_call:
+
+permissions:
+  contents: read
+
+# A new push to a pull request cancels its running CI. Pushes to main or
+# develop get one group per commit, so a later push never cancels the CI of an
+# earlier commit. github.workflow is the caller's name in a call ("Release"),
+# so the release's CI never waits behind, or is cancelled by, the CI of the
+# push on the same commit. The release workflow must keep its own group name.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   backend:
@@ -15,24 +29,34 @@ jobs:
         working-directory: backend
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
       # The postinstall script generates the Prisma client
       - run: npm ci
 
+      # critical only until B-11: the Prisma CLI, a runtime dependency, pulls
+      # 4 high advisories (deepmerge-ts, mysql2). B-11 overrides them and raises
+      # this to high. A new advisory is fixed by an upgrade or an override,
+      # never by lowering the threshold.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=critical
+
       - name: Check that migrations match the Prisma schema
         run: npm run db:check
 
       - name: TypeScript check
         run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
 
       - name: Build
         run: npm run build
@@ -41,14 +65,9 @@ jobs:
       - name: CI script tests
         run: node --test '../.github/scripts/*.test.mjs'
 
+      # src/test/setup.ts sets the test environment (database, secrets, admin)
       - name: Tests with coverage
         run: npm run test:coverage
-        env:
-          DATABASE_URL: file:./prisma/test.db
-          JWT_SECRET: test-secret
-          ADMIN_EMAIL: admin@test.local
-          ADMIN_PASSWORD: testpass123
-          NODE_ENV: test
 
       # The --ignore globs mirror coverage.exclude in backend/vitest.config.ts:
       # keep both lists in sync, or excluded files will count as 0% here.
@@ -69,7 +88,7 @@ jobs:
 
       - name: Upload backend coverage
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: backend-coverage
           path: backend/coverage/
@@ -83,20 +102,27 @@ jobs:
         working-directory: frontend
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
       - run: npm ci
 
+      # A new advisory is fixed by an upgrade or an override, never by lowering
+      # the threshold (the backend is at critical until B-11).
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      # tsconfig.json only holds project references ("files": []): without -b,
+      # tsc checks no file at all. Both referenced projects set noEmit.
       - name: TypeScript check
-        run: npx tsc --noEmit
+        run: npx tsc -b
 
       - name: Lint
         run: npm run lint
@@ -137,8 +163,36 @@ jobs:
 
       - name: Upload frontend coverage
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: frontend-coverage
           path: frontend/coverage/
           retention-days: 7
+
+  # Builds both images without pushing them, so a broken Dockerfile fails the
+  # pull request instead of the release. Same cache scopes as the release
+  # workflow. Only pushes write the cache: pull requests read the cache of
+  # their base branch, and writing their own layers would evict it (10 GB quota).
+  docker:
+    name: Docker build (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [backend, frontend]
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ./${{ matrix.service }}
+          push: false
+          # The image is not used afterwards: keep the result in the build cache only
+          outputs: type=cacheonly
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: ${{ github.event_name == 'push' && format('type=gha,mode=max,scope={0}', matrix.service) || '' }}
