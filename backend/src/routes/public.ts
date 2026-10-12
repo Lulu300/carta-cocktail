@@ -5,33 +5,16 @@ import { parseNameTranslations } from '../utils/translations';
 import { AuthRequest, optionalAuth } from '../middleware/auth';
 import { NotFoundError } from '../errors';
 import { calculateAvailabilities } from '../services/availabilityService';
-
-const parseNT = (val: any) => {
-  if (typeof val === 'string') { try { return JSON.parse(val); } catch { return null; } }
-  return val || null;
-};
+import { buildPublicCocktailSelect, CATEGORY_PUBLIC_SELECT } from '../services/cocktail/includes';
+import { exportCocktail } from '../services/cocktail/cocktailExport';
 
 const router = Router();
 
-// Public responses use explicit selects so inventory data (purchase price,
-// opening date, remaining level) never leaves the server.
-const CATEGORY_PUBLIC_SELECT = {
-  id: true, name: true, nameTranslations: true, type: true,
-} satisfies Prisma.CategorySelect;
-
+// Bottles of a bottle menu: inventory fields stay on the server (see includes.ts)
 const MENU_BOTTLE_PUBLIC_SELECT = {
   id: true, name: true, capacityMl: true, categoryId: true, alcoholPercentage: true, location: true,
   category: { select: CATEGORY_PUBLIC_SELECT },
 } satisfies Prisma.BottleSelect;
-
-const INGREDIENT_BOTTLE_PUBLIC_SELECT = {
-  id: true, name: true, alcoholPercentage: true,
-  category: { select: CATEGORY_PUBLIC_SELECT },
-} satisfies Prisma.BottleSelect;
-
-const INGREDIENT_PUBLIC_SELECT = {
-  id: true, name: true, nameTranslations: true, icon: true,
-} satisfies Prisma.IngredientSelect;
 
 // Hidden menu items and empty bottles are never served, even in admin preview:
 // the public page does not display them either.
@@ -40,31 +23,6 @@ const VISIBLE_MENU_BOTTLE_WHERE = {
   isHidden: false,
   bottle: { remainingPercent: { gt: 0 } },
 } satisfies Prisma.MenuBottleWhereInput;
-
-// Notes and preferred bottles are private: only a verified admin gets them.
-function buildCocktailSelect(isAdmin: boolean) {
-  return {
-    id: true, name: true, description: true, imagePath: true, tags: true, isAvailable: true,
-    notes: isAdmin,
-    ingredients: {
-      select: {
-        id: true, quantity: true, position: true, sourceType: true,
-        unit: true,
-        category: { select: CATEGORY_PUBLIC_SELECT },
-        ingredient: { select: INGREDIENT_PUBLIC_SELECT },
-        bottle: { select: INGREDIENT_BOTTLE_PUBLIC_SELECT },
-        preferredBottles: isAdmin
-          ? { select: { id: true, bottle: { select: INGREDIENT_BOTTLE_PUBLIC_SELECT } } }
-          : false,
-      },
-      orderBy: { position: 'asc' },
-    },
-    instructions: {
-      select: { id: true, stepNumber: true, text: true },
-      orderBy: { stepNumber: 'asc' },
-    },
-  } satisfies Prisma.CocktailSelect;
-}
 
 // A guest only reaches cocktails that are visible in at least one published menu.
 // The admin can preview any cocktail.
@@ -132,7 +90,7 @@ router.get('/menus/:slug', async (req: AuthRequest, res: Response) => {
       cocktails: {
         where: VISIBLE_MENU_COCKTAIL_WHERE,
         include: {
-          cocktail: { select: buildCocktailSelect(isAdmin) },
+          cocktail: { select: buildPublicCocktailSelect(isAdmin) },
         },
         orderBy: { position: 'asc' },
       },
@@ -171,87 +129,9 @@ router.get('/cocktails/:id/export', async (req: AuthRequest, res: Response) => {
   if (id === null) throw new NotFoundError();
 
   const isAdmin = isAdminRequest(req);
-  const cocktail = await prisma.cocktail.findFirst({
-    where: buildPublicCocktailWhere(id, isAdmin),
-    include: {
-      ingredients: {
-        include: {
-          unit: true,
-          bottle: { include: { category: true } },
-          category: true,
-          ingredient: true,
-          preferredBottles: isAdmin
-            ? { include: { bottle: { include: { category: true } } } }
-            : false,
-        },
-        orderBy: { position: 'asc' },
-      },
-      instructions: { orderBy: { stepNumber: 'asc' } },
-    },
-  });
-
-  if (!cocktail) throw new NotFoundError();
-
-  // Build export payload (same logic as admin export, minus private fields for guests)
-  const payload = {
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    cocktail: {
-      name: cocktail.name,
-      description: cocktail.description || null,
-      ...(isAdmin && { notes: cocktail.notes || null }),
-      tags: cocktail.tags ? cocktail.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [],
-      ingredients: (cocktail.ingredients || []).map((ing: any) => {
-        let sourceName = '';
-        let sourceDetail: any = {};
-        if (ing.sourceType === 'BOTTLE' && ing.bottle) {
-          sourceName = ing.bottle.name;
-          sourceDetail = {
-            categoryName: ing.bottle.category?.name || '',
-            categoryType: ing.bottle.category?.type || 'SPIRIT',
-            categoryNameTranslations: parseNT(ing.bottle.category?.nameTranslations),
-          };
-        } else if (ing.sourceType === 'CATEGORY' && ing.category) {
-          sourceName = ing.category.name;
-          sourceDetail = {
-            type: ing.category.type,
-            desiredStock: ing.category.desiredStock,
-            nameTranslations: parseNT(ing.category.nameTranslations),
-          };
-        } else if (ing.sourceType === 'INGREDIENT' && ing.ingredient) {
-          sourceName = ing.ingredient.name;
-          sourceDetail = {
-            icon: ing.ingredient.icon || null,
-            nameTranslations: parseNT(ing.ingredient.nameTranslations),
-          };
-        }
-        return {
-          sourceType: ing.sourceType,
-          sourceName,
-          sourceDetail,
-          quantity: ing.quantity,
-          unit: ing.unit ? {
-            name: ing.unit.name,
-            abbreviation: ing.unit.abbreviation,
-            conversionFactorToMl: ing.unit.conversionFactorToMl,
-            nameTranslations: parseNT(ing.unit.nameTranslations),
-          } : null,
-          position: ing.position,
-          ...(isAdmin && {
-            preferredBottles: (ing.preferredBottles || []).map((pb: any) => ({
-              name: pb.bottle?.name || '',
-              categoryName: pb.bottle?.category?.name || ing.category?.name || '',
-            })),
-          }),
-        };
-      }),
-      instructions: (cocktail.instructions || []).map((inst: any) => ({ stepNumber: inst.stepNumber, text: inst.text })),
-    },
-  };
-
-  const slug = cocktail.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-  res.setHeader('Content-Disposition', `attachment; filename="cocktail-${slug}.json"`);
-  res.json(payload);
+  const exported = await exportCocktail(buildPublicCocktailWhere(id, isAdmin), { includePrivate: isAdmin });
+  if (!exported) throw new NotFoundError();
+  res.attachment(exported.filename).json(exported.payload);
 });
 
 // List all units (public, needed for unit conversion on public pages)
@@ -268,7 +148,7 @@ router.get('/cocktails/:id', async (req: AuthRequest, res: Response) => {
   const isAdmin = isAdminRequest(req);
   const cocktail = await prisma.cocktail.findFirst({
     where: buildPublicCocktailWhere(id, isAdmin),
-    select: buildCocktailSelect(isAdmin),
+    select: buildPublicCocktailSelect(isAdmin),
   });
 
   if (!cocktail) throw new NotFoundError();

@@ -7,7 +7,7 @@ criticite: basse
 effort: S
 status: todo
 owner: agent
-depends_on: [C-07, C-09, C-10]
+depends_on: [C-07, C-09, C-10, C-33]
 touches: [backend/prisma/seed.ts, backend/src/routes/cocktails.ts, backend/src/routes/bottles.ts, backend/src/services/cocktail/, backend/src/i18n/]
 sources: ["02-backend-data-perf.md §2.4"]
 branch:
@@ -50,3 +50,4 @@ C-07 a rendu `Category.name` et `Unit.abbreviation` uniques en base, et les rout
 
 - 2026-10-10 : tâche créée pendant C-07 (les imports contournent le contrôle d'unicité insensible à la casse des routes).
 - 2026-10-10 : seed ajouté (revue de la PR #60).
+- 2026-10-12 : dépend aussi de C-33 (découpage de C-09 : l'import cocktail est réécrit par C-33).

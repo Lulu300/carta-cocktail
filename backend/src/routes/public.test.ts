@@ -58,6 +58,12 @@ async function seedPrivateCocktail() {
   return { cocktail, bottle };
 }
 
+function withoutPreferredBottles(line: Record<string, unknown>): Record<string, unknown> {
+  const publicLine = { ...line };
+  delete publicLine.preferredBottles;
+  return publicLine;
+}
+
 function expectNoPrivateBottleFields(body: unknown) {
   const json = JSON.stringify(body);
   for (const field of PRIVATE_BOTTLE_FIELDS) {
@@ -359,6 +365,25 @@ describe('GET /api/public/cocktails/:id/export', () => {
     }
     expectNoPrivateBottleFields(res.body);
   });
+
+  it('should match the admin export, notes and preferred bottles aside', async () => {
+    const { cocktail } = await seedPrivateCocktail();
+    await addCocktailToMenu(cocktail.id);
+
+    const guest = await request.get(`/api/public/cocktails/${cocktail.id}/export`);
+    const adminPublic = await request.get(`/api/public/cocktails/${cocktail.id}/export`).set(authHeader());
+    const admin = await request.get(`/api/cocktails/${cocktail.id}/export`).set(authHeader());
+
+    expect(adminPublic.body.cocktail).toEqual(admin.body.cocktail);
+    const { notes, ingredients, ...adminRest } = admin.body.cocktail;
+    expect(notes).toBe('Use the good rum');
+    expect(ingredients[1].preferredBottles).toEqual([{ name: 'Havana Club', categoryName: 'Rum' }]);
+    expect(guest.body.cocktail).toEqual({
+      ...adminRest,
+      ingredients: ingredients.map(withoutPreferredBottles),
+    });
+    expect(guest.headers['content-disposition']).toBe(admin.headers['content-disposition']);
+  });
 });
 
 describe('GET /api/public/cocktails/:id/export - all 3 source types', () => {
@@ -467,7 +492,8 @@ describe('GET /api/public/cocktails/:id/export - all 3 source types', () => {
     expect(categoryIngResult).toBeDefined();
     expect(categoryIngResult.sourceName).toBe('Rum');
     expect(categoryIngResult.sourceDetail.type).toBe('SPIRIT');
-    expect(categoryIngResult.sourceDetail.desiredStock).toBe(2);
+    // Desired stock is inventory data: never exported
+    expect(categoryIngResult.sourceDetail).not.toHaveProperty('desiredStock');
     // Preferred bottles mapped
     expect(categoryIngResult.preferredBottles).toHaveLength(1);
     expect(categoryIngResult.preferredBottles[0].name).toBe('Havana Club 3 ans');
