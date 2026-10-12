@@ -12,7 +12,7 @@ import {
   buildImage, ensureHelperImage, pullImage, remoteDigest, RESOURCE_PREFIX, serverPlatform,
 } from './lib/docker.mjs';
 import { renderReport } from './lib/report.mjs';
-import { latestHookVersion, parseUpgradePath } from './lib/versions.mjs';
+import { parseUpgradePath } from './lib/versions.mjs';
 
 const BENCH_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(BENCH_DIR, '../..');
@@ -32,7 +32,8 @@ const USAGE = `Usage: node scripts/upgrade-test/run.mjs --fixture <dir> --layout
   --layout <name>        friend or official (scripts/upgrade-test/layouts/)
   --path <list>          versions in order, e.g. 1.4.0,1.5.0,1.6.0-rc.1; "local" builds the checkout
   --mode <mode>          naive, conformant or both (default both)
-  --local-version <v>    release notes followed by the "local" step (default: newest hook file)
+  --local-version <v>    release notes followed by the "local" step (default: the minor release
+                         after the newest hook file and the newest version of the path)
   --report-dir <dir>     default <fixture>/../upgrade-test-reports/<date>/
   --timeout <seconds>    wait for each backend start (default 300)
   --keep                 keep the containers, volumes and work folder of a failed run
@@ -152,7 +153,7 @@ async function main() {
   checkFixture(fixtureDir);
   const { layout, layoutDir } = await loadLayout(options.layout);
   const hookFiles = await loadHookFiles();
-  const steps = parseUpgradePath(options.path, options['local-version'] ?? latestHookVersion(hookFiles));
+  const steps = parseUpgradePath(options.path, { hookFiles, localVersion: options['local-version'] });
   const now = new Date();
   const id = runId(now);
   cleanUpOnSignal(id);
