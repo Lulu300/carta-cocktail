@@ -1080,6 +1080,28 @@ describe('POST /api/cocktails/:id/image - file checks', () => {
   });
 });
 
+describe('POST /api/cocktails/:id/image - failed update', () => {
+  it('should delete the uploaded file and keep the previous photo when the update fails', async () => {
+    const cocktail = await seedCocktail();
+    const previous = await uploadImage(cocktail.id, 'old.png', 'image/png');
+    const filesBefore = uploadedFiles();
+    // Makes the update itself fail, as a locked database would
+    await prisma.$executeRawUnsafe(
+      `CREATE TRIGGER refuse_cocktail_update BEFORE UPDATE ON "Cocktail" BEGIN SELECT RAISE(ABORT, 'refused'); END`,
+    );
+    try {
+      const res = await uploadImage(cocktail.id, 'new.png', 'image/png');
+      expect(res.status).not.toBe(200);
+    } finally {
+      await prisma.$executeRawUnsafe('DROP TRIGGER refuse_cocktail_update');
+    }
+    expect(uploadedFiles()).toEqual(filesBefore);
+    const stored = await prisma.cocktail.findUniqueOrThrow({ where: { id: cocktail.id } });
+    expect(stored.imagePath).toBe(previous.body.imagePath);
+    expect(fs.existsSync(path.join(config.uploadDir, previous.body.imagePath))).toBe(true);
+  });
+});
+
 describe('DELETE /api/cocktails/:id - image file', () => {
   it('should return 404 for a cocktail that does not exist', async () => {
     const res = await request.delete('/api/cocktails/99999').set(authHeader());

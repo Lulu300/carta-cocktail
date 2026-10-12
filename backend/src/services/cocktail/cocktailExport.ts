@@ -142,7 +142,7 @@ export function buildCocktailExport(cocktail: ExportedCocktail, options: ExportO
 export function exportFilename(name: string, id: number): string {
   const slug = name
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/\p{M}/gu, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');

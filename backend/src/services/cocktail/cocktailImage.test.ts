@@ -11,9 +11,15 @@ describe('safeUploadPath', () => {
     expect(safeUploadPath('photo.png')).toBe(path.join(config.uploadDir, 'photo.png'));
   });
 
-  it('should keep only the base name of a path that tries to leave the upload folder', () => {
-    expect(safeUploadPath('../../etc/passwd')).toBe(path.join(config.uploadDir, 'passwd'));
-    expect(safeUploadPath('/etc/passwd')).toBe(path.join(config.uploadDir, 'passwd'));
+  it.each(['../../etc/passwd', '/etc/passwd', '../photo.png', 'sub/photo.png', 'photo.png/'])(
+    'should refuse %s, which is not a bare file name',
+    (imagePath) => {
+      expect(safeUploadPath(imagePath)).toBeNull();
+    },
+  );
+
+  it.each(['', '.', '..', '/'])('should refuse %j, which names a folder, not a file', (imagePath) => {
+    expect(safeUploadPath(imagePath)).toBeNull();
   });
 });
 
@@ -31,6 +37,16 @@ describe('removeImageFile', () => {
   it('should ignore a file that is already gone', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await expect(removeImageFile('never-existed.png')).resolves.toBeUndefined();
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it.each(['..', '.', '/', '../to-keep.png'])('should do nothing for %j', async (imagePath) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const unlink = vi.spyOn(fs.promises, 'unlink');
+
+    await removeImageFile(imagePath);
+
+    expect(unlink).not.toHaveBeenCalled();
     expect(warn).not.toHaveBeenCalled();
   });
 

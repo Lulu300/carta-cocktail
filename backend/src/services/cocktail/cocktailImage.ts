@@ -39,12 +39,17 @@ export const imageUpload = multer({
   limits: { fileSize: MAX_IMAGE_BYTES },
 });
 
+// Names that resolve to the upload folder itself or to its parent
+const FOLDER_NAMES = new Set(['', '.', '..']);
+
 /**
- * Path of a stored photo. Only the base name is kept, so an `imagePath` such as
- * `../../etc/passwd` (from a crafted backup) cannot point outside the upload folder.
+ * Path of a stored photo, or null when `imagePath` is not a bare file name.
+ * The upload always stored bare names, so anything else (`../../etc/passwd`,
+ * `../<another photo>`, `..`) comes from a crafted backup and points to no photo.
  */
-export function safeUploadPath(imagePath: string): string {
-  return path.join(config.uploadDir, path.basename(imagePath));
+export function safeUploadPath(imagePath: string): string | null {
+  const isBareFileName = path.basename(imagePath) === imagePath && !FOLDER_NAMES.has(imagePath);
+  return isBareFileName ? path.join(config.uploadDir, imagePath) : null;
 }
 
 // Best effort: a file left behind costs some disk space, while failing here would
@@ -59,8 +64,9 @@ async function deleteFileQuietly(filePath: string): Promise<void> {
 }
 
 /** Deletes a stored photo, if it is still there. Never throws. */
-export function removeImageFile(imagePath: string): Promise<void> {
-  return deleteFileQuietly(safeUploadPath(imagePath));
+export async function removeImageFile(imagePath: string): Promise<void> {
+  const filePath = safeUploadPath(imagePath);
+  if (filePath) await deleteFileQuietly(filePath);
 }
 
 /**

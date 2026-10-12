@@ -80,13 +80,13 @@ CRUD et images :
 ## Tests à ajouter ou adapter
 
 - `src/services/cocktail/cocktailExport.test.ts` : forme du payload, `includeNotes`, `exportFilename` (accents, non latin, vide).
-- `src/services/cocktail/cocktailImport.test.ts` (base de test) : unité non résolue → erreur détaillée ; bouteille ignorée + catégorie résolue → ligne `CATEGORY` ; bouteille ignorée sans catégorie → erreur et aucune écriture ; `alreadyExists` insensible à la casse.
+- `src/services/cocktail/cocktailImport.test.ts` (base de test) : unité non résolue → erreur détaillée ; bouteille ignorée + catégorie résolue → ligne `CATEGORY` ; bouteille ignorée sans catégorie → erreur et aucune écriture ; `alreadyExists` insensible à la casse. *Reporté à C-33.*
 - `cocktails.test.ts` :
   - upload sur id inexistant → 404, nombre de fichiers de `uploadDir` inchangé ;
   - `.xjpg` ou MIME incohérent → 400 ;
   - remplacement d'image : l'ancien fichier disparaît après l'update ;
   - DELETE : fichier supprimé après la ligne ; `imagePath` piégé vers un fichier témoin hors `uploadDir` → fichier intact ;
-  - POST avec `unitId` inexistant → 400 `unknownReference`.
+  - POST avec `unitId` inexistant → 400 `unknownReference`. *Reporté à C-33.*
 - `public.test.ts` : export public sans `notes`, identique à l'export admin pour le reste.
 
 ## Points d'attention
@@ -106,3 +106,4 @@ CRUD et images :
 - 2026-10-12 : découpage décidé par l'humain (diff estimé à ~1 800 lignes). C-09 livre l'export partagé, les images et `cocktailService.removeCocktail` ; le service CRUD, l'import fiable, les clés `errors.importUnresolved` et `errors.unknownReference` et `cocktailImport.test.ts` passent à C-33 (C-19 en dépend désormais).
 - 2026-10-12 : `desiredStock` retiré du format d'export (décision de l'humain) : les exports admin et public lisent le `select` public de A-05. L'import accepte encore le champ des anciens fichiers, repli à 1. Option nommée `includePrivate` (notes et bouteilles préférées) au lieu de `includeNotes`.
 - 2026-10-12 : PR #106 (branche `feature/C-09-cocktail-service`), couverture des lignes modifiées 100 %.
+- 2026-10-12 : relecture de la PR #106 : `safeUploadPath` n'accepte plus qu'un nom de fichier nu (`null` pour `''`, `.`, `..`, `/` ou un chemin) ; les 42 `imagePath` de la copie d'une instance réelle et tout ce qu'ont écrit les versions passées (`req.file.filename` de multer) sont des noms nus. Regex des diacritiques en `\p{M}` ; test d'échec de l'update à l'upload ajouté.
