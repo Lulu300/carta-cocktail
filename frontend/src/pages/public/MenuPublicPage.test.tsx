@@ -157,8 +157,8 @@ describe('MenuPublicPage', () => {
       renderMenu('aperitifs');
 
       expect(await screen.findByText('B57 (2)')).toBeInTheDocument();
-      expect(screen.getByText('public.alcoholPercentage(20)')).toBeInTheDocument();
-      expect(screen.queryByText('public.capacityMl(700)')).not.toBeInTheDocument();
+      expect(screen.getByText('units.abv(20)')).toBeInTheDocument();
+      expect(screen.queryByText('units.ml(700)')).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'cocktails.viewList' })).not.toBeInTheDocument();
     });
 
@@ -168,8 +168,8 @@ describe('MenuPublicPage', () => {
       renderMenu('aperitifs');
 
       expect(await screen.findByText('B57 (2)')).toBeInTheDocument();
-      expect(screen.getByText('public.capacityMl(700)')).toBeInTheDocument();
-      expect(screen.getByText('x2')).toBeInTheDocument();
+      expect(screen.getByText('units.ml(700)')).toBeInTheDocument();
+      expect(screen.getByText('×2')).toBeInTheDocument();
     });
 
     it('keeps the order of the bottles set in the admin', async () => {

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { cx } from '../ui/classNames';
 import Field from '../ui/Field';
 import Input from '../ui/Input';
+import { LANGUAGE_NAMES } from '../../utils/localization';
 import type { TranslationForm } from '../../utils/translations';
 
 interface TranslationFieldsProps {
@@ -36,14 +37,14 @@ export default function TranslationFields({ value, onChange, placeholder, defaul
       </button>
       {isOpen && (
         <div id={panelId} className="space-y-2 pt-1">
-          <Field label="Français">
+          <Field label={LANGUAGE_NAMES.fr}>
             <Input
               value={value.fr}
               onChange={(event) => onChange({ ...value, fr: event.target.value })}
               placeholder={placeholderText}
             />
           </Field>
-          <Field label="English">
+          <Field label={LANGUAGE_NAMES.en}>
             <Input
               value={value.en}
               onChange={(event) => onChange({ ...value, en: event.target.value })}

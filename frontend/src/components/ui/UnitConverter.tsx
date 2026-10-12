@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { publicApi } from '../../services/api';
 import { isConvertible, getAllConversions } from '../../utils/unitConverter';
 import type { Unit } from '../../types';
@@ -12,6 +13,7 @@ interface UnitConverterProps {
 }
 
 export default function UnitConverter({ quantity, unit: unitAbbr }: UnitConverterProps) {
+  const { t } = useTranslation();
   const { isOpen, closeAndFocusTrigger, panelId, containerRef, handleKeyDown, triggerProps } = useDisclosure();
   const [units, setUnits] = useState<Unit[]>([]);
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
@@ -73,7 +75,7 @@ export default function UnitConverter({ quantity, unit: unitAbbr }: UnitConverte
         >
           {/* Original value */}
           <div className="px-3 py-2 bg-line/50 border-b border-line-strong">
-            <div className="text-xs text-fg-muted mb-1">Unité originale</div>
+            <div className="text-xs text-fg-muted mb-1">{t('public.originalUnit')}</div>
             <button
               type="button"
               onClick={handleReset}
@@ -87,7 +89,7 @@ export default function UnitConverter({ quantity, unit: unitAbbr }: UnitConverte
 
           {/* Conversions */}
           <div className="py-1">
-            <div className="px-3 py-1 text-xs text-fg-muted">Convertir en:</div>
+            <div className="px-3 py-1 text-xs text-fg-muted">{t('public.convertTo')}</div>
             {conversions.map((conv) => {
               const isSelected = selectedUnit?.id === conv.unit.id;
               return (

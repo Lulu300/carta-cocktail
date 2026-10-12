@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../../hooks/useLocalizedName';
 import type { Bottle } from '../../../types';
+import { formatPrice } from '../../../utils/formatPrice';
 import Badge from '../../ui/Badge';
 import IconButton from '../../ui/IconButton';
 import { cx } from '../../ui/classNames';
@@ -46,7 +47,7 @@ interface BottleRowProps extends BottleActions {
 
 /** Row of an available bottle. */
 export default function BottleRow({ bottle, indented = false, onEdit, onDelete }: BottleRowProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const localize = useLocalizedName();
 
   return (
@@ -56,7 +57,7 @@ export default function BottleRow({ bottle, indented = false, onEdit, onDelete }
         {bottle.name}
       </td>
       <td className="px-6 py-4 text-fg-muted">{bottle.category ? localize(bottle.category) : ''}</td>
-      <td className="px-6 py-4">{bottle.capacityMl} ml</td>
+      <td className="px-6 py-4">{t('units.ml', { value: bottle.capacityMl })}</td>
       <td className="px-6 py-4">
         <RemainingBar percent={bottle.remainingPercent} label={`${bottle.remainingPercent}%`} />
       </td>
@@ -66,7 +67,7 @@ export default function BottleRow({ bottle, indented = false, onEdit, onDelete }
           {bottle.openedAt ? t('bottles.opened') : t('bottles.unopened')}
         </Badge>
       </td>
-      <td className="px-6 py-4 text-fg-muted">{bottle.purchasePrice ? `${bottle.purchasePrice} €` : '-'}</td>
+      <td className="px-6 py-4 text-fg-muted">{bottle.purchasePrice ? formatPrice(bottle.purchasePrice, i18n.language) : '-'}</td>
       <td className="px-6 py-4 text-right">
         <BottleRowActions bottle={bottle} onEdit={onEdit} onDelete={onDelete} />
       </td>

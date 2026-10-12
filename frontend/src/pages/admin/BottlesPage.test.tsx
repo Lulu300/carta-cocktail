@@ -6,6 +6,14 @@ import { qk } from '../../queries/keys';
 import { useShortages } from '../../queries/shortages';
 import BottlesPage from './BottlesPage';
 
+vi.mock('react-i18next', async (importOriginal) => {
+  const { translateWithValues } = await import('../../test/translateWithValues');
+  return {
+    ...await importOriginal<typeof import('react-i18next')>(),
+    useTranslation: () => ({ t: translateWithValues, i18n: { language: 'en' } }),
+  };
+});
+
 vi.mock('../../services/api', async () => {
   const actual = await vi.importActual<typeof import('../../services/api')>('../../services/api');
   return {
@@ -165,8 +173,8 @@ describe('BottlesPage', () => {
       await renderLoadedPage();
       expect(screen.getByText('Hendricks')).toBeInTheDocument();
       expect(screen.getByText('Vodka')).toBeInTheDocument();
-      expect(screen.getByText('700 ml')).toBeInTheDocument();
-      expect(screen.getByText('25 €')).toBeInTheDocument();
+      expect(screen.getByText('units.ml(700)')).toBeInTheDocument();
+      expect(screen.getByText('€25.00')).toBeInTheDocument();
       expect(screen.getByText('bottles.opened')).toBeInTheDocument();
       expect(screen.getByText('bottles.unopened')).toBeInTheDocument();
       expect(screen.getByText('bottles.activeTitle (2)')).toBeInTheDocument();
@@ -247,7 +255,7 @@ describe('BottlesPage', () => {
       try {
         renderPage();
 
-        await user.click(await screen.findByText('x2'));
+        await user.click(await screen.findByText('×2'));
 
         expect(screen.getAllByText('Absolut')).toHaveLength(3);
         expect(screen.getByText('~60%')).toBeInTheDocument();
@@ -263,7 +271,7 @@ describe('BottlesPage', () => {
       const user = userEvent.setup();
       mockApiList.mockResolvedValue([mockBottles[0], { ...mockBottles[0], id: 3 }, mockBottles[1]] as never);
       renderPage();
-      const toggle = await screen.findByRole('button', { name: /x2/ });
+      const toggle = await screen.findByRole('button', { name: /×2/ });
       expect(toggle).toHaveAttribute('aria-expanded', 'false');
 
       toggle.focus();
@@ -282,7 +290,7 @@ describe('BottlesPage', () => {
       await screen.findByText('Bottle 1');
 
       await user.click(screen.getByText('2', { selector: 'nav button' }));
-      await user.click(screen.getByText('x2'));
+      await user.click(screen.getByText('×2'));
       expect(screen.getAllByText('Absolut')).toHaveLength(3);
       await user.click(screen.getByText('1', { selector: 'nav button' }));
       await user.click(screen.getByText('2', { selector: 'nav button' }));
@@ -294,7 +302,7 @@ describe('BottlesPage', () => {
       const user = userEvent.setup();
       mockApiList.mockResolvedValue([mockBottles[0], { ...mockBottles[0], id: 3 }, mockBottles[1]] as never);
       renderPage();
-      await user.click(await screen.findByText('x2'));
+      await user.click(await screen.findByText('×2'));
 
       await user.type(screen.getByPlaceholderText('common.search'), 'hend');
       expect(screen.queryByText('Absolut')).not.toBeInTheDocument();
@@ -307,10 +315,10 @@ describe('BottlesPage', () => {
       const user = userEvent.setup();
       mockApiList.mockResolvedValue([mockBottles[0], { ...mockBottles[0], id: 3 }] as never);
       renderPage();
-      await user.click(await screen.findByText('x2'));
+      await user.click(await screen.findByText('×2'));
       expect(screen.getAllByText('Absolut')).toHaveLength(3);
 
-      await user.click(screen.getByText('x2'));
+      await user.click(screen.getByText('×2'));
 
       expect(screen.getAllByText('Absolut')).toHaveLength(1);
     });
@@ -344,7 +352,7 @@ describe('BottlesPage', () => {
       await openCreateForm(user);
 
       await user.type(nameInput(), 'New Whisky');
-      await user.click(within(dialog()).getByLabelText('Utilisable comme apéritif'));
+      await user.click(within(dialog()).getByLabelText('bottles.usableAsApero'));
       await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
 
       await waitFor(() => expect(mockApiCreate).toHaveBeenCalledWith({
@@ -376,9 +384,9 @@ describe('BottlesPage', () => {
       await user.type(form.getByLabelText('bottles.purchasePrice'), '32.5');
       fireEvent.change(form.getByLabelText(/bottles\.remainingPercent/), { target: { value: '60' } });
       fireEvent.change(form.getByLabelText('bottles.openedAt'), { target: { value: '2026-10-01' } });
-      await user.type(form.getByLabelText('Alcool % (vol.)'), '43.1');
+      await user.type(form.getByLabelText('bottles.alcoholPercentage'), '43.1');
       await user.type(form.getByLabelText('bottles.location'), 'Shelf');
-      await user.click(form.getByLabelText('Utilisable comme digestif'));
+      await user.click(form.getByLabelText('bottles.usableAsDigestif'));
       await user.click(form.getByRole('button', { name: 'common.save' }));
 
       await waitFor(() => expect(mockApiCreate).toHaveBeenCalledWith({
@@ -404,7 +412,7 @@ describe('BottlesPage', () => {
       await user.type(nameInput(), 'Rum');
       // An emptied field snaps back to 1, so set the value in one go.
       fireEvent.change(within(dialog()).getByLabelText('bottles.quantity'), { target: { value: '3' } });
-      expect(within(dialog()).getByText('bottles.quantityHint')).toBeInTheDocument();
+      expect(within(dialog()).getByText('bottles.quantityHint(3)')).toBeInTheDocument();
       await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
 
       await waitFor(() => expect(mockApiCreate).toHaveBeenCalledWith(expect.objectContaining({ name: 'Rum', quantity: 3 })));
@@ -473,8 +481,8 @@ describe('BottlesPage', () => {
       expect(screen.getByText('bottles.edit')).toBeInTheDocument();
       expect(nameInput()).toHaveValue('Hendricks');
       expect(within(dialog()).getByLabelText('bottles.openedAt')).toHaveValue('2024-06-01');
-      expect(within(dialog()).getByLabelText('Utilisable comme apéritif')).toBeChecked();
-      expect(within(dialog()).getByLabelText('Utilisable comme digestif')).not.toBeChecked();
+      expect(within(dialog()).getByLabelText('bottles.usableAsApero')).toBeChecked();
+      expect(within(dialog()).getByLabelText('bottles.usableAsDigestif')).not.toBeChecked();
       expect(within(dialog()).queryByRole('button', { name: 'bottles.saveDuplicate' })).not.toBeInTheDocument();
     });
 
@@ -643,7 +651,7 @@ describe('BottlesPage', () => {
 
       await user.type(search, 'abs');
 
-      expect(await screen.findByText('common.resultCount')).toHaveAttribute('aria-live', 'polite');
+      expect(await screen.findByText(/^common\.resultCount\(/)).toHaveAttribute('aria-live', 'polite');
     });
 
     it('shows an export failure in an error toast', async () => {

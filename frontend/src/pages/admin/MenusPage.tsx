@@ -35,10 +35,10 @@ interface MenuForm {
 
 const EMPTY_MENU_FORM: MenuForm = { name: '', slug: '', description: '', isPublic: false };
 
-const TYPE_BADGES: Record<Menu['type'], { label: string; color: string }> = {
-  COCKTAILS: { label: 'Cocktails', color: 'purple' },
-  APEROS: { label: 'Apéritifs', color: 'yellow' },
-  DIGESTIFS: { label: 'Digestifs', color: 'orange' },
+const TYPE_BADGES: Record<Menu['type'], { labelKey: string; color: string }> = {
+  COCKTAILS: { labelKey: 'menus.types.cocktails', color: 'purple' },
+  APEROS: { labelKey: 'menus.types.aperos', color: 'yellow' },
+  DIGESTIFS: { labelKey: 'menus.types.digestifs', color: 'orange' },
 };
 
 function isBottleMenu(menu: Menu): boolean {
@@ -95,17 +95,17 @@ export default function MenusPage() {
           >
             {menu.name}
           </a>
-          {isSystemMenu(menu) && <span className="ml-2 text-xs text-fg-muted">(par défaut)</span>}
+          {isSystemMenu(menu) && <span className="ml-2 text-xs text-fg-muted">{t('menus.default')}</span>}
         </>
       ),
     },
     {
       key: 'type',
-      header: 'Type',
+      header: t('menus.type'),
       sortable: true,
       render: (menu) => (
         <span className={cx('px-2 py-0.5 rounded text-xs font-medium', getBadgeClasses(TYPE_BADGES[menu.type].color))}>
-          {TYPE_BADGES[menu.type].label}
+          {t(TYPE_BADGES[menu.type].labelKey)}
         </span>
       ),
     },
@@ -120,11 +120,11 @@ export default function MenusPage() {
     },
     {
       key: 'content',
-      header: 'Contenu',
+      header: t('menus.content'),
       className: 'text-fg-muted',
       render: (menu) => (isBottleMenu(menu)
-        ? `${menu._count?.bottles ?? 0} bouteille(s)`
-        : `${menu._count?.cocktails ?? 0} cocktail(s)`),
+        ? t('menus.bottleCount', { count: menu._count?.bottles ?? 0 })
+        : t('menus.cocktailCount', { count: menu._count?.cocktails ?? 0 })),
     },
     {
       key: 'actions',

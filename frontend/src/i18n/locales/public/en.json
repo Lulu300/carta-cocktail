@@ -10,10 +10,6 @@
   "home": {
     "subtitle": "Discover our cocktail menus",
     "noMenus": "No menus available at the moment",
-    "cocktailCount_one": "{{count}} cocktail",
-    "cocktailCount_other": "{{count}} cocktails",
-    "bottleCount_one": "{{count}} bottle",
-    "bottleCount_other": "{{count}} bottles",
     "loadError": "Unable to load the menus"
   },
   "cocktails": {
@@ -51,8 +47,8 @@
     "moreIngredients_other": "{{count}} more ingredients",
     "showAllLocations_one": "Show {{count}} location",
     "showAllLocations_other": "Show all {{count}} locations",
-    "alcoholPercentage": "{{value}}% vol.",
-    "capacityMl": "{{value}} ml"
+    "originalUnit": "Original unit",
+    "convertTo": "Convert to:"
   },
   "common": {
     "cancel": "Cancel",
@@ -70,5 +66,15 @@
     "usedByBottles": "Bottles in it: {{names}}.",
     "more_one": "and {{count}} more",
     "more_other": "and {{count}} more"
+  },
+  "units": {
+    "ml": "{{value}} ml",
+    "abv": "{{value}}% vol."
+  },
+  "menus": {
+    "cocktailCount_one": "{{count}} cocktail",
+    "cocktailCount_other": "{{count}} cocktails",
+    "bottleCount_one": "{{count}} bottle",
+    "bottleCount_other": "{{count}} bottles"
   }
 }

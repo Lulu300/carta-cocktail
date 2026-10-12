@@ -186,8 +186,8 @@ describe('MenuBottleEditPage', () => {
     expect(menusApi.get).toHaveBeenCalledWith(5);
     expect(screen.getByRole('heading', { name: 'menus.bottles.aperos.title' })).toBeInTheDocument();
     expect(within(rowOf('Hendricks')).getByText('menus.bottles.count')).toBeInTheDocument();
-    expect(within(rowOf('Hendricks')).getByText('menus.bottles.abv')).toBeInTheDocument();
-    expect(within(rowOf('Lillet')).queryByText('menus.bottles.abv')).not.toBeInTheDocument();
+    expect(within(rowOf('Hendricks')).getByText('units.abv')).toBeInTheDocument();
+    expect(within(rowOf('Lillet')).queryByText('units.abv')).not.toBeInTheDocument();
   });
 
   it('marks a bottle at 0 % as empty', async () => {

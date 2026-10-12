@@ -99,12 +99,12 @@ export default function UnitsPage() {
     { key: 'abbreviation', header: t('units.abbreviation'), sortable: true, className: 'text-fg-muted', render: (unit) => unit.abbreviation },
     {
       key: 'conversionFactorToMl',
-      header: 'Facteur de conversion (ml)',
+      header: t('units.conversionFactor'),
       sortable: true,
       className: 'text-fg-muted',
       render: (unit) => (unit.conversionFactorToMl !== null
-        ? <span>1 {unit.abbreviation} = {unit.conversionFactorToMl} ml</span>
-        : <span className="italic">Non convertible</span>),
+        ? <span>1 {unit.abbreviation} = {t('units.ml', { value: unit.conversionFactorToMl })}</span>
+        : <span className="italic">{t('units.notConvertible')}</span>),
     },
     {
       key: 'actions',
@@ -156,15 +156,15 @@ export default function UnitsPage() {
             <Input value={form.abbreviation} onChange={(event) => setField('abbreviation', event.target.value)} />
           </Field>
           <Field
-            label="Facteur de conversion vers ml"
-            hint="Ex: 1 cl = 10 ml, donc facteur = 10. Laisser vide pour les unités de pièce."
+            label={t('units.conversionFactor')}
+            hint={t('units.conversionFactorHint')}
           >
             <Input
               type="number"
               step="any"
               value={form.conversionFactorToMl}
               onChange={(event) => setField('conversionFactorToMl', event.target.value)}
-              placeholder="Laisser vide si non convertible"
+              placeholder={t('units.notConvertible')}
             />
           </Field>
           <div className="flex justify-end gap-3 pt-2">

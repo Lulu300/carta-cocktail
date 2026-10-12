@@ -57,8 +57,8 @@ export default function HomePage() {
 function MenuCard({ menu }: { menu: Menu }) {
   const { t } = useTranslation();
   const countLabel = isBottleMenu(menu)
-    ? t('home.bottleCount', { count: menu._count?.bottles ?? 0 })
-    : t('home.cocktailCount', { count: menu._count?.cocktails ?? 0 });
+    ? t('menus.bottleCount', { count: menu._count?.bottles ?? 0 })
+    : t('menus.cocktailCount', { count: menu._count?.cocktails ?? 0 });
 
   return (
     <Link

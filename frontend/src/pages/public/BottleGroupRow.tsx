@@ -20,17 +20,17 @@ export default function BottleGroupRow({ group, showInventory, onShowLocations }
         <div className="flex items-center gap-2">
           <h3 className="text-lg font-medium text-white">{group.name}</h3>
           {showInventory && group.count > 1 && (
-            <span className="bg-accent/20 text-accent text-xs font-bold px-2 py-0.5 rounded-full">x{group.count}</span>
+            <span className="bg-accent/20 text-accent text-xs font-bold px-2 py-0.5 rounded-full">×{group.count}</span>
           )}
         </div>
         <div className="flex items-center gap-3 mt-1 text-sm text-fg-muted">
           {group.alcoholPercentage !== null && (
-            <span>{t('public.alcoholPercentage', { value: group.alcoholPercentage })}</span>
+            <span>{t('units.abv', { value: group.alcoholPercentage })}</span>
           )}
           {showInventory && (
             <>
               <span aria-hidden="true">•</span>
-              <span>{t('public.capacityMl', { value: group.capacityMl })}</span>
+              <span>{t('units.ml', { value: group.capacityMl })}</span>
             </>
           )}
         </div>

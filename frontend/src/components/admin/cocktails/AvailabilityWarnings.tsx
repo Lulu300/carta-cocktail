@@ -51,12 +51,12 @@ export default function AvailabilityWarnings({ availability, loading }: Availabi
 
   return (
     <>
-      <WarningBox tone="warning" title="⚠️ Stock faible" names={availability.lowStockWarnings} />
+      <WarningBox tone="warning" title={`⚠️ ${t('cocktails.lowStock')}`} names={availability.lowStockWarnings} />
       <WarningBox
         tone="danger"
-        title="❌ Manquant"
+        title={`❌ ${t('cocktails.missing')}`}
         names={missing}
-        more={<div className="opacity-60">+{missing.length - MAX_LISTED} autre(s)</div>}
+        more={<div className="opacity-60">{t('cocktails.moreMissing', { count: missing.length - MAX_LISTED })}</div>}
       />
       <WarningBox tone="warning" title={`⚠️ ${t('cocktails.noPreferredAvailable')}`} names={withoutPreferred} />
     </>

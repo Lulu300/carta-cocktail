@@ -5,6 +5,14 @@ import { clearToasts, renderWithFeedback } from '../../test/feedback';
 import { axe } from '../../test/axe';
 import UnitsPage from './UnitsPage';
 
+vi.mock('react-i18next', async (importOriginal) => {
+  const { translateWithValues } = await import('../../test/translateWithValues');
+  return {
+    ...await importOriginal<typeof import('react-i18next')>(),
+    useTranslation: () => ({ t: translateWithValues, i18n: { language: 'en' } }),
+  };
+});
+
 vi.mock('../../services/api', async () => {
   const actual = await vi.importActual<typeof import('../../services/api')>('../../services/api');
   return {
@@ -67,8 +75,8 @@ describe('UnitsPage', () => {
   it('lists the units with their conversion', async () => {
     await renderLoadedPage();
     expect(screen.getByText('Piece')).toBeInTheDocument();
-    expect(screen.getByText('1 cl = 10 ml')).toBeInTheDocument();
-    expect(screen.getByText('Non convertible')).toBeInTheDocument();
+    expect(screen.getByText('1 cl = units.ml(10)')).toBeInTheDocument();
+    expect(screen.getByText('units.notConvertible')).toBeInTheDocument();
   });
 
   it('never shows "no results" while the units are loading', async () => {
@@ -100,7 +108,7 @@ describe('UnitsPage', () => {
     const user = userEvent.setup();
     await renderLoadedPage();
     await fillCreateForm(user, 'Milliliter', 'ml');
-    await user.type(within(dialog()).getByPlaceholderText('Laisser vide si non convertible'), '1');
+    await user.type(within(dialog()).getByLabelText('units.conversionFactor'), '1');
 
     await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
 
@@ -165,7 +173,7 @@ describe('UnitsPage', () => {
 
     expect(screen.getByText('units.edit')).toBeInTheDocument();
     expect(within(dialog()).getByDisplayValue('Piece')).toBeInTheDocument();
-    expect(within(dialog()).getByPlaceholderText('Laisser vide si non convertible')).toHaveValue(null);
+    expect(within(dialog()).getByLabelText('units.conversionFactor')).toHaveValue(null);
   });
 
   it('updates a unit and confirms with a toast', async () => {

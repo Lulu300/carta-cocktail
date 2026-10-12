@@ -65,7 +65,7 @@ export default function LoginPage() {
     <main className="min-h-screen bg-canvas text-fg flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-accent font-serif mb-2">Carta Cocktail</h1>
+          <h1 className="text-4xl font-bold text-accent font-serif mb-2">{t('app.name')}</h1>
           <p className="text-fg-muted">{t('auth.welcome')}</p>
         </div>
 

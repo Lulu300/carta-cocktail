@@ -88,7 +88,7 @@ export default function BottlesPage() {
     { key: 'categoryName', header: t('bottles.category'), sortable: true },
     { key: 'capacityMl', header: t('bottles.capacityMl'), sortable: true },
     { key: 'remainingPercent', header: t('bottles.remainingPercent'), sortable: true },
-    { key: 'alcoholPercentage', header: 'Alcool', sortable: true },
+    { key: 'alcoholPercentage', header: t('bottles.alcoholPercentage'), sortable: true },
     { key: 'openedAt', header: t('bottles.openedAt'), sortable: true },
     { key: 'purchasePrice', header: t('bottles.purchasePrice'), sortable: true },
     { key: 'actions', header: t('common.actions'), align: 'right' },

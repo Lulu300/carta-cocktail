@@ -4,6 +4,14 @@ import { fireEvent, screen, waitFor, within } from '../../test/test-utils';
 import { clearToasts, renderWithFeedback } from '../../test/feedback';
 import MenusPage from './MenusPage';
 
+vi.mock('react-i18next', async (importOriginal) => {
+  const { translateWithValues } = await import('../../test/translateWithValues');
+  return {
+    ...await importOriginal<typeof import('react-i18next')>(),
+    useTranslation: () => ({ t: translateWithValues, i18n: { language: 'en' } }),
+  };
+});
+
 vi.mock('../../services/api', async () => {
   const actual = await vi.importActual<typeof import('../../services/api')>('../../services/api');
   return {
@@ -62,13 +70,13 @@ describe('MenusPage', () => {
 
   it('lists the menus with their type, visibility and content', async () => {
     await renderLoadedPage();
-    expect(screen.getByText('Cocktails')).toBeInTheDocument();
-    expect(screen.getByText('Apéritifs', { selector: 'span' })).toBeInTheDocument();
-    expect(screen.getByText('Digestifs', { selector: 'span' })).toBeInTheDocument();
+    expect(screen.getByText('menus.types.cocktails')).toBeInTheDocument();
+    expect(screen.getByText('menus.types.aperos')).toBeInTheDocument();
+    expect(screen.getByText('menus.types.digestifs')).toBeInTheDocument();
     expect(screen.getAllByText('common.yes')).toHaveLength(2);
     expect(screen.getAllByText('common.no')).toHaveLength(1);
-    expect(screen.getByText('5 bouteille(s)')).toBeInTheDocument();
-    expect(screen.getByText('8 cocktail(s)')).toBeInTheDocument();
+    expect(screen.getByText('menus.bottleCount(5)')).toBeInTheDocument();
+    expect(screen.getByText('menus.cocktailCount(8)')).toBeInTheDocument();
   });
 
   it('links each menu to its editor, the bottle editor for a bottle menu', async () => {
@@ -83,7 +91,7 @@ describe('MenusPage', () => {
 
   it('marks the system menus and offers no deletion for them', async () => {
     await renderLoadedPage();
-    expect(screen.getAllByText('(par défaut)')).toHaveLength(2);
+    expect(screen.getAllByText('menus.default')).toHaveLength(2);
     expect(screen.getAllByRole('button', { name: 'common.delete' })).toHaveLength(1);
   });
 
@@ -107,7 +115,7 @@ describe('MenusPage', () => {
     await user.type(screen.getByPlaceholderText('common.search'), 'summ');
 
     expect(screen.getByText('Summer Menu')).toBeInTheDocument();
-    expect(screen.queryByText('(par défaut)')).not.toBeInTheDocument();
+    expect(screen.queryByText('menus.default')).not.toBeInTheDocument();
   });
 
   it('creates a menu with a cleaned slug and confirms with a toast', async () => {

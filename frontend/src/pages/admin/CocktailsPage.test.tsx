@@ -164,10 +164,10 @@ describe('CocktailsPage', () => {
     });
 
     // Mojito: 5 doses (green badge)
-    expect(screen.getByText('5 doses')).toBeInTheDocument();
+    expect(screen.getByText('cocktails.doses')).toBeInTheDocument();
 
     // Negroni: unavailable (red badge)
-    expect(screen.getByText('Indisponible')).toBeInTheDocument();
+    expect(screen.getByText('cocktails.unavailable')).toBeInTheDocument();
   });
 
   it('still lists cocktails, without availability badges, when availability fails to load', async () => {
@@ -178,15 +178,15 @@ describe('CocktailsPage', () => {
     await screen.findAllByText('Mojito');
     await user.click(await screen.findByRole('button', { name: 'common.retry' }));
 
-    expect(await screen.findByText('5 doses')).toBeInTheDocument();
-    expect(screen.getByText('Indisponible')).toBeInTheDocument();
+    expect(await screen.findByText('cocktails.doses')).toBeInTheDocument();
+    expect(screen.getByText('cocktails.unavailable')).toBeInTheDocument();
   });
 
   it('hides availability while it reloads after an import', async () => {
     const user = userEvent.setup();
     let resolveReload: (value: typeof mockAvailabilities) => void = () => {};
     render(<CocktailsPage />);
-    expect(await screen.findByText('5 doses')).toBeInTheDocument();
+    expect(await screen.findByText('cocktails.doses')).toBeInTheDocument();
 
     vi.mocked(availabilityApi.getAllCocktails).mockReturnValueOnce(
       new Promise((resolve) => {
@@ -196,9 +196,9 @@ describe('CocktailsPage', () => {
     await user.click(screen.getByText('cocktails.import'));
     await user.click(screen.getByText('close'));
 
-    expect(screen.queryByText('5 doses')).not.toBeInTheDocument();
+    expect(screen.queryByText('cocktails.doses')).not.toBeInTheDocument();
     resolveReload(mockAvailabilities);
-    expect(await screen.findByText('5 doses')).toBeInTheDocument();
+    expect(await screen.findByText('cocktails.doses')).toBeInTheDocument();
   });
 
   it('shows missing ingredients warning on unavailable cocktails', async () => {
@@ -401,8 +401,9 @@ describe('CocktailsPage', () => {
 
     expect(await screen.findByText('White rum')).toBeInTheDocument();
     expect(screen.getByText('⚠️ cocktails.noPreferredAvailable')).toBeInTheDocument();
+    expect(screen.getByText('⚠️ cocktails.lowStock')).toBeInTheDocument();
     expect(screen.getByText('Rum is running low')).toBeInTheDocument();
-    expect(screen.getByText('+1 autre(s)')).toBeInTheDocument();
+    expect(screen.getByText('cocktails.moreMissing')).toBeInTheDocument();
   });
 
   it('filters the cocktails by tag, ignoring case', async () => {
