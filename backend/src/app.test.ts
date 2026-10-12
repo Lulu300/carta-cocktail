@@ -99,6 +99,14 @@ describe('Request body errors', () => {
     expectJsonError(res);
   });
 
+  it('answers 413 JSON for a bottle import confirmation over its own 5 MB limit', async () => {
+    const res = await request.post('/api/bottles/import/confirm').set(authHeader())
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify({ name: 'x'.repeat(5 * 1024 * 1024) }));
+    expect(res.status).toBe(413);
+    expectJsonError(res);
+  });
+
   it('answers 413 JSON for a cocktail image over 5 MB', async () => {
     const cocktail = await prisma.cocktail.create({ data: { name: 'Big Picture' } });
     const sixMegabytes = Buffer.alloc(6 * 1024 * 1024);

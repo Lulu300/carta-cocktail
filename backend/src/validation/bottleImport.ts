@@ -7,6 +7,8 @@ import { DesiredStock } from './categories';
 // the admin's choices. It goes through the same bounds as a bottle created by hand.
 
 export const MAX_IMPORT_ROWS = 2000;
+/** Bottles one import can create, quantities included: keeps the transaction short. */
+export const MAX_IMPORT_BOTTLES = 2000;
 
 const ImportCategoryRecord = z.object({
   name: RequiredText,
@@ -15,6 +17,11 @@ const ImportCategoryRecord = z.object({
   minimumPercent: Percent,
   nameTranslations: Translations,
 });
+
+/** Number of bottles the rows create, each row standing for `quantity` identical bottles. */
+export function totalQuantity(rows: { quantity: number }[]): number {
+  return rows.reduce((sum, row) => sum + row.quantity, 0);
+}
 
 const ImportBottleRecord = z.object({
   name: RequiredText,
@@ -34,7 +41,12 @@ const ImportBottleRecord = z.object({
 export const BottleImportPayload = z.object({
   version: z.literal(1),
   categories: z.array(ImportCategoryRecord).max(MAX_IMPORT_ROWS).default([]),
-  bottles: z.array(ImportBottleRecord).max(MAX_IMPORT_ROWS),
+  bottles: z
+    .array(ImportBottleRecord)
+    .max(MAX_IMPORT_ROWS)
+    .refine((bottles) => totalQuantity(bottles) <= MAX_IMPORT_BOTTLES, {
+      message: `More than ${MAX_IMPORT_BOTTLES} bottles`,
+    }),
 });
 
 // A resolution without its id or data is ignored, as before.

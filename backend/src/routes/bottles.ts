@@ -6,7 +6,7 @@ import { AuthRequest } from '../middleware/auth';
 import { BadRequestError, NotFoundError } from '../errors';
 import { parseNameTranslations } from '../utils/translations';
 import { buildExportPayload, buildCsvPayload } from '../utils/bottlesExport';
-import { parseImportFile, NormalizedImportPayload } from '../utils/bottlesImport';
+import { ImportParseError, parseImportFile, NormalizedImportPayload } from '../utils/bottlesImport';
 import { deleteBottle, isForceRequested } from '../services/deletionService';
 import { syncAllBottleMenus, syncBottle } from '../services/menuSyncService';
 import { valid, validate } from '../validation/validate';
@@ -37,24 +37,51 @@ router.get('/', validate(listSchemas), async (_req: AuthRequest, res: Response) 
   res.json(parseNameTranslations(bottles));
 });
 
+// The confirmation creates the bottles in batches: SQLite caps the parameters of one statement
+const CREATE_BATCH_SIZE = 500;
+// A 2,000-bottle import takes well under a second; the 5 s default leaves no margin on a slow disk
+const IMPORT_TRANSACTION_TIMEOUT_MS = 30_000;
+
+/** Same name, capacity and category, whatever the case: the import warns about such a bottle. */
+function duplicateKey(name: string, capacityMl: number, categoryName: string): string {
+  return `${name.toLowerCase()}|${capacityMl}|${categoryName.toLowerCase()}`;
+}
+
+function parseUploadedFile(file: Express.Multer.File): NormalizedImportPayload {
+  try {
+    return parseImportFile(file.originalname || '', file.buffer);
+  } catch (err) {
+    if (!(err instanceof ImportParseError)) throw err;
+    throw new BadRequestError(`errors.import.${err.code}`, { code: err.code, ...err.params });
+  }
+}
+
 router.post('/import/preview', importUpload.single('file'), async (req: AuthRequest, res: Response) => {
   if (!req.file) throw new BadRequestError();
 
-  let payload: NormalizedImportPayload;
-  try {
-    payload = parseImportFile(req.file.originalname || '', req.file.buffer);
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
-    throw new BadRequestError('errors.invalidImportFile', { reason });
-  }
+  // The rows left out are listed apart: the payload goes back unchanged to /import/confirm
+  const { errors, ...payload } = parseUploadedFile(req.file);
 
   const allCategories = await prisma.category.findMany();
   const allBottles = await prisma.bottle.findMany({ include: { category: true } });
 
+  // Indexes instead of a scan per imported row: an import has up to 2,000 rows
+  const categoriesByName = new Map<string, (typeof allCategories)[number]>();
+  for (const category of allCategories) {
+    const key = category.name.toLowerCase();
+    // The first match wins, as before
+    if (!categoriesByName.has(key)) categoriesByName.set(key, category);
+  }
+  const bottlesByKey = new Map<string, typeof allBottles>();
+  for (const bottle of allBottles) {
+    const key = duplicateKey(bottle.name, bottle.capacityMl, bottle.category.name);
+    const sameKey = bottlesByKey.get(key);
+    if (sameKey) sameKey.push(bottle);
+    else bottlesByKey.set(key, [bottle]);
+  }
+
   const categories = payload.categories.map((c) => {
-    const match = allCategories.find(
-      (ac) => ac.name.toLowerCase() === c.name.toLowerCase()
-    );
+    const match = categoriesByName.get(c.name.toLowerCase());
     return {
       ref: c,
       existingMatch: match
@@ -65,12 +92,7 @@ router.post('/import/preview', importUpload.single('file'), async (req: AuthRequ
   });
 
   const bottles = payload.bottles.map((b) => {
-    const duplicates = allBottles
-      .filter((eb) =>
-        eb.name.toLowerCase() === b.name.toLowerCase() &&
-        eb.capacityMl === b.capacityMl &&
-        eb.category.name.toLowerCase() === b.categoryName.toLowerCase()
-      )
+    const duplicates = (bottlesByKey.get(duplicateKey(b.name, b.capacityMl, b.categoryName)) ?? [])
       .map((d) => ({
         id: d.id,
         name: d.name,
@@ -85,7 +107,7 @@ router.post('/import/preview', importUpload.single('file'), async (req: AuthRequ
     };
   });
 
-  res.json({ payload, categories, bottles });
+  res.json({ payload, categories, bottles, errors });
 });
 
 const importConfirmSchemas = { body: BottleImportConfirm };
@@ -124,17 +146,15 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
       }
     }
 
-    let createdCount = 0;
     let skippedNoCategory = 0;
     let duplicatesCreated = 0;
+    const rows: Prisma.BottleCreateManyInput[] = [];
 
     const bottleResolutions = resolutions?.bottles || {};
 
-    const existingDuplicateKey = (name: string, capacityMl: number, categoryName: string) =>
-      `${name.toLowerCase()}|${capacityMl}|${categoryName.toLowerCase()}`;
     const existingBottles = await tx.bottle.findMany({ include: { category: true } });
     const existingKeys = new Set(
-      existingBottles.map((b) => existingDuplicateKey(b.name, b.capacityMl, b.category.name))
+      existingBottles.map((b) => duplicateKey(b.name, b.capacityMl, b.category.name))
     );
 
     for (let i = 0; i < payload.bottles.length; i++) {
@@ -154,34 +174,33 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
         continue;
       }
 
-      const isDuplicate = existingKeys.has(
-        existingDuplicateKey(b.name, b.capacityMl, finalCategoryName)
-      );
-
-      for (let q = 0; q < b.quantity; q++) {
-        await tx.bottle.create({
-          data: {
-            name: b.name,
-            categoryId,
-            capacityMl: b.capacityMl,
-            remainingPercent: b.remainingPercent,
-            alcoholPercentage: b.alcoholPercentage,
-            purchasePrice: b.purchasePrice,
-            location: b.location,
-            openedAt: b.openedAt,
-            isApero: b.isApero,
-            isDigestif: b.isDigestif,
-          },
-        });
-        createdCount++;
-        if (isDuplicate) duplicatesCreated++;
+      if (existingKeys.has(duplicateKey(b.name, b.capacityMl, finalCategoryName))) {
+        duplicatesCreated += b.quantity;
       }
+
+      const data: Prisma.BottleCreateManyInput = {
+        name: b.name,
+        categoryId,
+        capacityMl: b.capacityMl,
+        remainingPercent: b.remainingPercent,
+        alcoholPercentage: b.alcoholPercentage,
+        purchasePrice: b.purchasePrice,
+        location: b.location,
+        openedAt: b.openedAt,
+        isApero: b.isApero,
+        isDigestif: b.isDigestif,
+      };
+      for (let q = 0; q < b.quantity; q++) rows.push(data);
+    }
+
+    for (let start = 0; start < rows.length; start += CREATE_BATCH_SIZE) {
+      await tx.bottle.createMany({ data: rows.slice(start, start + CREATE_BATCH_SIZE) });
     }
 
     // Inside the transaction: a failed sync also cancels the import
     await syncAllBottleMenus(tx);
-    return { createdCount, skippedNoCategory, duplicatesCreated };
-  });
+    return { createdCount: rows.length, skippedNoCategory, duplicatesCreated };
+  }, { timeout: IMPORT_TRANSACTION_TIMEOUT_MS });
 
   res.status(201).json({
     created: { bottles: created.createdCount },
@@ -253,12 +272,12 @@ router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Respons
 
   // A failed menu sync also cancels the creation of the bottles
   const bottles = await prisma.$transaction(async (tx) => {
-    const created = [];
-    for (let i = 0; i < count; i++) {
-      const bottle = await tx.bottle.create({ data, include: { category: true } });
-      await syncBottle(tx, bottle.id);
-      created.push(bottle);
-    }
+    const created = await tx.bottle.createManyAndReturn({
+      data: Array.from({ length: count }, () => data),
+      include: { category: true },
+    });
+    // Per bottle, not syncAllBottleMenus: only the new bottles join the menus, in creation order
+    for (const bottle of created) await syncBottle(tx, bottle.id);
     return created;
   });
   res.status(201).json(parseNameTranslations(count === 1 ? bottles[0] : bottles));

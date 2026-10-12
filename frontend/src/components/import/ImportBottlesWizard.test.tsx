@@ -92,6 +92,21 @@ describe('ImportBottlesWizard', () => {
     expect(screen.getByText('bottles.importWizard.next')).toBeInTheDocument();
   });
 
+  it('sends a CSV export, byte order mark included, unchanged to the preview', async () => {
+    const user = userEvent.setup();
+    vi.mocked(bottlesApi.importPreview).mockResolvedValue(samplePreview);
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['﻿name;capacityMl\nHavana;700'], 'bottles-2026-10-12.csv', { type: 'text/csv' });
+    await user.upload(input, file);
+    await user.click(screen.getByText('bottles.importWizard.next'));
+
+    await waitFor(() => expect(bottlesApi.importPreview).toHaveBeenCalledWith(file));
+    const sent = vi.mocked(bottlesApi.importPreview).mock.calls[0][0];
+    expect([...new Uint8Array(await sent.arrayBuffer()).slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+  });
+
   it('transitions to the resolve step after successful preview', async () => {
     const user = userEvent.setup();
     vi.mocked(bottlesApi.importPreview).mockResolvedValue(samplePreview);

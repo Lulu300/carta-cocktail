@@ -15,7 +15,6 @@
     "cannotModifySystemMenu": "Le slug et le type d’un menu système ne peuvent pas être modifiés",
     "fileTooLarge": "Le fichier ou la requête est trop volumineux",
     "invalidJson": "Le corps de la requête n’est pas un JSON valide",
-    "invalidImportFile": "Le fichier d’import n’a pas pu être lu",
     "noFileUploaded": "Aucun fichier envoyé",
     "backupSchemaTooNew": "Cette sauvegarde vient d’une version plus récente de Carta Cocktail : mettez l’application à jour avant de la restaurer",
     "tooManyAttempts": "Trop de tentatives de connexion échouées : réessayez dans quelques minutes",
@@ -30,7 +29,19 @@
     "reorderDuplicateIds": "Le nouvel ordre contient deux fois le même élément",
     "reorderIncomplete": "Le nouvel ordre doit contenir tous les éléments de la carte",
     "reorderForeignIds": "Le nouvel ordre contient un élément qui n'est pas dans cette carte",
-    "sectionNotInMenu": "Cette section n'appartient pas à cette carte"
+    "sectionNotInMenu": "Cette section n'appartient pas à cette carte",
+    "import": {
+      "missingColumn": "Le fichier CSV doit avoir une colonne name et une colonne capacityMl",
+      "invalidJson": "Le fichier n'est pas un JSON valide",
+      "unsupportedVersion": "Ce fichier n'est pas un export de bouteilles de Carta Cocktail, ou sa version n'est pas prise en charge",
+      "bottlesRequired": "Le fichier JSON ne contient pas de liste de bouteilles",
+      "invalidZip": "L'archive ZIP n'a pas pu être lue",
+      "zipMissingBottles": "L'archive ZIP doit contenir bottles.csv ou bottles.json",
+      "zipEntryTooLarge": "Un fichier de l'archive ZIP dépasse 20 Mo une fois décompressé",
+      "unsupportedFormat": "Format de fichier non pris en charge : utilisez un fichier .csv, .json ou .zip",
+      "tooManyRows": "Le fichier a plus de 2 000 lignes : répartissez-le en plusieurs imports",
+      "tooManyBottles": "L'import créerait plus de 2 000 bouteilles : répartissez-le en plusieurs imports"
+    }
   },
   "auth": {
     "loginSuccess": "Connexion réussie",
