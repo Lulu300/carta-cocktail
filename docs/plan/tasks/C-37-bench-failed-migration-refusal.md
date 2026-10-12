@@ -27,6 +27,7 @@ Essai de C-18 sur une copie du jeu d'essai avec une catégorie en double, chemin
 - `refusal message` : KO, `"does not match migration 0_init" missing`, alors que le log contient le message de C-18 ;
 - `database left untouched by the refused start` : KO, `database file changed`. C'est attendu : la baseline marque `0_init` appliquée, et Prisma ajoute une ligne en échec dans `_prisma_migrations` (2 lignes). Les tables de données sont intactes (aucune perte dans le comptage) ;
 - `pre-migrate-*.db backup` : OK, 1 copie pour 3 démarrages.
+- `backend starts` a affiché une fois `refused: exit code 0, 2 restart(s)` pour ce même refus (code 1 au premier essai) : le code est lu pendant que `restart: unless-stopped` relance le conteneur, et Docker le remet à 0. Lire le code de la dernière sortie (événements `die`, ou `State.Restarting`), pas l'état courant.
 
 Le banc compte donc deux échecs inattendus pour un refus que les notes décrivent comme normal (doublons, voir v1.8.0).
 
