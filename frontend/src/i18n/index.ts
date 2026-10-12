@@ -1,11 +1,22 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
-import en from './locales/en.json';
-import fr from './locales/fr.json';
+import en from './locales/public/en.json';
+import fr from './locales/public/fr.json';
 import { FALLBACK_LANGUAGE, getBaseLanguage } from '../utils/localization';
 
 export const SUPPORTED_LANGUAGES = ['fr', 'en'] as const;
+export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
+
+// Only the messages of the first load (public pages and the components they share with the
+// admin) ship with the app entry: guests opening a menu from a QR code never need the rest.
+// The admin and login messages are registered by ./admin, loaded with their chunks.
+// A language added to SUPPORTED_LANGUAGES goes in this map and in the one of ./admin:
+// `satisfies` fails until both list it.
+const PUBLIC_RESOURCES = {
+  en: { translation: en },
+  fr: { translation: fr },
+} satisfies Record<SupportedLanguage, { translation: typeof en }>;
 
 // Registered before init so the language picked by the detector is applied too.
 i18n.on('languageChanged', (language) => {
@@ -16,10 +27,7 @@ i18n
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({
-    resources: {
-      en: { translation: en },
-      fr: { translation: fr },
-    },
+    resources: PUBLIC_RESOURCES,
     detection: {
       // Default order without 'htmlTag' and 'cookie'. <html lang> is written by the listener above,
       // so reading it back would make an unsupported browser language ("de") inherit the previous

@@ -1,0 +1,74 @@
+{
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "login": "Connexion",
+    "language": "Langue",
+    "changeLanguage": "Changer de langue",
+    "main": "Navigation principale",
+    "skipToContent": "Aller au contenu"
+  },
+  "home": {
+    "subtitle": "Découvrez nos cartes de cocktails",
+    "noMenus": "Aucune carte disponible pour le moment",
+    "cocktailCount_one": "{{count}} cocktail",
+    "cocktailCount_other": "{{count}} cocktails",
+    "bottleCount_one": "{{count}} bouteille",
+    "bottleCount_other": "{{count}} bouteilles",
+    "loadError": "Impossible de charger les cartes"
+  },
+  "cocktails": {
+    "notes": "Notes",
+    "preferredBottles": "Bouteilles favorites",
+    "created": "Cocktail créé",
+    "updated": "Cocktail mis à jour",
+    "deleted": "Cocktail supprimé",
+    "export": "Exporter",
+    "viewGrid": "Vue grille",
+    "viewList": "Vue liste"
+  },
+  "public": {
+    "menuNotFound": "Carte introuvable",
+    "cocktailNotFound": "Cocktail introuvable",
+    "unavailable": "Actuellement indisponible",
+    "bottleSearchPlaceholder": "Rechercher une bouteille...",
+    "cocktailSearchPlaceholder": "Rechercher dans les recettes...",
+    "withoutSection": "Sans section",
+    "other": "Autres",
+    "servings_one": "{{count}} dose",
+    "servings_other": "{{count}} doses",
+    "ingredients": "Ingrédients",
+    "instructions": "Préparation",
+    "print": "Imprimer",
+    "back": "Retour à la carte",
+    "backHome": "Retour à l'accueil",
+    "menuLoadError": "Impossible de charger la carte",
+    "cocktailLoadError": "Impossible de charger le cocktail",
+    "loadErrorHint": "Vérifiez votre connexion puis réessayez.",
+    "emptyMenu": "Cette carte est vide pour le moment",
+    "noResults": "Aucun résultat pour « {{query}} »",
+    "sectionNav": "Sections de la carte",
+    "moreIngredients_one": "{{count}} autre ingrédient",
+    "moreIngredients_other": "{{count}} autres ingrédients",
+    "showAllLocations_one": "Voir {{count}} emplacement",
+    "showAllLocations_other": "Voir les {{count}} emplacements",
+    "alcoholPercentage": "{{value}} % vol.",
+    "capacityMl": "{{value}} ml"
+  },
+  "common": {
+    "cancel": "Annuler",
+    "confirm": "Confirmer",
+    "loading": "Chargement...",
+    "error": "Une erreur est survenue",
+    "retry": "Réessayer",
+    "close": "Fermer",
+    "clearSearch": "Effacer la recherche",
+    "resultCount_one": "{{count}} résultat",
+    "resultCount_other": "{{count}} résultats"
+  },
+  "deletion": {
+    "usedByCocktails": "Utilisé par ces cocktails : {{names}}.",
+    "usedByBottles": "Bouteilles concernées : {{names}}.",
+    "more_one": "et {{count}} autre",
+    "more_other": "et {{count}} autres"
+  }
+}

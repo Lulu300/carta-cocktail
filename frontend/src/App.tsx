@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, type ComponentType } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from './contexts/AuthContext';
@@ -9,20 +9,26 @@ import CocktailPublicPage from './pages/public/CocktailPublicPage';
 
 // Guests scanning a menu QR code only need the public pages: everything behind
 // /login and /admin is split into on-demand chunks to keep the first load small.
-const AdminLayout = lazy(() => import('./components/layout/AdminLayout'));
-const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
-const DashboardPage = lazy(() => import('./pages/admin/DashboardPage'));
-const CategoriesPage = lazy(() => import('./pages/admin/CategoriesPage'));
-const BottlesPage = lazy(() => import('./pages/admin/BottlesPage'));
-const IngredientsPage = lazy(() => import('./pages/admin/IngredientsPage'));
-const UnitsPage = lazy(() => import('./pages/admin/UnitsPage'));
-const CocktailsPage = lazy(() => import('./pages/admin/CocktailsPage'));
-const CocktailFormPage = lazy(() => import('./pages/admin/CocktailFormPage'));
-const MenusPage = lazy(() => import('./pages/admin/MenusPage'));
-const MenuEditPage = lazy(() => import('./pages/admin/MenuEditPage'));
-const MenuBottleEditPage = lazy(() => import('./pages/admin/MenuBottleEditPage'));
-const ShortagesPage = lazy(() => import('./pages/admin/ShortagesPage'));
-const SettingsPage = lazy(() => import('./pages/admin/SettingsPage'));
+// Their messages too: each chunk waits for the admin messages, so they are
+// registered before its first render and no raw key ever shows.
+function lazyWithAdminMessages(load: () => Promise<{ default: ComponentType }>) {
+  return lazy(() => Promise.all([load(), import('./i18n/admin')]).then(([module]) => module));
+}
+
+const AdminLayout = lazyWithAdminMessages(() => import('./components/layout/AdminLayout'));
+const LoginPage = lazyWithAdminMessages(() => import('./pages/auth/LoginPage'));
+const DashboardPage = lazyWithAdminMessages(() => import('./pages/admin/DashboardPage'));
+const CategoriesPage = lazyWithAdminMessages(() => import('./pages/admin/CategoriesPage'));
+const BottlesPage = lazyWithAdminMessages(() => import('./pages/admin/BottlesPage'));
+const IngredientsPage = lazyWithAdminMessages(() => import('./pages/admin/IngredientsPage'));
+const UnitsPage = lazyWithAdminMessages(() => import('./pages/admin/UnitsPage'));
+const CocktailsPage = lazyWithAdminMessages(() => import('./pages/admin/CocktailsPage'));
+const CocktailFormPage = lazyWithAdminMessages(() => import('./pages/admin/CocktailFormPage'));
+const MenusPage = lazyWithAdminMessages(() => import('./pages/admin/MenusPage'));
+const MenuEditPage = lazyWithAdminMessages(() => import('./pages/admin/MenuEditPage'));
+const MenuBottleEditPage = lazyWithAdminMessages(() => import('./pages/admin/MenuBottleEditPage'));
+const ShortagesPage = lazyWithAdminMessages(() => import('./pages/admin/ShortagesPage'));
+const SettingsPage = lazyWithAdminMessages(() => import('./pages/admin/SettingsPage'));
 
 function RouteFallback() {
   const { t } = useTranslation();

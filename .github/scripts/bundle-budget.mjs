@@ -6,7 +6,8 @@
  * Guards the JavaScript a guest downloads before the first navigation (the
  * public menu opened from a QR code): the entry script of index.html plus its
  * <link rel="modulepreload"> chunks. Fails when:
- *   - one of these chunks contains admin, login or import wizard code, or jszip;
+ *   - one of these chunks contains admin, login or import wizard code, the admin
+ *     messages, or jszip;
  *   - one of these chunks contains the text "JSZip" (safety net);
  *   - their total gzip size exceeds the budget.
  *
@@ -38,6 +39,8 @@ const FORBIDDEN_MODULES = [
   'src/pages/auth/',
   'src/components/layout/AdminLayout.tsx',
   'src/components/import/',
+  'src/i18n/admin.ts',
+  'src/i18n/locales/admin/',
   'node_modules/jszip/',
 ];
 
