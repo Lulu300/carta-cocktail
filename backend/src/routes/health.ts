@@ -14,7 +14,8 @@ router.get('/', async (_req, res) => {
     res.status(503).json({ status: 'unavailable' });
     return;
   }
-  res.json({ status: 'ok', version: process.env.APP_VERSION ?? 'dev' });
+  // `||`, not `??`: an APP_VERSION set but empty also falls back to 'dev'
+  res.json({ status: 'ok', version: process.env.APP_VERSION || 'dev' });
 });
 
 export default router;

@@ -23,6 +23,13 @@ describe('GET /api/health', () => {
     expect(res.body).toEqual({ status: 'ok', version: '1.12.0' });
   });
 
+  it('reports dev when APP_VERSION is set but empty', async () => {
+    vi.stubEnv('APP_VERSION', '');
+    const res = await request.get('/api/health');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ status: 'ok', version: 'dev' });
+  });
+
   it('answers 503 with the status only when the database query fails', async () => {
     vi.spyOn(prisma, '$queryRaw').mockRejectedValueOnce(new Error('SQLITE_CANTOPEN: /app/data/carta_cocktail.db'));
     const res = await request.get('/api/health');
