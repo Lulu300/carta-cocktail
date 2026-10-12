@@ -25,10 +25,8 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
+      # The postinstall script generates the Prisma client
       - run: npm ci
-
-      - name: Generate Prisma client
-        run: npx prisma generate
 
       - name: Check that migrations match the Prisma schema
         run: npm run db:check
@@ -66,6 +64,8 @@ jobs:
           --scope backend/src/
           --ignore 'backend/src/test/**'
           --ignore 'backend/src/index.ts'
+          --ignore 'backend/src/scripts/seed.ts'
+          --ignore 'backend/src/scripts/check-integrity.ts'
 
       - name: Upload backend coverage
         if: always()

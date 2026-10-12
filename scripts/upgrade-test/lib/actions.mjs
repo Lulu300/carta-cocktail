@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { changeAdminPassword, checkLogLines } from './checks.mjs';
 import { copyDatabaseFiles, DB_FILE_NAME } from './database.mjs';
-import { containerMounts, docker } from './docker.mjs';
+import { containerMounts, docker, runHelper } from './docker.mjs';
 import { isRequirementMet } from './expectations.mjs';
 import { BACKEND_SERVICE, waitForStart } from './instance.mjs';
 
@@ -181,6 +181,31 @@ async function changeWeakAdminPassword(ctx, hook) {
   return { status: 'done', detail: `password of ${current.length} characters changed to ${newPassword.length} characters${envNote}` };
 }
 
+/**
+ * Mounts of the container on `destinations`, in that order, with their `-v` source: the volume
+ * name, or the host folder of a bind mount. Destinations without a mount are left out.
+ */
+export function mountsToChown(mounts, destinations) {
+  return destinations
+    .map((destination) => mounts.find((mount) => mount.Destination === destination))
+    .filter(Boolean)
+    .map((mount) => ({ destination: mount.Destination, type: mount.Type, source: mount.Type === 'volume' ? mount.Name : mount.Source }));
+}
+
+/**
+ * The backend image runs as a non-root user: the volumes and host folders mounted on
+ * `destinations` are given to `owner` with a helper container, as the notes do with an alpine
+ * container. Runs before the jump, on the mounts of the stopped container.
+ */
+function chownMounts(ctx, { destinations, owner }) {
+  const container = ctx.instance.containerId(BACKEND_SERVICE);
+  const mounts = mountsToChown(containerMounts(container), destinations);
+  if (mounts.length === 0) return { status: 'skipped', detail: `no mount on ${destinations.join(', ')}` };
+  for (const mount of mounts) runHelper([`${mount.source}:/target`], `chown -R ${owner} /target`);
+  const list = mounts.map((mount) => `${mount.destination} (${mount.type})`).join(', ');
+  return { status: 'done', detail: `${list} given to ${owner}` };
+}
+
 function manual(ctx, { note }) {
   return { status: 'manual', detail: note };
 }
@@ -195,6 +220,7 @@ const ACTIONS = {
   restoreUploads,
   checkPhotoMount,
   changeWeakAdminPassword,
+  chownMounts,
   manual,
 };
 

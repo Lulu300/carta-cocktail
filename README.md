@@ -116,6 +116,16 @@ ADMIN_PASSWORD=<at least 12 characters>        # required on first start
 
 Some versions require actions before or after the upgrade (new variables in `.env`, files to copy out of the old container…). **Read [`UPGRADING.md`](UPGRADING.md) before pulling a new version**, and apply the sections of every version newer than yours, in order. Upgrading from v1.4.0 or older to v1.5.0 requires a `JWT_SECRET` and a copy of the existing cocktail photos.
 
+#### Data folders and the node user
+
+The backend runs as the `node` user (uid 1000, gid 1000), never as root. The named volumes of the compose files need nothing: Docker gives a new volume the owner of the image folder. Host folders mounted on `/app/data` and `/app/uploads` must belong to uid 1000 (or to the uid set with `user:` in your compose file). Create them before the first start:
+
+```bash
+mkdir -p data uploads && sudo chown 1000:1000 data uploads
+```
+
+Versions before the `node` user ran as root, so the volumes and folders of an existing install belong to root: follow the required actions of that version in [`UPGRADING.md`](UPGRADING.md). If a folder is not writable, the backend stops at startup with the `chown` command to run.
+
 #### Database files and network shares
 
 By default, the backend runs SQLite in WAL mode. While it runs, the `db-data` volume holds `carta_cocktail.db-wal` and `carta_cocktail.db-shm` next to `carta_cocktail.db`, and the latest changes may only be in the `-wal` file. Never copy `carta_cocktail.db` alone while the backend runs: use the export in Settings > Backup & Restore, which saves a consistent copy of the database with the photos, or stop the backend and copy the `.db` file together with its `-wal` and `-shm` files when they exist. To put a copy back, use the restore in Settings > Backup & Restore, or follow [Restoring a pre-migration backup](#restoring-a-pre-migration-backup), which removes the old `-wal` and `-shm` files: a restored `.db` next to a stale `-wal` file can be corrupted. A copy put back by hand also brings back its sessions, including those revoked since it was made: set a new `JWT_SECRET` afterwards, as in [UPGRADING › "Signing in after a restore"](UPGRADING.md#signing-in-after-a-restore).
@@ -165,10 +175,11 @@ npm run db:check      # exit 0: the migrations match schema.prisma
 
 `backend/docker-entrypoint.sh` runs before the API:
 
-1. If the database exists and `prisma migrate status` reports pending migrations or no migration history, it copies the database to `backups/pre-migrate-<date>.db`, next to the database (`/app/data/backups/` in the `db-data` volume). It keeps the 10 most recent copies, and skips the copy when the database has not changed since the last one.
-2. It applies the pending migrations with `prisma migrate deploy`. A new database is created from scratch.
-3. A database created by `db push` (v1.5.0 and older) has no migration history. If its schema is exactly the one of the first migration, `0_init`, the entrypoint marks `0_init` as applied and continues. Otherwise **it refuses to start**: it prints the differences, leaves the database untouched, and the container exits.
-4. It runs the seed, then starts Node.
+1. The container runs as the `node` user (uid 1000). The entrypoint first checks that it can write to the database folder and the upload folder. Otherwise it stops and prints the `chown` command to run (see [Data folders and the node user](#data-folders-and-the-node-user)). A command given to the container (`docker compose run carta-cocktail-backend <command>`) runs instead of the steps below.
+2. If the database exists and `prisma migrate status` reports pending migrations or no migration history, it copies the database to `backups/pre-migrate-<date>.db`, next to the database (`/app/data/backups/` in the `db-data` volume). It keeps the 10 most recent copies, and skips the copy when the database has not changed since the last one.
+3. It applies the pending migrations with `prisma migrate deploy`. A new database is created from scratch.
+4. A database created by `db push` (v1.5.0 and older) has no migration history. If its schema is exactly the one of the first migration, `0_init`, the entrypoint marks `0_init` as applied and continues. Otherwise **it refuses to start**: it prints the differences, leaves the database untouched, and the container exits.
+5. It runs the seed, then starts Node.
 
 ### Checking a production database before the first upgrade
 
@@ -232,10 +243,11 @@ carta-cocktail/
 │   │   ├── services/       # Business logic (availability)
 │   │   ├── middleware/      # JWT auth
 │   │   ├── i18n/           # Backend translations
+│   │   ├── scripts/        # Seed (default data), integrity check
 │   │   └── utils/          # Helpers
 │   └── prisma/
 │       ├── schema.prisma   # Database schema (15 models)
-│       └── seed.ts         # Default data
+│       └── migrations/     # Versioned migrations
 ├── frontend/               # React SPA
 │   ├── src/
 │   │   ├── pages/          # Admin (12) + Public (3) pages

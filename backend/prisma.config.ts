@@ -10,7 +10,8 @@ export default defineConfig({
   schema: 'prisma/schema.prisma',
   migrations: {
     path: 'prisma/migrations',
-    seed: 'tsx prisma/seed.ts',
+    // Development only (`prisma db seed`): the image has no tsx and runs node dist/scripts/seed.js
+    seed: 'tsx src/scripts/seed.ts',
   },
   // `prisma generate` runs without a database (image build, CI): the commands
   // that need one fail with Prisma's own error when DATABASE_URL is missing.

@@ -1,3 +1,5 @@
+// Copied alone into the Docker image, where the Prisma CLI loads it through
+// prisma.config.ts: import Node built-ins only, never other files of src/.
 import path from 'path';
 
 /**

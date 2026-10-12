@@ -1,11 +1,18 @@
 #!/bin/sh
-# Container entrypoint: back up the SQLite database, apply the versioned Prisma
-# migrations, seed, then replace this shell with Node so that it receives SIGTERM.
+# Container entrypoint, run as the node user: check that the data folders are
+# writable, back up the SQLite database, apply the versioned Prisma migrations,
+# seed, then replace this shell with Node so that it receives SIGTERM (through
+# tini). A command given to the container (`docker compose run … sh`) runs
+# instead of those startup steps.
 set -eu
 
-: "${DATABASE_URL:?DATABASE_URL must be set, for example file:/app/data/carta_cocktail.db}"
-
 cd "$(dirname "$0")"
+
+if [ "$#" -gt 0 ]; then
+  exec "$@"
+fi
+
+: "${DATABASE_URL:?DATABASE_URL must be set, for example file:/app/data/carta_cocktail.db}"
 
 BASELINE_MIGRATION=0_init
 MAX_BACKUPS=10
@@ -23,7 +30,75 @@ resolve_db_file() {
 }
 
 DB_FILE="$(resolve_db_file)"
-BACKUP_DIR="$(dirname "$DB_FILE")/backups"
+DB_DIR="$(dirname "$DB_FILE")"
+BACKUP_DIR="$DB_DIR/backups"
+UPLOAD_DIR="${UPLOAD_DIR:-/app/uploads}"
+
+refuse_unwritable() {
+  owner="$(id -u):$(id -g)"
+  {
+    echo "ERROR: the backend runs as uid $(id -u) and cannot write to $1."
+    echo "Images before this version ran as root, so the files of an existing install belong to root."
+    echo "The folder may also belong to another uid (see \`user:\` in the compose file), or be mounted read-only."
+    echo "Stop the backend, give the volume or host folder mounted on $2 to $owner (mounted read-write), then start again:"
+    echo "  named volume: docker run --rm -v <volume>:/data alpine chown -R $owner /data"
+    echo "  host folder:  sudo chown -R $owner <host folder>"
+    echo "See the required actions of this version in UPGRADING.md."
+  } >&2
+  exit 1
+}
+
+# Real write tests: busybox `test -w` only compares mode bits, so it misses
+# read-only mounts, ACLs and the uid mapping of network shares. They change
+# nothing and leave nothing behind.
+can_write_dir() {
+  probe="$(mktemp -p "$1" .write-test.XXXXXX 2>/dev/null)" && rm -f "$probe"
+}
+
+# Opens the file for appending and writes nothing: content and mtime unchanged.
+can_write_file() {
+  (: >>"$1") 2>/dev/null
+}
+
+# require_writable <mount point> <path>...: every existing folder or file must be
+# writable. Without this check, the first write fails later, deep inside Prisma
+# or SQLite, or only when a photo is uploaded.
+require_writable() {
+  mount_point="$1"
+  shift
+  for path in "$@"; do
+    if [ -d "$path" ]; then
+      can_write_dir "$path" || refuse_unwritable "$path" "$mount_point"
+    elif [ -e "$path" ]; then
+      can_write_file "$path" || refuse_unwritable "$path" "$mount_point"
+    fi
+  done
+}
+
+# A backup restore renames the folders directly in UPLOAD_DIR: a subfolder left
+# to root by a non-recursive chown would make it fail. Photos only need their
+# folder to be writable.
+require_writable_upload_dirs() {
+  find "$UPLOAD_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r dir; do
+    require_writable "$UPLOAD_DIR" "$dir"
+  done
+}
+
+# SQLite migrations are not transactional: one stopped halfway is marked as
+# failed, and every later start refuses to go on (P3009). A stop request (tini
+# forwards SIGTERM to this shell only) lets the running command finish and
+# starts no new step. Docker still kills the container after its stop timeout
+# (10 s by default).
+stop_status=
+trap 'stop_status=143' TERM
+trap 'stop_status=130' INT
+
+exit_if_stop_requested() {
+  if [ -n "$stop_status" ]; then
+    echo "Stop requested: exiting before $1."
+    exit "$stop_status"
+  fi
+}
 
 latest_backup() {
   ls -1 "$BACKUP_DIR"/pre-migrate-*.db 2>/dev/null | sort -r | head -n 1
@@ -110,8 +185,10 @@ baseline_existing_database() {
   fi
   rm -rf "$baseline_dir"
 
+  exit_if_stop_requested "marking $BASELINE_MIGRATION as applied"
   echo "Existing database matches $BASELINE_MIGRATION: marking it as applied."
   npx prisma migrate resolve --applied "$BASELINE_MIGRATION"
+  exit_if_stop_requested "the migrations after $BASELINE_MIGRATION"
   npx prisma migrate deploy
 }
 
@@ -130,12 +207,21 @@ apply_migrations() {
   fi
 }
 
+require_writable "$DB_DIR" "$DB_DIR" "$DB_FILE" "$DB_FILE-wal" "$DB_FILE-shm" "$BACKUP_DIR"
+require_writable "$UPLOAD_DIR" "$UPLOAD_DIR"
+require_writable_upload_dirs || exit 1
+
 # `migrate status` fails when migrations are pending or the database has no
 # migration history: the two cases where the next step may change it.
 if [ -f "$DB_FILE" ] && ! npx prisma migrate status; then
+  exit_if_stop_requested "the backup"
   backup_database
 fi
 
+exit_if_stop_requested "the migrations"
 apply_migrations
-npm run db:seed
+exit_if_stop_requested "the seed"
+trap - TERM INT
+
+node dist/scripts/seed.js
 exec node dist/index.js

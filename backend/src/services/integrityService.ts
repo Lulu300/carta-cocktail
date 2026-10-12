@@ -3,7 +3,7 @@ import { PrismaClient } from '../generated/prisma/client';
 /**
  * Read-only audit of the data that the schema does not protect (or did not
  * protect before the schema_integrity migration). Run it on a copy of a
- * production database before upgrading: scripts/check-integrity.ts.
+ * production database before upgrading: src/scripts/check-integrity.ts.
  *
  * The queries use raw SQL on columns that already exist in older schemas, so
  * the audit also works on a database that has not been migrated yet.

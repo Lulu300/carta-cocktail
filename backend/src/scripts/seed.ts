@@ -1,6 +1,7 @@
-// The seed runs on its own (npm run db:seed): the shared client also loads backend/.env
-import { prisma } from '../src/lib/prisma';
-import { ensureAdmin } from '../src/bootstrap/ensureAdmin';
+// The seed runs on its own: `npm run db:seed` in development, `node dist/scripts/seed.js`
+// in the Docker image. The shared client also loads backend/.env
+import { prisma } from '../lib/prisma';
+import { ensureAdmin } from '../bootstrap/ensureAdmin';
 
 async function main() {
   await ensureAdmin(prisma);

@@ -1,22 +1,22 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { spawnSync } from 'child_process';
 import path from 'path';
-import { setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData } from './test/helpers';
-import { TEST_DATABASE_URL } from './test/testDatabase';
+import { setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData } from '../test/helpers';
+import { TEST_DATABASE_URL } from '../test/testDatabase';
 
-// scripts/check-integrity.ts runs as UPGRADING.md documents it: in its own process
+// The script runs as UPGRADING.md documents it: in its own process
 
-const BACKEND_DIR = path.resolve(__dirname, '..');
+const BACKEND_DIR = path.resolve(__dirname, '../..');
 const TSX = path.join(BACKEND_DIR, 'node_modules', '.bin', 'tsx');
 
 function runScript(databaseUrl: string | undefined) {
   const env = { ...process.env };
   delete env.DATABASE_URL;
   if (databaseUrl !== undefined) env.DATABASE_URL = databaseUrl;
-  return spawnSync(TSX, ['scripts/check-integrity.ts', '--counts-only'], { cwd: BACKEND_DIR, env, encoding: 'utf8' });
+  return spawnSync(TSX, ['src/scripts/check-integrity.ts', '--counts-only'], { cwd: BACKEND_DIR, env, encoding: 'utf8' });
 }
 
-describe('scripts/check-integrity.ts', () => {
+describe('src/scripts/check-integrity.ts', () => {
   beforeAll(async () => { await setupTestDatabase(); });
   afterAll(async () => { await teardownTestDatabase(); });
   beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
@@ -30,6 +30,13 @@ describe('scripts/check-integrity.ts', () => {
 
   it('should exit with 2 when the database file does not exist', () => {
     const result = runScript(`file:${path.join(BACKEND_DIR, 'prisma', 'missing-copy.db')}`);
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('Database file not found');
+  });
+
+  it('should exit with 2 when the path names a folder', () => {
+    const result = runScript(`file:${path.join(BACKEND_DIR, 'prisma')}`);
 
     expect(result.status).toBe(2);
     expect(result.stderr).toContain('Database file not found');
