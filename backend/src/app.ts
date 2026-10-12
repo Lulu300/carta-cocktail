@@ -42,6 +42,10 @@ if (process.env.NODE_ENV !== 'test') {
 }
 // i18n first, so that body parsing errors are answered in the client's language
 app.use(i18nMiddleware);
+// The confirmation of a bottle import sends back up to 2,000 rows and their resolutions: about
+// 2 MB at most, far above the default 100 kB. Read here, before the global parser (which skips a
+// body already read) and before authMiddleware: the limit stays at a few MB, under nginx's 20 MB.
+app.use('/api/bottles/import/confirm', express.json({ limit: '5mb' }));
 app.use(express.json());
 
 // Only failed attempts count: the admin who mistypes once and logs in is not held back

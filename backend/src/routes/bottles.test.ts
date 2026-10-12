@@ -10,6 +10,40 @@ beforeAll(async () => { await setupTestDatabase(); });
 afterAll(async () => { await teardownTestDatabase(); });
 beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
 
+const UTF8_BOM_BYTES = Buffer.from([0xef, 0xbb, 0xbf]);
+
+/** The CSV export as sent: decoding it as text would drop the byte order mark. */
+async function exportCsvBytes(): Promise<Buffer> {
+  const res = await request.get('/api/bottles/export?format=csv').set(authHeader())
+    .buffer(true)
+    .parse((response, done) => {
+      const chunks: Buffer[] = [];
+      response.on('data', (chunk: Buffer) => chunks.push(chunk));
+      response.on('end', () => done(null, Buffer.concat(chunks)));
+    });
+  return res.body as Buffer;
+}
+
+/** The bottles and the fields an export carries, in a stable order. */
+async function bottleSnapshot() {
+  return prisma.bottle.findMany({
+    select: {
+      name: true, capacityMl: true, remainingPercent: true, alcoholPercentage: true, purchasePrice: true,
+      location: true, openedAt: true, isApero: true, isDigestif: true, category: { select: { name: true } },
+    },
+    orderBy: [{ name: 'asc' }, { id: 'asc' }],
+  });
+}
+
+/** A complete import row, as /import/preview returns it. */
+function importRow(fields: Record<string, unknown> = {}) {
+  return {
+    name: 'Havana', categoryName: 'Rhum', capacityMl: 700, remainingPercent: 100,
+    alcoholPercentage: 40, purchasePrice: 25, location: 'Bar, top shelf', openedAt: null,
+    isApero: false, isDigestif: false, quantity: 1, ...fields,
+  };
+}
+
 describe('GET /api/bottles', () => {
   it('should return 401 without auth', async () => {
     const res = await request.get('/api/bottles');
@@ -200,6 +234,13 @@ describe('POST /api/bottles (batch)', () => {
       .send({ name: 'Shot', categoryId: cat.id, capacityMl: 50, quantity: 100 });
     expect(res.status).toBe(400);
     expect(res.body.details[0].path).toBe('body.quantity');
+    expect(await prisma.bottle.count()).toBe(0);
+  });
+
+  it('should create nothing when the batch fails', async () => {
+    const res = await request.post('/api/bottles').set(authHeader())
+      .send({ name: 'Ghost', categoryId: 999_999, capacityMl: 700, quantity: 3 });
+    expect(res.status).toBe(400);
     expect(await prisma.bottle.count()).toBe(0);
   });
 
@@ -502,7 +543,9 @@ describe('GET /api/bottles/export', () => {
     expect(res.headers['content-type']).toMatch(/text\/csv/);
     expect(res.headers['content-disposition']).toMatch(/bottles-\d{4}-\d{2}-\d{2}\.csv/);
 
-    const lines = res.text.trim().split('\n');
+    const csv = await exportCsvBytes();
+    expect(csv.subarray(0, 3)).toEqual(UTF8_BOM_BYTES);
+    const lines = csv.subarray(3).toString('utf8').trim().split('\n');
     expect(lines[0]).toBe(
       'name,categoryName,categoryType,capacityMl,quantity,remainingPercent,alcoholPercentage,purchasePrice,location,openedAt,isApero,isDigestif'
     );
@@ -534,6 +577,32 @@ describe('GET /api/bottles/export', () => {
     const lines = res.text.trim().split('\n');
     expect(lines).toHaveLength(2); // header + 1 row
     expect(lines[1]).toContain('Heineken,Beer,SPIRIT,330,2,');
+  });
+
+  it('should export a bottle named =1+1 as text, not as a formula', async () => {
+    await seedBottle({ name: '=1+1' });
+    const lines = (await exportCsvBytes()).toString('utf8').trim().split('\n');
+    expect(lines[1].startsWith("'=1+1,")).toBe(true);
+  });
+
+  it('should import back the bottles of a CSV export, BOM included', async () => {
+    const rhum = await seedCategory({ name: 'Rhum' });
+    const gin = await seedCategory({ name: 'Gin' });
+    await seedBottle({ name: '=1+1', categoryId: rhum.id, location: 'Cave, étagère 3', purchasePrice: 0 });
+    await seedBottle({ name: 'Château "Margaux"', categoryId: gin.id, alcoholPercentage: 40.5, isApero: true });
+    await seedBottle({ name: 'Château "Margaux"', categoryId: gin.id, alcoholPercentage: 40.5, isApero: true });
+    const exported = await bottleSnapshot();
+    const csv = await exportCsvBytes();
+
+    const preview = await request.post('/api/bottles/import/preview').set(authHeader())
+      .attach('file', csv, 'bottles.csv');
+    await prisma.bottle.deleteMany();
+    const confirm = await request.post('/api/bottles/import/confirm').set(authHeader())
+      .send({ payload: preview.body.payload, resolutions: {} });
+
+    expect(preview.body.errors).toEqual([]);
+    expect(confirm.status).toBe(201);
+    expect(await bottleSnapshot()).toEqual(exported);
   });
 });
 
@@ -647,8 +716,8 @@ describe('POST /api/bottles/import/preview', () => {
       .set(authHeader())
       .attach('file', Buffer.from(csv), 'bottles.csv');
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe('The import file could not be read');
-    expect(res.body.details).toEqual({ reason: 'CSV missing required column: capacityMl' });
+    expect(res.body.error).toBe('The CSV file must have a name column and a capacityMl column');
+    expect(res.body.details).toEqual({ code: 'missingColumn', column: 'capacityMl' });
   });
 
   it('should answer 413 JSON for a file over 10 MB', async () => {
@@ -685,6 +754,61 @@ describe('POST /api/bottles/import/preview', () => {
       .set(authHeader())
       .attach('file', zip.toBuffer(), 'bottles.zip');
     expect(res.status).toBe(400);
+    expect(res.body).toEqual({
+      error: 'The ZIP archive must contain bottles.csv or bottles.json',
+      details: { code: 'zipMissingBottles' },
+    });
+  });
+
+  it('should parse a CSV saved by Excel: BOM and semicolons', async () => {
+    const csv = '\uFEFFname;categoryName;capacityMl;purchasePrice\r\nHavana 7;Rhum;700;25,90\r\n';
+    const res = await request.post('/api/bottles/import/preview').set(authHeader())
+      .attach('file', Buffer.from(csv), 'bottles.csv');
+
+    expect(res.status).toBe(200);
+    expect(res.body.payload.bottles).toEqual([importRow({
+      name: 'Havana 7', alcoholPercentage: null, purchasePrice: 25.9, location: null,
+    })]);
+    expect(res.body.errors).toEqual([]);
+  });
+
+  it('should leave out an invalid row, list it in errors and keep the others', async () => {
+    const csv = 'name,categoryName,capacityMl\nNo capacity,Rhum,\nHavana,Rhum,700';
+    const res = await request.post('/api/bottles/import/preview').set(authHeader())
+      .attach('file', Buffer.from(csv), 'bottles.csv');
+
+    expect(res.status).toBe(200);
+    expect(res.body.errors).toEqual([{ source: 'bottles', line: 2, field: 'capacityMl', code: 'required' }]);
+    expect(res.body.payload.bottles.map((b: { name: string }) => b.name)).toEqual(['Havana']);
+    // The errors are not part of the payload sent back to /import/confirm
+    expect(res.body.payload.errors).toBeUndefined();
+  });
+
+  it('should refuse a file of 2,001 rows with a translated 400', async () => {
+    const rows = Array.from({ length: 2001 }, (_, i) => `Bottle ${i},Rhum,700`);
+    const res = await request.post('/api/bottles/import/preview').set(authHeader())
+      .set('Accept-Language', 'fr')
+      .attach('file', Buffer.from(['name,categoryName,capacityMl', ...rows].join('\n')), 'bottles.csv');
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({
+      error: 'Le fichier a plus de 2 000 lignes : répartissez-le en plusieurs imports',
+      details: { code: 'tooManyRows', max: 2000 },
+    });
+  });
+
+  it('should list the existing duplicates of each row, whatever the case', async () => {
+    const rhum = await seedCategory({ name: 'Rhum' });
+    await seedBottle({ name: 'HAVANA', categoryId: rhum.id, capacityMl: 700 });
+    await seedBottle({ name: 'havana', categoryId: rhum.id, capacityMl: 700 });
+    await seedBottle({ name: 'Havana', categoryId: rhum.id, capacityMl: 1000 });
+    const payload = { version: 1, bottles: [importRow({ categoryName: 'rhum' }), importRow({ name: 'Diplomatico' })] };
+
+    const res = await request.post('/api/bottles/import/preview').set(authHeader())
+      .attach('file', Buffer.from(JSON.stringify(payload)), 'bottles.json');
+
+    expect(res.body.bottles[0].potentialDuplicates.map((d: { name: string }) => d.name)).toEqual(['HAVANA', 'havana']);
+    expect(res.body.bottles[1].potentialDuplicates).toEqual([]);
   });
 });
 
@@ -699,6 +823,51 @@ describe('POST /api/bottles/import/confirm', () => {
       .set(authHeader())
       .send({ payload: { version: 99, bottles: [] } });
     expect(res.status).toBe(400);
+  });
+
+  it('should return 400 for an invalid openedAt and create nothing', async () => {
+    await seedCategory({ name: 'Rhum' });
+    const payload = { version: 1, bottles: [importRow(), importRow({ openedAt: 'abc' })] };
+
+    const res = await request.post('/api/bottles/import/confirm').set(authHeader()).send({ payload });
+
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('body.payload.bottles.1.openedAt');
+    expect(await prisma.bottle.count()).toBe(0);
+  });
+
+  it('should refuse rows that would create more than 2,000 bottles', async () => {
+    await seedCategory({ name: 'Rhum' });
+    const payload = { version: 1, bottles: Array.from({ length: 41 }, () => importRow({ quantity: 50 })) };
+
+    const res = await request.post('/api/bottles/import/confirm').set(authHeader()).send({ payload });
+
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('body.payload.bottles');
+    expect(await prisma.bottle.count()).toBe(0);
+  });
+
+  it.each([1000, 2000])('should import %i bottles sent in a body over 100 kB, in under 5 s', async (count) => {
+    await seedCategory({ name: 'Rhum' });
+    const payload = {
+      version: 1,
+      bottles: Array.from({ length: count }, (_, i) => importRow({ name: `Bottle ${i}`, isApero: i % 2 === 0 })),
+    };
+    const body = JSON.stringify({ payload, resolutions: {} });
+    // Over the 100 kB of the global JSON parser: this request needs the route's own limit
+    expect(body.length).toBeGreaterThan(200 * 1024);
+
+    const start = Date.now();
+    const res = await request.post('/api/bottles/import/confirm').set(authHeader())
+      .set('Content-Type', 'application/json').send(body);
+    const elapsedMs = Date.now() - start;
+
+    expect(res.status).toBe(201);
+    expect(res.body.created.bottles).toBe(count);
+    expect(elapsedMs).toBeLessThan(5000);
+    expect(await prisma.bottle.count()).toBe(count);
+    const aperitifs = await findSystemMenu('aperitifs');
+    expect(await prisma.menuBottle.count({ where: { menuId: aperitifs.id } })).toBe(count / 2);
   });
 
   it('should return 400 for remainingPercent above 100 and create nothing', async () => {

@@ -304,6 +304,25 @@ describe('bottles.exportFile', () => {
     expect(mockAnchor.click).toHaveBeenCalled();
   });
 
+  it('saves the CSV export as received, byte order mark included', async () => {
+    const csv = new Blob([new Uint8Array([0xef, 0xbb, 0xbf]), 'name,categoryName\n'], { type: 'text/csv' });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      blob: () => Promise.resolve(csv),
+      headers: { get: () => 'attachment; filename="bottles.csv"' },
+    });
+    vi.spyOn(document, 'createElement').mockReturnValue({ click: vi.fn() } as unknown as HTMLElement);
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fake-url');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+
+    const api = await getApi();
+    await api.bottles.exportFile('csv');
+
+    const saved = createObjectURL.mock.calls[0][0] as Blob;
+    expect([...new Uint8Array(await saved.arrayBuffer()).slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+  });
+
   it('triggers the unauthorized handler on 401', async () => {
     localStorage.setItem('token', 'expired-token');
     mockError(401, { error: 'Unauthorized' });

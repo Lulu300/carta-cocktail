@@ -15,7 +15,6 @@
     "cannotModifySystemMenu": "System menus cannot have their slug or type changed",
     "fileTooLarge": "The file or request is too large",
     "invalidJson": "The request body is not valid JSON",
-    "invalidImportFile": "The import file could not be read",
     "noFileUploaded": "No file uploaded",
     "backupSchemaTooNew": "This backup comes from a newer version of Carta Cocktail: update the application before restoring it",
     "tooManyAttempts": "Too many failed login attempts: try again in a few minutes",
@@ -30,7 +29,19 @@
     "reorderDuplicateIds": "The new order lists the same item twice",
     "reorderIncomplete": "The new order must list every item of the menu",
     "reorderForeignIds": "The new order lists an item that is not in this menu",
-    "sectionNotInMenu": "This section is not one of this menu's sections"
+    "sectionNotInMenu": "This section is not one of this menu's sections",
+    "import": {
+      "missingColumn": "The CSV file must have a name column and a capacityMl column",
+      "invalidJson": "The file is not valid JSON",
+      "unsupportedVersion": "This file is not a bottle export of Carta Cocktail, or its version is not supported",
+      "bottlesRequired": "The JSON file has no list of bottles",
+      "invalidZip": "The ZIP archive could not be read",
+      "zipMissingBottles": "The ZIP archive must contain bottles.csv or bottles.json",
+      "zipEntryTooLarge": "A file of the ZIP archive is over 20 MB once uncompressed",
+      "unsupportedFormat": "Unsupported file format: use a .csv, .json or .zip file",
+      "tooManyRows": "The file has more than 2,000 rows: split it into several imports",
+      "tooManyBottles": "The import would create more than 2,000 bottles: split it into several imports"
+    }
   },
   "auth": {
     "loginSuccess": "Login successful",

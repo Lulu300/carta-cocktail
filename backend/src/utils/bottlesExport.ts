@@ -121,9 +121,31 @@ const CSV_COLUMNS = [
   'location', 'openedAt', 'isApero', 'isDigestif',
 ] as const;
 
+/** Byte order mark: without it, Excel reads a UTF-8 file as Windows-1252 and breaks the accents. */
+export const UTF8_BOM = '\uFEFF';
+
+const FORMULA_GUARD = "'";
+// A spreadsheet runs a cell that starts with =, +, -, @, a tab or a carriage return as a
+// formula (CSV injection). Text that already starts with guards before such a character is
+// guarded too: otherwise the import would take its own apostrophe for the export's guard.
+const NEEDS_GUARD = /^'*[=+\-@\t\r]/;
+
+/** Prefixes text that a spreadsheet would run as a formula, so that it shows as text. */
+export function protectFormula(text: string): string {
+  return NEEDS_GUARD.test(text) ? FORMULA_GUARD + text : text;
+}
+
+/** Undoes `protectFormula`, so that an exported CSV imports back unchanged. */
+export function unprotectFormula(text: string): string {
+  const isGuarded = text.startsWith(FORMULA_GUARD) && NEEDS_GUARD.test(text.slice(1));
+  return isGuarded ? text.slice(1) : text;
+}
+
 function escapeCsvField(value: unknown): string {
   if (value === null || value === undefined) return '';
-  const str = typeof value === 'boolean' ? (value ? 'true' : 'false') : String(value);
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  // A negative number is a number, not a formula: only text is guarded
+  const str = typeof value === 'number' ? String(value) : protectFormula(String(value));
   if (/[",\n\r]/.test(str)) {
     return `"${str.replace(/"/g, '""')}"`;
   }
@@ -157,5 +179,5 @@ export function buildCsvPayload(bottles: BottleWithCategory[]): string {
       escapeCsvField(r.isDigestif),
     ].join(','));
   }
-  return rows.join('\n') + '\n';
+  return UTF8_BOM + rows.join('\n') + '\n';
 }
