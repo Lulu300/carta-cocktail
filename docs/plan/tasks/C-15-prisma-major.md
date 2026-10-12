@@ -5,13 +5,13 @@ phase: C
 lane: deps
 criticite: moyenne
 effort: L
-status: todo
+status: done
 owner: agent
 depends_on: [B-01, B-04, B-07, C-01, C-02]
-touches: [backend/package.json, backend/package-lock.json, backend/prisma/, backend/prisma.config.ts, backend/src/lib/prisma.ts, backend/src/test/, backend/Dockerfile, backend/docker-entrypoint.sh, backend/AGENTS.md, AGENTS.md]
+touches: [backend/package.json, backend/package-lock.json, backend/prisma/, backend/prisma.config.ts, backend/src/lib/prisma.ts, backend/src/lib/databasePath.ts, backend/src/test/, backend/Dockerfile, backend/.dockerignore, backend/.gitignore, backend/docker-entrypoint.sh, backend/eslint.config.js, backend/vitest.config.ts, backend/src/index.ts, backend/src/services/, backend/src/routes/, backend/src/middleware/errorHandler.ts, backend/src/bootstrap/ensureAdmin.ts, backend/AGENTS.md, AGENTS.md, README.md]
 sources: ["08-dependencies.md §3.1", "08-dependencies.md §4", "08-dependencies.md §5"]
-branch:
-pr:
+branch: chore/C-15-prisma-major
+pr: https://github.com/Lulu300/carta-cocktail/pull/103
 ---
 
 ## Contexte
@@ -57,11 +57,11 @@ Prisma 7 change en profondeur la façon dont le client est généré et se conne
 
 ## Critères d'acceptation
 
-- [ ] `prisma` et `@prisma/client` en 7.10.x exactement, aucune trace de 8.0 RC.
-- [ ] Un seul `new PrismaClient` dans `src/` (plus celui du seed si nécessaire).
-- [ ] Tous les tests backend verts, couverture inchangée.
-- [ ] `docker compose up --build` : migrations, seed et API fonctionnels ; export puis import de backup réussis.
-- [ ] En dev, le backend ouvre bien la base existante (pas une base vide créée ailleurs).
+- [x] `prisma` et `@prisma/client` en 7.10.x exactement, aucune trace de 8.0 RC.
+- [x] Un seul `new PrismaClient` dans `src/` (plus celui du seed si nécessaire).
+- [x] Tous les tests backend verts, couverture inchangée.
+- [x] `docker compose up --build` : migrations, seed et API fonctionnels ; export puis import de backup réussis.
+- [x] En dev, le backend ouvre bien la base existante (pas une base vide créée ailleurs).
 
 ## Tests à ajouter ou adapter
 
@@ -78,3 +78,4 @@ Prisma 7 change en profondeur la façon dont le client est généré et se conne
 ## Journal
 
 - 2026-10-08 : tâche créée à partir du rapport de dépendances.
+- 2026-10-12 : fait (PR #103). Prisma, client et adapter better-sqlite3 épinglés en 7.10.0 (better-sqlite3 ^12.11.1, la 13 sort de la plage de l'adapter). Client `prisma-client` généré dans `src/generated/prisma` par un `postinstall` (comme Prisma 6 au `npm install`), avec `importFileExtension = ""` : sans tsconfig (le `npm ci` de l'image), Prisma émet des imports `.ts` que le code compilé ne charge pas. `resolveDatabasePath` déplacée dans `src/lib/databasePath.ts`, utilisée par l'adapter et par `prisma.config.ts` (chemin absolu, base `prisma/` conservée). `createPrismaClient()` seule fabrique de clients. Découverte : Prisma 6 stockait les `DateTime` en millisecondes Unix (le jeu d'essai n'a que des entiers), l'adapter écrit des chaînes ISO par défaut ; `timestampFormat: 'unixepoch-ms'` garde un seul format par colonne (test qui échoue sans). Entrypoint et `db:check` passés aux options Prisma 7 (`--from-config-datasource`, `--to-migrations`, `--to-schema`) ; sans datasource, `migrate diff --from-migrations` ne signale aucun écart, d'où le `DATABASE_URL` fixé dans `db:check`. `Prisma.dmmf` n'existe plus : `schemaTables()` lit `Prisma.ModelName`. Fichiers ajoutés à `touches` : imports `@prisma/client` (chemin seul), `.dockerignore`, `eslint.config.js`, `vitest.config.ts`, `index.ts`, `README.md` (commandes de vérification de la baseline). 914 tests, couverture des lignes modifiées 100 %. Docker (images `linux/arm64` et `linux/amd64`, `docker build` + `docker run` du backend, pas `docker compose`) sur une copie temporaire du jeu d'essai : baseline `0_init`, 3 migrations, seed, connexion, export puis import de sauvegarde OK ; comptes de lignes identiques avant/après dans toutes les tables ; schéma et données identiques à ceux d'une image `develop` (Prisma 6) ; base vide, redémarrage, refus d'une base sans `Bottle.location` (SHA-256 inchangé), restauration d'une sauvegarde Prisma 6 et retour arrière vers l'image Prisma 6 OK. Banc (remarque de la revue D-17) : `prisma.config.ts` présent dans l'image, `npx prisma migrate status` sans argument fonctionne, lignes de démarrage attendues inchangées, pas de hook 1.12.0 nécessaire ; banc non lancé (à la demande du coordinateur). Pas d'action utilisateur. Pour D-01 : le `postinstall` et l'entrypoint ont besoin du CLI `prisma`. Pour C-26 : la fonction est maintenant dans `src/lib/databasePath.ts`.
