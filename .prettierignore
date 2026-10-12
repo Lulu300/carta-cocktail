@@ -1,0 +1,8 @@
+# Generated, vendored or machine-written files
+**/node_modules/
+**/dist/
+**/coverage/
+**/package-lock.json
+backend/prisma/migrations/
+uploads/
+docs/plan/index.html

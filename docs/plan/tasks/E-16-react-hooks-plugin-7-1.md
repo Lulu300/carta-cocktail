@@ -5,7 +5,7 @@ phase: E
 lane: deps
 criticite: basse
 effort: S
-status: todo
+status: dropped
 owner: agent
 depends_on: [A-07]
 touches: [frontend/package.json, frontend/package-lock.json, frontend/src/pages/admin/CocktailsPage.tsx, frontend/src/pages/admin/MenuBottleEditPage.tsx]
@@ -53,3 +53,4 @@ Vérifier que les tests de `CocktailsPage` et `MenuBottleEditPage` couvrent le c
 ## Journal
 
 - 2026-10-08 : tâche créée par A-07, qui a gardé le plugin en `~7.0.1`.
+- 2026-10-12 : `dropped`, intégrée à B-05 (PR #98) : ESLint 10 impose react-hooks 7.1, la plage passe à `^7.1.1` et les deux pages sont corrigées dans B-05.
