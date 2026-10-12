@@ -70,3 +70,4 @@ Les messages d'erreur passent par `req.t()`, mais trois clés appelées n'existe
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-12 : C-13 (PR #100) a modifié `menuSections.ts` : les numéros de ligne cités (`:79`, `:107`) sont à relire ; le message `'Sections reordered'` est toujours en dur.
