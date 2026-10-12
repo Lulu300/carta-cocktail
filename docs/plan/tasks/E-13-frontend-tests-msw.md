@@ -78,3 +78,4 @@ Les tests frontend remplacent tout le module `services/api` par des doubles écr
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-12 : relecture d'E-08 (PR #119) : le test « loads the lists once for a batch of 10 recipes » (`frontend/src/components/import/ImportCocktailWizard.test.tsx`) écrit en dur `staleTime: 30_000` et l'avance d'horloge de `31_000`. Lire la valeur dans `createQueryClient()` (`frontend/src/queries/queryClient.ts`) pour suivre celle de l'app, en gardant `retry: false`.

@@ -8,7 +8,7 @@ effort: S
 status: todo
 owner: agent
 depends_on: [A-01, A-04, C-01, C-05, D-01, D-03, D-05]
-touches: [AGENTS.md, backend/AGENTS.md, frontend/AGENTS.md, README.md, docs/operations.md, backend/src/bootstrap/ensureAdmin.ts, .gitignore]
+touches: [AGENTS.md, backend/AGENTS.md, frontend/AGENTS.md, README.md, docs/operations.md, backend/src/bootstrap/ensureAdmin.ts, .gitignore, .github/workflows/ci.yml]
 sources: ["07-devops-history.md §5"]
 branch:
 pr:
@@ -108,3 +108,4 @@ Les `AGENTS.md` sont lus par chaque agent avant une tâche : une affirmation fau
 - 2026-10-12 : relecture de B-08 (PR #110) : le point « `backend/AGENTS.md:151` » de « Problème constaté » est réglé (`@prisma/client` et `prisma` rangés en « Runtime (database) », plus de `ts-node`). Commentaire français de `.gitignore` ajouté aux Points d'attention (fichier ajouté à `touches`).
 - 2026-10-12 : relecture de D-04 (PR #112, seconde passe) : l'étape d'audit est bien dans `ci.yml`, Points d'attention mis à jour.
 - 2026-10-12 : D-05 (PR #118) transmet la description du nouveau pipeline de release (Points d'attention).
+- 2026-10-12 : relectures de D-03 (PR #117) et D-05 (PR #118), à reprendre ici : section « API Structure » d'`AGENTS.md` (`/api/health` est public, sans auth) ; sections « Auth Pattern » et « Structure » de `backend/AGENTS.md` (`/api/health`, `routes/health.ts`) ; dans le modèle de release, un tag dont le job `ci` échoue ne publie rien (supprimer puis reposer le tag, ou « Re-run failed jobs » dans le run Release) ; le build arm64 n'est testé qu'à la release (le job `docker` de `ci.yml` construit l'amd64 seul) ; corriger le commentaire « Same cache scopes as the release workflow » du job `docker` de `ci.yml` (exact en lecture seulement : la release écrit dans `<service>-release`), fichier ajouté à `touches`.
