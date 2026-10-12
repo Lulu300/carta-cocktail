@@ -7,7 +7,6 @@ import { useCocktailsAvailability } from '../../queries/cocktails';
 import type { Menu } from '../../types';
 import Button from '../../components/ui/Button';
 import EmptyState from '../../components/ui/EmptyState';
-import LiveResultCount from '../../components/ui/LiveResultCount';
 import Modal from '../../components/ui/Modal';
 import { cx } from '../../components/ui/classNames';
 import BottleGroupRow from './BottleGroupRow';
@@ -89,7 +88,13 @@ function MenuContent({ menu, slug }: { menu: Menu; slug: string }) {
         {navItems.length >= 2 && <SectionNav items={navItems} />}
       </div>
 
-      <LiveResultCount count={isSearching ? resultCount : null} />
+      {/*
+        Not LiveResultCount: this page is in the initial load, whose gzip budget
+        (140 kB, ci.yml) the component and its delay would exceed. Same region, no delay.
+      */}
+      <p className="sr-only" aria-live="polite">
+        {isSearching ? t('common.resultCount', { count: resultCount }) : ''}
+      </p>
 
       {resultCount === 0 ? renderNoResults() : (
         <div className={bottleMenu ? 'space-y-8' : 'space-y-10'}>
