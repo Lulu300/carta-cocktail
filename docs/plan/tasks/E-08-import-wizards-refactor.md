@@ -8,7 +8,7 @@ effort: M
 status: todo
 owner: agent
 depends_on: [E-01, E-03]
-touches: [frontend/src/components/import/, frontend/src/i18n/locales/]
+touches: [frontend/src/components/import/, frontend/src/i18n/locales/, frontend/src/types/index.ts]
 sources: ["05-frontend-archi.md §4.4"]
 branch:
 pr:
@@ -89,3 +89,4 @@ Duplication :
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-12 : C-10 (PR #113) : l'aperçu d'import des bouteilles renvoie `errors: { line, field, code, source }[]` à côté de `payload` (lignes écartées ; `source` vaut `bottles` ou `categories`, `line` est la ligne du fichier en CSV et la position dans la liste en JSON). Le type `BottleImportPreviewResponse` du frontend ne le déclare pas et l'assistant ne l'affiche pas : une ligne écartée n'apparaît que comme une ligne manquante. L'afficher (« ligne N du fichier de bouteilles / de catégories : champ, raison »), avec les clés i18n associées (`frontend/src/types/index.ts` ajouté à `touches`).

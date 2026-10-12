@@ -8,7 +8,7 @@ effort: S
 status: todo
 owner: mixed
 depends_on: [B-05]
-touches: [backend/, frontend/, .git-blame-ignore-revs, AGENTS.md, backend/AGENTS.md, frontend/AGENTS.md]
+touches: [backend/, frontend/, .git-blame-ignore-revs, AGENTS.md, backend/AGENTS.md, frontend/AGENTS.md, .github/workflows/ci.yml]
 sources: []
 branch:
 pr:
@@ -28,11 +28,12 @@ Le 2026-10-12, `prettier --list-different` signale 210 des 286 fichiers `.ts`/`.
 2. `npx prettier --write . --ignore-path .gitignore --ignore-path ../.prettierignore` dans `backend/` puis dans `frontend/` (ajouter au passage un script `format` qui fait la même chose).
 3. Vérifier `npm run lint`, `npx tsc --noEmit`, `npm test` et `npm run build` dans les deux paquets.
 4. Committer le reformatage **seul** (`style: format the repository with Prettier`), puis ajouter son SHA à `.git-blame-ignore-revs` dans un second commit, avec un commentaire. Ne pas squasher la PR au merge : le SHA doit rester valide (merge commit ou rebase).
-5. Mettre à jour les `AGENTS.md` : `format:check` passe et doit rester vert. L'ajout de `format:check` en CI relève de D-04 ou d'une tâche CI.
+5. Mettre à jour les `AGENTS.md` : `format:check` passe et doit rester vert. Ajouter `npm run format:check` aux jobs Backend et Frontend de `.github/workflows/ci.yml`.
 
 ## Critères d'acceptation
 
 - [ ] `npm run format:check` vert dans `backend/` et `frontend/`.
+- [ ] Les jobs Backend et Frontend de `ci.yml` lancent `npm run format:check`, vert sur la PR.
 - [ ] `.git-blame-ignore-revs` contient le SHA du commit de reformatage, tel qu'il est sur `develop`.
 - [ ] Lint, `tsc`, tests et build verts dans les deux paquets.
 
@@ -48,3 +49,4 @@ Aucun : le comportement ne change pas.
 ## Journal
 
 - 2026-10-12 : tâche créée par B-05, qui a posé la configuration Prettier sans reformater.
+- 2026-10-12 : relecture de D-04 (PR #112) : D-04 n'a pas ajouté `format:check` à la CI, car il échoue tant que ce reformatage n'est pas fait. L'ajout revient donc à cette tâche (étape 5, `ci.yml` ajouté à `touches`).
