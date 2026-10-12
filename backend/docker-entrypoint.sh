@@ -10,8 +10,9 @@ cd "$(dirname "$0")"
 BASELINE_MIGRATION=0_init
 MAX_BACKUPS=10
 
-# Prisma resolves a relative SQLite path from the schema folder, not from the
-# working directory.
+# Same rule as src/lib/databasePath.ts, which the application and the Prisma CLI
+# (prisma.config.ts) use: a relative SQLite path starts from the schema folder,
+# not from the working directory.
 resolve_db_file() {
   path="${DATABASE_URL#file:}"
   path="${path%%\?*}"
@@ -81,15 +82,15 @@ backup_database() {
 }
 
 refuse_baseline() {
-  baseline_db="$1"
+  baseline_dir="$1"
   {
     echo "ERROR: the existing database at $DB_FILE has no migration history and does not match migration $BASELINE_MIGRATION."
     echo "The backend will not start, and its data and schema were not modified. A copy is in $BACKUP_DIR."
     echo "SQL that would bring the database to $BASELINE_MIGRATION (for review only, do not run it blindly):"
-    npx prisma migrate diff --from-url "file:$DB_FILE" --to-url "file:$baseline_db" --script || true
+    npx prisma migrate diff --from-config-datasource --to-migrations "$baseline_dir" --script || true
     echo "Follow the manual baseline procedure in README.md (section \"Database migrations\")."
   } >&2
-  rm -f "$baseline_db"
+  rm -rf "$baseline_dir"
   exit 1
 }
 
@@ -97,16 +98,17 @@ refuse_baseline() {
 # migration history. Mark the first migration as applied only when the schema
 # is exactly the one it would create, then apply the newer migrations.
 baseline_existing_database() {
-  baseline_db="/tmp/carta-baseline-$$.db"
-  rm -f "$baseline_db"
-  npx prisma db execute --url "file:$baseline_db" --file "prisma/migrations/$BASELINE_MIGRATION/migration.sql" >/dev/null
+  # A migrations folder that holds the baseline alone. `migrate diff` replays it
+  # on an in-memory shadow database and only reads the database (DATABASE_URL).
+  baseline_dir="$(mktemp -d)"
+  cp -R "prisma/migrations/$BASELINE_MIGRATION" prisma/migrations/migration_lock.toml "$baseline_dir/"
 
   diff_status=0
-  npx prisma migrate diff --from-url "file:$DB_FILE" --to-url "file:$baseline_db" --exit-code >/dev/null || diff_status=$?
+  npx prisma migrate diff --from-config-datasource --to-migrations "$baseline_dir" --exit-code >/dev/null || diff_status=$?
   if [ "$diff_status" -ne 0 ]; then
-    refuse_baseline "$baseline_db"
+    refuse_baseline "$baseline_dir"
   fi
-  rm -f "$baseline_db"
+  rm -rf "$baseline_dir"
 
   echo "Existing database matches $BASELINE_MIGRATION: marking it as applied."
   npx prisma migrate resolve --applied "$BASELINE_MIGRATION"

@@ -1,5 +1,5 @@
 import { ErrorRequestHandler, RequestHandler } from 'express';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../generated/prisma/client';
 import multer from 'multer';
 import i18next from '../i18n';
 import {

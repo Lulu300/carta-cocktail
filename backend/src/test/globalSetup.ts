@@ -8,7 +8,7 @@ import { TEST_DATABASE_URL, removeTestDatabaseFiles } from './testDatabase';
  */
 export function setup(): void {
   removeTestDatabaseFiles();
-  execSync('npx prisma db push --skip-generate --force-reset', {
+  execSync('npx prisma db push --force-reset', {
     cwd: path.resolve(__dirname, '../..'),
     env: {
       ...process.env,

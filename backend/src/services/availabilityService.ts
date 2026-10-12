@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../generated/prisma/client';
 import { prisma } from '../lib/prisma';
 import { NotFoundError } from '../errors';
 

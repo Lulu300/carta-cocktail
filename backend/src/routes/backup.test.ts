@@ -3,14 +3,15 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import AdmZip from 'adm-zip';
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '../generated/prisma/client';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData, seedIngredient, seedCocktail,
   prisma, request, authHeader, getAuthToken,
 } from '../test/helpers';
-import { configureSqlite } from '../lib/prisma';
+import { configureSqlite, createPrismaClient } from '../lib/prisma';
+import { resolveDatabasePath } from '../lib/databasePath';
 import { config } from '../config';
-import { latestAppMigration, resolveDatabasePath, restoreBackup } from '../services/backupService';
+import { latestAppMigration, restoreBackup } from '../services/backupService';
 import { applySessionFloor, hasTokenVersionColumn, sessionFloorPath } from '../services/sessionFloor';
 
 const dbPath = resolveDatabasePath();
@@ -114,7 +115,7 @@ async function withDatabaseFile<T>(
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'carta-backup-'));
   const file = path.join(dir, 'database.db');
   if (bytes) fs.writeFileSync(file, bytes);
-  const client = new PrismaClient({ datasourceUrl: `file:${file}` });
+  const client = createPrismaClient(`file:${file}`);
   try {
     const result = await use(client);
     await client.$disconnect();
@@ -349,7 +350,7 @@ describe('backup restore', () => {
     await importBackup(backup);
 
     const [copy] = preRestoreCopies().filter((name) => !copiesBefore.includes(name));
-    const client = new PrismaClient({ datasourceUrl: `file:${path.join(preRestoreDir, copy)}` });
+    const client = createPrismaClient(`file:${path.join(preRestoreDir, copy)}`);
     try {
       expect((await client.cocktail.findMany()).map((c) => c.name)).toEqual(['Replaced']);
     } finally {

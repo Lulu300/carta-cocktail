@@ -35,7 +35,7 @@ A full review (2026-10-08) produced an action plan in `docs/plan/`. Before picki
 | Layer | Technology | Version |
 |-------|-----------|---------|
 | Backend | Express + TypeScript | 5.x |
-| ORM | Prisma | 6.x |
+| ORM | Prisma (better-sqlite3 adapter) | 7.x |
 | Database | SQLite | file-based |
 | Frontend | React + Vite | 19.x / 7.x |
 | Styling | TailwindCSS | 4.x |

@@ -2,28 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { PrismaClient } from '@prisma/client';
-import { latestAppMigration, readSchemaVersion, resolveDatabasePath } from './backupService';
-
-const prismaDir = path.resolve(__dirname, '../../prisma');
-
-describe('resolveDatabasePath', () => {
-  it('should resolve a relative path from the folder of schema.prisma', () => {
-    expect(resolveDatabasePath('file:./x.db')).toBe(path.join(prismaDir, 'x.db'));
-  });
-
-  it('should keep an absolute path', () => {
-    expect(resolveDatabasePath('file:/abs/x.db')).toBe(path.resolve('/abs/x.db'));
-  });
-
-  it('should drop the URL parameters', () => {
-    expect(resolveDatabasePath('file:./x.db?connection_limit=1')).toBe(path.join(prismaDir, 'x.db'));
-  });
-
-  it('should refuse a URL that is not a SQLite file', () => {
-    expect(() => resolveDatabasePath('postgresql://localhost/carta')).toThrow('file:');
-  });
-});
+import type { PrismaClient } from '../generated/prisma/client';
+import { createPrismaClient } from '../lib/prisma';
+import { latestAppMigration, readSchemaVersion } from './backupService';
 
 describe('with a temporary folder', () => {
   let tmpDir: string;
@@ -60,7 +41,7 @@ describe('with a temporary folder', () => {
     let client: PrismaClient;
 
     beforeEach(() => {
-      client = new PrismaClient({ datasourceUrl: `file:${path.join(tmpDir, 'test.db')}` });
+      client = createPrismaClient(`file:${path.join(tmpDir, 'test.db')}`);
     });
 
     afterEach(async () => {

@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import supertest from 'supertest';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../generated/prisma/client';
 import app from '../app';
 import { prisma } from '../lib/prisma';
 
@@ -25,9 +25,12 @@ export async function teardownTestDatabase(): Promise<void> {
   await prisma.$disconnect();
 }
 
-/** Tables of every model of schema.prisma, so that a model added later is emptied too. */
+/**
+ * Tables of every model of schema.prisma, so that a model added later is emptied too.
+ * No model renames its table (@@map): each table has the name of its model.
+ */
 export function schemaTables(): string[] {
-  return Prisma.dmmf.datamodel.models.map((model) => model.dbName ?? model.name);
+  return Object.values(Prisma.ModelName);
 }
 
 /**

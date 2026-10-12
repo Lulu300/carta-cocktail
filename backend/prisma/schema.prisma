@@ -1,10 +1,16 @@
 generator client {
-  provider = "prisma-client-js"
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "cjs"
+  // Extensionless imports, as tsc compiles them for CommonJS. Without this, the
+  // client generated without tsconfig.json (npm ci in the Docker image) would
+  // import "./internal/class.ts", which the compiled code cannot load.
+  importFileExtension = ""
 }
 
+// The database URL is read from prisma.config.ts (CLI) and src/lib/prisma.ts (application)
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
 }
 
 model User {

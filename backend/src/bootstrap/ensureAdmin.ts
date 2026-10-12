@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../generated/prisma/client';
 import bcrypt from 'bcryptjs';
 import { hashPassword, MIN_PASSWORD_LENGTH } from './password';
 
