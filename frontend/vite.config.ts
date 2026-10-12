@@ -13,6 +13,8 @@ export default defineConfig({
         codeSplitting: {
           groups: [
             {
+              // react-router is listed because react-router-dom only re-exports it: the
+              // re-export module disappears, leaving no dependency for the group to follow.
               name: 'vendor-react',
               test: /[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom)[\\/]/,
             },

@@ -43,6 +43,9 @@ const FORBIDDEN_MODULES = [
 
 const FORBIDDEN_TEXT = 'JSZip';
 
+// Rolldown's CJS interop helpers: generated code only, emitted without a source map.
+const GENERATED_CHUNK = /^assets\/rolldown-runtime-[\w-]+\.js$/;
+
 function fail(message) {
   console.error(message);
   process.exit(1);
@@ -103,15 +106,14 @@ function initialChunks(distDir) {
 /**
  * Source modules of a chunk, relative to the frontend folder, from its source map.
  *
- * Rolldown emits no source map for a chunk made only of generated code, such as
- * its `rolldown-runtime` helpers chunk, so a preload chunk without a map holds no
- * source module. The entry chunk always holds source modules: its map is required,
- * which also proves the build was made with source maps.
+ * Every chunk needs its map, except Rolldown's runtime chunk (GENERATED_CHUNK): it
+ * holds no source module, so Rolldown emits no map for it. The text check still
+ * applies to it.
  */
 function chunkModules(distDir, chunk) {
   const mapPath = join(distDir, `${chunk.path}.map`);
   if (!existsSync(mapPath)) {
-    if (chunk.role === 'preload') return [];
+    if (GENERATED_CHUNK.test(chunk.path)) return [];
     throw new Error(`Source map not found: ${mapPath}. Build with: npm run build -- --sourcemap hidden`);
   }
   const map = JSON.parse(readFileSync(mapPath, 'utf-8'));
