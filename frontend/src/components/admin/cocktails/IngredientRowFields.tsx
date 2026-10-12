@@ -5,7 +5,7 @@ import { useLocalizedName } from '../../../hooks/useLocalizedName';
 import IconButton from '../../ui/IconButton';
 import Input from '../../ui/Input';
 import Select from '../../ui/Select';
-import { SOURCE_KEYS, SOURCE_TYPES, type CocktailFormValues, type SourceType } from './cocktailFormSchema';
+import { SOURCE_KEYS, SOURCE_TYPES, isKeptStoredDefect, type CocktailFormValues, type SourceType } from './cocktailFormSchema';
 import { hasStock, type RecipeLists } from './recipeLists';
 import { useErrorText } from './useErrorText';
 
@@ -57,10 +57,8 @@ export default function IngredientRowFields({ index, lists, onRemove }: Ingredie
   const errorId = useId();
   const { control, register, setValue, formState: { errors } } = useFormContext<CocktailFormValues>();
   const path = `ingredients.${index}` as const;
-  const [sourceType, categoryId, bottleId] = useWatch({
-    control,
-    name: [`${path}.sourceType`, `${path}.categoryId`, `${path}.bottleId`],
-  });
+  const row = useWatch({ control, name: path });
+  const { sourceType, categoryId, bottleId } = row;
   const sourceKey = SOURCE_KEYS[sourceType];
 
   const rowErrors = errors.ingredients?.[index];
@@ -71,12 +69,14 @@ export default function IngredientRowFields({ index, lists, onRemove }: Ingredie
   const invalidProps = (error: string | undefined) =>
     error ? { 'aria-invalid': true, 'aria-describedby': errorId } : {};
 
-  const clearPreferredBottles = () => setValue(`${path}.preferredBottleIds`, []);
+  // Marked dirty, so a refetch of the cocktail (keepDirtyValues) never brings the old values back.
+  const dirty = { shouldDirty: true };
+  const clearPreferredBottles = () => setValue(`${path}.preferredBottleIds`, [], dirty);
   // Ids picked for the previous source would point to the wrong table.
   const resetSource = () => {
-    setValue(`${path}.bottleId`, null);
-    setValue(`${path}.categoryId`, null);
-    setValue(`${path}.ingredientId`, null);
+    setValue(`${path}.bottleId`, null, dirty);
+    setValue(`${path}.categoryId`, null, dirty);
+    setValue(`${path}.ingredientId`, null, dirty);
     clearPreferredBottles();
   };
 
@@ -128,6 +128,7 @@ export default function IngredientRowFields({ index, lists, onRemove }: Ingredie
       {messages.length > 0 && (
         <p id={errorId} className="text-xs text-danger">{messages.join(' · ')}</p>
       )}
+      {isKeptStoredDefect(row) && <p className="text-xs text-warning">{t('cocktails.storedDefect')}</p>}
 
       {sourceType === 'CATEGORY' && categoryId != null && (
         <Controller

@@ -1,5 +1,6 @@
 import { useParams } from 'react-router-dom';
 import CocktailForm from '../../components/admin/cocktails/CocktailForm';
+import { useCocktailFormKey } from '../../components/admin/cocktails/useCocktailFormKey';
 
 /**
  * `/admin/cocktails/new` and `/admin/cocktails/:id` render this page at the same
@@ -8,5 +9,6 @@ import CocktailForm from '../../components/admin/cocktails/CocktailForm';
  */
 export default function CocktailFormPage() {
   const { id } = useParams();
-  return <CocktailForm key={id ?? 'new'} id={id === undefined ? undefined : Number(id)} />;
+  const formKey = useCocktailFormKey();
+  return <CocktailForm key={formKey} id={id === undefined ? undefined : Number(id)} />;
 }

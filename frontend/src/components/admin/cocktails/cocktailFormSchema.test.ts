@@ -9,6 +9,7 @@ import {
   type CocktailFormValues,
   type IngredientRowValues,
   type SourceType,
+  isKeptStoredDefect,
 } from './cocktailFormSchema';
 
 const EMPTY_ROW: IngredientRowValues = {
@@ -19,6 +20,7 @@ const EMPTY_ROW: IngredientRowValues = {
   preferredBottleIds: [],
   quantity: 2,
   unitId: 1,
+  storedLine: null,
 };
 
 function formWith(rows: IngredientRowValues[], overrides: Partial<CocktailFormValues> = {}): CocktailFormValues {
@@ -57,6 +59,12 @@ describe('cocktailFormSchema', () => {
       'ingredients.0.quantity': 'validation.positive',
       'ingredients.0.unitId': 'validation.required',
       'ingredients.0.ingredientId': 'validation.sourceRequired',
+    });
+  });
+
+  it('refuses a negative quantity', () => {
+    expect(errorsOf(formWith([{ ...EMPTY_ROW, ingredientId: 5, quantity: -1 }]))).toEqual({
+      'ingredients.0.quantity': 'validation.positive',
     });
   });
 
@@ -130,8 +138,8 @@ describe('fromCocktail', () => {
       tags: 'rum,mint',
       isAvailable: true,
       ingredients: [
-        { sourceType: 'CATEGORY', bottleId: null, categoryId: 4, ingredientId: null, preferredBottleIds: [3], quantity: 5, unitId: 2 },
-        { sourceType: 'INGREDIENT', bottleId: null, categoryId: null, ingredientId: 5, preferredBottleIds: [], quantity: 1, unitId: 3 },
+        { sourceType: 'CATEGORY', bottleId: null, categoryId: 4, ingredientId: null, preferredBottleIds: [3], quantity: 5, unitId: 2, storedLine: null },
+        { sourceType: 'INGREDIENT', bottleId: null, categoryId: null, ingredientId: 5, preferredBottleIds: [], quantity: 1, unitId: 3, storedLine: null },
       ],
       instructions: [{ text: 'Muddle' }],
     });
@@ -156,5 +164,50 @@ describe('newIngredientRow', () => {
 
   it('leaves the ids empty when the lists are empty', () => {
     expect(newIngredientRow([], [])).toMatchObject({ ingredientId: null, unitId: null });
+  });
+});
+
+describe('lines stored with a defect (C-21)', () => {
+  const orphan: IngredientRowValues = { ...EMPTY_ROW, sourceType: 'CATEGORY', quantity: 0 };
+
+  /** The row as fromCocktail gives it for a line stored with a defect. */
+  function loaded(row: IngredientRowValues): IngredientRowValues {
+    const { sourceType, bottleId, categoryId, ingredientId, preferredBottleIds, quantity, unitId } = row;
+    return { ...row, storedLine: { sourceType, bottleId, categoryId, ingredientId, preferredBottleIds, quantity, unitId } };
+  }
+
+  it('accepts a loaded line kept as it was, with its missing source and quantity of 0', () => {
+    const row = loaded(orphan);
+    expect(isKeptStoredDefect(row)).toBe(true);
+    expect(errorsOf(formWith([row]))).toEqual({});
+  });
+
+  it('validates a loaded line strictly once it changes, even when it keeps its defect', () => {
+    const row = { ...loaded(orphan), unitId: 2 };
+    expect(isKeptStoredDefect(row)).toBe(false);
+    expect(errorsOf(formWith([row]))).toEqual({
+      'ingredients.0.categoryId': 'validation.sourceRequired',
+      'ingredients.0.quantity': 'validation.positive',
+    });
+  });
+
+  it('takes the preferred bottles into account, whatever their order', () => {
+    const row = loaded({ ...orphan, categoryId: 4, preferredBottleIds: [1, 2] });
+    expect(isKeptStoredDefect({ ...row, preferredBottleIds: [2, 1] })).toBe(true);
+    expect(isKeptStoredDefect({ ...row, preferredBottleIds: [2] })).toBe(false);
+  });
+
+  it('keeps a stored copy of the defective lines only, and accepts them as loaded', () => {
+    const values = fromCocktail({
+      id: 1, name: 'Old', description: null, notes: null, imagePath: null, tags: '', isAvailable: true,
+      createdAt: '2024-01-01', updatedAt: '2024-01-01',
+      ingredients: [
+        { id: 1, cocktailId: 1, quantity: 0, unitId: 1, sourceType: 'INGREDIENT', bottleId: null, categoryId: null, ingredientId: 5, position: 0 },
+        { id: 2, cocktailId: 1, quantity: 2, unitId: 1, sourceType: 'BOTTLE', bottleId: null, categoryId: null, ingredientId: null, position: 1 },
+        { id: 3, cocktailId: 1, quantity: 2, unitId: 1, sourceType: 'BOTTLE', bottleId: 3, categoryId: null, ingredientId: null, position: 2 },
+      ],
+    });
+    expect(values.ingredients.map((row) => row.storedLine !== null)).toEqual([true, true, false]);
+    expect(errorsOf({ ...values, name: 'Old' })).toEqual({});
   });
 });

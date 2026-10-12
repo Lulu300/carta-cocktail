@@ -53,11 +53,15 @@ const mojito: Cocktail = {
 function renderAt(path: string, queryClient = createTestQueryClient()) {
   window.history.pushState({}, '', path);
   return renderWithFeedback(
-    <Routes>
-      <Route path="/admin/cocktails" element={<p>cocktail list</p>} />
-      <Route path="/admin/cocktails/new" element={<CocktailFormPage />} />
-      <Route path="/admin/cocktails/:id" element={<><Link to="/admin/cocktails/new">new cocktail</Link><CocktailFormPage /></>} />
-    </Routes>,
+    // Both form routes render the page alone, as in App.tsx: React keeps it mounted between them.
+    <>
+      <Link to="/admin/cocktails/new">new cocktail</Link>
+      <Routes>
+        <Route path="/admin/cocktails" element={<p>cocktail list</p>} />
+        <Route path="/admin/cocktails/new" element={<CocktailFormPage />} />
+        <Route path="/admin/cocktails/:id" element={<CocktailFormPage />} />
+      </Routes>
+    </>,
     { queryClient },
   );
 }
@@ -243,28 +247,36 @@ describe('CocktailFormPage, creation', () => {
     expect(screen.queryByText('cocktail list')).not.toBeInTheDocument();
   });
 
-  it('opens the created cocktail when the image upload fails, so the next save updates it', async () => {
+  it('opens the created cocktail with the picked image when the upload fails, so the next save only updates it', async () => {
     const user = userEvent.setup();
     const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:preview');
     const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    const created = { ...mojito, description: null, tags: '', ingredients: [], instructions: [] };
+    vi.mocked(cocktails.create).mockResolvedValue(created);
+    vi.mocked(cocktails.get).mockResolvedValue(created);
     vi.mocked(cocktails.uploadImage)
       .mockRejectedValueOnce(new Error('Upload failed'))
-      .mockResolvedValueOnce({ ...mojito, imagePath: 'mojito.jpg' });
+      .mockResolvedValueOnce({ ...created, imagePath: 'mojito.jpg' });
+    const image = new File(['img'], 'mojito.png', { type: 'image/png' });
     await user.type(await renderNewForm(), 'Mojito');
-    await user.upload(screen.getByLabelText('cocktails.image'), new File(['img'], 'mojito.png', { type: 'image/png' }));
+    await user.upload(screen.getByLabelText('cocktails.image'), image);
     await user.click(screen.getByRole('button', { name: 'common.save' }));
 
     expect(await screen.findByText('Upload failed')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/admin/cocktails/42');
     expect(await screen.findByText('cocktails.edit')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /cocktails\.name/ })).toHaveValue('Mojito');
+    // The preview is decorative (empty alt): it has no img role.
+    expect(document.querySelector('img[src="blob:preview"]')).not.toBeNull();
 
-    await user.upload(screen.getByLabelText('cocktails.image'), new File(['img'], 'mojito.png', { type: 'image/png' }));
+    // No new pick: the same file is sent again with the update.
     await user.click(screen.getByRole('button', { name: 'common.save' }));
 
     expect(await screen.findByText('cocktail list')).toBeInTheDocument();
     expect(cocktails.create).toHaveBeenCalledTimes(1);
     expect(cocktails.update).toHaveBeenCalledWith(42, expect.objectContaining({ name: 'Mojito' }));
     expect(cocktails.uploadImage).toHaveBeenCalledTimes(2);
+    expect(cocktails.uploadImage).toHaveBeenLastCalledWith(42, image);
     createObjectURL.mockRestore();
     revokeObjectURL.mockRestore();
   });
@@ -344,6 +356,26 @@ describe('CocktailFormPage, edition', () => {
     expect(nameInput).toHaveValue('Virgin mojito');
   });
 
+  it.each([
+    ['a list', () => vi.mocked(ingredients.list)],
+    ['the cocktail', () => vi.mocked(cocktails.get)],
+  ])('keeps the form and what the admin typed when %s fails to reload', async (_name, request) => {
+    const user = userEvent.setup();
+    const queryClient = createTestQueryClient();
+    renderAt('/admin/cocktails/42', queryClient);
+    const nameInput = await screen.findByRole('textbox', { name: /cocktails\.name/ });
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Virgin mojito');
+
+    request().mockRejectedValue(new ApiError(500, 'Server error'));
+    await act(() => queryClient.invalidateQueries());
+
+    expect(request()).toHaveBeenCalledTimes(2);
+    expect(nameInput).toBeInTheDocument();
+    expect(nameInput).toHaveValue('Virgin mojito');
+    expect(screen.queryByRole('button', { name: 'common.retry' })).not.toBeInTheDocument();
+  });
+
   it('empties the form when going from a cocktail to a new one', async () => {
     const user = userEvent.setup();
     renderAt('/admin/cocktails/42');
@@ -414,5 +446,69 @@ describe('CocktailFormPage, edition', () => {
 
     expect(await screen.findByRole('textbox', { name: /cocktails\.name/ })).toBeInTheDocument();
     expect(units.list).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('CocktailFormPage, lines stored with a defect (C-21)', () => {
+  // Saved before v1.8.0: an orphan line (its category was deleted) and a quantity of 0.
+  const oldRecipe: Cocktail = {
+    ...mojito,
+    ingredients: [
+      { id: 7, cocktailId: 42, quantity: 4, unitId: 1, sourceType: 'CATEGORY', bottleId: null, categoryId: null, ingredientId: null, position: 0 },
+      { id: 8, cocktailId: 42, quantity: 0, unitId: 1, sourceType: 'INGREDIENT', bottleId: null, categoryId: null, ingredientId: 1, position: 1 },
+    ],
+  };
+
+  beforeEach(() => {
+    vi.mocked(cocktails.get).mockResolvedValue(oldRecipe);
+  });
+
+  async function renameTo(user: ReturnType<typeof userEvent.setup>, name: string) {
+    const nameInput = await screen.findByRole('textbox', { name: /cocktails\.name/ });
+    await user.clear(nameInput);
+    await user.type(nameInput, name);
+  }
+
+  it('saves a rename with the defective lines sent as they were, and warns on each of them', async () => {
+    const user = userEvent.setup();
+    renderAt('/admin/cocktails/42');
+    await renameTo(user, 'Old mojito');
+
+    expect(screen.getAllByText('cocktails.storedDefect')).toHaveLength(2);
+    await user.click(screen.getByRole('button', { name: 'common.save' }));
+
+    expect(await screen.findByText('cocktail list')).toBeInTheDocument();
+    expect(cocktails.update).toHaveBeenCalledWith(42, expect.objectContaining({
+      name: 'Old mojito',
+      ingredients: [
+        expect.objectContaining({ sourceType: 'CATEGORY', categoryId: null, quantity: 4 }),
+        expect.objectContaining({ sourceType: 'INGREDIENT', ingredientId: 1, quantity: 0 }),
+      ],
+    }));
+  });
+
+  it('blocks the save once a defective line is changed but keeps its defect', async () => {
+    const user = userEvent.setup();
+    renderAt('/admin/cocktails/42');
+    await renameTo(user, 'Old mojito');
+    const orphanRow = ingredientRows()[0];
+    await setQuantity(user, orphanRow, '5');
+    await user.click(screen.getByRole('button', { name: 'common.save' }));
+
+    expect(await within(orphanRow).findByText('validation.sourceRequired')).toBeInTheDocument();
+    expect(within(orphanRow).queryByText('cocktails.storedDefect')).not.toBeInTheDocument();
+    expect(cocktails.update).not.toHaveBeenCalled();
+  });
+
+  it('blocks the save when a new defective line is added', async () => {
+    const user = userEvent.setup();
+    renderAt('/admin/cocktails/42');
+    await renameTo(user, 'Old mojito');
+    const newRow = await addIngredientRow(user);
+    await setQuantity(user, newRow, '0');
+    await user.click(screen.getByRole('button', { name: 'common.save' }));
+
+    expect(await within(newRow).findByText('validation.positive')).toBeInTheDocument();
+    expect(cocktails.update).not.toHaveBeenCalled();
   });
 });

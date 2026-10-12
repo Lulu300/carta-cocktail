@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { Cocktail, CocktailAvailability, CocktailInput } from '../../../types';
-import { useCreateCocktail, useUpdateCocktail, useUploadCocktailImage } from '../../../queries/cocktails';
+import { useCreateCocktail, useSetCocktailData, useUpdateCocktail, useUploadCocktailImage } from '../../../queries/cocktails';
 import Button from '../../ui/Button';
 import Card from '../../ui/Card';
 import Field from '../../ui/Field';
@@ -24,6 +24,7 @@ import {
   type ValidCocktailForm,
 } from './cocktailFormSchema';
 import type { RecipeLists } from './recipeLists';
+import { useCocktailFormKey, type CocktailFormLocationState } from './useCocktailFormKey';
 import { useErrorText } from './useErrorText';
 
 const LIST_PATH = '/admin/cocktails';
@@ -42,6 +43,8 @@ export default function CocktailEditor({ cocktail, availability, lists }: Cockta
   const create = useCreateCocktail();
   const update = useUpdateCocktail();
   const uploadImage = useUploadCocktailImage();
+  const setCocktailData = useSetCocktailData();
+  const formKey = useCocktailFormKey();
   const [imageFile, setImageFile] = useState<File | null>(null);
   // formState.isSubmitting only disables the button once React re-renders:
   // this ref also stops a second submit fired before that (fast double click).
@@ -58,6 +61,17 @@ export default function CocktailEditor({ cocktail, availability, lists }: Cockta
   const { control, register, handleSubmit, formState: { errors, isSubmitting } } = form;
   const tags = useWatch({ control, name: 'tags' });
 
+  /**
+   * The cocktail exists now: its page updates it on the next save instead of
+   * creating a duplicate. The same form stays (same key, cocktail already cached),
+   * so the picked image is still there for that save.
+   */
+  const openCreatedCocktail = (created: Cocktail) => {
+    setCocktailData(created);
+    const state: CocktailFormLocationState = { formKey };
+    navigate(`${LIST_PATH}/${created.id}`, { replace: true, state });
+  };
+
   /** Saves the recipe, then the picked image. Each mutation shows its own error toast. */
   const saveRecipe = async (data: CocktailInput) => {
     let saved: Cocktail;
@@ -70,9 +84,7 @@ export default function CocktailEditor({ cocktail, availability, lists }: Cockta
       if (imageFile) await uploadImage.mutateAsync({ id: saved.id, file: imageFile });
       navigate(LIST_PATH);
     } catch {
-      // The cocktail exists now: its edit page updates it on the next save
-      // instead of creating a duplicate.
-      if (!cocktail) navigate(`${LIST_PATH}/${saved.id}`, { replace: true });
+      if (!cocktail) openCreatedCocktail(saved);
     }
   };
 
@@ -94,7 +106,7 @@ export default function CocktailEditor({ cocktail, availability, lists }: Cockta
 
       <FormProvider {...form}>
         {/* The schema validates, with messages placed on each field and row. */}
-        <form noValidate onSubmit={(event) => handleSubmit(save)(event)}className="space-y-6">
+        <form noValidate onSubmit={(event) => handleSubmit(save)(event)} className="space-y-6">
           <Card className="space-y-4">
             <Field label={t('cocktails.name')} error={errorText(errors.name)} required>
               <Input {...register('name')} />

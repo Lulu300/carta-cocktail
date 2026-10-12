@@ -1,4 +1,4 @@
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { availability as availabilityApi, cocktails as cocktailsApi } from '../services/api';
 import type { Cocktail, CocktailAvailability, CocktailInput } from '../types';
 import { useEntityMutation, type EntityMutation } from './crud';
@@ -18,6 +18,12 @@ export function useCocktail(id: number | undefined): UseQueryResult<Cocktail, Er
     queryFn: () => cocktailsApi.get(id as number),
     enabled: id !== undefined,
   });
+}
+
+/** Caches a cocktail the server just returned, so its page shows it without loading. */
+export function useSetCocktailData(): (cocktail: Cocktail) => void {
+  const queryClient = useQueryClient();
+  return (cocktail) => queryClient.setQueryData(qk.cocktail(cocktail.id), cocktail);
 }
 
 interface AvailabilityQueryOptions {
@@ -49,7 +55,8 @@ interface CocktailUpdate {
 export function useUpdateCocktail(): EntityMutation<CocktailUpdate, Cocktail> {
   return useEntityMutation({
     mutationFn: ({ id, data }: CocktailUpdate) => cocktailsApi.update(id, data),
-    invalidates: RECIPE_KEYS,
+    // Menus show the names of their cocktails.
+    invalidates: [...RECIPE_KEYS, qk.menus],
     successMessage: 'cocktails.updated',
   });
 }

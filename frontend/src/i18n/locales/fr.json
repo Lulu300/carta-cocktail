@@ -213,6 +213,7 @@
     "notFound": "Ce cocktail n'existe pas.",
     "backToList": "Retour aux cocktails",
     "noPreferredAvailable": "Aucune bouteille préférée disponible",
+    "storedDefect": "Cette ligne a été enregistrée incomplète par une version précédente (source supprimée ou quantité 0). Elle est conservée telle quelle : corrigez-la ou supprimez-la quand vous le pourrez.",
     "importWizard": {
       "title": "Importer une recette",
       "dropzone": "Glissez un fichier JSON ou ZIP ici ou cliquez pour parcourir",

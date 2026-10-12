@@ -10,6 +10,10 @@ import EmptyState from '../../ui/EmptyState';
 import LoadError from '../LoadError';
 import CocktailEditor from './CocktailEditor';
 
+function hasFailedWithoutData(query: { isError: boolean; data: unknown }): boolean {
+  return query.isError && query.data === undefined;
+}
+
 interface CocktailFormProps {
   /** The cocktail to edit, or undefined to create one. */
   id?: number;
@@ -30,7 +34,9 @@ export default function CocktailForm({ id }: CocktailFormProps) {
   const unitsQuery = useUnits();
   const listQueries = [categoriesQuery, bottlesQuery, ingredientsQuery, unitsQuery];
 
-  if (isEdit && cocktailQuery.isError) {
+  // Only a first load that fails replaces the form. A failed background refetch keeps
+  // the loaded data in TanStack Query, and the form stays with what the admin typed.
+  if (isEdit && hasFailedWithoutData(cocktailQuery)) {
     if (!isNotFoundError(cocktailQuery.error)) return <LoadError onRetry={() => cocktailQuery.refetch()} />;
     return (
       <EmptyState
@@ -41,7 +47,7 @@ export default function CocktailForm({ id }: CocktailFormProps) {
       />
     );
   }
-  const failedLists = listQueries.filter((query) => query.isError);
+  const failedLists = listQueries.filter(hasFailedWithoutData);
   if (failedLists.length > 0) {
     return <LoadError onRetry={() => failedLists.forEach((query) => query.refetch())} />;
   }
