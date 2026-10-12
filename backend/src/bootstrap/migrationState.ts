@@ -68,6 +68,16 @@ export async function readMigrationState(client: PrismaClient, migrationsDir: st
   };
 }
 
+/**
+ * The last line of an error message: Prisma puts the cause there
+ * ("Raw query failed. Code: `SQLITE_NOTADB`…"), after the invocation and blank lines.
+ */
+export function summarizeError(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  const lines = message.split('\n').map((line) => line.trim()).filter(Boolean);
+  return lines.length > 0 ? lines[lines.length - 1] : 'unknown error';
+}
+
 /** One line per migration, "unapplied <name>" or "failed <name>", read by docker-entrypoint.sh. */
 export function formatMigrationState(state: MigrationState): string {
   return [

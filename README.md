@@ -210,9 +210,18 @@ Do this once before deploying the first version with migrations, on a copy of th
 
 If the database differs from `0_init`, it usually comes from an older version: start v1.5.0 (the last version that synchronizes the schema with `db push`) once on the database, stop it, then compare again. If differences remain, fix them by hand on the copy, check again, and put the fixed copy back into the volume.
 
+### Running a previous version
+
+The current `docker-compose.prod.yml` does not fit images of v1.11.x or older, so going back to one takes more than changing the image tags:
+
+- **Compose file.** Those images have no `/api/health`: with the current file, their backend stays `unhealthy` and the frontend never starts. Use the compose file of that version, `https://raw.githubusercontent.com/Lulu300/carta-cocktail/v<version>/docker-compose.prod.yml`, with your own changes (keep a copy of the current one). Or remove the backend `healthcheck` block and the frontend `depends_on` condition from the current file. Up to v1.7.0, the frontend also listens on port 80, not 8080: its port mapping is `"<port>:80"`.
+- **Data folder owner.** Those images run as root, and may leave files that the `node` user cannot write. Before upgrading again, give the folders back to uid 1000 as in [Data folders and the node user](#data-folders-and-the-node-user): the backend otherwise stops with the `chown` command to run.
+
+To upgrade again, go back to the current compose file with the new image tags.
+
 ### Restoring a pre-migration backup
 
-To roll back an upgrade, pin the images back to the previous version in `docker-compose.prod.yml`, then restore the copy made before the migration.
+To roll back an upgrade, go back to the previous version (see [Running a previous version](#running-a-previous-version)), then restore the copy made before the migration.
 
 1. Stop the backend and list the copies (the newest is last):
 
@@ -236,32 +245,32 @@ The restored copy brings back its sessions, including those revoked since it was
 
 ### Recovering from a failed migration
 
-SQLite does not run a migration in a transaction: when a statement fails, the statements before it stay applied, and Prisma marks the migration as failed in the `_prisma_migrations` table. The backend then stops at every start, on `P3018` the first time and `P3009` after, with this message under the Prisma error:
+SQLite does not run a migration in a transaction: when a statement fails, the statements before it stay applied, and Prisma marks the migration as failed in the `_prisma_migrations` table. The backend then stops at every start, on `P3018` the first time and `P3009` after. The site is unavailable: the frontend waits for a healthy backend. Read the backend log with `docker compose -f docker-compose.prod.yml logs carta-cocktail-backend`. It ends with this message, under the Prisma error:
 
 ```
 ERROR: migration 20261010173910_schema_integrity failed. The backend will not start.
 SQLite does not run a migration in a transaction: the statements before the one that failed stay applied.
-Prisma applies no migration until this one is resolved: the previous image stops on P3009 too.
+Prisma applies no migration until this one is resolved: previous images (v1.6.0 and later) stop on P3009 too.
 Newest copy made before a migration: /app/data/backups/pre-migrate-20261012-101500.db (with its -wal file when there is one).
 Nothing was restored. Follow "Recovering from a failed migration" in README.md (section "Database migrations").
 ```
 
-The Prisma error just above gives the cause, for example `UNIQUE constraint failed: Category.name` (two categories with the same name). Going back to the previous image does not help: Prisma refuses to apply anything while a migration is marked failed, whatever the version. The entrypoint never restores anything by itself, and makes no new copy while a migration is marked failed: the copy named in the message is the one made before the failed attempt.
+The Prisma error just above gives the cause, for example `UNIQUE constraint failed: Category.name` (two categories with the same name). Going back to the previous image does not help: images from v1.6.0 apply migrations too, and Prisma refuses to apply anything while a migration is marked failed (up to v1.5.0, images synchronize the schema with `db push` instead). The entrypoint never restores anything by itself, and makes no new copy while a migration is marked failed: the copy named in the message is the one made before the failed attempt.
 
 **Restore the copy.** This works whatever statement failed.
 
 1. Stop the backend, otherwise the restart policy keeps trying: `docker compose -f docker-compose.prod.yml stop carta-cocktail-backend`.
 2. Put back the copy named in the message, with its `-wal` file: run the `run … sh -c` command of step 2 of [Restoring a pre-migration backup](#restoring-a-pre-migration-backup), not its `up -d` yet.
-3. Pin both images back to the version you upgraded from, start it (`docker compose -f docker-compose.prod.yml up -d`), and fix the cause in its admin. For duplicates, keep one item, move its bottles and recipe lines to it, then delete the others.
+3. Start the version you upgraded from, with its own compose file (see [Running a previous version](#running-a-previous-version)): `docker compose -f docker-compose.prod.yml up -d`. Fix the cause in its admin. For duplicates, keep one item, move its bottles and recipe lines to it, then delete the others.
 4. When the cause is a duplicate, check the fixed database with the integrity check of the new image. Stop the backend, copy the database out of its volume into `carta-db-copy` (step 2 of [Checking a production database before the first upgrade](#checking-a-production-database-before-the-first-upgrade)), then run, with your new version:
 
    ```bash
-   docker run --rm -v "$PWD/carta-db-copy:/data" -e DATABASE_URL=file:/data/carta_cocktail.db \
-     ghcr.io/lulu300/carta-cocktail/backend:<new version> node dist/scripts/check-integrity.js
+   docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/carta-db-copy:/data" -e DATABASE_URL=file:/data/carta_cocktail.db \
+     --entrypoint node ghcr.io/lulu300/carta-cocktail/backend:<new version> dist/scripts/check-integrity.js
    ```
 
    Exit code `0`: nothing blocks the migration. Exit code `1`: the output lists what is left to fix. Repeat steps 3 and 4 until it exits `0`.
-5. Pin both images to the new version again and start. The entrypoint copies the fixed database to a new `pre-migrate-<date>.db`, then runs the migration again.
+5. Stop the backend, go back to the current compose file with the new image tags, give the data folders back to uid 1000 if the previous version ran as root (see [Running a previous version](#running-a-previous-version)), and start. The entrypoint copies the fixed database to a new `pre-migrate-<date>.db`, then runs the migration again.
 
 **Without restoring.** Only when the migration failed before changing anything: the statement in the error is one of those at the top of its `migration.sql`, before any table is rebuilt (for `20261010173910_schema_integrity`, the unique indexes: `UNIQUE constraint failed: Category.name` or `Unit.abbreviation`). If in doubt, restore the copy.
 
@@ -273,8 +282,8 @@ The Prisma error just above gives the cause, for example `UNIQUE constraint fail
      npx prisma migrate resolve --rolled-back <migration>
    ```
 
-3. Fix the cause with the previous version, as in steps 3 and 4 above.
-4. Pin both images to the new version again and start. The entrypoint copies the database, fixes included, to a new `pre-migrate-<date>.db` before running the migration again: if it fails again, that copy is the one to restore.
+3. Fix the cause with the previous version and its own compose file, as in steps 3 and 4 above.
+4. Go back to the new version as in step 5 above. The entrypoint copies the database, fixes included, to a new `pre-migrate-<date>.db` before running the migration again: if it fails again, that copy is the one to restore.
 
 A restored copy brings back its sessions: afterwards, set a new `JWT_SECRET`, as in [UPGRADING › "Signing in after a restore"](UPGRADING.md#signing-in-after-a-restore).
 

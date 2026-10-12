@@ -5,7 +5,7 @@ import path from 'path';
 import type { PrismaClient } from '../generated/prisma/client';
 import { PRISMA_DIR } from '../lib/databasePath';
 import { createPrismaClient } from '../lib/prisma';
-import { formatMigrationState, listLocalMigrations, readMigrationState } from './migrationState';
+import { formatMigrationState, listLocalMigrations, readMigrationState, summarizeError } from './migrationState';
 
 // The table as `prisma migrate deploy` creates it in SQLite
 const MIGRATIONS_TABLE = `CREATE TABLE "_prisma_migrations" (
@@ -155,5 +155,21 @@ describe('formatMigrationState', () => {
 
   it('should print nothing when there is nothing to apply', () => {
     expect(formatMigrationState({ unapplied: [], failed: [] })).toBe('');
+  });
+});
+
+describe('summarizeError', () => {
+  it('should keep the last line of a multi-line Prisma message', () => {
+    const err = new Error('\nInvalid `prisma.$queryRaw()` invocation:\n\n\nRaw query failed. Code: `SQLITE_NOTADB`.\n');
+
+    expect(summarizeError(err)).toBe('Raw query failed. Code: `SQLITE_NOTADB`.');
+  });
+
+  it('should describe a value that is not an Error', () => {
+    expect(summarizeError('disk I/O error')).toBe('disk I/O error');
+  });
+
+  it('should not return an empty line', () => {
+    expect(summarizeError(new Error(''))).toBe('unknown error');
   });
 });

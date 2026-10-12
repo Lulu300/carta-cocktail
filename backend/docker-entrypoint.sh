@@ -175,12 +175,16 @@ needs_backup() {
 
 # Never restores anything: which copy to put back, and when, is the admin's call.
 refuse_failed_migration() {
-  failed="$(migration_state | sed -n 's/^failed //p' | tr '\n' ' ')"
+  failed=
+  # After a stop request, no new command: the Prisma error above names the migration.
+  if [ -z "$stop_status" ]; then
+    failed="$(migration_state | sed -n 's/^failed //p' | tr '\n' ' ')"
+  fi
   backup="$(latest_backup)"
   {
     echo "ERROR: migration ${failed:-(see the Prisma error above) }failed. The backend will not start."
     echo "SQLite does not run a migration in a transaction: the statements before the one that failed stay applied."
-    echo "Prisma applies no migration until this one is resolved: the previous image stops on P3009 too."
+    echo "Prisma applies no migration until this one is resolved: previous images (v1.6.0 and later) stop on P3009 too."
     if [ -n "$backup" ]; then
       echo "Newest copy made before a migration: $backup (with its -wal file when there is one)."
     else

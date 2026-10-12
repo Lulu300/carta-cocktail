@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'child_process';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { TEST_DATABASE_URL } from '../test/testDatabase';
 
@@ -32,6 +33,22 @@ describe('src/scripts/migration-state.ts', () => {
     expect(result.status).toBe(2);
     expect(result.stderr).toContain('Database file not found');
     expect(fs.existsSync(missing)).toBe(false);
+  });
+
+  it('should exit with 2 and one line when the file is not a database', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'carta-state-'));
+    const file = path.join(dir, 'not-a-database.db');
+    fs.writeFileSync(file, 'not a database');
+    try {
+      const result = runScript(`file:${file}`);
+
+      expect(result.status).toBe(2);
+      expect(result.stderr.trim()).toBe(
+        'Cannot read the migration history: Raw query failed. Code: `SQLITE_NOTADB`. Message: `file is not a database`',
+      );
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('should list every migration of the repository as to apply on the test database (db push, no history)', () => {
