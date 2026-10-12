@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { menus as menusApi } from '../../../services/api';
@@ -42,6 +42,14 @@ export default function MenuEditorLayout({ menuId, itemLabel, title, children }:
     successMessage: 'menus.updated',
   });
 
+  // The button is only disabled once React re-renders: a fast double click would queue the same save twice.
+  const isSavingInfo = useRef(false);
+  const submitInfo = (values: Partial<MenuInfoValues>) => {
+    if (isSavingInfo.current) return;
+    isSavingInfo.current = true;
+    saveInfo.mutate(values, { onSettled: () => { isSavingInfo.current = false; } });
+  };
+
   if (menuQuery.isPending) {
     return <div className="flex justify-center py-12"><Spinner /></div>;
   }
@@ -65,7 +73,7 @@ export default function MenuEditorLayout({ menuId, itemLabel, title, children }:
         key={menu.id}
         menu={menu}
         lockedFields={isSystemMenu(menu) ? ['slug'] : []}
-        onSave={(values) => saveInfo.mutate(values)}
+        onSave={submitInfo}
         isSaving={saveInfo.isPending}
       />
       <MenuSectionsManager menuId={menu.id} sections={menu.sections ?? []} itemLabel={itemLabel} />

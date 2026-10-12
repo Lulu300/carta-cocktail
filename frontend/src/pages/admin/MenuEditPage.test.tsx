@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
-import { screen, waitFor, within } from '../../test/test-utils';
+import { fireEvent, screen, waitFor, within } from '../../test/test-utils';
 import { clearToasts, renderWithFeedback } from '../../test/feedback';
 import MenuEditPage from './MenuEditPage';
 import type { Cocktail, Menu, MenuCocktail, MenuInput, MenuSection } from '../../types';
@@ -245,6 +245,19 @@ describe('MenuEditPage', () => {
     await waitFor(() => expect(menusApi.update).toHaveBeenCalledWith(3, {
       name: 'Winter', slug: 'winter-menu', description: 'Hot drinks', isPublic: true,
     }));
+  });
+
+  it('saves the menu info once on a double click', async () => {
+    renderPage();
+    await screen.findByDisplayValue('Summer');
+    const save = screen.getByRole('button', { name: 'common.save' });
+
+    // Two clicks before React re-renders: the button is not disabled yet.
+    fireEvent.click(save);
+    fireEvent.click(save);
+
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('menus.updated'));
+    expect(menusApi.update).toHaveBeenCalledTimes(1);
   });
 
   it('links to the public page of a published menu', async () => {

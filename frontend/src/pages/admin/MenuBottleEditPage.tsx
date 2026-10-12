@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { menuBottles as menuBottlesApi } from '../../services/api';
+import { menus as menusApi, menuBottles as menuBottlesApi } from '../../services/api';
 import type { Menu } from '../../types';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import Button from '../../components/ui/Button';
@@ -49,8 +49,16 @@ function MenuBottles({ menu }: { menu: Menu }) {
   const { t } = useTranslation();
   const confirm = useConfirm();
   const mutations = useMenuBottles(menu.id);
-  // Waits for the pending changes of the menu; the refetch that follows shows what it added.
-  const sync = useMenuMutation<void>({ menuId: menu.id, mutationFn: () => menuBottlesApi.sync(menu.id) });
+  // Queued with the other changes of the menu. The menu read after the sync becomes the
+  // confirmed state, so a change sent next already counts the bottles it added.
+  const sync = useMenuMutation<void, Menu>({
+    menuId: menu.id,
+    mutationFn: async () => {
+      await menuBottlesApi.sync(menu.id);
+      return menusApi.get(menu.id);
+    },
+    applyConfirmed: (state, _variables, syncedMenu) => ({ ...state, menu: syncedMenu }),
+  });
   const isSystem = isSystemMenu(menu);
   const sections = menu.sections ?? [];
   const groups = groupMenuBottles((menu.bottles ?? []).filter(hasBottle));

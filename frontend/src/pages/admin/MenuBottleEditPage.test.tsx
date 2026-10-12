@@ -354,6 +354,38 @@ describe('MenuBottleEditPage', () => {
     expect(within(compositionCard()).queryByText('Campari')).not.toBeInTheDocument();
   });
 
+  it('waits for every request of a group before the menu is read again', async () => {
+    const user = userEvent.setup();
+    storeMenu({}, removedCamparis());
+    let finishSecond: () => void = () => {};
+    vi.mocked(menuBottlesApi.restore)
+      .mockRejectedValueOnce(new ApiError(404, 'Resource not found'))
+      .mockImplementationOnce((_menuId, bottleId) => new Promise((resolve) => {
+        finishSecond = () => {
+          stored.exclusions = stored.exclusions.filter((item) => item.bottleId !== bottleId);
+          setEntries([...storedEntries(), makeEntry(50 + bottleId, sameCampari)]);
+          resolve({ message: 'ok' });
+        };
+      }));
+    renderPage();
+
+    await user.click(await within(await screen.findByRole('group')).findByRole('button', { name: 'menus.bottles.restoreLabel' }));
+    await waitFor(() => expect(menuBottlesApi.restore).toHaveBeenCalledTimes(2));
+    // The first request failed, the second is still on its way: nothing is read again yet.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(menusApi.get).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('alert')).not.toHaveTextContent('Resource not found');
+
+    finishSecond();
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Resource not found'));
+    await waitFor(() => expect(menusApi.get).toHaveBeenCalledTimes(2));
+    // As on the server: one Campari back in the menu, the other one still removed.
+    await waitFor(() => expect(within(compositionCard()).getByText('Campari')).toBeInTheDocument());
+    expect(within(excludedCard()).getByText('Campari')).toBeInTheDocument();
+    expect(within(rowOf('Campari', excludedCard())).queryByText('menus.bottles.count')).not.toBeInTheDocument();
+  });
+
   it('renames a system menu but keeps its slug read-only', async () => {
     const user = userEvent.setup();
     renderPage();
@@ -394,15 +426,41 @@ describe('MenuBottleEditPage', () => {
     expect(within(rowOf('Lillet')).getByRole('button', { name: 'menus.showItem' })).toBeInTheDocument();
   });
 
-  it('reloads the menu after a sync', async () => {
+  it('shows the bottles a sync added', async () => {
     const user = userEvent.setup();
+    vi.mocked(menuBottlesApi.sync).mockImplementation(async () => {
+      setEntries([...storedEntries(), makeEntry(60, campari)]);
+      return { message: 'ok', added: 1, removed: 0 };
+    });
     renderPage();
     await screen.findByText('Hendricks');
 
     await user.click(screen.getByRole('button', { name: 'menus.bottles.sync' }));
 
-    await waitFor(() => expect(menuBottlesApi.sync).toHaveBeenCalledWith(5));
-    await waitFor(() => expect(menusApi.get).toHaveBeenCalledTimes(2));
+    expect(await within(compositionCard()).findByText('Campari')).toBeInTheDocument();
+    expect(menuBottlesApi.sync).toHaveBeenCalledWith(5);
+  });
+
+  it('counts the bottles a sync added in the next move', async () => {
+    const user = userEvent.setup();
+    let finishSync: () => void = () => {};
+    vi.mocked(menuBottlesApi.sync).mockImplementation(() => new Promise((resolve) => {
+      finishSync = () => {
+        setEntries([...storedEntries(), makeEntry(60, campari)]);
+        resolve({ message: 'ok', added: 1, removed: 0 });
+      };
+    }));
+    renderPage();
+    await screen.findByText('Hendricks');
+
+    await user.click(screen.getByRole('button', { name: 'menus.bottles.sync' }));
+    await user.click(within(rowOf('Lillet')).getByRole('button', { name: 'menus.moveUp' }));
+    expect(menuBottlesApi.reorder).not.toHaveBeenCalled();
+    finishSync();
+
+    // Campari, added by the sync, is not on screen when the move is clicked: it keeps its place last.
+    await waitFor(() => expect(menuBottlesApi.reorder).toHaveBeenCalledWith(5, [12, 10, 11, 60]));
+    await waitFor(() => expect(compositionNames()).toEqual(['Lillet', 'Hendricks', 'Campari']));
   });
 
   it('offers neither removal nor removed bottles on a personal menu', async () => {
