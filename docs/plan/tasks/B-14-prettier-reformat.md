@@ -33,6 +33,7 @@ Le 2026-10-12, `prettier --list-different` signale 210 des 286 fichiers `.ts`/`.
 ## Critères d'acceptation
 
 - [ ] `npm run format:check` vert dans `backend/` et `frontend/`.
+- [ ] Les jobs Backend et Frontend de `ci.yml` lancent `npm run format:check`, vert sur la PR.
 - [ ] `.git-blame-ignore-revs` contient le SHA du commit de reformatage, tel qu'il est sur `develop`.
 - [ ] Lint, `tsc`, tests et build verts dans les deux paquets.
 

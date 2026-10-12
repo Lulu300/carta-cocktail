@@ -20,13 +20,13 @@ C-10 (PR #113) a réécrit la lecture des CSV de l'import de bouteilles : décou
 
 ## Problème constaté
 
-`splitCsvRecords` (et le comptage des séparateurs qui détecte `;` ou `,`) ouvre une zone entre guillemets sur n'importe quel `"`, alors que `parseCsvLine` ne la reconnaît qu'en début de champ. Constaté à la relecture de C-10 : `Bourbon 12" edition,700` suivi de deux lignes valides donne 0 bouteille et une seule erreur (ligne 2, `capacityMl`) ; les deux lignes suivantes, avalées dans le même enregistrement, disparaissent sans être signalées.
+`splitCsvRecords` ouvre une zone entre guillemets sur n'importe quel `"`, alors que `parseCsvLine` ne la reconnaît qu'en début de champ. Constaté à la relecture de C-10 : `Bourbon 12" edition,700` suivi de deux lignes valides donne 0 bouteille et une seule erreur (ligne 2, `capacityMl`) ; les deux lignes suivantes, avalées dans le même enregistrement, disparaissent sans être signalées. Avec deux guillemets isolés, le second referme la zone et toutes les lignes entre les deux ne forment qu'un enregistrement. `countOutsideQuotes` (détection du séparateur) a le même défaut, mais ne lit que l'en-tête.
 
 Le comportement est antérieur à C-10 (même logique dans l'ancien `splitCsvLines`). Excel double toujours les guillemets d'une cellule (RFC 4180), donc seuls les fichiers écrits à la main ou par un autre outil sont touchés.
 
 ## Ce qu'il faut faire
 
-1. Dans `splitCsvRecords` et la détection du séparateur, n'ouvrir une zone entre guillemets qu'en début de champ (début de ligne ou juste après un séparateur), comme `parseCsvLine`. Un `"` au milieu d'un champ non entouré de guillemets est un caractère ordinaire.
+1. Dans `splitCsvRecords` (et `countOutsideQuotes`), n'ouvrir une zone entre guillemets qu'en début de champ (début de ligne ou juste après un séparateur), comme `parseCsvLine`. Un `"` au milieu d'un champ non entouré de guillemets est un caractère ordinaire.
 2. Garder le reste du comportement de C-10 : `""` dans un champ entre guillemets, champs multilignes, `\r\n` conservé, numéros de ligne.
 
 ## Critères d'acceptation
@@ -41,6 +41,7 @@ Le comportement est antérieur à C-10 (même logique dans l'ancien `splitCsvLin
 
 ## Points d'attention
 
+- Ordre : `splitCsvRecords` tourne aujourd'hui avant `detectSeparator`, qui lit `records[0]`. Pour reconnaître un début de champ, il faut le séparateur avant le découpage : par exemple le détecter sur la première ligne physique (un en-tête n'a pas de champ multiligne) et le passer à `splitCsvRecords`.
 - Un champ qui commence par `"` sans guillemet fermant reste ambigu : garder le comportement actuel (zone ouverte jusqu'à la fin du fichier) ou le signaler en erreur, mais ne pas avaler de lignes en silence si un test simple permet de le détecter.
 
 ## Journal
