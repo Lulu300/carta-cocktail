@@ -80,4 +80,10 @@ CRUD :
   - `existingMatch.name` d'une unité vaut maintenant son abréviation (champ comparé) ; le wizard ne l'affiche qu'en repli pendant le chargement des listes.
   - Données réelles (copie migrée du jeu d'essai v1.4.0) : 0 ligne avec une référence vers une ligne absente ni clé de source nulle ; PUT sans changement 42/42 ; export puis import 42/42 (même base, bouteilles ignorées avec 27 replis `CATEGORY`, base vide).
   - Frontend : l'assistant et le formulaire affichent le message traduit, pas les `details` → C-38 créée.
+  - C-14 : ligne de Journal et `touches` (`backend/src/services/cocktail/`) mis à jour, la copie d'`ensureCategoryType` et les `JSON.stringify(nameTranslations)` de l'import ayant quitté `routes/cocktails.ts`.
   - `services/uploadsCheck.ts` non touché : le point `safeUploadPath` du Journal reste pour la prochaine tâche qui le modifie.
+- 2026-10-12 : suites de la revue de la PR #127 (rebase sur `develop` avec D-08 et D-16).
+  - PUT sur un cocktail inexistant : 404 vérifié en tête de transaction, avant `assertTargetsExist` (même si une ligne désigne une ligne absente).
+  - `resolveSource` s'appuie sur `SOURCE_KEYS` ; un seul helper `lowercase` (`importReferences.ts`).
+  - `importUnresolved` d'une bouteille à créer sans catégorie : `name` = nom de la source dans le fichier, comme les autres cas et comme C-38 le décrit.
+  - Les bouteilles préférées d'une ligne qui n'est pas `CATEGORY` ne sont plus listées dans l'aperçu : l'assistant ne propose plus de les créer, et un fichier où elles n'ont pas de catégorie n'est plus refusé.
