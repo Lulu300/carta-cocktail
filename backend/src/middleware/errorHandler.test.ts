@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { Request, Response } from 'express';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../generated/prisma/client';
 import multer from 'multer';
 import { toHttpError, errorHandler } from './errorHandler';
 import {

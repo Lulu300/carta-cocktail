@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { PrismaClient } from '@prisma/client';
-import { checkpointWal, configureSqlite } from './prisma';
+import type { PrismaClient } from '../generated/prisma/client';
+import { TEST_DATABASE_PATH } from '../test/testDatabase';
+import { checkpointWal, configureSqlite, createPrismaClient, prisma } from './prisma';
 
 // WAL needs a local file system, so these databases live in the OS temp folder
 let tmpDir: string;
@@ -11,7 +12,7 @@ let dbUrl: string;
 const clients: PrismaClient[] = [];
 
 function openClient(): PrismaClient {
-  const client = new PrismaClient({ datasourceUrl: dbUrl });
+  const client = createPrismaClient(dbUrl);
   clients.push(client);
   return client;
 }
@@ -113,10 +114,65 @@ describe('checkpointWal', () => {
   });
 });
 
-describe('prisma client pool', () => {
-  // lib/prisma.ts relies on this default instead of a per-connection pragma:
-  // the check fails if a Prisma upgrade drops it
-  it('should wait on a locked database on every pooled connection', async () => {
+/** Path of the file a client has open, as SQLite reports it. */
+async function openFile(client: PrismaClient): Promise<string> {
+  const rows = await client.$queryRawUnsafe<{ file: string }[]>("SELECT file FROM pragma_database_list WHERE name = 'main';");
+  return fs.realpathSync(rows[0].file);
+}
+
+describe('createPrismaClient', () => {
+  it('should open the file of an absolute URL and ignore the URL parameters', async () => {
+    const client = createPrismaClient(`file:${path.join(tmpDir, 'other.db')}?connection_limit=1`);
+    clients.push(client);
+
+    expect(await openFile(client)).toBe(fs.realpathSync(path.join(tmpDir, 'other.db')));
+  });
+
+  it('should open a relative DATABASE_URL from the prisma/ folder, not from the working directory', async () => {
+    // src/test/setup.ts sets DATABASE_URL to file:./test.db
+    expect(await openFile(prisma)).toBe(fs.realpathSync(TEST_DATABASE_PATH));
+  });
+});
+
+describe('DateTime storage', () => {
+  const email = 'datetime-storage@test.local';
+
+  afterEach(async () => {
+    await prisma.user.deleteMany({ where: { email } });
+  });
+
+  // Prisma 6 wrote Unix milliseconds: a column mixing them with ISO strings would
+  // sort and compare wrongly (SQLite orders every number before every string)
+  it('should write dates as Unix milliseconds, like Prisma 6', async () => {
+    const createdAt = new Date('2026-10-12T08:30:00.000Z');
+    await prisma.user.create({ data: { email, passwordHash: 'x', createdAt } });
+
+    const [row] = await prisma.$queryRawUnsafe<{ type: string; value: number | bigint }[]>(
+      'SELECT typeof(createdAt) AS type, createdAt AS value FROM "User" WHERE email = ?;',
+      email,
+    );
+    expect(row.type).toBe('integer');
+    expect(Number(row.value)).toBe(createdAt.getTime());
+  });
+
+  it('should read the dates Prisma 6 wrote', async () => {
+    const createdAt = new Date('2025-01-02T03:04:05.678Z');
+    await prisma.$executeRawUnsafe(
+      'INSERT INTO "User" (email, passwordHash, createdAt) VALUES (?, ?, ?);',
+      email,
+      'x',
+      createdAt.getTime(),
+    );
+
+    const user = await prisma.user.findUniqueOrThrow({ where: { email } });
+    expect(user.createdAt).toEqual(createdAt);
+  });
+});
+
+describe('prisma client connection', () => {
+  // lib/prisma.ts relies on the 5 s default of better-sqlite3 instead of a
+  // pragma: the check fails if an upgrade of the adapter drops it
+  it('should wait on a locked database', async () => {
     const client = openClient();
     const timeouts = await Promise.all(
       Array.from({ length: 20 }, () => readPragma(client, 'busy_timeout')),

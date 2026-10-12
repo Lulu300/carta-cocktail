@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { Menu, Prisma } from '@prisma/client';
+import { Menu, Prisma } from '../generated/prisma/client';
 import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../errors';

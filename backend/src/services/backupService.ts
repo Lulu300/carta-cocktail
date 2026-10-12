@@ -3,9 +3,10 @@ import os from 'os';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import AdmZip from 'adm-zip';
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '../generated/prisma/client';
 import { config } from '../config';
-import { checkpointWal, configureSqlite, prisma } from '../lib/prisma';
+import { PRISMA_DIR, resolveDatabasePath } from '../lib/databasePath';
+import { checkpointWal, configureSqlite, createPrismaClient, prisma } from '../lib/prisma';
 import { BadRequestError } from '../errors';
 import { hasTokenVersionColumn, writeSessionFloor } from './sessionFloor';
 
@@ -26,9 +27,6 @@ const REQUIRED_TABLES = ['User', 'Cocktail', 'Bottle', 'Menu'];
 // served from the admin's origin (an .html or .js file), so it is never restored.
 const RESTORABLE_UPLOAD_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
 
-// Folder of schema.prisma: Prisma resolves relative SQLite paths from there.
-// Same folder from src/services and dist/services.
-const PRISMA_DIR = path.resolve(__dirname, '../../prisma');
 const MIGRATIONS_DIR = path.join(PRISMA_DIR, 'migrations');
 const PACKAGE_JSON = path.resolve(__dirname, '../../package.json');
 
@@ -49,19 +47,6 @@ export interface RestoreResult {
    * (C-01 entrypoint), which refuses schemas older than the `0_init` baseline.
    */
   restartRecommended: boolean;
-}
-
-/**
- * Path of the SQLite file named by a `file:` DATABASE_URL, as Prisma opens it:
- * URL parameters removed, relative paths resolved from the folder of schema.prisma
- * (not from the working directory).
- */
-export function resolveDatabasePath(url: string = process.env.DATABASE_URL ?? ''): string {
-  if (!url.startsWith('file:')) {
-    throw new Error('DATABASE_URL must be a SQLite file: URL');
-  }
-  const filePath = url.slice('file:'.length).split('?')[0];
-  return path.resolve(PRISMA_DIR, filePath);
 }
 
 /**
@@ -191,7 +176,7 @@ function removeSqliteSideFiles(dbPath: string): void {
 async function validateDatabase(dbPath: string): Promise<string | null> {
   if (!hasSqliteHeader(dbPath)) throw new BadRequestError('errors.invalidBackup');
 
-  const client = new PrismaClient({ datasourceUrl: `file:${dbPath}` });
+  const client = createPrismaClient(`file:${dbPath}`);
   try {
     const [integrity] = await client.$queryRawUnsafe<{ integrity_check: string }[]>('PRAGMA integrity_check;');
     if (integrity?.integrity_check !== 'ok') throw new BadRequestError('errors.invalidBackup');
@@ -233,7 +218,7 @@ async function highestLiveTokenVersion(): Promise<number> {
  * migration adds the column at the next start, and the session floor raises it then.
  */
 async function raiseRestoredTokenVersion(restoredDbPath: string, liveTokenVersion: number): Promise<boolean> {
-  const client = new PrismaClient({ datasourceUrl: `file:${restoredDbPath}` });
+  const client = createPrismaClient(`file:${restoredDbPath}`);
   try {
     if (!(await hasTokenVersionColumn(client))) return false;
     await client.$executeRaw`UPDATE "User" SET "tokenVersion" = MAX("tokenVersion", ${liveTokenVersion}) + 1`;

@@ -15,8 +15,9 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:status": "prisma migrate status",
-    "db:check": "prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --shadow-database-url file::memory: --exit-code",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:check": "DATABASE_URL=file:./db-check.db prisma migrate diff --from-migrations prisma/migrations --to-schema prisma/schema.prisma --exit-code",
+    "db:seed": "tsx prisma/seed.ts",
+    "postinstall": "prisma generate"
   },
   "keywords": [],
   "author": "",
@@ -26,9 +27,12 @@
     "node": ">=24"
   },
   "dependencies": {
+    "@prisma/adapter-better-sqlite3": "7.10.0",
+    "@prisma/client": "7.10.0",
     "adm-zip": "^0.6.1",
     "archiver": "^8.0.0",
     "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.11.1",
     "cors": "^2.8.6",
     "dotenv": "^18.0.7",
     "express": "^5.2.1",
@@ -43,7 +47,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@prisma/client": "6.19.3",
     "@types/archiver": "^8.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
@@ -57,7 +60,7 @@
     "eslint": "^10.12.0",
     "globals": "^17.13.0",
     "prettier": "^3.9.10",
-    "prisma": "6.19.3",
+    "prisma": "7.10.0",
     "supertest": "^7.2.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",

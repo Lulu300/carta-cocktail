@@ -3,10 +3,10 @@ FROM node:24.21-alpine
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
-
 COPY prisma ./prisma
-RUN npx prisma generate
+# The postinstall script generates the Prisma client from prisma/schema.prisma
+# into src/generated/, which `npm run build` compiles with the sources
+RUN npm ci
 
 COPY . .
 RUN npm run build

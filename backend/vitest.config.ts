@@ -27,6 +27,8 @@ export default defineConfig({
       },
       exclude: [
         'src/test/**',
+        // Prisma client: generated, not versioned, so never in the ci.yml delta
+        'src/generated/**',
         'dist/**',
         '*.config.*',
         'src/index.ts',

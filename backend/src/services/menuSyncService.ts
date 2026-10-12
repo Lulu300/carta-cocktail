@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '../generated/prisma/client';
 import { BadRequestError, NotFoundError } from '../errors';
 import { nextPosition } from './positions';
 

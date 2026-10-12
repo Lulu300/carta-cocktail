@@ -1,12 +1,6 @@
-import { PrismaClient } from '@prisma/client';
-import dotenv from 'dotenv';
-import path from 'path';
+// The seed runs on its own (npm run db:seed): the shared client also loads backend/.env
+import { prisma } from '../src/lib/prisma';
 import { ensureAdmin } from '../src/bootstrap/ensureAdmin';
-
-// The seed runs on its own (npm run db:seed), outside the app that loads backend/.env
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
-
-const prisma = new PrismaClient();
 
 async function main() {
   await ensureAdmin(prisma);
