@@ -104,3 +104,4 @@ Duplication :
   4. Le test du lot de 10 recettes avance l'horloge de 31 s entre deux recettes avec le `staleTime` de l'app : il échoue si une étape recharge les listes à son montage (vérifié).
   5. Flèche de l'écran de confirmation lue « correspond à » ; Ignorer / Réactiver avec `aria-pressed` et le nom de la bouteille ; nom du fichier affiché seulement après un chargement réussi ; invalidation des listes dans les options de `useMutation`, donc même si l'assistant est fermé pendant la requête.
   6. Nouvelle tâche E-28 (primitive `ui/Alert`). Clés mortes `invalidVersion` et `summary` notées dans le Journal d'E-14.
+- 2026-10-12 : décisions de l'humain sur la relecture de la PR #119. (1) Le `field` des erreurs de lignes reste affiché brut : c'est le nom de colonne du fichier. (2) Echap ferme les assistants (comportement de `Modal`), sans confirmation supplémentaire.
