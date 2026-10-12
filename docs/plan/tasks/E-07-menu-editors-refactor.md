@@ -5,13 +5,13 @@ phase: E
 lane: frontend
 criticite: moyenne
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [A-02, C-13, E-02, E-03, C-06]
-touches: [frontend/src/pages/admin/MenuEditPage.tsx, frontend/src/pages/admin/MenuBottleEditPage.tsx, frontend/src/components/admin/menus/, frontend/src/services/api.ts, frontend/src/i18n/locales/]
+touches: [frontend/src/pages/admin/MenuEditPage.tsx, frontend/src/pages/admin/MenuBottleEditPage.tsx, frontend/src/components/admin/menus/, frontend/src/services/api.ts, frontend/src/i18n/locales/, frontend/src/queries/keys.ts, frontend/src/pages/admin/MenusPage.tsx]
 sources: ["05-frontend-archi.md §4.3", "05-frontend-archi.md §H5"]
-branch:
-pr:
+branch: feature/E-07-menu-editors-refactor
+pr: "#107"
 ---
 
 ## Décisions validées (2026-10-08)
@@ -85,18 +85,18 @@ Les composants communs utilisent des clés i18n (`menus.sections.*`). Les textes
 
 ## Critères d'acceptation
 
-- [ ] Modèle de sauvegarde appliqué : enregistrement immédiat, bouton uniquement pour le bloc d'infos.
-- [ ] Ranger des cocktails en sections, quitter la page, revenir : les sections sont conservées.
-- [ ] Masquer deux groupes de bouteilles en moins d'une seconde : les deux restent masqués après rechargement.
-- [ ] Déplacer un groupe de bouteilles : une seule requête réseau.
-- [ ] Supprimer une section : une seule requête réseau.
-- [ ] Une erreur serveur sur une modification remet l'écran dans son état précédent et affiche un toast.
-- [ ] Un id de menu inexistant affiche une erreur, pas « Chargement… » sans fin.
-- [ ] Les sections se réordonnent depuis l'UI.
-- [ ] Sur une carte système, retirer un groupe le fait passer dans « Bouteilles retirées » en une seule requête ; « Remettre » le replace en fin de liste ; les deux survivent à un rechargement.
-- [ ] Renommer la carte « Apéritifs » (nom, description, publication) fonctionne ; son slug est en lecture seule.
-- [ ] Les deux pages font chacune moins de 200 lignes ; aucun texte en dur ; aucun `confirm(`.
-- [ ] Couverture ≥ 80 % sur les lignes modifiées (0 % aujourd'hui).
+- [x] Modèle de sauvegarde appliqué : enregistrement immédiat, bouton uniquement pour le bloc d'infos.
+- [x] Ranger des cocktails en sections, quitter la page, revenir : les sections sont conservées.
+- [x] Masquer deux groupes de bouteilles en moins d'une seconde : les deux restent masqués après rechargement.
+- [x] Déplacer un groupe de bouteilles : une seule requête réseau.
+- [x] Supprimer une section : une seule requête réseau.
+- [x] Une erreur serveur sur une modification remet l'écran dans son état précédent et affiche un toast.
+- [x] Un id de menu inexistant affiche une erreur, pas « Chargement… » sans fin.
+- [x] Les sections se réordonnent depuis l'UI.
+- [x] Sur une carte système, retirer un groupe le fait passer dans « Bouteilles retirées » en une seule requête ; « Remettre » le replace en fin de liste ; les deux survivent à un rechargement.
+- [x] Renommer la carte « Apéritifs » (nom, description, publication) fonctionne ; son slug est en lecture seule.
+- [x] Les deux pages font chacune moins de 200 lignes ; aucun texte en dur ; aucun `confirm(`.
+- [x] Couverture ≥ 80 % sur les lignes modifiées (0 % aujourd'hui).
 
 ## Tests à ajouter ou adapter
 
@@ -121,3 +121,4 @@ Les composants communs utilisent des clés i18n (`menus.sections.*`). Les textes
 - 2026-10-09 : décision « liste d'exclusions » reprise : bouton « Retirer » et section « Bouteilles retirées » avec « Remettre » sur les cartes système (étape 3, critère, tests). C-06 ajoutée à `depends_on` : ces routes viennent de C-06.
 - 2026-10-09 : revue de la PR #38. Cartes système : nom, description et `isPublic` modifiables, seuls le slug et le type verrouillés (point d'attention réécrit, critère et test ajoutés). « Retirer » un groupe passe par la route d'exclusion en lot de C-06 (une requête).
 - 2026-10-12 : revue de la PR #99 (C-06), décision humaine : C-06 et E-07 sortent dans la même release (point d'attention ajouté).
+- 2026-10-12 : fait (PR #107). Composants et hooks communs dans `components/admin/menus/`, mutation optimiste unique (`useMenuMutation`, `scope` par carte, rechargement par la dernière modification seulement), déplacement d'un groupe en une requête `reorder` (C-13), retrait et « Remettre » sur les cartes système (C-06). Écarts : pas de prop `fields` sur `MenuInfoForm` (les deux éditeurs montrent les mêmes champs), bouton « Synchroniser » gardé sur toutes les cartes de bouteilles (F-08). Fichiers ajoutés à `touches` : `frontend/src/queries/keys.ts` (`qk.menuExclusions`) et `frontend/src/pages/admin/MenusPage.tsx` (`toSlug` partagé). Release : à sortir avec C-06 (#99).
