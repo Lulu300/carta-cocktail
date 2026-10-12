@@ -4,6 +4,7 @@ import { AuthRequest } from '../middleware/auth';
 import { valid, validate } from '../validation/validate';
 import { IdParams, idRequest, MenuIdParams } from '../validation/common';
 import { MenuSectionCreate, MenuSectionReorder, MenuSectionUpdate } from '../validation/menuSections';
+import { nextPosition, reorder } from '../services/positions';
 
 const router = Router();
 
@@ -24,19 +25,12 @@ const createSchemas = { params: MenuIdParams, body: MenuSectionCreate };
 router.post('/menu/:menuId/sections', validate(createSchemas), async (_req: AuthRequest, res: Response) => {
   const { params: { menuId }, body: { name } } = valid<typeof createSchemas>(res);
 
-  // Get max position for this menu
-  const maxSection = await prisma.menuSection.findFirst({
-    where: { menuId },
-    orderBy: { position: 'desc' },
-  });
-
-  const section = await prisma.menuSection.create({
-    data: {
-      menuId,
-      name,
-      position: (maxSection?.position ?? -1) + 1,
-    },
-  });
+  // One transaction for the read and the insert, so a concurrent insert cannot take the same position
+  const section = await prisma.$transaction(async (tx) =>
+    tx.menuSection.create({
+      data: { menuId, name, position: await nextPosition(tx, 'menuSection', menuId) },
+    })
+  );
 
   res.status(201).json(section);
 });
@@ -67,18 +61,9 @@ router.delete('/sections/:id', validate(idRequest), async (_req: AuthRequest, re
 const reorderSchemas = { params: MenuIdParams, body: MenuSectionReorder };
 
 router.post('/menu/:menuId/sections/reorder', validate(reorderSchemas), async (_req: AuthRequest, res: Response) => {
-  // sectionIds lists the menu's sections in their new order
+  // sectionIds lists every section of the menu, in its new order
   const { params: { menuId }, body: { sectionIds } } = valid<typeof reorderSchemas>(res);
-
-  await Promise.all(
-    sectionIds.map((id, index) =>
-      prisma.menuSection.update({
-        where: { id, menuId },
-        data: { position: index },
-      })
-    )
-  );
-
+  await prisma.$transaction((tx) => reorder(tx, 'menuSection', menuId, sectionIds));
   res.json({ message: 'Sections reordered' });
 });
 
