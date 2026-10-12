@@ -42,6 +42,13 @@ jobs:
       # The postinstall script generates the Prisma client
       - run: npm ci
 
+      # critical only until B-11: the Prisma CLI, a runtime dependency, pulls
+      # 4 high advisories (deepmerge-ts, mysql2). B-11 overrides them and raises
+      # this to high. A new advisory is fixed by an upgrade or an override,
+      # never by lowering the threshold.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=critical
+
       - name: Check that migrations match the Prisma schema
         run: npm run db:check
 
@@ -106,6 +113,11 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - run: npm ci
+
+      # A new advisory is fixed by an upgrade or an override, never by lowering
+      # the threshold (the backend is at critical until B-11).
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
 
       # tsconfig.json only holds project references ("files": []): without -b,
       # tsc checks no file at all. Both referenced projects set noEmit.
