@@ -5,13 +5,13 @@ phase: C
 lane: ci
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-18]
 touches: [scripts/upgrade-test/]
 sources: []
-branch:
-pr:
+branch: chore/C-37-bench-failed-migration-refusal
+pr: "#131"
 ---
 
 ## Contexte
@@ -39,9 +39,9 @@ Le banc compte donc deux échecs inattendus pour un refus que les notes décrive
 
 ## Critères d'acceptation
 
-- [ ] Sur un jeu d'essai avec doublon, le saut vers la version qui livre C-18 est rapporté comme un refus propre (0 échec inattendu) en mode naïf.
-- [ ] Le refus de la baseline `0_init` reste reconnu comme avant.
-- [ ] Tests unitaires du banc adaptés (`node --test scripts/upgrade-test/test/*.test.mjs`).
+- [x] Sur un jeu d'essai avec doublon, le saut vers la version qui livre C-18 est rapporté comme un refus propre (0 échec inattendu) en mode naïf.
+- [x] Le refus de la baseline `0_init` reste reconnu comme avant.
+- [x] Tests unitaires du banc adaptés (`node --test scripts/upgrade-test/test/*.test.mjs`).
 
 ## Tests à ajouter ou adapter
 
@@ -54,3 +54,5 @@ Le banc compte donc deux échecs inattendus pour un refus que les notes décrive
 ## Journal
 
 - 2026-10-12 : tâche créée pendant C-18 (point d'attention « le banc attend un refus propre »).
+- 2026-10-12 : fait (PR #131). `profile.refusalLog` devient `profile.refusals` (liste de `{ log, database }`, cumulée d'une version à l'autre par `profileOf`). Les deux refus sont définis dans `lib/checks.mjs` : `BASELINE_REFUSAL` (listé par `hooks/1.6.0.mjs`, base inchangée au SHA-256 près) et `FAILED_MIGRATION_REFUSAL` (`database: 'backupBeforeJump'` : la dernière copie `pre-migrate-*` doit avoir le SHA-256 de la base d'avant le saut ; le comptage des lignes reste contrôlé à chaque démarrage). Code de sortie d'un refus lu dans le dernier événement `die` du conteneur (`State.ExitCode` reste à 0 pendant les relances, vérifié avec un conteneur de test). Point 3 (injection d'un doublon) non fait. Banc : copie temporaire du jeu d'essai avec une catégorie en double, `1.4.0,local`, `friend`, naïf, avec un `hooks/1.12.0.mjs` temporaire non commité (refus de C-18 et actions de D-01) : refus reconnu, 0 échec inattendu, code de sortie 1 et 2 relances, aucune perte, copie `pre-migrate` identique à la base d'avant le saut, 1 copie pour 3 démarrages. Le refus `0_init` est couvert par les tests unitaires ; il n'est pas reproductible sur le banc, car v1.4.0 réaligne le schéma par `db push --accept-data-loss`. Tests du banc : 42 OK.
+- 2026-10-12 : Notes de version : aucune action pour les utilisateurs. Hook du banc pour v1.12.0 : ajouter `refusals: [FAILED_MIGRATION_REFUSAL]` (import depuis `../lib/checks.mjs`) au profil, à côté des actions de D-01.
