@@ -5,13 +5,13 @@ phase: D
 lane: docs
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: mixed
 depends_on: []
-touches: [.mailmap, .github/]
+touches: [.mailmap, .github/, docs/plan/tasks/D-09-docs-sync-ops-guide.md, docs/plan/tasks/D-24-pr-auto-labels.md]
 sources: ["07-devops-history.md §1.3"]
-branch:
-pr:
+branch: docs/D-07-git-governance
+pr: "#PRNUM"
 ---
 
 ## Décisions validées (2026-10-08)
@@ -65,8 +65,8 @@ Partie humaine (réglages GitHub, à faire après merge) :
 
 ## Critères d'acceptation
 
-- [ ] `git shortlog -sne` n'affiche plus qu'une seule identité.
-- [ ] `.github/pull_request_template.md` et `.github/release.yml` existent.
+- [x] `git shortlog -sne` n'affiche plus qu'une seule identité (hors `dependabot[bot]`).
+- [x] `.github/pull_request_template.md` et `.github/release.yml` existent.
 - [ ] (humain) Un `git push origin main` direct est refusé.
 - [ ] (humain) Une PR vers `develop` avec le check `Backend` rouge ne peut pas être mergée.
 - [ ] (humain) La branche d'une PR mergée est supprimée automatiquement.
@@ -90,3 +90,5 @@ Partie humaine (réglages GitHub, à faire après merge) :
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : décisions validées par l'humain (voir « Décisions validées »).
 - 2026-10-09 : les notes de release (liste des PR classée par labels) relèvent désormais de D-11, plus de D-05 : renvoi corrigé.
+- 2026-10-12 : partie agent faite (PR #PRNUM) : `.mailmap`, `.github/pull_request_template.md`, `.github/release.yml` (catégories par label ; `bug`, `enhancement` et `documentation` acceptés comme alias ; catégorie « Other changes » pour les PR sans label ; label `skip-changelog` exclu). La partie humaine (étapes 5 à 10) est décrite dans la PR, avec l'état actuel relevé en lecture seule et les commandes prêtes à copier. Les critères « (humain) » restent à cocher après les réglages.
+- 2026-10-12 : état relevé en lecture seule. `user.email` global vaut déjà `ludwig@simonl.fr` (étape 9 faite) ; `user.name` vaut `Lulu300`, ramené à `Ludwig SIMON` par le `.mailmap`. Secret scanning et push protection actifs, Dependabot alerts actives, security updates désactivées (décision de D-21), CodeQL non configuré. 35 branches distantes mergées dans `main`. Aucune PR du plan ne porte de label : création de D-24 (labels automatiques depuis le préfixe de branche). Convention de commit transmise à D-09 (Points d'attention) ; `AGENTS.md` la contient déjà.
