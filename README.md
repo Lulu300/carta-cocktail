@@ -17,7 +17,7 @@ A cocktail menu management system with admin panel and public-facing menu displa
 
 | Layer | Technology |
 | --- | --- |
-| Backend | Express 5, TypeScript, Prisma 6, SQLite |
+| Backend | Express 5, TypeScript, Prisma 7, SQLite |
 | Frontend | React 19, Vite 7, TailwindCSS 4, React Router 7 |
 | Auth | JWT (single admin) |
 | i18n | i18next |
@@ -185,9 +185,11 @@ Do this once before deploying the first version with migrations, on a copy of th
 3. From `backend/` in a checkout of the new version (after `npm ci`), compare the copy with `0_init`:
 
    ```bash
-   npx prisma db execute --url "file:$PWD/baseline.db" --file prisma/migrations/0_init/migration.sql
-   npx prisma migrate diff --from-url "file:/absolute/path/to/carta-db-copy/carta_cocktail.db" --to-url "file:$PWD/baseline.db" --script
-   rm baseline.db
+   mkdir baseline
+   cp -R prisma/migrations/0_init prisma/migrations/migration_lock.toml baseline/
+   DATABASE_URL="file:/absolute/path/to/carta-db-copy/carta_cocktail.db" \
+     npx prisma migrate diff --from-config-datasource --to-migrations baseline --script
+   rm -r baseline
    ```
 
    Expected: `-- This is an empty migration.` Otherwise the output is the SQL that would bring the database to `0_init`: read it and fix the database before deploying (see below).
