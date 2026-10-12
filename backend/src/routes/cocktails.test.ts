@@ -354,6 +354,15 @@ describe('PUT /api/cocktails/:id', () => {
     expect(res.status).toBe(404);
   });
 
+  it('should return 404 for a non-existent cocktail even when a line names a missing unit', async () => {
+    const lime = await seedIngredient({ name: 'Lime' });
+
+    const res = await request.put('/api/cocktails/99999').set(authHeader()).send({
+      ingredients: [{ quantity: 1, unitId: 99999, sourceType: 'INGREDIENT', ingredientId: lime.id }],
+    });
+    expect(res.status).toBe(404);
+  });
+
   it('should return 400 and leave the recipe untouched for a BOTTLE line without bottleId', async () => {
     const { id, unit } = await createFullCocktail();
 

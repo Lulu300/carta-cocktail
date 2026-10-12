@@ -3,9 +3,9 @@ import { Prisma } from '../../generated/prisma/client';
 import { prisma } from '../../lib/prisma';
 import { BadRequestError } from '../../errors';
 import { ImportRecipeV1, ImportResolutions } from '../../validation/cocktailImport';
-import { SourceType } from '../../validation/cocktails';
+import { SOURCE_KEYS, SourceType } from '../../validation/cocktails';
 import { createCocktailIn, IngredientLineValue } from './cocktailService';
-import { collectImportReferences, ImportReferences, ImportedLine } from './importReferences';
+import { collectImportReferences, ImportReferences, ImportedLine, lowercase } from './importReferences';
 
 /**
  * Import of a cocktail exported as JSON (format version 1).
@@ -44,10 +44,6 @@ const SOURCE_KIND: Record<z.output<typeof SourceType>, EntityKind> = {
   CATEGORY: 'category',
   INGREDIENT: 'ingredient',
 };
-
-function lowercase(value: string): string {
-  return value.toLowerCase();
-}
 
 function stringifyTranslations(translations: Record<string, unknown> | null | undefined): string | null {
   return translations ? JSON.stringify(translations) : null;
@@ -138,9 +134,10 @@ function unresolved(details: UnresolvedReference[]): BadRequestError {
 
 // The first recipe line that names this bottle, as its source or as a preferred bottle
 function firstLineUsingBottle(recipe: ImportedRecipe, key: string): number {
-  return (recipe.ingredients ?? []).findIndex((line) =>
-    (line.sourceType === 'BOTTLE' && lowercase(line.sourceName) === key)
-    || (line.preferredBottles ?? []).some((bottle) => lowercase(bottle.name) === key));
+  return (recipe.ingredients ?? []).findIndex((line) => {
+    if (line.sourceType === 'BOTTLE') return lowercase(line.sourceName) === key;
+    return line.sourceType === 'CATEGORY' && (line.preferredBottles ?? []).some((bottle) => lowercase(bottle.name) === key);
+  });
 }
 
 async function ensureCategoryType(db: Db, name: string): Promise<void> {
@@ -180,12 +177,14 @@ async function resolveAll(db: Db, recipe: ImportedRecipe, refs: ImportReferences
   });
 
   const bottle = await resolveEntities(refs.bottles, resolutions?.bottles, async (data, ref, key) => {
-    const name = data.name || ref.name || key;
     const categoryName = data.categoryName || ref.categoryName;
     const categoryId = categoryName ? category.get(lowercase(categoryName)) : undefined;
-    if (!categoryId) throw unresolved([{ line: firstLineUsingBottle(recipe, key), kind: 'bottle', name }]);
+    // Named as in the file, like every other unresolved reference
+    if (!categoryId) throw unresolved([{ line: firstLineUsingBottle(recipe, key), kind: 'bottle', name: ref.name }]);
     const { capacityMl, remainingPercent, alcoholPercentage } = data;
-    const created = await db.bottle.create({ data: { name, categoryId, capacityMl, remainingPercent, alcoholPercentage } });
+    const created = await db.bottle.create({
+      data: { name: data.name || ref.name || key, categoryId, capacityMl, remainingPercent, alcoholPercentage },
+    });
     return created.id;
   });
 
@@ -213,9 +212,7 @@ type LineSource = Pick<IngredientLineValue, 'sourceType' | 'bottleId' | 'categor
  */
 function resolveSource(line: ImportedLine, ids: ResolvedIds): LineSource | null {
   const id = ids[SOURCE_KIND[line.sourceType]].get(lowercase(line.sourceName));
-  if (id && line.sourceType === 'BOTTLE') return { sourceType: 'BOTTLE', bottleId: id };
-  if (id && line.sourceType === 'CATEGORY') return { sourceType: 'CATEGORY', categoryId: id };
-  if (id && line.sourceType === 'INGREDIENT') return { sourceType: 'INGREDIENT', ingredientId: id };
+  if (id) return { sourceType: line.sourceType, [SOURCE_KEYS[line.sourceType]]: id };
 
   const categoryName = line.sourceType === 'BOTTLE' ? line.sourceDetail?.categoryName : undefined;
   const categoryId = categoryName ? ids.category.get(lowercase(categoryName)) : undefined;

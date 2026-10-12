@@ -70,6 +70,13 @@ describe('previewImport', () => {
     expect(preview.categories[0]).toMatchObject({ status: 'matched', existingMatch: { id: category.id, name: 'Rum' } });
   });
 
+  it('should not list the preferred bottles of a line that is not a category line', async () => {
+    const preview = await previewImport(recipe([
+      { ...rumBottleLine, preferredBottles: [{ name: 'Diplomatico' }] },
+    ]));
+    expect(preview.bottles.map((entity) => entity.ref.name)).toEqual(['Havana']);
+  });
+
   it('should keep the refs of every kind of entity', async () => {
     const preview = await previewImport(recipe([
       rumBottleLine,
@@ -153,8 +160,9 @@ describe('confirmImport - unresolved references', () => {
       confirmImport(recipe([rumBottleLine]), resolutions({
         units: { cl: { action: 'use_existing', existingId: unit.id } },
         categories: { rum: { action: 'skip' } },
-        bottles: { havana: { action: 'create', data: { name: 'Havana', categoryName: 'Rum', capacityMl: 700 } } },
+        bottles: { havana: { action: 'create', data: { name: 'Havana Club 3', categoryName: 'Rum', capacityMl: 700 } } },
       })),
+      // Named as in the file, not as the admin renamed it
       [{ line: 0, kind: 'bottle', name: 'Havana' }],
     );
     expect(await rowCounts()).toEqual(before);

@@ -6,6 +6,11 @@ type Translations = Record<string, string | undefined> | null;
 
 export type ImportedLine = NonNullable<ImportedRecipe['ingredients']>[number];
 
+/** References and resolutions are keyed by lowercased name (or unit abbreviation). */
+export function lowercase(value: string): string {
+  return value.toLowerCase();
+}
+
 // What the preview sends back as `ref` for each entity: the fields the wizard
 // shows and proposes when the admin chooses to create the entity.
 
@@ -45,13 +50,13 @@ export interface ImportReferences {
 
 // A category named by a bottle; a category line of the recipe describes it better
 function addBottleCategory(refs: ImportReferences, name: string, type: string, nameTranslations?: Translations): void {
-  const key = name.toLowerCase();
+  const key = lowercase(name);
   if (refs.categories.has(key)) return;
   refs.categories.set(key, { name, type, desiredStock: 1, ...(nameTranslations !== undefined && { nameTranslations }) });
 }
 
 function addSource(refs: ImportReferences, line: ImportedLine): void {
-  const key = line.sourceName.toLowerCase();
+  const key = lowercase(line.sourceName);
   const detail = line.sourceDetail;
   if (line.sourceType === 'BOTTLE') {
     refs.bottles.set(key, {
@@ -78,9 +83,11 @@ function addSource(refs: ImportReferences, line: ImportedLine): void {
   }
 }
 
+// Only a CATEGORY line uses its preferred bottles: the others are not offered for creation
 function addPreferredBottles(refs: ImportReferences, line: ImportedLine): void {
+  if (line.sourceType !== 'CATEGORY') return;
   for (const bottle of line.preferredBottles ?? []) {
-    refs.bottles.set(bottle.name.toLowerCase(), {
+    refs.bottles.set(lowercase(bottle.name), {
       name: bottle.name,
       categoryName: bottle.categoryName || '',
       categoryType: 'SPIRIT',
@@ -94,7 +101,7 @@ export function collectImportReferences(recipe: ImportedRecipe): ImportReference
   const refs: ImportReferences = { units: new Map(), categories: new Map(), bottles: new Map(), ingredients: new Map() };
   for (const line of recipe.ingredients ?? []) {
     if (line.unit) {
-      refs.units.set(line.unit.abbreviation.toLowerCase(), { ...line.unit, nameTranslations: line.unit.nameTranslations || null });
+      refs.units.set(lowercase(line.unit.abbreviation), { ...line.unit, nameTranslations: line.unit.nameTranslations || null });
     }
     addSource(refs, line);
     addPreferredBottles(refs, line);

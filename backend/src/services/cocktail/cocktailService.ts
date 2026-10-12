@@ -1,7 +1,7 @@
 import type { z } from 'zod';
 import { Prisma } from '../../generated/prisma/client';
 import { prisma } from '../../lib/prisma';
-import { BadRequestError } from '../../errors';
+import { BadRequestError, NotFoundError } from '../../errors';
 import { CocktailCreate, CocktailUpdate, IngredientLine, Tags } from '../../validation/cocktails';
 import { refuseNewRecipeDefects } from '../recipeDefectsService';
 import { removeImageFile } from './cocktailImage';
@@ -140,6 +140,9 @@ export async function updateCocktail(id: number, changes: CocktailChanges) {
   if (ingredients) await refuseNewRecipeDefects(id, ingredients);
 
   return prisma.$transaction(async (tx) => {
+    // A missing cocktail answers 404, even when the lines also name missing rows
+    const cocktail = await tx.cocktail.findUnique({ where: { id }, select: { id: true } });
+    if (!cocktail) throw new NotFoundError();
     if (ingredients) await assertTargetsExist(tx, ingredients);
     // Absent fields are undefined, which Prisma leaves untouched
     return tx.cocktail.update({
