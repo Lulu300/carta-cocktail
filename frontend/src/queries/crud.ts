@@ -4,8 +4,8 @@ import { useMutation, useQueryClient, type QueryKey, type UseMutationResult } fr
 import { toast } from '../components/ui/ToastStore';
 import { describeMutationError } from './deletionImpact';
 
-interface EntityMutationOptions<Variables> {
-  mutationFn: (variables: Variables) => Promise<unknown>;
+interface EntityMutationOptions<Variables, Result> {
+  mutationFn: (variables: Variables) => Promise<Result>;
   /** Queries that show the changed data: refreshed after a success. */
   invalidates: QueryKey[];
   /** i18n key of the success toast. Left out when the page already shows the change, e.g. a toggle. */
@@ -18,7 +18,8 @@ interface EntityMutationOptions<Variables> {
   ignoreWhilePending?: boolean;
 }
 
-export type EntityMutation<Variables> = UseMutationResult<unknown, Error, Variables>;
+/** `Result` is what the request returns, e.g. the created entity. */
+export type EntityMutation<Variables, Result = unknown> = UseMutationResult<Result, Error, Variables>;
 
 /** Refreshes every query shown under one of the given keys. */
 export function useInvalidateQueries(): (keys: QueryKey[]) => void {
@@ -32,17 +33,17 @@ export function useInvalidateQueries(): (keys: QueryKey[]) => void {
  * A mutation that refreshes the given queries and reports its outcome in a toast.
  * Only `mutate` honours `ignoreWhilePending`: `mutateAsync` is TanStack Query's own.
  */
-export function useEntityMutation<Variables>({
+export function useEntityMutation<Variables, Result = unknown>({
   mutationFn,
   invalidates,
   successMessage,
   ignoreWhilePending = false,
-}: EntityMutationOptions<Variables>): EntityMutation<Variables> {
+}: EntityMutationOptions<Variables, Result>): EntityMutation<Variables, Result> {
   const { t } = useTranslation();
   const invalidateQueries = useInvalidateQueries();
   const inFlight = useRef(false);
 
-  const mutation = useMutation<unknown, Error, Variables>({
+  const mutation = useMutation<Result, Error, Variables>({
     mutationFn,
     onSuccess: () => {
       if (successMessage) toast.success(t(successMessage));
@@ -56,7 +57,7 @@ export function useEntityMutation<Variables>({
     },
   });
 
-  const mutate: EntityMutation<Variables>['mutate'] = (...args) => {
+  const mutate: EntityMutation<Variables, Result>['mutate'] = (...args) => {
     if (ignoreWhilePending && inFlight.current) return;
     inFlight.current = true;
     mutation.mutate(...args);

@@ -210,6 +210,9 @@
     "exportZip": "Exporter ZIP ({{count}})",
     "viewGrid": "Vue grille",
     "viewList": "Vue liste",
+    "notFound": "Ce cocktail n'existe pas.",
+    "backToList": "Retour aux cocktails",
+    "noPreferredAvailable": "Aucune bouteille préférée disponible",
     "importWizard": {
       "title": "Importer une recette",
       "dropzone": "Glissez un fichier JSON ou ZIP ici ou cliquez pour parcourir",
@@ -394,5 +397,10 @@
     "usedByBottles": "Bouteilles concernées : {{names}}.",
     "more_one": "et {{count}} autre",
     "more_other": "et {{count}} autres"
+  },
+  "validation": {
+    "required": "Obligatoire",
+    "positive": "Doit être supérieur à 0",
+    "sourceRequired": "Choisissez un élément"
   }
 }
