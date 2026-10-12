@@ -5,13 +5,13 @@ phase: E
 lane: frontend
 criticite: moyenne
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [E-02, E-03, E-04]
-touches: [frontend/src/pages/admin/CocktailsPage.tsx, frontend/src/pages/admin/CocktailFormPage.tsx, frontend/src/components/admin/cocktails/, frontend/src/queries/, frontend/package.json, frontend/package-lock.json]
+touches: [frontend/src/pages/admin/CocktailsPage.tsx, frontend/src/pages/admin/CocktailFormPage.tsx, frontend/src/components/admin/cocktails/, frontend/src/queries/, frontend/package.json, frontend/package-lock.json, frontend/src/i18n/locales/, frontend/src/types/index.ts]
 sources: ["05-frontend-archi.md §H4", "05-frontend-archi.md §4.2", "05-frontend-archi.md §6"]
-branch:
-pr:
+branch: feature/E-06-cocktails-pages-forms
+pr: "#102"
 ---
 
 ## Décisions validées (2026-10-08)
@@ -64,16 +64,16 @@ Le formulaire de cocktail est l'écran le plus utilisé de l'admin et le moins t
 
 ## Critères d'acceptation
 
-- [ ] Avertissement « aucune bouteille préférée disponible » affiché quand `preferredAvailable === false` (si C-08 est mergée).
-- [ ] Avec une base sans unité, `/admin/cocktails/:id` affiche le cocktail (nom, description, instructions).
-- [ ] Modifier un champ puis attendre un rechargement des listes en arrière-plan : la saisie n'est pas écrasée.
-- [ ] Passer de `/admin/cocktails/3` à `/admin/cocktails/new` vide le formulaire.
-- [ ] Une ligne d'ingrédient sans source ou avec quantité ≤ 0 bloque l'envoi et affiche l'erreur sur la ligne ; aucune requête ne part.
-- [ ] Supprimer la 2ᵉ ligne d'ingrédients sur 3 conserve les valeurs saisies de la 3ᵉ.
-- [ ] Double clic sur « Enregistrer » en création : un seul `POST /api/cocktails`.
-- [ ] `CocktailsPage.tsx` ≤ 200 lignes, `CocktailFormPage.tsx` ≤ 150 lignes, plus de `split(',')` dans les deux pages.
-- [ ] Plus de `confirm(` ni de `console.error` dans les deux pages.
-- [ ] Couverture de `CocktailFormPage` et des composants extraits ≥ 80 % (34 % aujourd'hui).
+- [x] Avertissement « aucune bouteille préférée disponible » affiché quand `preferredAvailable === false` (si C-08 est mergée).
+- [x] Avec une base sans unité, `/admin/cocktails/:id` affiche le cocktail (nom, description, instructions).
+- [x] Modifier un champ puis attendre un rechargement des listes en arrière-plan : la saisie n'est pas écrasée.
+- [x] Passer de `/admin/cocktails/3` à `/admin/cocktails/new` vide le formulaire.
+- [x] Une ligne d'ingrédient sans source ou avec quantité ≤ 0 bloque l'envoi et affiche l'erreur sur la ligne ; aucune requête ne part.
+- [x] Supprimer la 2ᵉ ligne d'ingrédients sur 3 conserve les valeurs saisies de la 3ᵉ.
+- [x] Double clic sur « Enregistrer » en création : un seul `POST /api/cocktails`.
+- [x] `CocktailsPage.tsx` ≤ 200 lignes, `CocktailFormPage.tsx` ≤ 150 lignes, plus de `split(',')` dans les deux pages.
+- [x] Plus de `confirm(` ni de `console.error` dans les deux pages.
+- [x] Couverture de `CocktailFormPage` et des composants extraits ≥ 80 % (34 % aujourd'hui).
 
 ## Tests à ajouter ou adapter
 
@@ -93,3 +93,4 @@ Le formulaire de cocktail est l'écran le plus utilisé de l'admin et le moins t
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : décisions validées par l'humain (voir « Décisions validées »).
+- 2026-10-12 : faite (PR #102). `CocktailFormPage` (12 lignes) rend `CocktailForm` avec `key`. Ce composant charge le cocktail et les listes séparément et attend les listes pour que les selects affichent l'id stocké. 404 → lien vers la liste. `CocktailEditor` : react-hook-form + zod, `values` + `keepDirtyValues`. `CocktailsPage` (189 lignes) lit le cache de requêtes. Schéma : une seule forme de ligne avec `superRefine` (comme `IngredientLine` du backend) au lieu de `discriminatedUnion`, pour un état de formulaire du même type quelle que soit la source ; les erreurs d'une ligne s'affichent toutes à la fois (`when`). Corrigé au passage : une description ou des notes vidées partent en `null`, alors qu'avant le `PUT` partiel d'A-03 ne les effaçait pas. Avertissement C-08 dans la liste et dans la fiche. Une bouteille préférée vide reste affichée pour pouvoir la décocher. `useEntityMutation` reçoit un type de résultat optionnel. Ajoutés aux `touches` : `i18n/locales/` (clés `validation.*` et trois clés `cocktails.*`) et `types/index.ts` (`CocktailInput` accepte `null`). react-hook-form et zod sont seulement dans le chunk de `CocktailFormPage`. Couverture des lignes modifiées : 100 %. Tâche E-26 créée (export silencieux, tags publics découpés à la main).
