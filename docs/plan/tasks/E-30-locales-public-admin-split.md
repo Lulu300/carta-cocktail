@@ -8,7 +8,7 @@ effort: S
 status: done
 owner: agent
 depends_on: [E-01, D-14]
-touches: [frontend/src/i18n/, frontend/src/App.tsx, frontend/src/App.test.tsx, frontend/AGENTS.md, .github/scripts/bundle-budget.mjs, .github/scripts/bundle-budget.test.mjs]
+touches: [frontend/src/i18n/, frontend/src/App.tsx, frontend/src/App.test.tsx, frontend/AGENTS.md, docs/plan/tasks/C-39-english-uk-variant.md, .github/scripts/bundle-budget.mjs, .github/scripts/bundle-budget.test.mjs]
 sources: ["06-frontend-ux-perf.md §1"]
 branch: feature/E-30-locales-public-admin-split
 pr: https://github.com/Lulu300/carta-cocktail/pull/133
@@ -34,7 +34,7 @@ Le budget du chargement public (`.github/scripts/bundle-budget.mjs`, 140 kB gzip
 2. `i18n/index.ts` n'initialise i18next qu'avec le paquet public.
 3. Nouveau module `i18n/admin.ts` qui enregistre le paquet admin des deux langues à son évaluation (`addResourceBundle` en fusion profonde, sans écraser).
 4. `App.tsx` : chaque chunk paresseux de `/login` et `/admin` attend aussi `i18n/admin` (`lazyWithAdminMessages`), donc les messages admin sont enregistrés avant le premier rendu de la page de connexion, d'`AdminLayout` et des pages admin.
-5. Une future langue s'ajoute à un seul endroit par paquet : la table de messages d'`index.ts` et celle d'`admin.ts`, contrôlées par `satisfies Record<SupportedLanguage, …>`.
+5. Une future langue s'ajoute à un seul endroit par paquet : la table de messages d'`index.ts` et celle d'`admin.ts`, typées par `TRANSLATED_LANGUAGES` (langues qui ont leurs propres fichiers, dont part `SUPPORTED_LANGUAGES`) et contrôlées par `satisfies Record<TranslatedLanguage, …>`. Une variante régionale sans fichier (`en-GB`, C-39) n'a pas d'entrée dans ces tables : elle s'ajoute à `SUPPORTED_LANGUAGES` et à `LanguageSelector`, et i18next lui sert les messages de sa langue de base.
 6. `bundle-budget.mjs` : refuser `src/i18n/admin.ts` et `src/i18n/locales/admin/` dans le premier chargement.
 
 ## Critères d'acceptation
@@ -49,7 +49,10 @@ Le budget du chargement public (`.github/scripts/bundle-budget.mjs`, 140 kB gzip
 ## Tests à ajouter ou adapter
 
 - `src/i18n/bundles.test.ts` : parité des clés en/fr par paquet ; aucune clé définie dans les deux paquets (ni clé d'un côté qui serait un espace de noms de l'autre) ; chaque clé citée par un fichier du premier chargement est dans le paquet public et le paquet public ne contient que celles-là ; pas de clé construite à l'exécution (`` `ns.${x}` ``) dans le premier chargement ; après `import('./admin')`, tous les messages des deux paquets sont présents dans les deux langues ; repli `en` d'une clé admin.
-- `src/App.test.tsx` : le module `./i18n/admin` est chargé avant le premier rendu de `LoginPage`, d'`AdminLayout` et d'une page admin. Le mock global de `react-i18next` (`setup.ts`) ignore les ressources : le test suit l'ordre de chargement au lieu du texte rendu, et `bundles.test.ts` utilise la vraie instance i18next.
+- `src/App.test.tsx` :
+  - contrôle structurel sur le source d'`App.tsx` (`?raw`) : un seul appel `lazy(`, celui de `lazyWithAdminMessages`, qui attend `./i18n/admin` ; chaque import de `pages/admin/`, `pages/auth/` et d'`AdminLayout` passe par ce helper. Il couvre toutes les routes (vérifié par mutation : une route admin en `lazy` simple le fait échouer) ;
+  - ordre de chargement : `./i18n/admin` est chargé avant le premier rendu de `LoginPage`, d'`AdminLayout` et d'une page admin. Le module simulé ne s'exécute qu'une fois par fichier : ce test prouve que le helper attend les messages, sur la première route rendue seulement, d'où le contrôle structurel.
+  - Le mock global de `react-i18next` (`setup.ts`) ignore les ressources : ces tests suivent le chargement au lieu du texte rendu, et `bundles.test.ts` utilise la vraie instance i18next.
 - `.github/scripts/bundle-budget.test.mjs` : un chunk préchargé qui contient les messages admin fait échouer le contrôle.
 
 ## Points d'attention
@@ -63,3 +66,4 @@ Le budget du chargement public (`.github/scripts/bundle-budget.mjs`, 140 kB gzip
 
 - 2026-10-12 : tâche créée sur décision humaine (voir Décisions validées), après le dépassement de budget d'E-10.
 - 2026-10-13 : faite dans la PR #133 (`feature/E-30-locales-public-admin-split`). 60 clés publiques et 401 clés admin par langue, contenu identique à `develop` (vérifié clé par clé). Premier chargement : 139,94 kB gzip avant, 131,80 kB après (−8,14 kB) ; le chunk `api` passe de 11,83 à 1,81 kB et un chunk `i18n` de 1,78 kB porte le paquet public. Le paquet admin part dans un chunk `admin` de 8,89 kB gzip, chargé en parallèle du premier chunk de `/login` ou `/admin`. Messages seuls (JSON minifié, gzip) : public 0,85 / 0,99 kB (en / fr), admin 4,79 / 5,48 kB. `frontend/AGENTS.md` décrit les deux paquets et la règle de rangement des clés. Aucune action requise.
+- 2026-10-13 : relecture de la PR #133 : contrôle structurel des routes paresseuses ajouté dans `App.test.tsx` (le test d'ordre ne voyait que la première route rendue) ; tables de messages typées par `TRANSLATED_LANGUAGES`, `SUPPORTED_LANGUAGES` en dérive, pour que la variante `en-GB` de C-39 passe par le repli d'i18next (ligne ajoutée au Journal de C-39) ; `frontend/AGENTS.md` cite `LanguageSelector` pour l'ajout d'une langue. `docs/plan/tasks/C-39-english-uk-variant.md` ajouté à `touches`. Rebase sur `develop` (B-11, C-37, C-35).

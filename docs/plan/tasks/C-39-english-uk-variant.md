@@ -75,3 +75,4 @@ Un admin britannique ne peut donc ni choisir le format jour/mois en anglais, ni 
 
 - 2026-10-12 : tâche créée par C-35, sur décision de l'humain (`en` = English (US), English (UK) plus tard).
 - 2026-10-13 : relecture de la PR #132 : `frontend/src/i18n/index.test.ts` ajouté à `touches`, `LanguageSelector` lit `i18n.language`.
+- 2026-10-13 : E-30 (PR #133) : les tables de messages d'`i18n/index.ts` et d'`i18n/admin.ts` sont typées par `TRANSLATED_LANGUAGES` (langues qui ont leurs propres fichiers), dont part `SUPPORTED_LANGUAGES`. `en-GB` s'ajoute à `SUPPORTED_LANGUAGES` et à `LanguageSelector` seulement, pas à `TRANSLATED_LANGUAGES` ni aux tables : i18next lui sert les messages `en`.
