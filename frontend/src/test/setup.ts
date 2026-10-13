@@ -54,13 +54,25 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
-// Fake backend for every request of services/api.ts: a request with no handler
+// Fake backend for every request of services/api.ts. A request with no handler
 // fails the test, so a page cannot silently call an endpoint the test ignores.
+// `onUnhandledRequest: 'error'` alone only logs and rejects the fetch, which a
+// request nobody awaits (a reload after an invalidation) would hide: such
+// requests are collected and turned into an error after the test.
+const unhandledRequests: string[] = [];
+server.events.on('request:unhandled', ({ request }) => {
+  unhandledRequests.push(`${request.method} ${new URL(request.url).pathname}`);
+});
+
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
   server.resetHandlers();
   resetCreatedIds();
   resetFactories();
   localStorage.clear();
+  const unexpected = unhandledRequests.splice(0);
+  if (unexpected.length > 0) {
+    throw new Error(`Requests without a handler: ${unexpected.join(', ')}`);
+  }
 });
 afterAll(() => server.close());

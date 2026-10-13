@@ -83,7 +83,8 @@ function slugify(name: string): string {
 }
 
 export function buildCategoryType(overrides: Partial<CategoryType> = {}): CategoryType {
-  const index = nextId('categoryType');
+  // The name is what identifies a category type: like an id, a given name uses up no number.
+  const index = overrides.name === undefined ? nextId('categoryType') : 1;
   return {
     name: nameFor(CATEGORY_TYPE_NAMES, index),
     nameTranslations: null,

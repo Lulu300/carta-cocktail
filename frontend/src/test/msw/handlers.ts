@@ -19,6 +19,10 @@ import {
  * A test changes an answer with `server.use(...)` or the helpers of `./utils`;
  * `server.resetHandlers()` restores these defaults after each test.
  *
+ * Default data is built with fixed ids (or names): a request never uses up a
+ * number of the factory sequences, so the ids a test builds do not depend on
+ * when the page loaded.
+ *
  * Paths are relative: MSW resolves them on the jsdom origin, like `fetch('/api/…')`.
  */
 
@@ -66,7 +70,10 @@ const authHandlers = [
 
 const categoryTypeHandlers = [
   http.get('/api/category-types', () =>
-    HttpResponse.json([buildCategoryType({ name: 'SPIRIT' }), buildCategoryType({ name: 'SYRUP' })]),
+    HttpResponse.json([
+      buildCategoryType({ name: 'SPIRIT', color: 'blue' }),
+      buildCategoryType({ name: 'SYRUP', color: 'purple' }),
+    ]),
   ),
   http.post('/api/category-types', async ({ request }) => HttpResponse.json(await readJsonObject(request), { status: 201 })),
   http.put('/api/category-types/:name', async ({ request, params }) =>
@@ -139,7 +146,9 @@ const menuHandlers = [
 
 const menuBottleHandlers = [
   http.get('/api/menu-bottles/menu/:menuId', ({ params }) =>
-    HttpResponse.json([buildMenuBottle({ menuId: Number(params.menuId) })]),
+    HttpResponse.json([
+      buildMenuBottle({ id: 1, menuId: Number(params.menuId), bottle: buildBottle({ id: 1, isApero: true }) }),
+    ]),
   ),
   http.get('/api/menu-bottles/menu/:menuId/exclusions', () => HttpResponse.json([])),
   http.post('/api/menu-bottles/menu/:menuId/exclusions', done),
@@ -153,7 +162,7 @@ const menuBottleHandlers = [
 
 const menuSectionHandlers = [
   http.get('/api/menu-sections/menu/:menuId/sections', ({ params }) =>
-    HttpResponse.json([buildMenuSection({ menuId: Number(params.menuId) })]),
+    HttpResponse.json([buildMenuSection({ id: 1, menuId: Number(params.menuId) })]),
   ),
   http.post('/api/menu-sections/menu/:menuId/sections/reorder', done),
   http.post('/api/menu-sections/menu/:menuId/sections', echoCreated),

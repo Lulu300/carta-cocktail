@@ -68,6 +68,8 @@ describe('factories', () => {
   it('builds category types, shortages, availabilities and site settings', () => {
     expect(buildCategoryType()).toEqual({ name: 'SPIRIT', nameTranslations: null, color: 'blue' });
     expect(buildCategoryType().name).toBe('SYRUP');
+    expect(buildCategoryType({ name: 'BITTER' }).name).toBe('BITTER');
+    expect(buildCategoryType().name).toBe('SOFT');
     expect(buildShortage().totalPercent).toBeLessThan(buildShortage().requiredPercent);
     expect(buildAvailability({ cocktailId: 3 })).toMatchObject({ cocktailId: 3, isAvailable: true });
     expect(buildSiteSettings({ siteName: 'Bar' }).siteName).toBe('Bar');

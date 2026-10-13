@@ -14,6 +14,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   const api = await getApi();
   api.setUnauthorizedHandler(null);
   // Some tests switch the UI language: restore the default for the next ones
