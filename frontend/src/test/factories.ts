@@ -13,6 +13,7 @@ import type {
   SiteSettings,
   Unit,
 } from '../types';
+import { CATEGORY_TYPE_COLORS } from '../utils/colors';
 
 /**
  * Typed builders for API payloads. Each one returns a complete entity with
@@ -58,7 +59,6 @@ function nameFor(pool: readonly string[], id: number): string {
 }
 
 const CATEGORY_TYPE_NAMES: readonly string[] = ['SPIRIT', 'SYRUP', 'SOFT', 'LIQUEUR'];
-const CATEGORY_TYPE_COLORS: readonly string[] = ['amber', 'pink', 'blue', 'purple'];
 const CATEGORY_NAMES: readonly string[] = ['Gin', 'Vodka', 'Rhum blanc', 'Tequila', 'Whisky'];
 const BOTTLE_NAMES: readonly string[] = ['Tanqueray', 'Absolut', 'Havana Club 3', 'Olmeca', 'Lagavulin 16'];
 const INGREDIENT_NAMES: readonly string[] = ['Citron vert', 'Menthe', 'Sucre de canne', 'Glaçons', 'Orange'];
@@ -229,24 +229,34 @@ export function buildMenuBottle(overrides: Partial<MenuBottle> = {}): MenuBottle
   };
 }
 
-/** A category under its desired stock, as listed by GET /api/shortages. */
-export function buildShortage(overrides: Partial<Shortage> = {}): Shortage {
-  const category = buildCategory({ desiredStock: 2 });
+type ShortageCategory = Shortage['category'];
+
+/**
+ * A category under its desired stock, as listed by GET /api/shortages.
+ * `category` overrides are merged into the default category.
+ */
+export function buildShortage(
+  overrides: Partial<Omit<Shortage, 'category'>> & { category?: Partial<ShortageCategory> } = {},
+): Shortage {
+  const { category: categoryOverrides, ...shortageOverrides } = overrides;
+  const { id, name, nameTranslations, type, desiredStock, minimumPercent } = buildCategory({ desiredStock: 2 });
+  const category: ShortageCategory = {
+    id,
+    name,
+    nameTranslations,
+    type,
+    categoryType: { name: type, color: 'blue' },
+    desiredStock,
+    minimumPercent,
+    ...categoryOverrides,
+  };
   return {
-    category: {
-      id: category.id,
-      name: category.name,
-      nameTranslations: category.nameTranslations,
-      type: category.type,
-      categoryType: { name: 'SPIRIT', color: 'amber' },
-      desiredStock: category.desiredStock,
-      minimumPercent: category.minimumPercent,
-    },
+    category,
     totalPercent: 40,
     requiredPercent: 130,
     totalUsable: 1,
     isShortage: true,
-    ...overrides,
+    ...shortageOverrides,
   };
 }
 

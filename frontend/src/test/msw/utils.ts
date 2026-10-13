@@ -35,7 +35,8 @@ export interface CapturedRequest {
 
 /**
  * Records the requests sent to `method path` while letting the default handler
- * (or one added earlier with `server.use`) answer them.
+ * (or one added earlier with `server.use`) answer them. Call it after the
+ * overrides of the same endpoint: MSW tries the handler added last first.
  */
 export function captureRequest(method: ApiMethod, path: string): CapturedRequest {
   let received = 0;

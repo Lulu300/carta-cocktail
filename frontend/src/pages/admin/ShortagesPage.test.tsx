@@ -1,97 +1,74 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '../../test/test-utils';
+import { describe, it, expect } from 'vitest';
+import { render, screen, within } from '../../test/test-utils';
 import userEvent from '@testing-library/user-event';
+import { buildShortage } from '../../test/factories';
+import { captureRequest, mockApiError, mockApiPending, mockApiResponse } from '../../test/msw/utils';
 import ShortagesPage from './ShortagesPage';
 
-vi.mock('../../services/api', () => ({
-  shortages: { list: vi.fn() },
-}));
-
-vi.mock('../../hooks/useLocalizedName', () => ({
-  useLocalizedName: () => (entity: { name: string }) => entity.name,
-}));
-
-vi.mock('../../utils/colors', () => ({
-  getBadgeClasses: () => 'bg-gray-500/20 text-gray-400',
-}));
-
-import { shortages as api } from '../../services/api';
-const mockList = vi.mocked(api.list);
-
-const mockShortages = [
-  {
-    category: { id: 1, name: 'Vodka', type: 'SPIRIT', categoryType: { name: 'SPIRIT', color: 'blue' }, desiredStock: 3, minimumPercent: 30 },
-    totalPercent: 100,
-    requiredPercent: 230,
-    totalUsable: 1,
-    isShortage: true,
+const vodka = buildShortage({
+  category: { id: 1, name: 'Vodka', desiredStock: 3, minimumPercent: 30 },
+  totalPercent: 100,
+  requiredPercent: 230,
+});
+const gin = buildShortage({
+  category: {
+    id: 2,
+    name: 'Gin',
+    nameTranslations: { en: 'Dry gin', fr: 'Gin sec' },
+    categoryType: { name: 'LIQUEUR', nameTranslations: { en: 'Liqueur' }, color: 'purple' },
   },
-  {
-    category: { id: 2, name: 'Gin', type: 'SPIRIT', categoryType: { name: 'SPIRIT', color: 'blue' }, desiredStock: 1, minimumPercent: 30 },
-    totalPercent: 20,
-    requiredPercent: 30,
-    totalUsable: 1,
-    isShortage: true,
-  },
-];
-
-beforeEach(() => {
-  vi.clearAllMocks();
-  mockList.mockResolvedValue(mockShortages as never);
+  totalPercent: 20,
+  requiredPercent: 30,
 });
 
+function mockShortages(items = [vodka, gin]) {
+  mockApiResponse('get', '/api/shortages', items);
+}
+
+/** The card of a category, found by its heading. */
+function getCard(name: string): HTMLElement {
+  const card = screen.getByRole('heading', { name }).closest('div.rounded-xl');
+  if (!(card instanceof HTMLElement)) throw new Error(`No card for ${name}`);
+  return card;
+}
+
 describe('ShortagesPage', () => {
-  it('should render title', async () => {
+  it('shows a card per short category, with its localized name and type badge', async () => {
+    mockShortages();
     render(<ShortagesPage />);
-    expect(screen.getByText('shortages.title')).toBeInTheDocument();
-    await screen.findByText('Vodka');
+
+    expect(screen.getByRole('heading', { level: 1, name: 'shortages.title' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Vodka' })).toBeInTheDocument();
+    // English name of the category and of its type, with the badge color of the type
+    expect(screen.getByRole('heading', { name: 'Dry gin' })).toBeInTheDocument();
+    expect(within(getCard('Dry gin')).getByText('Liqueur')).toHaveClass('bg-purple-500/20');
+    expect(within(getCard('Vodka')).getByText('SPIRIT')).toHaveClass('bg-blue-500/20');
   });
 
-  it('should display shortage cards after loading', async () => {
+  it('shows the stock, the requirement, the deficit and the threshold of each category', async () => {
+    mockShortages();
     render(<ShortagesPage />);
-    await waitFor(() => {
-      expect(screen.getByText('Vodka')).toBeInTheDocument();
-      expect(screen.getByText('Gin')).toBeInTheDocument();
-    });
+
+    await screen.findByRole('heading', { name: 'Vodka' });
+    const vodkaCard = getCard('Vodka');
+    expect(within(vodkaCard).getByText('100%')).toBeInTheDocument();
+    expect(within(vodkaCard).getByText('230%')).toBeInTheDocument();
+    // Deficit: 230 - 100
+    expect(within(vodkaCard).getByText('-130%')).toBeInTheDocument();
+    expect(within(vodkaCard).getByText('3')).toBeInTheDocument();
+    expect(within(vodkaCard).getByText('30%')).toBeInTheDocument();
+
+    expect(within(getCard('Dry gin')).getByText('-10%')).toBeInTheDocument();
   });
 
-  it('should show current stock and required threshold', async () => {
-    render(<ShortagesPage />);
-    await waitFor(() => {
-      const currentLabels = screen.getAllByText('shortages.currentStock');
-      expect(currentLabels.length).toBe(2);
-      const requiredLabels = screen.getAllByText('shortages.required');
-      expect(requiredLabels.length).toBe(2);
-    });
-  });
-
-  it('should show deficit values', async () => {
-    render(<ShortagesPage />);
-    await waitFor(() => {
-      // Vodka: 230 - 100 = 130%, Gin: 30 - 20 = 10%
-      expect(screen.getByText('-130%')).toBeInTheDocument();
-      expect(screen.getByText('-10%')).toBeInTheDocument();
-    });
-  });
-
-  it('should show threshold info', async () => {
-    render(<ShortagesPage />);
-    await waitFor(() => {
-      const thresholdLabels = screen.getAllByText('shortages.threshold');
-      expect(thresholdLabels.length).toBe(2);
-      const thresholdValues = screen.getAllByText('30%');
-      expect(thresholdValues.length).toBeGreaterThanOrEqual(2);
-    });
-  });
-
-  it('should show no shortages message when empty', async () => {
-    mockList.mockResolvedValue([] as never);
+  it('shows a message when nothing is short', async () => {
+    mockShortages([]);
     render(<ShortagesPage />);
     expect(await screen.findByText('shortages.noShortages')).toBeInTheDocument();
   });
 
   it('shows a loading message instead of "no shortages" while loading', () => {
-    mockList.mockReturnValue(new Promise(() => {}) as never);
+    mockApiPending('get', '/api/shortages');
     render(<ShortagesPage />);
     expect(screen.getByText('common.loading')).toBeInTheDocument();
     expect(screen.queryByText('shortages.noShortages')).not.toBeInTheDocument();
@@ -99,27 +76,27 @@ describe('ShortagesPage', () => {
 
   it('shows an error with a retry button when loading fails', async () => {
     const user = userEvent.setup();
-    mockList.mockRejectedValueOnce(new Error('Network down'));
+    mockApiError('get', '/api/shortages', 500, 'Database unavailable');
     render(<ShortagesPage />);
 
     expect(await screen.findByText('common.error')).toBeInTheDocument();
     expect(screen.queryByText('shortages.noShortages')).not.toBeInTheDocument();
 
+    mockShortages();
+    const retried = captureRequest('get', '/api/shortages');
     await user.click(screen.getByRole('button', { name: 'common.retry' }));
 
-    expect(mockList).toHaveBeenCalledTimes(2);
-    expect(await screen.findByText('Vodka')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Vodka' })).toBeInTheDocument();
+    expect(retried.count()).toBe(1);
     expect(screen.queryByText('common.error')).not.toBeInTheDocument();
   });
 
   it('renders a full bar instead of NaN when the required percent is 0', async () => {
-    mockList.mockResolvedValue([
-      { ...mockShortages[0], totalPercent: 0, requiredPercent: 0 },
-    ] as never);
+    mockShortages([{ ...vodka, totalPercent: 0, requiredPercent: 0 }]);
     render(<ShortagesPage />);
-    await screen.findByText('Vodka');
+    await screen.findByRole('heading', { name: 'Vodka' });
 
-    const bar = document.querySelector('.bg-danger') as HTMLElement;
-    expect(bar.style.width).toBe('100%');
+    const bar = getCard('Vodka').querySelector('.bg-danger');
+    expect(bar).toHaveStyle({ width: '100%' });
   });
 });
