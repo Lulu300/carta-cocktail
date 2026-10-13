@@ -11,7 +11,10 @@ import {
 } from '../lib/checks.mjs';
 import { parseSnapshot } from '../lib/database.mjs';
 import { parseLastExitCode } from '../lib/docker.mjs';
-import { allowedFailures, isRequirementMet, markExpected, unexpectedFailures } from '../lib/expectations.mjs';
+import {
+  allowedActionFailures, allowedFailures, INJECTED_DUPLICATE_REASON, isRequirementMet, markExpected, markExpectedActions,
+  unexpectedFailures,
+} from '../lib/expectations.mjs';
 import {
   BACKEND_SERVICE, FRONTEND_SERVICE, Instance, publishedContainerPort, readEnvVariable, renderTemplate, writeEnvVariable,
 } from '../lib/instance.mjs';
@@ -179,6 +182,45 @@ test('expectations: conformant mode does not inherit previous failures', () => {
   const rows = [{ group: 'images', status: 'ko' }];
   markExpected(rows, { mode: 'conformant', allowed: {}, previousFailedGroups: new Set(['images']) });
   assert.equal(unexpectedFailures(rows).length, 1);
+});
+
+test('expectations: --inject-duplicate allows the refused start with its own reason, in both modes', () => {
+  const crossedHooks = [{ naiveMayFail: { startup: 'weak secret', images: 'photos lost' } }];
+  const refuses = { knownIssues: {}, uniqueCategoryNames: true };
+  for (const mode of ['naive', 'conformant']) {
+    const allowed = allowedFailures({ mode, profile: refuses, crossedHooks, unmetRequirements: ['v1.5.0'], injectedDuplicate: true });
+    assert.equal(allowed.startup, INJECTED_DUPLICATE_REASON, mode);
+  }
+  const naive = allowedFailures({ mode: 'naive', profile: refuses, crossedHooks, unmetRequirements: [], injectedDuplicate: true });
+  assert.equal(naive.images, 'photos lost');
+  assert.match(INJECTED_DUPLICATE_REASON, /--inject-duplicate: the schema_integrity migration refuses duplicate/);
+});
+
+test('expectations: --inject-duplicate changes nothing before v1.8.0, nor without the option', () => {
+  const crossedHooks = [{ naiveMayFail: { startup: 'weak secret' } }];
+  const accepts = { knownIssues: {} };
+  const refuses = { knownIssues: {}, uniqueCategoryNames: true };
+  assert.equal(allowedFailures({ mode: 'naive', profile: accepts, crossedHooks, unmetRequirements: [], injectedDuplicate: true }).startup,
+    'weak secret');
+  assert.equal(allowedFailures({ mode: 'naive', profile: refuses, crossedHooks, unmetRequirements: [] }).startup, 'weak secret');
+  assert.equal(allowedFailures({ mode: 'conformant', profile: refuses, crossedHooks, unmetRequirements: [] }).startup, undefined);
+  assert.deepEqual(allowedActionFailures({ profile: accepts, injectedDuplicate: true }), {});
+  assert.deepEqual(allowedActionFailures({ profile: refuses }), {});
+});
+
+test('expectations: --inject-duplicate expects the refused database copy (v1.6.0 Before 4) only', () => {
+  const allowed = allowedActionFailures({ profile: { uniqueCategoryNames: true }, injectedDuplicate: true });
+  assert.deepEqual(allowed, { checkDatabaseCopy: INJECTED_DUPLICATE_REASON });
+  const actions = [
+    { step: 'v1.6.0 Before 3', action: 'copyDatabase', status: 'done' },
+    { step: 'v1.6.0 Before 4', action: 'checkDatabaseCopy', status: 'failed' },
+    { step: 'v1.5.0 After 1', action: 'restoreUploads', status: 'failed' },
+  ];
+  markExpectedActions(actions, allowed);
+  assert.deepEqual(actions.map((action) => action.expected ?? null), [null, INJECTED_DUPLICATE_REASON, null]);
+  assert.deepEqual(unexpectedFailures(actions).map((action) => action.step), ['v1.5.0 After 1']);
+  const done = [{ step: 'v1.6.0 Before 4', action: 'checkDatabaseCopy', status: 'done' }];
+  assert.equal(markExpectedActions(done, allowed)[0].expected, undefined);
 });
 
 test('isRequirementMet accepts a started version, or a direct jump from the allowed release line', () => {

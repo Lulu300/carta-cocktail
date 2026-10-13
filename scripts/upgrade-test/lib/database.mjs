@@ -83,6 +83,36 @@ export function createAnonymizedCopy(fixtureDir, dataDir, { email, passwordHash 
   }
 }
 
+// Unique index created by migration 20261010173910_schema_integrity (v1.8.0).
+const UNIQUE_CATEGORY_NAME_INDEX = 'Category_name_key';
+
+/**
+ * True when the fixture database already has the unique index on Category.name, so that a
+ * duplicate cannot be added. Opened as immutable on a read-only mount: the fixture is never written.
+ */
+export function hasUniqueCategoryNameIndex(fixtureDir) {
+  const query = `SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = '${UNIQUE_CATEGORY_NAME_INDEX}';`;
+  const output = runHelper([`${fixtureDir}:/fixture:ro`], `sqlite3 'file:/fixture/${DB_FILE_NAME}?immutable=1' "${query}"`);
+  return Number(output.trim()) > 0;
+}
+
+// Copies the category with the lowest id under a new id. Every column but the primary key is
+// copied, whatever the schema version of the fixture. Only the number of rows added is printed.
+const INJECT_DUPLICATE_SCRIPT = `
+set -e
+DB=/data/${DB_FILE_NAME}
+COLUMNS="$(sqlite3 "$DB" "SELECT group_concat('\\"' || name || '\\"', ', ') FROM pragma_table_info('Category') WHERE pk = 0;")"
+sqlite3 "$DB" "INSERT INTO \\"Category\\" ($COLUMNS) SELECT $COLUMNS FROM \\"Category\\" ORDER BY id LIMIT 1; SELECT changes();"
+`;
+
+/**
+ * --inject-duplicate: adds to the working copy in `dataDir` a category with the name of an
+ * existing one, which the v1.8.0 migration refuses. Returns the number of rows added.
+ */
+export function injectDuplicateCategory(dataDir) {
+  return Number(runHelper([`${dataDir}:/data`], INJECT_DUPLICATE_SCRIPT).trim());
+}
+
 /** Copies every database file (carta_cocktail.db*) from `dataMount` to the host folder `outDir`. */
 export function copyDatabaseFiles(dataMount, outDir) {
   fs.mkdirSync(outDir, { recursive: true });

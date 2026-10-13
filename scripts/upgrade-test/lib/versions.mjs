@@ -133,6 +133,19 @@ export function profileOf(hookFiles, version) {
     }), { refusals: [] });
 }
 
+/**
+ * --inject-duplicate needs a first version that accepts two categories of the same name. From the
+ * release whose profile has `uniqueCategoryNames` (v1.8.0), the first start is already refused,
+ * and no running version is left to upgrade from.
+ */
+export function checkDuplicateInjectionPath(steps, hookFiles) {
+  const first = steps[0];
+  if (!profileOf(hookFiles, first.version).uniqueCategoryNames) return;
+  const since = sortedByRelease(hookFiles).find((hooks) => hooks.profile.uniqueCategoryNames).version;
+  throw new Error(`--inject-duplicate needs a path that starts before v${since}: from v${since} on, `
+    + `duplicate category names are refused, so the first start (${first.label}) would already fail`);
+}
+
 export function latestHookVersion(hookFiles) {
   return sortedByRelease(hookFiles).at(-1).version;
 }

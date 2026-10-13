@@ -1,6 +1,13 @@
 // Decides which failures a step may have without failing the bench.
 import { releaseOf } from './versions.mjs';
 
+export const INJECTED_DUPLICATE_REASON = 'duplicate injected by --inject-duplicate: '
+  + 'the schema_integrity migration refuses duplicate category names';
+
+function refusesInjectedDuplicate(profile, injectedDuplicate) {
+  return injectedDuplicate && Boolean(profile.uniqueCategoryNames);
+}
+
 /**
  * `requireStarted` hooks: the version must have started earlier on the path, unless the jump
  * comes from a release line the notes allow to skip it (`directFrom: '1.4'` for v1.6.0).
@@ -16,12 +23,16 @@ export function isRequirementMet(hook, startedReleases, previousVersion) {
  * - in naive mode, what the release notes of the crossed versions say breaks without their actions.
  *   The notes describe the default setup: `layoutReasons` replaces their reason when the layout
  *   knows the real cause;
- * - a refused start when the path skips a version that the notes require to start first.
+ * - a refused start when the path skips a version that the notes require to start first;
+ * - with --inject-duplicate (`injectedDuplicate`), a refused start on a version that refuses
+ *   duplicate category names: this reason replaces the one of the notes.
  * Photos that the backend does not serve cannot reach the frontend nginx either: whenever
  * `images` may fail, `frontendImages` may fail for the same reason, unless the notes give it
  * a reason of their own.
  */
-export function allowedFailures({ mode, profile, crossedHooks, unmetRequirements, layoutReasons = {} }) {
+export function allowedFailures({
+  mode, profile, crossedHooks, unmetRequirements, layoutReasons = {}, injectedDuplicate = false,
+}) {
   const allowed = { ...profile.knownIssues };
   if (mode === 'naive') {
     for (const hooks of crossedHooks) Object.assign(allowed, hooks.naiveMayFail);
@@ -33,7 +44,25 @@ export function allowedFailures({ mode, profile, crossedHooks, unmetRequirements
   if (unmetRequirements.length) {
     allowed.startup = `the path skips ${unmetRequirements.join(', ')}, which the notes require to start first`;
   }
+  if (refusesInjectedDuplicate(profile, injectedDuplicate)) allowed.startup = INJECTED_DUPLICATE_REASON;
   return allowed;
+}
+
+/**
+ * Required actions that may fail, by action name (`action` of the hook), with the reason shown in
+ * the report. With --inject-duplicate, the new image refuses the copy of the database
+ * (`checkDatabaseCopy`) as it refuses the database itself.
+ */
+export function allowedActionFailures({ profile, injectedDuplicate = false }) {
+  return refusesInjectedDuplicate(profile, injectedDuplicate) ? { checkDatabaseCopy: INJECTED_DUPLICATE_REASON } : {};
+}
+
+/** Marks the failed actions that `allowed` (from allowedActionFailures) expects. */
+export function markExpectedActions(actions, allowed) {
+  for (const result of actions) {
+    if (result.status === 'failed' && allowed[result.action]) result.expected = allowed[result.action];
+  }
+  return actions;
 }
 
 /**

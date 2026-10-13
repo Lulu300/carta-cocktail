@@ -9,12 +9,13 @@ import {
   findRefusal, infoRow, row, tryLogin,
 } from './checks.mjs';
 import { removeDirectories, workDirOf } from './cleanup.mjs';
-import { createAnonymizedCopy, fillVolume, takeSnapshot } from './database.mjs';
+import { createAnonymizedCopy, fillVolume, injectDuplicateCategory, takeSnapshot } from './database.mjs';
 import {
   containerLogs, containerMounts, containerState, docker, removeResources, RESOURCE_PREFIX,
 } from './docker.mjs';
 import {
-  allowedFailures, failedGroups, isRequirementMet, markExpected, unexpectedFailures,
+  allowedActionFailures, allowedFailures, failedGroups, isRequirementMet, markExpected, markExpectedActions,
+  unexpectedFailures,
 } from './expectations.mjs';
 import { BACKEND_SERVICE, FRONTEND_SERVICE, Instance, waitForHttp, waitForStart } from './instance.mjs';
 import { hooksForJump, profileOf, releaseOf } from './versions.mjs';
@@ -47,8 +48,10 @@ function envSecretValues(layout) {
 }
 
 export class BenchRun {
-  constructor({ fixtureDir, layout, layoutDir, mode, steps, images, hookFiles, runId, timeoutMs }) {
-    Object.assign(this, { fixtureDir, layout, mode, steps, images, hookFiles, timeoutMs });
+  constructor({
+    fixtureDir, layout, layoutDir, mode, steps, images, hookFiles, runId, timeoutMs, injectDuplicate = false,
+  }) {
+    Object.assign(this, { fixtureDir, layout, mode, steps, images, hookFiles, timeoutMs, injectDuplicate });
     this.project = `${RESOURCE_PREFIX}${runId}-${layout.name}-${mode}`;
     this.workDir = workDirOf(runId, layout.name, mode);
     this.instance = new Instance({ project: this.project, layout, layoutDir, workDir: this.workDir });
@@ -111,12 +114,15 @@ export class BenchRun {
       ? path.join(this.instance.dir, this.layout.database.hostDir)
       : path.join(this.workDir, 'seed-data');
     const users = createAnonymizedCopy(this.fixtureDir, dataDir, { email: ADMIN_EMAIL, passwordHash });
+    // Before the snapshot: the row counts of reference include the duplicate.
+    const injectedDuplicates = this.injectDuplicate ? this.addDuplicateCategory(dataDir) : undefined;
     const photosDir = extractPhotos(path.join(this.fixtureDir, 'uploads.tgz'), this.workDir);
     this.baseline = takeSnapshot(dataDir);
     this.lastSnapshot = this.baseline;
     this.admin = { password: this.testPassword, label: 'test password (hash replaced in the copy)' };
     this.result.setup = {
       users,
+      injectedDuplicates,
       tables: Object.keys(this.baseline.counts).length,
       rows: Object.values(this.baseline.counts).reduce((sum, count) => sum + count, 0),
       photosInArchive: fs.readdirSync(photosDir).length,
@@ -131,6 +137,13 @@ export class BenchRun {
     this.instance.create();
     if (this.layout.database.kind === 'volume') fillVolume(this.instance.dataMount(), dataDir);
     this.placePhotos(photosDir);
+  }
+
+  /** --inject-duplicate: one category copied under a new id, so that v1.8.0 and later refuse the database. */
+  addDuplicateCategory(dataDir) {
+    const added = injectDuplicateCategory(dataDir);
+    if (added === 0) throw new Error('--inject-duplicate: the fixture has no category to duplicate');
+    return added;
   }
 
   placePhotos(photosDir) {
@@ -228,8 +241,10 @@ export class BenchRun {
       crossedHooks: ctx.crossedHooks,
       unmetRequirements: unmet,
       layoutReasons: this.photoMountReasons(ctx.profile),
+      injectedDuplicate: this.injectDuplicate,
     });
     markExpected(step.checks, { mode: this.mode, allowed, previousFailedGroups: this.previousFailedGroups });
+    markExpectedActions(step.actions, allowedActionFailures({ profile: ctx.profile, injectedDuplicate: this.injectDuplicate }));
     this.previousFailedGroups = failedGroups(step.checks);
     const unexpected = unexpectedFailures([...step.actions, ...step.checks]).length;
     this.log(`${title}: ${outcome.started ? 'started' : 'refused'}, ${unexpected} unexpected failure(s)`);

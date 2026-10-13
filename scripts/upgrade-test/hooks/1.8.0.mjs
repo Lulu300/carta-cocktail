@@ -2,7 +2,11 @@
 export default {
   version: '1.8.0',
   releaseNotes: 'docs/releases/v1.8.0.md',
-  profile: {},
+  profile: {
+    // Migration 20261010173910_schema_integrity creates the unique index Category_name_key: it
+    // fails on a database with two categories of the same name (see --inject-duplicate).
+    uniqueCategoryNames: true,
+  },
   before: [
     {
       step: 'Before 1',
