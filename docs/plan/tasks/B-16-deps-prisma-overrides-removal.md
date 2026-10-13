@@ -48,3 +48,4 @@ Aucun : la suite backend utilise la CLI Prisma pour créer la base de test.
 ## Journal
 
 - 2026-10-12 : tâche créée par B-11 (surcharges posées en attendant une version stable de Prisma qui corrige).
+- 2026-10-13 : depuis D-30 (PR #138), l'étage `prod-deps` de `backend/Dockerfile` coupe des arêtes du graphe de dépendances de la CLI Prisma (`backend/docker/prune-unused-deps.mjs`) et se termine par `prisma --version`. Une arête qui n'existe plus ou un paquet coupé que la CLI charge arrête le build. Si la correction passe par une montée de version de Prisma, la liste des coupes du `Dockerfile` peut devoir changer : vérifier le job « Docker build (backend) » et le Smoke, et ajouter `backend/Dockerfile` aux `touches` le cas échéant. D-30 a vérifié que sa solution ne dépend pas des surcharges (même résultat avec un lockfile régénéré sans elles).
