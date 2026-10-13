@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Outlet, useLocation } from 'react-router-dom';
 import App from './App';
+import appSource from './App.tsx?raw';
 
 const mockUseAuth = vi.fn();
 
@@ -126,6 +127,27 @@ describe('route code splitting', () => {
 });
 
 describe('admin messages', () => {
+  // The load-order tests below only see the first lazy route of this file to render: the
+  // mocked ./i18n/admin module runs once. This check covers every route, from the source.
+  it('are awaited by every lazy chunk behind /login and /admin', () => {
+    const lazyCalls = appSource.match(/\blazy\(/g) ?? [];
+    // The only lazy() call is the one inside lazyWithAdminMessages
+    expect(lazyCalls).toHaveLength(1);
+    expect(appSource).toContain("return lazy(() => Promise.all([load(), import('./i18n/admin')])");
+
+    const adminChunks = [...appSource.matchAll(/import\('([^']+)'\)/g)]
+      .map((match) => match[1])
+      .filter((path) => /^\.\/pages\/(admin|auth)\/|\/AdminLayout$/.test(path));
+    expect(adminChunks).toEqual(
+      expect.arrayContaining(['./components/layout/AdminLayout', './pages/auth/LoginPage']),
+    );
+    expect(adminChunks.length).toBeGreaterThanOrEqual(14);
+    const unwrapped = adminChunks.filter(
+      (path) => !appSource.includes(`lazyWithAdminMessages(() => import('${path}'))`),
+    );
+    expect(unwrapped).toEqual([]);
+  });
+
   // The first render of a chunk must come after the admin messages are registered, or raw keys
   // would flash on screen. Events accumulate across tests: the first occurrence of each counts.
   function expectRegisteredBeforeFirstRender(component: string) {

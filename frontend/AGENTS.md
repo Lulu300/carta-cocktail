@@ -164,7 +164,7 @@ Admin pages are self-contained with inline forms and modals. Each page:
 
 ### Locale bundles
 
-Messages are split in two bundles so guests do not download the admin texts. A key goes in `locales/public/` when a file of the first load (reached from `main.tsx` through static imports) uses it, otherwise in `locales/admin/`; `src/i18n/bundles.test.ts` checks the split and fails with the keys to move. A new lazy chunk behind `/login` or `/admin` goes through `lazyWithAdminMessages` in `App.tsx`. A new language goes in `SUPPORTED_LANGUAGES` and in the message map of `i18n/index.ts` and `i18n/admin.ts`.
+Messages are split in two bundles so guests do not download the admin texts. A key goes in `locales/public/` when a file of the first load (reached from `main.tsx` through static imports) uses it, otherwise in `locales/admin/`; `src/i18n/bundles.test.ts` checks the split and fails with the keys to move. A new lazy chunk behind `/login` or `/admin` goes through `lazyWithAdminMessages` in `App.tsx`. A new language with its own message files goes in `TRANSLATED_LANGUAGES` (`i18n/index.ts`, from which `SUPPORTED_LANGUAGES` derives), in the message maps of `i18n/index.ts` and `i18n/admin.ts` (typed by `TRANSLATED_LANGUAGES`, so `tsc` fails until both list it), and in `LanguageSelector` (`languages` and `flagComponents`). A regional variant without files (`en-GB`) goes in `SUPPORTED_LANGUAGES` and `LanguageSelector` only: it has no entry in the message maps and i18next serves it the messages of its base language.
 
 ### TailwindCSS v4
 
