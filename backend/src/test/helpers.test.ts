@@ -1,9 +1,13 @@
+import fs from 'fs';
+import path from 'path';
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { PRISMA_DIR, resolveDatabasePath } from '../lib/databasePath';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData, prisma, schemaTables,
   seedCategory, seedBottle, seedIngredient, seedFullCocktail, seedMenu, seedMenuSection,
   addCocktailToMenu, addBottleToMenu, excludeBottleFromMenu, findSystemMenu,
 } from './helpers';
+import { TEST_DATABASE_DIR } from './testDatabase';
 
 beforeAll(async () => { await setupTestDatabase(); });
 afterAll(async () => { await teardownTestDatabase(); });
@@ -120,5 +124,16 @@ describe('menu factories', () => {
     const entry = await addBottleToMenu(menu.id, bottle.id);
 
     expect(entry).toMatchObject({ menuId: menu.id, bottleId: bottle.id, position: 0, isHidden: false, menuSectionId: null });
+  });
+});
+
+describe('test database location', () => {
+  it('opens a database in a folder of its own under prisma/, not next to the developer database', () => {
+    const dbPath = resolveDatabasePath();
+
+    expect(fs.existsSync(dbPath)).toBe(true);
+    expect(path.dirname(dbPath)).not.toBe(PRISMA_DIR);
+    expect(path.dirname(dbPath)).toBe(TEST_DATABASE_DIR);
+    expect(path.dirname(TEST_DATABASE_DIR)).toBe(PRISMA_DIR);
   });
 });
