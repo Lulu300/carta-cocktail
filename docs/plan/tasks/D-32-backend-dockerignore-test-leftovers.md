@@ -24,17 +24,18 @@ Relevé par la relecture de la PR #136 (point 3, non bloquant, antérieur à B-1
 
 - `backend/.dockerignore` n'exclut que `**/*.db` et `**/*.db-journal`. Après un run interrompu, `prisma/test/test.db-wal`, `test.db-shm` et `test.db.restore-*` partent dans le contexte de build, puis dans une image construite en local.
 - Même chose pour la base de développement : `prisma/carta_cocktail.db-wal`, `-shm` (mode WAL) et `carta_cocktail.db.restore-*` (restauration interrompue).
+- Même chose pour le fichier de plancher de session : `sessionFloorPath()` (`backend/src/services/sessionFloor.ts`) écrit `${dbPath}.session-floor`, en passant par `${dbPath}.session-floor.tmp`. La restauration d'une sauvegarde antérieure à v1.11.0 laisse `prisma/carta_cocktail.db.session-floor` jusqu'au redémarrage suivant. Git l'ignore déjà (`*.session-floor*` dans le `.gitignore` racine, C-30), Docker non.
 - `carta_cocktail.db.restore-*` n'est pas ignoré par git non plus : `backend/.gitignore` ignore `/prisma/test/`, et le `.gitignore` racine ignore `*.db`, `*.db-wal` et `*.db-shm`, mais pas `*.db.restore-*`.
 
 ## Ce qu'il faut faire
 
-1. `backend/.dockerignore` : exclure `prisma/test`, `**/*.db-wal`, `**/*.db-shm` et `**/*.db.restore-*`, avec un commentaire qui dit pourquoi.
+1. `backend/.dockerignore` : exclure `prisma/test`, `**/*.db-wal`, `**/*.db-shm`, `**/*.db.restore-*` et `**/*.session-floor*`, avec un commentaire qui dit pourquoi.
 2. `backend/.gitignore` : ignorer `*.db.restore-*`, avec un commentaire (le `.gitignore` racine porte les autres motifs `*.db*`).
 3. Vérifier que l'image construite contient toujours `prisma/schema.prisma` et `prisma/migrations/`.
 
 ## Critères d'acceptation
 
-- [ ] Avec des fichiers factices `prisma/test/test.db-wal`, `prisma/carta_cocktail.db-shm` et `prisma/carta_cocktail.db.restore-x`, `docker build` puis `docker run --rm --entrypoint ls <image> -R prisma` ne les montre pas.
+- [ ] Avec des fichiers factices `prisma/test/test.db-wal`, `prisma/carta_cocktail.db-shm`, `prisma/carta_cocktail.db.restore-x` et `prisma/carta_cocktail.db.session-floor`, `docker build` puis `docker run --rm --entrypoint ls <image> -R prisma` ne les montre pas.
 - [ ] `git status` ne montre pas `prisma/carta_cocktail.db.restore-x`.
 - [ ] Check Smoke vert ; l'image contient toujours le schéma et les migrations.
 

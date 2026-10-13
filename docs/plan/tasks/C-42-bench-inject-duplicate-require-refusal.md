@@ -32,7 +32,7 @@ Relevé par la relecture de la PR #137 (points 1 à 4, non bloquants) :
 1. Avec `--inject-duplicate`, sur une étape dont le profil a `uniqueCategoryNames`, un démarrage réussi donne une ligne KO non autorisée (« refus attendu absent : le doublon injecté n'a pas été refusé »).
 2. N'attendre, pour `checkDatabaseCopy`, que la copie refusée : par exemple un champ `refused: true` dans le résultat de l'action quand la copie sort sans démarrer, et `markExpectedActions` qui ne marque que ce cas.
 3. Exporter le chargement des hooks (par exemple depuis `lib/versions.mjs`) et l'utiliser dans `run.mjs` et dans `test/versions.test.mjs`.
-4. Jeu d'essai sans catégorie avec `--inject-duplicate` : refus de l'option (code 2), contrôlé avant tout appel Docker coûteux, comme le contrôle de l'index `Category_name_key`.
+4. Jeu d'essai sans catégorie avec `--inject-duplicate` : refus de l'option (code 2), contrôlé au même endroit que le contrôle de l'index `Category_name_key`, avant `resolveImages`.
 
 ## Critères d'acceptation
 
