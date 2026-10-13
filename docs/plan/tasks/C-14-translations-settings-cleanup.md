@@ -81,4 +81,4 @@ Les traductions des noms (`nameTranslations`) sont stockées en chaîne JSON. L'
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-12 : C-33 (PR #127) déplace l'import de cocktails de `routes/cocktails.ts` vers `services/cocktail/cocktailImport.ts` : la copie d'`ensureCategoryType` et les 3 `JSON.stringify(nameTranslations)` (regroupés dans un `stringifyTranslations` local) y sont désormais ; `backend/src/services/cocktail/` ajouté à `touches`.
-- 2026-10-13 : relecture d'E-10 (PR #134). Le problème de `GET /menus/:id` (`menus.ts:54-86`, cité `:23-63` plus haut) se voit maintenant dans l'interface : `GET /menus/:id` renvoie `bottle.category.nameTranslations` en chaîne JSON, `useLocalizedName` retombe donc sur `name`, et l'éditeur de carte de bouteilles affiche « Rhum blanc » en anglais.
+- 2026-10-13 : relecture d'E-10 (PR #134). Le problème de `GET /menus/:id` (`menus.ts:54-86`, cité `:23-63` plus haut) se voit maintenant dans l'interface : la route renvoie `bottle.category.nameTranslations` en chaîne JSON, `useLocalizedName` retombe donc sur `name`, et l'éditeur de carte de bouteilles affiche « Rhum blanc » en anglais.

@@ -16,7 +16,7 @@ pr:
 
 ## Décisions validées (2026-10-13)
 
-- **Principe** : chaque paquet présent dans l'image de production doit y avoir une raison d'être. On retire ce qui ne sert pas à l'exécution, en particulier les outils (CLI, interfaces, types), même si le gain de taille est faible. Garder une image petite est un objectif, mais pas au détriment de ce qui est nécessaire au fonctionnement (décision de l'humain, relecture de la PR docs #135).
+- **Principe** (décision de l'humain, relecture de la PR docs #135) : avant la taille, ce qui compte est que chaque dépendance de l'image de production y ait un vrai intérêt. Un outil comme une CLI n'a pas sa place par défaut dans une image de prod : vérifier s'il est vraiment utile et si l'on peut s'en passer. Ne rien retirer au détriment de ce qui est important : le démarrage (migrations de l'entrypoint) et les procédures documentées lancées dans l'image (README, UPGRADING) doivent continuer à marcher, ou recevoir un remplacement documenté. Garder une image petite reste un objectif.
 
 ## Contexte
 
@@ -34,7 +34,7 @@ Relevé par la relecture de B-11 (PR #130) :
 ## Ce qu'il faut faire
 
 1. Inventaire : lister les paquets de `node_modules` de l'image (`npm ls --omit=dev --all` ou `docker run --rm --entrypoint ls`), groupés par dépendance directe, avec la taille. Classer chaque groupe : utilisé à l'exécution par l'API, utilisé par l'entrypoint (CLI Prisma), ou inutile.
-2. CLI Prisma : étudier comment l'entrypoint peut appliquer les migrations sans embarquer ce qui ne sert pas à `migrate deploy`, `migrate diff` et `migrate resolve`. Pistes à évaluer : retirer après `npm prune` les paquets que la CLI ne charge pas pour ces commandes (vérifié commande par commande) ; installer la CLI seule dans un dossier à part de l'étage `prod-deps` ; appliquer les migrations sans la CLI. Le comportement de l'entrypoint (copie `pre-migrate`, baseline, refus de C-18) ne doit pas changer.
+2. CLI Prisma : étudier comment l'entrypoint peut appliquer les migrations sans embarquer ce qui ne sert pas à `migrate deploy`, `migrate diff` et `migrate resolve`. Pistes à évaluer : retirer après `npm prune` les paquets que la CLI ne charge pas pour ces commandes (vérifié commande par commande) ; installer la CLI seule dans un dossier à part de l'étage `prod-deps` ; appliquer les migrations sans la CLI. Le comportement de l'entrypoint (copie `pre-migrate`, baseline, refus de C-18) ne doit pas changer. Commandes à garder (ou à remplacer avec la documentation) : celles de l'entrypoint (`migrate deploy`, `migrate diff`, `migrate resolve --applied`) et celles que README et UPGRADING font lancer dans l'image (`migrate status`, `migrate resolve --rolled-back`, `dist/scripts/check-integrity.js`).
 3. Appliquer ce qui est sûr, sans modifier le comportement de l'application. Noter dans le Journal ce qui reste et pourquoi.
 4. Mesurer la taille de l'image avant et après.
 
@@ -44,6 +44,7 @@ Relevé par la relecture de B-11 (PR #130) :
 - [ ] `@prisma/studio-core`, `react`, `react-dom`, `@radix-ui/*` et `@types/node` ne sont plus dans l'image, ou le Journal explique pourquoi l'un d'eux doit rester.
 - [ ] Le démarrage sur une copie du jeu d'essai réel (v1.4.0) passe comme avant : sauvegarde, P3005, baseline `0_init`, migrations appliquées, `/api/health` 200. Une installation neuve et un second démarrage passent aussi.
 - [ ] Le refus sur migration en échec (C-18) et le refus de la baseline restent identiques (message et code de sortie).
+- [ ] Les commandes Prisma et la vérification d'intégrité que README et UPGRADING font lancer dans l'image marchent toujours (`migrate status`, `migrate resolve --applied`/`--rolled-back`, `check-integrity.js`), ou la documentation donne leur remplacement.
 - [ ] Check Smoke vert ; taille de l'image avant/après dans la PR.
 
 ## Tests à ajouter ou adapter
@@ -55,7 +56,8 @@ Relevé par la relecture de B-11 (PR #130) :
 - D-26 touche aussi `backend/Dockerfile` (retrait de `src/` de l'image) : enchaîner, pas en parallèle.
 - Une seule tâche à la fois sur `backend/package-lock.json` (couloir `deps`).
 - B-16 retirera les surcharges `deepmerge-ts`/`mysql2` quand Prisma corrigera : vérifier que la solution retenue ne dépend pas de ces surcharges.
-- Ne pas casser les commandes `--entrypoint` données dans le README (vérification d'intégrité, `migrate resolve`).
+- Les procédures documentées passent soit par `--entrypoint`, soit par l'entrypoint (`docker compose run … npx prisma …`, `exec "$@"` dans `docker-entrypoint.sh`) : vérifier les deux chemins.
+- Piste « CLI dans un dossier à part » : l'entrypoint et la documentation appellent `npx prisma` depuis `/app`. Si `node_modules/.bin/prisma` n'y est plus, `npx` irait chercher `prisma` sur le registre (réseau, version non épinglée) au lieu d'échouer. `prisma.config.ts` importe `prisma/config` et `dotenv` depuis `/app` : la résolution doit continuer à marcher. Si la documentation change, `README.md` s'ajoute aux `touches` (UPGRADING passe par les notes de version).
 
 ## Journal
 
