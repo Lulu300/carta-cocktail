@@ -117,12 +117,20 @@ export function hooksForJump(hookFiles, from, to) {
   );
 }
 
-/** Behaviour of a version (upload folder, migrations…): merged profiles of all releases up to it. */
+/**
+ * Behaviour of a version (upload folder, migrations…): merged profiles of all releases up to it.
+ * A newer profile replaces a field, except `refusals`, which add up: a release that adds a
+ * refusal keeps the ones of the releases before it.
+ */
 export function profileOf(hookFiles, version) {
   const release = releaseOf(version);
   return sortedByRelease(hookFiles)
     .filter((hooks) => compareVersions(hooks.version, release) <= 0)
-    .reduce((profile, hooks) => ({ ...profile, ...hooks.profile }), {});
+    .reduce((profile, hooks) => ({
+      ...profile,
+      ...hooks.profile,
+      refusals: [...profile.refusals, ...(hooks.profile.refusals ?? [])],
+    }), { refusals: [] });
 }
 
 export function latestHookVersion(hookFiles) {

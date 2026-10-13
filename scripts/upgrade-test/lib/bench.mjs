@@ -5,7 +5,8 @@ import { spawnSync } from 'node:child_process';
 import { MIGRATE_STATUS_OK, randomSecret, runAction } from './actions.mjs';
 import {
   checkAdminLogin, checkFrontendShell, checkImages, checkIntegrity, checkJournalMode, checkLogLines,
-  checkPublicApi, checkRowCounts, checkUploadsPersistent, infoRow, row, tryLogin,
+  checkPublicApi, checkRefusalMessage, checkRefusedDatabase, checkRowCounts, checkUploadsPersistent,
+  findRefusal, infoRow, row, tryLogin,
 } from './checks.mjs';
 import { removeDirectories, workDirOf } from './cleanup.mjs';
 import { createAnonymizedCopy, fillVolume, takeSnapshot } from './database.mjs';
@@ -203,6 +204,7 @@ export class BenchRun {
     const outcome = await waitForStart(backend, this.timeoutMs);
     fs.writeFileSync(path.join(this.logsDir, `${index}-${ctx.target.label}.log`), outcome.logs);
     step.checks.push(this.startupRow(outcome));
+    const refusal = outcome.started ? null : findRefusal(ctx.profile.refusals, outcome.logs);
     if (outcome.started) {
       this.startedReleases.add(releaseOf(ctx.target.version));
       if (ctx.profile.seedResetsAdmin) this.trackAdminPasswordReset(ctx);
@@ -210,7 +212,7 @@ export class BenchRun {
       if (conformant) step.actions.push(...await this.runHooks(ctx, 'after'));
       step.checks.push(...await this.runningChecks(ctx, outcome));
     } else {
-      step.checks.push(this.refusalMessageRow(ctx, outcome));
+      step.checks.push(checkRefusalMessage(ctx.profile.refusals, refusal));
       step.checks.push({ group: 'http', label: 'HTTP checks', status: 'skip', detail: 'backend not running' });
     }
     step.checks.push(checkUploadsPersistent(containerMounts(backend), ctx.profile.uploadDir));
@@ -218,7 +220,7 @@ export class BenchRun {
     const stopStartedAt = Date.now();
     this.instance.stopBackend();
     if (outcome.started) step.checks.push(this.shutdownRow(ctx, backend, Date.now() - stopStartedAt));
-    step.checks.push(...this.databaseChecks(ctx, outcome));
+    step.checks.push(...this.databaseChecks(ctx, outcome, refusal));
 
     const allowed = allowedFailures({
       mode: this.mode,
@@ -249,13 +251,6 @@ export class BenchRun {
       password: envPassword,
       label: `ADMIN_PASSWORD of ${this.layout.envFile} (${envPassword.length} characters), written by the v${releaseOf(ctx.target.version)} seed`,
     };
-  }
-
-  refusalMessageRow(ctx, outcome) {
-    const expected = ctx.profile.refusalLog;
-    if (!expected) return infoRow('refusal', 'refusal message', 'no refusal message defined for this version');
-    const found = outcome.logs.includes(expected);
-    return row('refusal', 'refusal message', found, `"${expected}" ${found ? 'found' : 'missing'}`);
   }
 
   shutdownRow(ctx, backend, durationMs) {
@@ -300,15 +295,13 @@ export class BenchRun {
     return rows;
   }
 
-  databaseChecks(ctx, outcome) {
+  databaseChecks(ctx, outcome, refusal) {
     const snapshot = takeSnapshot(this.instance.dataMount());
     const rows = [checkRowCounts(this.baseline, snapshot), checkIntegrity(snapshot)];
     if (outcome.started) {
       rows.push(checkJournalMode(snapshot, ctx.profile.journalMode));
     } else {
-      const untouched = snapshot.fingerprint === this.lastSnapshot.fingerprint;
-      rows.push(row('refusal', 'database left untouched by the refused start', untouched,
-        untouched ? 'same SHA-256 as before the jump' : 'database file changed'));
+      rows.push(checkRefusedDatabase(refusal, this.lastSnapshot, snapshot));
     }
     if (ctx.fromDbPush && ctx.profile.migrations) {
       const created = snapshot.backups > this.lastSnapshot.backups;

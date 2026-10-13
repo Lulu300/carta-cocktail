@@ -8,7 +8,7 @@ import { runHelper } from './docker.mjs';
 export const DB_FILE_NAME = 'carta_cocktail.db';
 
 // Reads a copy of the database files, from a read-only mount: opening the live database would
-// checkpoint its WAL and change the state handed to the next version. The fingerprint and the
+// checkpoint its WAL and change the state handed to the next version. The fingerprints and the
 // backups are read from the original folder.
 const SNAPSHOT_SCRIPT = `
 set -e
@@ -17,6 +17,11 @@ cp /data/${DB_FILE_NAME}* /tmp/snapshot/
 DB=/tmp/snapshot/${DB_FILE_NAME}
 echo "fingerprint|$(sha256sum /data/${DB_FILE_NAME} | cut -d' ' -f1)"
 echo "backups|$(ls /data/backups/pre-migrate-*.db 2>/dev/null | wc -l)"
+# Backup names embed the date: a reverse name sort lists the newest first, as in the entrypoint.
+LATEST_BACKUP="$(ls /data/backups/pre-migrate-*.db 2>/dev/null | sort -r | head -n 1)"
+if [ -n "$LATEST_BACKUP" ]; then
+  echo "latestBackup|$(sha256sum "$LATEST_BACKUP" | cut -d' ' -f1)"
+fi
 echo "integrity|$(sqlite3 "$DB" 'PRAGMA integrity_check;' | tr '\\n' ' ')"
 echo "journal|$(sqlite3 "$DB" 'PRAGMA journal_mode;')"
 for table in $(sqlite3 "$DB" "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name;"); do
@@ -31,6 +36,7 @@ export function parseSnapshot(output) {
     const [kind, ...values] = line.split('|');
     if (kind === 'fingerprint') snapshot.fingerprint = values[0];
     if (kind === 'backups') snapshot.backups = Number(values[0].trim());
+    if (kind === 'latestBackup') snapshot.latestBackupFingerprint = values[0];
     if (kind === 'integrity') snapshot.integrity = values[0].trim();
     if (kind === 'journal') snapshot.journalMode = values[0].trim();
     if (kind === 'count') snapshot.counts[values[0]] = Number(values[1]);

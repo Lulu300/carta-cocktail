@@ -5,26 +5,102 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isStrongJwtSecret } from '../lib/actions.mjs';
-import { checkImages, checkLogLines, checkRowCounts, checkUploadsPersistent } from '../lib/checks.mjs';
+import {
+  BASELINE_REFUSAL, checkImages, checkLogLines, checkRefusalMessage, checkRefusedDatabase, checkRowCounts,
+  checkUploadsPersistent, FAILED_MIGRATION_REFUSAL, findRefusal,
+} from '../lib/checks.mjs';
 import { parseSnapshot } from '../lib/database.mjs';
+import { parseLastExitCode } from '../lib/docker.mjs';
 import { allowedFailures, isRequirementMet, markExpected, unexpectedFailures } from '../lib/expectations.mjs';
 import {
   BACKEND_SERVICE, FRONTEND_SERVICE, Instance, publishedContainerPort, readEnvVariable, renderTemplate, writeEnvVariable,
 } from '../lib/instance.mjs';
 
 const LAYOUTS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'layouts');
+const ENTRYPOINT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'backend', 'docker-entrypoint.sh');
+// First lines printed by the entrypoint for each refusal.
+const BASELINE_REFUSAL_LOGS = [
+  'ERROR: the existing database at /app/data/carta_cocktail.db has no migration history and does not match migration 0_init.',
+  'The backend will not start, and its data and schema were not modified. A copy is in /app/data/backups.',
+].join('\n');
+const FAILED_MIGRATION_LOGS = [
+  'Error: P3009',
+  'ERROR: migration 20261010173910_schema_integrity failed. The backend will not start.',
+  'Newest copy made before a migration: /app/data/backups/pre-migrate-20261012-101500.db (with its -wal file when there is one).',
+].join('\n');
 // Port the frontend container listens on, per compose generation of the layouts.
 const FRONTEND_PORT_BY_GENERATION = { '1.4.0': 80, '1.5.0': 80, '1.8.0': 8080 };
 
 test('parseSnapshot reads the helper output', () => {
   const snapshot = parseSnapshot([
-    'fingerprint|abc', 'backups|       2', 'integrity|ok ', 'journal|wal',
+    'fingerprint|abc', 'backups|       2', 'latestBackup|def', 'integrity|ok ', 'journal|wal',
     'count|Cocktail|42', 'count|User|1', 'image|1.jpg', 'image|2.jpg', '',
   ].join('\n'));
   assert.deepEqual(snapshot, {
-    fingerprint: 'abc', backups: 2, integrity: 'ok', journalMode: 'wal',
+    fingerprint: 'abc', backups: 2, latestBackupFingerprint: 'def', integrity: 'ok', journalMode: 'wal',
     counts: { Cocktail: 42, User: 1 }, imagePaths: ['1.jpg', '2.jpg'],
   });
+  assert.equal(parseSnapshot('fingerprint|abc\nbackups|0\n').latestBackupFingerprint, undefined);
+});
+
+test('the refusal messages are the ones the entrypoint prints', () => {
+  const source = fs.readFileSync(ENTRYPOINT, 'utf8');
+  // The 0_init message names the migration through a variable.
+  const baselineMigration = /^BASELINE_MIGRATION=(\S+)$/m.exec(source)[1];
+  const entrypoint = source.replaceAll('$BASELINE_MIGRATION', baselineMigration);
+  for (const refusal of [BASELINE_REFUSAL, FAILED_MIGRATION_REFUSAL]) {
+    assert.ok(entrypoint.includes(refusal.log), refusal.log);
+  }
+});
+
+test('findRefusal recognises each refusal, and only its own message', () => {
+  const refusals = [BASELINE_REFUSAL, FAILED_MIGRATION_REFUSAL];
+  assert.equal(findRefusal(refusals, BASELINE_REFUSAL_LOGS), BASELINE_REFUSAL);
+  assert.equal(findRefusal(refusals, FAILED_MIGRATION_LOGS), FAILED_MIGRATION_REFUSAL);
+  assert.equal(findRefusal(refusals, 'ERROR: the backend runs as uid 1000 and cannot write to /app/data.'), null);
+  assert.equal(findRefusal([BASELINE_REFUSAL], FAILED_MIGRATION_LOGS), null);
+});
+
+test('checkRefusalMessage reports the message found, or every message it looked for', () => {
+  const refusals = [BASELINE_REFUSAL, FAILED_MIGRATION_REFUSAL];
+  const found = checkRefusalMessage(refusals, FAILED_MIGRATION_REFUSAL);
+  assert.equal(found.status, 'ok');
+  assert.equal(found.detail, '"failed. The backend will not start." found');
+  const missing = checkRefusalMessage(refusals, null);
+  assert.equal(missing.status, 'ko');
+  assert.equal(missing.detail, 'none found: "does not match migration 0_init", "failed. The backend will not start."');
+  assert.equal(checkRefusalMessage([], null).status, 'info');
+});
+
+test('checkRefusedDatabase: the 0_init refusal, or an unknown one, must leave the database file unchanged', () => {
+  const before = { fingerprint: 'aaa' };
+  for (const refusal of [BASELINE_REFUSAL, null]) {
+    const untouched = checkRefusedDatabase(refusal, before, { fingerprint: 'aaa', latestBackupFingerprint: 'aaa' });
+    assert.deepEqual([untouched.label, untouched.status], ['database left untouched by the refused start', 'ok']);
+    const changed = checkRefusedDatabase(refusal, before, { fingerprint: 'bbb', latestBackupFingerprint: 'aaa' });
+    assert.deepEqual([changed.status, changed.detail], ['ko', 'database file changed']);
+  }
+});
+
+test('checkRefusedDatabase: a failed migration must leave a pre-migrate copy of the database before the jump', () => {
+  const before = { fingerprint: 'aaa' };
+  const kept = checkRefusedDatabase(FAILED_MIGRATION_REFUSAL, before, { fingerprint: 'bbb', latestBackupFingerprint: 'aaa' });
+  assert.deepEqual([kept.label, kept.status, kept.detail],
+    ['newest pre-migrate copy holds the database before the jump', 'ok', 'same SHA-256 as the database before the jump']);
+  const other = checkRefusedDatabase(FAILED_MIGRATION_REFUSAL, before, { fingerprint: 'bbb', latestBackupFingerprint: 'ccc' });
+  assert.deepEqual([other.status, other.detail], ['ko', 'SHA-256 differs from the database before the jump']);
+  const none = checkRefusedDatabase(FAILED_MIGRATION_REFUSAL, before, { fingerprint: 'bbb' });
+  assert.deepEqual([none.status, none.detail], ['ko', 'no pre-migrate copy']);
+});
+
+test('parseLastExitCode keeps the code of the last die event', () => {
+  assert.equal(parseLastExitCode({ status: 0, stdout: '1\n1\n0\n' }), 0);
+  assert.equal(parseLastExitCode({ status: 0, stdout: '0\n1\n' }), 1);
+  assert.equal(parseLastExitCode({ status: 0, stdout: '' }), null);
+});
+
+test('parseLastExitCode gives null when docker events failed, so the caller falls back to State.ExitCode', () => {
+  assert.equal(parseLastExitCode({ status: 1, stdout: '3\n' }), null);
 });
 
 test('checkRowCounts fails on a lost row and reports new tables', () => {

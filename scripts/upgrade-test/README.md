@@ -55,7 +55,8 @@ A layout is a folder in `layouts/` with a `layout.mjs`, one compose template per
 
 `hooks/<version>.mjs` describes one release:
 
-- `profile`: how the version behaves (upload folder, migrations, journal mode, expected log lines, known bugs). A version without a hook file inherits the profile of the previous one.
+- `profile`: how the version behaves (upload folder, migrations, journal mode, expected log lines, known bugs, clean refusals). A version without a hook file inherits the profile of the previous one.
+  - `refusals`: the clean refusals that the release adds, defined in `lib/checks.mjs`; they add up with the ones of older releases. `BASELINE_REFUSAL` (v1.6.0): a `db push` database that does not match `0_init`. `FAILED_MIGRATION_REFUSAL`: a migration that fails, for example on duplicates (C-18, to list in the hook file of the release that ships it).
 - `before` / `after`: the required actions, each linked to its step in the notes. Actions are implemented in `lib/actions.mjs` and follow the notes for any layout, from what `docker inspect` shows:
   - `rescueUploads`: copies the photos out of the old container, unless their folder is a mount;
   - `checkPhotoMount`: on v1.5.0, checks that `/app/uploads` is a mount, and copies the photos out if it is not;
@@ -79,7 +80,7 @@ After each start or jump:
 
 | Check | How |
 |---|---|
-| Start, or clean refusal | API ready line, or container stopped/restarting; a refusal must print the refusal message and leave the database file unchanged |
+| Start, or clean refusal | API ready line, or container stopped/restarting. A refusal must print a message of `profile.refusals`. The `0_init` refusal (or an unknown one) must leave the database file unchanged. A failed migration stays in the database (SQLite migrations are not transactional): the newest `pre-migrate-*.db` copy must then have the SHA-256 of the database before the jump, and the row counts below must show no loss. The exit code comes from the last `die` event: under `restart: unless-stopped`, the state shows the attempt that runs again (code 0) |
 | Log lines | `profile.startupLogs`, plus `profile.baselineLogs` on the first start of a database created by `db push` (backup `pre-migrate-*`, `0_init` baseline) |
 | `prisma migrate status` | versions with migrations |
 | Admin login | `POST /api/auth/login` then `/api/auth/me`. v1.4.0 rewrites the admin password from `ADMIN_PASSWORD` at each start: from then on the bench expects that password, and checks it still works after each jump |

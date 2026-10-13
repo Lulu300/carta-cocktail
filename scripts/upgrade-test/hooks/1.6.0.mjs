@@ -1,4 +1,6 @@
 // Required actions of docs/releases/v1.6.0.md (and the v1.6.0 section of UPGRADING.md).
+import { BASELINE_REFUSAL } from '../lib/checks.mjs';
+
 export default {
   version: '1.6.0',
   releaseNotes: 'docs/releases/v1.6.0.md',
@@ -12,7 +14,7 @@ export default {
       'Existing database matches 0_init: marking it as applied.',
       'Migration 0_init marked as applied.',
     ],
-    refusalLog: 'does not match migration 0_init',
+    refusals: [BASELINE_REFUSAL],
     // Node runs as PID 1 and handles SIGTERM: `docker compose stop` exits with code 0.
     cleanShutdown: true,
   },

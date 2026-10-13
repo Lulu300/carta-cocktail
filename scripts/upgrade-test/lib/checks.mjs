@@ -177,6 +177,52 @@ export function checkRowCounts(baseline, current) {
   return row('rowCounts', 'row count of each table vs the fixture', lost.length === 0, notes.filter(Boolean).join('; '));
 }
 
+// Clean refusals of the entrypoint (backend/docker-entrypoint.sh). A hook file lists the ones
+// its release adds in `profile.refusals`; `database` says what the refused start may change
+// (see checkRefusedDatabase).
+
+/** v1.6.0: a database created by `db push` that does not match the 0_init baseline. */
+export const BASELINE_REFUSAL = { log: 'does not match migration 0_init', database: 'untouched' };
+
+/**
+ * C-18: a migration failed (P3018), or failed at an earlier start (P3009, every restart). The
+ * message names the migration; the 0_init refusal says "will not start, and" instead.
+ */
+export const FAILED_MIGRATION_REFUSAL = { log: 'failed. The backend will not start.', database: 'backupBeforeJump' };
+
+/** The first refusal of `refusals` (`profile.refusals`) whose message is in the logs, or null. */
+export function findRefusal(refusals, logs) {
+  return refusals.find((refusal) => logs.includes(refusal.log)) ?? null;
+}
+
+export function checkRefusalMessage(refusals, refusal) {
+  if (refusals.length === 0) return infoRow('refusal', 'refusal message', 'no refusal message defined for this version');
+  if (refusal) return row('refusal', 'refusal message', true, `"${refusal.log}" found`);
+  return row('refusal', 'refusal message', false, `none found: ${refusals.map((candidate) => `"${candidate.log}"`).join(', ')}`);
+}
+
+/**
+ * What a refused start may change in the database, compared with the snapshot taken before it:
+ * - `untouched`: nothing (the 0_init baseline refuses before writing anything);
+ * - `backupBeforeJump`: the failed migration and its history row stay in the database (SQLite
+ *   migrations are not transactional), so the newest pre-migrate copy must hold the database
+ *   as it was before the jump. Row counts are checked separately, for every start.
+ * An unrecognised refusal gets the strictest check.
+ */
+export function checkRefusedDatabase(refusal, before, after) {
+  if (refusal?.database === 'backupBeforeJump') {
+    const matches = after.latestBackupFingerprint === before.fingerprint;
+    let detail = 'no pre-migrate copy';
+    if (after.latestBackupFingerprint) {
+      detail = matches ? 'same SHA-256 as the database before the jump' : 'SHA-256 differs from the database before the jump';
+    }
+    return row('refusal', 'newest pre-migrate copy holds the database before the jump', matches, detail);
+  }
+  const untouched = after.fingerprint === before.fingerprint;
+  return row('refusal', 'database left untouched by the refused start', untouched,
+    untouched ? 'same SHA-256 as before the jump' : 'database file changed');
+}
+
 export function checkIntegrity(snapshot) {
   return row('integrity', 'PRAGMA integrity_check', snapshot.integrity === 'ok', snapshot.integrity);
 }
