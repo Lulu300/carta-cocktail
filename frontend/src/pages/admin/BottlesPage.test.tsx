@@ -175,6 +175,7 @@ describe('BottlesPage', () => {
       expect(screen.getByText('Vodka')).toBeInTheDocument();
       expect(screen.getByText('units.ml(700)')).toBeInTheDocument();
       expect(screen.getByText('€25.00')).toBeInTheDocument();
+      expect(screen.getByText('units.abv(40)')).toBeInTheDocument();
       expect(screen.getByText('bottles.opened')).toBeInTheDocument();
       expect(screen.getByText('bottles.unopened')).toBeInTheDocument();
       expect(screen.getByText('bottles.activeTitle (2)')).toBeInTheDocument();

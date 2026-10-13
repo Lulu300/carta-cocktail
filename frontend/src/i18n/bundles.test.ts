@@ -271,3 +271,20 @@ describe('plural forms', () => {
     expect(t('cocktails.doses', { count: 999, servings: '∞' })).toBe('∞ doses');
   });
 });
+
+describe('number formats', () => {
+  // Intl may separate French thousands with a narrow no-break space.
+  const normalizeSpaces = (text: string) => text.replace(/\s/g, ' ');
+
+  it('write quantities the French way', () => {
+    const t = i18n.getFixedT('fr');
+    expect(normalizeSpaces(t('units.ml', { value: 0.6 }))).toBe('0,6 ml');
+    expect(normalizeSpaces(t('units.abv', { value: 40.5 }))).toBe('40,5 % vol.');
+  });
+
+  it('write quantities the English way', () => {
+    const t = i18n.getFixedT('en');
+    expect(t('units.ml', { value: 1500 })).toBe('1,500 ml');
+    expect(t('units.abv', { value: 40.5 })).toBe('40.5% vol.');
+  });
+});

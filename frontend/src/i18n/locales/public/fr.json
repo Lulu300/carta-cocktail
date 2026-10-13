@@ -68,8 +68,8 @@
     "more_other": "et {{count}} autres"
   },
   "units": {
-    "ml": "{{value}} ml",
-    "abv": "{{value}} % vol."
+    "ml": "{{value, number}} ml",
+    "abv": "{{value, number}} % vol."
   },
   "menus": {
     "cocktailCount_one": "{{count}} cocktail",

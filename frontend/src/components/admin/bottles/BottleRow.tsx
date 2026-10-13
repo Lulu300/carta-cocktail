@@ -61,7 +61,7 @@ export default function BottleRow({ bottle, indented = false, onEdit, onDelete }
       <td className="px-6 py-4">
         <RemainingBar percent={bottle.remainingPercent} label={`${bottle.remainingPercent}%`} />
       </td>
-      <td className="px-6 py-4 text-fg-muted">{bottle.alcoholPercentage ? `${bottle.alcoholPercentage}%` : '-'}</td>
+      <td className="px-6 py-4 text-fg-muted">{bottle.alcoholPercentage ? t('units.abv', { value: bottle.alcoholPercentage }) : '-'}</td>
       <td className="px-6 py-4">
         <Badge tone={bottle.openedAt ? 'warning' : 'success'}>
           {bottle.openedAt ? t('bottles.opened') : t('bottles.unopened')}

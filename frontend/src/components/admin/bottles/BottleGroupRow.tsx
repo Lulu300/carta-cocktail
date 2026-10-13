@@ -43,7 +43,7 @@ export default function BottleGroupRow({ group, expanded, onToggle, onEdit, onDe
         <td className="px-6 py-4 text-fg-muted">
           <RemainingBar percent={average} label={`~${average}%`} />
         </td>
-        <td className="px-6 py-4 text-fg-muted">{group.alcoholPercentage ? `${group.alcoholPercentage}%` : '-'}</td>
+        <td className="px-6 py-4 text-fg-muted">{group.alcoholPercentage ? t('units.abv', { value: group.alcoholPercentage }) : '-'}</td>
         <td className="px-6 py-4 text-fg-muted">-</td>
         <td className="px-6 py-4 text-fg-muted">-</td>
         <td className="px-6 py-4"></td>
