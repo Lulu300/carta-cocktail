@@ -4,22 +4,16 @@ import { clearToasts, renderWithFeedback } from '../../test/feedback';
 import userEvent from '@testing-library/user-event';
 import CocktailsPage from './CocktailsPage';
 import { qk } from '../../queries/keys';
+import { buildAvailability, buildCocktail } from '../../test/factories';
+import { captureRequest, holdApiResponse, mockApiResponse, mockNetworkError } from '../../test/msw/utils';
+import type { Cocktail } from '../../types';
 
-vi.mock('../../services/api', () => ({
-  cocktails: { list: vi.fn(), delete: vi.fn(), exportRecipe: vi.fn() },
-  availability: { getAllCocktails: vi.fn() },
-}));
-
+// Builds a ZIP of every selected recipe: services/exportZip.test.ts covers it.
 vi.mock('../../services/exportZip', () => ({
   exportCocktailsAsZip: vi.fn(),
 }));
 
-vi.mock('../../components/ui/ExportCocktailButton', () => ({
-  default: ({ cocktailId }: { cocktailId: number }) => (
-    <button data-testid={`export-${cocktailId}`}>export</button>
-  ),
-}));
-
+// The wizard has its own tests: here it only has to close.
 vi.mock('../../components/import/ImportCocktailWizard', () => ({
   default: ({ onClose }: { onClose: () => void }) => (
     <div data-testid="import-wizard">
@@ -28,52 +22,19 @@ vi.mock('../../components/import/ImportCocktailWizard', () => ({
   ),
 }));
 
-import { cocktails as api, availability as availabilityApi } from '../../services/api';
 import { exportCocktailsAsZip } from '../../services/exportZip';
 
-const mockCocktails = [
-  {
-    id: 1,
-    name: 'Mojito',
-    description: 'Classic',
-    notes: 'Jus de citron frais',
-    imagePath: null,
-    tags: 'rum,lime',
-    isAvailable: true,
-    createdAt: '2024-01-01',
-    updatedAt: '2024-01-01',
-  },
-  {
-    id: 2,
-    name: 'Negroni',
-    description: null,
-    notes: null,
-    imagePath: 'negroni.jpg',
-    tags: '',
-    isAvailable: true,
-    createdAt: '2024-01-01',
-    updatedAt: '2024-01-01',
-  },
-];
+const mojito = buildCocktail({ id: 1, name: 'Mojito', description: 'Classic', notes: 'Jus de citron frais', tags: 'rum,lime' });
+const negroni = buildCocktail({ id: 2, name: 'Negroni', imagePath: 'negroni.jpg' });
 
 const mockAvailabilities = {
-  1: {
-    cocktailId: 1,
-    isAvailable: true,
-    maxServings: 5,
-    ingredients: [],
-    missingIngredients: [],
-    lowStockWarnings: [],
-  },
-  2: {
-    cocktailId: 2,
-    isAvailable: false,
-    maxServings: 0,
-    ingredients: [],
-    missingIngredients: ['Campari'],
-    lowStockWarnings: [],
-  },
+  1: buildAvailability({ cocktailId: 1, maxServings: 5 }),
+  2: buildAvailability({ cocktailId: 2, isAvailable: false, maxServings: 0, missingIngredients: ['Campari'] }),
 };
+
+function mockCocktails(cocktails: Cocktail[]) {
+  mockApiResponse('get', '/api/cocktails', cocktails);
+}
 
 // The page asks for confirmation and reports through toasts.
 const render = renderWithFeedback;
@@ -83,8 +44,8 @@ describe('CocktailsPage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(api.list).mockResolvedValue(mockCocktails);
-    vi.mocked(availabilityApi.getAllCocktails).mockResolvedValue(mockAvailabilities);
+    mockCocktails([mojito, negroni]);
+    mockApiResponse('get', '/api/availability/cocktails', mockAvailabilities);
   });
 
   it('renders title and action buttons', async () => {
@@ -98,6 +59,8 @@ describe('CocktailsPage', () => {
     expect(screen.getByText('cocktails.batchExport')).toBeInTheDocument();
     expect(screen.getByText('cocktails.import')).toBeInTheDocument();
     expect(screen.getByText('cocktails.add')).toBeInTheDocument();
+    // The real export button of each card
+    expect(screen.getAllByTitle('cocktails.export')).toHaveLength(2);
   });
 
   it('displays cocktail cards after loading', async () => {
@@ -147,7 +110,7 @@ describe('CocktailsPage', () => {
   });
 
   it('shows noResults when empty', async () => {
-    vi.mocked(api.list).mockResolvedValue([]);
+    mockCocktails([]);
 
     render(<CocktailsPage />);
 
@@ -172,11 +135,13 @@ describe('CocktailsPage', () => {
 
   it('still lists cocktails, without availability badges, when availability fails to load', async () => {
     const user = userEvent.setup();
-    vi.mocked(availabilityApi.getAllCocktails).mockRejectedValueOnce(new Error('offline'));
+    mockNetworkError('get', '/api/availability/cocktails');
     render(<CocktailsPage />);
 
     await screen.findAllByText('Mojito');
-    await user.click(await screen.findByRole('button', { name: 'common.retry' }));
+    const retry = await screen.findByRole('button', { name: 'common.retry' });
+    mockApiResponse('get', '/api/availability/cocktails', mockAvailabilities);
+    await user.click(retry);
 
     expect(await screen.findByText('cocktails.doses')).toBeInTheDocument();
     expect(screen.getByText('cocktails.unavailable')).toBeInTheDocument();
@@ -184,20 +149,15 @@ describe('CocktailsPage', () => {
 
   it('hides availability while it reloads after an import', async () => {
     const user = userEvent.setup();
-    let resolveReload: (value: typeof mockAvailabilities) => void = () => {};
     render(<CocktailsPage />);
     expect(await screen.findByText('cocktails.doses')).toBeInTheDocument();
 
-    vi.mocked(availabilityApi.getAllCocktails).mockReturnValueOnce(
-      new Promise((resolve) => {
-        resolveReload = resolve;
-      }),
-    );
+    const releaseReload = holdApiResponse('get', '/api/availability/cocktails', mockAvailabilities);
     await user.click(screen.getByText('cocktails.import'));
     await user.click(screen.getByText('close'));
 
     expect(screen.queryByText('cocktails.doses')).not.toBeInTheDocument();
-    resolveReload(mockAvailabilities);
+    releaseReload();
     expect(await screen.findByText('cocktails.doses')).toBeInTheDocument();
   });
 
@@ -233,8 +193,8 @@ describe('CocktailsPage', () => {
 
   it('selects and exports only the filtered cocktails with "select all"', async () => {
     const user = userEvent.setup();
-    const daiquiri = { ...mockCocktails[1], id: 3, name: 'Daiquiri', imagePath: null };
-    vi.mocked(api.list).mockResolvedValue([...mockCocktails, daiquiri]);
+    const daiquiri = buildCocktail({ id: 3, name: 'Daiquiri' });
+    mockCocktails([mojito, negroni, daiquiri]);
     render(<CocktailsPage />);
 
     const search = await screen.findByPlaceholderText('common.search');
@@ -262,7 +222,8 @@ describe('CocktailsPage', () => {
     await user.click(screen.getByText('cocktails.batchExport'));
 
     // Select Negroni while it is visible, then filter it out
-    const negroniCard = screen.getByText('Negroni').closest('div.rounded-xl') as HTMLElement;
+    const negroniCard = screen.getByText('Negroni').closest('div.rounded-xl');
+    if (!(negroniCard instanceof HTMLElement)) throw new Error('No card for Negroni');
     await user.click(negroniCard);
 
     await user.type(screen.getByPlaceholderText('common.search'), 'rum citron');
@@ -305,6 +266,8 @@ describe('CocktailsPage', () => {
     const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
     render(<CocktailsPage />, { queryClient });
     await screen.findAllByText('Mojito');
+    const cocktailsReloaded = captureRequest('get', '/api/cocktails');
+    const availabilityReloaded = captureRequest('get', '/api/availability/cocktails');
 
     await user.click(screen.getByText('cocktails.import'));
     await user.click(screen.getByText('close'));
@@ -320,26 +283,27 @@ describe('CocktailsPage', () => {
       qk.ingredients,
       qk.shortages,
     ]);
-    await waitFor(() => expect(api.list).toHaveBeenCalledTimes(2));
-    expect(availabilityApi.getAllCocktails).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(cocktailsReloaded.count()).toBe(1));
+    await waitFor(() => expect(availabilityReloaded.count()).toBe(1));
   });
 
   it('deletes a cocktail once the dialog is confirmed, then refreshes the list', async () => {
     const user = userEvent.setup();
-    vi.mocked(api.delete).mockResolvedValue({ message: 'ok' });
     render(<CocktailsPage />);
     await screen.findByText('Mojito');
+    const deleted = captureRequest('delete', '/api/cocktails/:id');
+    const reloaded = captureRequest('get', '/api/cocktails');
 
     await user.click(screen.getAllByRole('button', { name: 'common.delete' })[0]);
     await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.cancel' }));
-    expect(api.delete).not.toHaveBeenCalled();
+    expect(deleted.count()).toBe(0);
 
     await user.click(screen.getAllByRole('button', { name: 'common.delete' })[0]);
     await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.delete' }));
 
-    await waitFor(() => expect(api.delete).toHaveBeenCalledWith(1));
     expect(await screen.findByText('cocktails.deleted')).toBeInTheDocument();
-    await waitFor(() => expect(api.list).toHaveBeenCalledTimes(2));
+    expect((await deleted.url).pathname).toBe('/api/cocktails/1');
+    await waitFor(() => expect(reloaded.count()).toBe(1));
   });
 
   it('reports a failed batch export in a toast and keeps the selection', async () => {
@@ -385,7 +349,7 @@ describe('CocktailsPage', () => {
   });
 
   it('lists the stock warnings, among them the category lines without an available preferred bottle', async () => {
-    vi.mocked(availabilityApi.getAllCocktails).mockResolvedValue({
+    mockApiResponse('get', '/api/availability/cocktails', {
       ...mockAvailabilities,
       1: {
         ...mockAvailabilities[1],
@@ -408,7 +372,7 @@ describe('CocktailsPage', () => {
 
   it('filters the cocktails by tag, ignoring case', async () => {
     const user = userEvent.setup();
-    vi.mocked(api.list).mockResolvedValue([mockCocktails[0], { ...mockCocktails[1], tags: 'Bitter, RUM' }, { ...mockCocktails[1], id: 3, name: 'Spritz', tags: 'bitter' }]);
+    mockCocktails([mojito, { ...negroni, tags: 'Bitter, RUM' }, buildCocktail({ id: 3, name: 'Spritz', tags: 'bitter' })]);
     render(<CocktailsPage />);
     await screen.findByText('Spritz');
 
@@ -436,10 +400,12 @@ describe('CocktailsPage', () => {
 
   it('offers to retry when the list fails to load', async () => {
     const user = userEvent.setup();
-    vi.mocked(api.list).mockRejectedValueOnce(new Error('offline'));
+    mockNetworkError('get', '/api/cocktails');
     render(<CocktailsPage />);
 
-    await user.click(await screen.findByRole('button', { name: 'common.retry' }));
+    const retry = await screen.findByRole('button', { name: 'common.retry' });
+    mockCocktails([mojito, negroni]);
+    await user.click(retry);
 
     expect(await screen.findByText('Mojito')).toBeInTheDocument();
   });

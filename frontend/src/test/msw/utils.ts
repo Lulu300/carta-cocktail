@@ -20,6 +20,22 @@ export function mockApiPending(method: ApiMethod, path: string): void {
   server.use(http[method](path, () => new Promise<never>(() => {})));
 }
 
+/**
+ * Makes `method path` answer `body` only once the returned function is called,
+ * to check what the page shows while the request is in flight.
+ */
+export function holdApiResponse(method: ApiMethod, path: string, body: JsonBodyType): () => void {
+  let release: () => void = () => {};
+  const released = new Promise<void>((resolve) => { release = resolve; });
+  server.use(
+    http[method](path, async () => {
+      await released;
+      return HttpResponse.json(body);
+    }),
+  );
+  return release;
+}
+
 /** Makes `method path` fail like a dropped connection (fetch rejects, no HTTP status). */
 export function mockNetworkError(method: ApiMethod, path: string): void {
   server.use(http[method](path, () => HttpResponse.error()));
