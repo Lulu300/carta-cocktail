@@ -60,3 +60,4 @@ En Docker, nginx est la seule porte d'entrée. Quand il refuse une requête lui-
 ## Journal
 
 - 2026-10-08 : tâche créée à partir des revues de PR de la phase A (A-06, A-10).
+- 2026-10-13 : relecture d'E-30 (PR #133) : les locales frontend sont scindées en `locales/public/` (premier chargement) et `locales/admin/`. `errors.fileTooLarge` et `errors.serverUnavailable` seront lues par `services/api.ts`, qui fait partie du premier chargement : elles vont dans `locales/public/{en,fr}.json` (`frontend/src/i18n/bundles.test.ts` le vérifie), pas dans `locales/en.json`.
