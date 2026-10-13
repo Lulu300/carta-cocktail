@@ -56,3 +56,4 @@ Mesuré dans l'image de D-30 (`du`, Mio sur disque, arm64), pour les trois group
 
 - 2026-10-13 : tâche créée par D-30 (mesures dans l'image de D-30).
 - 2026-10-13 : décision de l'humain (relecture de la PR #138) : « Groupes peu risqués ». Tâche limitée à l'UI Studio et ses metafiles, `better-sqlite3/deps` et les `.map` ; `owner` passe à `agent`.
+- 2026-10-13 : relecture ciblée de la PR #138. « Gain compressé faible » n'a pas de seuil : l'agent donne dans sa PR la mesure du gain compressé (amd64 et arm64) groupe par groupe, et le coordinateur confirme un éventuel abandon (`dropped`), plutôt que l'agent ne tranche seul.
