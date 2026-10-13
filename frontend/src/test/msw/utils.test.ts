@@ -1,7 +1,19 @@
-import { describe, expect, it } from 'vitest';
-import { categories, units } from '../../services/api';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { backup, categories, units } from '../../services/api';
 import { buildUnit } from '../factories';
-import { captureRequest, mockApiError, mockApiPending, mockApiResponse, mockNetworkError } from './utils';
+import {
+  captureRequest,
+  holdApiResponse,
+  mockApiError,
+  mockApiPending,
+  mockApiResponse,
+  mockNetworkError,
+  rejectNextFetch,
+} from './utils';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('fake backend', () => {
   it('answers the requests of services/api.ts with the default data', async () => {
@@ -50,5 +62,38 @@ describe('fake backend', () => {
     expect((await request.url).pathname).toBe('/api/units/4');
     expect(request.count()).toBe(1);
     expect(updated).toEqual({ id: 4, abbreviation: 'oz' });
+  });
+
+  it('holds a response until the test releases it', async () => {
+    const release = holdApiResponse('get', '/api/units', [buildUnit({ name: 'Held' })]);
+    let settled = false;
+    const list = units.list().then((result) => {
+      settled = true;
+      return result;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(settled).toBe(false);
+
+    release();
+
+    expect((await list)[0].name).toBe('Held');
+  });
+
+  it('makes the next fetch reject with any value, then lets the next ones through', async () => {
+    rejectNextFetch('not an Error');
+
+    await expect(units.list()).rejects.toBe('not an Error');
+    expect(await units.list()).toHaveLength(2);
+  });
+
+  it('gives the raw multipart text of a file upload', async () => {
+    mockApiResponse('post', '/api/backup/import', { message: 'ok', skippedFiles: 0, restartRecommended: false });
+    const request = captureRequest('post', '/api/backup/import');
+
+    await backup.importBackup(new File(['zip'], 'backup.zip', { type: 'application/zip' }));
+
+    const body = await request.body;
+    expect(body).toContain('name="backup"');
+    expect(body).toContain('Content-Type: application/zip');
   });
 });
