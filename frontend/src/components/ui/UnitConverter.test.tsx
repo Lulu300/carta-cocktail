@@ -1,27 +1,33 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { render, screen } from '../../test/test-utils';
-import type { Unit } from '../../types';
+import { buildUnit } from '../../test/factories';
+import { mockApiResponse, mockNetworkError } from '../../test/msw/utils';
 import UnitConverter from './UnitConverter';
 
-vi.mock('../../services/api', () => ({
-  publicApi: { listUnits: vi.fn() },
-}));
-
-import { publicApi } from '../../services/api';
-
-function unit(id: number, abbreviation: string, conversionFactorToMl: number | null): Unit {
-  return { id, name: abbreviation, abbreviation, conversionFactorToMl };
+function unit(id: number, abbreviation: string, conversionFactorToMl: number | null) {
+  return buildUnit({ id, name: abbreviation, abbreviation, conversionFactorToMl });
 }
 
 beforeEach(() => {
-  vi.mocked(publicApi.listUnits).mockResolvedValue([unit(1, 'cl', 10), unit(2, 'ml', 1), unit(3, 'oz', 29.57)]);
+  mockApiResponse('get', '/api/public/units', [unit(1, 'cl', 10), unit(2, 'ml', 1), unit(3, 'oz', 29.57)]);
 });
 
 describe('UnitConverter', () => {
   it('shows a plain quantity for a unit it cannot convert', async () => {
+    mockApiResponse('get', '/api/public/units', [unit(1, 'cl', 10), unit(4, 'pinch', null)]);
     render(<UnitConverter quantity={2} unit="pinch" />);
     expect(await screen.findByText('2 pinch')).toBeInTheDocument();
+    // Still plain once the units have loaded
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('shows a plain quantity when the units cannot be loaded', async () => {
+    mockNetworkError('get', '/api/public/units');
+    render(<UnitConverter quantity={3} unit="cl" />);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.getByText('3 cl')).toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
