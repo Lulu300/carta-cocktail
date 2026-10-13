@@ -30,6 +30,28 @@ COPY package*.json ./
 COPY prisma/schema.prisma ./prisma/schema.prisma
 RUN npm ci
 RUN npm prune --omit=dev --omit=optional
+# The entrypoint and the documented recovery commands need the Prisma CLI
+# (migrate deploy, diff, resolve, status) and its schema engine. The CLI also
+# brings what only `prisma studio` (a web UI built with React) and `prisma dev`
+# (a local Postgres server) use. Whatever the command, it loads at startup the
+# data modules of @prisma/studio-core and dist/state.cjs of @prisma/dev, which
+# need none of the dependencies cut below. Only Studio imports the MySQL and
+# Postgres drivers.
+# better-sqlite3 only runs prebuild-install during `npm ci`, to get its binary.
+COPY docker/prune-unused-deps.mjs /tmp/
+RUN node /tmp/prune-unused-deps.mjs \
+    '@prisma/studio-core:*' \
+    @prisma/dev:@electric-sql/pglite \
+    @prisma/dev:@electric-sql/pglite-socket \
+    @prisma/dev:@electric-sql/pglite-tools \
+    @prisma/dev:@prisma/get-platform \
+    @prisma/dev:@prisma/query-plan-executor \
+    @prisma/dev:@prisma/streams-local \
+    @prisma/dev:find-my-way \
+    @prisma/dev:foreground-child \
+    prisma:mysql2 \
+    prisma:postgres \
+    better-sqlite3:prebuild-install
 
 FROM node:24.21-alpine AS runtime
 # tini forwards SIGTERM to the entrypoint, then to Node once the entrypoint has exec'd it
