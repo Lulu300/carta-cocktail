@@ -1,5 +1,8 @@
 import '@testing-library/jest-dom/vitest';
-import { vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, vi } from 'vitest';
+import { resetFactories } from './factories';
+import { resetCreatedIds } from './msw/handlers';
+import { server } from './msw/server';
 
 // Mock localStorage (Node.js 22+ built-in localStorage conflicts with jsdom)
 const store: Record<string, string> = {};
@@ -50,3 +53,26 @@ Object.defineProperty(window, 'matchMedia', {
     dispatchEvent: vi.fn(),
   })),
 });
+
+// Fake backend for every request of services/api.ts. A request with no handler
+// fails the test, so a page cannot silently call an endpoint the test ignores.
+// `onUnhandledRequest: 'error'` alone only logs and rejects the fetch, which a
+// request nobody awaits (a reload after an invalidation) would hide: such
+// requests are collected and turned into an error after the test.
+const unhandledRequests: string[] = [];
+server.events.on('request:unhandled', ({ request }) => {
+  unhandledRequests.push(`${request.method} ${new URL(request.url).pathname}`);
+});
+
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+afterEach(() => {
+  server.resetHandlers();
+  resetCreatedIds();
+  resetFactories();
+  localStorage.clear();
+  const unexpected = unhandledRequests.splice(0);
+  if (unexpected.length > 0) {
+    throw new Error(`Requests without a handler: ${unexpected.join(', ')}`);
+  }
+});
+afterAll(() => server.close());

@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { fireEvent, screen, waitFor, within } from '../../test/test-utils';
 import { clearToasts, renderWithFeedback } from '../../test/feedback';
+import { buildMenu } from '../../test/factories';
+import { captureRequest, mockApiError, mockApiPending, mockApiResponse } from '../../test/msw/utils';
 import MenusPage from './MenusPage';
 
 vi.mock('react-i18next', async (importOriginal) => {
@@ -12,24 +14,16 @@ vi.mock('react-i18next', async (importOriginal) => {
   };
 });
 
-vi.mock('../../services/api', async () => {
-  const actual = await vi.importActual<typeof import('../../services/api')>('../../services/api');
-  return {
-    ApiError: actual.ApiError,
-    menus: { list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
-  };
+const aperitifs = buildMenu({ id: 1, name: 'Apéritifs', slug: 'aperitifs', type: 'APEROS', _count: { cocktails: 0, bottles: 5 } });
+const digestifs = buildMenu({
+  id: 2,
+  name: 'Digestifs',
+  slug: 'digestifs',
+  type: 'DIGESTIFS',
+  isPublic: false,
+  _count: { cocktails: 0, bottles: 2 },
 });
-
-import { ApiError, menus as api } from '../../services/api';
-const mockList = vi.mocked(api.list);
-const mockCreate = vi.mocked(api.create);
-const mockDelete = vi.mocked(api.delete);
-
-const mockMenus = [
-  { id: 1, name: 'Apéritifs', slug: 'aperitifs', type: 'APEROS', description: null, isPublic: true, createdAt: '2024-01-01', updatedAt: '2024-01-01', _count: { cocktails: 0, bottles: 5 } },
-  { id: 2, name: 'Digestifs', slug: 'digestifs', type: 'DIGESTIFS', description: null, isPublic: false, createdAt: '2024-01-01', updatedAt: '2024-01-01', _count: { cocktails: 0, bottles: 2 } },
-  { id: 3, name: 'Summer Menu', slug: 'summer', type: 'COCKTAILS', description: 'Summer cocktails', isPublic: true, createdAt: '2024-01-01', updatedAt: '2024-01-01', _count: { cocktails: 8, bottles: 0 } },
-];
+const summer = buildMenu({ id: 3, name: 'Summer Menu', slug: 'summer', description: 'Summer cocktails', _count: { cocktails: 8, bottles: 0 } });
 
 type User = ReturnType<typeof userEvent.setup>;
 
@@ -53,23 +47,15 @@ async function fillCreateForm(user: User, name: string, slug: string) {
 }
 
 beforeEach(() => {
-  vi.clearAllMocks();
-  mockList.mockResolvedValue(mockMenus as never);
-  mockCreate.mockResolvedValue({} as never);
-  mockDelete.mockResolvedValue({ message: 'ok' } as never);
+  mockApiResponse('get', '/api/menus', [aperitifs, digestifs, summer]);
 });
 
 afterEach(clearToasts);
 
 describe('MenusPage', () => {
-  it('renders the title and the add button', () => {
-    renderPage();
-    expect(screen.getByText('menus.title')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'menus.add' })).toBeInTheDocument();
-  });
-
   it('lists the menus with their type, visibility and content', async () => {
     await renderLoadedPage();
+    expect(screen.getByRole('heading', { name: 'menus.title' })).toBeInTheDocument();
     expect(screen.getByText('menus.types.cocktails')).toBeInTheDocument();
     expect(screen.getByText('menus.types.aperos')).toBeInTheDocument();
     expect(screen.getByText('menus.types.digestifs')).toBeInTheDocument();
@@ -96,14 +82,14 @@ describe('MenusPage', () => {
   });
 
   it('never shows "no results" while the menus are loading', () => {
-    mockList.mockReturnValue(new Promise(() => {}));
+    mockApiPending('get', '/api/menus');
     renderPage();
     expect(screen.getByText('common.loading')).toBeInTheDocument();
     expect(screen.queryByText('common.noResults')).not.toBeInTheDocument();
   });
 
   it('shows "no results" once loaded without menus', async () => {
-    mockList.mockResolvedValue([] as never);
+    mockApiResponse('get', '/api/menus', []);
     renderPage();
     expect(await screen.findByText('common.noResults')).toBeInTheDocument();
   });
@@ -121,25 +107,26 @@ describe('MenusPage', () => {
   it('creates a menu with a cleaned slug and confirms with a toast', async () => {
     const user = userEvent.setup();
     await renderLoadedPage();
+    const created = captureRequest('post', '/api/menus');
     await fillCreateForm(user, 'Winter', 'Winter Menu!');
     await user.type(within(dialog()).getByLabelText('menus.description'), 'Hot drinks');
     await user.click(within(dialog()).getByRole('switch', { name: 'menus.isPublic' }));
 
     await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
 
-    await waitFor(() => expect(mockCreate).toHaveBeenCalledWith({
+    expect(await created.body).toEqual({
       name: 'Winter',
       slug: 'winter-menu-',
       description: 'Hot drinks',
       isPublic: true,
-    }));
+    });
     expect(await screen.findByText('menus.created')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('shows a slug already taken in a toast and keeps the form open', async () => {
     const user = userEvent.setup();
-    mockCreate.mockRejectedValue(new ApiError(409, 'This slug is already used'));
+    mockApiError('post', '/api/menus', 409, 'This slug is already used');
     await renderLoadedPage();
     await fillCreateForm(user, 'Summer 2', 'summer');
 
@@ -151,7 +138,8 @@ describe('MenusPage', () => {
 
   it('sends a single request on a fast double click on save', async () => {
     const user = userEvent.setup();
-    mockCreate.mockReturnValue(new Promise(() => {}));
+    mockApiPending('post', '/api/menus');
+    const created = captureRequest('post', '/api/menus');
     await renderLoadedPage();
     await fillCreateForm(user, 'Winter', 'winter');
     const save = within(dialog()).getByRole('button', { name: 'common.save' });
@@ -160,7 +148,7 @@ describe('MenusPage', () => {
     fireEvent.click(save);
 
     await waitFor(() => expect(save).toBeDisabled());
-    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(created.count()).toBe(1);
   });
 
   it('starts from an empty form after a creation', async () => {
@@ -177,23 +165,26 @@ describe('MenusPage', () => {
   it('deletes a menu after confirmation and confirms with a toast', async () => {
     const user = userEvent.setup();
     await renderLoadedPage();
+    const deleted = captureRequest('delete', '/api/menus/:id');
 
     await user.click(screen.getByRole('button', { name: 'common.delete' }));
     const confirmation = screen.getByRole('alertdialog');
     expect(confirmation).toHaveAccessibleDescription('menus.confirmDelete');
     await user.click(within(confirmation).getByRole('button', { name: 'common.delete' }));
 
-    await waitFor(() => expect(mockDelete).toHaveBeenCalledWith(3));
     expect(await screen.findByText('menus.deleted')).toBeInTheDocument();
+    expect((await deleted.url).pathname).toBe('/api/menus/3');
   });
 
   it('does not delete when the dialog is cancelled', async () => {
     const user = userEvent.setup();
     await renderLoadedPage();
+    const deleted = captureRequest('delete', '/api/menus/:id');
 
     await user.click(screen.getByRole('button', { name: 'common.delete' }));
     await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.cancel' }));
 
-    expect(mockDelete).not.toHaveBeenCalled();
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(deleted.count()).toBe(0);
   });
 });

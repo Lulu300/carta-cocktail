@@ -4,6 +4,9 @@ import { createTestQueryClient, fireEvent, screen, waitFor, within } from '../..
 import { clearToasts, renderWithFeedback } from '../../test/feedback';
 import { qk } from '../../queries/keys';
 import { useShortages } from '../../queries/shortages';
+import { buildBottle, buildCategory, buildShortage } from '../../test/factories';
+import { captureRequest, mockApiError, mockApiPending, mockApiResponse, mockNetworkError } from '../../test/msw/utils';
+import type { Bottle } from '../../types';
 import BottlesPage from './BottlesPage';
 
 vi.mock('react-i18next', async (importOriginal) => {
@@ -14,25 +17,7 @@ vi.mock('react-i18next', async (importOriginal) => {
   };
 });
 
-vi.mock('../../services/api', async () => {
-  const actual = await vi.importActual<typeof import('../../services/api')>('../../services/api');
-  return {
-    ApiError: actual.ApiError,
-    bottles: {
-      list: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-      exportFile: vi.fn(),
-      importPreview: vi.fn(),
-      importConfirm: vi.fn(),
-    },
-    categories: { list: vi.fn() },
-    categoryTypes: { list: vi.fn().mockResolvedValue([]) },
-    shortages: { list: vi.fn() },
-  };
-});
-
+// The wizard has its own tests: here it only has to report an import or a close.
 vi.mock('../../components/import/ImportBottlesWizard', () => ({
   default: ({ onClose, onImported }: { onClose: () => void; onImported?: () => void }) => (
     <div data-testid="import-wizard">
@@ -42,73 +27,36 @@ vi.mock('../../components/import/ImportBottlesWizard', () => ({
   ),
 }));
 
-vi.mock('../../hooks/useLocalizedName', () => ({
-  useLocalizedName: () => (entity: { name: string; nameTranslations?: Record<string, string> | null }) =>
-    entity.nameTranslations?.en ?? entity.name,
-}));
+const vodka = buildCategory({ id: 1, name: 'Vodka', categoryType: { name: 'SPIRIT', color: 'blue' }, desiredStock: 2 });
+const gin = buildCategory({ id: 2, name: 'Gin', categoryType: { name: 'SPIRIT', color: 'blue' }, desiredStock: 2 });
 
-// Kept until E-13 replaces the component mocks.
-vi.mock('../../components/ui/MultiSelectDropdown', () => ({
-  default: ({ placeholder }: { onChange: (v: string[]) => void; placeholder: string }) => (
-    <div data-testid="multi-select">{placeholder}</div>
-  ),
-}));
+const absolut = buildBottle({
+  id: 1,
+  name: 'Absolut',
+  category: vodka,
+  capacityMl: 700,
+  remainingPercent: 80,
+  purchasePrice: 25,
+  alcoholPercentage: 40,
+  location: 'Bar',
+});
+const hendricks = buildBottle({
+  id: 2,
+  name: 'Hendricks',
+  category: gin,
+  capacityMl: 500,
+  remainingPercent: 20,
+  openedAt: '2024-06-01T00:00:00.000Z',
+  purchasePrice: null,
+  alcoholPercentage: 41.4,
+  location: null,
+  isApero: true,
+});
+const emptyBottle = buildBottle({ ...absolut, id: 9, name: 'Finished rum', remainingPercent: 0 });
 
-vi.mock('../../components/ui/LocationAutocomplete', () => ({
-  default: ({ onChange, placeholder }: { onChange: (v: string) => void; placeholder: string }) => (
-    <input data-testid="location-autocomplete" placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
-  ),
-}));
-
-import { ApiError, bottles as api, categories as categoriesApi, shortages as shortagesApi } from '../../services/api';
-
-const mockApiList = vi.mocked(api.list);
-const mockApiCreate = vi.mocked(api.create);
-const mockApiUpdate = vi.mocked(api.update);
-const mockApiDelete = vi.mocked(api.delete);
-const mockExport = vi.mocked(api.exportFile);
-const mockCatList = vi.mocked(categoriesApi.list);
-const mockShortagesList = vi.mocked(shortagesApi.list);
-
-const mockBottles = [
-  {
-    id: 1,
-    name: 'Absolut',
-    categoryId: 1,
-    category: { id: 1, name: 'Vodka', type: 'SPIRIT' },
-    capacityMl: 700,
-    remainingPercent: 80,
-    openedAt: null,
-    purchasePrice: 25,
-    alcoholPercentage: 40,
-    location: 'Bar',
-    isApero: false,
-    isDigestif: false,
-    createdAt: '2024-01-01',
-  },
-  {
-    id: 2,
-    name: 'Hendricks',
-    categoryId: 2,
-    category: { id: 2, name: 'Gin', type: 'SPIRIT' },
-    capacityMl: 500,
-    remainingPercent: 20,
-    openedAt: '2024-06-01T00:00:00.000Z',
-    purchasePrice: null,
-    alcoholPercentage: 41.4,
-    location: null,
-    isApero: true,
-    isDigestif: false,
-    createdAt: '2024-01-01',
-  },
-];
-
-const emptyBottle = { ...mockBottles[0], id: 9, name: 'Finished rum', remainingPercent: 0 };
-
-const mockCategories = [
-  { id: 1, name: 'Vodka', type: 'SPIRIT', categoryType: { name: 'SPIRIT', color: 'blue' }, desiredStock: 2 },
-  { id: 2, name: 'Gin', type: 'SPIRIT', categoryType: { name: 'SPIRIT', color: 'blue' }, desiredStock: 2 },
-];
+function mockBottles(bottles: Bottle[]) {
+  mockApiResponse('get', '/api/bottles', bottles);
+}
 
 type User = ReturnType<typeof userEvent.setup>;
 
@@ -140,6 +88,16 @@ async function confirmDeletion(user: User, index = 0) {
   await user.click(within(confirmation).getByRole('button', { name: 'common.delete' }));
 }
 
+/**
+ * The export saves the file through a temporary link: jsdom cannot download, so the
+ * link click is recorded instead. Returns the spy on that click.
+ */
+function mockDownload() {
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:bottles');
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+  return vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+}
+
 /** Reads the shortages like the sidebar badge of AdminLayout does. */
 function ShortagesBadge() {
   const { data } = useShortages();
@@ -147,30 +105,20 @@ function ShortagesBadge() {
 }
 
 beforeEach(() => {
-  vi.clearAllMocks();
-  mockApiList.mockResolvedValue(mockBottles as never);
-  mockCatList.mockResolvedValue(mockCategories as never);
-  mockApiCreate.mockResolvedValue({} as never);
-  mockApiUpdate.mockResolvedValue({} as never);
-  mockApiDelete.mockResolvedValue({} as never);
-  mockExport.mockResolvedValue(undefined);
-  mockShortagesList.mockResolvedValue([] as never);
+  mockBottles([absolut, hendricks]);
+  mockApiResponse('get', '/api/categories', [vodka, gin]);
 });
 
-afterEach(clearToasts);
+afterEach(() => {
+  clearToasts();
+  vi.restoreAllMocks();
+});
 
 describe('BottlesPage', () => {
   describe('list', () => {
-    it('renders the title and the header buttons', () => {
-      renderPage();
-      expect(screen.getByText('bottles.title')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'bottles.add' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'bottles.import' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'bottles.export' })).toBeInTheDocument();
-    });
-
     it('lists the available bottles with their details', async () => {
       await renderLoadedPage();
+      expect(screen.getByRole('heading', { level: 1, name: 'bottles.title' })).toBeInTheDocument();
       expect(screen.getByText('Hendricks')).toBeInTheDocument();
       expect(screen.getByText('Vodka')).toBeInTheDocument();
       expect(screen.getByText('units.ml(700)')).toBeInTheDocument();
@@ -189,24 +137,26 @@ describe('BottlesPage', () => {
     });
 
     it('never shows "no results" while the bottles are loading', () => {
-      mockApiList.mockReturnValue(new Promise(() => {}));
+      mockApiPending('get', '/api/bottles');
       renderPage();
       expect(screen.getByText('common.loading')).toBeInTheDocument();
       expect(screen.queryByText('common.noResults')).not.toBeInTheDocument();
     });
 
     it('shows "no results" once loaded without bottles', async () => {
-      mockApiList.mockResolvedValue([] as never);
+      mockBottles([]);
       renderPage();
       expect(await screen.findByText('common.noResults')).toBeInTheDocument();
     });
 
     it('shows a load error with a retry button', async () => {
       const user = userEvent.setup();
-      mockApiList.mockRejectedValueOnce(new Error('Failed to fetch'));
+      mockNetworkError('get', '/api/bottles');
       renderPage();
+      const retry = await screen.findByRole('button', { name: 'common.retry' });
 
-      await user.click(await screen.findByRole('button', { name: 'common.retry' }));
+      mockBottles([absolut, hendricks]);
+      await user.click(retry);
 
       expect(await screen.findByText('Absolut')).toBeInTheDocument();
     });
@@ -219,7 +169,20 @@ describe('BottlesPage', () => {
       expect(screen.queryByText('Hendricks')).not.toBeInTheDocument();
       await user.clear(screen.getByPlaceholderText('common.search'));
 
-      await user.type(screen.getByTestId('location-autocomplete'), 'bar');
+      await user.type(screen.getByRole('combobox', { name: 'bottles.filterByLocation' }), 'bar');
+      expect(screen.getByText('Absolut')).toBeInTheDocument();
+      expect(screen.queryByText('Hendricks')).not.toBeInTheDocument();
+    });
+
+    it('suggests the known locations and filters on the one picked', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const location = screen.getByRole('combobox', { name: 'bottles.filterByLocation' });
+
+      await user.type(location, 'b');
+      await user.click(screen.getByRole('option', { name: 'Bar' }));
+
+      expect(location).toHaveValue('Bar');
       expect(screen.getByText('Absolut')).toBeInTheDocument();
       expect(screen.queryByText('Hendricks')).not.toBeInTheDocument();
     });
@@ -236,10 +199,10 @@ describe('BottlesPage', () => {
 
     it('sorts the category column on the localized name', async () => {
       const user = userEvent.setup();
-      mockApiList.mockResolvedValue([
-        { ...mockBottles[0], category: { ...mockBottles[0].category, name: 'A-vodka', nameTranslations: { en: 'Zubrowka' } } },
-        { ...mockBottles[1], category: { ...mockBottles[1].category, name: 'Z-gin', nameTranslations: { en: 'Gin' } } },
-      ] as never);
+      mockBottles([
+        { ...absolut, category: { ...vodka, name: 'A-vodka', nameTranslations: { en: 'Zubrowka' } } },
+        { ...hendricks, category: { ...gin, name: 'Z-gin', nameTranslations: { en: 'Gin' } } },
+      ]);
       renderPage();
       await screen.findByText('Absolut');
 
@@ -252,7 +215,7 @@ describe('BottlesPage', () => {
     it('groups identical bottles and lists them when the group is opened', async () => {
       const user = userEvent.setup();
       const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-      mockApiList.mockResolvedValue([mockBottles[0], { ...mockBottles[0], id: 3, remainingPercent: 40 }, mockBottles[1]] as never);
+      mockBottles([absolut, { ...absolut, id: 3, remainingPercent: 40 }, hendricks]);
       try {
         renderPage();
 
@@ -270,7 +233,7 @@ describe('BottlesPage', () => {
 
     it('opens a group from the keyboard with a button that reports its state', async () => {
       const user = userEvent.setup();
-      mockApiList.mockResolvedValue([mockBottles[0], { ...mockBottles[0], id: 3 }, mockBottles[1]] as never);
+      mockBottles([absolut, { ...absolut, id: 3 }, hendricks]);
       renderPage();
       const toggle = await screen.findByRole('button', { name: /×2/ });
       expect(toggle).toHaveAttribute('aria-expanded', 'false');
@@ -284,9 +247,9 @@ describe('BottlesPage', () => {
 
     it('keeps a group open after a page change and back', async () => {
       const user = userEvent.setup();
-      const singles = Array.from({ length: 25 }, (_, index) => ({ ...mockBottles[1], id: 100 + index, name: `Bottle ${index + 1}` }));
-      const group = [{ ...mockBottles[0], id: 1 }, { ...mockBottles[0], id: 2 }];
-      mockApiList.mockResolvedValue([...singles, ...group] as never);
+      const singles = Array.from({ length: 25 }, (_, index) => ({ ...hendricks, id: 100 + index, name: `Bottle ${index + 1}` }));
+      const group = [{ ...absolut, id: 1 }, { ...absolut, id: 2 }];
+      mockBottles([...singles, ...group]);
       renderPage();
       await screen.findByText('Bottle 1');
 
@@ -301,7 +264,7 @@ describe('BottlesPage', () => {
 
     it('keeps a group open after a search hides it and shows it again', async () => {
       const user = userEvent.setup();
-      mockApiList.mockResolvedValue([mockBottles[0], { ...mockBottles[0], id: 3 }, mockBottles[1]] as never);
+      mockBottles([absolut, { ...absolut, id: 3 }, hendricks]);
       renderPage();
       await user.click(await screen.findByText('×2'));
 
@@ -314,7 +277,7 @@ describe('BottlesPage', () => {
 
     it('closes an open group on a second click', async () => {
       const user = userEvent.setup();
-      mockApiList.mockResolvedValue([mockBottles[0], { ...mockBottles[0], id: 3 }] as never);
+      mockBottles([absolut, { ...absolut, id: 3 }]);
       renderPage();
       await user.click(await screen.findByText('×2'));
       expect(screen.getAllByText('Absolut')).toHaveLength(3);
@@ -326,7 +289,7 @@ describe('BottlesPage', () => {
 
     it('keeps the empty bottles in a collapsed history', async () => {
       const user = userEvent.setup();
-      mockApiList.mockResolvedValue([...mockBottles, emptyBottle] as never);
+      mockBottles([absolut, hendricks, emptyBottle]);
       await renderLoadedPage();
       expect(screen.queryByText('Finished rum')).not.toBeInTheDocument();
 
@@ -339,7 +302,7 @@ describe('BottlesPage', () => {
 
   describe('form', () => {
     it('disables the add button while no category is loaded', async () => {
-      mockCatList.mockResolvedValue([] as never);
+      mockApiResponse('get', '/api/categories', []);
       await renderLoadedPage();
 
       const addButton = screen.getByRole('button', { name: 'bottles.add' });
@@ -350,13 +313,14 @@ describe('BottlesPage', () => {
     it('creates a bottle in the first category and confirms with a toast', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
+      const created = captureRequest('post', '/api/bottles');
       await openCreateForm(user);
 
       await user.type(nameInput(), 'New Whisky');
       await user.click(within(dialog()).getByLabelText('bottles.usableAsApero'));
       await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
 
-      await waitFor(() => expect(mockApiCreate).toHaveBeenCalledWith({
+      expect(await created.body).toEqual({
         name: 'New Whisky',
         categoryId: 1,
         purchasePrice: null,
@@ -368,7 +332,7 @@ describe('BottlesPage', () => {
         isApero: true,
         isDigestif: false,
         quantity: 1,
-      }));
+      });
       expect(await screen.findByText('bottles.created')).toBeInTheDocument();
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
@@ -376,6 +340,7 @@ describe('BottlesPage', () => {
     it('sends every field of the form', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
+      const created = captureRequest('post', '/api/bottles');
       await openCreateForm(user);
       const form = within(dialog());
 
@@ -390,7 +355,7 @@ describe('BottlesPage', () => {
       await user.click(form.getByLabelText('bottles.usableAsDigestif'));
       await user.click(form.getByRole('button', { name: 'common.save' }));
 
-      await waitFor(() => expect(mockApiCreate).toHaveBeenCalledWith({
+      expect(await created.body).toEqual({
         name: 'Tanqueray',
         categoryId: 2,
         purchasePrice: 32.5,
@@ -402,12 +367,13 @@ describe('BottlesPage', () => {
         isApero: false,
         isDigestif: true,
         quantity: 1,
-      }));
+      });
     });
 
     it('creates several identical bottles at once', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
+      const created = captureRequest('post', '/api/bottles');
       await openCreateForm(user);
 
       await user.type(nameInput(), 'Rum');
@@ -416,12 +382,13 @@ describe('BottlesPage', () => {
       expect(within(dialog()).getByText('bottles.quantityHint(3)')).toBeInTheDocument();
       await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
 
-      await waitFor(() => expect(mockApiCreate).toHaveBeenCalledWith(expect.objectContaining({ name: 'Rum', quantity: 3 })));
+      expect(await created.body).toMatchObject({ name: 'Rum', quantity: 3 });
     });
 
     it('sends a single request on a fast double click on save', async () => {
       const user = userEvent.setup();
-      mockApiCreate.mockReturnValue(new Promise(() => {}));
+      mockApiPending('post', '/api/bottles');
+      const created = captureRequest('post', '/api/bottles');
       await renderLoadedPage();
       await openCreateForm(user);
       await user.type(nameInput(), 'Rum');
@@ -431,46 +398,50 @@ describe('BottlesPage', () => {
       fireEvent.click(save);
 
       await waitFor(() => expect(save).toBeDisabled());
-      expect(mockApiCreate).toHaveBeenCalledTimes(1);
+      expect(created.count()).toBe(1);
     });
 
     it('does not submit "save and duplicate" when the name is empty', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
+      const created = captureRequest('post', '/api/bottles');
       await openCreateForm(user);
 
       await user.click(within(dialog()).getByRole('button', { name: 'bottles.saveDuplicate' }));
 
-      expect(mockApiCreate).not.toHaveBeenCalled();
+      expect(created.count()).toBe(0);
       expect((nameInput() as HTMLInputElement).validity.valueMissing).toBe(true);
     });
 
     it('creates the bottle and keeps the form open on "save and duplicate"', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
+      const created = captureRequest('post', '/api/bottles');
       await openCreateForm(user);
 
       await user.type(nameInput(), 'New Whisky');
       await user.click(within(dialog()).getByRole('button', { name: 'bottles.saveDuplicate' }));
 
-      await waitFor(() => expect(mockApiCreate).toHaveBeenCalledWith(expect.objectContaining({ name: 'New Whisky', categoryId: 1 })));
+      expect(await created.body).toMatchObject({ name: 'New Whisky', categoryId: 1 });
+      expect(await screen.findByText('bottles.created')).toBeInTheDocument();
       expect(within(dialog()).getByDisplayValue('New Whisky')).toBeInTheDocument();
 
       // The intent is reset: a plain save afterwards closes the form.
       await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
       await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-      expect(mockApiCreate).toHaveBeenCalledTimes(2);
+      expect(created.count()).toBe(2);
     });
 
     it('pressing Enter in the name field saves and closes the form', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
+      const created = captureRequest('post', '/api/bottles');
       await openCreateForm(user);
 
       await user.type(nameInput(), 'New Whisky{Enter}');
 
-      await waitFor(() => expect(mockApiCreate).toHaveBeenCalledTimes(1));
       await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      expect(created.count()).toBe(1);
     });
 
     it('opens the edit form filled with the bottle', async () => {
@@ -490,19 +461,22 @@ describe('BottlesPage', () => {
     it('updates a bottle without a quantity and confirms with a toast', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
+      const updated = captureRequest('put', '/api/bottles/:id');
       await user.click(screen.getAllByRole('button', { name: 'common.edit' })[0]);
 
       await user.clear(nameInput());
       await user.type(nameInput(), 'Absolut Elyx');
       await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
 
-      await waitFor(() => expect(mockApiUpdate).toHaveBeenCalledWith(1, expect.objectContaining({
+      expect((await updated.url).pathname).toBe('/api/bottles/1');
+      const body = await updated.body;
+      expect(body).toMatchObject({
         name: 'Absolut Elyx',
         purchasePrice: 25,
         alcoholPercentage: 40,
         location: 'Bar',
-      })));
-      expect(mockApiUpdate.mock.calls[0][1]).not.toHaveProperty('quantity');
+      });
+      expect(body).not.toHaveProperty('quantity');
       expect(await screen.findByText('bottles.updated')).toBeInTheDocument();
     });
 
@@ -510,14 +484,15 @@ describe('BottlesPage', () => {
       const user = userEvent.setup();
       renderWithFeedback(<><BottlesPage /><ShortagesBadge /></>);
       await screen.findByText('Absolut');
-      await waitFor(() => expect(mockShortagesList).toHaveBeenCalledTimes(1));
-      mockShortagesList.mockResolvedValue([{ categoryId: 1 }] as never);
+      await waitFor(() => expect(screen.getByTestId('shortages-badge')).toHaveTextContent('0'));
+      mockApiResponse('get', '/api/shortages', [buildShortage({ category: { id: 1 } })]);
+      const shortagesReloaded = captureRequest('get', '/api/shortages');
 
       await user.click(screen.getAllByRole('button', { name: 'common.edit' })[0]);
       await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
 
       await waitFor(() => expect(screen.getByTestId('shortages-badge')).toHaveTextContent('1'));
-      expect(mockShortagesList).toHaveBeenCalledTimes(2);
+      expect(shortagesReloaded.count()).toBe(1);
     });
   });
 
@@ -525,40 +500,44 @@ describe('BottlesPage', () => {
     it('deletes a bottle after confirmation and confirms with a toast', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
+      const deleted = captureRequest('delete', '/api/bottles/:id');
 
       await confirmDeletion(user);
 
-      await waitFor(() => expect(mockApiDelete).toHaveBeenCalledWith(1));
       expect(await screen.findByText('bottles.deleted')).toBeInTheDocument();
+      expect((await deleted.url).pathname).toBe('/api/bottles/1');
     });
 
     it('deletes an empty bottle from the history', async () => {
       const user = userEvent.setup();
-      mockApiList.mockResolvedValue([emptyBottle] as never);
+      mockBottles([emptyBottle]);
+      const deleted = captureRequest('delete', '/api/bottles/:id');
       renderPage();
       await user.click(await screen.findByRole('button', { name: /bottles\.historyTitle/ }));
 
       await confirmDeletion(user);
 
-      await waitFor(() => expect(mockApiDelete).toHaveBeenCalledWith(9));
+      expect((await deleted.url).pathname).toBe('/api/bottles/9');
     });
 
     it('does not delete when the dialog is cancelled', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
+      const deleted = captureRequest('delete', '/api/bottles/:id');
 
       await user.click(screen.getAllByRole('button', { name: 'common.delete' })[0]);
       await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.cancel' }));
 
-      expect(mockApiDelete).not.toHaveBeenCalled();
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      expect(deleted.count()).toBe(0);
     });
 
     it('shows the backend message and the cocktails of a bottle in use', async () => {
       const user = userEvent.setup();
-      mockApiDelete.mockRejectedValue(new ApiError(409, 'This bottle is used by cocktails', {
+      mockApiResponse('delete', '/api/bottles/:id', {
         error: 'This bottle is used by cocktails',
         details: { cocktails: [{ id: 4, name: 'Moscow Mule', removedLines: 1 }], bottles: [] },
-      }));
+      }, 409);
       await renderLoadedPage();
 
       await confirmDeletion(user);
@@ -586,35 +565,43 @@ describe('BottlesPage', () => {
       const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
       renderWithFeedback(<BottlesPage />, { queryClient });
       await screen.findByText('Absolut');
+      const reloaded = captureRequest('get', '/api/bottles');
 
       await user.click(screen.getByRole('button', { name: 'bottles.import' }));
       await user.click(screen.getByText('finish-import'));
 
       const refreshed = invalidate.mock.calls.map(([filters]) => filters?.queryKey);
       expect(refreshed).toEqual([qk.bottles, qk.shortages, qk.categories, qk.menus, qk.availability, qk.categoryTypes]);
-      await waitFor(() => expect(mockApiList).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(reloaded.count()).toBe(1));
     });
 
     it('exports the filtered bottles in the chosen format', async () => {
       const user = userEvent.setup();
+      const download = mockDownload();
       await renderLoadedPage();
+      const exported = captureRequest('get', '/api/bottles/export');
       await user.type(screen.getByPlaceholderText('common.search'), 'abs');
 
       await user.click(screen.getByRole('button', { name: 'bottles.export' }));
       await user.click(screen.getByText('bottles.exportCsv'));
 
-      await waitFor(() => expect(mockExport).toHaveBeenCalledWith('csv', { categoryId: undefined, search: 'abs', location: undefined }));
+      const query = (await exported.url).searchParams;
+      expect(Object.fromEntries(query)).toEqual({ format: 'csv', search: 'abs' });
+      await waitFor(() => expect(download).toHaveBeenCalledTimes(1));
       expect(screen.queryByText('bottles.exportJson')).not.toBeInTheDocument();
     });
 
     it('exports in JSON', async () => {
       const user = userEvent.setup();
+      const download = mockDownload();
       await renderLoadedPage();
+      const exported = captureRequest('get', '/api/bottles/export');
 
       await user.click(screen.getByRole('button', { name: 'bottles.export' }));
       await user.click(screen.getByText('bottles.exportJson'));
 
-      await waitFor(() => expect(mockExport).toHaveBeenCalledWith('json', expect.any(Object)));
+      expect((await exported.url).searchParams.get('format')).toBe('json');
+      await waitFor(() => expect(download).toHaveBeenCalledTimes(1));
       // The menu closes: its button takes the focus back.
       expect(screen.getByRole('button', { name: 'bottles.export' })).toHaveFocus();
     });
@@ -657,13 +644,13 @@ describe('BottlesPage', () => {
 
     it('shows an export failure in an error toast', async () => {
       const user = userEvent.setup();
-      mockExport.mockRejectedValue(new Error('Network down'));
+      mockApiError('get', '/api/bottles/export', 500, 'Export failed');
       await renderLoadedPage();
 
       await user.click(screen.getByRole('button', { name: 'bottles.export' }));
       await user.click(screen.getByText('bottles.exportJson'));
 
-      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Network down'));
+      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Export failed'));
     });
   });
 });

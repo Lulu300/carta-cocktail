@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '../../test/test-utils';
 import userEvent from '@testing-library/user-event';
-import { QueryClient } from '@tanstack/react-query';
+import { createQueryClient } from '../../queries/queryClient';
 import type { CocktailExportFormat, ImportPreviewResponse } from '../../types';
 import ImportCocktailWizard from './ImportCocktailWizard';
 
@@ -216,9 +216,12 @@ describe('ImportCocktailWizard', () => {
 
   it('loads the lists once for a batch of 10 recipes, however long it takes', async () => {
     const names = Array.from({ length: 10 }, (_, i) => `Cocktail ${i + 1}`);
-    // The app's stale time (createQueryClient): a step that loaded the lists on
-    // each mount would reload them once the cache has gone stale
-    const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: false } } });
+    // The app's client and stale time, without retries: a step that loaded the
+    // lists on each mount would reload them once the cache has gone stale
+    const queryClient = createQueryClient();
+    const appQueryOptions = queryClient.getDefaultOptions().queries;
+    queryClient.setDefaultOptions({ queries: { ...appQueryOptions, retry: false } });
+    const staleTime = Number(appQueryOptions?.staleTime);
     render(<ImportCocktailWizard onClose={vi.fn()} />, { queryClient });
 
     try {
@@ -227,7 +230,7 @@ describe('ImportCocktailWizard', () => {
       await goToConfirmation();
       await confirmImport();
       for (let i = 1; i < names.length; i++) {
-        vi.setSystemTime(Date.now() + 31_000);
+        vi.setSystemTime(Date.now() + staleTime + 1_000);
         await goToConfirmationFromResolve();
         await confirmImport();
       }

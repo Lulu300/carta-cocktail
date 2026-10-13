@@ -3,41 +3,15 @@ import userEvent from '@testing-library/user-event';
 import { createTestQueryClient, fireEvent, screen, waitFor, within } from '../../test/test-utils';
 import { clearToasts, renderWithFeedback } from '../../test/feedback';
 import { qk } from '../../queries/keys';
+import { buildCategory, buildCategoryType } from '../../test/factories';
+import { captureRequest, mockApiError, mockApiPending, mockApiResponse } from '../../test/msw/utils';
 import CategoriesPage from './CategoriesPage';
 
-vi.mock('../../services/api', async () => {
-  const actual = await vi.importActual<typeof import('../../services/api')>('../../services/api');
-  return {
-    ApiError: actual.ApiError,
-    categories: { list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
-    categoryTypes: { list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
-  };
-});
-
-vi.mock('../../hooks/useLocalizedName', () => ({
-  useLocalizedName: () => (entity: { name: string }) => entity.name,
-}));
-
-import { ApiError, categories as api, categoryTypes as ctApi } from '../../services/api';
-
-const mockApiList = vi.mocked(api.list);
-const mockApiCreate = vi.mocked(api.create);
-const mockApiUpdate = vi.mocked(api.update);
-const mockApiDelete = vi.mocked(api.delete);
-const mockCtApiList = vi.mocked(ctApi.list);
-const mockCtApiCreate = vi.mocked(ctApi.create);
-const mockCtApiUpdate = vi.mocked(ctApi.update);
-const mockCtApiDelete = vi.mocked(ctApi.delete);
-
-const mockCategories = [
-  { id: 1, name: 'Vodka', type: 'SPIRIT', categoryType: { name: 'SPIRIT', color: 'blue', nameTranslations: null }, desiredStock: 2, minimumPercent: 30, _count: { bottles: 3 } },
-  { id: 2, name: 'Grenadine', type: 'SYRUP', categoryType: { name: 'SYRUP', color: 'red', nameTranslations: null }, desiredStock: 1, minimumPercent: 30, _count: { bottles: 1 } },
-];
-const mockCatTypes = [
-  { name: 'SPIRIT', color: 'blue', nameTranslations: null, _count: { categories: 1 } },
-  { name: 'SYRUP', color: 'red', nameTranslations: null, _count: { categories: 1 } },
-  { name: 'GARNISH', color: 'green', nameTranslations: null, _count: { categories: 0 } },
-];
+const spirit = buildCategoryType({ name: 'SPIRIT', color: 'blue', _count: { categories: 1 } });
+const syrup = buildCategoryType({ name: 'SYRUP', color: 'red', _count: { categories: 1 } });
+const garnish = buildCategoryType({ name: 'GARNISH', color: 'green', _count: { categories: 0 } });
+const vodka = buildCategory({ id: 1, name: 'Vodka', type: 'SPIRIT', categoryType: spirit, desiredStock: 2, _count: { bottles: 3 } });
+const grenadine = buildCategory({ id: 2, name: 'Grenadine', type: 'SYRUP', categoryType: syrup, _count: { bottles: 1 } });
 
 type User = ReturnType<typeof userEvent.setup>;
 
@@ -60,29 +34,16 @@ async function openTypesManager(user: User) {
 }
 
 beforeEach(() => {
-  vi.clearAllMocks();
-  mockApiList.mockResolvedValue(mockCategories as never);
-  mockCtApiList.mockResolvedValue(mockCatTypes as never);
-  mockApiCreate.mockResolvedValue({} as never);
-  mockApiUpdate.mockResolvedValue({} as never);
-  mockApiDelete.mockResolvedValue({} as never);
-  mockCtApiCreate.mockResolvedValue({} as never);
-  mockCtApiUpdate.mockResolvedValue({} as never);
-  mockCtApiDelete.mockResolvedValue({} as never);
+  mockApiResponse('get', '/api/categories', [vodka, grenadine]);
+  mockApiResponse('get', '/api/category-types', [spirit, syrup, garnish]);
 });
 
 afterEach(clearToasts);
 
 describe('CategoriesPage', () => {
-  it('renders the title and the action buttons', () => {
-    renderPage();
-    expect(screen.getByText('categories.title')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'categories.add' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'categoryTypes.manage' })).toBeInTheDocument();
-  });
-
   it('lists the categories with their stock settings and bottle count', async () => {
     await renderLoadedPage();
+    expect(screen.getByRole('heading', { name: 'categories.title' })).toBeInTheDocument();
     expect(screen.getByText('Grenadine')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
@@ -90,7 +51,7 @@ describe('CategoriesPage', () => {
   });
 
   it('never shows "no results" while the categories are loading', () => {
-    mockApiList.mockReturnValue(new Promise(() => {}));
+    mockApiPending('get', '/api/categories');
     renderPage();
 
     expect(screen.getByText('common.loading')).toBeInTheDocument();
@@ -98,7 +59,7 @@ describe('CategoriesPage', () => {
   });
 
   it('shows "no results" once loaded without categories', async () => {
-    mockApiList.mockResolvedValue([] as never);
+    mockApiResponse('get', '/api/categories', []);
     renderPage();
     expect(await screen.findByText('common.noResults')).toBeInTheDocument();
   });
@@ -117,6 +78,7 @@ describe('CategoriesPage', () => {
     it('creates a category with the first type by default and confirms with a toast', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
+      const created = captureRequest('post', '/api/categories');
       await user.click(screen.getByRole('button', { name: 'categories.add' }));
 
       await user.type(within(categoryDialog()).getByLabelText(/categories\.name/), 'Rum');
@@ -125,13 +87,13 @@ describe('CategoriesPage', () => {
       await user.type(desiredStock, '3');
       await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
 
-      await waitFor(() => expect(mockApiCreate).toHaveBeenCalledWith({
+      expect(await created.body).toEqual({
         name: 'Rum',
         type: 'SPIRIT',
         desiredStock: 3,
         minimumPercent: 30,
         nameTranslations: null,
-      }));
+      });
       expect(await screen.findByText('categories.created')).toBeInTheDocument();
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
@@ -139,6 +101,7 @@ describe('CategoriesPage', () => {
     it('creates a category of a custom type, upper-cased', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
+      const created = captureRequest('post', '/api/categories');
       await user.click(screen.getByRole('button', { name: 'categories.add' }));
 
       await user.type(within(categoryDialog()).getByLabelText(/categories\.name/), 'Tonic');
@@ -146,18 +109,19 @@ describe('CategoriesPage', () => {
       await user.type(within(categoryDialog()).getByPlaceholderText('categories.customType'), 'mixer');
       await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
 
-      await waitFor(() => expect(mockApiCreate).toHaveBeenCalledWith({
+      expect(await created.body).toEqual({
         name: 'Tonic',
         type: 'MIXER',
         desiredStock: 1,
         minimumPercent: 30,
         nameTranslations: null,
-      }));
+      });
     });
 
     it('does not send a blank custom type', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
+      const created = captureRequest('post', '/api/categories');
       await user.click(screen.getByRole('button', { name: 'categories.add' }));
 
       await user.type(within(categoryDialog()).getByLabelText(/categories\.name/), 'Tonic');
@@ -165,13 +129,14 @@ describe('CategoriesPage', () => {
       await user.type(within(categoryDialog()).getByPlaceholderText('categories.customType'), '   ');
       await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
 
-      expect(mockApiCreate).not.toHaveBeenCalled();
+      expect(created.count()).toBe(0);
       expect(categoryDialog()).toBeInTheDocument();
     });
 
     it('sends a single request on a fast double click on save', async () => {
       const user = userEvent.setup();
-      mockApiCreate.mockReturnValue(new Promise(() => {}));
+      mockApiPending('post', '/api/categories');
+      const created = captureRequest('post', '/api/categories');
       await renderLoadedPage();
       await user.click(screen.getByRole('button', { name: 'categories.add' }));
       await user.type(within(categoryDialog()).getByLabelText(/categories\.name/), 'Rum');
@@ -181,12 +146,13 @@ describe('CategoriesPage', () => {
       fireEvent.click(save);
 
       await waitFor(() => expect(save).toBeDisabled());
-      expect(mockApiCreate).toHaveBeenCalledTimes(1);
+      expect(created.count()).toBe(1);
     });
 
     it('updates a category and confirms with a toast', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
+      const updated = captureRequest('put', '/api/categories/:id');
       await user.click(screen.getAllByRole('button', { name: 'common.edit' })[0]);
 
       const name = within(categoryDialog()).getByDisplayValue('Vodka');
@@ -194,21 +160,22 @@ describe('CategoriesPage', () => {
       await user.type(name, 'Gin');
       await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
 
-      await waitFor(() => expect(mockApiUpdate).toHaveBeenCalledWith(1, {
+      expect((await updated.url).pathname).toBe('/api/categories/1');
+      expect(await updated.body).toEqual({
         name: 'Gin',
         type: 'SPIRIT',
         desiredStock: 2,
         minimumPercent: 30,
         nameTranslations: null,
-      }));
+      });
       expect(await screen.findByText('categories.updated')).toBeInTheDocument();
     });
 
     it('shows a type missing from the list as a custom type', async () => {
       const user = userEvent.setup();
-      mockApiList.mockResolvedValue([
-        { id: 3, name: 'Water', type: 'UNKNOWN', categoryType: null, desiredStock: 1, minimumPercent: 30, _count: { bottles: 0 } },
-      ] as never);
+      mockApiResponse('get', '/api/categories', [
+        buildCategory({ name: 'Water', type: 'UNKNOWN', categoryType: null, _count: { bottles: 0 } }),
+      ]);
       renderPage();
       await screen.findByText('Water');
 
@@ -248,32 +215,36 @@ describe('CategoriesPage', () => {
       const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
       renderWithFeedback(<CategoriesPage />, { queryClient });
       await screen.findByText('Vodka');
+      const deleted = captureRequest('delete', '/api/categories/:id');
+      const reloaded = captureRequest('get', '/api/categories');
 
       await deleteFirstCategory(user);
 
-      await waitFor(() => expect(mockApiDelete).toHaveBeenCalledWith(1));
       expect(await screen.findByText('categories.deleted')).toBeInTheDocument();
+      expect((await deleted.url).pathname).toBe('/api/categories/1');
       const refreshed = invalidate.mock.calls.map(([filters]) => filters?.queryKey);
       expect(refreshed).toEqual([qk.categories, qk.categoryTypes, qk.bottles, qk.shortages, qk.availability]);
-      await waitFor(() => expect(mockApiList).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(reloaded.count()).toBe(1));
     });
 
     it('does not delete when the dialog is cancelled', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
+      const deleted = captureRequest('delete', '/api/categories/:id');
 
       await user.click(screen.getAllByRole('button', { name: 'common.delete' })[0]);
       await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.cancel' }));
 
-      expect(mockApiDelete).not.toHaveBeenCalled();
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      expect(deleted.count()).toBe(0);
     });
 
     it('shows the backend message and the bottles of a category that still has some', async () => {
       const user = userEvent.setup();
-      mockApiDelete.mockRejectedValue(new ApiError(409, 'This category still has bottles', {
+      mockApiResponse('delete', '/api/categories/:id', {
         error: 'This category still has bottles',
         details: { cocktails: [], bottles: [{ id: 7, name: 'Absolut' }] },
-      }));
+      }, 409);
       await renderLoadedPage();
 
       await deleteFirstCategory(user);
@@ -298,12 +269,13 @@ describe('CategoriesPage', () => {
     it('creates a type, upper-cased, and empties the form', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
+      const created = captureRequest('post', '/api/category-types');
       const manager = await openTypesManager(user);
 
       await user.type(within(manager).getByPlaceholderText('GARNISH, MIXER...'), 'mixer');
       await user.click(within(manager).getByRole('button', { name: 'common.create' }));
 
-      await waitFor(() => expect(mockCtApiCreate).toHaveBeenCalledWith({ name: 'MIXER', nameTranslations: null, color: 'gray' }));
+      expect(await created.body).toEqual({ name: 'MIXER', nameTranslations: null, color: 'gray' });
       expect(await screen.findByText('categoryTypes.created')).toBeInTheDocument();
       expect(within(manager).getByPlaceholderText('GARNISH, MIXER...')).toHaveValue('');
     });
@@ -311,17 +283,19 @@ describe('CategoriesPage', () => {
     it('does not create a type without a name', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
+      const created = captureRequest('post', '/api/category-types');
       const manager = await openTypesManager(user);
 
       await user.type(within(manager).getByPlaceholderText('GARNISH, MIXER...'), '  ');
       await user.click(within(manager).getByRole('button', { name: 'common.create' }));
 
-      expect(mockCtApiCreate).not.toHaveBeenCalled();
+      expect(created.count()).toBe(0);
     });
 
     it('edits a type: name locked, translations open, color and translations sent', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
+      const updated = captureRequest('put', '/api/category-types/:name');
       const manager = await openTypesManager(user);
 
       await user.click(within(manager).getAllByRole('button', { name: 'common.edit' })[0]);
@@ -330,10 +304,11 @@ describe('CategoriesPage', () => {
       await user.type(within(manager).getByLabelText('Français'), 'Spiritueux');
       await user.click(within(manager).getByRole('button', { name: 'common.save' }));
 
-      await waitFor(() => expect(mockCtApiUpdate).toHaveBeenCalledWith('SPIRIT', {
+      expect((await updated.url).pathname).toBe('/api/category-types/SPIRIT');
+      expect(await updated.body).toEqual({
         nameTranslations: { fr: 'Spiritueux' },
         color: 'blue',
-      }));
+      });
       expect(await screen.findByText('categoryTypes.updated')).toBeInTheDocument();
       expect(within(manager).getByText('categoryTypes.add')).toBeInTheDocument();
     });
@@ -354,6 +329,7 @@ describe('CategoriesPage', () => {
     it('sends the color picked for a new type', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
+      const created = captureRequest('post', '/api/category-types');
       const manager = await openTypesManager(user);
 
       await user.type(within(manager).getByPlaceholderText('GARNISH, MIXER...'), 'bitter');
@@ -361,12 +337,13 @@ describe('CategoriesPage', () => {
       expect(within(manager).getByRole('button', { name: 'colors.red' })).toHaveAttribute('aria-pressed', 'true');
       await user.click(within(manager).getByRole('button', { name: 'common.create' }));
 
-      await waitFor(() => expect(mockCtApiCreate).toHaveBeenCalledWith({ name: 'BITTER', nameTranslations: null, color: 'red' }));
+      expect(await created.body).toEqual({ name: 'BITTER', nameTranslations: null, color: 'red' });
     });
 
     it('deletes an unused type after confirmation', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
+      const deleted = captureRequest('delete', '/api/category-types/:name');
       const manager = await openTypesManager(user);
 
       await user.click(within(manager).getByRole('button', { name: 'common.delete' }));
@@ -374,8 +351,8 @@ describe('CategoriesPage', () => {
       expect(confirmation).toHaveAccessibleDescription('categoryTypes.confirmDelete');
       await user.click(within(confirmation).getByRole('button', { name: 'common.delete' }));
 
-      await waitFor(() => expect(mockCtApiDelete).toHaveBeenCalledWith('GARNISH'));
       expect(await screen.findByText('categoryTypes.deleted')).toBeInTheDocument();
+      expect((await deleted.url).pathname).toBe('/api/category-types/GARNISH');
     });
 
     it('empties the form when the type being edited is deleted', async () => {
@@ -407,7 +384,7 @@ describe('CategoriesPage', () => {
 
     it('shows the backend message in a toast when a type cannot be deleted', async () => {
       const user = userEvent.setup();
-      mockCtApiDelete.mockRejectedValue(new ApiError(400, 'Type is in use by categories'));
+      mockApiError('delete', '/api/category-types/:name', 400, 'Type is in use by categories');
       await renderLoadedPage();
       const manager = await openTypesManager(user);
 
