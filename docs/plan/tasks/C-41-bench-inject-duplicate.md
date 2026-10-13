@@ -44,6 +44,7 @@ pr:
 ## Points d'attention
 
 - Seul le message de C-18 est reconnu. Un saut vers v1.8.0 à v1.11.0 avec le doublon s'arrête sur l'erreur Prisma `P3018`, sans ce message : ce refus n'est pas reconnu, et le contrôle de la base reste le contrôle strict (SHA-256 inchangé), qui échoue. Le chemin à documenter est donc un saut direct d'une version antérieure à v1.8.0 vers une version qui livre C-18 (v1.12.0 et après, ou `local`).
+- Aujourd'hui, `allowedFailures` et `markExpected` (`lib/expectations.mjs`) ne s'appliquent qu'à `step.checks` (`runStep` dans `lib/bench.mjs`). `unexpectedFailures([...step.actions, ...step.checks])` compte toujours une action en statut `failed`, par exemple `checkDatabaseCopy` (`v1.6.0 Before 4`). Pour autoriser cet échec en conforme (point 3), il faut étendre ce mécanisme aux actions, avec la raison du doublon injecté.
 - Le jeu d'essai reste hors du dépôt, et le rapport ne contient que des nombres.
 
 ## Journal
