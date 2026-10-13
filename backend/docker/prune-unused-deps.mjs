@@ -114,6 +114,19 @@ function removeDanglingBinLinks(dirs) {
   }
 }
 
+// Only the scope folders ("node_modules/@radix-ui") of removed packages, once
+// empty: those that npm itself leaves empty are not this script's business.
+function removeEmptiedScopeFolders(removedDirs) {
+  const scopes = new Set(
+    removedDirs
+      .filter((dir) => path.basename(path.dirname(dir)).startsWith('@'))
+      .map((dir) => path.dirname(dir)),
+  );
+  for (const scope of scopes) {
+    if (existsSync(scope) && readdirSync(scope).length === 0) rmSync(scope, { recursive: true });
+  }
+}
+
 const cuts = parseCuts(process.argv.slice(2));
 const installed = listInstalled(ROOT);
 const { reachable, usedCuts } = findReachable(installed, cuts);
@@ -131,6 +144,7 @@ const unused = [...installed].filter((dir) => !reachable.has(dir)).sort();
 for (const dir of unused) {
   rmSync(dir, { recursive: true, force: true });
 }
+removeEmptiedScopeFolders(unused);
 removeDanglingBinLinks([...reachable]);
 console.log(`Removed ${unused.length} unused packages:`);
 console.log(unused.map((dir) => `  ${dir}`).join('\n'));

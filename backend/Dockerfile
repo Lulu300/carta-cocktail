@@ -52,6 +52,10 @@ RUN node /tmp/prune-unused-deps.mjs \
     prisma:mysql2 \
     prisma:postgres \
     better-sqlite3:prebuild-install
+# Fails the build, on every platform, when a Prisma update makes the CLI load at
+# startup a package cut above: otherwise only the first container start would show it.
+# Without network, as in a container that cannot reach the registry.
+RUN --network=none CHECKPOINT_DISABLE=1 node_modules/.bin/prisma --version
 
 FROM node:24.21-alpine AS runtime
 # tini forwards SIGTERM to the entrypoint, then to Node once the entrypoint has exec'd it
