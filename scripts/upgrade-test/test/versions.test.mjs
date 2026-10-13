@@ -1,8 +1,19 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
-  compareVersions, defaultLocalVersion, hooksForJump, latestHookVersion, parseUpgradePath, profileOf, releaseOf,
+  checkDuplicateInjectionPath, compareVersions, defaultLocalVersion, hooksForJump, latestHookVersion, parseUpgradePath,
+  profileOf, releaseOf,
 } from '../lib/versions.mjs';
+
+const HOOKS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'hooks');
+
+async function loadRealHookFiles() {
+  const files = fs.readdirSync(HOOKS_DIR).filter((file) => file.endsWith('.mjs'));
+  return Promise.all(files.map(async (file) => (await import(pathToFileURL(path.join(HOOKS_DIR, file)))).default));
+}
 
 const HOOKS = [
   { version: '1.6.0', profile: { migrations: true } },
@@ -92,4 +103,22 @@ test('profileOf adds up the refusals of the releases up to the version', () => {
 
 test('latestHookVersion picks the newest hook file', () => {
   assert.equal(latestHookVersion(HOOKS), '1.6.0');
+});
+
+test('checkDuplicateInjectionPath accepts a path that starts before v1.8.0', async () => {
+  const hookFiles = await loadRealHookFiles();
+  for (const text of ['1.4.0,local', '1.7.0,1.8.0', '1.4.0,1.6.0,local']) {
+    assert.doesNotThrow(() => checkDuplicateInjectionPath(parseUpgradePath(text, { hookFiles }), hookFiles), text);
+  }
+});
+
+test('checkDuplicateInjectionPath refuses a path that starts at v1.8.0 or later', async () => {
+  const hookFiles = await loadRealHookFiles();
+  for (const [text, first] of [['1.8.0,local', '1.8.0'], ['1.8.0-rc.1,1.9.0', '1.8.0-rc.1'], ['1.11.0,local', '1.11.0']]) {
+    assert.throws(
+      () => checkDuplicateInjectionPath(parseUpgradePath(text, { hookFiles }), hookFiles),
+      new RegExp(`^Error: --inject-duplicate needs a path that starts before v1\\.8\\.0: .*first start \\(${first.replaceAll('.', '\\.')}\\)`),
+      text,
+    );
+  }
 });

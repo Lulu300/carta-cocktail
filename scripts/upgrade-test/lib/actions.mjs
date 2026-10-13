@@ -227,11 +227,12 @@ const ACTIONS = {
 export async function runAction(ctx, hook) {
   const run = ACTIONS[hook.action];
   if (!run) throw new Error(`Unknown action "${hook.action}" in the hooks of v${ctx.hooksVersion}`);
+  const result = { step: `v${ctx.hooksVersion} ${hook.step}`, action: hook.action, note: hook.note };
   try {
     const { status, detail } = await run(ctx, hook);
-    return { step: `v${ctx.hooksVersion} ${hook.step}`, note: hook.note, status, detail };
+    return { ...result, status, detail };
   } catch (error) {
-    return { step: `v${ctx.hooksVersion} ${hook.step}`, note: hook.note, status: 'failed', detail: error.message };
+    return { ...result, status: 'failed', detail: error.message };
   }
 }
 

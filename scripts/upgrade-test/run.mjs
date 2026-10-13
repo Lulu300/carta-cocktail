@@ -8,11 +8,12 @@ import { parseArgs } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { BenchRun } from './lib/bench.mjs';
 import { cleanupAll, cleanupRun, workRoot } from './lib/cleanup.mjs';
+import { hasUniqueCategoryNameIndex } from './lib/database.mjs';
 import {
   buildImage, ensureHelperImage, pullImage, remoteDigest, RESOURCE_PREFIX, serverPlatform,
 } from './lib/docker.mjs';
 import { renderReport } from './lib/report.mjs';
-import { parseUpgradePath } from './lib/versions.mjs';
+import { checkDuplicateInjectionPath, parseUpgradePath } from './lib/versions.mjs';
 
 const BENCH_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(BENCH_DIR, '../..');
@@ -36,6 +37,8 @@ const USAGE = `Usage: node scripts/upgrade-test/run.mjs --fixture <dir> --layout
                          after the newest hook file and the newest version of the path)
   --report-dir <dir>     default <fixture>/../upgrade-test-reports/<date>/
   --timeout <seconds>    wait for each backend start (default 300)
+  --inject-duplicate     add to the working copy a category with the name of an existing one, which the
+                         schema_integrity migration (v1.8.0) refuses; the path must start before v1.8.0
   --keep                 keep the containers, volumes and work folder of a failed run
   --clean-all            remove every resource left by earlier runs (${RESOURCE_PREFIX}*) and their
                          work folders, then exit`;
@@ -50,6 +53,7 @@ function parseCli() {
       'local-version': { type: 'string' },
       'report-dir': { type: 'string' },
       timeout: { type: 'string', default: '300' },
+      'inject-duplicate': { type: 'boolean', default: false },
       keep: { type: 'boolean', default: false },
       'clean-all': { type: 'boolean', default: false },
       help: { type: 'boolean', default: false },
@@ -116,6 +120,14 @@ function resolveImages(steps, hookFiles) {
   return images;
 }
 
+/** --inject-duplicate: a fixture taken from a v1.8.0 or newer instance cannot hold a duplicate name. */
+function checkFixtureAcceptsDuplicate(fixtureDir) {
+  if (hasUniqueCategoryNameIndex(fixtureDir)) {
+    throw new Error('--inject-duplicate: the fixture already has the unique index Category_name_key '
+      + '(database of v1.8.0 or later), so a duplicate category name cannot be added');
+  }
+}
+
 function defaultReportDir(fixtureDir, now) {
   return path.resolve(fixtureDir, '..', 'upgrade-test-reports', now.toISOString().slice(0, 10));
 }
@@ -154,17 +166,19 @@ async function main() {
   const { layout, layoutDir } = await loadLayout(options.layout);
   const hookFiles = await loadHookFiles();
   const steps = parseUpgradePath(options.path, { hookFiles, localVersion: options['local-version'] });
+  if (options['inject-duplicate']) checkDuplicateInjectionPath(steps, hookFiles);
   const now = new Date();
   const id = runId(now);
   cleanUpOnSignal(id);
 
   ensureHelperImage();
+  if (options['inject-duplicate']) checkFixtureAcceptsDuplicate(fixtureDir);
   const images = resolveImages(steps, hookFiles);
   const runs = [];
   for (const mode of modes) {
     const bench = new BenchRun({
       fixtureDir, layout, layoutDir, mode, steps, images, hookFiles,
-      runId: id, timeoutMs: Number(options.timeout) * 1000,
+      runId: id, timeoutMs: Number(options.timeout) * 1000, injectDuplicate: options['inject-duplicate'],
     });
     runs.push({ ...await bench.execute({ keep: options.keep }), failed: bench.hasFailed() });
   }

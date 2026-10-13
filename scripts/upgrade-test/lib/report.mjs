@@ -47,7 +47,7 @@ function renderStep(step, mode) {
   if (step.actions.length) {
     parts.push('Required actions of the release notes:', table(
       ['Notes', 'Action', 'Result', 'Details'],
-      step.actions.map((action) => [action.step, action.note, action.status, action.detail]),
+      step.actions.map((action) => [action.step, action.note, resultLabel(action), action.detail]),
     ));
   }
   parts.push(table(['Check', 'Result', 'Details'], step.checks.map((check) => [check.label, resultLabel(check), check.detail])));
@@ -71,6 +71,12 @@ function renderImages(images) {
     Object.entries(images).map(([label, image]) => [label, image.backend, image.frontend, image.platform, image.note ?? '']));
 }
 
+function injectedDuplicateLines(setup) {
+  if (setup.injectedDuplicates === undefined) return [];
+  return [`- \`--inject-duplicate\`: ${setup.injectedDuplicates} category row(s) added to the working copy with the `
+    + 'name of an existing one, before the row counts of reference; the schema_integrity migration refuses them.'];
+}
+
 export function renderReport({ generatedAt, layout, pathLabels, images, runs }) {
   const setup = runs.find((run) => run.setup?.tables)?.setup ?? {};
   const sections = [
@@ -81,6 +87,7 @@ export function renderReport({ generatedAt, layout, pathLabels, images, runs }) 
       `- Layout \`${layout.name}\`: ${layout.description}.`,
       `- Fixture: ${setup.tables} tables, ${setup.rows} rows, journal mode \`${setup.journalMode}\`; `
         + `${setup.photosInArchive} photos in the archive, ${setup.photosReferenced} referenced by cocktails.`,
+      ...injectedDuplicateLines(setup),
       `- Credentials: in the working copy, the admin email was replaced by a placeholder and the password hash `
         + `(${setup.users} user(s)) by a bcrypt hash of a random test password. The env file holds random values `
         + `of the lengths given by the layout (${Object.entries(layout.envSecrets).map(([name, length]) => `${name}: ${length}`).join(', ')}).`,

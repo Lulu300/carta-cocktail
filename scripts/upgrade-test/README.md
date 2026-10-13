@@ -34,10 +34,13 @@ The bench never writes to the fixture. It works on copies in the system temp fol
 | `--local-version <v>` | release notes followed by a `local` step, see below |
 | `--report-dir <dir>` | default `<fixture>/../upgrade-test-reports/<date>/` |
 | `--timeout <s>` | wait for each backend start, default 300 |
+| `--inject-duplicate` | add a duplicate category name to the working copy, to replay the refusal of a failed migration, see below |
 | `--keep` | keep the containers, volumes and work folder of a run that failed |
 | `--clean-all` | remove every `carta-ut-*` container, volume and network and `$TMPDIR/carta-upgrade-test/`, then exit |
 
 **`local` step.** It builds the images from the checkout, which is newer than any published version: by default it follows the notes of the minor release after the newest hook file and the newest version of the path (`1.12.0` when the newest hook file is `1.11.0`). The jump to it therefore goes up and crosses every hook file, including one already added for a release in preparation. `--local-version` forces another version (`--local-version 1.12.0`); it takes priority over the default and must still be newer than the step before `local`. A path that goes down is refused, and when a `local` step is involved the message points to `--local-version`.
+
+**`--inject-duplicate`.** Before the row counts of reference are taken, the bench copies one category of the working copy under a new id, with the same name. The `schema_integrity` migration (v1.8.0) creates the unique index `Category_name_key` and fails on it. The report only gives the number of rows added. On each step whose version refuses duplicate names (`uniqueCategoryNames` in the profile), a refused start is expected in both modes, with the reason of the injected duplicate instead of the one of the notes; in conformant mode, so is the refused database copy (`checkDatabaseCopy`, v1.6.0 Before 4). The refusal itself is still checked: its message must be in `profile.refusals`, and the database check of that refusal must pass. Use a direct jump from a version before v1.8.0 to a version that ships the failed-migration refusal (C-18: v1.12.0 and later, or `local`), for example `--path 1.4.0,local`. A jump to v1.8.0 up to v1.11.0 stops on the Prisma error `P3018` without that message: the refusal is not recognised, and the database gets the strict check, which fails. The option is refused (exit code 2) when the path starts at v1.8.0 or later (the first start would already be refused), or when the fixture already has `Category_name_key` (taken from a v1.8.0 or newer instance).
 
 Exit code: `0` when every check gives the expected result, `1` when a check or a required action fails unexpectedly, `2` for a setup error (wrong option, missing fixture, image not found), `130` when the run was interrupted (Ctrl+C or `SIGTERM`).
 
@@ -56,6 +59,7 @@ A layout is a folder in `layouts/` with a `layout.mjs`, one compose template per
 `hooks/<version>.mjs` describes one release:
 
 - `profile`: how the version behaves (upload folder, migrations, journal mode, expected log lines, known bugs, clean refusals). A version without a hook file inherits the profile of the previous one.
+  - `uniqueCategoryNames`: the release refuses two categories with the same name (v1.8.0), see `--inject-duplicate`.
   - `refusals`: the clean refusals that the release adds, defined in `lib/checks.mjs`; they add up with the ones of older releases. `BASELINE_REFUSAL` (v1.6.0): a `db push` database that does not match `0_init`. `FAILED_MIGRATION_REFUSAL`: a migration that fails, for example on duplicates (C-18, to list in the hook file of the release that ships it).
 - `before` / `after`: the required actions, each linked to its step in the notes. Actions are implemented in `lib/actions.mjs` and follow the notes for any layout, from what `docker inspect` shows:
   - `rescueUploads`: copies the photos out of the old container, unless their folder is a mount;

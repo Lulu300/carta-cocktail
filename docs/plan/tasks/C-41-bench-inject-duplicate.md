@@ -5,13 +5,13 @@ phase: C
 lane: ci
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-37]
 touches: [scripts/upgrade-test/]
 sources: []
-branch:
-pr:
+branch: chore/C-41-bench-inject-duplicate
+pr: "#137"
 ---
 
 ## Contexte
@@ -32,10 +32,10 @@ pr:
 
 ## Critères d'acceptation
 
-- [ ] `--path 1.4.0,local --layout friend --inject-duplicate`, naïf et conforme : refus reconnu (`refusal message` OK, `backupBeforeJump` OK), 0 échec inattendu, et la raison de `backend starts` est celle du doublon injecté.
-- [ ] Sans l'option, les rapports sont inchangés.
-- [ ] `--inject-duplicate` avec un chemin qui commence à v1.8.0 ou après, ou sur une base qui a déjà `Category_name_key` : refusé avec un message clair.
-- [ ] Tests unitaires du banc (`node --test scripts/upgrade-test/test/*.test.mjs`) : raisons autorisées avec l'option, refus de l'option selon le chemin.
+- [x] `--path 1.4.0,local --layout friend --inject-duplicate`, naïf et conforme : refus reconnu (`refusal message` OK, `backupBeforeJump` OK), 0 échec inattendu, et la raison de `backend starts` est celle du doublon injecté.
+- [x] Sans l'option, les rapports sont inchangés.
+- [x] `--inject-duplicate` avec un chemin qui commence à v1.8.0 ou après, ou sur une base qui a déjà `Category_name_key` : refusé avec un message clair.
+- [x] Tests unitaires du banc (`node --test scripts/upgrade-test/test/*.test.mjs`) : raisons autorisées avec l'option, refus de l'option selon le chemin.
 
 ## Tests à ajouter ou adapter
 
@@ -50,3 +50,4 @@ pr:
 ## Journal
 
 - 2026-10-13 : tâche créée par la relecture de la PR #131 (C-37, étape 3 optionnelle).
+- 2026-10-13 : fait (PR #137). Option `--inject-duplicate` de `run.mjs`. Le profil de `hooks/1.8.0.mjs` porte `uniqueCategoryNames: true` (hérité par les versions suivantes) : le chemin est refusé (code 2) s'il commence sur une version qui l'a, et la base est refusée si elle a déjà `Category_name_key` (lue en `immutable=1` sur un montage en lecture seule, avant tout pull). `BenchRun.prepare()` copie la catégorie de plus petit id sous un nouvel id (toutes les colonnes sauf la clé, donc indépendant de la version du schéma) avant `takeSnapshot` ; seul le nombre de lignes ajoutées sort du helper et va dans le rapport. Sur chaque étape dont la version refuse les doublons, `startup` est autorisé avec la raison du doublon injecté (à la place de celle de `naiveMayFail` ou d'un `requireStarted` manquant), et en conforme l'échec de `checkDatabaseCopy` : les résultats d'action portent désormais le nom de l'action (`action`), `allowedActionFailures` et `markExpectedActions` (`lib/expectations.mjs`) les marquent, et le tableau des actions du rapport affiche la raison. Banc sur une copie du jeu d'essai, `--path 1.4.0,local --layout friend`, avec un `hooks/1.12.0.mjs` temporaire non commité : avec l'option, naïf et conforme OK, 0 échec inattendu, 2 échecs attendus par mode (`backend starts` avec la raison du doublon ; naïf : dossier de photos du layout ; conforme : `v1.6.0 Before 4`), `refusal message` OK, copie `pre-migrate` identique à la base d'avant le saut, 759 lignes de référence (758 + 1), aucune perte. Sans l'option, rapport identique à celui de `develop` (hors horodatage et durée d'arrêt). Option refusée (code 2) pour `1.8.0,local`, `1.11.0,local` et une copie qui a `Category_name_key`. Tests du banc : 49 OK (tests du chemin dans `versions.test.mjs`, à côté de la fonction).
