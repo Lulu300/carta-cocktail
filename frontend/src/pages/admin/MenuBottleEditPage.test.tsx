@@ -1,67 +1,71 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '../../test/test-utils';
 import { clearToasts, renderWithFeedback } from '../../test/feedback';
+import { buildBottle, buildCategory, buildMenu, buildMenuBottle, buildMenuSection } from '../../test/factories';
+import { server } from '../../test/msw/server';
 import MenuBottleEditPage from './MenuBottleEditPage';
-import type { Bottle, Menu, MenuBottle, MenuSection } from '../../types';
+import type { Bottle, Menu, MenuBottle } from '../../types';
 import type { MenuBottleExclusion } from '../../services/api';
 
-vi.mock('../../services/api', async () => {
-  const actual = await vi.importActual<typeof import('../../services/api')>('../../services/api');
-  return {
-    ApiError: actual.ApiError,
-    menus: { get: vi.fn(), update: vi.fn() },
-    menuBottles: {
-      sync: vi.fn(), update: vi.fn(), reorder: vi.fn(), exclusions: vi.fn(), exclude: vi.fn(), restore: vi.fn(),
-    },
-    menuSections: { create: vi.fn(), update: vi.fn(), delete: vi.fn(), reorder: vi.fn() },
-  };
-});
-
-import {
-  ApiError,
-  menus as menusApi,
-  menuBottles as menuBottlesApi,
-  menuSections as menuSectionsApi,
-} from '../../services/api';
+const gin = buildCategory({ id: 1, name: 'Gin', minimumPercent: 0 });
 
 function makeBottle(id: number, name: string, overrides: Partial<Bottle> = {}): Bottle {
-  return {
-    id,
-    name,
-    categoryId: 1,
-    category: { id: 1, name: 'Gin', type: 'SPIRIT', desiredStock: 1, minimumPercent: 0, createdAt: '2026-01-01' },
-    purchasePrice: null,
-    capacityMl: 700,
-    remainingPercent: 100,
-    openedAt: null,
-    alcoholPercentage: null,
-    location: null,
-    isApero: true,
-    isDigestif: false,
-    createdAt: '2026-01-01',
-    ...overrides,
-  };
+  return buildBottle({ id, name, category: gin, purchasePrice: null, alcoholPercentage: null, isApero: true, ...overrides });
 }
 
-const gins: MenuSection = { id: 4, menuId: 5, name: 'Gins', position: 0 };
+const gins = buildMenuSection({ id: 4, menuId: 5, name: 'Gins', position: 0 });
 const hendricks = makeBottle(1, 'Hendricks', { alcoholPercentage: 41.4 });
 const sameHendricks = makeBottle(2, 'Hendricks', { alcoholPercentage: 41.4 });
 const lillet = makeBottle(3, 'Lillet');
 const campari = makeBottle(6, 'Campari');
 const sameCampari = makeBottle(7, 'Campari');
 
+function exclusionOf(bottle: Bottle): MenuBottleExclusion {
+  return { menuId: 5, bottleId: bottle.id, bottle, createdAt: '2026-10-12' };
+}
+
 function removedCamparis(): MenuBottleExclusion[] {
-  return [campari, sameCampari].map((bottle) => ({ menuId: 5, bottleId: bottle.id, bottle, createdAt: '2026-10-12' }));
+  return [campari, sameCampari].map(exclusionOf);
 }
 
 function makeEntry(id: number, bottle: Bottle, menuSectionId: number | null = null): MenuBottle {
-  return { id, menuId: 5, bottleId: bottle.id, bottle, menuSectionId, position: id, isHidden: false };
+  return buildMenuBottle({ id, menuId: 5, bottle, menuSectionId, position: id });
 }
+
+// --- Fake backend of the editor: it stores the menu and records each request ---
 
 /** What the server stores: a refetch after a change returns the saved state. */
 let stored: { menu: Menu; exclusions: MenuBottleExclusion[] };
+
+/** Requests received, in order. */
+let received: {
+  menuReads: number[];
+  exclusionReads: number[];
+  menuUpdates: unknown[];
+  entryUpdates: { id: number; changes: Partial<MenuBottle> }[];
+  reorders: number[][];
+  excludes: number[][];
+  restores: number[];
+  syncs: number[];
+  sectionDeletes: number[];
+};
+
+/** How the server answers the requests a test needs to control; the defaults apply the change. */
+let answer: {
+  menuRead: () => Promise<Response>;
+  exclusionsRead: () => Promise<Response>;
+  entryUpdate: (id: number, changes: Partial<MenuBottle>) => Promise<Response>;
+  exclude: (bottleIds: number[]) => Promise<Response>;
+  restore: (bottleId: number) => Promise<Response>;
+  sync: () => Promise<Response>;
+};
+
+const ok = () => HttpResponse.json({ message: 'ok' });
+const refused = (status: number, error: string) => HttpResponse.json({ error }, { status });
+const never = () => new Promise<Response>(() => {});
 
 function storedEntries(): MenuBottle[] {
   return stored.menu.bottles ?? [];
@@ -73,19 +77,15 @@ function setEntries(entries: MenuBottle[]) {
 
 function storeMenu(overrides: Partial<Menu> = {}, exclusions: MenuBottleExclusion[] = []) {
   stored = {
-    menu: {
+    menu: buildMenu({
       id: 5,
       name: 'Apéritifs',
       description: 'Before dinner',
       slug: 'aperitifs',
       type: 'APEROS',
-      isPublic: true,
-      createdAt: '2026-01-01',
-      updatedAt: '2026-01-01',
-      sections: [],
       bottles: [makeEntry(10, hendricks), makeEntry(11, sameHendricks), makeEntry(12, lillet)],
       ...overrides,
-    },
+    }),
     exclusions,
   };
 }
@@ -93,6 +93,131 @@ function storeMenu(overrides: Partial<Menu> = {}, exclusions: MenuBottleExclusio
 function updateEntry(id: number, changes: Partial<MenuBottle>) {
   setEntries(storedEntries().map((entry) => (entry.id === id ? { ...entry, ...changes } : entry)));
 }
+
+function excludeBottles(bottleIds: number[]) {
+  const removed = storedEntries().filter((entry) => bottleIds.includes(entry.bottleId));
+  setEntries(storedEntries().filter((entry) => !bottleIds.includes(entry.bottleId)));
+  stored.exclusions = [
+    ...stored.exclusions,
+    ...removed.flatMap((entry) => (entry.bottle ? [exclusionOf(entry.bottle)] : [])),
+  ];
+}
+
+function restoreBottle(bottleId: number) {
+  const exclusion = stored.exclusions.find((item) => item.bottleId === bottleId);
+  if (!exclusion) throw new Error(`Bottle ${bottleId} is not removed`);
+  stored.exclusions = stored.exclusions.filter((item) => item.bottleId !== bottleId);
+  setEntries([...storedEntries(), makeEntry(50 + bottleId, exclusion.bottle)]);
+}
+
+async function readObject(request: Request): Promise<Record<string, unknown>> {
+  const body: unknown = await request.json();
+  return typeof body === 'object' && body !== null ? { ...body } : {};
+}
+
+function numbers(value: unknown): number[] {
+  return Array.isArray(value) ? value.filter((item): item is number => typeof item === 'number') : [];
+}
+
+/** The entry changes the editor may send: visibility, section, position. */
+function entryChanges(body: Record<string, unknown>): Partial<MenuBottle> {
+  const changes: Partial<MenuBottle> = {};
+  if (typeof body.isHidden === 'boolean') changes.isHidden = body.isHidden;
+  if (typeof body.menuSectionId === 'number' || body.menuSectionId === null) changes.menuSectionId = body.menuSectionId;
+  if (typeof body.position === 'number') changes.position = body.position;
+  return changes;
+}
+
+function installFakeBackend() {
+  received = {
+    menuReads: [], exclusionReads: [], menuUpdates: [], entryUpdates: [], reorders: [], excludes: [], restores: [],
+    syncs: [], sectionDeletes: [],
+  };
+  answer = {
+    menuRead: async () => HttpResponse.json(stored.menu),
+    exclusionsRead: async () => HttpResponse.json(stored.exclusions),
+    entryUpdate: async (id, changes) => {
+      updateEntry(id, changes);
+      return HttpResponse.json(storedEntries().find((entry) => entry.id === id) ?? null);
+    },
+    exclude: async (bottleIds) => {
+      excludeBottles(bottleIds);
+      return ok();
+    },
+    restore: async (bottleId) => {
+      restoreBottle(bottleId);
+      return ok();
+    },
+    sync: async () => HttpResponse.json({ message: 'ok', added: 0, removed: 0 }),
+  };
+  server.use(
+    http.get('/api/menus/:id', ({ params }) => {
+      received.menuReads.push(Number(params.id));
+      return answer.menuRead();
+    }),
+    http.put('/api/menus/:id', async ({ request }) => {
+      const data = await readObject(request);
+      received.menuUpdates.push(data);
+      stored.menu = { ...stored.menu, ...data };
+      return HttpResponse.json(stored.menu);
+    }),
+    http.put('/api/menu-bottles/:id', async ({ request, params }) => {
+      const changes = entryChanges(await readObject(request));
+      received.entryUpdates.push({ id: Number(params.id), changes });
+      return answer.entryUpdate(Number(params.id), changes);
+    }),
+    http.post('/api/menu-bottles/menu/:menuId/reorder', async ({ request }) => {
+      const ids = numbers((await readObject(request)).ids);
+      received.reorders.push(ids);
+      setEntries(ids.flatMap((id) => storedEntries().filter((entry) => entry.id === id)));
+      return ok();
+    }),
+    http.get('/api/menu-bottles/menu/:menuId/exclusions', ({ params }) => {
+      received.exclusionReads.push(Number(params.menuId));
+      return answer.exclusionsRead();
+    }),
+    http.post('/api/menu-bottles/menu/:menuId/exclusions', async ({ request }) => {
+      const bottleIds = numbers((await readObject(request)).bottleIds);
+      received.excludes.push(bottleIds);
+      return answer.exclude(bottleIds);
+    }),
+    http.delete('/api/menu-bottles/menu/:menuId/exclusions/:bottleId', ({ params }) => {
+      received.restores.push(Number(params.bottleId));
+      return answer.restore(Number(params.bottleId));
+    }),
+    http.post('/api/menu-bottles/menu/:menuId/sync', ({ params }) => {
+      received.syncs.push(Number(params.menuId));
+      return answer.sync();
+    }),
+    http.delete('/api/menu-sections/sections/:id', ({ params }) => {
+      const id = Number(params.id);
+      received.sectionDeletes.push(id);
+      stored.menu = { ...stored.menu, sections: (stored.menu.sections ?? []).filter((section) => section.id !== id) };
+      setEntries(storedEntries().map((entry) => (entry.menuSectionId === id ? { ...entry, menuSectionId: null } : entry)));
+      return ok();
+    }),
+  );
+}
+
+/** The first loads answer; every refetch then waits forever, so only the editor itself can fix the screen. */
+function serveOnlyFirstLoad() {
+  answer.menuRead = async () => (received.menuReads.length === 1 ? HttpResponse.json(stored.menu) : never());
+  answer.exclusionsRead = async () => (received.exclusionReads.length === 1 ? HttpResponse.json(stored.exclusions) : never());
+}
+
+/** Holds every entry update until the test answers it, in any order. */
+function holdEntryUpdates(): (() => void)[] {
+  const pending: (() => void)[] = [];
+  answer.entryUpdate = (id, changes) => new Promise((resolve) => {
+    pending.push(() => {
+      updateEntry(id, changes);
+      resolve(HttpResponse.json(storedEntries().find((entry) => entry.id === id) ?? null));
+    });
+  });
+  return pending;
+}
+
+// --- Page helpers ---
 
 function renderPage() {
   window.history.pushState({}, '', '/admin/menus/5/bottles');
@@ -109,12 +234,18 @@ function rowOf(name: string, container: HTMLElement = document.body): HTMLElemen
   return row;
 }
 
+function sectionAround(element: HTMLElement): HTMLElement {
+  const section = element.closest('section');
+  if (!section) throw new Error('No section around the element');
+  return section;
+}
+
 function compositionCard(): HTMLElement {
-  return screen.getByRole('heading', { name: 'menus.bottles.title' }).closest('section') as HTMLElement;
+  return sectionAround(screen.getByRole('heading', { name: 'menus.bottles.title' }));
 }
 
 function excludedCard(): HTMLElement {
-  return screen.getByText(/menus.bottles.excludedTitle/).closest('section') as HTMLElement;
+  return sectionAround(screen.getByText(/menus.bottles.excludedTitle/));
 }
 
 function compositionNames(): string[] {
@@ -126,54 +257,9 @@ async function removeGroup(user: ReturnType<typeof userEvent.setup>, name: strin
   await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'menus.bottles.exclude' }));
 }
 
-/** The first loads answer; every refetch then waits forever, so only the editor itself can fix the screen. */
-function serveOnlyFirstLoad() {
-  vi.mocked(menusApi.get)
-    .mockImplementation(() => new Promise<Menu>(() => {}))
-    .mockImplementationOnce(async () => stored.menu);
-  vi.mocked(menuBottlesApi.exclusions)
-    .mockImplementation(() => new Promise<MenuBottleExclusion[]>(() => {}))
-    .mockImplementationOnce(async () => stored.exclusions);
-}
-
 beforeEach(() => {
-  vi.clearAllMocks();
   storeMenu();
-  vi.mocked(menusApi.get).mockImplementation(async () => stored.menu);
-  vi.mocked(menusApi.update).mockImplementation(async (_id, data) => {
-    stored.menu = { ...stored.menu, ...data } as Menu;
-    return stored.menu;
-  });
-  vi.mocked(menuBottlesApi.update).mockImplementation(async (id, changes) => {
-    updateEntry(id, changes);
-    return storedEntries().find((entry) => entry.id === id) as MenuBottle;
-  });
-  vi.mocked(menuBottlesApi.reorder).mockImplementation(async (_menuId, ids) => {
-    setEntries(ids.map((id) => storedEntries().find((entry) => entry.id === id) as MenuBottle));
-    return { message: 'ok' };
-  });
-  vi.mocked(menuBottlesApi.exclusions).mockImplementation(async () => stored.exclusions);
-  vi.mocked(menuBottlesApi.exclude).mockImplementation(async (_menuId, bottleIds) => {
-    const removed = storedEntries().filter((entry) => bottleIds.includes(entry.bottleId));
-    setEntries(storedEntries().filter((entry) => !bottleIds.includes(entry.bottleId)));
-    stored.exclusions = [
-      ...stored.exclusions,
-      ...removed.map((entry) => ({ menuId: 5, bottleId: entry.bottleId, bottle: entry.bottle as Bottle, createdAt: '2026-10-12' })),
-    ];
-    return { message: 'ok' };
-  });
-  vi.mocked(menuBottlesApi.restore).mockImplementation(async (_menuId, bottleId) => {
-    const exclusion = stored.exclusions.find((item) => item.bottleId === bottleId) as MenuBottleExclusion;
-    stored.exclusions = stored.exclusions.filter((item) => item.bottleId !== bottleId);
-    setEntries([...storedEntries(), makeEntry(50 + bottleId, exclusion.bottle)]);
-    return { message: 'ok' };
-  });
-  vi.mocked(menuBottlesApi.sync).mockResolvedValue({ message: 'ok', added: 0, removed: 0 });
-  vi.mocked(menuSectionsApi.delete).mockImplementation(async (id) => {
-    stored.menu = { ...stored.menu, sections: (stored.menu.sections ?? []).filter((section) => section.id !== id) };
-    setEntries(storedEntries().map((entry) => (entry.menuSectionId === id ? { ...entry, menuSectionId: null } : entry)));
-    return { message: 'ok' };
-  });
+  installFakeBackend();
 });
 
 afterEach(clearToasts);
@@ -183,7 +269,7 @@ describe('MenuBottleEditPage', () => {
     renderPage();
 
     expect(await screen.findByText('Hendricks')).toBeInTheDocument();
-    expect(menusApi.get).toHaveBeenCalledWith(5);
+    expect(received.menuReads).toEqual([5]);
     expect(screen.getByRole('heading', { name: 'menus.bottles.aperos.title' })).toBeInTheDocument();
     expect(within(rowOf('Hendricks')).getByText('menus.bottles.count')).toBeInTheDocument();
     expect(within(rowOf('Hendricks')).getByText('units.abv')).toBeInTheDocument();
@@ -200,13 +286,7 @@ describe('MenuBottleEditPage', () => {
 
   it('keeps both groups hidden after two quick visibility changes', async () => {
     const user = userEvent.setup();
-    const answers: (() => void)[] = [];
-    vi.mocked(menuBottlesApi.update).mockImplementation((id, changes) => new Promise((resolve) => {
-      answers.push(() => {
-        updateEntry(id, changes);
-        resolve({} as MenuBottle);
-      });
-    }));
+    const answers = holdEntryUpdates();
     renderPage();
     await screen.findByText('Hendricks');
 
@@ -216,17 +296,17 @@ describe('MenuBottleEditPage', () => {
     expect(within(rowOf('Hendricks')).getByRole('button', { name: 'menus.showItem' })).toBeInTheDocument();
     expect(within(rowOf('Lillet')).getByRole('button', { name: 'menus.showItem' })).toBeInTheDocument();
     // The second change waits for the first one: only the two Hendricks bottles are sent.
-    expect(menuBottlesApi.update).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(received.entryUpdates).toHaveLength(2));
     answers[1]();
     answers[0]();
-    await waitFor(() => expect(menuBottlesApi.update).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(received.entryUpdates).toHaveLength(3));
     // No refetch between the two changes: it would show Lillet visible again.
-    expect(menusApi.get).toHaveBeenCalledTimes(1);
+    expect(received.menuReads).toHaveLength(1);
     expect(within(rowOf('Hendricks')).getByRole('button', { name: 'menus.showItem' })).toBeInTheDocument();
     expect(within(rowOf('Lillet')).getByRole('button', { name: 'menus.showItem' })).toBeInTheDocument();
     answers[2]();
 
-    await waitFor(() => expect(menusApi.get).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(received.menuReads).toHaveLength(2));
     expect(storedEntries().every((entry) => entry.isHidden)).toBe(true);
     expect(within(rowOf('Hendricks')).getByRole('button', { name: 'menus.showItem' })).toBeInTheDocument();
     expect(within(rowOf('Lillet')).getByRole('button', { name: 'menus.showItem' })).toBeInTheDocument();
@@ -239,9 +319,8 @@ describe('MenuBottleEditPage', () => {
 
     await user.click(within(rowOf('Lillet')).getByRole('button', { name: 'menus.moveUp' }));
 
-    await waitFor(() => expect(menuBottlesApi.reorder).toHaveBeenCalledTimes(1));
-    expect(menuBottlesApi.reorder).toHaveBeenCalledWith(5, [12, 10, 11]);
-    expect(menuBottlesApi.update).not.toHaveBeenCalled();
+    await waitFor(() => expect(received.reorders).toEqual([[12, 10, 11]]));
+    expect(received.entryUpdates).toEqual([]);
     expect(compositionNames()).toEqual(['Lillet', 'Hendricks']);
   });
 
@@ -253,9 +332,11 @@ describe('MenuBottleEditPage', () => {
 
     await user.selectOptions(within(rowOf('Hendricks')).getByRole('combobox', { name: 'menus.sections.select' }), '4');
 
-    await waitFor(() => expect(menuBottlesApi.update).toHaveBeenCalledTimes(2));
-    expect(menuBottlesApi.update).toHaveBeenCalledWith(10, { menuSectionId: 4 });
-    expect(menuBottlesApi.update).toHaveBeenCalledWith(11, { menuSectionId: 4 });
+    await waitFor(() => expect(received.entryUpdates).toHaveLength(2));
+    expect(received.entryUpdates).toEqual(expect.arrayContaining([
+      { id: 10, changes: { menuSectionId: 4 } },
+      { id: 11, changes: { menuSectionId: 4 } },
+    ]));
   });
 
   it('deletes a section with a single request', async () => {
@@ -269,9 +350,8 @@ describe('MenuBottleEditPage', () => {
     expect(confirmation).toHaveAccessibleDescription('menus.sections.confirmDelete.bottles');
     await user.click(within(confirmation).getByRole('button', { name: 'common.delete' }));
 
-    await waitFor(() => expect(menuSectionsApi.delete).toHaveBeenCalledWith(4));
-    expect(menuSectionsApi.delete).toHaveBeenCalledTimes(1);
-    expect(menuBottlesApi.update).not.toHaveBeenCalled();
+    await waitFor(() => expect(received.sectionDeletes).toEqual([4]));
+    expect(received.entryUpdates).toEqual([]);
     expect(within(compositionCard()).queryByRole('heading', { name: 'Gins' })).not.toBeInTheDocument();
   });
 
@@ -279,13 +359,12 @@ describe('MenuBottleEditPage', () => {
     const user = userEvent.setup();
     renderPage();
     await screen.findByText('Hendricks');
-    await waitFor(() => expect(menuBottlesApi.exclusions).toHaveBeenCalledWith(5));
-    expect(within(excludedCard()).getByText('menus.bottles.noExcluded')).toBeInTheDocument();
+    await waitFor(() => expect(received.exclusionReads).toEqual([5]));
+    await waitFor(() => expect(within(excludedCard()).getByText('menus.bottles.noExcluded')).toBeInTheDocument());
 
     await removeGroup(user, 'Hendricks');
 
-    await waitFor(() => expect(menuBottlesApi.exclude).toHaveBeenCalledTimes(1));
-    expect(menuBottlesApi.exclude).toHaveBeenCalledWith(5, [1, 2]);
+    await waitFor(() => expect(received.excludes).toEqual([[1, 2]]));
     expect(within(compositionCard()).queryByText('Hendricks')).not.toBeInTheDocument();
     // One row for the two identical bottles, as in the menu.
     await waitFor(() => expect(within(excludedCard()).getAllByText('Hendricks')).toHaveLength(1));
@@ -294,7 +373,7 @@ describe('MenuBottleEditPage', () => {
 
   it('puts both lists back with a toast when the removal fails', async () => {
     const user = userEvent.setup();
-    vi.mocked(menuBottlesApi.exclude).mockRejectedValue(new ApiError(400, 'Not a system menu'));
+    answer.exclude = async () => refused(400, 'Not a system menu');
     serveOnlyFirstLoad();
     renderPage();
     await screen.findByText('Hendricks');
@@ -317,7 +396,7 @@ describe('MenuBottleEditPage', () => {
     await user.click(within(rowOf('Hendricks')).getByRole('button', { name: 'menus.removeItem' }));
     await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'common.cancel' }));
 
-    expect(menuBottlesApi.exclude).not.toHaveBeenCalled();
+    expect(received.excludes).toEqual([]);
     expect(within(compositionCard()).getByText('Hendricks')).toBeInTheDocument();
   });
 
@@ -329,9 +408,8 @@ describe('MenuBottleEditPage', () => {
     await user.click(await within(await screen.findByRole('group')).findByRole('button', { name: 'menus.bottles.restoreLabel' }));
 
     await waitFor(() => expect(compositionNames()).toEqual(['Hendricks', 'Lillet', 'Campari']));
-    expect(menuBottlesApi.restore).toHaveBeenCalledTimes(2);
-    expect(menuBottlesApi.restore).toHaveBeenCalledWith(5, 6);
-    expect(menuBottlesApi.restore).toHaveBeenCalledWith(5, 7);
+    expect(received.restores).toEqual(expect.arrayContaining([6, 7]));
+    expect(received.restores).toHaveLength(2);
     expect(within(excludedCard()).queryByText('Campari')).not.toBeInTheDocument();
     await waitFor(() => expect(within(rowOf('Campari', compositionCard())).getByRole('button', { name: 'menus.moveUp' })).toBeEnabled());
     expect(within(rowOf('Campari', compositionCard())).getByText('menus.bottles.count')).toBeInTheDocument();
@@ -340,9 +418,7 @@ describe('MenuBottleEditPage', () => {
   it('shows the removed bottles again with a toast when putting one back fails', async () => {
     const user = userEvent.setup();
     storeMenu({}, removedCamparis());
-    vi.mocked(menuBottlesApi.restore)
-      .mockResolvedValueOnce({ message: 'ok' })
-      .mockRejectedValueOnce(new ApiError(404, 'Resource not found'));
+    answer.restore = async () => (received.restores.length === 1 ? ok() : refused(404, 'Resource not found'));
     serveOnlyFirstLoad();
     renderPage();
 
@@ -358,28 +434,28 @@ describe('MenuBottleEditPage', () => {
     const user = userEvent.setup();
     storeMenu({}, removedCamparis());
     let finishSecond: () => void = () => {};
-    vi.mocked(menuBottlesApi.restore)
-      .mockRejectedValueOnce(new ApiError(404, 'Resource not found'))
-      .mockImplementationOnce((_menuId, bottleId) => new Promise((resolve) => {
+    answer.restore = (bottleId) => {
+      if (received.restores.length === 1) return Promise.resolve(refused(404, 'Resource not found'));
+      return new Promise((resolve) => {
         finishSecond = () => {
-          stored.exclusions = stored.exclusions.filter((item) => item.bottleId !== bottleId);
-          setEntries([...storedEntries(), makeEntry(50 + bottleId, sameCampari)]);
-          resolve({ message: 'ok' });
+          restoreBottle(bottleId);
+          resolve(ok());
         };
-      }));
+      });
+    };
     renderPage();
 
     await user.click(await within(await screen.findByRole('group')).findByRole('button', { name: 'menus.bottles.restoreLabel' }));
-    await waitFor(() => expect(menuBottlesApi.restore).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(received.restores).toHaveLength(2));
     // The first request failed, the second is still on its way: nothing is read again yet.
     await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(menusApi.get).toHaveBeenCalledTimes(1);
+    expect(received.menuReads).toHaveLength(1);
     expect(screen.queryByRole('alert')).not.toHaveTextContent('Resource not found');
 
     finishSecond();
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Resource not found'));
-    await waitFor(() => expect(menusApi.get).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(received.menuReads).toHaveLength(2));
     // As on the server: one Campari back in the menu, the other one still removed.
     await waitFor(() => expect(within(compositionCard()).getByText('Campari')).toBeInTheDocument());
     expect(within(excludedCard()).getByText('Campari')).toBeInTheDocument();
@@ -398,68 +474,64 @@ describe('MenuBottleEditPage', () => {
     await user.type(name, 'Apéros');
     await user.click(screen.getByRole('button', { name: 'common.save' }));
 
-    await waitFor(() => expect(menusApi.update).toHaveBeenCalledWith(5, {
+    await waitFor(() => expect(received.menuUpdates).toEqual([{
       name: 'Apéros', description: 'Before dinner', isPublic: true,
-    }));
+    }]));
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('menus.updated'));
   });
 
   it('saves the menu info after the composition changes still waiting', async () => {
     const user = userEvent.setup();
-    const answers: (() => void)[] = [];
-    vi.mocked(menuBottlesApi.update).mockImplementation((id, changes) => new Promise((resolve) => {
-      answers.push(() => {
-        updateEntry(id, changes);
-        resolve({} as MenuBottle);
-      });
-    }));
+    const answers = holdEntryUpdates();
     renderPage();
     await screen.findByText('Hendricks');
 
     await user.click(within(rowOf('Lillet')).getByRole('button', { name: 'menus.hideItem' }));
     await user.click(screen.getByRole('button', { name: 'common.save' }));
-    expect(menusApi.update).not.toHaveBeenCalled();
+    await waitFor(() => expect(received.entryUpdates).toHaveLength(1));
+    expect(received.menuUpdates).toEqual([]);
 
     answers[0]();
-    await waitFor(() => expect(menusApi.update).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(menusApi.get).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(received.menuUpdates).toHaveLength(1));
+    await waitFor(() => expect(received.menuReads).toHaveLength(2));
     expect(within(rowOf('Lillet')).getByRole('button', { name: 'menus.showItem' })).toBeInTheDocument();
   });
 
   it('shows the bottles a sync added', async () => {
     const user = userEvent.setup();
-    vi.mocked(menuBottlesApi.sync).mockImplementation(async () => {
+    answer.sync = async () => {
       setEntries([...storedEntries(), makeEntry(60, campari)]);
-      return { message: 'ok', added: 1, removed: 0 };
-    });
+      return HttpResponse.json({ message: 'ok', added: 1, removed: 0 });
+    };
     renderPage();
     await screen.findByText('Hendricks');
 
     await user.click(screen.getByRole('button', { name: 'menus.bottles.sync' }));
 
     expect(await within(compositionCard()).findByText('Campari')).toBeInTheDocument();
-    expect(menuBottlesApi.sync).toHaveBeenCalledWith(5);
+    expect(received.syncs).toEqual([5]);
   });
 
   it('counts the bottles a sync added in the next move', async () => {
     const user = userEvent.setup();
     let finishSync: () => void = () => {};
-    vi.mocked(menuBottlesApi.sync).mockImplementation(() => new Promise((resolve) => {
+    answer.sync = () => new Promise((resolve) => {
       finishSync = () => {
         setEntries([...storedEntries(), makeEntry(60, campari)]);
-        resolve({ message: 'ok', added: 1, removed: 0 });
+        resolve(HttpResponse.json({ message: 'ok', added: 1, removed: 0 }));
       };
-    }));
+    });
     renderPage();
     await screen.findByText('Hendricks');
 
     await user.click(screen.getByRole('button', { name: 'menus.bottles.sync' }));
     await user.click(within(rowOf('Lillet')).getByRole('button', { name: 'menus.moveUp' }));
-    expect(menuBottlesApi.reorder).not.toHaveBeenCalled();
+    await waitFor(() => expect(received.syncs).toHaveLength(1));
+    expect(received.reorders).toEqual([]);
     finishSync();
 
     // Campari, added by the sync, is not on screen when the move is clicked: it keeps its place last.
-    await waitFor(() => expect(menuBottlesApi.reorder).toHaveBeenCalledWith(5, [12, 10, 11, 60]));
+    await waitFor(() => expect(received.reorders).toEqual([[12, 10, 11, 60]]));
     await waitFor(() => expect(compositionNames()).toEqual(['Lillet', 'Hendricks', 'Campari']));
   });
 
@@ -471,7 +543,7 @@ describe('MenuBottleEditPage', () => {
     expect(screen.queryByRole('button', { name: 'menus.removeItem' })).not.toBeInTheDocument();
     expect(screen.queryByText(/menus.bottles.excludedTitle/)).not.toBeInTheDocument();
     expect(screen.getByDisplayValue('summer-aperos')).not.toHaveAttribute('readonly');
-    expect(menuBottlesApi.exclusions).not.toHaveBeenCalled();
+    expect(received.exclusionReads).toEqual([]);
   });
 
   it('titles a digestifs menu as such and shows its empty state', async () => {
@@ -483,7 +555,7 @@ describe('MenuBottleEditPage', () => {
   });
 
   it('shows an error when the menu does not exist', async () => {
-    vi.mocked(menusApi.get).mockRejectedValue(new ApiError(404, 'Resource not found'));
+    answer.menuRead = async () => refused(404, 'Resource not found');
     renderPage();
 
     expect(await screen.findByText('menus.loadError')).toBeInTheDocument();
