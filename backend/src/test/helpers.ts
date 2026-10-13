@@ -167,6 +167,7 @@ export async function seedBottle(overrides: Partial<{
   alcoholPercentage: number | null;
   purchasePrice: number | null;
   location: string | null;
+  openedAt: Date | null;
   isApero: boolean;
   isDigestif: boolean;
 }> = {}) {
@@ -191,6 +192,7 @@ export async function seedBottle(overrides: Partial<{
       alcoholPercentage: overrides.alcoholPercentage ?? null,
       purchasePrice: overrides.purchasePrice ?? null,
       location: overrides.location ?? null,
+      openedAt: overrides.openedAt ?? null,
       isApero: overrides.isApero ?? false,
       isDigestif: overrides.isDigestif ?? false,
     },

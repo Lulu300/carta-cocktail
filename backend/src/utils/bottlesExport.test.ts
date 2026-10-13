@@ -59,7 +59,7 @@ describe('buildCsvPayload', () => {
 
   it('imports back names that already start with an apostrophe', () => {
     const names = ["'=foo", "''=bar", "'Ti Punch", '-', '+33 cave', '@home'];
-    const payload = parseCsvBottles(buildCsvPayload(names.map((name) => bottle({ name }))));
+    const payload = parseCsvBottles(buildCsvPayload(names.map((name) => bottle({ name }))), 'en');
     expect(payload.bottles.map((b) => b.name)).toEqual(names);
   });
 
@@ -70,7 +70,7 @@ describe('buildCsvPayload', () => {
       bottle({ name: 'Château "Margaux"', openedAt: new Date('2026-10-11T00:00:00.000Z'), isApero: true }),
     ];
 
-    const payload = parseCsvBottles(buildCsvPayload(bottles));
+    const payload = parseCsvBottles(buildCsvPayload(bottles), 'en');
 
     expect(payload.errors).toEqual([]);
     expect(payload.bottles).toEqual([

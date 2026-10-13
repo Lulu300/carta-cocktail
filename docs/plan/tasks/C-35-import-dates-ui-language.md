@@ -5,18 +5,22 @@ phase: C
 lane: backend
 criticite: moyenne
 effort: S
-status: todo
+status: done
 owner: mixed
 depends_on: [C-10]
-touches: [backend/src/utils/bottlesImport.ts, backend/src/utils/bottlesImport.test.ts, backend/src/utils/importDates.ts, backend/src/utils/importDates.test.ts, backend/src/routes/bottles.ts, backend/src/routes/bottles.test.ts]
+touches: [backend/src/utils/bottlesImport.ts, backend/src/utils/bottlesImport.test.ts, backend/src/utils/importDates.ts, backend/src/utils/importDates.test.ts, backend/src/routes/bottles.ts, backend/src/routes/bottles.test.ts, backend/src/utils/bottlesExport.test.ts, backend/src/test/helpers.ts, backend/src/i18n/index.ts]
 sources: []
-branch:
-pr:
+branch: feature/C-35-import-dates-ui-language
+pr: https://github.com/Lulu300/carta-cocktail/pull/132
 ---
 
 ## Décisions validées (2026-10-12)
 
 - **Dates** : toutes les dates sont affichées et saisies selon la langue de l'application (fr : format français, en : format anglais, une future langue : son propre format), quelle que soit leur origine (saisie à la main ou import). Un seul format de stockage en base. La partie frontend (affichage et saisie) est traitée par E-27.
+- **Format de `en`** : `en` est l'anglais américain (English (US)). En `en`, une date à barres ou à points est lue mois/jour/année (`12/03/2024` = 3 décembre 2024). En `fr` : jour/mois/année.
+- **Export CSV** : il garde l'ISO 8601 ; l'export ne change pas.
+- **English (UK)** : une variante `en-GB` (jour/mois) viendra avec C-39. La table de formats d'`importDates.ts` est donc indexée par langue et cherche le code exact (`en-GB`), puis la langue de base (`en`), puis le repli `en`. L'entrée `en-GB` n'est pas ajoutée ici : elle serait du code mort tant que C-39 n'est pas faite.
+- **Années à deux chiffres** : refusées (`03/12/24` écarte la ligne avec `invalidDate`), aucun siècle n'est deviné. L'admin corrige le format de la colonne dans son tableur.
 
 ## Contexte
 
@@ -36,20 +40,20 @@ Relevé par la revue de la PR #113 (C-10).
 
 1. Un module `backend/src/utils/importDates.ts` : `parseImportDate(text, language)` renvoie une date ISO (`aaaa-mm-jj`, ou l'horodatage ISO complet tel quel) ou `null` si la valeur est invalide.
    - L'ISO 8601 est toujours accepté, quelle que soit la langue (c'est le format de l'export).
-   - Une date à barres (ou à points, `12.03.2024`) est lue selon la langue de la requête : `fr` → jour/mois/année. Pour `en` : voir « Points d'attention ».
+   - Une date à barres (ou à points, `12.03.2024`) est lue selon la langue de la requête : `fr` → jour/mois/année, `en` → mois/jour/année (anglais américain, voir « Décisions validées »).
    - Tout autre format, ou une date impossible (`31/02/2024`, mois 13), donne `null`. Une date ambiguë n'est jamais devinée.
 2. `RowReader.date` (`bottlesImport.ts`) utilise `parseImportDate` à la place de `NullableDate.safeParse`. Une valeur refusée donne `invalidDate` et la ligne est écartée, comme aujourd'hui. Le payload contient la date ISO normalisée, que la confirmation (`NullableDate`) relit sans ambiguïté.
 3. `parseImportFile` reçoit la langue. La route `POST /bottles/import/preview` la passe depuis `req.language` (repli `en`, langue de repli de l'application).
-4. Une future langue ajoute son format dans une table de `importDates.ts`, avec un test : pas de lecture générique par `Date.parse`.
+4. Une future langue ajoute son format dans une table de `importDates.ts`, avec un test : pas de lecture générique par `Date.parse`. La table est indexée par langue : code exact, puis langue de base (`fr-FR` → `fr`), puis repli `en`.
 5. `NullableDate` ne change pas : les formulaires envoient de l'ISO (E-27 garde ce format pour l'API).
 
 ## Critères d'acceptation
 
-- [ ] `2024-03-12` et `2024-03-12T00:00:00.000Z` sont acceptés quelle que soit la langue.
-- [ ] En `fr`, `12/03/2024` donne le 12 mars 2024.
-- [ ] En `en`, `12/03/2024` est lu selon le format décidé par l'humain.
-- [ ] `31/02/2024`, `2024`, `March 2024` et `12-03-24` donnent `invalidDate` dans les deux langues, et la ligne est listée dans `errors`.
-- [ ] L'aller-retour export CSV → import redonne les mêmes dates.
+- [x] `2024-03-12` et `2024-03-12T00:00:00.000Z` sont acceptés quelle que soit la langue.
+- [x] En `fr`, `12/03/2024` donne le 12 mars 2024.
+- [x] En `en`, `12/03/2024` est lu selon le format décidé par l'humain : le 3 décembre 2024 (en-US).
+- [x] `31/02/2024`, `2024`, `March 2024` et `12-03-24` donnent `invalidDate` dans les deux langues, et la ligne est listée dans `errors`.
+- [x] L'aller-retour export CSV → import redonne les mêmes dates.
 
 ## Tests à ajouter ou adapter
 
@@ -59,11 +63,18 @@ Relevé par la revue de la PR #113 (C-10).
 
 ## Points d'attention
 
-- **À trancher par l'humain** : le format de `en`. Soit en-US (mois/jour, comme Excel en anglais américain), soit en-GB (jour/mois). Une autre option est de refuser toute date à barres en `en` et de n'accepter que l'ISO.
-- **À trancher par l'humain** : l'export CSV reste en ISO (proposition), pour que l'aller-retour ne dépende pas de la langue de celui qui exporte. Un export dans la langue de l'interface serait plus lisible dans Excel, mais un fichier exporté en `fr` puis importé en `en` serait mal lu.
+- **Tranché le 2026-10-12** : le format de `en` est en-US (mois/jour, comme Excel en anglais américain) ; en-GB (jour/mois) viendra avec C-39.
+- **Tranché le 2026-10-12** : l'export CSV reste en ISO, pour que l'aller-retour ne dépende pas de la langue de celui qui exporte. Un fichier exporté en `fr` puis importé en `en` est donc bien lu.
 - Le JSON garde l'ISO : il n'est pas fait pour être saisi à la main.
 - C-34 touche aussi `bottlesImport.ts` (décodage Windows-1252) : enchaîner.
+- Le JSON passe par la même lecture que le CSV : une date à barres dans un JSON est lue selon la langue, comme dans un CSV. Une date d'un ancien JSON qui n'est ni ISO ni à barres (`Date.parse` l'acceptait) est maintenant refusée. Les exports écrivent `toISOString()` depuis leur arrivée (v1.3.0) : ils ne sont pas concernés.
+- Un horodatage ISO doit avoir un fuseau (`Z` ou `+01:00`) : sans fuseau, il serait lu dans le fuseau du serveur.
 
 ## Journal
 
 - 2026-10-12 : tâche créée par C-10, après la revue de la PR #113 et la décision de l'humain sur les dates.
+- 2026-10-12 : décisions de l'humain : `en` = anglais américain (mois/jour), export CSV en ISO inchangé, variante English (UK) reportée à C-39 (créée). Table de formats indexée par langue (code exact, langue de base, repli `en`), sans entrée `en-GB`.
+- 2026-10-12 : faite (PR #132). `parseImportDate` (`importDates.ts`), langue passée par `parseImportFile` depuis `req.language`. Fichiers ajoutés à `touches` : `bottlesExport.test.ts` (appelle `parseCsvBottles`, qui prend la langue) et `test/helpers.ts` (`seedBottle` accepte `openedAt`, pour l'aller-retour daté). Vérifié sur une copie de l'instance réelle (149 bouteilles, aucune avec `openedAt`) : aller-retour export CSV → import identique en `fr` et en `en`, sans date puis avec une date synthétique sur chaque bouteille ; seul écart, un nom entouré d'espaces que l'import rogne (comportement antérieur). La copie ne couvre pas les dates tapées à la main dans Excel.
+- 2026-10-12 : Notes de version : aucune action requise. Changement de comportement de l'import de bouteilles : une date à barres ou à points est lue selon la langue de l'interface (fr : jour/mois/année, en : mois/jour/année) ; une date dans un autre format (`2024`, `March 2024`, `12-03-24`) ou impossible (`31/02/2024`) écarte la ligne avec `invalidDate`, au lieu d'être devinée. Sont aussi refusées deux formes qu'un tableur produit : l'année à deux chiffres (`03/12/24`, format court par défaut de LibreOffice en anglais US, que `Date.parse` lisait en `en`) et la cellule date + heure (`12/03/2024 14:30`).
+- 2026-10-13 : relecture de la PR #132. L'année est écrite sur quatre chiffres (`0999-03-12`) : une année courte (`204-03-12`) n'était pas de l'ISO et la confirmation la relisait dans le fuseau du serveur. La langue de repli vient de `backend/src/i18n/index.ts` (`FALLBACK_LANGUAGE`, aussi utilisée par `fallbackLng`), ajouté à `touches`. Notes de version complétées (années à deux chiffres, cellules date + heure).
+- 2026-10-13 : décision de l'humain (2026-10-12) : les années à deux chiffres (`03/12/24`) sont refusées, comme le fait la PR et comme le proposait la relecture.

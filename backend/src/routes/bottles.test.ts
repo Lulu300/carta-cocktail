@@ -585,16 +585,19 @@ describe('GET /api/bottles/export', () => {
     expect(lines[1].startsWith("'=1+1,")).toBe(true);
   });
 
-  it('should import back the bottles of a CSV export, BOM included', async () => {
+  // The export writes ISO 8601: the dates come back the same whatever the importer's language
+  it.each(['fr', 'en'])('should import back the bottles of a CSV export, BOM and dates included, in %s', async (language) => {
     const rhum = await seedCategory({ name: 'Rhum' });
     const gin = await seedCategory({ name: 'Gin' });
     await seedBottle({ name: '=1+1', categoryId: rhum.id, location: 'Cave, étagère 3', purchasePrice: 0 });
+    await seedBottle({ name: 'Diplomatico', categoryId: rhum.id, openedAt: new Date('2024-03-12T00:00:00.000Z') });
     await seedBottle({ name: 'Château "Margaux"', categoryId: gin.id, alcoholPercentage: 40.5, isApero: true });
     await seedBottle({ name: 'Château "Margaux"', categoryId: gin.id, alcoholPercentage: 40.5, isApero: true });
     const exported = await bottleSnapshot();
     const csv = await exportCsvBytes();
 
     const preview = await request.post('/api/bottles/import/preview').set(authHeader())
+      .set('Accept-Language', language)
       .attach('file', csv, 'bottles.csv');
     await prisma.bottle.deleteMany();
     const confirm = await request.post('/api/bottles/import/confirm').set(authHeader())
@@ -794,6 +797,52 @@ describe('POST /api/bottles/import/preview', () => {
     expect(res.body).toEqual({
       error: 'Le fichier a plus de 2 000 lignes : répartissez-le en plusieurs imports',
       details: { code: 'tooManyRows', max: 2000 },
+    });
+  });
+
+  describe('opening dates typed in a spreadsheet', () => {
+    const csvDated = (openedAt: string) => Buffer.from(`name;categoryName;capacityMl;openedAt\nHavana;Rhum;700;${openedAt}`);
+
+    it.each([
+      ['fr', '2024-03-12'],
+      ['fr-FR,fr;q=0.9', '2024-03-12'],
+      ['en', '2024-12-03'],
+    ])('should read 12/03/2024 with Accept-Language %s as %s', async (language, expected) => {
+      const res = await request.post('/api/bottles/import/preview').set(authHeader())
+        .set('Accept-Language', language)
+        .attach('file', csvDated('12/03/2024'), 'bottles.csv');
+
+      expect(res.status).toBe(200);
+      expect(res.body.errors).toEqual([]);
+      expect(res.body.payload.bottles[0].openedAt).toBe(expected);
+    });
+
+    it('should read the date as US English without Accept-Language', async () => {
+      const res = await request.post('/api/bottles/import/preview').set(authHeader())
+        .attach('file', csvDated('12/03/2024'), 'bottles.csv');
+      expect(res.body.payload.bottles[0].openedAt).toBe('2024-12-03');
+    });
+
+    it('should list a date that does not exist in errors', async () => {
+      const res = await request.post('/api/bottles/import/preview').set(authHeader())
+        .set('Accept-Language', 'fr')
+        .attach('file', csvDated('31/02/2024'), 'bottles.csv');
+
+      expect(res.body.payload.bottles).toEqual([]);
+      expect(res.body.errors).toEqual([{ source: 'bottles', line: 2, field: 'openedAt', code: 'invalidDate' }]);
+    });
+
+    it('should save the date read in French once confirmed', async () => {
+      await seedCategory({ name: 'Rhum' });
+      const preview = await request.post('/api/bottles/import/preview').set(authHeader())
+        .set('Accept-Language', 'fr')
+        .attach('file', csvDated('25/03/2024'), 'bottles.csv');
+      const confirm = await request.post('/api/bottles/import/confirm').set(authHeader())
+        .send({ payload: preview.body.payload, resolutions: {} });
+
+      expect(confirm.status).toBe(201);
+      const [bottle] = await prisma.bottle.findMany();
+      expect(bottle.openedAt?.toISOString()).toBe('2024-03-25T00:00:00.000Z');
     });
   });
 

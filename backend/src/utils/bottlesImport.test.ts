@@ -44,7 +44,7 @@ describe('parseCsvBottles', () => {
     const csv = `${BOM}name;categoryName;capacityMl;alcoholPercentage;purchasePrice;isApero\r\n`
       + 'Havana 7;Rhum;700;40,5;25,90;VRAI\r\n';
 
-    const payload = parseCsvBottles(csv);
+    const payload = parseCsvBottles(csv, 'en');
 
     expect(payload.errors).toEqual([]);
     expect(payload.bottles).toEqual([expect.objectContaining({
@@ -53,17 +53,17 @@ describe('parseCsvBottles', () => {
   });
 
   it('keeps a semicolon inside a quoted field', () => {
-    const payload = parseCsvBottles('name;capacityMl;location\n"Gin; London Dry";700;"Bar; top shelf"');
+    const payload = parseCsvBottles('name;capacityMl;location\n"Gin; London Dry";700;"Bar; top shelf"', 'en');
     expect(payload.bottles[0]).toMatchObject({ name: 'Gin; London Dry', location: 'Bar; top shelf' });
   });
 
   it('keeps the comma separator when the header has more commas than semicolons', () => {
-    const payload = parseCsvBottles('name,capacityMl,location\nGin,700,Bar; top shelf');
+    const payload = parseCsvBottles('name,capacityMl,location\nGin,700,Bar; top shelf', 'en');
     expect(payload.bottles[0]).toMatchObject({ name: 'Gin', location: 'Bar; top shelf' });
   });
 
   it('removes the apostrophe the export puts before a formula', () => {
-    const payload = parseCsvBottles(csvOf("'=1+1,Rhum,SPIRIT,700,1,100,,,'@cellar,,false,false"));
+    const payload = parseCsvBottles(csvOf("'=1+1,Rhum,SPIRIT,700,1,100,,,'@cellar,,false,false"), 'en');
     expect(payload.bottles[0]).toMatchObject({ name: '=1+1', location: '@cellar' });
   });
 
@@ -72,18 +72,18 @@ describe('parseCsvBottles', () => {
       'Havana,Rhum,SPIRIT,700,1,,,,,,,',
       'Monin,Sirop,SYRUP,700,1,,,,,,,',
       'Bad,Ignored,SPIRIT,,1,,,,,,,',
-    ));
+    ), 'en');
     expect(payload.categories.map((c) => [c.name, c.type])).toEqual([['Rhum', 'SPIRIT'], ['Sirop', 'SYRUP']]);
   });
 
   it('skips the rows a spreadsheet leaves with empty cells only', () => {
-    const payload = parseCsvBottles(csvOf('Havana,Rhum,SPIRIT,700,1,,,,,,,', ',,,,,,,,,,,', ' , ,'));
+    const payload = parseCsvBottles(csvOf('Havana,Rhum,SPIRIT,700,1,,,,,,,', ',,,,,,,,,,,', ' , ,'), 'en');
     expect(payload.bottles).toHaveLength(1);
     expect(payload.errors).toEqual([]);
   });
 
   it('caps the quantity between 1 and 50', () => {
-    const payload = parseCsvBottles(csvOf('A,Rhum,,700,0,,,,,,,', 'B,Rhum,,700,80,,,,,,,', 'C,Rhum,,700,2.7,,,,,,,'));
+    const payload = parseCsvBottles(csvOf('A,Rhum,,700,0,,,,,,,', 'B,Rhum,,700,80,,,,,,,', 'C,Rhum,,700,2.7,,,,,,,'), 'en');
     expect(payload.bottles.map((b) => b.quantity)).toEqual([1, 50, 2]);
   });
 
@@ -100,43 +100,81 @@ describe('parseCsvBottles', () => {
     ['purchasePrice', 'Havana,Rhum,SPIRIT,700,1,,,-3,,,,', 'outOfRange'],
     ['openedAt', 'Havana,Rhum,SPIRIT,700,1,,,,,abc,,', 'invalidDate'],
   ])('leaves out a row whose %s is invalid (%s)', (field, row, code) => {
-    const payload = parseCsvBottles(csvOf('Valid,Rhum,SPIRIT,700,1,,,,,,,', row));
+    const payload = parseCsvBottles(csvOf('Valid,Rhum,SPIRIT,700,1,,,,,,,', row), 'en');
 
     expect(payload.bottles.map((b) => b.name)).toEqual(['Valid']);
     expect(payload.errors).toEqual([{ source: 'bottles', line: 3, field, code }]);
   });
 
   it('keeps a Windows line break inside a quoted field', () => {
-    const payload = parseCsvBottles('name,capacityMl,location\r\nGin,700,"Shelf\r\nleft"\r\nRum,700,\r\n');
+    const payload = parseCsvBottles('name,capacityMl,location\r\nGin,700,"Shelf\r\nleft"\r\nRum,700,\r\n', 'en');
     expect(payload.bottles.map((b) => b.location)).toEqual(['Shelf\r\nleft', null]);
   });
 
   it('reports the file line of a row after a multi-line quoted field', () => {
-    const payload = parseCsvBottles(csvOf('"Two\nlines",Rhum,,700,1,,,,,,,', '', 'Bad,Rhum,,,1,,,,,,,'));
+    const payload = parseCsvBottles(csvOf('"Two\nlines",Rhum,,700,1,,,,,,,', '', 'Bad,Rhum,,,1,,,,,,,'), 'en');
     expect(payload.errors).toEqual([{ source: 'bottles', line: 5, field: 'capacityMl', code: 'required' }]);
   });
 
   it('refuses a file without a capacityMl column', () => {
-    expect(parseError(() => parseCsvBottles('name\nHavana'))).toMatchObject({
+    expect(parseError(() => parseCsvBottles('name\nHavana', 'en'))).toMatchObject({
       code: 'missingColumn', params: { column: 'capacityMl' },
     });
   });
 
   it('reads an empty file as an empty import', () => {
-    expect(parseCsvBottles(BOM)).toEqual({ version: 1, categories: [], bottles: [], errors: [] });
+    expect(parseCsvBottles(BOM, 'en')).toEqual({ version: 1, categories: [], bottles: [], errors: [] });
   });
 
   it(`accepts ${MAX_IMPORT_ROWS} rows and refuses one more`, () => {
     const rows = Array.from({ length: MAX_IMPORT_ROWS }, (_, i) => `Bottle ${i},Rhum,,700,1,,,,,,,`);
-    expect(parseCsvBottles(csvOf(...rows)).bottles).toHaveLength(MAX_IMPORT_ROWS);
+    expect(parseCsvBottles(csvOf(...rows), 'en').bottles).toHaveLength(MAX_IMPORT_ROWS);
 
-    const error = parseError(() => parseCsvBottles(csvOf(...rows, 'One more,Rhum,,700,1,,,,,,,')));
+    const error = parseError(() => parseCsvBottles(csvOf(...rows, 'One more,Rhum,,700,1,,,,,,,'), 'en'));
     expect(error).toMatchObject({ code: 'tooManyRows', params: { max: MAX_IMPORT_ROWS } });
   });
 
   it('refuses rows that would create more than 2,000 bottles', () => {
     const rows = Array.from({ length: 41 }, (_, i) => `Bottle ${i},Rhum,,700,50,,,,,,,`);
-    expect(parseError(() => parseCsvBottles(csvOf(...rows))).code).toBe('tooManyBottles');
+    expect(parseError(() => parseCsvBottles(csvOf(...rows), 'en')).code).toBe('tooManyBottles');
+  });
+});
+
+describe('opening dates', () => {
+  const datedRow = (openedAt: string) => csvOf(`Havana,Rhum,SPIRIT,700,1,,,,,${openedAt},,`);
+
+  it.each([
+    ['fr', '2024-03-12'],
+    ['en', '2024-12-03'],
+  ])('reads 12/03/2024 in the order of %s and sends it on as %s', (language, expected) => {
+    const payload = parseCsvBottles(datedRow('12/03/2024'), language);
+    expect(payload.errors).toEqual([]);
+    expect(payload.bottles[0].openedAt).toBe(expected);
+  });
+
+  it.each(['fr', 'en'])('keeps the ISO timestamp of an export as written in %s', (language) => {
+    const payload = parseCsvBottles(datedRow('2024-03-12T00:00:00.000Z'), language);
+    expect(payload.bottles[0].openedAt).toBe('2024-03-12T00:00:00.000Z');
+  });
+
+  it.each(['fr', 'en'])('leaves out the rows with an unreadable date in %s and lists them', (language) => {
+    const csv = csvOf(
+      'Havana,Rhum,SPIRIT,700,1,,,,,31/02/2024,,',
+      'Diplomatico,Rhum,SPIRIT,700,1,,,,,2024,,',
+      'Bumbu,Rhum,SPIRIT,700,1,,,,,March 2024,,',
+      'Plantation,Rhum,SPIRIT,700,1,,,,,12-03-24,,',
+      'Kept,Rhum,SPIRIT,700,1,,,,,2024-03-12,,',
+    );
+    const payload = parseCsvBottles(csv, language);
+    expect(payload.bottles.map((b) => b.name)).toEqual(['Kept']);
+    expect(payload.errors).toEqual([2, 3, 4, 5].map((line) => (
+      { source: 'bottles', line, field: 'openedAt', code: 'invalidDate' }
+    )));
+  });
+
+  it('reads a JSON date in the language too', () => {
+    const payload = parseJsonBottles({ version: 1, bottles: [jsonBottle({ openedAt: '25/03/2024' })] }, 'fr');
+    expect(payload.bottles[0].openedAt).toBe('2024-03-25');
   });
 });
 
@@ -145,7 +183,7 @@ describe('parseJsonBottles', () => {
     const payload = parseJsonBottles({
       version: 1,
       bottles: [jsonBottle({ capacityMl: '750', isApero: 'false', isDigestif: 1, location: '', quantity: 3 })],
-    });
+    }, 'en');
     expect(payload.bottles[0]).toEqual({
       name: 'Havana', categoryName: 'Rhum', capacityMl: 750, remainingPercent: 100,
       alcoholPercentage: null, purchasePrice: null, location: null, openedAt: null,
@@ -157,7 +195,7 @@ describe('parseJsonBottles', () => {
     const payload = parseJsonBottles({
       version: 1,
       bottles: [jsonBottle(), jsonBottle({ remainingPercent: 150 }), jsonBottle({ openedAt: 12 }), 'not a bottle'],
-    });
+    }, 'en');
     expect(payload.bottles).toHaveLength(1);
     expect(payload.errors).toEqual([
       { source: 'bottles', line: 2, field: 'remainingPercent', code: 'outOfRange' },
@@ -167,7 +205,7 @@ describe('parseJsonBottles', () => {
   });
 
   it('keeps a valid opening date as written', () => {
-    const payload = parseJsonBottles({ version: 1, bottles: [jsonBottle({ openedAt: '2026-10-11' })] });
+    const payload = parseJsonBottles({ version: 1, bottles: [jsonBottle({ openedAt: '2026-10-11' })] }, 'en');
     expect(payload.bottles[0].openedAt).toBe('2026-10-11');
   });
 
@@ -181,7 +219,7 @@ describe('parseJsonBottles', () => {
         { name: '' },
       ],
       bottles: [],
-    });
+    }, 'en');
     expect(payload.categories).toEqual([
       { name: 'Rhum', type: 'SPIRIT', desiredStock: 2, minimumPercent: 30, nameTranslations: { fr: 'Rhum' } },
     ]);
@@ -199,7 +237,7 @@ describe('parseJsonBottles', () => {
         { name: 'Gin', nameTranslations: { en: 'Gin', fr: 42 } },
       ],
       bottles: [],
-    });
+    }, 'en');
     expect(payload.categories.map((c) => c.nameTranslations)).toEqual([null, null]);
     expect(payload.errors).toEqual([]);
   });
@@ -209,7 +247,7 @@ describe('parseJsonBottles', () => {
       version: 1,
       categories: [{ name: 'Rhum' }, { name: 'Gin', desiredStock: -1 }],
       bottles: [jsonBottle(), jsonBottle({ capacityMl: 0 })],
-    });
+    }, 'en');
     expect(payload.errors).toEqual([
       { source: 'categories', line: 2, field: 'desiredStock', code: 'outOfRange' },
       { source: 'bottles', line: 2, field: 'capacityMl', code: 'outOfRange' },
@@ -221,32 +259,32 @@ describe('parseJsonBottles', () => {
     ['an array', [], 'unsupportedVersion'],
     ['no bottles array', { version: 1, bottles: {} }, 'bottlesRequired'],
   ])('refuses a file with %s', (_label, json, code) => {
-    expect(parseError(() => parseJsonBottles(json)).code).toBe(code);
+    expect(parseError(() => parseJsonBottles(json, 'en')).code).toBe(code);
   });
 
   it(`refuses more than ${MAX_IMPORT_ROWS} rows`, () => {
     const bottles = Array.from({ length: MAX_IMPORT_ROWS + 1 }, () => jsonBottle());
-    expect(parseError(() => parseJsonBottles({ version: 1, bottles })).code).toBe('tooManyRows');
+    expect(parseError(() => parseJsonBottles({ version: 1, bottles }, 'en')).code).toBe('tooManyRows');
   });
 });
 
 describe('parseImportFile', () => {
   it('reads a JSON file that starts with a BOM', () => {
     const file = Buffer.from(BOM + JSON.stringify({ version: 1, bottles: [jsonBottle()] }));
-    expect(parseImportFile('bottles.JSON', file).bottles).toHaveLength(1);
+    expect(parseImportFile('bottles.JSON', file, 'en').bottles).toHaveLength(1);
   });
 
   it('reads a CSV file that starts with a BOM', () => {
     const file = Buffer.from(BOM + csvOf('Havana,Rhum,SPIRIT,700,1,,,,,,,'));
-    expect(parseImportFile('bottles.csv', file).bottles).toHaveLength(1);
+    expect(parseImportFile('bottles.csv', file, 'en').bottles).toHaveLength(1);
   });
 
   it('refuses a JSON file that does not parse', () => {
-    expect(parseError(() => parseImportFile('bottles.json', Buffer.from('{ nope'))).code).toBe('invalidJson');
+    expect(parseError(() => parseImportFile('bottles.json', Buffer.from('{ nope'), 'en')).code).toBe('invalidJson');
   });
 
   it('refuses another extension', () => {
-    expect(parseError(() => parseImportFile('bottles.txt', Buffer.from(''))).code).toBe('unsupportedFormat');
+    expect(parseError(() => parseImportFile('bottles.txt', Buffer.from(''), 'en')).code).toBe('unsupportedFormat');
   });
 });
 
@@ -264,7 +302,7 @@ describe('parseZipBottles', () => {
         + 'Rhum;SPIRIT;3;25;"{""fr"":""Rhum""}"\nGin;SPIRIT;-2;30;',
     });
 
-    const payload = parseZipBottles(zip);
+    const payload = parseZipBottles(zip, 'en');
 
     expect(payload.bottles).toHaveLength(1);
     expect(payload.categories).toEqual([
@@ -275,20 +313,20 @@ describe('parseZipBottles', () => {
 
   it('ignores a categories.csv without a name column', () => {
     const zip = zipOf({ 'bottles.csv': csvOf('Havana,Rhum,SPIRIT,700,1,,,,,,,'), 'categories.csv': 'type\nSPIRIT' });
-    expect(parseZipBottles(zip).categories.map((c) => c.name)).toEqual(['Rhum']);
+    expect(parseZipBottles(zip, 'en').categories.map((c) => c.name)).toEqual(['Rhum']);
   });
 
   it('refuses an entry over 20 MB once uncompressed, before reading it', () => {
     const zip = zipOf({ 'bottles.csv': Buffer.alloc(MAX_ZIP_ENTRY_BYTES + 1, ' ') });
-    expect(parseError(() => parseZipBottles(zip))).toMatchObject({ code: 'zipEntryTooLarge', params: { maxMb: 20 } });
+    expect(parseError(() => parseZipBottles(zip, 'en'))).toMatchObject({ code: 'zipEntryTooLarge', params: { maxMb: 20 } });
   });
 
   it('refuses an archive without bottles.csv or bottles.json', () => {
-    expect(parseError(() => parseZipBottles(zipOf({ 'notes.txt': 'nope' }))).code).toBe('zipMissingBottles');
+    expect(parseError(() => parseZipBottles(zipOf({ 'notes.txt': 'nope' }), 'en')).code).toBe('zipMissingBottles');
   });
 
   it('refuses a file that is not a ZIP archive', () => {
-    expect(parseError(() => parseZipBottles(Buffer.from('not a zip'))).code).toBe('invalidZip');
+    expect(parseError(() => parseZipBottles(Buffer.from('not a zip'), 'en')).code).toBe('invalidZip');
   });
 
   it('refuses an archive whose entry does not decompress', () => {
@@ -296,6 +334,6 @@ describe('parseZipBottles', () => {
     // Corrupts the compressed data that follows the 30-byte local header and the entry name
     const corrupted = Buffer.from(zip);
     corrupted.fill(0xff, 30 + 'bottles.csv'.length, 30 + 'bottles.csv'.length + 20);
-    expect(parseError(() => parseZipBottles(corrupted)).code).toBe('invalidZip');
+    expect(parseError(() => parseZipBottles(corrupted, 'en')).code).toBe('invalidZip');
   });
 });
