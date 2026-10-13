@@ -8,7 +8,7 @@ effort: S
 status: todo
 owner: agent
 depends_on: [E-10, E-30]
-touches: [frontend/src/i18n/, frontend/src/components/import/]
+touches: [frontend/src/i18n/locales/admin/, frontend/src/i18n/bundles.test.ts, frontend/src/components/import/]
 sources: ["06-frontend-ux-perf.md §2"]
 branch:
 pr:
@@ -16,11 +16,11 @@ pr:
 
 ## Contexte
 
-E-10 a remplacé les pluriels faits dans le code (« bouteille(s) » construit en TypeScript, « dose/doses ») par les formes `_one` / `_other` d'i18next. Il reste des messages dont le pluriel est écrit dans le texte même de la traduction : l'admin lit « 1 bouteille(s) importée(s) ». Ils n'ont pas été convertis dans E-10, parce que le budget du chargement public était dépassé de 90 octets et que chaque forme ajoutée l'alourdit. E-30 scinde les locales public/admin : ces messages sont tous côté admin et ne pèseront plus sur la carte publique.
+E-10 a remplacé les pluriels faits dans le code (« bouteille(s) » construit en TypeScript, « dose/doses ») par les formes `_one` / `_other` d'i18next. Il reste des messages dont le pluriel est écrit dans le texte même de la traduction : l'admin lit « 1 bouteille(s) importée(s) ». Ils n'ont pas été convertis dans E-10, parce que le budget du chargement public était dépassé de 90 octets et que chaque forme ajoutée l'alourdit. Depuis E-30, les locales sont scindées en paquets public et admin : ces messages sont tous dans `frontend/src/i18n/locales/admin/` et ne pèsent plus sur la carte publique.
 
 ## Problème constaté
 
-14 clés, relevées sur la branche d'E-10 (le chiffre de 17 cité lors de la décision comptait les lignes du `grep`, dont `dashboard.shortageAlert`, déjà corrigé par E-10). Pour les retrouver après E-30, qui peut déplacer les fichiers :
+14 clés, relevées sur la branche d'E-10 (le chiffre de 17 cité lors de la décision comptait les lignes du `grep`, dont `dashboard.shortageAlert`, déjà corrigé par E-10). Elles sont toutes dans `locales/admin/` ; la commande suivante trouve 28 lignes (14 clés × 2 langues) :
 
 ```bash
 grep -rnE '\([a-z/]+\)' frontend/src/i18n/locales/ | grep '{{'
@@ -54,21 +54,21 @@ Toutes ces clés reçoivent déjà `count`, sauf `batchSummaryCount` : `ImportCo
 ## Critères d'acceptation
 
 - [ ] La commande `grep` ci-dessus ne trouve plus rien.
-- [ ] `src/i18n/locales.test.ts` (créé par E-10) passe : mêmes clés en `en` et `fr`, chaque `_one` a son `_other`, chaque clé utilisée existe.
-- [ ] « 1 bouteille importée », « 0 bouteille importée », « 2 bouteilles importées », « 1 bottle imported » s'affichent correctement (test avec une vraie instance i18next, comme dans `locales.test.ts`).
+- [ ] `src/i18n/bundles.test.ts` passe : mêmes clés en `en` et `fr` dans chaque paquet, chaque `_one` a son `_other`, chaque clé `t('…')` existe dans un paquet.
+- [ ] « 1 bouteille importée », « 0 bouteille importée », « 2 bouteilles importées », « 1 bottle imported » s'affichent correctement (test avec la vraie instance i18next, dans le bloc `plural forms` de `bundles.test.ts`).
 - [ ] Budget du chargement public toujours respecté (les clés sont côté admin après E-30).
 
 ## Tests à ajouter ou adapter
 
-- `locales.test.ts` : quelques cas de pluriel réels (`successCount`, `batchSummaryCount`, `common.selected` en français).
+- `bundles.test.ts`, bloc `plural forms` : quelques cas de pluriel réels (`successCount`, `batchSummaryCount`, `common.selected` en français). Ces clés sont dans le paquet admin : elles ne se résolvent qu'après `await import('./admin')`, comme dans le test de `cocktails.doses`.
 - `ImportCocktailResults` : la clé reçoit `count` (mock `translateWithValues`).
 - Les tests qui cherchent `bottles.importWizard.successCount` ou `cocktails.importWizard.unresolvedCount` avec le mock par défaut (`t = key => key`) restent valables.
 
 ## Points d'attention
 
-- E-30 peut changer l'emplacement ou le découpage des fichiers de locales : adapter les chemins de `touches` et de la commande `grep` au début de la tâche.
 - Tâche frontend qui touche les locales : ne pas la lancer en parallèle d'une autre tâche qui les modifie.
 
 ## Journal
 
 - 2026-10-12 : tâche créée par E-10, sur décision de l'humain : le budget du chargement public était dépassé de 90 octets, E-30 scinde d'abord les locales, les pluriels écrits dans le texte passent dans cette tâche.
+- 2026-10-13 : relecture de la PR #134 (E-10) : les contrôles prévus dans `locales.test.ts` sont dans `bundles.test.ts` ; renvois corrigés, point d'attention sur E-30 retiré (mergée, les 14 clés sont dans `locales/admin/`).
