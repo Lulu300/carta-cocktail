@@ -79,6 +79,13 @@ describe('matchesCocktailSearch', () => {
   it('accepts an empty query', () => {
     expect(matchesCocktailSearch(cocktail(), '   ', localize)).toBe(true);
   });
+
+  it('searches a cocktail sent without its ingredients and steps', () => {
+    const item = cocktail({ ingredients: undefined, instructions: undefined });
+
+    expect(matchesCocktailSearch(item, 'mojito tiki', localize)).toBe(true);
+    expect(matchesCocktailSearch(item, 'citron', localize)).toBe(false);
+  });
 });
 
 describe('normalize', () => {
