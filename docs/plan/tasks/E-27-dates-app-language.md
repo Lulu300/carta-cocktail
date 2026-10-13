@@ -8,7 +8,7 @@ effort: M
 status: todo
 owner: agent
 depends_on: [C-35]
-touches: [frontend/src/components/admin/bottles/BottleFormModal.tsx, frontend/src/components/admin/bottles/bottleForm.ts, frontend/src/components/admin/bottles/BottleFormModal.test.tsx, frontend/src/components/ui/DateInput.tsx, frontend/src/components/ui/DateInput.test.tsx, frontend/src/utils/dates.ts, frontend/src/utils/dates.test.ts, frontend/src/i18n/locales/]
+touches: [frontend/src/components/admin/bottles/BottleFormModal.tsx, frontend/src/components/admin/bottles/bottleForm.ts, frontend/src/components/admin/bottles/BottleFormModal.test.tsx, frontend/src/components/ui/DateInput.tsx, frontend/src/components/ui/DateInput.test.tsx, frontend/src/utils/dates.ts, frontend/src/utils/dates.test.ts, frontend/src/components/import/BottleImportRowErrors.tsx, frontend/src/components/import/BottleImportRowErrors.test.tsx, frontend/src/i18n/locales/]
 sources: []
 branch:
 pr:
@@ -67,5 +67,5 @@ La langue de l'application vient de `i18n.language` (sélecteur `LanguageSelecto
 
 - 2026-10-12 : tâche créée par C-10, après la revue de la PR #113 et la décision de l'humain sur les dates.
 - 2026-10-12 : décision de l'humain reportée par C-35 : le format anglais retenu est en-US (`mm/dd/yyyy`) ; English (UK) suivra avec C-39.
-- 2026-10-13 : relecture de C-35 (PR #132). L'import est maintenant strict : formats à barres de la langue ou ISO 8601, années à deux chiffres et date + heure refusées. Or le message `bottles.importWizard.rowErrors.code.invalidDate` (`frontend/src/i18n/locales/admin/{en,fr}.json`, « … n'est pas une date valide ») ne dit pas quel format est attendu. Ajouter le format de la langue (`jj/mm/aaaa ou aaaa-mm-jj`, `mm/dd/yyyy or yyyy-mm-dd`), avec le même gabarit que `datePattern`.
+- 2026-10-13 : relecture de C-35 (PR #132). L'import est maintenant strict : formats à barres ou à points de la langue, ou ISO 8601, années à deux chiffres et date + heure refusées. Or le message `bottles.importWizard.rowErrors.code.invalidDate` (`frontend/src/i18n/locales/admin/{en,fr}.json`, « … n'est pas une date valide ») ne dit pas quel format est attendu. Ajouter le format de la langue (`jj/mm/aaaa ou aaaa-mm-jj`, `mm/dd/yyyy or yyyy-mm-dd`) par interpolation (`{{pattern}}`, rempli avec `datePattern(i18n.language)` dans `BottleImportRowErrors.tsx`), pas écrit dans le JSON : `en-GB` (C-39) n'aura pas de fichier de messages et doit montrer son propre format. `frontend/src/components/import/BottleImportRowErrors.tsx` et son test sont ajoutés à `touches`.
 - 2026-10-13 : relecture de C-35 (PR #132). Un horodatage ISO avec décalage est gardé tel quel : `2024-03-12T23:30:00-05:00` est enregistré à `2024-03-13T04:30Z`, donc un affichage en UTC montrera le 13. C'était déjà le cas avant C-35, et l'export écrit toujours `Z`. À garder en tête pour `formatDate`.

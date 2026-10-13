@@ -63,4 +63,4 @@ C-07 change le comportement du backend. Supprimer une bouteille, un ingrédient 
 ## Journal
 
 - 2026-10-08 : tâche créée suite à la décision sur la suppression (C-07).
-- 2026-10-13 : relecture d'E-30 (PR #133) : les locales frontend sont scindées. `categories.confirmDelete` est maintenant dans `frontend/src/i18n/locales/admin/en.json` et `admin/fr.json` (plus `locales/en.json:55`).
+- 2026-10-13 : relecture d'E-30 (PR #133) : les locales frontend sont scindées. `categories.confirmDelete` est maintenant dans `frontend/src/i18n/locales/admin/en.json` et `admin/fr.json` (ligne 48, et non plus dans `locales/en.json:55`).

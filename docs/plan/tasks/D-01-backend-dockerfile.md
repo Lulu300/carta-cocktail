@@ -139,4 +139,4 @@ L'image backend publiée sur ghcr.io est celle qui tourne sur le NAS. Elle embar
   - `copyDatabase` et `chownMounts` 1000:1000 ;
   - un `naiveMayFail.startup` dont la raison cite les deux causes : dossiers de données qui n'appartiennent pas à l'uid 1000, ou migration en échec sur des doublons.
 
-  Sur un jeu d'essai avec doublon, le mode conforme reste KO, avec 2 échecs : `v1.6.0 Before 4` et `backend starts`. C'est attendu tant que les notes demandent de corriger les doublons avant la mise à jour : ce n'est pas une régression du banc de release.
+  Sur un jeu d'essai avec doublon, le mode conforme reste KO, avec 2 échecs inattendus : `v1.6.0 Before 4` et `backend starts`. C'est attendu tant que les notes demandent de corriger les doublons avant la mise à jour : ce n'est pas une régression du banc de release.
