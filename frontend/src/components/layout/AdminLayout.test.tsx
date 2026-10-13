@@ -3,43 +3,53 @@ import { Route, Routes } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { render, screen, waitFor, within } from '../../test/test-utils';
 import { axe } from '../../test/axe';
+import { AuthProvider } from '../../contexts/AuthContext';
+import { SiteSettingsProvider } from '../../contexts/SiteSettingsContext';
+import { buildShortage, buildSiteSettings } from '../../test/factories';
+import { ADMIN_USER } from '../../test/msw/handlers';
+import { captureRequest, mockApiError, mockApiResponse, type CapturedRequest } from '../../test/msw/utils';
 import AdminLayout from './AdminLayout';
 
-vi.mock('../../services/api', () => ({
-  shortages: { list: vi.fn() },
-}));
+const twoShortages = [buildShortage(), buildShortage()];
 
-const mockLogout = vi.fn();
-vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ logout: mockLogout }),
-}));
+let shortagesRequests: CapturedRequest;
 
-vi.mock('../../contexts/SiteSettingsContext', () => ({
-  useSiteSettings: () => ({ siteSettings: { siteName: 'Carta', siteIcon: '' } }),
-}));
-
-import { shortages } from '../../services/api';
-const mockShortList = vi.mocked(shortages.list);
-
-const twoShortages = [{ category: { id: 1 } }, { category: { id: 2 } }];
-
+/** Renders the layout once the test has set its answers: the shortages requests are recorded from here. */
 function renderLayout() {
+  shortagesRequests = captureRequest('get', '/api/shortages');
   return render(
-    <Routes>
-      <Route path="/admin" element={<AdminLayout />}>
-        <Route index element={<p>dashboard page</p>} />
-        <Route path="categories" element={<p>categories page</p>} />
-        <Route path="units" element={<p>units page</p>} />
-      </Route>
-      <Route path="/login" element={<p>login page</p>} />
-    </Routes>,
+    <AuthProvider>
+      <SiteSettingsProvider>
+        <Routes>
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<p>dashboard page</p>} />
+            <Route path="categories" element={<p>categories page</p>} />
+            <Route path="units" element={<p>units page</p>} />
+          </Route>
+          <Route path="/login" element={<p>login page</p>} />
+        </Routes>
+      </SiteSettingsProvider>
+    </AuthProvider>,
   );
 }
 
+/** Waits for the requests of the layout: the session, the site settings and the shortages. */
+async function waitForLayoutData() {
+  await waitFor(() => expect(document.title).toBe('Chez Lulu'));
+  await waitFor(() => expect(shortagesRequests.count()).toBe(1));
+  await screen.findByRole('link', { name: /Chez Lulu/ });
+}
+
 beforeEach(() => {
-  vi.clearAllMocks();
   window.history.pushState({}, '', '/admin/categories');
-  mockShortList.mockResolvedValue(twoShortages as never);
+  localStorage.setItem('token', 'admin-token');
+  mockApiResponse('get', '/api/auth/me', ADMIN_USER);
+  mockApiResponse('get', '/api/public/settings', buildSiteSettings({ siteName: 'Chez Lulu' }));
+  mockApiResponse('get', '/api/shortages', twoShortages);
+});
+
+afterEach(() => {
+  document.title = '';
 });
 
 describe('AdminLayout shortages badge', () => {
@@ -52,18 +62,18 @@ describe('AdminLayout shortages badge', () => {
   });
 
   it('shows no badge when there is no shortage', async () => {
-    mockShortList.mockResolvedValue([]);
+    mockApiResponse('get', '/api/shortages', []);
     renderLayout();
 
-    await waitFor(() => expect(mockShortList).toHaveBeenCalled());
+    await waitForLayoutData();
     expect(screen.queryByText('dashboard.shortageAlert')).not.toBeInTheDocument();
   });
 
   it('shows no badge when the request fails', async () => {
-    mockShortList.mockRejectedValue(new Error('Network down'));
+    mockApiError('get', '/api/shortages', 500, 'Database unavailable');
     renderLayout();
 
-    await waitFor(() => expect(mockShortList).toHaveBeenCalled());
+    await waitForLayoutData();
     expect(screen.queryByText('dashboard.shortageAlert')).not.toBeInTheDocument();
   });
 
@@ -75,7 +85,7 @@ describe('AdminLayout shortages badge', () => {
     await user.click(screen.getByRole('link', { name: /nav\.units/ }));
 
     expect(screen.getByText('units page')).toBeInTheDocument();
-    expect(mockShortList).toHaveBeenCalledTimes(1);
+    expect(shortagesRequests.count()).toBe(1);
   });
 });
 
@@ -83,11 +93,12 @@ describe('AdminLayout logout', () => {
   it('signs out and goes to the login page', async () => {
     const user = userEvent.setup();
     renderLayout();
+    await waitForLayoutData();
 
     await user.click(screen.getByRole('button', { name: 'nav.logout' }));
 
-    expect(mockLogout).toHaveBeenCalledTimes(1);
     expect(await screen.findByText('login page')).toBeInTheDocument();
+    expect(localStorage.getItem('token')).toBeNull();
   });
 });
 
@@ -105,7 +116,7 @@ describe('AdminLayout accessibility', () => {
     const skipLink = screen.getByRole('link', { name: 'nav.skipToContent' });
     expect(skipLink).toHaveFocus();
     expect(skipLink).toHaveAttribute('href', `#${screen.getByRole('main').id}`);
-    await waitFor(() => expect(mockShortList).toHaveBeenCalled());
+    await waitForLayoutData();
   });
 
   it('marks the current page in the navigation and hides the emojis', async () => {
@@ -115,12 +126,13 @@ describe('AdminLayout accessibility', () => {
     expect(within(nav).getByRole('link', { name: 'nav.categories' })).toHaveAttribute('aria-current', 'page');
     expect(within(nav).getByRole('link', { name: 'nav.dashboard' })).not.toHaveAttribute('aria-current');
     expect(within(nav).getByText('🏷️')).toHaveAttribute('aria-hidden', 'true');
-    await waitFor(() => expect(mockShortList).toHaveBeenCalled());
+    await waitForLayoutData();
   });
 
   it('opens the mobile drawer from a named menu button, focusing its first link', async () => {
     const user = userEvent.setup();
     renderLayout();
+    await waitForLayoutData();
     const menuButton = getMenuButton();
     const sidebar = screen.getByRole('complementary');
     expect(menuButton).toHaveAttribute('aria-expanded', 'false');
@@ -132,7 +144,7 @@ describe('AdminLayout accessibility', () => {
 
     expect(menuButton).toHaveAttribute('aria-expanded', 'true');
     expect(sidebar).not.toHaveClass('max-lg:invisible');
-    expect(within(sidebar).getByRole('link', { name: /Carta/ })).toHaveFocus();
+    expect(within(sidebar).getByRole('link', { name: /Chez Lulu/ })).toHaveFocus();
   });
 
   // jsdom runs no transition: the real-browser cause of a lost focus is the
@@ -140,6 +152,7 @@ describe('AdminLayout accessibility', () => {
   it('shows the drawer at once on opening and hides it only after the slide on closing', async () => {
     const user = userEvent.setup();
     renderLayout();
+    await waitForLayoutData();
     const sidebar = screen.getByRole('complementary');
     expect(sidebar.className).toContain('visibility_0s_200ms');
 
@@ -152,6 +165,7 @@ describe('AdminLayout accessibility', () => {
   it('gives the focus back to the menu button when the overlay is clicked', async () => {
     const user = userEvent.setup();
     const { container } = renderLayout();
+    await waitForLayoutData();
     await user.click(getMenuButton());
 
     await user.click(container.querySelector('.bg-black\\/50')!);
@@ -160,14 +174,16 @@ describe('AdminLayout accessibility', () => {
     expect(getMenuButton()).toHaveFocus();
   });
 
-  it('lets the skip link move the focus to the main content', () => {
+  it('lets the skip link move the focus to the main content', async () => {
     renderLayout();
+    await waitForLayoutData();
     expect(screen.getByRole('main')).toHaveAttribute('tabindex', '-1');
   });
 
   it('closes the drawer on Escape and gives the focus back to the menu button', async () => {
     const user = userEvent.setup();
     renderLayout();
+    await waitForLayoutData();
     await user.click(getMenuButton());
 
     await user.keyboard('{Escape}');
@@ -180,6 +196,7 @@ describe('AdminLayout accessibility', () => {
   it('closes the drawer when a page is chosen', async () => {
     const user = userEvent.setup();
     renderLayout();
+    await waitForLayoutData();
     await user.click(getMenuButton());
 
     await user.click(screen.getByRole('link', { name: /nav\.units/ }));
@@ -190,7 +207,7 @@ describe('AdminLayout accessibility', () => {
   it('has no serious accessibility violation, drawer open', async () => {
     const user = userEvent.setup();
     const { container } = renderLayout();
-    await screen.findByText('dashboard.shortageAlert');
+    await waitForLayoutData();
     await user.click(getMenuButton());
 
     expect(await axe(container)).toHaveNoViolations();
@@ -208,6 +225,6 @@ describe('AdminLayout app version', () => {
 
     const sidebar = screen.getByRole('complementary');
     expect(within(sidebar).getByText('v1.8.0')).toBeInTheDocument();
-    await waitFor(() => expect(mockShortList).toHaveBeenCalled());
+    await waitForLayoutData();
   });
 });

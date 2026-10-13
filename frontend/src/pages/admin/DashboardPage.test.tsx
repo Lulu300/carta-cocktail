@@ -2,21 +2,16 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
 import { render, screen, waitFor, within } from '../../test/test-utils';
 import AdminLayout from '../../components/layout/AdminLayout';
+import { AuthProvider } from '../../contexts/AuthContext';
+import { SiteSettingsProvider } from '../../contexts/SiteSettingsContext';
 import { createQueryClient } from '../../queries/queryClient';
 import { buildBottle, buildCategory, buildCocktail, buildMenu, buildShortage } from '../../test/factories';
 import { captureRequest, mockApiError, mockApiPending, mockApiResponse } from '../../test/msw/utils';
 import DashboardPage from './DashboardPage';
 
-vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ logout: vi.fn() }),
-}));
-
-vi.mock('../../contexts/SiteSettingsContext', () => ({
-  useSiteSettings: () => ({ siteSettings: { siteName: 'Carta', siteIcon: '' } }),
-}));
-
 afterEach(() => {
   vi.useRealTimers();
+  document.title = '';
 });
 
 const getCard = (label: RegExp) => screen.getByRole('link', { name: label });
@@ -120,12 +115,17 @@ describe('DashboardPage', () => {
     mockApiResponse('get', '/api/shortages', [buildShortage()]);
     const shortagesRequests = captureRequest('get', '/api/shortages');
 
+    // The providers of main.tsx: the layout reads the session and the site settings
     render(
-      <Routes>
-        <Route element={<AdminLayout />}>
-          <Route path="/" element={<DashboardPage />} />
-        </Route>
-      </Routes>,
+      <AuthProvider>
+        <SiteSettingsProvider>
+          <Routes>
+            <Route element={<AdminLayout />}>
+              <Route path="/" element={<DashboardPage />} />
+            </Route>
+          </Routes>
+        </SiteSettingsProvider>
+      </AuthProvider>,
     );
 
     // Layout badge and dashboard alert both show the count from the same request
@@ -133,5 +133,6 @@ describe('DashboardPage', () => {
       expect(screen.getAllByText(/dashboard\.shortageAlert/)).toHaveLength(2);
     });
     expect(shortagesRequests.count()).toBe(1);
+    await waitFor(() => expect(document.title).toBe('Carta'));
   });
 });
