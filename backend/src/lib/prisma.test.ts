@@ -129,7 +129,7 @@ describe('createPrismaClient', () => {
   });
 
   it('should open a relative DATABASE_URL from the prisma/ folder, not from the working directory', async () => {
-    // src/test/setup.ts sets DATABASE_URL to file:./test.db
+    // src/test/setup.ts sets DATABASE_URL to the relative URL of the test database
     expect(await openFile(prisma)).toBe(fs.realpathSync(TEST_DATABASE_PATH));
   });
 });

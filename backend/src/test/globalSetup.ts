@@ -1,13 +1,18 @@
 import { execSync } from 'child_process';
 import path from 'path';
-import { TEST_DATABASE_URL, removeTestDatabaseFiles } from './testDatabase';
+import {
+  TEST_DATABASE_URL,
+  createEmptyTestDatabaseDir,
+  removeTestDatabaseDir,
+} from './testDatabase';
 
 /**
  * Creates the test database once for the whole run, in Vitest's main process.
  * Test files share it and empty it with cleanDatabase() between tests.
  */
 export function setup(): void {
-  removeTestDatabaseFiles();
+  // SQLite does not create missing parent folders
+  createEmptyTestDatabaseDir();
   execSync('npx prisma db push --force-reset', {
     cwd: path.resolve(__dirname, '../..'),
     env: {
@@ -21,5 +26,5 @@ export function setup(): void {
 }
 
 export function teardown(): void {
-  removeTestDatabaseFiles();
+  removeTestDatabaseDir();
 }
