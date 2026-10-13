@@ -33,9 +33,10 @@ CI runs automatically on PRs: tsc → lint → build → test → coverage check
 
 - Test files live next to their source: `utils/colors.test.ts`, `pages/admin/BottlesPage.test.tsx`
 - Use the shared test utilities from `src/test/test-utils.tsx` (custom render with BrowserRouter)
-- Setup file `src/test/setup.ts` provides jest-dom matchers, i18n mock, and matchMedia mock
+- Setup file `src/test/setup.ts` provides jest-dom matchers, i18n mock, and matchMedia mock, starts the MSW server and resets handlers, factory ids and `localStorage` after each test
 - Environment: jsdom via Vitest
-- API calls are mocked (no real backend needed)
+- API calls go through the real `services/api.ts` to an MSW fake backend (`src/test/msw/handlers.ts`, one default handler per endpoint). Do not `vi.mock('services/api')`: set the answers a test needs with `mockApiResponse`, `mockApiError`, `mockApiPending`, `mockNetworkError`, and check what the page sent with `captureRequest` (`src/test/msw/utils.ts`). A request without a handler fails the test
+- Build test data with the typed factories of `src/test/factories.ts` (`buildBottle`, `buildCategory`…), never with `as never` casts
 - Run with coverage locally: `npm test -- --coverage`
 - Accessibility: page tests check axe with `expect(await axe(container)).toHaveNoViolations()` (`src/test/axe.ts`, serious and critical violations only). jsdom computes no colors: contrast is checked with Lighthouse in a browser
 
