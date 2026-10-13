@@ -56,7 +56,7 @@ Relevé par la relecture de B-11 (PR #130) :
 - D-26 touche aussi `backend/Dockerfile` (retrait de `src/` de l'image) : enchaîner, pas en parallèle.
 - Une seule tâche à la fois sur `backend/package-lock.json` (couloir `deps`).
 - B-16 retirera les surcharges `deepmerge-ts`/`mysql2` quand Prisma corrigera : vérifier que la solution retenue ne dépend pas de ces surcharges.
-- Les procédures documentées passent soit par `--entrypoint`, soit par l'entrypoint (`docker compose run … npx prisma …`, `exec "$@"` dans `docker-entrypoint.sh`) : vérifier les deux chemins.
+- Les procédures documentées lancent la CLI de trois façons : `--entrypoint` (README:269), `docker compose exec`/`docker exec` dans le conteneur qui tourne (README:209, UPGRADING:236, :278), et `docker compose run`, qui passe par l'entrypoint (`exec "$@"` dans `docker-entrypoint.sh`, README:282). Vérifier les trois.
 - Piste « CLI dans un dossier à part » : l'entrypoint et la documentation appellent `npx prisma` depuis `/app`. Si `node_modules/.bin/prisma` n'y est plus, `npx` irait chercher `prisma` sur le registre (réseau, version non épinglée) au lieu d'échouer. `prisma.config.ts` importe `prisma/config` et `dotenv` depuis `/app` : la résolution doit continuer à marcher. Si la documentation change, `README.md` s'ajoute aux `touches` (UPGRADING passe par les notes de version).
 
 ## Journal
