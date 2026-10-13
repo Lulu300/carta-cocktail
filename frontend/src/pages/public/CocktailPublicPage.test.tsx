@@ -1,28 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { render, screen, waitFor } from '../../test/test-utils';
-import { ApiError } from '../../services/api';
 import { axe } from '../../test/axe';
+import {
+  buildBottle,
+  buildCategory,
+  buildCocktail,
+  buildCocktailIngredient,
+  buildUnit,
+} from '../../test/factories';
+import { captureRequest, mockApiError, mockApiPending, mockApiResponse } from '../../test/msw/utils';
 import CocktailPublicPage from './CocktailPublicPage';
 
-const mockGetCocktail = vi.fn();
 const mockNavigate = vi.fn();
 const mockUseAuth = vi.fn();
 
-vi.mock('../../services/api', async () => {
-  const actual = await vi.importActual<typeof import('../../services/api')>('../../services/api');
-  return {
-    ApiError: actual.ApiError,
-    publicApi: { getCocktail: (...args: unknown[]) => mockGetCocktail(...args) },
-  };
-});
-
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => mockUseAuth(),
-}));
-
-vi.mock('../../hooks/useLocalizedName', () => ({
-  useLocalizedName: () => (entity: { name?: string }) => entity?.name || '',
 }));
 
 vi.mock('react-router-dom', async () => {
@@ -34,69 +28,60 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
-vi.mock('../../components/ui/UnitConverter', () => ({
-  default: ({ quantity, unit }: { quantity: number; unit: string }) => <span>{quantity} {unit}</span>,
-}));
+const vermouth = buildCategory({ id: 10, name: 'Vermouth', minimumPercent: 0 });
 
-vi.mock('../../components/ui/ExportCocktailButton', () => ({
-  default: () => <button type="button">export</button>,
-}));
-
-const cocktailResponse = {
+const negroni = buildCocktail({
   id: 42,
   name: 'Negroni',
   description: 'Bitter and bright',
   notes: 'Use the large mixing glass.',
   imagePath: 'cocktails/negroni.jpg',
   tags: 'classic,bitter',
-  isAvailable: true,
-  createdAt: '2024-01-01',
-  updatedAt: '2024-01-01',
   ingredients: [
-    {
+    buildCocktailIngredient({
       id: 1,
       cocktailId: 42,
       quantity: 30,
-      unitId: 1,
-      unit: { id: 1, name: 'Millilitre', abbreviation: 'ml', conversionFactorToMl: 1 },
-      sourceType: 'CATEGORY' as const,
-      bottleId: null,
+      unitId: 2,
+      unit: buildUnit({ id: 2, name: 'Millilitre', abbreviation: 'ml', conversionFactorToMl: 1 }),
+      sourceType: 'CATEGORY',
+      ingredient: null,
       categoryId: 10,
-      category: { id: 10, name: 'Vermouth', type: 'SPIRIT', desiredStock: 1, minimumPercent: 0, createdAt: '2024-01-01' },
-      ingredientId: null,
+      category: vermouth,
       position: 0,
       preferredBottles: [
         {
           id: 8,
           cocktailIngredientId: 1,
           bottleId: 100,
-          bottle: {
-            id: 100,
-            name: 'Cocchi Vermouth di Torino',
-            categoryId: 10,
-            capacityMl: 750,
-            remainingPercent: 100,
-            purchasePrice: null,
-            openedAt: null,
-            alcoholPercentage: null,
-            location: null,
-            isApero: false,
-            isDigestif: false,
-            createdAt: '2024-01-01',
-          },
+          bottle: buildBottle({ id: 100, name: 'Cocchi Vermouth di Torino', category: vermouth, capacityMl: 750 }),
         },
       ],
-    },
+    }),
   ],
   instructions: [
     { id: 1, cocktailId: 42, stepNumber: 1, text: 'Stir with ice.' },
   ],
-};
+});
 
 describe('CocktailPublicPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetCocktail.mockResolvedValue(cocktailResponse);
+    mockApiResponse('get', '/api/public/cocktails/:id', negroni);
+  });
+
+  it('loads the cocktail of the URL and shows the recipe with its quantities', async () => {
+    mockUseAuth.mockReturnValue({ user: null });
+    const request = captureRequest('get', '/api/public/cocktails/:id');
+
+    render(<CocktailPublicPage />);
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Negroni' })).toBeInTheDocument();
+    expect((await request.url).pathname).toBe('/api/public/cocktails/42');
+    expect(screen.getByText('Vermouth')).toBeInTheDocument();
+    expect(screen.getByText('Stir with ice.')).toBeInTheDocument();
+    // The unit converter turns the quantity into a button once the units are loaded
+    expect(await screen.findByRole('button', { name: '30 ml' })).toBeInTheDocument();
   });
 
   it('shows notes and preferred bottles for logged-in admins', async () => {
@@ -187,14 +172,14 @@ describe('CocktailPublicPage', () => {
     });
 
     it('shows a skeleton while the recipe loads', () => {
-      mockGetCocktail.mockReturnValue(new Promise(() => {}));
+      mockApiPending('get', '/api/public/cocktails/:id');
       render(<CocktailPublicPage />);
 
       expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
     });
 
     it('tells an unknown cocktail apart and links back to the menu', async () => {
-      mockGetCocktail.mockRejectedValue(new ApiError(404, 'Not found'));
+      mockApiError('get', '/api/public/cocktails/:id', 404, 'Not found');
       render(<CocktailPublicPage />);
 
       expect(await screen.findByRole('alert')).toHaveTextContent('public.cocktailNotFound');
@@ -204,10 +189,11 @@ describe('CocktailPublicPage', () => {
 
     it('offers a retry when the recipe cannot be loaded', async () => {
       const user = userEvent.setup();
-      mockGetCocktail.mockRejectedValueOnce(new ApiError(503, 'Unavailable'));
+      mockApiError('get', '/api/public/cocktails/:id', 503, 'Unavailable');
       render(<CocktailPublicPage />);
 
       expect(await screen.findByRole('alert')).toHaveTextContent('public.cocktailLoadError');
+      mockApiResponse('get', '/api/public/cocktails/:id', negroni);
       await user.click(screen.getByRole('button', { name: 'common.retry' }));
 
       expect(await screen.findByText('Negroni')).toBeInTheDocument();
@@ -223,13 +209,13 @@ describe('CocktailPublicPage', () => {
     await user.click(await screen.findByRole('button', { name: /public\.print/ }));
 
     expect(print).toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'export' })).toBeInTheDocument();
+    expect(screen.getByTitle('cocktails.export')).toBeInTheDocument();
   });
 });
 
 describe('CocktailPublicPage accessibility', () => {
   it('has no serious accessibility violation', async () => {
-    mockGetCocktail.mockResolvedValue(cocktailResponse);
+    mockApiResponse('get', '/api/public/cocktails/:id', negroni);
     mockUseAuth.mockReturnValue({ user: { id: 1, email: 'admin@test.local' } });
     const { container } = render(<CocktailPublicPage />);
     await screen.findByText('Negroni');

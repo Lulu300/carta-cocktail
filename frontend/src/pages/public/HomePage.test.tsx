@@ -1,21 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { render, screen } from '../../test/test-utils';
-import { bottleMenu, cocktailMenu } from '../../test/publicMenuFixtures';
+import { AppProviders } from '../../test/appProviders';
+import { buildMenu, buildSiteSettings } from '../../test/factories';
+import { mockApiPending, mockApiResponse, mockNetworkError } from '../../test/msw/utils';
+import type { Menu } from '../../types';
 import { axe } from '../../test/axe';
 import HomePage from './HomePage';
-
-vi.mock('../../services/api', () => ({
-  publicApi: { listMenus: vi.fn() },
-}));
-
-vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ user: null, token: null }),
-}));
-
-vi.mock('../../contexts/SiteSettingsContext', () => ({
-  useSiteSettings: () => ({ siteSettings: { siteName: 'Chez Lulu', siteIcon: '🍹' } }),
-}));
 
 vi.mock('react-i18next', async (importOriginal) => {
   const { translateWithValues } = await import('../../test/translateWithValues');
@@ -25,53 +16,61 @@ vi.mock('react-i18next', async (importOriginal) => {
   };
 });
 
-import { publicApi } from '../../services/api';
+function mockMenus(menus: Menu[]) {
+  mockApiResponse('get', '/api/public/menus', menus);
+}
+
+/** The home page of a guest: no stored token, the site settings from the backend. */
+function renderHome() {
+  return render(<AppProviders><HomePage /></AppProviders>);
+}
+
+beforeEach(() => {
+  mockApiResponse('get', '/api/public/settings', buildSiteSettings({ siteName: 'Chez Lulu', siteIcon: '🍹' }));
+});
 
 describe('HomePage', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('lists the public menus with a pluralized count of cocktails or bottles', async () => {
-    vi.mocked(publicApi.listMenus).mockResolvedValue([
-      cocktailMenu([], { slug: 'summer', name: 'Summer', description: 'Fresh drinks', _count: { cocktails: 1, bottles: 0 } }),
-      bottleMenu([], { id: 3, slug: 'aperitifs', name: 'Apéritifs', _count: { cocktails: 0, bottles: 5 } }),
+    mockMenus([
+      buildMenu({ slug: 'summer', name: 'Summer', description: 'Fresh drinks', _count: { cocktails: 1, bottles: 0 } }),
+      buildMenu({ slug: 'aperitifs', name: 'Apéritifs', type: 'APEROS', _count: { cocktails: 0, bottles: 5 } }),
     ]);
 
-    render(<HomePage />);
+    renderHome();
 
     expect(await screen.findByRole('link', { name: /Summer/ })).toHaveAttribute('href', '/menu/summer');
     expect(screen.getByText('Fresh drinks')).toBeInTheDocument();
     expect(screen.getByText('menus.cocktailCount(1)')).toBeInTheDocument();
     expect(screen.getByText('menus.bottleCount(5)')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Chez Lulu');
+    expect(await screen.findByRole('heading', { level: 1, name: /Chez Lulu/ })).toBeInTheDocument();
   });
 
   it('counts zero when the API sends no count', async () => {
-    vi.mocked(publicApi.listMenus).mockResolvedValue([cocktailMenu([])]);
+    mockMenus([buildMenu()]);
 
-    render(<HomePage />);
+    renderHome();
 
     expect(await screen.findByText('menus.cocktailCount(0)')).toBeInTheDocument();
   });
 
   it('says when no menu is published', async () => {
-    vi.mocked(publicApi.listMenus).mockResolvedValue([]);
+    mockMenus([]);
 
-    render(<HomePage />);
+    renderHome();
 
     expect(await screen.findByText('home.noMenus')).toBeInTheDocument();
   });
 
   it('shows an error with a retry, never "no menus", when the menus cannot be loaded', async () => {
     const user = userEvent.setup();
-    vi.mocked(publicApi.listMenus).mockRejectedValueOnce(new TypeError('Failed to fetch'));
-    vi.mocked(publicApi.listMenus).mockResolvedValueOnce([cocktailMenu([], { name: 'Summer' })]);
+    mockNetworkError('get', '/api/public/menus');
 
-    render(<HomePage />);
+    renderHome();
 
     expect(await screen.findByRole('alert')).toHaveTextContent('home.loadError');
     expect(screen.queryByText('home.noMenus')).not.toBeInTheDocument();
+
+    mockMenus([buildMenu({ name: 'Summer' })]);
 
     await user.click(screen.getByRole('button', { name: 'common.retry' }));
 
@@ -79,9 +78,9 @@ describe('HomePage', () => {
   });
 
   it('shows placeholders while the menus load', () => {
-    vi.mocked(publicApi.listMenus).mockReturnValue(new Promise(() => {}));
+    mockApiPending('get', '/api/public/menus');
 
-    render(<HomePage />);
+    renderHome();
 
     expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
     expect(screen.queryByText('home.noMenus')).not.toBeInTheDocument();
@@ -90,8 +89,8 @@ describe('HomePage', () => {
 
 describe('HomePage accessibility', () => {
   it('has no serious accessibility violation', async () => {
-    vi.mocked(publicApi.listMenus).mockResolvedValue([cocktailMenu([], { slug: 'summer', name: 'Summer' })]);
-    const { container } = render(<HomePage />);
+    mockMenus([buildMenu({ slug: 'summer', name: 'Summer' })]);
+    const { container } = renderHome();
     await screen.findByRole('link', { name: /Summer/ });
 
     expect(await axe(container)).toHaveNoViolations();

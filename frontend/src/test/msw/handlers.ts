@@ -1,5 +1,6 @@
 import { http, HttpResponse, type DefaultBodyType, type PathParams, type StrictRequest } from 'msw';
 import type { CocktailExportFormat } from '../../types';
+import { readJsonObject } from './responses';
 import {
   buildAvailability,
   buildBottle,
@@ -34,11 +35,6 @@ function exportedRecipe(name: string): CocktailExportFormat {
     exportedAt: '2026-01-15T10:00:00.000Z',
     cocktail: { name, description: null, notes: null, tags: [], ingredients: [], instructions: [] },
   };
-}
-
-async function readJsonObject(request: StrictRequest<DefaultBodyType>): Promise<Record<string, unknown>> {
-  const body = await request.json();
-  return typeof body === 'object' && body !== null ? { ...body } : {};
 }
 
 const FIRST_CREATED_ID = 1000;
@@ -146,9 +142,7 @@ const menuHandlers = [
 
 const menuBottleHandlers = [
   http.get('/api/menu-bottles/menu/:menuId', ({ params }) =>
-    HttpResponse.json([
-      buildMenuBottle({ id: 1, menuId: Number(params.menuId), bottle: buildBottle({ id: 1, isApero: true }) }),
-    ]),
+    HttpResponse.json([buildMenuBottle({ id: 1, menuId: Number(params.menuId) })]),
   ),
   http.get('/api/menu-bottles/menu/:menuId/exclusions', () => HttpResponse.json([])),
   http.post('/api/menu-bottles/menu/:menuId/exclusions', done),

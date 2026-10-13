@@ -1,5 +1,9 @@
+import { onTestFinished, vi } from 'vitest';
 import { http, HttpResponse, type JsonBodyType } from 'msw';
+import { errorResponse, pendingResponse } from './responses';
 import { server } from './server';
+
+export { errorResponse, pendingResponse, readJsonObject } from './responses';
 
 /** HTTP methods of `services/api.ts`, as named by MSW's `http` helpers. */
 export type ApiMethod = 'get' | 'post' | 'put' | 'delete';
@@ -11,12 +15,28 @@ export function mockApiResponse(method: ApiMethod, path: string, body: JsonBodyT
 
 /** Makes the backend reject `method path` with `status` and the `{ error }` body the real API sends. */
 export function mockApiError(method: ApiMethod, path: string, status: number, message: string): void {
-  mockApiResponse(method, path, { error: message }, status);
+  server.use(http[method](path, () => errorResponse(status, message)));
 }
 
 /** Makes `method path` hang: the page stays in its loading state for the whole test. */
 export function mockApiPending(method: ApiMethod, path: string): void {
-  server.use(http[method](path, () => new Promise<never>(() => {})));
+  server.use(http[method](path, pendingResponse));
+}
+
+/**
+ * Makes `method path` answer `body` only once the returned function is called,
+ * to check what the page shows while the request is in flight.
+ */
+export function holdApiResponse(method: ApiMethod, path: string, body: JsonBodyType): () => void {
+  let release: () => void = () => {};
+  const released = new Promise<void>((resolve) => { release = resolve; });
+  server.use(
+    http[method](path, async () => {
+      await released;
+      return HttpResponse.json(body);
+    }),
+  );
+  return release;
 }
 
 /** Makes `method path` fail like a dropped connection (fetch rejects, no HTTP status). */
@@ -24,8 +44,28 @@ export function mockNetworkError(method: ApiMethod, path: string): void {
   server.use(http[method](path, () => HttpResponse.error()));
 }
 
+/**
+ * Makes the next `fetch` reject with `reason`, which need not be an Error. No HTTP
+ * answer can do that: it covers the code that guards against a non-Error throw.
+ * The stub ends with the test, so a rejection left unused cannot reach the next test.
+ */
+export function rejectNextFetch(reason: unknown): void {
+  const spy = vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(reason);
+  onTestFinished(() => spy.mockRestore());
+}
+
+async function readBody(request: Request): Promise<unknown> {
+  const text = await request.text();
+  // request.formData() fails on the jsdom File of an upload: a test reads the raw multipart text
+  if (request.headers.get('Content-Type')?.startsWith('multipart/form-data')) return text;
+  return text ? JSON.parse(text) : null;
+}
+
 export interface CapturedRequest {
-  /** Body of the first matching request, parsed as JSON (`null` without a body). */
+  /**
+   * Body of the first matching request: parsed JSON, the raw multipart text for a
+   * file upload, `null` without a body.
+   */
   body: Promise<unknown>;
   /** Number of matching requests received so far. */
   count: () => number;
@@ -49,9 +89,8 @@ export function captureRequest(method: ApiMethod, path: string): CapturedRequest
     http[method](path, async ({ request }) => {
       received += 1;
       if (received === 1) {
-        const text = await request.clone().text();
         resolveUrl(new URL(request.url));
-        resolveBody(text ? JSON.parse(text) : null);
+        resolveBody(await readBody(request.clone()));
       }
       // No response: MSW falls through to the next handler for this request.
       return undefined;

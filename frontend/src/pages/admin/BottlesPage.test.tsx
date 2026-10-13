@@ -4,6 +4,7 @@ import { createTestQueryClient, fireEvent, screen, waitFor, within } from '../..
 import { clearToasts, renderWithFeedback } from '../../test/feedback';
 import { qk } from '../../queries/keys';
 import { useShortages } from '../../queries/shortages';
+import { mockDownload } from '../../test/download';
 import { buildBottle, buildCategory, buildShortage } from '../../test/factories';
 import { captureRequest, mockApiError, mockApiPending, mockApiResponse, mockNetworkError } from '../../test/msw/utils';
 import type { Bottle } from '../../types';
@@ -86,16 +87,6 @@ async function confirmDeletion(user: User, index = 0) {
   const confirmation = screen.getByRole('alertdialog');
   expect(confirmation).toHaveAccessibleDescription('bottles.confirmDelete');
   await user.click(within(confirmation).getByRole('button', { name: 'common.delete' }));
-}
-
-/**
- * The export saves the file through a temporary link: jsdom cannot download, so the
- * link click is recorded instead. Returns the spy on that click.
- */
-function mockDownload() {
-  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:bottles');
-  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
-  return vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
 }
 
 /** Reads the shortages like the sidebar badge of AdminLayout does. */
@@ -577,7 +568,7 @@ describe('BottlesPage', () => {
 
     it('exports the filtered bottles in the chosen format', async () => {
       const user = userEvent.setup();
-      const download = mockDownload();
+      const downloads = mockDownload();
       await renderLoadedPage();
       const exported = captureRequest('get', '/api/bottles/export');
       await user.type(screen.getByPlaceholderText('common.search'), 'abs');
@@ -587,13 +578,14 @@ describe('BottlesPage', () => {
 
       const query = (await exported.url).searchParams;
       expect(Object.fromEntries(query)).toEqual({ format: 'csv', search: 'abs' });
-      await waitFor(() => expect(download).toHaveBeenCalledTimes(1));
+      // Saved under the name sent by the server (Content-Disposition)
+      await waitFor(() => expect(downloads).toEqual(['bottles.csv']));
       expect(screen.queryByText('bottles.exportJson')).not.toBeInTheDocument();
     });
 
     it('exports in JSON', async () => {
       const user = userEvent.setup();
-      const download = mockDownload();
+      const downloads = mockDownload();
       await renderLoadedPage();
       const exported = captureRequest('get', '/api/bottles/export');
 
@@ -601,7 +593,7 @@ describe('BottlesPage', () => {
       await user.click(screen.getByText('bottles.exportJson'));
 
       expect((await exported.url).searchParams.get('format')).toBe('json');
-      await waitFor(() => expect(download).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(downloads).toHaveLength(1));
       // The menu closes: its button takes the focus back.
       expect(screen.getByRole('button', { name: 'bottles.export' })).toHaveFocus();
     });

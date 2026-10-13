@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
+import { buildCategory } from '../../test/factories';
 import { render, screen } from '../../test/test-utils';
 import type { Category } from '../../types';
 import CategoryFilterInput from './CategoryFilterInput';
 
 function category(id: number, name: string): Category {
-  return { id, name, type: 'SPIRIT', desiredStock: 1, minimumPercent: 0, createdAt: '2024-01-01' };
+  return buildCategory({ id, name, minimumPercent: 0 });
 }
 
 const categories = [category(1, 'Rum'), category(2, 'Rye whiskey'), category(3, 'Gin')];

@@ -1,45 +1,85 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
+import { http, HttpResponse } from 'msw';
 import userEvent from '@testing-library/user-event';
 import { fireEvent, screen, waitFor, within } from '../../test/test-utils';
 import { clearToasts, renderWithFeedback } from '../../test/feedback';
+import { buildCocktail, buildMenu, buildMenuCocktail, buildMenuSection } from '../../test/factories';
+import { server } from '../../test/msw/server';
+import { errorResponse, mockApiResponse, pendingResponse } from '../../test/msw/utils';
 import MenuEditPage from './MenuEditPage';
 import type { Cocktail, Menu, MenuCocktail, MenuInput, MenuSection } from '../../types';
 
-vi.mock('../../services/api', async () => {
-  const actual = await vi.importActual<typeof import('../../services/api')>('../../services/api');
-  return {
-    ApiError: actual.ApiError,
-    menus: { get: vi.fn(), update: vi.fn() },
-    cocktails: { list: vi.fn() },
-    menuSections: { create: vi.fn(), update: vi.fn(), delete: vi.fn(), reorder: vi.fn() },
-  };
-});
-
-import { ApiError, cocktails as cocktailsApi, menus as menusApi } from '../../services/api';
-
-const classics: MenuSection = { id: 7, menuId: 3, name: 'Classics', position: 0 };
-
-function makeCocktail(id: number, name: string): Cocktail {
-  return {
-    id, name, description: null, notes: null, imagePath: null, tags: '', isAvailable: true,
-    createdAt: '2026-01-01', updatedAt: '2026-01-01',
-  } as Cocktail;
-}
+const classics = buildMenuSection({ id: 7, menuId: 3, name: 'Classics', position: 0 });
 
 function makeEntry(cocktail: Cocktail, position: number, menuSectionId: number | null = null): MenuCocktail {
-  return { id: 100 + cocktail.id, menuId: 3, cocktailId: cocktail.id, cocktail, menuSectionId, position, isHidden: false };
+  return buildMenuCocktail({ id: 100 + cocktail.id, menuId: 3, cocktail, menuSectionId, position });
 }
 
-const mojito = makeCocktail(1, 'Mojito');
-const negroni = makeCocktail(2, 'Negroni');
-const spritz = makeCocktail(3, 'Spritz');
+const mojito = buildCocktail({ id: 1, name: 'Mojito' });
+const negroni = buildCocktail({ id: 2, name: 'Negroni' });
+const spritz = buildCocktail({ id: 3, name: 'Spritz' });
 
 function makeMenu(cocktails: MenuCocktail[], sections: MenuSection[] = [classics]): Menu {
-  return {
-    id: 3, name: 'Summer', description: null, slug: 'summer', type: 'COCKTAILS', isPublic: false,
-    createdAt: '2026-01-01', updatedAt: '2026-01-01', sections, cocktails,
+  return buildMenu({ id: 3, name: 'Summer', slug: 'summer', isPublic: false, sections, cocktails });
+}
+
+const ALL_COCKTAILS = [mojito, negroni, spritz];
+
+// --- Fake backend of the editor: it stores the menu and records each request ---
+
+/** What the server stores: a refetch after a save returns the saved composition. */
+let storedMenu: Menu;
+
+/** Requests received, in order: the id of each menu read and the body of each update. */
+let received: { menuReads: number[]; updates: Partial<MenuInput>[] };
+
+/** How the server answers an update; the default stores it. A test replaces it to refuse or hold one. */
+let answerUpdate: (data: Partial<MenuInput>) => Promise<Response>;
+
+/** How the server answers a read of the menu. */
+let answerRead: () => Promise<Response>;
+
+function storeCocktails(items: NonNullable<Partial<MenuInput>['cocktails']>) {
+  storedMenu = {
+    ...storedMenu,
+    cocktails: items.flatMap((item, index) => ALL_COCKTAILS
+      .filter((cocktail) => cocktail.id === item.cocktailId)
+      .map((cocktail) => ({ ...makeEntry(cocktail, index, item.menuSectionId ?? null), isHidden: item.isHidden ?? false }))),
   };
+}
+
+function storeUpdate(data: Partial<MenuInput>): Response {
+  if (data.cocktails) storeCocktails(data.cocktails);
+  return HttpResponse.json(storedMenu);
+}
+
+/** The menu fields the editor sends. */
+function isMenuUpdate(body: unknown): body is Partial<MenuInput> {
+  return typeof body === 'object' && body !== null && !Array.isArray(body);
+}
+
+function installFakeBackend() {
+  received = { menuReads: [], updates: [] };
+  answerRead = async () => HttpResponse.json(storedMenu);
+  answerUpdate = async (data) => storeUpdate(data);
+  server.use(
+    http.get('/api/menus/:id', ({ params }) => {
+      received.menuReads.push(Number(params.id));
+      return answerRead();
+    }),
+    http.put('/api/menus/:id', async ({ request }) => {
+      const body: unknown = await request.json();
+      if (!isMenuUpdate(body)) return errorResponse(400, 'Invalid body');
+      received.updates.push(body);
+      return answerUpdate(body);
+    }),
+  );
+}
+
+/** The first load answers; every refetch then waits forever, so only the editor itself can fix the screen. */
+function serveOnlyFirstLoad() {
+  answerRead = async () => (received.menuReads.length === 1 ? HttpResponse.json(storedMenu) : pendingResponse());
 }
 
 function renderPage() {
@@ -58,44 +98,17 @@ function rowOf(name: string): HTMLElement {
 }
 
 function sentCocktails(call = 0) {
-  return vi.mocked(menusApi.update).mock.calls[call][1].cocktails ?? [];
+  return received.updates[call].cocktails ?? [];
 }
 
 function sentCocktailIds(call = 0) {
   return sentCocktails(call).map((item) => item.cocktailId);
 }
 
-const ALL_COCKTAILS = [mojito, negroni, spritz];
-
-/** What the server stores: a refetch after a save returns the saved composition. */
-let storedMenu: Menu;
-
-function storeCocktails(items: NonNullable<Partial<MenuInput>['cocktails']>) {
-  storedMenu = {
-    ...storedMenu,
-    cocktails: items.map((item, index) => ({
-      ...makeEntry(ALL_COCKTAILS.find((cocktail) => cocktail.id === item.cocktailId) as Cocktail, index, item.menuSectionId ?? null),
-      isHidden: item.isHidden ?? false,
-    })),
-  };
-}
-
-/** The first load answers; every refetch then waits forever, so only the editor itself can fix the screen. */
-function serveOnlyFirstLoad() {
-  vi.mocked(menusApi.get)
-    .mockImplementation(() => new Promise<Menu>(() => {}))
-    .mockImplementationOnce(async () => storedMenu);
-}
-
 beforeEach(() => {
-  vi.clearAllMocks();
   storedMenu = makeMenu([makeEntry(mojito, 0), makeEntry(negroni, 1)]);
-  vi.mocked(menusApi.get).mockImplementation(async () => storedMenu);
-  vi.mocked(menusApi.update).mockImplementation(async (_id, data) => {
-    if (data.cocktails) storeCocktails(data.cocktails);
-    return storedMenu;
-  });
-  vi.mocked(cocktailsApi.list).mockResolvedValue(ALL_COCKTAILS);
+  installFakeBackend();
+  mockApiResponse('get', '/api/cocktails', ALL_COCKTAILS);
 });
 
 afterEach(clearToasts);
@@ -105,7 +118,7 @@ describe('MenuEditPage', () => {
     renderPage();
 
     expect(await screen.findByText('Mojito')).toBeInTheDocument();
-    expect(menusApi.get).toHaveBeenCalledWith(3);
+    expect(received.menuReads).toEqual([3]);
     expect(screen.getByDisplayValue('Summer')).toBeInTheDocument();
     expect(screen.getByDisplayValue('summer')).not.toHaveAttribute('readonly');
     expect(screen.getByRole('link', { name: /menus.backToList/ })).toHaveAttribute('href', '/admin/menus');
@@ -118,13 +131,14 @@ describe('MenuEditPage', () => {
 
     await user.selectOptions(within(rowOf('Negroni')).getByRole('combobox', { name: 'menus.sections.select' }), '7');
 
-    await waitFor(() => expect(menusApi.update).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(received.updates).toHaveLength(1));
     expect(sentCocktails()).toEqual([
       { cocktailId: 1, position: 0, isHidden: false, menuSectionId: null },
       { cocktailId: 2, position: 1, isHidden: false, menuSectionId: 7 },
     ]);
-    expect(within(screen.getByText('Classics', { selector: 'h3' }).closest('section') as HTMLElement).getByText('Negroni'))
-      .toBeInTheDocument();
+    const classicsSection = screen.getByText('Classics', { selector: 'h3' }).closest('section');
+    if (!classicsSection) throw new Error('No Classics section');
+    expect(within(classicsSection).getByText('Negroni')).toBeInTheDocument();
   });
 
   it('adds a cocktail at the end of the menu', async () => {
@@ -137,7 +151,7 @@ describe('MenuEditPage', () => {
     expect(within(dialog).queryByText('Mojito')).not.toBeInTheDocument();
     await user.click(await within(dialog).findByRole('button', { name: 'Spritz' }));
 
-    await waitFor(() => expect(menusApi.update).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(received.updates).toHaveLength(1));
     expect(sentCocktailIds()).toEqual([1, 2, 3]);
     expect(screen.getByText('Spritz')).toBeInTheDocument();
   });
@@ -151,7 +165,7 @@ describe('MenuEditPage', () => {
     await waitFor(() => expect(screen.queryByText('Mojito')).not.toBeInTheDocument());
     await user.click(within(rowOf('Negroni')).getByRole('button', { name: 'menus.hideItem' }));
 
-    await waitFor(() => expect(menusApi.update).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(received.updates).toHaveLength(2));
     expect(sentCocktails(0)).toEqual([{ cocktailId: 2, position: 0, isHidden: false, menuSectionId: null }]);
     expect(sentCocktails(1)).toEqual([{ cocktailId: 2, position: 0, isHidden: true, menuSectionId: null }]);
   });
@@ -163,14 +177,14 @@ describe('MenuEditPage', () => {
 
     await user.click(within(rowOf('Mojito')).getByRole('button', { name: 'menus.moveDown' }));
 
-    await waitFor(() => expect(menusApi.update).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(received.updates).toHaveLength(1));
     expect(sentCocktailIds()).toEqual([2, 1]);
     expect(within(rowOf('Negroni')).getByRole('button', { name: 'menus.moveUp' })).toBeDisabled();
   });
 
   it('puts the cocktail back and shows the server error when the save fails', async () => {
     const user = userEvent.setup();
-    vi.mocked(menusApi.update).mockRejectedValue(new ApiError(400, 'Unknown section'));
+    answerUpdate = async () => errorResponse(400, 'Unknown section');
     serveOnlyFirstLoad();
     renderPage();
     await screen.findByText('Mojito');
@@ -185,16 +199,13 @@ describe('MenuEditPage', () => {
   it('sends each change on top of the saved list: never a refused change, never a later one', async () => {
     const user = userEvent.setup();
     storedMenu = makeMenu([makeEntry(mojito, 0), makeEntry(negroni, 1), makeEntry(spritz, 2)]);
-    const answers: { resolve: () => void; reject: (error: Error) => void }[] = [];
-    vi.mocked(menusApi.update).mockImplementation((_id, data) => new Promise((resolve, reject) => {
+    const answers: { resolve: () => void; reject: (message: string) => void }[] = [];
+    answerUpdate = (data) => new Promise((resolve) => {
       answers.push({
-        resolve: () => {
-          storeCocktails(data.cocktails ?? []);
-          resolve(storedMenu);
-        },
-        reject,
+        resolve: () => resolve(storeUpdate(data)),
+        reject: (message) => resolve(errorResponse(500, message)),
       });
-    }));
+    });
     const hiddenFlags = (call: number) => sentCocktails(call).map((item) => item.isHidden);
     renderPage();
     await screen.findByText('Mojito');
@@ -203,10 +214,10 @@ describe('MenuEditPage', () => {
     await user.click(within(rowOf('Negroni')).getByRole('button', { name: 'menus.hideItem' }));
     await user.click(within(rowOf('Spritz')).getByRole('button', { name: 'menus.hideItem' }));
     expect(within(rowOf('Mojito')).getByRole('button', { name: 'menus.showItem' })).toBeInTheDocument();
-    expect(menusApi.update).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(received.updates).toHaveLength(1));
 
-    answers[0].reject(new ApiError(500, 'Boom'));
-    await waitFor(() => expect(menusApi.update).toHaveBeenCalledTimes(2));
+    answers[0].reject('Boom');
+    await waitFor(() => expect(received.updates).toHaveLength(2));
     // Without the refused Mojito change, and without the Spritz change still waiting.
     expect(hiddenFlags(1)).toEqual([false, true, false]);
     // The screen drops the refused change and keeps the ones still waiting.
@@ -216,11 +227,11 @@ describe('MenuEditPage', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Boom');
 
     answers[1].resolve();
-    await waitFor(() => expect(menusApi.update).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(received.updates).toHaveLength(3));
     expect(hiddenFlags(2)).toEqual([false, true, true]);
     answers[2].resolve();
 
-    await waitFor(() => expect(menusApi.get).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(received.menuReads).toHaveLength(2));
     expect(storedMenu.cocktails?.map((item) => item.isHidden)).toEqual([false, true, true]);
     expect(within(rowOf('Mojito')).getByRole('button', { name: 'menus.hideItem' })).toBeInTheDocument();
     expect(within(rowOf('Negroni')).getByRole('button', { name: 'menus.showItem' })).toBeInTheDocument();
@@ -239,12 +250,12 @@ describe('MenuEditPage', () => {
     await user.type(slug, 'Winter Menu');
     await user.type(screen.getByRole('textbox', { name: 'menus.description' }), 'Hot drinks');
     await user.click(screen.getByRole('switch', { name: 'menus.isPublic' }));
-    expect(menusApi.update).not.toHaveBeenCalled();
+    expect(received.updates).toEqual([]);
     await user.click(screen.getByRole('button', { name: 'common.save' }));
 
-    await waitFor(() => expect(menusApi.update).toHaveBeenCalledWith(3, {
+    await waitFor(() => expect(received.updates).toEqual([{
       name: 'Winter', slug: 'winter-menu', description: 'Hot drinks', isPublic: true,
-    }));
+    }]));
   });
 
   it('saves the menu info once on a double click', async () => {
@@ -257,7 +268,7 @@ describe('MenuEditPage', () => {
     fireEvent.click(save);
 
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('menus.updated'));
-    expect(menusApi.update).toHaveBeenCalledTimes(1);
+    expect(received.updates).toHaveLength(1);
   });
 
   it('links to the public page of a published menu', async () => {
@@ -268,7 +279,7 @@ describe('MenuEditPage', () => {
   });
 
   it('shows an error with a way back when the menu does not exist', async () => {
-    vi.mocked(menusApi.get).mockRejectedValue(new ApiError(404, 'Resource not found'));
+    answerRead = async () => errorResponse(404, 'Resource not found');
     renderPage();
 
     expect(await screen.findByText('menus.loadError')).toBeInTheDocument();

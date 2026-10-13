@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { buildCocktail, buildCocktailIngredient, buildIngredient } from '../test/factories';
 import type { Cocktail } from '../types';
 import { buildSearchText, matchesCocktailSearch, matchesSearchText, normalize } from './cocktailSearch';
 
@@ -6,44 +7,16 @@ const localize = (entity: { name: string; nameTranslations?: Record<string, stri
   entity.nameTranslations?.fr || entity.name;
 
 function cocktail(overrides: Partial<Cocktail> = {}): Cocktail {
-  return {
-    id: 1,
-    name: 'Mojito',
-    description: 'Un cocktail frais',
-    notes: null,
-    imagePath: null,
-    tags: 'rhum,tiki',
-    isAvailable: true,
-    createdAt: '2024-01-01',
-    updatedAt: '2024-01-01',
-    ingredients: [],
-    instructions: [],
-    ...overrides,
-  };
+  return buildCocktail({ id: 1, name: 'Mojito', description: 'Un cocktail frais', tags: 'rhum,tiki', ...overrides });
 }
 
 describe('matchesCocktailSearch', () => {
   it('matches every search term across different recipe fields', () => {
     const item = cocktail({
-      ingredients: [{
+      ingredients: [buildCocktailIngredient({
         id: 1,
-        cocktailId: 1,
-        quantity: 2,
-        unitId: 1,
-        sourceType: 'INGREDIENT',
-        bottleId: null,
-        categoryId: null,
-        ingredientId: 1,
-        ingredient: {
-          id: 1,
-          name: 'Lime',
-          nameTranslations: { fr: 'Citron vert' },
-          icon: null,
-          isAvailable: true,
-          createdAt: '2024-01-01',
-        },
-        position: 0,
-      }],
+        ingredient: buildIngredient({ id: 1, name: 'Lime', nameTranslations: { fr: 'Citron vert' } }),
+      })],
     });
 
     expect(matchesCocktailSearch(item, 'rhum citron', localize)).toBe(true);
@@ -78,6 +51,13 @@ describe('matchesCocktailSearch', () => {
 
   it('accepts an empty query', () => {
     expect(matchesCocktailSearch(cocktail(), '   ', localize)).toBe(true);
+  });
+
+  it('searches a cocktail sent without its ingredients and steps', () => {
+    const item = cocktail({ ingredients: undefined, instructions: undefined });
+
+    expect(matchesCocktailSearch(item, 'mojito tiki', localize)).toBe(true);
+    expect(matchesCocktailSearch(item, 'citron', localize)).toBe(false);
   });
 });
 

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
-import { menuCocktail } from '../../test/publicMenuFixtures';
+import { buildCocktailIngredient, buildIngredient, buildMenuCocktail } from '../../test/factories';
 import type { CocktailIngredient } from '../../types';
 import PublicCocktailItem from './PublicCocktailItem';
 
@@ -15,18 +15,7 @@ vi.mock('react-i18next', async (importOriginal) => {
 });
 
 function ingredient(id: number, name: string): CocktailIngredient {
-  return {
-    id,
-    cocktailId: 1,
-    quantity: 1,
-    unitId: 1,
-    sourceType: 'INGREDIENT',
-    bottleId: null,
-    categoryId: null,
-    ingredientId: id,
-    ingredient: { id, name, icon: null, isAvailable: true, createdAt: '2024-01-01' },
-    position: id,
-  };
+  return buildCocktailIngredient({ id, ingredient: buildIngredient({ id, name }) });
 }
 
 function CocktailPageProbe() {
@@ -34,7 +23,7 @@ function CocktailPageProbe() {
   return <p>cocktail page, state: {JSON.stringify(location.state)}</p>;
 }
 
-function renderItem(item = menuCocktail(1)) {
+function renderItem(item = buildMenuCocktail({ id: 1, cocktail: { name: 'Mojito' } })) {
   return render(
     <MemoryRouter initialEntries={['/menu/summer']}>
       <Routes>
@@ -51,7 +40,7 @@ function renderItem(item = menuCocktail(1)) {
 describe('PublicCocktailItem', () => {
   it('shows four ingredients and sums up the others', () => {
     const names = ['Rum', 'Lime', 'Mint', 'Sugar', 'Soda', 'Ice'];
-    renderItem(menuCocktail(1, { ingredients: names.map((name, index) => ingredient(index + 1, name)) }));
+    renderItem(buildMenuCocktail({ id: 1, cocktail: { ingredients: names.map((name, index) => ingredient(index + 1, name)) } }));
 
     expect(screen.getByText('Sugar')).toBeInTheDocument();
     expect(screen.queryByText('Soda')).not.toBeInTheDocument();
@@ -70,7 +59,7 @@ describe('PublicCocktailItem', () => {
 
   it('greys out a cocktail switched on but out of stock and does not open it', async () => {
     const user = userEvent.setup();
-    renderItem(menuCocktail(1, { isAvailable: true, available: false }));
+    renderItem(buildMenuCocktail({ id: 1, cocktail: { isAvailable: true, available: false } }));
 
     const link = screen.getByRole('link', { name: /Mojito/ });
     expect(link).toHaveClass('grayscale');
@@ -81,7 +70,7 @@ describe('PublicCocktailItem', () => {
   });
 
   it('keeps an available cocktail in color', () => {
-    renderItem(menuCocktail(1, { isAvailable: true, available: true }));
+    renderItem(buildMenuCocktail({ id: 1, cocktail: { isAvailable: true, available: true } }));
 
     const link = screen.getByRole('link', { name: /Mojito/ });
     expect(link).not.toHaveClass('grayscale');
@@ -91,7 +80,7 @@ describe('PublicCocktailItem', () => {
   });
 
   it('takes an unavailable cocktail out of the tab order and announces it as disabled', () => {
-    renderItem(menuCocktail(1, { isAvailable: true, available: false }));
+    renderItem(buildMenuCocktail({ id: 1, cocktail: { isAvailable: true, available: false } }));
 
     const link = screen.getByRole('link', { name: /Mojito/ });
     expect(link).toHaveAttribute('aria-disabled', 'true');
@@ -99,12 +88,12 @@ describe('PublicCocktailItem', () => {
   });
 
   it('treats the photo as decoration: the heading already names the link', () => {
-    renderItem(menuCocktail(1, { imagePath: 'mojito.jpg' }));
+    renderItem(buildMenuCocktail({ id: 1, cocktail: { imagePath: 'mojito.jpg' } }));
     expect(screen.getByRole('link', { name: /Mojito/ }).querySelector('img')).toHaveAttribute('alt', '');
   });
 
   it('hides the placeholder emoji from screen readers', () => {
-    renderItem(menuCocktail(1, { imagePath: null }));
+    renderItem(buildMenuCocktail({ id: 1, cocktail: { imagePath: null } }));
     expect(screen.getByText('🍸')).toHaveAttribute('aria-hidden', 'true');
   });
 });
