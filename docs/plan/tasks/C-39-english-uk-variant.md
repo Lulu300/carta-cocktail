@@ -8,7 +8,7 @@ effort: S
 status: todo
 owner: mixed
 depends_on: [C-35, E-10, E-27]
-touches: [frontend/src/i18n/index.ts, frontend/src/i18n/index.test.ts, frontend/src/utils/localization.ts, frontend/src/utils/localization.test.ts, frontend/src/components/ui/LanguageSelector.tsx, frontend/src/components/ui/LanguageSelector.test.tsx, frontend/src/services/api.ts, frontend/src/services/api.test.ts, frontend/src/utils/dates.ts, frontend/src/utils/dates.test.ts, backend/src/utils/importDates.ts, backend/src/utils/importDates.test.ts]
+touches: [frontend/src/i18n/index.ts, frontend/src/i18n/index.test.ts, frontend/src/utils/localization.ts, frontend/src/utils/localization.test.ts, frontend/src/components/ui/LanguageSelector.tsx, frontend/src/components/ui/LanguageSelector.test.tsx, frontend/src/components/admin/TranslationFields.tsx, frontend/src/components/admin/TranslationFields.test.tsx, frontend/src/services/api.ts, frontend/src/services/api.test.ts, frontend/src/utils/dates.ts, frontend/src/utils/dates.test.ts, backend/src/utils/importDates.ts, backend/src/utils/importDates.test.ts]
 sources: []
 branch:
 pr:
@@ -76,3 +76,4 @@ Un admin britannique ne peut donc ni choisir le format jour/mois en anglais, ni 
 - 2026-10-12 : tâche créée par C-35, sur décision de l'humain (`en` = English (US), English (UK) plus tard).
 - 2026-10-13 : relecture de la PR #132 : `frontend/src/i18n/index.test.ts` ajouté à `touches`, `LanguageSelector` lit `i18n.language`.
 - 2026-10-13 : E-30 (PR #133) : les tables de messages d'`i18n/index.ts` et d'`i18n/admin.ts` sont typées par `TRANSLATED_LANGUAGES` (langues qui ont leurs propres fichiers), dont part `SUPPORTED_LANGUAGES`. `en-GB` s'ajoute à `SUPPORTED_LANGUAGES` et à `LanguageSelector` seulement, pas à `TRANSLATED_LANGUAGES` ni aux tables : i18next lui sert les messages `en`.
+- 2026-10-13 : relecture d'E-10 (PR #134). E-10 ajoute une constante `LANGUAGE_NAMES` (`frontend/src/utils/localization.ts`), utilisée à la fois par `LanguageSelector` et par les libellés de `TranslationFields`. Si C-39 renomme `en` en « English (US) », le champ de traduction anglais prendra ce nom, alors que `nameTranslations.en` sert aussi à `en-GB`. Il faut séparer les noms affichés dans le sélecteur des noms des langues de contenu. La règle attendue au dernier point d'attention est fixée : les noms de langues sont des endonymes, jamais traduits, rangés dans `LANGUAGE_NAMES`. `frontend/src/components/admin/TranslationFields.tsx` (et son test) sont ajoutés à `touches`.
