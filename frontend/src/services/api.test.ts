@@ -3,11 +3,13 @@ import i18n from '../i18n';
 
 // We test the request helper behavior by importing the module and mocking fetch
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
 
 beforeEach(() => {
   localStorage.clear();
   mockFetch.mockReset();
+  // Set after the MSW server of src/test/setup.ts patched fetch: this unit test
+  // checks the exact fetch calls, so it bypasses the fake backend.
+  vi.stubGlobal('fetch', mockFetch);
 });
 
 afterEach(async () => {
