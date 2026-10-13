@@ -5,13 +5,13 @@ phase: D
 lane: infra
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [D-01, B-11]
-touches: [backend/Dockerfile, backend/package.json, backend/package-lock.json, backend/docker-entrypoint.sh]
+touches: [backend/Dockerfile, backend/docker/prune-unused-deps.mjs, backend/package.json, backend/package-lock.json, backend/docker-entrypoint.sh]
 sources: []
-branch:
-pr:
+branch: chore/D-30-backend-image-runtime-deps
+pr: 138
 ---
 
 ## Décisions validées (2026-10-13)
@@ -40,12 +40,12 @@ Relevé par la relecture de B-11 (PR #130) :
 
 ## Critères d'acceptation
 
-- [ ] L'inventaire de l'étape 1 est dans la PR (paquets ou groupes, raison, taille).
-- [ ] `@prisma/studio-core`, `react`, `react-dom`, `@radix-ui/*` et `@types/node` ne sont plus dans l'image, ou le Journal explique pourquoi l'un d'eux doit rester.
-- [ ] Le démarrage sur une copie du jeu d'essai réel (v1.4.0) passe comme avant : sauvegarde, P3005, baseline `0_init`, migrations appliquées, `/api/health` 200. Une installation neuve et un second démarrage passent aussi.
-- [ ] Le refus sur migration en échec (C-18) et le refus de la baseline restent identiques (message et code de sortie).
-- [ ] Les commandes Prisma et la vérification d'intégrité que README et UPGRADING font lancer dans l'image marchent toujours (`migrate status`, `migrate resolve --applied`/`--rolled-back`, `check-integrity.js`), ou la documentation donne leur remplacement.
-- [ ] Check Smoke vert ; taille de l'image avant/après dans la PR.
+- [x] L'inventaire de l'étape 1 est dans la PR (paquets ou groupes, raison, taille).
+- [x] `@prisma/studio-core`, `react`, `react-dom`, `@radix-ui/*` et `@types/node` ne sont plus dans l'image, ou le Journal explique pourquoi l'un d'eux doit rester.
+- [x] Le démarrage sur une copie du jeu d'essai réel (v1.4.0) passe comme avant : sauvegarde, P3005, baseline `0_init`, migrations appliquées, `/api/health` 200. Une installation neuve et un second démarrage passent aussi.
+- [x] Le refus sur migration en échec (C-18) et le refus de la baseline restent identiques (message et code de sortie).
+- [x] Les commandes Prisma et la vérification d'intégrité que README et UPGRADING font lancer dans l'image marchent toujours (`migrate status`, `migrate resolve --applied`/`--rolled-back`, `check-integrity.js`), ou la documentation donne leur remplacement.
+- [x] Check Smoke vert ; taille de l'image avant/après dans la PR.
 
 ## Tests à ajouter ou adapter
 
@@ -62,3 +62,5 @@ Relevé par la relecture de B-11 (PR #130) :
 ## Journal
 
 - 2026-10-13 : tâche créée par la PR docs #135 (suites du lot C-35/E-10/B-11/C-37/E-30), sur décision de l'humain, à partir de la relecture de B-11 (PR #130).
+- 2026-10-13 : fait (PR #138). La CLI Prisma reste dans l'image : l'entrypoint (`migrate deploy`, baseline par `migrate diff` et `migrate resolve`) et les procédures de README et UPGRADING (`npx prisma migrate status`, `resolve --rolled-back`) en ont besoin ; s'en passer demanderait une image de migration à part ou un exécuteur de migrations maison (la comparaison de la baseline exige le moteur de schéma), avec de nouvelles procédures : décision de conception pour l'humain, hors de cette tâche. Après `npm prune`, l'étage `prod-deps` lance `backend/docker/prune-unused-deps.mjs` (ajouté à `touches`), qui coupe des arêtes du graphe de dépendances et supprime ce qui n'est plus atteignable depuis `package.json` ; une arête absente arrête le build. Retirés : les dépendances de `@prisma/studio-core` (React, React DOM, Radix, visx, d3, `@types/react`…), le serveur Postgres local de `@prisma/dev` (PGlite…), `mysql2` (avec `@types/node` et `undici-types`), `postgres` et `prebuild-install` : 118 paquets, 77 Mio. `node_modules` passe de 362 à 285 Mio, l'image de 165 à 148 Mo compressée (723 à 625 Mo sur disque). `@prisma/studio-core` et `@prisma/dev` restent : `prisma/build/cli.js` charge au démarrage, quelle que soit la commande, les modules `dist/data/` du premier et `dist/state.cjs` du second (sans eux, `prisma --version` échoue). Indépendant des surcharges de B-16 : même résultat avec un lockfile régénéré sans elles. Aucune procédure ne change ; `prisma studio` et `prisma dev`, non documentés, ne marchent plus dans l'image. Les fichiers jamais chargés à l'intérieur des paquets gardés (interface de Studio, compilateurs de requêtes des autres bases, sources de SQLite, `.map`, `.d.ts`) sont suivis par la nouvelle tâche D-31.
+- 2026-10-13 : vérifications (PR #138, nombres seulement). Sur des copies du jeu d'essai, image avant et après : installation neuve et second démarrage, démarrage v1.4.0 (sauvegarde, P3005, baseline `0_init`, 3 migrations, `/api/health` 200), refus C-18 (P3018 puis P3009) et refus de la baseline avec les mêmes messages et le code 1, commandes de README et UPGRADING sous les trois formes (`--entrypoint`, `exec`, `run` par l'entrypoint, aussi par `docker compose`) avec les mêmes codes de sortie, `--network none` pour les commandes ponctuelles. Banc `1.4.0,local` vert en `friend` et `official` (naïf et conforme, 42/42 photos, 762 lignes sans perte), avec un hook `1.12.0.mjs` temporaire non commité ; Smoke local et check Smoke verts.
