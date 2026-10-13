@@ -38,6 +38,7 @@ CI runs automatically on PRs: tsc → lint → build → test → coverage check
 - API calls go through the real `services/api.ts` to an MSW fake backend (`src/test/msw/handlers.ts`, one default handler per endpoint). Do not `vi.mock('services/api')`: set the answers a test needs with `mockApiResponse`, `mockApiError`, `mockApiPending`, `mockNetworkError`, and check what the page sent with `captureRequest` (`src/test/msw/utils.ts`). A request without a handler fails the test
 - Build test data with the typed factories of `src/test/factories.ts` (`buildBottle`, `buildCategory`…), never with `as never` casts
 - Run with coverage locally: `npm test -- --coverage`
+- Under an AI agent, Vitest picks its `minimal` reporter, which hides the console of passing tests (`act(...)` warnings, `[MSW]` messages): run `npx vitest run --silent=false` to see it
 - Accessibility: page tests check axe with `expect(await axe(container)).toHaveNoViolations()` (`src/test/axe.ts`, serious and critical violations only). jsdom computes no colors: contrast is checked with Lighthouse in a browser
 
 ## Structure
