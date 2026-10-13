@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../../hooks/useLocalizedName';
 import type { BottleGroup } from '../../../utils/bottleGrouping';
 import { cx } from '../../ui/classNames';
@@ -17,6 +18,7 @@ function averageRemaining(group: BottleGroup): number {
 
 /** Row of identical bottles with their count; a click lists each bottle below it. */
 export default function BottleGroupRow({ group, expanded, onToggle, onEdit, onDelete }: BottleGroupRowProps) {
+  const { t } = useTranslation();
   const localize = useLocalizedName();
   const average = averageRemaining(group);
 
@@ -33,15 +35,15 @@ export default function BottleGroupRow({ group, expanded, onToggle, onEdit, onDe
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
             {group.name}
-            <span className="bg-accent/20 text-accent text-xs font-bold px-2 py-0.5 rounded-full">x{group.bottles.length}</span>
+            <span className="bg-accent/20 text-accent text-xs font-bold px-2 py-0.5 rounded-full">×{group.bottles.length}</span>
           </button>
         </td>
         <td className="px-6 py-4 text-fg-muted">{group.category ? localize(group.category) : ''}</td>
-        <td className="px-6 py-4">{group.capacityMl} ml</td>
+        <td className="px-6 py-4">{t('units.ml', { value: group.capacityMl })}</td>
         <td className="px-6 py-4 text-fg-muted">
           <RemainingBar percent={average} label={`~${average}%`} />
         </td>
-        <td className="px-6 py-4 text-fg-muted">{group.alcoholPercentage ? `${group.alcoholPercentage}%` : '-'}</td>
+        <td className="px-6 py-4 text-fg-muted">{group.alcoholPercentage ? t('units.abv', { value: group.alcoholPercentage }) : '-'}</td>
         <td className="px-6 py-4 text-fg-muted">-</td>
         <td className="px-6 py-4 text-fg-muted">-</td>
         <td className="px-6 py-4"></td>

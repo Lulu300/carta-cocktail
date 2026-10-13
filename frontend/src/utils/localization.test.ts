@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { getBaseLanguage, getLocalizedName } from './localization';
+import { SUPPORTED_LANGUAGES } from '../i18n';
+import { LANGUAGE_NAMES, getBaseLanguage, getLocalizedName } from './localization';
 
 describe('getBaseLanguage', () => {
   it('should strip the region from a regional locale', () => {
@@ -66,5 +67,12 @@ describe('getLocalizedName', () => {
   it('should handle non-object translations', () => {
     const entity = { name: 'Vodka', nameTranslations: 'invalid' as unknown as Record<string, string> };
     expect(getLocalizedName(entity, 'fr')).toBe('Vodka');
+  });
+});
+
+describe('LANGUAGE_NAMES', () => {
+  // The language selector lists LANGUAGE_NAMES: a supported language without a name would be missing.
+  it('names exactly the supported languages', () => {
+    expect(Object.keys(LANGUAGE_NAMES)).toEqual([...SUPPORTED_LANGUAGES]);
   });
 });

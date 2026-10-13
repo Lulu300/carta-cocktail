@@ -42,8 +42,8 @@ describe('HomePage', () => {
 
     expect(await screen.findByRole('link', { name: /Summer/ })).toHaveAttribute('href', '/menu/summer');
     expect(screen.getByText('Fresh drinks')).toBeInTheDocument();
-    expect(screen.getByText('home.cocktailCount(1)')).toBeInTheDocument();
-    expect(screen.getByText('home.bottleCount(5)')).toBeInTheDocument();
+    expect(screen.getByText('menus.cocktailCount(1)')).toBeInTheDocument();
+    expect(screen.getByText('menus.bottleCount(5)')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Chez Lulu');
   });
 
@@ -52,7 +52,7 @@ describe('HomePage', () => {
 
     render(<HomePage />);
 
-    expect(await screen.findByText('home.cocktailCount(0)')).toBeInTheDocument();
+    expect(await screen.findByText('menus.cocktailCount(0)')).toBeInTheDocument();
   });
 
   it('says when no menu is published', async () => {

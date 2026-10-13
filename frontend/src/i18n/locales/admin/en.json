@@ -25,15 +25,14 @@
   },
   "dashboard": {
     "title": "Dashboard",
-    "welcome": "Welcome back!",
     "stats": {
       "categories": "Categories",
       "bottles": "Bottles",
       "cocktails": "Cocktails",
       "menus": "Menus"
     },
-    "shortageAlert": "{{count}} shortage(s) detected",
-    "noShortages": "No shortages - stock is good!"
+    "shortageAlert_one": "{{count}} shortage detected",
+    "shortageAlert_other": "{{count}} shortages detected"
   },
   "categories": {
     "title": "Categories",
@@ -77,14 +76,11 @@
     "openedAt": "Opened On",
     "unopened": "Sealed",
     "opened": "Opened",
-    "empty": "Empty",
     "confirmDelete": "Delete this bottle?",
     "created": "Bottle created",
     "updated": "Bottle updated",
     "deleted": "Bottle deleted",
     "filterByCategory": "Filter by category",
-    "filterByType": "Filter by type",
-    "all": "All",
     "location": "Location",
     "locationPlaceholder": "E.g.: Top shelf, Main bar...",
     "activeTitle": "Available bottles",
@@ -94,7 +90,6 @@
     "quantityHint": "{{count}} identical bottles will be created",
     "saveDuplicate": "Save and duplicate",
     "noCategoryHint": "Create a category first to add bottles",
-    "showAllLocations": "Show all locations",
     "import": "Import",
     "export": "Export",
     "exportJson": "Export (JSON)",
@@ -157,7 +152,11 @@
         }
       }
     },
-    "search": "Search bottles"
+    "search": "Search bottles",
+    "alcoholPercentage": "Alcohol (% vol.)",
+    "usage": "Use",
+    "usableAsApero": "Can be served as an aperitif",
+    "usableAsDigestif": "Can be served as a digestif"
   },
   "ingredients": {
     "title": "Ingredients",
@@ -175,7 +174,8 @@
     "created": "Ingredient created",
     "updated": "Ingredient updated",
     "deleted": "Ingredient deleted",
-    "search": "Search ingredients"
+    "search": "Search ingredients",
+    "icon": "Icon (optional)"
   },
   "units": {
     "title": "Units",
@@ -187,7 +187,10 @@
     "created": "Unit created",
     "updated": "Unit updated",
     "deleted": "Unit deleted",
-    "search": "Search units"
+    "search": "Search units",
+    "conversionFactor": "Conversion factor (ml)",
+    "conversionFactorHint": "E.g. 1 cl = 10 ml, so the factor is 10. Leave empty for units counted by the piece.",
+    "notConvertible": "Not convertible"
   },
   "cocktails": {
     "title": "Cocktails",
@@ -198,7 +201,6 @@
     "available": "Available",
     "unavailable": "Unavailable",
     "image": "Image",
-    "uploadImage": "Upload Image",
     "ingredients": "Ingredients",
     "instructions": "Instructions",
     "addIngredient": "Add Ingredient",
@@ -226,7 +228,6 @@
       "title": "Import a recipe",
       "dropzone": "Drop a JSON or ZIP file here or click to browse",
       "invalidFile": "Invalid JSON file",
-      "invalidVersion": "Unsupported format version",
       "preview": "Preview",
       "ingredientCount": "{{count}} ingredient(s)",
       "instructionCount": "{{count}} step(s)",
@@ -241,7 +242,6 @@
       "skip": "Skip",
       "allResolved": "All dependencies are resolved",
       "unresolvedCount": "{{count}} dependency(ies) to resolve",
-      "summary": "Import summary",
       "entitiesToCreate": "Entities to create",
       "entitiesMapped": "Existing entities used",
       "confirmImport": "Confirm import",
@@ -281,7 +281,13 @@
       "resultNotImported": "not imported",
       "mapsTo": "maps to"
     },
-    "search": "Search cocktails"
+    "search": "Search cocktails",
+    "doses_one": "{{servings}} serving",
+    "doses_other": "{{servings}} servings",
+    "lowStock": "Low stock",
+    "missing": "Missing",
+    "moreMissing_one": "+{{count}} more",
+    "moreMissing_other": "+{{count}} more"
   },
   "menus": {
     "title": "Menus",
@@ -291,7 +297,6 @@
     "description": "Description",
     "slug": "URL Slug",
     "isPublic": "Public",
-    "cocktailCount": "Cocktails",
     "addCocktail": "Add Cocktail",
     "hidden": "Hidden",
     "visible": "Visible",
@@ -333,7 +338,6 @@
       "sync": "Synchronize",
       "count": "×{{count}}",
       "empty": "Empty",
-      "abv": "{{value}}% vol.",
       "exclude": "Remove",
       "excludeTitle": "Remove from this menu?",
       "excludeMessage": "{{name}} leaves this menu and the sync no longer adds it back. \"Removed bottles\" puts it back.",
@@ -353,22 +357,25 @@
         "empty": "No bottles. Check bottles as digestif, then synchronize."
       }
     },
-    "search": "Search menus"
+    "search": "Search menus",
+    "type": "Type",
+    "types": {
+      "cocktails": "Cocktails",
+      "aperos": "Aperitifs",
+      "digestifs": "Digestifs"
+    },
+    "content": "Content",
+    "default": "(default)"
   },
   "shortages": {
     "title": "Shortages",
     "noShortages": "All stock levels are sufficient!",
-    "category": "Category",
-    "type": "Type",
     "currentStock": "Current stock",
     "required": "Required threshold",
     "desired": "Desired Stock",
     "deficit": "Deficit",
     "totalUsable": "Usable bottles",
     "threshold": "Alert threshold"
-  },
-  "public": {
-    "export": "Export recipe"
   },
   "settings": {
     "title": "Settings",
@@ -407,7 +414,6 @@
       "skippedFiles_other": "{{count}} files of the uploads folder were not restored: only JPG, PNG and WebP images are restored, once per file name.",
       "reload": "Reload the page",
       "reloadAfterRestart": "Reload the page once the backend has restarted",
-      "invalidBackup": "Invalid backup file",
       "fileSelected": "File: {{name}}"
     },
     "noIcon": "No icon"
@@ -420,13 +426,10 @@
     "actions": "Actions",
     "search": "Search...",
     "noResults": "No results",
-    "success": "Success",
     "yes": "Yes",
     "no": "No",
     "translations": "Translations",
-    "translationHint": "Optional: provide translated names for each language",
     "selected": "{{count}} selected",
-    "undo": "Undo",
     "clear": "Clear",
     "removeItem": "Remove {{name}}",
     "filterOptions": "Filter the options"
@@ -443,8 +446,7 @@
     "pageSize": "Items per page"
   },
   "confirm": {
-    "deleteTitle": "Delete?",
-    "irreversible": "This action cannot be undone."
+    "deleteTitle": "Delete?"
   },
   "validation": {
     "required": "Required",

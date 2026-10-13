@@ -10,10 +10,6 @@
   "home": {
     "subtitle": "Découvrez nos cartes de cocktails",
     "noMenus": "Aucune carte disponible pour le moment",
-    "cocktailCount_one": "{{count}} cocktail",
-    "cocktailCount_other": "{{count}} cocktails",
-    "bottleCount_one": "{{count}} bouteille",
-    "bottleCount_other": "{{count}} bouteilles",
     "loadError": "Impossible de charger les cartes"
   },
   "cocktails": {
@@ -51,8 +47,8 @@
     "moreIngredients_other": "{{count}} autres ingrédients",
     "showAllLocations_one": "Voir {{count}} emplacement",
     "showAllLocations_other": "Voir les {{count}} emplacements",
-    "alcoholPercentage": "{{value}} % vol.",
-    "capacityMl": "{{value}} ml"
+    "originalUnit": "Unité originale",
+    "convertTo": "Convertir en :"
   },
   "common": {
     "cancel": "Annuler",
@@ -70,5 +66,15 @@
     "usedByBottles": "Bouteilles concernées : {{names}}.",
     "more_one": "et {{count}} autre",
     "more_other": "et {{count}} autres"
+  },
+  "units": {
+    "ml": "{{value, number}} ml",
+    "abv": "{{value, number}} % vol."
+  },
+  "menus": {
+    "cocktailCount_one": "{{count}} cocktail",
+    "cocktailCount_other": "{{count}} cocktails",
+    "bottleCount_one": "{{count}} bouteille",
+    "bottleCount_other": "{{count}} bouteilles"
   }
 }

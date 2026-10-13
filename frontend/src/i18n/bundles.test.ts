@@ -168,3 +168,123 @@ describe('admin bundle registration', () => {
     expect(i18n.t('auth.login', { lng: 'de' })).toBe(BUNDLES.admin.en['auth.login']);
   });
 });
+
+describe('messages', () => {
+  const languages = Object.entries(BUNDLES).flatMap(([name, bundle]) =>
+    Object.entries(bundle).map(([language, messages]) => ({ name: `${name}/${language}`, messages })),
+  );
+
+  it.each(languages)('$name gives every "_one" plural form its "_other" form', ({ messages }) => {
+    const orphans = Object.keys(messages)
+      .filter((key) => key.endsWith('_one'))
+      .filter((key) => !(key.replace(/_one$/, '_other') in messages));
+    expect(orphans).toEqual([]);
+  });
+
+  it.each(languages)('$name has no empty message', ({ messages }) => {
+    const empty = Object.entries(messages).filter(([, value]) => value.trim() === '');
+    expect(empty).toEqual([]);
+  });
+});
+
+describe('translation keys used in the code', () => {
+  /** Every t('literal.key') call: unlike KEY_LITERAL, it also catches a key missing from both bundles. */
+  function literalKeys(source: string): string[] {
+    return [...source.matchAll(/\bt\(\s*'([^']+)'/g)].map((match) => match[1]);
+  }
+
+  /** Every t(`template.${value}`) call, as the text between the backticks. */
+  function keyTemplates(source: string): string[] {
+    return [...source.matchAll(/\bt\(\s*`([^`]*)`/g)].map((match) => match[1]);
+  }
+
+  // Keys built at runtime from a value the code controls (a nav item, a color, an entity type...).
+  // A new one is added here once its keys exist in both languages.
+  const KEY_TEMPLATES = [
+    'nav.${item.key}',
+    'colors.${color}',
+    'ingredients.filter.${status}',
+    'menus.sections.confirmDelete.${itemLabel}',
+    'menus.sections.empty.${itemLabel}',
+    'cocktails.importWizard.${type}',
+    '${type}.name',
+    'bottles.importWizard.rowErrors.source.${source}',
+  ];
+
+  /** "colors.${color}" matches "colors.blue": each placeholder stands for one key segment. */
+  function templatePattern(template: string): RegExp {
+    const parts = template.split(/\$\{[^}]+\}/).map((part) => part.replaceAll('.', '\\.'));
+    return new RegExp(`^${parts.join('[^.]+')}$`);
+  }
+
+  it('finds the t() calls of the source files', () => {
+    expect([...sources.values()].flatMap(literalKeys).length).toBeGreaterThan(300);
+  });
+
+  it('all exist in a bundle', () => {
+    const missing = [...sources].flatMap(([path, source]) =>
+      literalKeys(source)
+        .filter((key) => !allKeys.has(key))
+        .map((key) => `${path}: ${key}`),
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it('are only built at runtime from a listed template', () => {
+    const unlisted = [...sources].flatMap(([path, source]) =>
+      keyTemplates(source)
+        .filter((template) => !KEY_TEMPLATES.includes(template))
+        .map((template) => `${path}: ${template}`),
+    );
+    expect(unlisted).toEqual([]);
+  });
+
+  it('only list templates that match existing keys', () => {
+    const unmatched = KEY_TEMPLATES.filter(
+      (template) => ![...allKeys].some((key) => templatePattern(template).test(key)),
+    );
+    expect(unmatched).toEqual([]);
+  });
+});
+
+describe('plural forms', () => {
+  it('count bottles and cocktails in English', () => {
+    const t = i18n.getFixedT('en');
+    expect(t('menus.bottleCount', { count: 1 })).toBe('1 bottle');
+    expect(t('menus.bottleCount', { count: 2 })).toBe('2 bottles');
+    expect(t('menus.cocktailCount', { count: 1 })).toBe('1 cocktail');
+    expect(t('menus.cocktailCount', { count: 0 })).toBe('0 cocktails');
+  });
+
+  it('count bottles and cocktails in French, where 0 is singular', () => {
+    const t = i18n.getFixedT('fr');
+    expect(t('menus.bottleCount', { count: 0 })).toBe('0 bouteille');
+    expect(t('menus.bottleCount', { count: 1 })).toBe('1 bouteille');
+    expect(t('menus.bottleCount', { count: 2 })).toBe('2 bouteilles');
+    expect(t('menus.cocktailCount', { count: 1 })).toBe('1 cocktail');
+  });
+
+  it('show unlimited servings with the plural form', async () => {
+    await import('./admin');
+    const t = i18n.getFixedT('fr');
+    expect(t('cocktails.doses', { count: 1, servings: 1 })).toBe('1 dose');
+    expect(t('cocktails.doses', { count: 999, servings: '∞' })).toBe('∞ doses');
+  });
+});
+
+describe('number formats', () => {
+  // Intl may separate French thousands with a narrow no-break space.
+  const normalizeSpaces = (text: string) => text.replace(/\s/g, ' ');
+
+  it('write quantities the French way', () => {
+    const t = i18n.getFixedT('fr');
+    expect(normalizeSpaces(t('units.ml', { value: 0.6 }))).toBe('0,6 ml');
+    expect(normalizeSpaces(t('units.abv', { value: 40.5 }))).toBe('40,5 % vol.');
+  });
+
+  it('write quantities the English way', () => {
+    const t = i18n.getFixedT('en');
+    expect(t('units.ml', { value: 1500 })).toBe('1,500 ml');
+    expect(t('units.abv', { value: 40.5 })).toBe('40.5% vol.');
+  });
+});

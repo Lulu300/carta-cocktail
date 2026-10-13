@@ -82,7 +82,7 @@ export default function MenuInfoForm({ menu, lockedFields = [], onSave, isSaving
             <ToggleSwitch checked={values.isPublic} onChange={(isPublic) => setField('isPublic', isPublic)} label={t('menus.isPublic')} />
             {menu.isPublic && (
               <a href={`/menu/${menu.slug}`} target="_blank" rel="noopener noreferrer" className="text-xs text-info hover:underline">
-                /menu/{menu.slug}
+                {`/menu/${menu.slug}`}
               </a>
             )}
           </div>

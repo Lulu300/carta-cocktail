@@ -1,6 +1,12 @@
 /** Language used when the requested one is not available (also i18next's fallbackLng). */
 export const FALLBACK_LANGUAGE = 'en';
 
+/** Name of each supported language in that language: endonyms are never translated. */
+export const LANGUAGE_NAMES = {
+  fr: 'Français',
+  en: 'English',
+} as const;
+
 /**
  * Reduce a BCP 47 locale (e.g. "fr-FR") to its base language code ("fr").
  */

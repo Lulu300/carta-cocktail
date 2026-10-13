@@ -251,7 +251,7 @@ export default function IngredientsPage() {
             placeholder={form.name}
           />
           <div>
-            <p className="block text-sm text-fg-muted mb-2">Icône (optionnel)</p>
+            <p className="block text-sm text-fg-muted mb-2">{t('ingredients.icon')}</p>
             <IconPicker value={form.icon} onChange={(icon) => setField('icon', icon)} />
           </div>
           <div className="flex justify-end gap-3 pt-4">

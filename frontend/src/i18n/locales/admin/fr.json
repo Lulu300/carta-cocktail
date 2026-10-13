@@ -25,15 +25,14 @@
   },
   "dashboard": {
     "title": "Tableau de bord",
-    "welcome": "Bon retour !",
     "stats": {
       "categories": "Catégories",
       "bottles": "Bouteilles",
       "cocktails": "Cocktails",
       "menus": "Cartes"
     },
-    "shortageAlert": "{{count}} pénurie(s) détectée(s)",
-    "noShortages": "Aucune pénurie - le stock est bon !"
+    "shortageAlert_one": "{{count}} pénurie détectée",
+    "shortageAlert_other": "{{count}} pénuries détectées"
   },
   "categories": {
     "title": "Catégories",
@@ -77,14 +76,11 @@
     "openedAt": "Ouverte le",
     "unopened": "Scellée",
     "opened": "Ouverte",
-    "empty": "Vide",
     "confirmDelete": "Supprimer cette bouteille ?",
     "created": "Bouteille créée",
     "updated": "Bouteille mise à jour",
     "deleted": "Bouteille supprimée",
     "filterByCategory": "Filtrer par catégorie",
-    "filterByType": "Filtrer par type",
-    "all": "Tous",
     "location": "Localisation",
     "locationPlaceholder": "Ex: Étagère du haut, Bar principal...",
     "activeTitle": "Bouteilles disponibles",
@@ -94,7 +90,6 @@
     "quantityHint": "{{count}} bouteilles identiques seront créées",
     "saveDuplicate": "Enregistrer et dupliquer",
     "noCategoryHint": "Créez d'abord une catégorie pour ajouter des bouteilles",
-    "showAllLocations": "Voir toutes les localisations",
     "import": "Importer",
     "export": "Exporter",
     "exportJson": "Exporter (JSON)",
@@ -157,7 +152,11 @@
         }
       }
     },
-    "search": "Rechercher une bouteille"
+    "search": "Rechercher une bouteille",
+    "alcoholPercentage": "Alcool (% vol.)",
+    "usage": "Utilisation",
+    "usableAsApero": "Utilisable comme apéritif",
+    "usableAsDigestif": "Utilisable comme digestif"
   },
   "ingredients": {
     "title": "Ingrédients",
@@ -175,7 +174,8 @@
     "created": "Ingrédient créé",
     "updated": "Ingrédient mis à jour",
     "deleted": "Ingrédient supprimé",
-    "search": "Rechercher un ingrédient"
+    "search": "Rechercher un ingrédient",
+    "icon": "Icône (optionnel)"
   },
   "units": {
     "title": "Unités",
@@ -187,7 +187,10 @@
     "created": "Unité créée",
     "updated": "Unité mise à jour",
     "deleted": "Unité supprimée",
-    "search": "Rechercher une unité"
+    "search": "Rechercher une unité",
+    "conversionFactor": "Facteur de conversion (ml)",
+    "conversionFactorHint": "Ex. : 1 cl = 10 ml, donc facteur = 10. Laisser vide pour les unités de pièce.",
+    "notConvertible": "Non convertible"
   },
   "cocktails": {
     "title": "Cocktails",
@@ -198,7 +201,6 @@
     "available": "Disponible",
     "unavailable": "Indisponible",
     "image": "Image",
-    "uploadImage": "Télécharger une image",
     "ingredients": "Ingrédients",
     "instructions": "Instructions",
     "addIngredient": "Ajouter un ingrédient",
@@ -226,7 +228,6 @@
       "title": "Importer une recette",
       "dropzone": "Glissez un fichier JSON ou ZIP ici ou cliquez pour parcourir",
       "invalidFile": "Fichier JSON invalide",
-      "invalidVersion": "Version de format non supportée",
       "preview": "Aperçu",
       "ingredientCount": "{{count}} ingrédient(s)",
       "instructionCount": "{{count}} étape(s)",
@@ -241,7 +242,6 @@
       "skip": "Ignorer",
       "allResolved": "Toutes les dépendances sont résolues",
       "unresolvedCount": "{{count}} dépendance(s) à résoudre",
-      "summary": "Résumé de l'import",
       "entitiesToCreate": "Entités à créer",
       "entitiesMapped": "Entités existantes utilisées",
       "confirmImport": "Confirmer l'import",
@@ -281,7 +281,13 @@
       "resultNotImported": "non importé",
       "mapsTo": "correspond à"
     },
-    "search": "Rechercher un cocktail"
+    "search": "Rechercher un cocktail",
+    "doses_one": "{{servings}} dose",
+    "doses_other": "{{servings}} doses",
+    "lowStock": "Stock faible",
+    "missing": "Manquant",
+    "moreMissing_one": "+{{count}} autre",
+    "moreMissing_other": "+{{count}} autres"
   },
   "menus": {
     "title": "Cartes",
@@ -291,7 +297,6 @@
     "description": "Description",
     "slug": "Slug URL",
     "isPublic": "Publique",
-    "cocktailCount": "Cocktails",
     "addCocktail": "Ajouter un cocktail",
     "hidden": "Masqué",
     "visible": "Visible",
@@ -333,7 +338,6 @@
       "sync": "Synchroniser",
       "count": "×{{count}}",
       "empty": "Vide",
-      "abv": "{{value}} % vol.",
       "exclude": "Retirer",
       "excludeTitle": "Retirer de cette carte ?",
       "excludeMessage": "{{name}} quitte cette carte et la synchronisation ne la remet plus. « Bouteilles retirées » permet de la remettre.",
@@ -353,22 +357,25 @@
         "empty": "Aucune bouteille. Cochez des bouteilles comme digestif, puis synchronisez."
       }
     },
-    "search": "Rechercher une carte"
+    "search": "Rechercher une carte",
+    "type": "Type",
+    "types": {
+      "cocktails": "Cocktails",
+      "aperos": "Apéritifs",
+      "digestifs": "Digestifs"
+    },
+    "content": "Contenu",
+    "default": "(par défaut)"
   },
   "shortages": {
     "title": "Pénuries",
     "noShortages": "Tous les niveaux de stock sont suffisants !",
-    "category": "Catégorie",
-    "type": "Type",
     "currentStock": "Stock actuel",
     "required": "Seuil requis",
     "desired": "Stock souhaité",
     "deficit": "Déficit",
     "totalUsable": "Bouteilles utilisables",
     "threshold": "Seuil d'alerte"
-  },
-  "public": {
-    "export": "Exporter la recette"
   },
   "settings": {
     "title": "Paramètres",
@@ -407,7 +414,6 @@
       "skippedFiles_other": "{{count}} fichiers du dossier uploads n'ont pas été restaurés : seules les images JPG, PNG et WebP sont restaurées, une fois par nom de fichier.",
       "reload": "Recharger la page",
       "reloadAfterRestart": "Recharger la page une fois le backend redémarré",
-      "invalidBackup": "Fichier de sauvegarde invalide",
       "fileSelected": "Fichier : {{name}}"
     },
     "noIcon": "Aucune icône"
@@ -420,13 +426,10 @@
     "actions": "Actions",
     "search": "Rechercher...",
     "noResults": "Aucun résultat",
-    "success": "Succès",
     "yes": "Oui",
     "no": "Non",
     "translations": "Traductions",
-    "translationHint": "Optionnel : fournir des noms traduits pour chaque langue",
     "selected": "{{count}} sélectionné(s)",
-    "undo": "Annuler",
     "clear": "Effacer",
     "removeItem": "Retirer {{name}}",
     "filterOptions": "Filtrer les options"
@@ -443,8 +446,7 @@
     "pageSize": "Éléments par page"
   },
   "confirm": {
-    "deleteTitle": "Supprimer ?",
-    "irreversible": "Cette action est définitive."
+    "deleteTitle": "Supprimer ?"
   },
   "validation": {
     "required": "Obligatoire",

@@ -1,6 +1,6 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FALLBACK_LANGUAGE, getBaseLanguage } from '../../utils/localization';
+import { FALLBACK_LANGUAGE, LANGUAGE_NAMES, getBaseLanguage } from '../../utils/localization';
 import { cx } from './classNames';
 import Icon from './Icon';
 import { useDisclosure } from './useDisclosure';
@@ -32,10 +32,7 @@ const flagComponents: Record<string, ({ className }: { className?: string }) => 
   en: FlagGB,
 };
 
-const languages = [
-  { code: 'fr', name: 'Français' },
-  { code: 'en', name: 'English' },
-];
+const languages = Object.entries(LANGUAGE_NAMES).map(([code, name]) => ({ code, name }));
 
 /** Moves the focus to the next or previous menu item, wrapping around the ends. */
 function focusSiblingItem(menu: HTMLElement, step: 1 | -1) {

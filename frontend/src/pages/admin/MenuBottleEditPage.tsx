@@ -113,7 +113,7 @@ function MenuBottles({ menu }: { menu: Menu }) {
                 onRemove={isSystem ? () => exclude(group) : undefined}
                 disabled={!group.isSaved}
                 details={group.bottle.alcoholPercentage != null && (
-                  <span className="text-xs text-fg-muted">{t('menus.bottles.abv', { value: group.bottle.alcoholPercentage })}</span>
+                  <span className="text-xs text-fg-muted">{t('units.abv', { value: group.bottle.alcoholPercentage })}</span>
                 )}
               >
                 <BottleGroupLabel bottle={group.bottle} count={group.entries.length} isEmpty={group.isEmpty} />
