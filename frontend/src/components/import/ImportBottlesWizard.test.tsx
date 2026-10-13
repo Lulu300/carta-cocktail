@@ -130,8 +130,8 @@ describe('ImportBottlesWizard', () => {
     await user.click(screen.getByText('bottles.importWizard.next'));
 
     expect(await preview.body).toContain('name="file"');
+    // The very File picked, byte order mark included: not a re-encoded copy
     expect(append).toHaveBeenCalledWith('file', file);
-    expect([...new Uint8Array(await file.arrayBuffer()).slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
   });
 
   it('transitions to the resolve step after successful preview', async () => {

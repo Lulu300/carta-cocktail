@@ -2,8 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
 import { render, screen, waitFor, within } from '../../test/test-utils';
 import AdminLayout from '../../components/layout/AdminLayout';
-import { AuthProvider } from '../../contexts/AuthContext';
-import { SiteSettingsProvider } from '../../contexts/SiteSettingsContext';
+import { AppProviders } from '../../test/appProviders';
 import { createQueryClient } from '../../queries/queryClient';
 import { buildBottle, buildCategory, buildCocktail, buildMenu, buildShortage } from '../../test/factories';
 import { captureRequest, mockApiError, mockApiPending, mockApiResponse } from '../../test/msw/utils';
@@ -117,15 +116,13 @@ describe('DashboardPage', () => {
 
     // The providers of main.tsx: the layout reads the session and the site settings
     render(
-      <AuthProvider>
-        <SiteSettingsProvider>
-          <Routes>
-            <Route element={<AdminLayout />}>
-              <Route path="/" element={<DashboardPage />} />
-            </Route>
-          </Routes>
-        </SiteSettingsProvider>
-      </AuthProvider>,
+      <AppProviders>
+        <Routes>
+          <Route element={<AdminLayout />}>
+            <Route path="/" element={<DashboardPage />} />
+          </Route>
+        </Routes>
+      </AppProviders>,
     );
 
     // Layout badge and dashboard alert both show the count from the same request

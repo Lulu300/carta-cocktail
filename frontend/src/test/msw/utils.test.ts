@@ -101,6 +101,17 @@ describe('fake backend', () => {
   });
 });
 
+describe('rejectNextFetch', () => {
+  // The two tests run in order: the first one leaves its rejection unused.
+  it('can be left unused by a test that fails before its request', () => {
+    rejectNextFetch('left over');
+  });
+
+  it('does not reach the next test', async () => {
+    expect(await units.list()).toHaveLength(2);
+  });
+});
+
 describe('fake answer building blocks', () => {
   it('reads a JSON object body, and anything else as an empty object', async () => {
     const post = (body: string) => new Request('http://localhost/api', { method: 'POST', body });

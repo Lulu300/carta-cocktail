@@ -3,9 +3,8 @@ import { render, screen, waitFor, within } from '../../test/test-utils';
 import userEvent from '@testing-library/user-event';
 import { fireEvent } from '@testing-library/react';
 import SettingsPage from './SettingsPage';
-import { AuthProvider } from '../../contexts/AuthContext';
+import { AppProviders } from '../../test/appProviders';
 import { ConfirmProvider } from '../../contexts/ConfirmContext';
-import { SiteSettingsProvider } from '../../contexts/SiteSettingsContext';
 import { toast } from '../../components/ui/ToastStore';
 import type { BackupRestoreResult } from '../../services/api';
 import { mockDownload } from '../../test/download';
@@ -41,13 +40,11 @@ function mockRestore(result: BackupRestoreResult) {
 /** The page inside the providers of main.tsx: the signed-in admin and the site settings. */
 function renderPage() {
   return render(
-    <AuthProvider>
-      <SiteSettingsProvider>
-        <ConfirmProvider>
-          <SettingsPage />
-        </ConfirmProvider>
-      </SiteSettingsProvider>
-    </AuthProvider>,
+    <AppProviders>
+      <ConfirmProvider>
+        <SettingsPage />
+      </ConfirmProvider>
+    </AppProviders>,
   );
 }
 

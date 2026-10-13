@@ -3,8 +3,7 @@ import { Route, Routes } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { render, screen, waitFor, within } from '../../test/test-utils';
 import { axe } from '../../test/axe';
-import { AuthProvider } from '../../contexts/AuthContext';
-import { SiteSettingsProvider } from '../../contexts/SiteSettingsContext';
+import { AppProviders } from '../../test/appProviders';
 import { buildShortage, buildSiteSettings } from '../../test/factories';
 import { ADMIN_USER } from '../../test/msw/handlers';
 import { captureRequest, mockApiError, mockApiResponse, type CapturedRequest } from '../../test/msw/utils';
@@ -18,18 +17,16 @@ let shortagesRequests: CapturedRequest;
 function renderLayout() {
   shortagesRequests = captureRequest('get', '/api/shortages');
   return render(
-    <AuthProvider>
-      <SiteSettingsProvider>
-        <Routes>
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<p>dashboard page</p>} />
-            <Route path="categories" element={<p>categories page</p>} />
-            <Route path="units" element={<p>units page</p>} />
-          </Route>
-          <Route path="/login" element={<p>login page</p>} />
-        </Routes>
-      </SiteSettingsProvider>
-    </AuthProvider>,
+    <AppProviders>
+      <Routes>
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<p>dashboard page</p>} />
+          <Route path="categories" element={<p>categories page</p>} />
+          <Route path="units" element={<p>units page</p>} />
+        </Route>
+        <Route path="/login" element={<p>login page</p>} />
+      </Routes>
+    </AppProviders>,
   );
 }
 

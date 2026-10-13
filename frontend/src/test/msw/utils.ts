@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { onTestFinished, vi } from 'vitest';
 import { http, HttpResponse, type JsonBodyType } from 'msw';
 import { errorResponse, pendingResponse } from './responses';
 import { server } from './server';
@@ -47,10 +47,11 @@ export function mockNetworkError(method: ApiMethod, path: string): void {
 /**
  * Makes the next `fetch` reject with `reason`, which need not be an Error. No HTTP
  * answer can do that: it covers the code that guards against a non-Error throw.
- * Undo with `vi.restoreAllMocks()`.
+ * The stub ends with the test, so a rejection left unused cannot reach the next test.
  */
 export function rejectNextFetch(reason: unknown): void {
-  vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(reason);
+  const spy = vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(reason);
+  onTestFinished(() => spy.mockRestore());
 }
 
 async function readBody(request: Request): Promise<unknown> {
