@@ -1,0 +1,74 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "login": "Login",
+    "language": "Language",
+    "changeLanguage": "Change language",
+    "main": "Main navigation",
+    "skipToContent": "Skip to content"
+  },
+  "home": {
+    "subtitle": "Discover our cocktail menus",
+    "noMenus": "No menus available at the moment",
+    "cocktailCount_one": "{{count}} cocktail",
+    "cocktailCount_other": "{{count}} cocktails",
+    "bottleCount_one": "{{count}} bottle",
+    "bottleCount_other": "{{count}} bottles",
+    "loadError": "Unable to load the menus"
+  },
+  "cocktails": {
+    "notes": "Notes",
+    "preferredBottles": "Preferred Bottles",
+    "created": "Cocktail created",
+    "updated": "Cocktail updated",
+    "deleted": "Cocktail deleted",
+    "export": "Export",
+    "viewGrid": "Grid view",
+    "viewList": "List view"
+  },
+  "public": {
+    "menuNotFound": "Menu not found",
+    "cocktailNotFound": "Cocktail not found",
+    "unavailable": "Currently unavailable",
+    "bottleSearchPlaceholder": "Search for a bottle...",
+    "cocktailSearchPlaceholder": "Search recipes...",
+    "withoutSection": "Without a section",
+    "other": "Other",
+    "servings_one": "{{count}} serving",
+    "servings_other": "{{count}} servings",
+    "ingredients": "Ingredients",
+    "instructions": "Preparation",
+    "print": "Print",
+    "back": "Back to menu",
+    "backHome": "Back to home",
+    "menuLoadError": "Unable to load the menu",
+    "cocktailLoadError": "Unable to load the cocktail",
+    "loadErrorHint": "Check your connection and try again.",
+    "emptyMenu": "This menu is empty for now",
+    "noResults": "No results for “{{query}}”",
+    "sectionNav": "Menu sections",
+    "moreIngredients_one": "{{count}} more ingredient",
+    "moreIngredients_other": "{{count}} more ingredients",
+    "showAllLocations_one": "Show {{count}} location",
+    "showAllLocations_other": "Show all {{count}} locations",
+    "alcoholPercentage": "{{value}}% vol.",
+    "capacityMl": "{{value}} ml"
+  },
+  "common": {
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "retry": "Retry",
+    "close": "Close",
+    "clearSearch": "Clear search",
+    "resultCount_one": "{{count}} result",
+    "resultCount_other": "{{count}} results"
+  },
+  "deletion": {
+    "usedByCocktails": "Used by these cocktails: {{names}}.",
+    "usedByBottles": "Bottles in it: {{names}}.",
+    "more_one": "and {{count}} more",
+    "more_other": "and {{count}} more"
+  }
+}

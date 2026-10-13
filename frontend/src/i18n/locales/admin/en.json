@@ -3,7 +3,6 @@
     "name": "Carta Cocktail"
   },
   "nav": {
-    "dashboard": "Dashboard",
     "categories": "Categories",
     "bottles": "Bottles",
     "ingredients": "Ingredients",
@@ -13,22 +12,8 @@
     "shortages": "Shortages",
     "settings": "Settings",
     "logout": "Logout",
-    "login": "Login",
-    "language": "Language",
-    "changeLanguage": "Change language",
     "menu": "Navigation menu",
-    "admin": "Administration",
-    "main": "Main navigation",
-    "skipToContent": "Skip to content"
-  },
-  "home": {
-    "subtitle": "Discover our cocktail menus",
-    "noMenus": "No menus available at the moment",
-    "cocktailCount_one": "{{count}} cocktail",
-    "cocktailCount_other": "{{count}} cocktails",
-    "bottleCount_one": "{{count}} bottle",
-    "bottleCount_other": "{{count}} bottles",
-    "loadError": "Unable to load the menus"
+    "admin": "Administration"
   },
   "auth": {
     "login": "Login",
@@ -210,7 +195,6 @@
     "edit": "Edit Cocktail",
     "name": "Name",
     "description": "Description",
-    "notes": "Notes",
     "available": "Available",
     "unavailable": "Unavailable",
     "image": "Image",
@@ -225,22 +209,15 @@
     "freeIngredient": "Other Ingredient",
     "quantity": "Qty",
     "unit": "Unit",
-    "preferredBottles": "Preferred Bottles",
     "tags": "Tags",
     "tagsPlaceholder": "Separate with commas (e.g. classic, fruity, tiki)",
     "confirmDelete": "Delete this cocktail?",
-    "created": "Cocktail created",
-    "updated": "Cocktail updated",
-    "deleted": "Cocktail deleted",
     "step": "Step {{number}}",
-    "export": "Export",
     "import": "Import",
     "selectAll": "Select all",
     "batchExport": "Batch export",
     "filterByTags": "Filter by tags",
     "exportZip": "Export ZIP ({{count}})",
-    "viewGrid": "Grid view",
-    "viewList": "List view",
     "notFound": "This cocktail does not exist.",
     "backToList": "Back to cocktails",
     "noPreferredAvailable": "No preferred bottle available",
@@ -391,33 +368,7 @@
     "threshold": "Alert threshold"
   },
   "public": {
-    "menuNotFound": "Menu not found",
-    "cocktailNotFound": "Cocktail not found",
-    "unavailable": "Currently unavailable",
-    "bottleSearchPlaceholder": "Search for a bottle...",
-    "cocktailSearchPlaceholder": "Search recipes...",
-    "withoutSection": "Without a section",
-    "other": "Other",
-    "servings_one": "{{count}} serving",
-    "servings_other": "{{count}} servings",
-    "ingredients": "Ingredients",
-    "instructions": "Preparation",
-    "print": "Print",
-    "export": "Export recipe",
-    "back": "Back to menu",
-    "backHome": "Back to home",
-    "menuLoadError": "Unable to load the menu",
-    "cocktailLoadError": "Unable to load the cocktail",
-    "loadErrorHint": "Check your connection and try again.",
-    "emptyMenu": "This menu is empty for now",
-    "noResults": "No results for “{{query}}”",
-    "sectionNav": "Menu sections",
-    "moreIngredients_one": "{{count}} more ingredient",
-    "moreIngredients_other": "{{count}} more ingredients",
-    "showAllLocations_one": "Show {{count}} location",
-    "showAllLocations_other": "Show all {{count}} locations",
-    "alcoholPercentage": "{{value}}% vol.",
-    "capacityMl": "{{value}} ml"
+    "export": "Export recipe"
   },
   "settings": {
     "title": "Settings",
@@ -463,31 +414,22 @@
   },
   "common": {
     "save": "Save",
-    "cancel": "Cancel",
     "delete": "Delete",
     "edit": "Edit",
     "create": "Create",
     "actions": "Actions",
-    "confirm": "Confirm",
     "search": "Search...",
     "noResults": "No results",
-    "loading": "Loading...",
-    "error": "An error occurred",
     "success": "Success",
     "yes": "Yes",
     "no": "No",
     "translations": "Translations",
     "translationHint": "Optional: provide translated names for each language",
     "selected": "{{count}} selected",
-    "retry": "Retry",
-    "close": "Close",
     "undo": "Undo",
     "clear": "Clear",
-    "clearSearch": "Clear search",
     "removeItem": "Remove {{name}}",
-    "filterOptions": "Filter the options",
-    "resultCount_one": "{{count}} result",
-    "resultCount_other": "{{count}} results"
+    "filterOptions": "Filter the options"
   },
   "pagination": {
     "showing": "{{start}}-{{end}} of {{total}}",
@@ -503,12 +445,6 @@
   "confirm": {
     "deleteTitle": "Delete?",
     "irreversible": "This action cannot be undone."
-  },
-  "deletion": {
-    "usedByCocktails": "Used by these cocktails: {{names}}.",
-    "usedByBottles": "Bottles in it: {{names}}.",
-    "more_one": "and {{count}} more",
-    "more_other": "and {{count}} more"
   },
   "validation": {
     "required": "Required",

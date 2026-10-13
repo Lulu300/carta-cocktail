@@ -126,6 +126,25 @@ describe('bundle-budget.mjs CLI', () => {
     assert.doesNotMatch(run.stderr, /PublicLayout/);
   });
 
+  it('fails when a preloaded chunk holds the admin messages', () => {
+    writeCompliantBuild();
+    writeChunk('index-abc.js', {
+      sources: [
+        ...PUBLIC_MODULES,
+        '../../src/i18n/admin.ts',
+        '../../src/i18n/locales/admin/en.json',
+        '../../src/i18n/locales/public/en.json',
+      ],
+    });
+
+    const run = runCli([distDir, '100']);
+
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /index-abc\.js contains src\/i18n\/admin\.ts/);
+    assert.match(run.stderr, /index-abc\.js contains src\/i18n\/locales\/admin\/en\.json/);
+    assert.doesNotMatch(run.stderr, /locales\/public/);
+  });
+
   it('fails when the jszip package is statically imported', () => {
     writeCompliantBuild();
     writeChunk('vendor-react-def.js', {

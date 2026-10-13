@@ -97,10 +97,11 @@ frontend/
 │   │   ├── localization.ts       # Localization helpers
 │   │   └── unitConverter.ts      # Unit conversion logic
 │   └── i18n/
-│       ├── index.ts              # i18next + browser language detector
+│       ├── index.ts              # i18next + browser language detector, public messages
+│       ├── admin.ts              # Registers the admin messages (loaded by App.tsx with each /login and /admin chunk)
 │       └── locales/
-│           ├── en.json           # English (~270 keys)
-│           └── fr.json           # French
+│           ├── public/           # en.json, fr.json: keys used by the first load (public pages, shared components)
+│           └── admin/            # en.json, fr.json: every other key (login page and admin)
 ├── package.json
 ├── tsconfig.json
 ├── vite.config.ts
@@ -160,6 +161,10 @@ Admin pages are self-contained with inline forms and modals. Each page:
 2. Manages local state with `useState`
 3. Uses `useTranslation()` for all UI text
 4. Handles CRUD operations with optimistic or refetch patterns
+
+### Locale bundles
+
+Messages are split in two bundles so guests do not download the admin texts. A key goes in `locales/public/` when a file of the first load (reached from `main.tsx` through static imports) uses it, otherwise in `locales/admin/`; `src/i18n/bundles.test.ts` checks the split and fails with the keys to move. A new lazy chunk behind `/login` or `/admin` goes through `lazyWithAdminMessages` in `App.tsx`. A new language with its own message files goes in `TRANSLATED_LANGUAGES` (`i18n/index.ts`, from which `SUPPORTED_LANGUAGES` derives), in the message maps of `i18n/index.ts` and `i18n/admin.ts` (typed by `TRANSLATED_LANGUAGES`, so `tsc` fails until both list it), and in `LanguageSelector` (`languages` and `flagComponents`). A regional variant without files (`en-GB`) goes in `SUPPORTED_LANGUAGES` and `LanguageSelector` only: it has no entry in the message maps and i18next serves it the messages of its base language.
 
 ### TailwindCSS v4
 
