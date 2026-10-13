@@ -5,13 +5,13 @@ phase: B
 lane: backend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [B-03]
-touches: [backend/src/test/, backend/AGENTS.md]
+touches: [backend/src/test/, backend/AGENTS.md, backend/.gitignore]
 sources: []
-branch:
-pr:
+branch: feature/B-12-test-db-own-folder
+pr: "#136"
 ---
 
 ## Contexte
@@ -37,10 +37,10 @@ Hors périmètre : la variable `DATABASE_URL` de `.github/workflows/ci.yml` (D-0
 
 ## Critères d'acceptation
 
-- [ ] Pendant et après `npm test`, rien n'est écrit dans `backend/prisma/` en dehors du dossier de la base de test.
-- [ ] Le dossier de la base de test n'existe plus après le run, `backups/` compris.
-- [ ] Une base `backend/prisma/carta_cocktail.db` et un dossier `backend/prisma/backups/` existants restent intacts après `npm test`.
-- [ ] Tous les tests passent ; couverture inchangée ou meilleure.
+- [x] Pendant et après `npm test`, rien n'est écrit dans `backend/prisma/` en dehors du dossier de la base de test.
+- [x] Le dossier de la base de test n'existe plus après le run, `backups/` compris.
+- [x] Une base `backend/prisma/carta_cocktail.db` et un dossier `backend/prisma/backups/` existants restent intacts après `npm test`.
+- [x] Tous les tests passent ; couverture inchangée ou meilleure.
 
 ## Tests à ajouter ou adapter
 
@@ -56,3 +56,4 @@ Hors périmètre : la variable `DATABASE_URL` de `.github/workflows/ci.yml` (D-0
 
 - 2026-10-11 : tâche créée à partir de la revue de la PR #89 (B-03, remarque 2), hors revue du 2026-10-08.
 - 2026-10-12 : D-04 (PR #112) a retiré le bloc `env:` de l'étape de tests backend de `ci.yml` : la variable `DATABASE_URL` citée « hors périmètre » n'existe plus (`src/test/setup.ts` impose la sienne).
+- 2026-10-13 : base de test dans `backend/prisma/test/test.db` (dossier fixe plutôt que temporaire : rien à transmettre aux workers). `globalSetup.ts` vide et crée le dossier avant `prisma db push`, le supprime en fin de run. Ajout de `/prisma/test/` à `backend/.gitignore` (ajouté à `touches`) : un run interrompu peut y laisser un `test.db.restore-*` que `*.db` n'ignore pas. Commentaire de `src/lib/prisma.test.ts` mis à jour. Vérification manuelle (run complet et run interrompu pendant `backup.test.ts`) décrite dans la PR #136.
