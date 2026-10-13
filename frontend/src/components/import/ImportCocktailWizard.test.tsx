@@ -1,18 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { http, HttpResponse } from 'msw';
 import { render, screen, fireEvent, waitFor, within } from '../../test/test-utils';
 import userEvent from '@testing-library/user-event';
 import { createQueryClient } from '../../queries/queryClient';
-import type { CocktailExportFormat, ImportPreviewResponse } from '../../types';
+import { buildCategory, buildCocktail } from '../../test/factories';
+import { server } from '../../test/msw/server';
+import { captureRequest, mockApiError, mockApiResponse, rejectNextFetch, type CapturedRequest } from '../../test/msw/utils';
+import type { CocktailExportFormat, EntityResolutionAction, ImportPreviewResponse } from '../../types';
 import ImportCocktailWizard from './ImportCocktailWizard';
-
-vi.mock('../../services/api', () => ({
-  cocktails: { importPreview: vi.fn(), importConfirm: vi.fn() },
-  units: { list: vi.fn() },
-  categories: { list: vi.fn() },
-  bottles: { list: vi.fn() },
-  ingredients: { list: vi.fn() },
-  categoryTypes: { list: vi.fn() },
-}));
 
 const mockLoadAsync = vi.fn();
 
@@ -21,9 +16,8 @@ vi.mock('jszip', () => ({
   default: { loadAsync: (...args: unknown[]) => mockLoadAsync(...args) },
 }));
 
-import * as api from '../../services/api';
-
-const LIST_CALLS = [api.units.list, api.categories.list, api.bottles.list, api.ingredients.list, api.categoryTypes.list];
+/** The lists of existing entities the resolve step matches the recipe against. */
+const LIST_PATHS = ['/api/units', '/api/categories', '/api/bottles', '/api/ingredients', '/api/category-types'];
 
 function recipe(name: string): CocktailExportFormat {
   return {
@@ -53,9 +47,14 @@ function nameOf(recipeToPreview: CocktailExportFormat): string {
   return recipeToPreview.cocktail.name;
 }
 
+function fileInput(): HTMLInputElement {
+  const input = document.querySelector('input[type="file"]');
+  if (!(input instanceof HTMLInputElement)) throw new Error('No file input');
+  return input;
+}
+
 function uploadJson(recipeToLoad: CocktailExportFormat) {
-  const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-  fireEvent.change(input, { target: { files: [new File([JSON.stringify(recipeToLoad)], 'recipe.json', { type: 'application/json' })] } });
+  fireEvent.change(fileInput(), { target: { files: [new File([JSON.stringify(recipeToLoad)], 'recipe.json', { type: 'application/json' })] } });
 }
 
 function uploadZip(names: string[]) {
@@ -64,14 +63,64 @@ function uploadZip(names: string[]) {
     { dir: false, async: vi.fn().mockResolvedValue(JSON.stringify(recipe(name))) },
   ]));
   mockLoadAsync.mockResolvedValue({ files });
-  const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-  fireEvent.change(input, { target: { files: [new File(['zip'], 'recipes.zip', { type: 'application/zip' })] } });
+  fireEvent.change(fileInput(), { target: { files: [new File(['zip'], 'recipes.zip', { type: 'application/zip' })] } });
 }
 
-function containsNaN(value: unknown): boolean {
-  if (typeof value === 'number') return Number.isNaN(value);
-  if (value && typeof value === 'object') return Object.values(value).some(containsNaN);
-  return false;
+// --- Fake backend: previews and confirmations answer per recipe name ---
+
+interface ImportConfirmation {
+  recipe: CocktailExportFormat;
+  resolutions: Record<string, Record<string, EntityResolutionAction>>;
+}
+
+function isRecipe(body: unknown): body is CocktailExportFormat {
+  return typeof body === 'object' && body !== null && 'cocktail' in body;
+}
+
+function isConfirmation(body: unknown): body is ImportConfirmation {
+  return typeof body === 'object' && body !== null && 'recipe' in body && isRecipe(body.recipe) && 'resolutions' in body;
+}
+
+const refused = (status: number, error: string) => HttpResponse.json({ error }, { status });
+
+/** Confirmations received, in order. */
+let confirmations: ImportConfirmation[];
+/** How the server answers the preview of a recipe, by name. */
+let answerPreview: (name: string) => Response;
+/** How the server answers a confirmation; `attempt` counts from 1. */
+let answerConfirm: (name: string, attempt: number) => Response;
+let listReads: CapturedRequest[];
+
+/** The first preview fails with `message`, the next ones answer as usual. */
+function failFirstPreview(message: string) {
+  answerPreview = () => {
+    answerPreview = (name) => HttpResponse.json(matchedPreview(name));
+    return refused(503, message);
+  };
+}
+
+function installFakeBackend() {
+  confirmations = [];
+  answerPreview = (name) => HttpResponse.json(matchedPreview(name));
+  answerConfirm = (name, attempt) => HttpResponse.json(buildCocktail({ id: 99 + attempt, name }));
+  mockApiResponse('get', '/api/units', []);
+  mockApiResponse('get', '/api/categories', [buildCategory({ id: 10, name: 'Rhum' })]);
+  mockApiResponse('get', '/api/bottles', []);
+  mockApiResponse('get', '/api/ingredients', []);
+  mockApiResponse('get', '/api/category-types', []);
+  listReads = LIST_PATHS.map((path) => captureRequest('get', path));
+  server.use(
+    http.post('/api/cocktails/import/preview', async ({ request }) => {
+      const body: unknown = await request.json();
+      return isRecipe(body) ? answerPreview(nameOf(body)) : refused(400, 'Invalid recipe');
+    }),
+    http.post('/api/cocktails/import/confirm', async ({ request }) => {
+      const body: unknown = await request.json();
+      if (!isConfirmation(body)) return refused(400, 'Invalid confirmation');
+      confirmations.push(body);
+      return answerConfirm(nameOf(body.recipe), confirmations.length);
+    }),
+  );
 }
 
 const user = userEvent.setup();
@@ -91,17 +140,17 @@ async function confirmImport() {
 }
 
 beforeEach(() => {
-  vi.clearAllMocks();
-  for (const list of LIST_CALLS) vi.mocked(list).mockResolvedValue([]);
-  vi.mocked(api.categories.list).mockResolvedValue([{ id: 10, name: 'Rhum' }] as never);
-  vi.mocked(api.cocktails.importPreview).mockImplementation(async (r) => matchedPreview(nameOf(r)));
-  let nextId = 100;
-  vi.mocked(api.cocktails.importConfirm).mockImplementation(async ({ recipe: r }) => ({ id: nextId++, name: nameOf(r) }) as never);
+  mockLoadAsync.mockReset();
+  installFakeBackend();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('ImportCocktailWizard', () => {
   it('imports a single JSON recipe and sends no NaN', async () => {
-    vi.mocked(api.cocktails.importPreview).mockResolvedValue(bottleToCreatePreview);
+    answerPreview = () => HttpResponse.json(bottleToCreatePreview);
     render(<ImportCocktailWizard onClose={vi.fn()} />);
 
     uploadJson(recipe('Daiquiri'));
@@ -118,17 +167,19 @@ describe('ImportCocktailWizard', () => {
     await confirmImport();
 
     expect(await screen.findByText('cocktails.importWizard.success')).toBeInTheDocument();
-    const body = vi.mocked(api.cocktails.importConfirm).mock.calls[0][0];
-    expect(containsNaN(body)).toBe(false);
-    expect(body.resolutions.bottles['havana 3']).toEqual({
-      action: 'create',
-      data: { name: 'Havana 3', categoryName: 'Rhum', capacityMl: 750, remainingPercent: 100 },
+    // JSON turns a NaN into null: every number of the resolutions must come out as sent
+    expect(confirmations[0].resolutions.bottles).toEqual({
+      'havana 3': {
+        action: 'create',
+        data: { name: 'Havana 3', categoryName: 'Rhum', capacityMl: 750, remainingPercent: 100 },
+      },
     });
+    expect(JSON.stringify(confirmations[0].resolutions)).not.toContain('null');
     expect(screen.getByRole('link', { name: 'cocktails.importWizard.editImported' })).toHaveAttribute('href', '/admin/cocktails/100');
   });
 
   it('blocks the import while the name of an entity to create is empty', async () => {
-    vi.mocked(api.cocktails.importPreview).mockResolvedValue(bottleToCreatePreview);
+    answerPreview = () => HttpResponse.json(bottleToCreatePreview);
     render(<ImportCocktailWizard onClose={vi.fn()} />);
 
     uploadJson(recipe('Daiquiri'));
@@ -141,23 +192,19 @@ describe('ImportCocktailWizard', () => {
   });
 
   it('refreshes the lists after a confirmation that created an entity', async () => {
-    vi.mocked(api.cocktails.importPreview).mockResolvedValue(bottleToCreatePreview);
+    answerPreview = () => HttpResponse.json(bottleToCreatePreview);
     render(<ImportCocktailWizard onClose={vi.fn()} />);
 
     uploadJson(recipe('Daiquiri'));
     await goToConfirmation();
     await confirmImport();
 
-    await waitFor(() => expect(api.bottles.list).toHaveBeenCalledTimes(2));
+    const bottlesRead = listReads[LIST_PATHS.indexOf('/api/bottles')];
+    await waitFor(() => expect(bottlesRead.count()).toBe(2));
   });
 
   it('imports a batch where the second recipe fails once: one line per recipe, all imported', async () => {
-    let confirmations = 0;
-    vi.mocked(api.cocktails.importConfirm).mockImplementation(async ({ recipe: r }) => {
-      confirmations += 1;
-      if (confirmations === 2) throw new Error('Boom');
-      return { id: confirmations, name: nameOf(r) } as never;
-    });
+    answerConfirm = (name, attempt) => (attempt === 2 ? refused(500, 'Boom') : HttpResponse.json(buildCocktail({ id: attempt, name })));
     render(<ImportCocktailWizard onClose={vi.fn()} />);
 
     uploadZip(['Mojito', 'Negroni', 'Daiquiri']);
@@ -185,14 +232,11 @@ describe('ImportCocktailWizard', () => {
       expect.stringContaining('Daiquiri'),
     ]);
     expect(screen.getAllByText('cocktails.importWizard.resultImported')).toHaveLength(3);
-    expect(api.cocktails.importConfirm).toHaveBeenCalledTimes(4);
+    expect(confirmations.map((confirmation) => nameOf(confirmation.recipe))).toEqual(['Mojito', 'Negroni', 'Negroni', 'Daiquiri']);
   });
 
   it('shows an error screen with buttons when the preview of the next recipe fails', async () => {
-    vi.mocked(api.cocktails.importPreview).mockImplementation(async (r) => {
-      if (nameOf(r) === 'Negroni') throw new Error('Invalid recipe');
-      return matchedPreview(nameOf(r));
-    });
+    answerPreview = (name) => (name === 'Negroni' ? refused(400, 'Invalid recipe') : HttpResponse.json(matchedPreview(name)));
     const onClose = vi.fn();
     render(<ImportCocktailWizard onClose={onClose} />);
 
@@ -239,12 +283,12 @@ describe('ImportCocktailWizard', () => {
     } finally {
       vi.useRealTimers();
     }
-    expect(api.cocktails.importConfirm).toHaveBeenCalledTimes(10);
-    for (const list of LIST_CALLS) expect(list).toHaveBeenCalledTimes(1);
+    expect(confirmations).toHaveLength(10);
+    for (const read of listReads) expect(read.count()).toBe(1);
   });
 
   it('goes back to the file from the first recipe, and after a failed preview', async () => {
-    vi.mocked(api.cocktails.importPreview).mockRejectedValueOnce(new Error('Server down'));
+    failFirstPreview('Server down');
     render(<ImportCocktailWizard onClose={vi.fn()} />);
 
     uploadJson(recipe('Mojito'));
@@ -258,7 +302,7 @@ describe('ImportCocktailWizard', () => {
   });
 
   it('retries a failed preview', async () => {
-    vi.mocked(api.cocktails.importPreview).mockRejectedValueOnce(new Error('Server down'));
+    failFirstPreview('Server down');
     render(<ImportCocktailWizard onClose={vi.fn()} />);
 
     uploadJson(recipe('Mojito'));
@@ -269,7 +313,7 @@ describe('ImportCocktailWizard', () => {
   });
 
   it('warns when an existing list cannot be loaded', async () => {
-    vi.mocked(api.ingredients.list).mockRejectedValue(new Error('Down'));
+    mockApiError('get', '/api/ingredients', 503, 'Down');
     render(<ImportCocktailWizard onClose={vi.fn()} />);
 
     uploadJson(recipe('Mojito'));
@@ -279,12 +323,13 @@ describe('ImportCocktailWizard', () => {
   });
 
   it('closes from the error screen of a single recipe', async () => {
-    vi.mocked(api.cocktails.importConfirm).mockRejectedValue('not an Error');
     const onClose = vi.fn();
     render(<ImportCocktailWizard onClose={onClose} />);
 
     uploadJson(recipe('Mojito'));
     await goToConfirmation();
+    // Only something else than an HTTP answer can reject with a non-Error
+    rejectNextFetch('not an Error');
     await confirmImport();
 
     expect(await screen.findByText('cocktails.importWizard.error')).toBeInTheDocument();

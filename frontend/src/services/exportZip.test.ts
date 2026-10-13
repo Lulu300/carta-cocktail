@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock JSZip as a class constructor
 const mockFile = vi.fn();
@@ -13,30 +13,22 @@ vi.mock('jszip', () => {
   };
 });
 
-// Mock the API
-vi.mock('./api', () => ({
-  cocktails: { exportRecipe: vi.fn() },
-}));
-
+import { http, HttpResponse } from 'msw';
 import { exportCocktailsAsZip } from './exportZip';
-import { cocktails as cocktailsApi } from './api';
+import { mockDownload } from '../test/download';
+import { server } from '../test/msw/server';
 import type { CocktailExportFormat } from '../types';
 
-let mockAnchor: { href: string; download: string; click: ReturnType<typeof vi.fn> };
+let downloads: string[];
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockGenerateAsync.mockResolvedValue(new Blob(['zip-content']));
+  downloads = mockDownload();
+});
 
-  // Mock DOM APIs
-  global.URL.createObjectURL = vi.fn(() => 'blob:test-url');
-  global.URL.revokeObjectURL = vi.fn();
-
-  // Mock document.createElement and body methods
-  mockAnchor = { href: '', download: '', click: vi.fn() };
-  vi.spyOn(document, 'createElement').mockReturnValue(mockAnchor as unknown as HTMLElement);
-  vi.spyOn(document.body, 'appendChild').mockImplementation(() => mockAnchor as unknown as HTMLElement);
-  vi.spyOn(document.body, 'removeChild').mockImplementation(() => mockAnchor as unknown as HTMLElement);
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 function recipe(name: string): CocktailExportFormat {
@@ -47,11 +39,23 @@ function recipe(name: string): CocktailExportFormat {
   };
 }
 
-/** Each call to the API answers with the next file name, as the backend would. */
-function mockServerFiles(...files: { filename: string; name: string }[]) {
-  for (const { filename, name } of files) {
-    vi.mocked(cocktailsApi.exportRecipe).mockResolvedValueOnce({ filename, data: recipe(name) });
-  }
+/** Exported ids, in the order the server received them. */
+let requestedIds: number[];
+
+/** The server names each export file, as the backend does (Content-Disposition). */
+function mockServerFiles(...files: { id: number; filename: string; name: string }[]) {
+  requestedIds = [];
+  server.use(
+    http.get('/api/cocktails/:id/export', ({ params }) => {
+      const id = Number(params.id);
+      requestedIds.push(id);
+      const file = files.find((candidate) => candidate.id === id);
+      if (!file) return HttpResponse.json({ error: 'Cocktail not found' }, { status: 404 });
+      return HttpResponse.json(recipe(file.name), {
+        headers: { 'Content-Disposition': `attachment; filename="${file.filename}"` },
+      });
+    }),
+  );
 }
 
 function zippedFilenames(): string[] {
@@ -60,32 +64,32 @@ function zippedFilenames(): string[] {
 
 describe('exportCocktailsAsZip', () => {
   it('should export single cocktail as zip under the server file name', async () => {
-    mockServerFiles({ filename: 'cocktail-mojito.json', name: 'Mojito' });
+    mockServerFiles({ id: 1, filename: 'cocktail-mojito.json', name: 'Mojito' });
 
     await exportCocktailsAsZip([1]);
 
-    expect(cocktailsApi.exportRecipe).toHaveBeenCalledWith(1);
+    expect(requestedIds).toEqual([1]);
     expect(mockFile).toHaveBeenCalledWith('cocktail-mojito.json', JSON.stringify(recipe('Mojito'), null, 2));
     expect(mockGenerateAsync).toHaveBeenCalledWith({ type: 'blob' });
   });
 
   it('should export multiple cocktails', async () => {
     mockServerFiles(
-      { filename: 'cocktail-mojito.json', name: 'Mojito' },
-      { filename: 'cocktail-negroni.json', name: 'Negroni' },
+      { id: 1, filename: 'cocktail-mojito.json', name: 'Mojito' },
+      { id: 2, filename: 'cocktail-negroni.json', name: 'Negroni' },
     );
 
     await exportCocktailsAsZip([1, 2]);
 
-    expect(cocktailsApi.exportRecipe).toHaveBeenCalledTimes(2);
+    expect(requestedIds).toHaveLength(2);
     expect(zippedFilenames()).toEqual(['cocktail-mojito.json', 'cocktail-negroni.json']);
   });
 
   it('should keep one file per cocktail when names collide', async () => {
     mockServerFiles(
-      { filename: 'cocktail-mojito.json', name: 'Mojito' },
-      { filename: 'cocktail-mojito.json', name: 'Mojito' },
-      { filename: 'cocktail-mojito.json', name: 'mojito' },
+      { id: 1, filename: 'cocktail-mojito.json', name: 'Mojito' },
+      { id: 2, filename: 'cocktail-mojito.json', name: 'Mojito' },
+      { id: 3, filename: 'cocktail-mojito.json', name: 'mojito' },
     );
 
     await exportCocktailsAsZip([1, 2, 3]);
@@ -95,9 +99,9 @@ describe('exportCocktailsAsZip', () => {
 
   it('should build an archive that holds every recipe of a batch with duplicate names', async () => {
     mockServerFiles(
-      { filename: 'cocktail-mojito.json', name: 'Mojito' },
-      { filename: 'cocktail-mojito.json', name: 'Mojito' },
-      { filename: 'cocktail-42.json', name: 'モヒート' },
+      { id: 1, filename: 'cocktail-mojito.json', name: 'Mojito' },
+      { id: 2, filename: 'cocktail-mojito.json', name: 'Mojito' },
+      { id: 42, filename: 'cocktail-42.json', name: 'モヒート' },
     );
 
     await exportCocktailsAsZip([1, 2, 42]);
@@ -113,9 +117,9 @@ describe('exportCocktailsAsZip', () => {
 
   it('should not reuse a suffixed name already taken by another cocktail', async () => {
     mockServerFiles(
-      { filename: 'cocktail-mojito.json', name: 'Mojito' },
-      { filename: 'cocktail-mojito-2.json', name: 'Mojito 2' },
-      { filename: 'cocktail-mojito.json', name: 'Mojito' },
+      { id: 1, filename: 'cocktail-mojito.json', name: 'Mojito' },
+      { id: 2, filename: 'cocktail-mojito-2.json', name: 'Mojito 2' },
+      { id: 3, filename: 'cocktail-mojito.json', name: 'Mojito' },
     );
 
     await exportCocktailsAsZip([1, 2, 3]);
@@ -124,7 +128,7 @@ describe('exportCocktailsAsZip', () => {
   });
 
   it('should keep the id-based name of a cocktail with no latin letter', async () => {
-    mockServerFiles({ filename: 'cocktail-42.json', name: 'モヒート' });
+    mockServerFiles({ id: 42, filename: 'cocktail-42.json', name: 'モヒート' });
 
     await exportCocktailsAsZip([42]);
 
@@ -132,18 +136,19 @@ describe('exportCocktailsAsZip', () => {
   });
 
   it('should create download link with correct filename format', async () => {
-    mockServerFiles({ filename: 'cocktail-mojito.json', name: 'Mojito' });
+    mockServerFiles({ id: 1, filename: 'cocktail-mojito.json', name: 'Mojito' });
 
     await exportCocktailsAsZip([1]);
 
-    expect(mockAnchor.download).toMatch(/^cocktails-export-\d{4}-\d{2}-\d{2}\.zip$/);
+    expect(downloads).toHaveLength(1);
+    expect(downloads[0]).toMatch(/^cocktails-export-\d{4}-\d{2}-\d{2}\.zip$/);
   });
 
   it('should clean up object URL after download', async () => {
-    mockServerFiles({ filename: 'cocktail-mojito.json', name: 'Mojito' });
+    mockServerFiles({ id: 1, filename: 'cocktail-mojito.json', name: 'Mojito' });
 
     await exportCocktailsAsZip([1]);
 
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:test-url');
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:download');
   });
 });
