@@ -5,7 +5,14 @@ import userEvent from '@testing-library/user-event';
 import { createQueryClient } from '../../queries/queryClient';
 import { buildCategory, buildCocktail } from '../../test/factories';
 import { server } from '../../test/msw/server';
-import { captureRequest, mockApiError, mockApiResponse, rejectNextFetch, type CapturedRequest } from '../../test/msw/utils';
+import {
+  captureRequest,
+  errorResponse,
+  mockApiError,
+  mockApiResponse,
+  rejectNextFetch,
+  type CapturedRequest,
+} from '../../test/msw/utils';
 import type { CocktailExportFormat, EntityResolutionAction, ImportPreviewResponse } from '../../types';
 import ImportCocktailWizard from './ImportCocktailWizard';
 
@@ -81,8 +88,6 @@ function isConfirmation(body: unknown): body is ImportConfirmation {
   return typeof body === 'object' && body !== null && 'recipe' in body && isRecipe(body.recipe) && 'resolutions' in body;
 }
 
-const refused = (status: number, error: string) => HttpResponse.json({ error }, { status });
-
 /** Confirmations received, in order. */
 let confirmations: ImportConfirmation[];
 /** How the server answers the preview of a recipe, by name. */
@@ -95,7 +100,7 @@ let listReads: CapturedRequest[];
 function failFirstPreview(message: string) {
   answerPreview = () => {
     answerPreview = (name) => HttpResponse.json(matchedPreview(name));
-    return refused(503, message);
+    return errorResponse(503, message);
   };
 }
 
@@ -112,11 +117,11 @@ function installFakeBackend() {
   server.use(
     http.post('/api/cocktails/import/preview', async ({ request }) => {
       const body: unknown = await request.json();
-      return isRecipe(body) ? answerPreview(nameOf(body)) : refused(400, 'Invalid recipe');
+      return isRecipe(body) ? answerPreview(nameOf(body)) : errorResponse(400, 'Invalid recipe');
     }),
     http.post('/api/cocktails/import/confirm', async ({ request }) => {
       const body: unknown = await request.json();
-      if (!isConfirmation(body)) return refused(400, 'Invalid confirmation');
+      if (!isConfirmation(body)) return errorResponse(400, 'Invalid confirmation');
       confirmations.push(body);
       return answerConfirm(nameOf(body.recipe), confirmations.length);
     }),
@@ -204,7 +209,7 @@ describe('ImportCocktailWizard', () => {
   });
 
   it('imports a batch where the second recipe fails once: one line per recipe, all imported', async () => {
-    answerConfirm = (name, attempt) => (attempt === 2 ? refused(500, 'Boom') : HttpResponse.json(buildCocktail({ id: attempt, name })));
+    answerConfirm = (name, attempt) => (attempt === 2 ? errorResponse(500, 'Boom') : HttpResponse.json(buildCocktail({ id: attempt, name })));
     render(<ImportCocktailWizard onClose={vi.fn()} />);
 
     uploadZip(['Mojito', 'Negroni', 'Daiquiri']);
@@ -236,7 +241,7 @@ describe('ImportCocktailWizard', () => {
   });
 
   it('shows an error screen with buttons when the preview of the next recipe fails', async () => {
-    answerPreview = (name) => (name === 'Negroni' ? refused(400, 'Invalid recipe') : HttpResponse.json(matchedPreview(name)));
+    answerPreview = (name) => (name === 'Negroni' ? errorResponse(400, 'Invalid recipe') : HttpResponse.json(matchedPreview(name)));
     const onClose = vi.fn();
     render(<ImportCocktailWizard onClose={onClose} />);
 

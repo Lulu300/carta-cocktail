@@ -13,7 +13,14 @@ import {
   buildIngredient,
   buildUnit,
 } from '../../test/factories';
-import { captureRequest, holdApiResponse, mockApiError, mockApiPending, mockApiResponse } from '../../test/msw/utils';
+import {
+  captureRequest,
+  errorResponse,
+  holdApiResponse,
+  mockApiError,
+  mockApiPending,
+  mockApiResponse,
+} from '../../test/msw/utils';
 import type { Cocktail, CocktailInput } from '../../types';
 import CocktailFormPage from './CocktailFormPage';
 
@@ -277,7 +284,7 @@ describe('CocktailFormPage, creation', () => {
       http.post('/api/cocktails/:id/image', () => {
         uploads += 1;
         return uploads === 1
-          ? HttpResponse.json({ error: 'Upload failed' }, { status: 500 })
+          ? errorResponse(500, 'Upload failed')
           : HttpResponse.json({ ...created, imagePath: 'mojito.jpg' });
       }),
     );

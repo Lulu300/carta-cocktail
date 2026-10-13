@@ -6,6 +6,7 @@ import { screen, waitFor, within } from '../../test/test-utils';
 import { clearToasts, renderWithFeedback } from '../../test/feedback';
 import { buildBottle, buildCategory, buildMenu, buildMenuBottle, buildMenuSection } from '../../test/factories';
 import { server } from '../../test/msw/server';
+import { errorResponse, pendingResponse, readJsonObject } from '../../test/msw/utils';
 import MenuBottleEditPage from './MenuBottleEditPage';
 import type { Bottle, Menu, MenuBottle } from '../../types';
 import type { MenuBottleExclusion } from '../../services/api';
@@ -64,8 +65,6 @@ let answer: {
 };
 
 const ok = () => HttpResponse.json({ message: 'ok' });
-const refused = (status: number, error: string) => HttpResponse.json({ error }, { status });
-const never = () => new Promise<Response>(() => {});
 
 function storedEntries(): MenuBottle[] {
   return stored.menu.bottles ?? [];
@@ -110,11 +109,6 @@ function restoreBottle(bottleId: number) {
   setEntries([...storedEntries(), makeEntry(50 + bottleId, exclusion.bottle)]);
 }
 
-async function readObject(request: Request): Promise<Record<string, unknown>> {
-  const body: unknown = await request.json();
-  return typeof body === 'object' && body !== null ? { ...body } : {};
-}
-
 function numbers(value: unknown): number[] {
   return Array.isArray(value) ? value.filter((item): item is number => typeof item === 'number') : [];
 }
@@ -156,18 +150,18 @@ function installFakeBackend() {
       return answer.menuRead();
     }),
     http.put('/api/menus/:id', async ({ request }) => {
-      const data = await readObject(request);
+      const data = await readJsonObject(request);
       received.menuUpdates.push(data);
       stored.menu = { ...stored.menu, ...data };
       return HttpResponse.json(stored.menu);
     }),
     http.put('/api/menu-bottles/:id', async ({ request, params }) => {
-      const changes = entryChanges(await readObject(request));
+      const changes = entryChanges(await readJsonObject(request));
       received.entryUpdates.push({ id: Number(params.id), changes });
       return answer.entryUpdate(Number(params.id), changes);
     }),
     http.post('/api/menu-bottles/menu/:menuId/reorder', async ({ request }) => {
-      const ids = numbers((await readObject(request)).ids);
+      const ids = numbers((await readJsonObject(request)).ids);
       received.reorders.push(ids);
       setEntries(ids.flatMap((id) => storedEntries().filter((entry) => entry.id === id)));
       return ok();
@@ -177,7 +171,7 @@ function installFakeBackend() {
       return answer.exclusionsRead();
     }),
     http.post('/api/menu-bottles/menu/:menuId/exclusions', async ({ request }) => {
-      const bottleIds = numbers((await readObject(request)).bottleIds);
+      const bottleIds = numbers((await readJsonObject(request)).bottleIds);
       received.excludes.push(bottleIds);
       return answer.exclude(bottleIds);
     }),
@@ -201,8 +195,8 @@ function installFakeBackend() {
 
 /** The first loads answer; every refetch then waits forever, so only the editor itself can fix the screen. */
 function serveOnlyFirstLoad() {
-  answer.menuRead = async () => (received.menuReads.length === 1 ? HttpResponse.json(stored.menu) : never());
-  answer.exclusionsRead = async () => (received.exclusionReads.length === 1 ? HttpResponse.json(stored.exclusions) : never());
+  answer.menuRead = async () => (received.menuReads.length === 1 ? HttpResponse.json(stored.menu) : pendingResponse());
+  answer.exclusionsRead = async () => (received.exclusionReads.length === 1 ? HttpResponse.json(stored.exclusions) : pendingResponse());
 }
 
 /** Holds every entry update until the test answers it, in any order. */
@@ -373,7 +367,7 @@ describe('MenuBottleEditPage', () => {
 
   it('puts both lists back with a toast when the removal fails', async () => {
     const user = userEvent.setup();
-    answer.exclude = async () => refused(400, 'Not a system menu');
+    answer.exclude = async () => errorResponse(400, 'Not a system menu');
     serveOnlyFirstLoad();
     renderPage();
     await screen.findByText('Hendricks');
@@ -418,7 +412,7 @@ describe('MenuBottleEditPage', () => {
   it('shows the removed bottles again with a toast when putting one back fails', async () => {
     const user = userEvent.setup();
     storeMenu({}, removedCamparis());
-    answer.restore = async () => (received.restores.length === 1 ? ok() : refused(404, 'Resource not found'));
+    answer.restore = async () => (received.restores.length === 1 ? ok() : errorResponse(404, 'Resource not found'));
     serveOnlyFirstLoad();
     renderPage();
 
@@ -435,7 +429,7 @@ describe('MenuBottleEditPage', () => {
     storeMenu({}, removedCamparis());
     let finishSecond: () => void = () => {};
     answer.restore = (bottleId) => {
-      if (received.restores.length === 1) return Promise.resolve(refused(404, 'Resource not found'));
+      if (received.restores.length === 1) return Promise.resolve(errorResponse(404, 'Resource not found'));
       return new Promise((resolve) => {
         finishSecond = () => {
           restoreBottle(bottleId);
@@ -555,7 +549,7 @@ describe('MenuBottleEditPage', () => {
   });
 
   it('shows an error when the menu does not exist', async () => {
-    answer.menuRead = async () => refused(404, 'Resource not found');
+    answer.menuRead = async () => errorResponse(404, 'Resource not found');
     renderPage();
 
     expect(await screen.findByText('menus.loadError')).toBeInTheDocument();

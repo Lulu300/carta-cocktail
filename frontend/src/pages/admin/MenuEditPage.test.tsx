@@ -6,7 +6,7 @@ import { fireEvent, screen, waitFor, within } from '../../test/test-utils';
 import { clearToasts, renderWithFeedback } from '../../test/feedback';
 import { buildCocktail, buildMenu, buildMenuCocktail, buildMenuSection } from '../../test/factories';
 import { server } from '../../test/msw/server';
-import { mockApiResponse } from '../../test/msw/utils';
+import { errorResponse, mockApiResponse, pendingResponse } from '../../test/msw/utils';
 import MenuEditPage from './MenuEditPage';
 import type { Cocktail, Menu, MenuCocktail, MenuInput, MenuSection } from '../../types';
 
@@ -70,7 +70,7 @@ function installFakeBackend() {
     }),
     http.put('/api/menus/:id', async ({ request }) => {
       const body: unknown = await request.json();
-      if (!isMenuUpdate(body)) return HttpResponse.json({ error: 'Invalid body' }, { status: 400 });
+      if (!isMenuUpdate(body)) return errorResponse(400, 'Invalid body');
       received.updates.push(body);
       return answerUpdate(body);
     }),
@@ -79,7 +79,7 @@ function installFakeBackend() {
 
 /** The first load answers; every refetch then waits forever, so only the editor itself can fix the screen. */
 function serveOnlyFirstLoad() {
-  answerRead = async () => (received.menuReads.length === 1 ? HttpResponse.json(storedMenu) : new Promise<Response>(() => {}));
+  answerRead = async () => (received.menuReads.length === 1 ? HttpResponse.json(storedMenu) : pendingResponse());
 }
 
 function renderPage() {
@@ -184,7 +184,7 @@ describe('MenuEditPage', () => {
 
   it('puts the cocktail back and shows the server error when the save fails', async () => {
     const user = userEvent.setup();
-    answerUpdate = async () => HttpResponse.json({ error: 'Unknown section' }, { status: 400 });
+    answerUpdate = async () => errorResponse(400, 'Unknown section');
     serveOnlyFirstLoad();
     renderPage();
     await screen.findByText('Mojito');
@@ -203,7 +203,7 @@ describe('MenuEditPage', () => {
     answerUpdate = (data) => new Promise((resolve) => {
       answers.push({
         resolve: () => resolve(storeUpdate(data)),
-        reject: (message) => resolve(HttpResponse.json({ error: message }, { status: 500 })),
+        reject: (message) => resolve(errorResponse(500, message)),
       });
     });
     const hiddenFlags = (call: number) => sentCocktails(call).map((item) => item.isHidden);
@@ -279,7 +279,7 @@ describe('MenuEditPage', () => {
   });
 
   it('shows an error with a way back when the menu does not exist', async () => {
-    answerRead = async () => HttpResponse.json({ error: 'Resource not found' }, { status: 404 });
+    answerRead = async () => errorResponse(404, 'Resource not found');
     renderPage();
 
     expect(await screen.findByText('menus.loadError')).toBeInTheDocument();

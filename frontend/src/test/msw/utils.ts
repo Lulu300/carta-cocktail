@@ -1,6 +1,9 @@
 import { vi } from 'vitest';
 import { http, HttpResponse, type JsonBodyType } from 'msw';
+import { errorResponse, pendingResponse } from './responses';
 import { server } from './server';
+
+export { errorResponse, pendingResponse, readJsonObject } from './responses';
 
 /** HTTP methods of `services/api.ts`, as named by MSW's `http` helpers. */
 export type ApiMethod = 'get' | 'post' | 'put' | 'delete';
@@ -12,12 +15,12 @@ export function mockApiResponse(method: ApiMethod, path: string, body: JsonBodyT
 
 /** Makes the backend reject `method path` with `status` and the `{ error }` body the real API sends. */
 export function mockApiError(method: ApiMethod, path: string, status: number, message: string): void {
-  mockApiResponse(method, path, { error: message }, status);
+  server.use(http[method](path, () => errorResponse(status, message)));
 }
 
 /** Makes `method path` hang: the page stays in its loading state for the whole test. */
 export function mockApiPending(method: ApiMethod, path: string): void {
-  server.use(http[method](path, () => new Promise<never>(() => {})));
+  server.use(http[method](path, pendingResponse));
 }
 
 /**

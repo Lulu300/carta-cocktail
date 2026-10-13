@@ -17,6 +17,7 @@ import { http, HttpResponse } from 'msw';
 import { exportCocktailsAsZip } from './exportZip';
 import { mockDownload } from '../test/download';
 import { server } from '../test/msw/server';
+import { errorResponse } from '../test/msw/utils';
 import type { CocktailExportFormat } from '../types';
 
 let downloads: string[];
@@ -50,7 +51,7 @@ function mockServerFiles(...files: { id: number; filename: string; name: string 
       const id = Number(params.id);
       requestedIds.push(id);
       const file = files.find((candidate) => candidate.id === id);
-      if (!file) return HttpResponse.json({ error: 'Cocktail not found' }, { status: 404 });
+      if (!file) return errorResponse(404, 'Cocktail not found');
       return HttpResponse.json(recipe(file.name), {
         headers: { 'Content-Disposition': `attachment; filename="${file.filename}"` },
       });

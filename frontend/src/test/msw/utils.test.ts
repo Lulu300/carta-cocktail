@@ -3,11 +3,14 @@ import { backup, categories, units } from '../../services/api';
 import { buildUnit } from '../factories';
 import {
   captureRequest,
+  errorResponse,
   holdApiResponse,
   mockApiError,
   mockApiPending,
   mockApiResponse,
   mockNetworkError,
+  pendingResponse,
+  readJsonObject,
   rejectNextFetch,
 } from './utils';
 
@@ -95,5 +98,28 @@ describe('fake backend', () => {
     const body = await request.body;
     expect(body).toContain('name="backup"');
     expect(body).toContain('Content-Type: application/zip');
+  });
+});
+
+describe('fake answer building blocks', () => {
+  it('reads a JSON object body, and anything else as an empty object', async () => {
+    const post = (body: string) => new Request('http://localhost/api', { method: 'POST', body });
+
+    expect(await readJsonObject(post('{"name":"Gin"}'))).toEqual({ name: 'Gin' });
+    expect(await readJsonObject(post('[1, 2]'))).toEqual({});
+    expect(await readJsonObject(post('null'))).toEqual({});
+  });
+
+  it('builds the error body of the real API', async () => {
+    const response = errorResponse(409, 'Unit in use');
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: 'Unit in use' });
+  });
+
+  it('builds an answer that never comes', async () => {
+    const outcome = await Promise.race([pendingResponse(), new Promise((resolve) => setTimeout(() => resolve('pending'), 20))]);
+
+    expect(outcome).toBe('pending');
   });
 });
