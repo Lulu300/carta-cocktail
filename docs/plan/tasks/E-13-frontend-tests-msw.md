@@ -11,7 +11,7 @@ depends_on: [B-04, E-02]
 touches: [frontend/src/test/, frontend/src/**/*.test.tsx, frontend/src/**/*.test.ts, frontend/package.json, frontend/package-lock.json, frontend/AGENTS.md]
 sources: ["04-tests.md §5.1", "04-tests.md §5.2", "04-tests.md §5.5"]
 branch: feature/E-13-frontend-tests-msw-2
-pr: "#139, #PR2"
+pr: "#139, #140"
 ---
 
 ## Contexte
