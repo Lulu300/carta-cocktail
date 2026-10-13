@@ -1,10 +1,23 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, within } from '../../test/test-utils';
 import userEvent from '@testing-library/user-event';
 import { fireEvent } from '@testing-library/react';
 import SettingsPage from './SettingsPage';
+import { AuthProvider } from '../../contexts/AuthContext';
 import { ConfirmProvider } from '../../contexts/ConfirmContext';
+import { SiteSettingsProvider } from '../../contexts/SiteSettingsContext';
 import { toast } from '../../components/ui/ToastStore';
+import type { BackupRestoreResult } from '../../services/api';
+import { mockDownload } from '../../test/download';
+import { buildSiteSettings } from '../../test/factories';
+import { ADMIN_USER } from '../../test/msw/handlers';
+import {
+  captureRequest,
+  mockApiError,
+  mockApiPending,
+  mockApiResponse,
+  rejectNextFetch,
+} from '../../test/msw/utils';
 
 // Keeps the interpolation values visible, so that a test can check the count of skipped files
 vi.mock('react-i18next', async (importOriginal) => {
@@ -15,39 +28,42 @@ vi.mock('react-i18next', async (importOriginal) => {
   };
 });
 
-vi.mock('../../services/api', () => ({
-  settings: { get: vi.fn(), update: vi.fn(), updateProfile: vi.fn() },
-  backup: { exportBackup: vi.fn(), importBackup: vi.fn() },
-}));
+const admin = { ...ADMIN_USER, email: 'admin@test.local' };
 
-// One stable value, as AuthProvider gives: a new user object on each render
-// would make the page reset the email field.
-const mockAuth = vi.hoisted(() => ({
-  user: { id: 1, email: 'admin@test.local' },
-  updateSession: vi.fn(),
-}));
-const mockUpdateSession = mockAuth.updateSession;
-vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => mockAuth,
-}));
+function restoreResult(overrides: Partial<BackupRestoreResult> = {}): BackupRestoreResult {
+  return { message: 'Backup restored', skippedFiles: 0, restartRecommended: false, ...overrides };
+}
 
-vi.mock('../../contexts/SiteSettingsContext', () => ({
-  useSiteSettings: () => ({ refresh: vi.fn() }),
-}));
+function mockRestore(result: BackupRestoreResult) {
+  mockApiResponse('post', '/api/backup/import', result);
+}
 
-import { settings as settingsApi, backup as backupApi } from '../../services/api';
-const mockGet = vi.mocked(settingsApi.get);
-const mockUpdate = vi.mocked(settingsApi.update);
-const mockUpdateProfile = vi.mocked(settingsApi.updateProfile);
-const mockExportBackup = vi.mocked(backupApi.exportBackup);
-const mockImportBackup = vi.mocked(backupApi.importBackup);
-
+/** The page inside the providers of main.tsx: the signed-in admin and the site settings. */
 function renderPage() {
   return render(
-    <ConfirmProvider>
-      <SettingsPage />
-    </ConfirmProvider>,
+    <AuthProvider>
+      <SiteSettingsProvider>
+        <ConfirmProvider>
+          <SettingsPage />
+        </ConfirmProvider>
+      </SiteSettingsProvider>
+    </AuthProvider>,
   );
+}
+
+/** Renders the page and waits for the site settings and the admin email. */
+async function renderLoadedPage() {
+  renderPage();
+  expect(await screen.findByDisplayValue('My Bar')).toBeInTheDocument();
+  expect(await screen.findByDisplayValue('admin@test.local')).toBeInTheDocument();
+}
+
+function siteSaveButton() {
+  return screen.getAllByText('common.save')[0];
+}
+
+function profileSaveButton() {
+  return screen.getAllByText('common.save')[1];
 }
 
 async function selectBackupFileAndClickImport(): Promise<File> {
@@ -56,7 +72,8 @@ async function selectBackupFileAndClickImport(): Promise<File> {
   });
 
   // Select a file via the hidden input
-  const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+  const fileInput = document.querySelector('input[type="file"]');
+  if (!(fileInput instanceof HTMLInputElement)) throw new Error('No file input');
   const file = new File(['content'], 'backup.zip', { type: 'application/zip' });
   fireEvent.change(fileInput, { target: { files: [file] } });
 
@@ -71,42 +88,46 @@ async function selectBackupFileAndClickImport(): Promise<File> {
 async function answerRestoreDialog(buttonName: 'settings.backup.import' | 'common.cancel') {
   const dialog = await screen.findByRole('alertdialog', { name: 'settings.backup.import' });
   expect(dialog).toHaveAccessibleDescription('settings.backup.confirmRestore');
-  fireEvent.click(within(dialog).getByRole('button', { name: buttonName }));
+  // userEvent waits for the restore that the answer starts: its updates stay inside act()
+  await userEvent.click(within(dialog).getByRole('button', { name: buttonName }));
 }
 
 beforeEach(() => {
-  vi.clearAllMocks();
-  mockGet.mockResolvedValue({ id: 1, siteName: 'My Bar', siteIcon: '🍸' } as never);
-  mockUpdate.mockResolvedValue({ id: 1, siteName: 'My Bar', siteIcon: '🍸' } as never);
-  mockUpdateProfile.mockResolvedValue({ id: 1, email: 'admin@test.local' } as never);
-  mockExportBackup.mockResolvedValue(undefined as never);
-  mockImportBackup.mockResolvedValue({ message: 'Backup restored', skippedFiles: 0, restartRecommended: false });
+  localStorage.setItem('token', 'admin-token');
+  mockApiResponse('get', '/api/auth/me', admin);
+  mockApiResponse('get', '/api/settings', buildSiteSettings({ siteName: 'My Bar', siteIcon: '🍸' }));
+  mockRestore(restoreResult());
   vi.spyOn(toast, 'success').mockReturnValue('toast-1');
   vi.spyOn(toast, 'info').mockReturnValue('toast-2');
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+  document.title = '';
+});
+
 describe('SettingsPage', () => {
-  it('should show loading state initially', () => {
-    // Don't resolve the promise yet
-    mockGet.mockReturnValue(new Promise(() => {}) as never);
+  it('shows a loading state until the site settings arrive', async () => {
+    mockApiPending('get', '/api/settings');
     renderPage();
     expect(screen.getByText('common.loading')).toBeInTheDocument();
+    // The providers still load the session and the public settings
+    await waitFor(() => expect(document.title).toBe('Carta'));
   });
 
-  it('should render title and both forms after loading', async () => {
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByText('settings.title')).toBeInTheDocument();
-      expect(screen.getByText('settings.siteConfig')).toBeInTheDocument();
-      expect(screen.getByText('settings.profileConfig')).toBeInTheDocument();
-    });
+  it('renders the title, both forms and the backup section after loading', async () => {
+    await renderLoadedPage();
+    expect(screen.getByRole('heading', { level: 1, name: 'settings.title' })).toBeInTheDocument();
+    expect(screen.getByText('settings.siteConfig')).toBeInTheDocument();
+    expect(screen.getByText('settings.profileConfig')).toBeInTheDocument();
+    expect(screen.getByText('settings.backup.title')).toBeInTheDocument();
   });
 
   it('labels every field and marks the chosen site icon', async () => {
     const user = userEvent.setup();
-    renderPage();
+    await renderLoadedPage();
 
-    expect(await screen.findByLabelText(/settings\.siteName/)).toHaveValue('My Bar');
+    expect(screen.getByLabelText(/settings\.siteName/)).toHaveValue('My Bar');
     expect(screen.getByLabelText(/settings\.email/)).toHaveValue('admin@test.local');
     expect(screen.getByLabelText('settings.currentPassword')).toHaveAttribute('type', 'password');
     expect(screen.getByLabelText('settings.newPassword')).toHaveAttribute('autocomplete', 'new-password');
@@ -119,163 +140,79 @@ describe('SettingsPage', () => {
     expect(within(icons).getByRole('button', { name: '🍸' })).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('should display site settings after loading', async () => {
-    renderPage();
-    await waitFor(() => {
-      const siteNameInput = screen.getByDisplayValue('My Bar');
-      expect(siteNameInput).toBeInTheDocument();
-    });
-  });
-
-  it('should display user email in profile form', async () => {
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('admin@test.local')).toBeInTheDocument();
-    });
-  });
-
-  it('should save site settings on submit', async () => {
+  it('saves the site settings, confirms and refreshes the name shown everywhere', async () => {
     const user = userEvent.setup();
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('My Bar')).toBeInTheDocument();
-    });
+    await renderLoadedPage();
+    const saved = captureRequest('put', '/api/settings');
+    mockApiResponse('get', '/api/public/settings', buildSiteSettings({ siteName: 'New Bar Name' }));
 
     const siteNameInput = screen.getByDisplayValue('My Bar');
     await user.clear(siteNameInput);
     await user.type(siteNameInput, 'New Bar Name');
+    await user.click(siteSaveButton());
 
-    const saveButtons = screen.getAllByText('common.save');
-    await user.click(saveButtons[0]); // first save button is for site settings
-
-    await waitFor(() => {
-      expect(mockUpdate).toHaveBeenCalledWith({ siteName: 'New Bar Name', siteIcon: '🍸' });
-    });
+    expect(await saved.body).toEqual({ siteName: 'New Bar Name', siteIcon: '🍸' });
+    expect(await screen.findByText('settings.siteUpdated')).toBeInTheDocument();
+    // SiteSettingsProvider reloaded the public settings
+    await waitFor(() => expect(document.title).toBe('New Bar Name'));
   });
 
-  it('should show success message after site save', async () => {
+  it('shows the server message when the site save fails', async () => {
+    mockApiError('put', '/api/settings', 400, 'Site name is required');
     const user = userEvent.setup();
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('My Bar')).toBeInTheDocument();
-    });
+    await renderLoadedPage();
 
-    const saveButtons = screen.getAllByText('common.save');
-    await user.click(saveButtons[0]);
+    await user.click(siteSaveButton());
 
-    await waitFor(() => {
-      expect(screen.getByText('settings.siteUpdated')).toBeInTheDocument();
-    });
+    expect(await screen.findByText('Site name is required')).toBeInTheDocument();
   });
 
-  it('should show error on site save failure', async () => {
-    mockUpdate.mockRejectedValue(new Error('Server error'));
+  it('shows a generic error when the site save fails with something else than an Error', async () => {
     const user = userEvent.setup();
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('My Bar')).toBeInTheDocument();
-    });
+    await renderLoadedPage();
+    rejectNextFetch('string error');
 
-    const saveButtons = screen.getAllByText('common.save');
-    await user.click(saveButtons[0]);
+    await user.click(siteSaveButton());
 
-    await waitFor(() => {
-      expect(screen.getByText('Server error')).toBeInTheDocument();
-    });
+    expect(await screen.findByText('common.error')).toBeInTheDocument();
   });
 
-  it('should show error on site save failure with non-Error object', async () => {
-    mockUpdate.mockRejectedValue('string error');
+  it('refuses two different new passwords without asking the server', async () => {
     const user = userEvent.setup();
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('My Bar')).toBeInTheDocument();
-    });
-
-    const saveButtons = screen.getAllByText('common.save');
-    await user.click(saveButtons[0]);
-
-    await waitFor(() => {
-      expect(screen.getByText('common.error')).toBeInTheDocument();
-    });
-  });
-
-  it('should show password mismatch error', async () => {
-    const user = userEvent.setup();
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('admin@test.local')).toBeInTheDocument();
-    });
-
-    // Find the new password and confirm password fields
-    const newPasswordInput = screen.getByPlaceholderText('settings.newPasswordPlaceholder');
-    const confirmPasswordInput = screen.getByPlaceholderText('settings.confirmPasswordPlaceholder');
+    await renderLoadedPage();
+    const profile = captureRequest('put', '/api/settings/profile');
 
     await user.type(screen.getByPlaceholderText('settings.currentPasswordPlaceholder'), 'old-password-1');
-    await user.type(newPasswordInput, 'newpass123');
-    await user.type(confirmPasswordInput, 'differentpass');
+    await user.type(screen.getByPlaceholderText('settings.newPasswordPlaceholder'), 'newpass123');
+    await user.type(screen.getByPlaceholderText('settings.confirmPasswordPlaceholder'), 'differentpass');
+    await user.click(profileSaveButton());
 
-    const saveButtons = screen.getAllByText('common.save');
-    await user.click(saveButtons[1]); // second save button is for profile
-
-    await waitFor(() => {
-      expect(screen.getByText('settings.passwordMismatch')).toBeInTheDocument();
-    });
-    expect(mockUpdateProfile).not.toHaveBeenCalled();
+    expect(await screen.findByText('settings.passwordMismatch')).toBeInTheDocument();
+    expect(profile.count()).toBe(0);
   });
 
-  it('should save profile with matching passwords and show success message', async () => {
+  it('changes the password and keeps the admin signed in with the new token', async () => {
+    mockApiResponse('put', '/api/settings/profile', { ...admin, token: 'new-token' });
     const user = userEvent.setup();
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('admin@test.local')).toBeInTheDocument();
-    });
-
-    const currentPasswordInput = screen.getByPlaceholderText('settings.currentPasswordPlaceholder');
-    const newPasswordInput = screen.getByPlaceholderText('settings.newPasswordPlaceholder');
-    const confirmPasswordInput = screen.getByPlaceholderText('settings.confirmPasswordPlaceholder');
-
-    await user.type(currentPasswordInput, 'oldpass');
-    await user.type(newPasswordInput, 'newpass123');
-    await user.type(confirmPasswordInput, 'newpass123');
-
-    const saveButtons = screen.getAllByText('common.save');
-    await user.click(saveButtons[1]);
-
-    await waitFor(() => {
-      expect(mockUpdateProfile).toHaveBeenCalledWith({
-        currentPassword: 'oldpass',
-        newPassword: 'newpass123',
-      });
-      expect(screen.getByText('settings.profileUpdated')).toBeInTheDocument();
-    });
-  });
-
-  it('should keep the admin logged in with the token returned after a password change', async () => {
-    mockUpdateProfile.mockResolvedValue({ id: 1, email: 'admin@test.local', token: 'new-token' });
-    const user = userEvent.setup();
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('admin@test.local')).toBeInTheDocument();
-    });
+    await renderLoadedPage();
+    const profile = captureRequest('put', '/api/settings/profile');
 
     await user.type(screen.getByPlaceholderText('settings.currentPasswordPlaceholder'), 'old-password-1');
     await user.type(screen.getByPlaceholderText('settings.newPasswordPlaceholder'), 'new-password-12');
     await user.type(screen.getByPlaceholderText('settings.confirmPasswordPlaceholder'), 'new-password-12');
-    await user.click(screen.getAllByText('common.save')[1]);
+    await user.click(profileSaveButton());
 
-    await waitFor(() => {
-      expect(mockUpdateSession).toHaveBeenCalledWith({ id: 1, email: 'admin@test.local' }, 'new-token');
-    });
+    expect(await profile.body).toEqual({ currentPassword: 'old-password-1', newPassword: 'new-password-12' });
+    expect(await screen.findByText('settings.profileUpdated')).toBeInTheDocument();
+    expect(localStorage.getItem('token')).toBe('new-token');
+    expect(screen.getByPlaceholderText('settings.newPasswordPlaceholder')).toHaveValue('');
   });
 
-  it('should send the current password with a new email and update the session', async () => {
-    mockUpdateProfile.mockResolvedValue({ id: 1, email: 'new@test.local' });
+  it('sends the current password with a new email and shows the new email', async () => {
+    mockApiResponse('put', '/api/settings/profile', { ...admin, email: 'new@test.local' });
     const user = userEvent.setup();
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('admin@test.local')).toBeInTheDocument();
-    });
+    await renderLoadedPage();
+    const profile = captureRequest('put', '/api/settings/profile');
     const currentPasswordInput = screen.getByPlaceholderText('settings.currentPasswordPlaceholder');
     expect(currentPasswordInput).not.toBeRequired();
 
@@ -284,158 +221,117 @@ describe('SettingsPage', () => {
     await user.type(emailInput, 'new@test.local');
     expect(currentPasswordInput).toBeRequired();
     await user.type(currentPasswordInput, 'old-password-1');
-    await user.click(screen.getAllByText('common.save')[1]);
+    await user.click(profileSaveButton());
 
-    await waitFor(() => {
-      expect(mockUpdateProfile).toHaveBeenCalledWith({ email: 'new@test.local', currentPassword: 'old-password-1' });
-      expect(mockUpdateSession).toHaveBeenCalledWith({ id: 1, email: 'new@test.local' }, undefined);
-    });
+    expect(await profile.body).toEqual({ email: 'new@test.local', currentPassword: 'old-password-1' });
+    expect(await screen.findByText('settings.profileUpdated')).toBeInTheDocument();
+    // The session now holds the new email: it is no longer a change
+    expect(screen.getByDisplayValue('new@test.local')).toBeInTheDocument();
+    expect(currentPasswordInput).not.toBeRequired();
+    expect(localStorage.getItem('token')).toBe('admin-token');
   });
 
-  it('should require the current password with a new password', async () => {
+  it('requires the current password with a new password', async () => {
     const user = userEvent.setup();
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('admin@test.local')).toBeInTheDocument();
-    });
+    await renderLoadedPage();
 
     await user.type(screen.getByPlaceholderText('settings.newPasswordPlaceholder'), 'x');
 
     expect(screen.getByPlaceholderText('settings.currentPasswordPlaceholder')).toBeRequired();
   });
 
-  it('should show error on profile save failure', async () => {
-    mockUpdateProfile.mockRejectedValue(new Error('Profile error'));
+  it('shows the server message when the profile save fails', async () => {
+    mockApiError('put', '/api/settings/profile', 400, 'Current password is incorrect');
     const user = userEvent.setup();
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('admin@test.local')).toBeInTheDocument();
-    });
+    await renderLoadedPage();
 
-    const saveButtons = screen.getAllByText('common.save');
-    await user.click(saveButtons[1]);
+    await user.click(profileSaveButton());
 
-    await waitFor(() => {
-      expect(screen.getByText('Profile error')).toBeInTheDocument();
-    });
+    expect(await screen.findByText('Current password is incorrect')).toBeInTheDocument();
   });
 
-  it('should show error on profile save failure with non-Error object', async () => {
-    mockUpdateProfile.mockRejectedValue('profile string error');
+  it('shows a generic error when the profile save fails with something else than an Error', async () => {
     const user = userEvent.setup();
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('admin@test.local')).toBeInTheDocument();
-    });
+    await renderLoadedPage();
+    rejectNextFetch('profile string error');
 
-    const saveButtons = screen.getAllByText('common.save');
-    await user.click(saveButtons[1]);
+    await user.click(profileSaveButton());
 
-    await waitFor(() => {
-      expect(screen.getByText('common.error')).toBeInTheDocument();
-    });
+    expect(await screen.findByText('common.error')).toBeInTheDocument();
   });
 
-  it('should render after site settings load error', async () => {
-    mockGet.mockRejectedValue(new Error('Network error'));
+  it('still renders the page when the site settings cannot be loaded', async () => {
+    mockApiError('get', '/api/settings', 500, 'Database unavailable');
     renderPage();
-    // Page should render (not stuck in loading state) after load error
-    await waitFor(() => {
-      expect(screen.getByText('settings.title')).toBeInTheDocument();
-    });
+    expect(await screen.findByRole('heading', { level: 1, name: 'settings.title' })).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('admin@test.local')).toBeInTheDocument();
   });
 
   // Backup section tests
 
-  it('should show backup section title', async () => {
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByText('settings.backup.title')).toBeInTheDocument();
-    });
-  });
-
-  it('should export backup successfully and show success message', async () => {
+  it('downloads the backup and shows a success message', async () => {
+    const downloads = mockDownload();
     const user = userEvent.setup();
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByText('settings.backup.export')).toBeInTheDocument();
-    });
+    await renderLoadedPage();
 
-    const exportButton = screen.getByText('settings.backup.export');
-    await user.click(exportButton);
+    await user.click(screen.getByText('settings.backup.export'));
 
-    await waitFor(() => {
-      expect(mockExportBackup).toHaveBeenCalledTimes(1);
-      expect(screen.getByText('settings.backup.exportSuccess')).toBeInTheDocument();
-    });
+    expect(await screen.findByText('settings.backup.exportSuccess')).toBeInTheDocument();
+    // Saved under the name sent by the server (Content-Disposition)
+    expect(downloads).toEqual(['backup.zip']);
   });
 
-  it('should show error on backup export failure', async () => {
-    mockExportBackup.mockRejectedValue(new Error('Export failed'));
+  it('shows the server message when the backup export fails', async () => {
+    mockApiError('get', '/api/backup/export', 500, 'Export failed');
     const user = userEvent.setup();
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByText('settings.backup.export')).toBeInTheDocument();
-    });
+    await renderLoadedPage();
 
-    const exportButton = screen.getByText('settings.backup.export');
-    await user.click(exportButton);
+    await user.click(screen.getByText('settings.backup.export'));
 
-    await waitFor(() => {
-      expect(screen.getByText('Export failed')).toBeInTheDocument();
-    });
+    expect(await screen.findByText('Export failed')).toBeInTheDocument();
   });
 
-  it('should show error on backup export failure with non-Error object', async () => {
-    mockExportBackup.mockRejectedValue('export string error');
+  it('shows a generic error when the export fails with something else than an Error', async () => {
     const user = userEvent.setup();
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByText('settings.backup.export')).toBeInTheDocument();
-    });
+    await renderLoadedPage();
+    rejectNextFetch('export string error');
 
-    const exportButton = screen.getByText('settings.backup.export');
-    await user.click(exportButton);
+    await user.click(screen.getByText('settings.backup.export'));
 
-    await waitFor(() => {
-      expect(screen.getByText('common.error')).toBeInTheDocument();
-    });
+    expect(await screen.findByText('common.error')).toBeInTheDocument();
   });
 
-  it('should show file name after selecting a backup file', async () => {
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByText('settings.backup.selectFile')).toBeInTheDocument();
-    });
+  it('shows the file name after selecting a backup file', async () => {
+    await renderLoadedPage();
 
-    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-    const file = new File(['content'], 'backup.zip', { type: 'application/zip' });
+    const fileInput = document.querySelector('input[type="file"]');
+    if (!(fileInput instanceof HTMLInputElement)) throw new Error('No file input');
+    fireEvent.change(fileInput, { target: { files: [new File(['content'], 'backup.zip', { type: 'application/zip' })] } });
 
-    fireEvent.change(fileInput, { target: { files: [file] } });
-
-    await waitFor(() => {
-      expect(screen.getByText('settings.backup.fileSelected(backup.zip)')).toBeInTheDocument();
-    });
+    expect(await screen.findByText('settings.backup.fileSelected(backup.zip)')).toBeInTheDocument();
   });
 
-  it('should import backup after confirming in the dialog and show success message', async () => {
-    renderPage();
-    const file = await selectBackupFileAndClickImport();
+  it('uploads the backup after confirming in the dialog and shows a success message', async () => {
+    await renderLoadedPage();
+    const restore = captureRequest('post', '/api/backup/import');
+    await selectBackupFileAndClickImport();
 
-    expect(mockImportBackup).not.toHaveBeenCalled();
+    expect(restore.count()).toBe(0);
     await answerRestoreDialog('settings.backup.import');
 
-    await waitFor(() => {
-      expect(mockImportBackup).toHaveBeenCalledWith(file);
-      expect(screen.getByText('settings.backup.importSuccess')).toBeInTheDocument();
-    });
+    expect(await screen.findByText('settings.backup.importSuccess')).toBeInTheDocument();
+    // The file goes in the "backup" field of a multipart body. Node's fetch drops the
+    // name and bytes of a jsdom File, so only the field and its type can be checked.
+    const body = await restore.body;
+    expect(body).toContain('name="backup"');
+    expect(body).toContain('Content-Type: application/zip');
     expect(toast.success).toHaveBeenCalledWith('settings.backup.importSuccess');
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   });
 
-  it('should reload the page by itself when the restore has nothing to report', async () => {
+  it('reloads the page by itself when the restore has nothing to report', async () => {
     const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
-    renderPage();
+    await renderLoadedPage();
     await selectBackupFileAndClickImport();
     await answerRestoreDialog('settings.backup.import');
 
@@ -446,10 +342,10 @@ describe('SettingsPage', () => {
     expect(screen.queryByRole('button', { name: /settings\.backup\.reload/ })).not.toBeInTheDocument();
   });
 
-  it('should keep the restart warning and the skipped files on screen after restoring an older backup', async () => {
-    mockImportBackup.mockResolvedValue({ message: 'Backup restored', skippedFiles: 2, restartRecommended: true });
+  it('keeps the restart warning and the skipped files on screen after restoring an older backup', async () => {
+    mockRestore(restoreResult({ skippedFiles: 2, restartRecommended: true }));
     const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
-    renderPage();
+    await renderLoadedPage();
     await selectBackupFileAndClickImport();
     await answerRestoreDialog('settings.backup.import');
 
@@ -468,10 +364,10 @@ describe('SettingsPage', () => {
     expect(setTimeoutSpy).not.toHaveBeenCalledWith(expect.any(Function), 1500);
   });
 
-  it('should show the skipped files without the restart warning when the schema is current', async () => {
-    mockImportBackup.mockResolvedValue({ message: 'Backup restored', skippedFiles: 1, restartRecommended: false });
+  it('shows the skipped files without the restart warning when the schema is current', async () => {
+    mockRestore(restoreResult({ skippedFiles: 1 }));
     const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
-    renderPage();
+    await renderLoadedPage();
     await selectBackupFileAndClickImport();
     await answerRestoreDialog('settings.backup.import');
 
@@ -482,9 +378,10 @@ describe('SettingsPage', () => {
     expect(setTimeoutSpy).not.toHaveBeenCalledWith(expect.any(Function), 1500);
   });
 
-  it('should clear the restore report after a successful export', async () => {
-    mockImportBackup.mockResolvedValue({ message: 'Backup restored', skippedFiles: 1, restartRecommended: false });
-    renderPage();
+  it('clears the restore report after a successful export', async () => {
+    mockDownload();
+    mockRestore(restoreResult({ skippedFiles: 1 }));
+    await renderLoadedPage();
     await selectBackupFileAndClickImport();
     await answerRestoreDialog('settings.backup.import');
     await screen.findByText('settings.backup.skippedFiles(1)');
@@ -495,10 +392,10 @@ describe('SettingsPage', () => {
     expect(screen.queryByText('settings.backup.skippedFiles(1)')).not.toBeInTheDocument();
   });
 
-  it('should keep the restart warning when the export fails', async () => {
-    mockImportBackup.mockResolvedValue({ message: 'Backup restored', skippedFiles: 0, restartRecommended: true });
-    mockExportBackup.mockRejectedValue(new Error('Internal server error'));
-    renderPage();
+  it('keeps the restart warning when the export fails', async () => {
+    mockRestore(restoreResult({ restartRecommended: true }));
+    mockApiError('get', '/api/backup/export', 500, 'Internal server error');
+    await renderLoadedPage();
     await selectBackupFileAndClickImport();
     await answerRestoreDialog('settings.backup.import');
     await screen.findByRole('alert');
@@ -509,14 +406,14 @@ describe('SettingsPage', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('settings.backup.restartTitle');
   });
 
-  it('should clear the previous restore report when restoring again', async () => {
-    mockImportBackup.mockResolvedValueOnce({ message: 'Backup restored', skippedFiles: 0, restartRecommended: true });
-    renderPage();
+  it('clears the previous restore report when restoring again', async () => {
+    mockRestore(restoreResult({ restartRecommended: true }));
+    await renderLoadedPage();
     await selectBackupFileAndClickImport();
     await answerRestoreDialog('settings.backup.import');
     await screen.findByRole('alert');
 
-    mockImportBackup.mockRejectedValueOnce(new Error('Import failed'));
+    mockApiError('post', '/api/backup/import', 400, 'Import failed');
     await selectBackupFileAndClickImport();
     await answerRestoreDialog('settings.backup.import');
 
@@ -524,8 +421,9 @@ describe('SettingsPage', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('should not import backup when the dialog is cancelled', async () => {
-    renderPage();
+  it('does not upload the backup when the dialog is cancelled', async () => {
+    await renderLoadedPage();
+    const restore = captureRequest('post', '/api/backup/import');
     await selectBackupFileAndClickImport();
 
     await answerRestoreDialog('common.cancel');
@@ -533,32 +431,27 @@ describe('SettingsPage', () => {
     await waitFor(() => {
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     });
-    expect(mockImportBackup).not.toHaveBeenCalled();
+    expect(restore.count()).toBe(0);
     expect(toast.success).not.toHaveBeenCalled();
   });
 
-  it('should show error on backup import failure', async () => {
-    mockImportBackup.mockRejectedValue(new Error('Import failed'));
+  it('shows the server message when the restore fails', async () => {
+    mockApiError('post', '/api/backup/import', 400, 'Import failed');
 
-    renderPage();
+    await renderLoadedPage();
     await selectBackupFileAndClickImport();
     await answerRestoreDialog('settings.backup.import');
 
-    await waitFor(() => {
-      expect(screen.getByText('Import failed')).toBeInTheDocument();
-    });
+    expect(await screen.findByText('Import failed')).toBeInTheDocument();
     expect(toast.success).not.toHaveBeenCalled();
   });
 
-  it('should show error on backup import failure with non-Error object', async () => {
-    mockImportBackup.mockRejectedValue('import string error');
-
-    renderPage();
+  it('shows a generic error when the restore fails with something else than an Error', async () => {
+    await renderLoadedPage();
     await selectBackupFileAndClickImport();
+    rejectNextFetch('import string error');
     await answerRestoreDialog('settings.backup.import');
 
-    await waitFor(() => {
-      expect(screen.getByText('common.error')).toBeInTheDocument();
-    });
+    expect(await screen.findByText('common.error')).toBeInTheDocument();
   });
 });

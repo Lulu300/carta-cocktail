@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { http, HttpResponse, type JsonBodyType } from 'msw';
 import { server } from './server';
 
@@ -24,8 +25,27 @@ export function mockNetworkError(method: ApiMethod, path: string): void {
   server.use(http[method](path, () => HttpResponse.error()));
 }
 
+/**
+ * Makes the next `fetch` reject with `reason`, which need not be an Error. No HTTP
+ * answer can do that: it covers the code that guards against a non-Error throw.
+ * Undo with `vi.restoreAllMocks()`.
+ */
+export function rejectNextFetch(reason: unknown): void {
+  vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(reason);
+}
+
+async function readBody(request: Request): Promise<unknown> {
+  const text = await request.text();
+  // request.formData() fails on the jsdom File of an upload: a test reads the raw multipart text
+  if (request.headers.get('Content-Type')?.startsWith('multipart/form-data')) return text;
+  return text ? JSON.parse(text) : null;
+}
+
 export interface CapturedRequest {
-  /** Body of the first matching request, parsed as JSON (`null` without a body). */
+  /**
+   * Body of the first matching request: parsed JSON, the raw multipart text for a
+   * file upload, `null` without a body.
+   */
   body: Promise<unknown>;
   /** Number of matching requests received so far. */
   count: () => number;
@@ -49,9 +69,8 @@ export function captureRequest(method: ApiMethod, path: string): CapturedRequest
     http[method](path, async ({ request }) => {
       received += 1;
       if (received === 1) {
-        const text = await request.clone().text();
         resolveUrl(new URL(request.url));
-        resolveBody(text ? JSON.parse(text) : null);
+        resolveBody(await readBody(request.clone()));
       }
       // No response: MSW falls through to the next handler for this request.
       return undefined;
