@@ -146,9 +146,7 @@ const menuHandlers = [
 
 const menuBottleHandlers = [
   http.get('/api/menu-bottles/menu/:menuId', ({ params }) =>
-    HttpResponse.json([
-      buildMenuBottle({ id: 1, menuId: Number(params.menuId), bottle: buildBottle({ id: 1, isApero: true }) }),
-    ]),
+    HttpResponse.json([buildMenuBottle({ id: 1, menuId: Number(params.menuId) })]),
   ),
   http.get('/api/menu-bottles/menu/:menuId/exclusions', () => HttpResponse.json([])),
   http.post('/api/menu-bottles/menu/:menuId/exclusions', done),

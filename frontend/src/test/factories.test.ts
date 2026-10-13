@@ -5,6 +5,7 @@ import {
   buildCategory,
   buildCategoryType,
   buildCocktail,
+  buildCocktailIngredient,
   buildIngredient,
   buildMenu,
   buildMenuBottle,
@@ -21,6 +22,7 @@ describe('factories', () => {
     ['bottle', buildBottle],
     ['category', buildCategory],
     ['cocktail', buildCocktail],
+    ['recipe line', buildCocktailIngredient],
     ['ingredient', buildIngredient],
     ['menu', buildMenu],
     ['menu bottle', buildMenuBottle],
@@ -59,6 +61,26 @@ describe('factories', () => {
     expect(buildMenuCocktail({ cocktail }).cocktailId).toBe(5);
     expect(buildMenuBottle({ bottle }).bottleId).toBe(9);
     expect(buildMenuBottle().bottle?.isApero).toBe(true);
+  });
+
+  it('merges partial cocktail and bottle overrides, sharing the id of the entry', () => {
+    const negroni = buildMenuCocktail({ id: 4, cocktail: { name: 'Negroni' }, menuSectionId: 10 });
+    const suze = buildMenuBottle({ id: 6, bottle: { name: 'Suze' } });
+
+    expect(negroni).toMatchObject({ id: 4, cocktailId: 4, menuSectionId: 10, cocktail: { id: 4, name: 'Negroni' } });
+    expect(suze).toMatchObject({ id: 6, bottleId: 6, bottle: { id: 6, name: 'Suze', isApero: true } });
+    expect(buildMenuCocktail({ id: 4, cocktail: { id: 8 } }).cocktailId).toBe(8);
+  });
+
+  it('keeps an id when an override passes it as undefined', () => {
+    expect(buildBottle({ id: undefined }).id).toBe(1);
+  });
+
+  it('builds a recipe line on a free ingredient sharing its id', () => {
+    const line = buildCocktailIngredient({ id: 3 });
+
+    expect(line).toMatchObject({ sourceType: 'INGREDIENT', ingredientId: 3, ingredient: { id: 3 }, position: 3 });
+    expect(buildCocktailIngredient({ sourceType: 'CATEGORY', ingredient: null }).ingredientId).toBeNull();
   });
 
   it('derives the menu slug from its name', () => {

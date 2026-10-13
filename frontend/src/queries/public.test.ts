@@ -1,51 +1,48 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { ApiError } from '../services/api';
+import { buildCocktail, buildMenu } from '../test/factories';
+import { captureRequest, mockApiResponse } from '../test/msw/utils';
 import { createTestQueryClient, renderHook, waitFor } from '../test/test-utils';
 import { qk } from './keys';
 import { isNotFoundError, usePublicCocktail, usePublicMenu, usePublicMenus } from './public';
-
-vi.mock('../services/api', async () => {
-  const actual = await vi.importActual<typeof import('../services/api')>('../services/api');
-  return {
-    ApiError: actual.ApiError,
-    publicApi: { listMenus: vi.fn(), getMenu: vi.fn(), getCocktail: vi.fn() },
-  };
-});
 
 const mockUseAuth = vi.fn();
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => mockUseAuth(),
 }));
 
-import { ApiError, publicApi } from '../services/api';
+const summer = buildMenu({ id: 1, name: 'Summer', slug: 'summer' });
+const daiquiri = buildCocktail({ id: 7, name: 'Daiquiri' });
 
 function signIn(token: string | null) {
   mockUseAuth.mockReturnValue({ token, user: token ? { id: 1, email: 'admin@carta.local' } : null });
 }
 
 beforeEach(() => {
-  vi.clearAllMocks();
   signIn(null);
-  vi.mocked(publicApi.listMenus).mockResolvedValue([]);
-  vi.mocked(publicApi.getMenu).mockResolvedValue({ id: 1 } as never);
-  vi.mocked(publicApi.getCocktail).mockResolvedValue({ id: 7 } as never);
+  mockApiResponse('get', '/api/public/menus', []);
+  mockApiResponse('get', '/api/public/menus/:slug', summer);
+  mockApiResponse('get', '/api/public/cocktails/:id', daiquiri);
 });
 
 describe('public query hooks', () => {
   it('caches a menu per slug and per viewer, since an admin gets private fields', async () => {
+    const requests = captureRequest('get', '/api/public/menus/:slug');
     const queryClient = createTestQueryClient();
     const { result } = renderHook(() => usePublicMenu('summer'), { queryClient });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(publicApi.getMenu).toHaveBeenCalledWith('summer');
-    expect(queryClient.getQueryData(qk.publicMenu('summer', 'guest'))).toEqual({ id: 1 });
+    expect((await requests.url).pathname).toBe('/api/public/menus/summer');
+    expect(queryClient.getQueryData(qk.publicMenu('summer', 'guest'))).toEqual(summer);
 
     signIn('token');
     const admin = renderHook(() => usePublicMenu('summer'), { queryClient });
     await waitFor(() => expect(admin.result.current.isSuccess).toBe(true));
-    expect(queryClient.getQueryData(qk.publicMenu('summer', 'admin'))).toEqual({ id: 1 });
-    expect(publicApi.getMenu).toHaveBeenCalledTimes(2);
+    expect(queryClient.getQueryData(qk.publicMenu('summer', 'admin'))).toEqual(summer);
+    expect(requests.count()).toBe(2);
   });
 
   it('serves a guest from the cache when coming back to a menu', async () => {
+    const requests = captureRequest('get', '/api/public/menus/:slug');
     const queryClient = createTestQueryClient();
     const first = renderHook(() => usePublicMenu('summer'), { queryClient });
     await waitFor(() => expect(first.result.current.isSuccess).toBe(true));
@@ -53,13 +50,14 @@ describe('public query hooks', () => {
 
     const second = renderHook(() => usePublicMenu('summer'), { queryClient });
 
-    expect(second.result.current.data).toEqual({ id: 1 });
+    expect(second.result.current.data).toEqual(summer);
     expect(second.result.current.isFetching).toBe(false);
-    expect(publicApi.getMenu).toHaveBeenCalledTimes(1);
+    expect(requests.count()).toBe(1);
   });
 
   it('refreshes an admin preview in the background, since admin edits do not invalidate it', async () => {
     signIn('token');
+    const requests = captureRequest('get', '/api/public/menus/:slug');
     const queryClient = createTestQueryClient();
     const first = renderHook(() => usePublicMenu('summer'), { queryClient });
     await waitFor(() => expect(first.result.current.isSuccess).toBe(true));
@@ -67,8 +65,8 @@ describe('public query hooks', () => {
 
     const second = renderHook(() => usePublicMenu('summer'), { queryClient });
 
-    expect(second.result.current.data).toEqual({ id: 1 });
-    await waitFor(() => expect(publicApi.getMenu).toHaveBeenCalledTimes(2));
+    expect(second.result.current.data).toEqual(summer);
+    await waitFor(() => expect(requests.count()).toBe(2));
   });
 
   it('loads the list of public menus', async () => {
@@ -80,12 +78,13 @@ describe('public query hooks', () => {
   });
 
   it('loads a public cocktail by id', async () => {
+    const request = captureRequest('get', '/api/public/cocktails/:id');
     const queryClient = createTestQueryClient();
     const { result } = renderHook(() => usePublicCocktail(7), { queryClient });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(publicApi.getCocktail).toHaveBeenCalledWith(7);
-    expect(queryClient.getQueryData(qk.publicCocktail(7, 'guest'))).toEqual({ id: 7 });
+    expect((await request.url).pathname).toBe('/api/public/cocktails/7');
+    expect(queryClient.getQueryData(qk.publicCocktail(7, 'guest'))).toEqual(daiquiri);
   });
 });
 

@@ -3,6 +3,7 @@ import type {
   Category,
   CategoryType,
   Cocktail,
+  CocktailIngredient,
   CocktailAvailability,
   Ingredient,
   Menu,
@@ -29,6 +30,7 @@ type Entity =
   | 'category'
   | 'categoryType'
   | 'cocktail'
+  | 'cocktailIngredient'
   | 'ingredient'
   | 'menu'
   | 'menuBottle'
@@ -96,7 +98,6 @@ export function buildCategoryType(overrides: Partial<CategoryType> = {}): Catego
 export function buildCategory(overrides: Partial<Category> = {}): Category {
   const id = overrides.id ?? nextId('category');
   return {
-    id,
     name: nameFor(CATEGORY_NAMES, id),
     nameTranslations: null,
     type: 'SPIRIT',
@@ -104,13 +105,13 @@ export function buildCategory(overrides: Partial<Category> = {}): Category {
     minimumPercent: 30,
     createdAt: CREATED_AT,
     ...overrides,
+    id,
   };
 }
 
 export function buildBottle(overrides: Partial<Bottle> = {}): Bottle {
   const id = overrides.id ?? nextId('bottle');
   return {
-    id,
     name: nameFor(BOTTLE_NAMES, id),
     categoryId: overrides.category?.id ?? 1,
     purchasePrice: 25,
@@ -123,19 +124,20 @@ export function buildBottle(overrides: Partial<Bottle> = {}): Bottle {
     isDigestif: false,
     createdAt: CREATED_AT,
     ...overrides,
+    id,
   };
 }
 
 export function buildIngredient(overrides: Partial<Ingredient> = {}): Ingredient {
   const id = overrides.id ?? nextId('ingredient');
   return {
-    id,
     name: nameFor(INGREDIENT_NAMES, id),
     nameTranslations: null,
     icon: null,
     isAvailable: true,
     createdAt: CREATED_AT,
     ...overrides,
+    id,
   };
 }
 
@@ -143,19 +145,40 @@ export function buildUnit(overrides: Partial<Unit> = {}): Unit {
   const id = overrides.id ?? nextId('unit');
   const unit = UNIT_DEFAULTS[(id - 1) % UNIT_DEFAULTS.length];
   return {
-    id,
     name: nameFor(UNIT_NAMES, id),
     nameTranslations: null,
     abbreviation: unit.abbreviation,
     conversionFactorToMl: unit.conversionFactorToMl,
     ...overrides,
+    id,
+  };
+}
+
+/**
+ * A line of a recipe, a free ingredient by default (2 of unit 1). Given an `id`,
+ * the line and its ingredient share it unless `ingredient` says otherwise.
+ */
+export function buildCocktailIngredient(overrides: Partial<CocktailIngredient> = {}): CocktailIngredient {
+  const id = overrides.id ?? nextId('cocktailIngredient');
+  const ingredient = overrides.ingredient === undefined ? buildIngredient({ id }) : overrides.ingredient;
+  return {
+    cocktailId: 1,
+    quantity: 2,
+    unitId: 1,
+    sourceType: 'INGREDIENT',
+    bottleId: null,
+    categoryId: null,
+    ingredientId: ingredient?.id ?? null,
+    ingredient,
+    position: id,
+    ...overrides,
+    id,
   };
 }
 
 export function buildCocktail(overrides: Partial<Cocktail> = {}): Cocktail {
   const id = overrides.id ?? nextId('cocktail');
   return {
-    id,
     name: nameFor(COCKTAIL_NAMES, id),
     description: null,
     notes: null,
@@ -167,6 +190,7 @@ export function buildCocktail(overrides: Partial<Cocktail> = {}): Cocktail {
     ingredients: [],
     instructions: [],
     ...overrides,
+    id,
   };
 }
 
@@ -174,7 +198,6 @@ export function buildMenu(overrides: Partial<Menu> = {}): Menu {
   const id = overrides.id ?? nextId('menu');
   const name = overrides.name ?? nameFor(MENU_NAMES, id);
   return {
-    id,
     name,
     description: null,
     slug: slugify(name),
@@ -186,47 +209,63 @@ export function buildMenu(overrides: Partial<Menu> = {}): Menu {
     cocktails: [],
     bottles: [],
     ...overrides,
+    id,
   };
 }
 
 export function buildMenuSection(overrides: Partial<MenuSection> = {}): MenuSection {
   const id = overrides.id ?? nextId('menuSection');
   return {
-    id,
     menuId: 1,
     name: nameFor(SECTION_NAMES, id),
     position: id,
     ...overrides,
+    id,
   };
 }
 
-export function buildMenuCocktail(overrides: Partial<MenuCocktail> = {}): MenuCocktail {
-  const id = overrides.id ?? nextId('menuCocktail');
-  const cocktail = overrides.cocktail ?? buildCocktail();
+/**
+ * A cocktail of a menu. `cocktail` overrides are merged into a built cocktail,
+ * so `buildMenuCocktail({ cocktail: { name: 'Negroni' } })` is enough. Given an
+ * `id`, the entry and its cocktail share it unless `cocktail.id` says otherwise.
+ */
+export function buildMenuCocktail(
+  overrides: Partial<Omit<MenuCocktail, 'cocktail'>> & { cocktail?: Partial<Cocktail> } = {},
+): MenuCocktail {
+  const { cocktail: cocktailOverrides, ...entryOverrides } = overrides;
+  const id = entryOverrides.id ?? nextId('menuCocktail');
+  const cocktail = buildCocktail({ id: entryOverrides.id ?? cocktailOverrides?.id, ...cocktailOverrides });
   return {
-    id,
     menuId: 1,
     cocktailId: cocktail.id,
     cocktail,
     menuSectionId: null,
     position: id,
     isHidden: false,
-    ...overrides,
+    ...entryOverrides,
+    id,
   };
 }
 
-export function buildMenuBottle(overrides: Partial<MenuBottle> = {}): MenuBottle {
-  const id = overrides.id ?? nextId('menuBottle');
-  const bottle = overrides.bottle ?? buildBottle({ isApero: true });
+/**
+ * A bottle of a menu, an apéritif by default. `bottle` overrides are merged
+ * into a built bottle, and the ids are shared, like in `buildMenuCocktail`.
+ */
+export function buildMenuBottle(
+  overrides: Partial<Omit<MenuBottle, 'bottle'>> & { bottle?: Partial<Bottle> } = {},
+): MenuBottle {
+  const { bottle: bottleOverrides, ...entryOverrides } = overrides;
+  const id = entryOverrides.id ?? nextId('menuBottle');
+  const bottle = buildBottle({ id: entryOverrides.id ?? bottleOverrides?.id, isApero: true, ...bottleOverrides });
   return {
-    id,
     menuId: 1,
     bottleId: bottle.id,
     bottle,
     menuSectionId: null,
     position: id,
     isHidden: false,
-    ...overrides,
+    ...entryOverrides,
+    id,
   };
 }
 
