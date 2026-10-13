@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { backup, categories, units } from '../../services/api';
 import { buildUnit } from '../factories';
 import {
@@ -13,10 +13,6 @@ import {
   readJsonObject,
   rejectNextFetch,
 } from './utils';
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 describe('fake backend', () => {
   it('answers the requests of services/api.ts with the default data', async () => {
