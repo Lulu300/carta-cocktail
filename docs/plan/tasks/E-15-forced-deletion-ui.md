@@ -5,13 +5,13 @@ phase: E
 lane: frontend
 criticite: moyenne
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-07, E-04, E-05]
-touches: [frontend/src/pages/admin/BottlesPage.tsx, frontend/src/pages/admin/CategoriesPage.tsx, frontend/src/pages/admin/IngredientsPage.tsx, frontend/src/components/admin/, frontend/src/queries/, frontend/src/services/api.ts, frontend/src/i18n/locales/]
+touches: [frontend/src/pages/admin/BottlesPage.tsx, frontend/src/pages/admin/CategoriesPage.tsx, frontend/src/pages/admin/IngredientsPage.tsx, frontend/src/pages/admin/UnitsPage.tsx, frontend/src/components/admin/, frontend/src/queries/, frontend/src/services/api.ts, frontend/src/types/index.ts, frontend/src/i18n/locales/, frontend/src/test/msw/, frontend/AGENTS.md]
 sources: ["02-backend-data-perf.md §2.3", "05-frontend-archi.md §H2"]
-branch:
-pr:
+branch: feature/E-15-forced-deletion-ui
+pr: https://github.com/Lulu300/carta-cocktail/pull/148
 ---
 
 ## Décisions validées (2026-10-08)
@@ -41,11 +41,11 @@ C-07 change le comportement du backend. Supprimer une bouteille, un ingrédient 
 
 ## Critères d'acceptation
 
-- [ ] Suppression d'un élément utilisé : la boîte liste les impacts, le bouton « Supprimer quand même » est désactivé tant que la case n'est pas cochée.
-- [ ] Après confirmation, l'élément est supprimé et un toast résume l'impact ; les listes et la disponibilité sont à jour sans recharger la page.
-- [ ] Annuler ne supprime rien.
-- [ ] Unités : pas d'option de forçage.
-- [ ] Tous les textes passent par i18n, en et fr.
+- [x] Suppression d'un élément utilisé : la boîte liste les impacts, le bouton « Supprimer quand même » est désactivé tant que la case n'est pas cochée.
+- [x] Après confirmation, l'élément est supprimé et un toast résume l'impact ; les listes et la disponibilité sont à jour sans recharger la page.
+- [x] Annuler ne supprime rien.
+- [x] Unités : pas d'option de forçage.
+- [x] Tous les textes passent par i18n, en et fr.
 
 ## Tests à ajouter ou adapter
 
@@ -64,3 +64,5 @@ C-07 change le comportement du backend. Supprimer une bouteille, un ingrédient 
 
 - 2026-10-08 : tâche créée suite à la décision sur la suppression (C-07).
 - 2026-10-13 : relecture d'E-30 (PR #133) : les locales frontend sont scindées. `categories.confirmDelete` est maintenant dans `frontend/src/i18n/locales/admin/en.json` et `admin/fr.json` (ligne 48, et non plus dans `locales/en.json:55`).
+- 2026-11-05 : réalisée (PR #148). Hook `useForcedDelete` et liste `DeletionImpactList` dans `components/admin/`, branchés dans les pages Bouteilles, Catégories et Ingrédients ; contrat vérifié contre `deletionService.ts` (C-07). Le message et la case s'adaptent à l'impact : phrase sur les recettes si des cocktails sont listés, phrase sur les bouteilles d'une catégorie si des bouteilles sont listées. Annuler garde la liste dans le toast d'erreur d'E-05. Unités : indication de changer l'unité des lignes, via `messages.inUse` de `useCrudMutations`. `categories.confirmDelete` corrigé. Ajouts à `touches` : `UnitsPage.tsx`, `types/index.ts` (types `DeletionImpact`, `DeletionResponse`, `DeleteOptions`, sortis de `queries/deletionImpact.ts` pour typer `api.ts`), `test/msw/` (aide `mockItemInUse`, réponses DELETE par défaut alignées sur le backend) et `frontend/AGENTS.md` (aide documentée).
+- 2026-11-05 : corrections après relecture de la PR #148. Tests des requêtes rafraîchies par les pages (clés d'une suppression simple de bouteille, rechargement de la liste des ingrédients) ; les deux sabotages de la relecture font échouer un test. Troisième libellé de la case quand une catégorie a des bouteilles et des recettes. Le nettoyage de `useCrudMutations` (messages et listes de requêtes déclarés pour un `remove` inutilisé) part dans E-35. Rebasée sur `develop` après B-19.

@@ -240,6 +240,22 @@ describe('categories API', () => {
   });
 });
 
+describe('forced deletion', () => {
+  it.each(['bottles', 'categories', 'ingredients'] as const)('adds ?force=true to a forced %s deletion only', async (resource) => {
+    const api = await getApi();
+
+    mockOk({ message: 'ok', deleted: true, impact: { cocktails: [], bottles: [] } });
+    await api[resource].delete(3);
+    mockOk({ message: 'ok', deleted: true, impact: { cocktails: [], bottles: [] } });
+    await api[resource].delete(3, { force: true });
+
+    expect(mockFetch.mock.calls.map(([url, init]) => `${init.method} ${url}`)).toEqual([
+      `DELETE /api/${resource}/3`,
+      `DELETE /api/${resource}/3?force=true`,
+    ]);
+  });
+});
+
 describe('bottles API', () => {
   it('should list with no params', async () => {
     mockOk([]);

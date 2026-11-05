@@ -23,6 +23,7 @@ import { cx } from '../../components/ui/classNames';
 import LoadError from '../../components/admin/LoadError';
 import TranslationFields from '../../components/admin/TranslationFields';
 import { useConfirmDelete } from '../../components/admin/useConfirmDelete';
+import { useForcedDelete } from '../../components/admin/useForcedDelete';
 import { useEntityForm } from '../../components/admin/useEntityForm';
 
 type AvailabilityFilter = 'all' | 'available' | 'unavailable';
@@ -71,11 +72,16 @@ export default function IngredientsPage() {
   const confirmDelete = useConfirmDelete();
   const ingredientsQuery = useIngredients();
   const ingredients = ingredientsQuery.data;
-  const { create, update, remove } = useCrudMutations<IngredientInput>({
+  const { create, update } = useCrudMutations<IngredientInput>({
     key: qk.ingredients,
     api: ingredientsApi,
     invalidates: [qk.availability],
     messages: { created: 'ingredients.created', updated: 'ingredients.updated', deleted: 'ingredients.deleted' },
+  });
+  const deleteIngredient = useForcedDelete({
+    deleteItem: ingredientsApi.delete,
+    invalidates: REFRESHED_KEYS,
+    deletedMessage: 'ingredients.deleted',
   });
   const toggleAvailability = useEntityMutation<Ingredient>({
     mutationFn: (ingredient) => ingredientsApi.update(ingredient.id, { isAvailable: !ingredient.isAvailable }),
@@ -111,7 +117,7 @@ export default function IngredientsPage() {
   };
 
   const handleDelete = async (ingredient: Ingredient) => {
-    if (await confirmDelete(t('ingredients.confirmDelete'))) remove.mutate(ingredient.id);
+    if (await confirmDelete(t('ingredients.confirmDelete'))) await deleteIngredient(ingredient.id);
   };
 
   const countFor = (status: AvailabilityFilter) =>

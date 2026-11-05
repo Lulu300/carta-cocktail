@@ -6,7 +6,7 @@ import { qk } from '../../queries/keys';
 import { useShortages } from '../../queries/shortages';
 import { mockDownload } from '../../test/download';
 import { buildBottle, buildCategory, buildShortage } from '../../test/factories';
-import { captureRequest, mockApiError, mockApiPending, mockApiResponse, mockNetworkError } from '../../test/msw/utils';
+import { captureRequest, mockApiError, mockApiPending, mockApiResponse, mockItemInUse, mockNetworkError } from '../../test/msw/utils';
 import type { Bottle } from '../../types';
 import BottlesPage from './BottlesPage';
 
@@ -488,15 +488,20 @@ describe('BottlesPage', () => {
   });
 
   describe('deletion', () => {
-    it('deletes a bottle after confirmation and confirms with a toast', async () => {
+    it('deletes a bottle after confirmation and refreshes everything that shows bottles', async () => {
       const user = userEvent.setup();
-      await renderLoadedPage();
+      const queryClient = createTestQueryClient();
+      const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+      renderWithFeedback(<BottlesPage />, { queryClient });
+      await screen.findByText('Absolut');
       const deleted = captureRequest('delete', '/api/bottles/:id');
 
       await confirmDeletion(user);
 
       expect(await screen.findByText('bottles.deleted')).toBeInTheDocument();
       expect((await deleted.url).pathname).toBe('/api/bottles/1');
+      const refreshed = invalidate.mock.calls.map(([filters]) => filters?.queryKey);
+      expect(refreshed).toEqual([qk.bottles, qk.shortages, qk.categories, qk.menus, qk.availability]);
     });
 
     it('deletes an empty bottle from the history', async () => {
@@ -523,18 +528,46 @@ describe('BottlesPage', () => {
       expect(deleted.count()).toBe(0);
     });
 
-    it('shows the backend message and the cocktails of a bottle in use', async () => {
+    it('lists the cocktails of a bottle in use and deletes it anyway once the risks are accepted', async () => {
       const user = userEvent.setup();
-      mockApiResponse('delete', '/api/bottles/:id', {
-        error: 'This bottle is used by cocktails',
-        details: { cocktails: [{ id: 4, name: 'Moscow Mule', removedLines: 1 }], bottles: [] },
-      }, 409);
+      const requests = mockItemInUse('/api/bottles/:id', {
+        cocktails: [{ id: 4, name: 'Moscow Mule', removedLines: 1 }],
+        bottles: [],
+      });
       await renderLoadedPage();
+      const reloaded = captureRequest('get', '/api/bottles');
 
       await confirmDeletion(user);
 
+      const forced = await screen.findByRole('alertdialog', { name: 'deletion.forced.title' });
+      expect(forced).toHaveTextContent('deletion.forced.cocktailLines(Moscow Mule,1)');
+      const deleteAnyway = within(forced).getByRole('button', { name: 'deletion.forced.confirm' });
+      expect(deleteAnyway).toBeDisabled();
+      await user.click(within(forced).getByRole('checkbox', { name: 'deletion.forced.acknowledgeRecipes' }));
+      await user.click(deleteAnyway);
+
+      expect(await screen.findByText(
+        'deletion.forced.summary(bottles.deleted,deletion.forced.cocktailsChanged(1))',
+      )).toBeInTheDocument();
+      expect(requests.map((url) => `${url.pathname}${url.search}`)).toEqual(['/api/bottles/1', '/api/bottles/1?force=true']);
+      await waitFor(() => expect(reloaded.count()).toBe(1));
+    });
+
+    it('keeps a bottle in use when the forced deletion is cancelled', async () => {
+      const user = userEvent.setup();
+      const requests = mockItemInUse('/api/bottles/:id', {
+        cocktails: [{ id: 4, name: 'Moscow Mule', removedLines: 1 }],
+        bottles: [],
+      }, 'This bottle is used by cocktails');
+      await renderLoadedPage();
+
+      await confirmDeletion(user);
+      await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'common.cancel' }));
+
       await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('This bottle is used by cocktails'));
       expect(screen.getByRole('alert')).toHaveTextContent('deletion.usedByCocktails');
+      expect(requests).toHaveLength(1);
+      expect(screen.getByText('Absolut')).toBeInTheDocument();
     });
   });
 

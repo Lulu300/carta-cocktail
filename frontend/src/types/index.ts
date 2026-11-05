@@ -392,3 +392,22 @@ export interface BottleImportConfirmResponse {
   duplicatesCreated: number;
   skippedNoCategory: number;
 }
+
+/** What a deletion breaks: `details` of a deletion refused with a 409, `impact` once it is done. */
+export interface DeletionImpact {
+  /** Recipes that use the item: a forced deletion removes `removedLines` lines from each. */
+  cocktails: { id: number; name: string; removedLines: number }[];
+  /** Bottles of a category, deleted with it. */
+  bottles: { id: number; name: string }[];
+}
+
+export interface DeletionResponse {
+  message: string;
+  deleted: boolean;
+  impact: DeletionImpact;
+}
+
+export interface DeleteOptions {
+  /** Also deletes what uses the item: the recipe lines, and the bottles of a category. */
+  force?: boolean;
+}

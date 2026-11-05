@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { fireEvent, screen, waitFor, within } from '../../test/test-utils';
 import { clearToasts, renderWithFeedback } from '../../test/feedback';
 import { buildIngredient } from '../../test/factories';
-import { captureRequest, mockApiError, mockApiPending, mockApiResponse, mockNetworkError } from '../../test/msw/utils';
+import { captureRequest, mockApiError, mockApiPending, mockApiResponse, mockItemInUse, mockNetworkError } from '../../test/msw/utils';
 import IngredientsPage from './IngredientsPage';
 
 const lime = buildIngredient({ id: 1, name: 'Lime', icon: '🍋', isAvailable: true });
@@ -214,11 +214,12 @@ describe('IngredientsPage', () => {
     expect(updated.count()).toBe(1);
   });
 
-  it('deletes an ingredient after confirmation and confirms with a toast', async () => {
+  it('deletes an ingredient after confirmation, confirms with a toast and reloads the list', async () => {
     const user = userEvent.setup();
     await renderLoadedPage();
     const deleted = captureRequest('delete', '/api/ingredients/:id');
     const updated = captureRequest('put', '/api/ingredients/:id');
+    const reloaded = captureRequest('get', '/api/ingredients');
 
     await confirmDeletion(user);
 
@@ -226,6 +227,7 @@ describe('IngredientsPage', () => {
     expect((await deleted.url).pathname).toBe('/api/ingredients/1');
     // The delete button does not toggle the card it sits on.
     expect(updated.count()).toBe(0);
+    await waitFor(() => expect(reloaded.count()).toBe(1));
   });
 
   it('does not delete when the dialog is cancelled', async () => {
@@ -240,15 +242,35 @@ describe('IngredientsPage', () => {
     expect(deleted.count()).toBe(0);
   });
 
-  it('shows the backend message when the deletion is refused', async () => {
+  it('deletes an ingredient in use once the forced deletion is confirmed', async () => {
     const user = userEvent.setup();
-    mockApiResponse('delete', '/api/ingredients/:id', {
-      error: 'This ingredient is used by cocktails',
-      details: { cocktails: [{ id: 5, name: 'Mojito', removedLines: 1 }], bottles: [] },
-    }, 409);
+    const requests = mockItemInUse('/api/ingredients/:id', {
+      cocktails: [{ id: 5, name: 'Mojito', removedLines: 1 }],
+      bottles: [],
+    });
+    await renderLoadedPage();
+    const reloaded = captureRequest('get', '/api/ingredients');
+
+    await confirmDeletion(user);
+    const forced = await screen.findByRole('alertdialog', { name: 'deletion.forced.title' });
+    await user.click(within(forced).getByRole('checkbox'));
+    await user.click(within(forced).getByRole('button', { name: 'deletion.forced.confirm' }));
+
+    expect(await screen.findByText('deletion.forced.summary')).toBeInTheDocument();
+    expect(requests.map((url) => `${url.pathname}${url.search}`)).toEqual(['/api/ingredients/1', '/api/ingredients/1?force=true']);
+    await waitFor(() => expect(reloaded.count()).toBe(1));
+  });
+
+  it('shows the backend message when the forced deletion is cancelled', async () => {
+    const user = userEvent.setup();
+    mockItemInUse('/api/ingredients/:id', {
+      cocktails: [{ id: 5, name: 'Mojito', removedLines: 1 }],
+      bottles: [],
+    }, 'This ingredient is used by cocktails');
     await renderLoadedPage();
 
     await confirmDeletion(user);
+    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'common.cancel' }));
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('This ingredient is used by cocktails'));
   });

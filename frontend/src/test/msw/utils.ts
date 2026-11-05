@@ -1,5 +1,6 @@
 import { onTestFinished, vi } from 'vitest';
 import { http, HttpResponse, type JsonBodyType } from 'msw';
+import type { DeletionImpact } from '../../types';
 import { errorResponse, pendingResponse } from './responses';
 import { server } from './server';
 
@@ -37,6 +38,26 @@ export function holdApiResponse(method: ApiMethod, path: string, body: JsonBodyT
     }),
   );
   return release;
+}
+
+/**
+ * Makes DELETE `path` answer like the backend for an item in use: a 409 that
+ * lists `impact`, unless the request asks `?force=true`, which deletes and
+ * answers with the same impact. Returns the URLs received, in order.
+ */
+export function mockItemInUse(path: string, impact: DeletionImpact, message = 'This item is used by cocktails'): URL[] {
+  const urls: URL[] = [];
+  server.use(
+    http.delete(path, ({ request }) => {
+      const url = new URL(request.url);
+      urls.push(url);
+      if (url.searchParams.get('force') !== 'true') {
+        return HttpResponse.json({ error: message, details: impact }, { status: 409 });
+      }
+      return HttpResponse.json({ message: 'Deleted', deleted: true, impact });
+    }),
+  );
+  return urls;
 }
 
 /** Makes `method path` fail like a dropped connection (fetch rejects, no HTTP status). */

@@ -57,6 +57,8 @@ async function echoUpdated({ request, params }: { request: StrictRequest<Default
 }
 
 const deleted = () => HttpResponse.json({ message: 'Deleted' });
+/** DELETE of an item recipes can use (C-07): nothing used it, so nothing else changed. */
+const deletedUnused = () => HttpResponse.json({ message: 'Deleted', deleted: true, impact: { cocktails: [], bottles: [] } });
 const done = () => HttpResponse.json({ message: 'OK' });
 
 const authHandlers = [
@@ -83,7 +85,7 @@ const categoryHandlers = [
   http.get('/api/categories/:id', ({ params }) => HttpResponse.json(buildCategory({ id: Number(params.id) }))),
   http.post('/api/categories', echoCreated),
   http.put('/api/categories/:id', echoUpdated),
-  http.delete('/api/categories/:id', deleted),
+  http.delete('/api/categories/:id', deletedUnused),
 ];
 
 const bottleHandlers = [
@@ -96,7 +98,7 @@ const bottleHandlers = [
   http.get('/api/bottles/:id', ({ params }) => HttpResponse.json(buildBottle({ id: Number(params.id) }))),
   http.post('/api/bottles', echoCreated),
   http.put('/api/bottles/:id', echoUpdated),
-  http.delete('/api/bottles/:id', deleted),
+  http.delete('/api/bottles/:id', deletedUnused),
 ];
 
 const ingredientHandlers = [
@@ -105,7 +107,7 @@ const ingredientHandlers = [
   http.post('/api/ingredients/bulk-availability', () => HttpResponse.json({ updated: 0 })),
   http.post('/api/ingredients', echoCreated),
   http.put('/api/ingredients/:id', echoUpdated),
-  http.delete('/api/ingredients/:id', deleted),
+  http.delete('/api/ingredients/:id', deletedUnused),
 ];
 
 const unitHandlers = [

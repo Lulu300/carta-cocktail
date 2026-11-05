@@ -16,6 +16,7 @@ import SearchInput from '../../components/ui/SearchInput';
 import ImportBottlesWizard from '../../components/import/ImportBottlesWizard';
 import DataTable, { type Column } from '../../components/admin/DataTable';
 import { useConfirmDelete } from '../../components/admin/useConfirmDelete';
+import { useForcedDelete } from '../../components/admin/useForcedDelete';
 import { useEntityForm } from '../../components/admin/useEntityForm';
 import BottleFormModal from '../../components/admin/bottles/BottleFormModal';
 import BottleGroupRow from '../../components/admin/bottles/BottleGroupRow';
@@ -39,11 +40,16 @@ export default function BottlesPage() {
   const invalidateQueries = useInvalidateQueries();
   const bottlesQuery = useBottles();
   const categories = useCategories().data ?? [];
-  const { create, update, remove } = useCrudMutations<BottleInput>({
+  const { create, update } = useCrudMutations<BottleInput>({
     key: qk.bottles,
     api: bottlesApi,
     invalidates: BOTTLE_DEPENDENT_KEYS,
     messages: { created: 'bottles.created', updated: 'bottles.updated', deleted: 'bottles.deleted' },
+  });
+  const deleteBottle = useForcedDelete({
+    deleteItem: bottlesApi.delete,
+    invalidates: [qk.bottles, ...BOTTLE_DEPENDENT_KEYS],
+    deletedMessage: 'bottles.deleted',
   });
   const bottleForm = useEntityForm((bottle?: Bottle) => toBottleForm(categories, bottle));
   const filters = useBottleFilters(bottlesQuery.data);
@@ -65,7 +71,7 @@ export default function BottlesPage() {
   };
 
   const handleDelete = async (bottle: Bottle) => {
-    if (await confirmDelete(t('bottles.confirmDelete'))) remove.mutate(bottle.id);
+    if (await confirmDelete(t('bottles.confirmDelete'))) await deleteBottle(bottle.id);
   };
 
   const toggleGroup = (groupKey: string) => {
