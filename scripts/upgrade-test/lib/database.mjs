@@ -86,14 +86,35 @@ export function createAnonymizedCopy(fixtureDir, dataDir, { email, passwordHash 
 // Unique index created by migration 20261010173910_schema_integrity (v1.8.0).
 const UNIQUE_CATEGORY_NAME_INDEX = 'Category_name_key';
 
+// Prints two lines: the number of unique indexes on Category.name, then the number of categories.
+const FIXTURE_CATEGORIES_QUERY = `SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = '${UNIQUE_CATEGORY_NAME_INDEX}'; `
+  + 'SELECT COUNT(*) FROM Category;';
+
+export function parseFixtureCategories(output) {
+  const [indexes, categories] = output.trim().split('\n').map(Number);
+  return { hasUniqueNameIndex: indexes > 0, categories };
+}
+
 /**
- * True when the fixture database already has the unique index on Category.name, so that a
- * duplicate cannot be added. Opened as immutable on a read-only mount: the fixture is never written.
+ * What --inject-duplicate needs to know of the fixture database: whether it already has the unique
+ * index on Category.name, and how many categories it holds. Opened as immutable on a read-only
+ * mount: the fixture is never written.
  */
-export function hasUniqueCategoryNameIndex(fixtureDir) {
-  const query = `SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = '${UNIQUE_CATEGORY_NAME_INDEX}';`;
-  const output = runHelper([`${fixtureDir}:/fixture:ro`], `sqlite3 'file:/fixture/${DB_FILE_NAME}?immutable=1' "${query}"`);
-  return Number(output.trim()) > 0;
+export function readFixtureCategories(fixtureDir) {
+  const command = `sqlite3 'file:/fixture/${DB_FILE_NAME}?immutable=1' "${FIXTURE_CATEGORIES_QUERY}"`;
+  return parseFixtureCategories(runHelper([`${fixtureDir}:/fixture:ro`], command));
+}
+
+/**
+ * --inject-duplicate copies an existing category: the fixture needs one, and must not come from
+ * a v1.8.0 or newer instance, whose unique index refuses the copy.
+ */
+export function checkFixtureAcceptsDuplicate({ hasUniqueNameIndex, categories }) {
+  if (hasUniqueNameIndex) {
+    throw new Error('--inject-duplicate: the fixture already has the unique index Category_name_key '
+      + '(database of v1.8.0 or later), so a duplicate category name cannot be added');
+  }
+  if (categories === 0) throw new Error('--inject-duplicate: the fixture has no category to duplicate');
 }
 
 // Copies the category with the lowest id under a new id. Every column but the primary key is

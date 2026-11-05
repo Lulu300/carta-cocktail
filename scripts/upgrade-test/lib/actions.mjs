@@ -1,5 +1,6 @@
 // Required actions of the release notes, as listed in the hook files. Each action returns
-// { status, detail }: status is done, skipped, manual, "not met" or failed.
+// { status, detail }: status is done, skipped, manual, "not met" or failed. A failed action that
+// was refused by the new image also returns `refused: true` (see markExpectedActions).
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -144,7 +145,11 @@ async function checkDatabaseCopy(ctx) {
   try {
     const outcome = await waitForStart(name, ctx.timeoutMs);
     if (!outcome.started) {
-      return { status: 'failed', detail: `the copy was refused (exit code ${outcome.exitCode ?? 'none'}): the notes say not to upgrade` };
+      return {
+        status: 'failed',
+        refused: true,
+        detail: `the copy was refused (exit code ${outcome.exitCode ?? 'none'}): the notes say not to upgrade`,
+      };
     }
     const lines = checkLogLines(outcome.logs, ctx.expectedStartLogs);
     const found = lines.filter((line) => line.status === 'ok').length;
@@ -229,8 +234,7 @@ export async function runAction(ctx, hook) {
   if (!run) throw new Error(`Unknown action "${hook.action}" in the hooks of v${ctx.hooksVersion}`);
   const result = { step: `v${ctx.hooksVersion} ${hook.step}`, action: hook.action, note: hook.note };
   try {
-    const { status, detail } = await run(ctx, hook);
-    return { ...result, status, detail };
+    return { ...result, ...await run(ctx, hook) };
   } catch (error) {
     return { ...result, status: 'failed', detail: error.message };
   }

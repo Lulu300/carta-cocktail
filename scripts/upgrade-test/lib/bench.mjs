@@ -14,8 +14,8 @@ import {
   containerLogs, containerMounts, containerState, docker, removeResources, RESOURCE_PREFIX,
 } from './docker.mjs';
 import {
-  allowedActionFailures, allowedFailures, failedGroups, isRequirementMet, markExpected, markExpectedActions,
-  unexpectedFailures,
+  allowedActionFailures, allowedFailures, checkInjectedDuplicateRefused, failedGroups, isRequirementMet, markExpected,
+  markExpectedActions, unexpectedFailures,
 } from './expectations.mjs';
 import { BACKEND_SERVICE, FRONTEND_SERVICE, Instance, waitForHttp, waitForStart } from './instance.mjs';
 import { hooksForJump, profileOf, releaseOf } from './versions.mjs';
@@ -115,7 +115,7 @@ export class BenchRun {
       : path.join(this.workDir, 'seed-data');
     const users = createAnonymizedCopy(this.fixtureDir, dataDir, { email: ADMIN_EMAIL, passwordHash });
     // Before the snapshot: the row counts of reference include the duplicate.
-    const injectedDuplicates = this.injectDuplicate ? this.addDuplicateCategory(dataDir) : undefined;
+    const injectedDuplicates = this.injectDuplicate ? injectDuplicateCategory(dataDir) : undefined;
     const photosDir = extractPhotos(path.join(this.fixtureDir, 'uploads.tgz'), this.workDir);
     this.baseline = takeSnapshot(dataDir);
     this.lastSnapshot = this.baseline;
@@ -137,13 +137,6 @@ export class BenchRun {
     this.instance.create();
     if (this.layout.database.kind === 'volume') fillVolume(this.instance.dataMount(), dataDir);
     this.placePhotos(photosDir);
-  }
-
-  /** --inject-duplicate: one category copied under a new id, so that v1.8.0 and later refuse the database. */
-  addDuplicateCategory(dataDir) {
-    const added = injectDuplicateCategory(dataDir);
-    if (added === 0) throw new Error('--inject-duplicate: the fixture has no category to duplicate');
-    return added;
   }
 
   placePhotos(photosDir) {
@@ -217,6 +210,9 @@ export class BenchRun {
     const outcome = await waitForStart(backend, this.timeoutMs);
     fs.writeFileSync(path.join(this.logsDir, `${index}-${ctx.target.label}.log`), outcome.logs);
     step.checks.push(this.startupRow(outcome));
+    step.checks.push(...checkInjectedDuplicateRefused({
+      profile: ctx.profile, injectedDuplicate: this.injectDuplicate, started: outcome.started,
+    }));
     const refusal = outcome.started ? null : findRefusal(ctx.profile.refusals, outcome.logs);
     if (outcome.started) {
       this.startedReleases.add(releaseOf(ctx.target.version));

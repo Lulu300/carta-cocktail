@@ -8,12 +8,12 @@ import { parseArgs } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { BenchRun } from './lib/bench.mjs';
 import { cleanupAll, cleanupRun, workRoot } from './lib/cleanup.mjs';
-import { hasUniqueCategoryNameIndex } from './lib/database.mjs';
+import { checkFixtureAcceptsDuplicate, readFixtureCategories } from './lib/database.mjs';
 import {
   buildImage, ensureHelperImage, pullImage, remoteDigest, RESOURCE_PREFIX, serverPlatform,
 } from './lib/docker.mjs';
 import { renderReport } from './lib/report.mjs';
-import { checkDuplicateInjectionPath, parseUpgradePath } from './lib/versions.mjs';
+import { checkDuplicateInjectionPath, loadHookFiles, parseUpgradePath } from './lib/versions.mjs';
 
 const BENCH_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(BENCH_DIR, '../..');
@@ -60,12 +60,6 @@ function parseCli() {
     },
   });
   return values;
-}
-
-async function loadHookFiles() {
-  const dir = path.join(BENCH_DIR, 'hooks');
-  const files = fs.readdirSync(dir).filter((file) => file.endsWith('.mjs'));
-  return Promise.all(files.map(async (file) => (await import(pathToFileURL(path.join(dir, file)))).default));
 }
 
 async function loadLayout(name) {
@@ -120,14 +114,6 @@ function resolveImages(steps, hookFiles) {
   return images;
 }
 
-/** --inject-duplicate: a fixture taken from a v1.8.0 or newer instance cannot hold a duplicate name. */
-function checkFixtureAcceptsDuplicate(fixtureDir) {
-  if (hasUniqueCategoryNameIndex(fixtureDir)) {
-    throw new Error('--inject-duplicate: the fixture already has the unique index Category_name_key '
-      + '(database of v1.8.0 or later), so a duplicate category name cannot be added');
-  }
-}
-
 function defaultReportDir(fixtureDir, now) {
   return path.resolve(fixtureDir, '..', 'upgrade-test-reports', now.toISOString().slice(0, 10));
 }
@@ -172,7 +158,7 @@ async function main() {
   cleanUpOnSignal(id);
 
   ensureHelperImage();
-  if (options['inject-duplicate']) checkFixtureAcceptsDuplicate(fixtureDir);
+  if (options['inject-duplicate']) checkFixtureAcceptsDuplicate(readFixtureCategories(fixtureDir));
   const images = resolveImages(steps, hookFiles);
   const runs = [];
   for (const mode of modes) {

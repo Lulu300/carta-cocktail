@@ -1,4 +1,5 @@
 // Decides which failures a step may have without failing the bench.
+import { row } from './checks.mjs';
 import { releaseOf } from './versions.mjs';
 
 export const INJECTED_DUPLICATE_REASON = 'duplicate injected by --inject-duplicate: '
@@ -49,18 +50,33 @@ export function allowedFailures({
 }
 
 /**
- * Required actions that may fail, by action name (`action` of the hook), with the reason shown in
- * the report. With --inject-duplicate, the new image refuses the copy of the database
- * (`checkDatabaseCopy`) as it refuses the database itself.
+ * --inject-duplicate: a version that refuses duplicate category names must refuse the working copy.
+ * `allowedFailures` only allows the refused start: without this row, a start would go unnoticed.
+ * Returns no row when the step does not have to refuse.
+ */
+export function checkInjectedDuplicateRefused({ profile, injectedDuplicate = false, started }) {
+  if (!refusesInjectedDuplicate(profile, injectedDuplicate)) return [];
+  const detail = started ? 'expected refusal missing: the injected duplicate was not refused' : 'backend refused to start';
+  return [row('duplicateRefusal', 'injected duplicate refused', !started, detail)];
+}
+
+/**
+ * Required actions whose refusal is expected, by action name (`action` of the hook), with the
+ * reason shown in the report. With --inject-duplicate, the new image refuses the copy of the
+ * database (`checkDatabaseCopy`) as it refuses the database itself.
  */
 export function allowedActionFailures({ profile, injectedDuplicate = false }) {
   return refusesInjectedDuplicate(profile, injectedDuplicate) ? { checkDatabaseCopy: INJECTED_DUPLICATE_REASON } : {};
 }
 
-/** Marks the failed actions that `allowed` (from allowedActionFailures) expects. */
+/**
+ * Marks the refused actions (`refused: true`) that `allowed` (from allowedActionFailures) expects.
+ * Any other failure stays unexpected: a database copy that started, but without the expected log
+ * lines or migration status, means that the copy was not refused.
+ */
 export function markExpectedActions(actions, allowed) {
   for (const result of actions) {
-    if (result.status === 'failed' && allowed[result.action]) result.expected = allowed[result.action];
+    if (result.status === 'failed' && result.refused && allowed[result.action]) result.expected = allowed[result.action];
   }
   return actions;
 }
