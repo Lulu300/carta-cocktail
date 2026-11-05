@@ -229,15 +229,49 @@ function readCsvRows(csv: string): { headers: string[]; rows: NumberedRow[] } {
 }
 
 const DECIMAL_COMMA = /^[+-]?\d+,\d+$/;
+// `\s` matches the no-break (U+00A0) and narrow no-break (U+202F) spaces Excel in a French locale writes
+const SPACE_GROUPED_THOUSANDS = /^[+-]?\d{1,3}(?:\s\d{3})+(?:[.,]\d+)?$/u;
 const TRUE_WORDS = new Set(['true', '1', 'yes', 'vrai', 'oui']);
 
-/** A number from a cell or a JSON value: null when blank, NaN when it is not a number. */
-function toNumber(value: unknown): number | null {
+/** The unit a spreadsheet may display after the number of a column. */
+type ColumnUnit = '€' | '%' | 'ml';
+
+/**
+ * Only the column's own unit is removed: `70 cl` in `capacityMl` stays an invalid number
+ * rather than being read as 70 ml.
+ */
+const COLUMN_UNITS: Partial<Record<string, ColumnUnit>> = {
+  capacityMl: 'ml',
+  remainingPercent: '%',
+  alcoholPercentage: '%',
+  purchasePrice: '€',
+  minimumPercent: '%',
+};
+
+/** `700 ml`, `700ML`, `40 %`, `25,90 €`, `€25.00`: the number without the unit, or the text unchanged. */
+function stripUnit(text: string, unit: ColumnUnit | undefined): string {
+  if (unit === undefined) return text;
+  // Excel in an English locale writes the euro sign before the number
+  if (unit === '€' && text.startsWith(unit)) return text.slice(unit.length).trimStart();
+  if (!text.toLowerCase().endsWith(unit)) return text;
+  return text.slice(0, -unit.length).trimEnd();
+}
+
+/**
+ * A number from a cell or a JSON value: null when blank, NaN when it is not a number.
+ * Excel writes the displayed value into a CSV, so a cell may hold the column's unit
+ * and thousands grouped with spaces (`1 234,50 €`).
+ */
+function toNumber(value: unknown, unit?: ColumnUnit): number | null {
   if (value === null || value === undefined) return null;
   if (typeof value === 'number') return value;
   if (typeof value !== 'string') return NaN;
-  const text = value.trim();
-  if (text === '') return null;
+  const trimmed = value.trim();
+  if (trimmed === '') return null;
+  const withoutUnit = stripUnit(trimmed, unit);
+  // A unit alone is not a number (Number('') would read it as 0)
+  if (withoutUnit === '') return NaN;
+  const text = SPACE_GROUPED_THOUSANDS.test(withoutUnit) ? withoutUnit.replace(/\s/gu, '') : withoutUnit;
   // Excel in a French locale writes decimals with a comma
   return Number(DECIMAL_COMMA.test(text) ? text.replace(',', '.') : text);
 }
@@ -293,7 +327,7 @@ class RowReader {
 
   /** A number checked by `schema`; a blank value gives `fallback`, or fails when there is none. */
   number<T extends number | null>(field: string, schema: z.ZodType<T>, fallback?: T): T {
-    const value = toNumber(this.row.values[field]);
+    const value = toNumber(this.row.values[field], COLUMN_UNITS[field]);
     if (value === null) {
       if (fallback === undefined) this.fail(field, 'required');
       return fallback as T;
