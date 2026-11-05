@@ -13,7 +13,7 @@ import { checkFixtureAcceptsDuplicate, parseFixtureCategories, parseSnapshot } f
 import { parseLastExitCode } from '../lib/docker.mjs';
 import {
   allowedActionFailures, allowedFailures, checkInjectedDuplicateRefused, INJECTED_DUPLICATE_REASON, isRequirementMet,
-  markExpected, markExpectedActions, unexpectedFailures,
+  judgeStep, markExpected, markExpectedActions, unexpectedFailures,
 } from '../lib/expectations.mjs';
 import {
   BACKEND_SERVICE, FRONTEND_SERVICE, Instance, publishedContainerPort, readEnvVariable, renderTemplate, writeEnvVariable,
@@ -234,35 +234,60 @@ test('expectations: --inject-duplicate, a database copy that started stays an un
   assert.equal(unexpectedFailures(started).length, 1);
 });
 
-/** Checks of a simulated step, judged as BenchRun.runStep does. */
-function judgedStep({ mode, started, injectedDuplicate }) {
-  const profile = { knownIssues: {}, uniqueCategoryNames: true };
-  const crossedHooks = [{ naiveMayFail: { startup: 'weak secret' } }];
-  const checks = [
-    row('startup', 'backend starts', started, started ? 'API running' : 'refused: exit code 1, 1 restart(s)'),
-    ...checkInjectedDuplicateRefused({ profile, injectedDuplicate, started }),
-    started
-      ? row('login', 'admin login', true, 'POST /api/auth/login 200')
-      : row('refusal', 'refusal message', true, '"failed. The backend will not start." found'),
-  ];
-  const allowed = allowedFailures({ mode, profile, crossedHooks, unmetRequirements: [], injectedDuplicate });
-  return markExpected(checks, { mode, allowed, previousFailedGroups: new Set() });
+/** A simulated step (a start or a refused start, and a refused database copy), judged by judgeStep. */
+function judgedStep({ mode, started, injectedDuplicate, refusal = started ? null : FAILED_MIGRATION_REFUSAL }) {
+  const step = {
+    actions: [{ step: 'v1.6.0 Before 4', action: 'checkDatabaseCopy', status: 'failed', refused: true }],
+    checks: [
+      row('startup', 'backend starts', started, started ? 'API running' : 'refused: exit code 1, 1 restart(s)'),
+      started
+        ? row('login', 'admin login', true, 'POST /api/auth/login 200')
+        : row('refusal', 'refusal message', true, `"${refusal?.log}" found`),
+    ],
+  };
+  return judgeStep(step, {
+    mode,
+    profile: { knownIssues: {}, uniqueCategoryNames: true, refusals: [BASELINE_REFUSAL, FAILED_MIGRATION_REFUSAL] },
+    crossedHooks: [{ naiveMayFail: { startup: 'weak secret' } }],
+    unmetRequirements: [],
+    injectedDuplicate,
+    started,
+    refusal,
+    previousFailedGroups: new Set(),
+  });
 }
 
-test('expectations: --inject-duplicate requires the refusal, in both modes', () => {
+function unexpectedOf(step) {
+  return unexpectedFailures([...step.actions, ...step.checks]).map((result) => [result.group ?? result.action, result.detail]);
+}
+
+test('judgeStep: --inject-duplicate requires the refusal, in both modes', () => {
   for (const mode of ['naive', 'conformant']) {
-    const startedRows = judgedStep({ mode, started: true, injectedDuplicate: true });
-    assert.deepEqual(unexpectedFailures(startedRows).map((result) => [result.group, result.detail]),
+    assert.deepEqual(unexpectedOf(judgedStep({ mode, started: true, injectedDuplicate: true })),
       [['duplicateRefusal', 'expected refusal missing: the injected duplicate was not refused']], mode);
-    const refusedRows = judgedStep({ mode, started: false, injectedDuplicate: true });
-    assert.equal(unexpectedFailures(refusedRows).length, 0, mode);
-    assert.deepEqual(refusedRows.find((result) => result.group === 'duplicateRefusal'),
-      { group: 'duplicateRefusal', label: 'injected duplicate refused', status: 'ok', detail: 'backend refused to start' });
+    const refused = judgedStep({ mode, started: false, injectedDuplicate: true });
+    assert.deepEqual(unexpectedOf(refused), [], mode);
+    assert.deepEqual(refused.checks.map((result) => result.group), ['startup', 'duplicateRefusal', 'refusal'], mode);
+    assert.deepEqual(refused.checks[1], {
+      group: 'duplicateRefusal', label: 'injected duplicate refused', status: 'ok',
+      detail: 'refused: "failed. The backend will not start."',
+    });
+    assert.equal(refused.actions[0].expected, INJECTED_DUPLICATE_REASON, mode);
   }
 });
 
-test('expectations: without the option, or before v1.8.0, no refusal is required', () => {
-  assert.equal(judgedStep({ mode: 'conformant', started: true, injectedDuplicate: false }).length, 2);
+test('judgeStep: --inject-duplicate requires the refusal of the failed migration, not any refusal', () => {
+  const baseline = judgedStep({ mode: 'conformant', started: false, injectedDuplicate: true, refusal: BASELINE_REFUSAL });
+  assert.deepEqual(unexpectedOf(baseline),
+    [['duplicateRefusal', 'refused, but not by the failed migration: "does not match migration 0_init"']]);
+  const unknown = judgedStep({ mode: 'naive', started: false, injectedDuplicate: true, refusal: null });
+  assert.deepEqual(unexpectedOf(unknown), [['duplicateRefusal', 'refused, but not by the failed migration: no known refusal message']]);
+});
+
+test('judgeStep: without the option, or before v1.8.0, no refusal is required', () => {
+  const plain = judgedStep({ mode: 'conformant', started: true, injectedDuplicate: false });
+  assert.deepEqual(plain.checks.map((result) => result.group), ['startup', 'login']);
+  assert.deepEqual(unexpectedOf(plain), [['checkDatabaseCopy', undefined]]);
   assert.deepEqual(checkInjectedDuplicateRefused({ profile: { knownIssues: {} }, injectedDuplicate: true, started: true }), []);
 });
 

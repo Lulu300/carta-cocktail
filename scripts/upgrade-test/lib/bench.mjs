@@ -13,10 +13,7 @@ import { createAnonymizedCopy, fillVolume, injectDuplicateCategory, takeSnapshot
 import {
   containerLogs, containerMounts, containerState, docker, removeResources, RESOURCE_PREFIX,
 } from './docker.mjs';
-import {
-  allowedActionFailures, allowedFailures, checkInjectedDuplicateRefused, failedGroups, isRequirementMet, markExpected,
-  markExpectedActions, unexpectedFailures,
-} from './expectations.mjs';
+import { failedGroups, isRequirementMet, judgeStep, unexpectedFailures } from './expectations.mjs';
 import { BACKEND_SERVICE, FRONTEND_SERVICE, Instance, waitForHttp, waitForStart } from './instance.mjs';
 import { hooksForJump, profileOf, releaseOf } from './versions.mjs';
 
@@ -210,9 +207,6 @@ export class BenchRun {
     const outcome = await waitForStart(backend, this.timeoutMs);
     fs.writeFileSync(path.join(this.logsDir, `${index}-${ctx.target.label}.log`), outcome.logs);
     step.checks.push(this.startupRow(outcome));
-    step.checks.push(...checkInjectedDuplicateRefused({
-      profile: ctx.profile, injectedDuplicate: this.injectDuplicate, started: outcome.started,
-    }));
     const refusal = outcome.started ? null : findRefusal(ctx.profile.refusals, outcome.logs);
     if (outcome.started) {
       this.startedReleases.add(releaseOf(ctx.target.version));
@@ -231,16 +225,17 @@ export class BenchRun {
     if (outcome.started) step.checks.push(this.shutdownRow(ctx, backend, Date.now() - stopStartedAt));
     step.checks.push(...this.databaseChecks(ctx, outcome, refusal));
 
-    const allowed = allowedFailures({
+    judgeStep(step, {
       mode: this.mode,
       profile: ctx.profile,
       crossedHooks: ctx.crossedHooks,
       unmetRequirements: unmet,
       layoutReasons: this.photoMountReasons(ctx.profile),
       injectedDuplicate: this.injectDuplicate,
+      started: outcome.started,
+      refusal,
+      previousFailedGroups: this.previousFailedGroups,
     });
-    markExpected(step.checks, { mode: this.mode, allowed, previousFailedGroups: this.previousFailedGroups });
-    markExpectedActions(step.actions, allowedActionFailures({ profile: ctx.profile, injectedDuplicate: this.injectDuplicate }));
     this.previousFailedGroups = failedGroups(step.checks);
     const unexpected = unexpectedFailures([...step.actions, ...step.checks]).length;
     this.log(`${title}: ${outcome.started ? 'started' : 'refused'}, ${unexpected} unexpected failure(s)`);

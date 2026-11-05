@@ -111,7 +111,7 @@ export function readFixtureCategories(fixtureDir) {
  */
 export function checkFixtureAcceptsDuplicate({ hasUniqueNameIndex, categories }) {
   if (hasUniqueNameIndex) {
-    throw new Error('--inject-duplicate: the fixture already has the unique index Category_name_key '
+    throw new Error(`--inject-duplicate: the fixture already has the unique index ${UNIQUE_CATEGORY_NAME_INDEX} `
       + '(database of v1.8.0 or later), so a duplicate category name cannot be added');
   }
   if (categories === 0) throw new Error('--inject-duplicate: the fixture has no category to duplicate');
