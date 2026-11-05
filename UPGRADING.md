@@ -14,11 +14,122 @@ This guide lists the actions required to upgrade an existing instance, version b
 
 Pre-releases (`vX.Y.Z-rc.N`) are not listed: they use the section of their target version `vX.Y.Z`. The detailed changes of each version are in its [GitHub Release](https://github.com/Lulu300/carta-cocktail/releases) and in [`docs/releases/`](docs/releases/).
 
-We recommend pinning the images to a version (`:1.11.0`) instead of `:latest`, so that an upgrade only happens when you have read this guide.
+We recommend pinning the images to a version (`:1.12.0`, or `:1.12` from v1.12.0 on to follow its patch releases) instead of `:latest`, so that an upgrade only happens when you have read this guide.
 
 To restore a backup made by an older version, see [Restoring a backup from an older version](#restoring-a-backup-from-an-older-version), at the end of this guide.
 
 The commands below assume the default `docker-compose.prod.yml`, run from its folder. Adapt the file name and the service name `carta-cocktail-backend` if yours differ.
+
+## v1.12.0
+
+**Breaking:** the backend container now runs as the `node` user (uid 1000) and never starts as root: every existing install must give its volumes or host folders to uid 1000 before upgrading (step 3), otherwise the backend **stops at startup**. `docker-compose.prod.yml` changes (healthchecks) and no longer publishes the backend port 3001: scripts and reverse proxies that call port 3001 must go through nginx (step 5). At the first start, the backend copies the database to `backups/pre-migrate-<date>.db` and applies one migration (a new table). Release notes: [`docs/releases/v1.12.0.md`](docs/releases/v1.12.0.md).
+
+Instances older than v1.8.0: upgrade to v1.8.0 first, following the [v1.8.0 section](#v180) (and the sections before it), check that it works, then apply this one.
+
+Pin both images to `:1.12.0` (not `:latest`) so that the upgrade only happens once the steps below are done. From this release on, `:1.12` is published too, and follows the 1.12.x patch releases.
+
+**Testing a pre-release**: use `:1.12.0-rc.N` instead of `:1.12.0` in the commands and in the compose file, and `v1.12.0-rc.N` instead of `v1.12.0` in the compose file URL (step 6).
+
+### Before upgrading
+
+The backend container now runs as the `node` user (uid 1000, gid 1000) and never starts as root. Earlier images ran as root, so the database and photos of every existing install belong to root.
+
+**Mandatory for every existing install**:
+
+1. Stop the backend: `docker compose -f docker-compose.prod.yml stop carta-cocktail-backend`.
+2. Back up the database and the photos:
+   - database: README › "Checking a production database before the first upgrade", steps 1 and 2;
+   - photos:
+
+     ```bash
+     mkdir -p carta-uploads-copy
+     docker run --rm --user "$(id -u):$(id -g)" -v <project>_uploads:/uploads:ro -v "$PWD/carta-uploads-copy":/out alpine cp -r /uploads/. /out/
+     ```
+
+     With a host folder, copy that folder.
+3. Give the data to uid 1000. `<project>` is the folder of the compose file (`docker volume ls | grep db-data` shows the names):
+   - **named volumes** (`docker-compose.prod.yml`):
+
+     ```bash
+     docker run --rm -v <project>_db-data:/data -v <project>_uploads:/uploads alpine chown -R 1000:1000 /data /uploads
+     ```
+   - **host folders** mounted on `/app/data` and `/app/uploads` (for example `./data` and `./uploads`):
+
+     ```bash
+     docker run --rm -v "$PWD/data":/data -v "$PWD/uploads":/uploads alpine chown -R 1000:1000 /data /uploads
+     ```
+
+     or, on the host, `sudo chown -R 1000:1000 data uploads`;
+   - **compose file that sets `user:`** for the backend (for example `user: "1026:100"`): run the same command with that uid and gid instead of `1000:1000`;
+   - **Docker rootless**: run the alpine command of your case with the rootless Docker. Root in the container changes the owner inside the user namespace. The host then shows a subordinate uid; this is expected. Not tested for this release (no rootless host).
+4. **Integrity check** (when the notes ask for it): the old command `--entrypoint npx <image> tsx scripts/check-integrity.ts` no longer works (no `tsx`, no sources in the image). New command, on a copy (not `:ro`: SQLite writes `-shm` next to it):
+
+   ```bash
+   docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/carta-db-copy:/data" -e DATABASE_URL=file:/data/carta_cocktail.db \
+     --entrypoint node ghcr.io/lulu300/carta-cocktail/backend:1.12.0 dist/scripts/check-integrity.js
+   ```
+
+   From a checkout (after `npm ci` in `backend/`): `DATABASE_URL=file:/absolute/path/to/copy.db npx tsx src/scripts/check-integrity.ts`. The commands of `UPGRADING.md` (v1.8.0 section, "Restoring a backup from an older version") stay right for the images they name. For versions that include D-01 (v1.12.0 and later), they need the new command.
+
+**If step 3 is forgotten**, the backend stops at startup (exit code 1, restarted in a loop by `restart: unless-stopped`) and logs `ERROR: the backend runs as uid 1000 and cannot write to /app/data.`, followed by the commands to run. Nothing is written. The same message appears for a folder that belongs to another uid or is mounted read-only. Run step 3, then start again.
+
+5. **Backend port 3001**. With `docker-compose.prod.yml`, the backend API is no longer published on the host port 3001.
+   - **Scripts and monitoring** that call `http://<host>:3001/api/...` or `http://<host>:3001/uploads/...`: call `http://<host>:<frontend port>/api/...` / `/uploads/...` instead, through nginx (the frontend service; port 80 by default).
+   - **A reverse proxy (SWAG, Traefik…) that targeted port 3001**: point it at the frontend port instead. If `TRUST_PROXY` is a number, add 1: the requests now also go through nginx, and without the extra hop every client shares one login counter, so 10 failures lock everyone out, the admin included, for 15 minutes. The default `TRUST_PROXY` needs no change.
+   - **A proxy that reaches `carta-cocktail-backend:3001` over a shared Docker network** is not affected: `expose` changes nothing between containers.
+   - **Publishing the port again** in a `docker-compose.override.yml`, bound to the loopback address, only serves processes running on the host itself. A proxy in a container (its `127.0.0.1` is its own) or on another machine cannot reach it and answers 502: point those at the frontend port instead.
+     ```yaml
+     services:
+       carta-cocktail-backend:
+         ports:
+           - "127.0.0.1:3001:3001"
+     ```
+   - **A custom compose file** copied from an older `docker-compose.prod.yml`: copy the new `healthcheck` blocks and the `depends_on` condition, and remove the backend `ports` entry (or bind it to `127.0.0.1`).
+6. **New compose file.** `docker-compose.prod.yml` changed for the first time since v1.8.0 (step 5). Download it, then put your own changes back in it (ports, volumes, extra variables), and pin both images to `:1.12.0`:
+
+   ```bash
+   cp docker-compose.prod.yml docker-compose.prod.yml.bak
+   curl -fsSLo docker-compose.prod.yml https://raw.githubusercontent.com/Lulu300/carta-cocktail/v1.12.0/docker-compose.prod.yml
+   ```
+
+   ```yaml
+   image: ghcr.io/lulu300/carta-cocktail/backend:1.12.0
+   image: ghcr.io/lulu300/carta-cocktail/frontend:1.12.0
+   ```
+
+   **If you had added `- SQLITE_WAL=false`** to the `environment` list of `carta-cocktail-backend` (database on a network share, see [README › "Database files and network shares"](README.md#database-files-and-network-shares)), the new file does not have it: add it again, after `- UPLOAD_DIR=/app/uploads`. Otherwise the database goes back to WAL mode, which does not work on SMB or NFS. The same goes for any variable you added there (`TRUST_PROXY`, `LOGIN_RATE_LIMIT`…): the compose files still do not pass them from `.env`.
+
+   ```yaml
+         - UPLOAD_DIR=/app/uploads
+         - SQLITE_WAL=false
+   ```
+
+Then pull and start:
+
+```bash
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d --wait
+```
+
+### After upgrading
+
+1. `docker compose logs carta-cocktail-backend` shows `API running on port 3001`.
+2. Optional: `docker compose exec carta-cocktail-backend ps -o user,args` shows `node` for every process.
+3. `docker compose up -d --wait` returns once both services are healthy (or fails if one is not).
+4. `docker compose ps` shows `(healthy)` for both services.
+5. `curl http://<host>:<frontend port>/api/health` answers `{"status":"ok","version":"…"}`.
+6. If the backend fails to start, the frontend is not started either: read `docker compose logs carta-cocktail-backend`, fix the cause, then run `docker compose up -d` again.
+7. With `SQLITE_WAL=false`, the startup log shows `SQLite journal mode: delete`.
+8. **Check the Apéritifs and Digestifs menus**. "Synchronize", or a bottle import, adds every bottle checked for the menu's type, **empty ones included** (hidden on the public page while empty). Creating or editing a bottle syncs that bottle only. Check both menus and remove, in the menu editor, the bottles that should not be there: a removed bottle stays out of that menu, and the "Removed bottles" section puts it back.
+
+**After restoring a backup made with an earlier version**: restart the backend before using bottles and menus (`docker compose -f docker-compose.prod.yml restart carta-cocktail-backend`). The new table is created by the migrations at the next start; until then, creating, editing or importing bottles, removing a bottle from a menu, the sync and the exclusion routes answer 500.
+
+### Rolling back
+
+- **Rollback**: after going back to a version before this one (README › "Restoring a pre-migration backup"), which runs as root, run step 3 again before upgrading again.
+- An image older than this release has no `/api/health`: with the new compose file its backend stays `unhealthy` and the frontend never starts. When rolling back to an older image, go back to the previous compose file too (or drop the backend `healthcheck` and the `depends_on` condition). The same applies when using the new compose file with an older tag, or when taking it from `main` before the matching `latest` image is published.
+
+The full procedure, with the `docker-compose.prod.yml.bak` kept at step 6: [README › "Running a previous version"](README.md#running-a-previous-version), then [README › "Restoring a pre-migration backup"](README.md#restoring-a-pre-migration-backup).
 
 ## v1.11.0
 
@@ -469,9 +580,12 @@ To use the old backup anyway, fix it on the version that made it, then export it
 3. Fix it: for duplicates, rename or merge them in the admin, as in step 1 of the [v1.8.0 section](#v180) (move the bottles and recipe lines to the item you keep, then delete the other one).
 4. Export a new backup from that instance, then restore it on this one.
 
-To check a backup for duplicates before restoring it, unzip it, copy its `database.db` to `carta-db-copy/carta_cocktail.db`, and run the integrity check of the [v1.8.0 section](#v180) (step 1.2) on it. Without Docker, from `backend/` in a checkout of the installed version (after `npm ci`):
+To check a backup for duplicates before restoring it, unzip it, copy its `database.db` to `carta-db-copy/carta_cocktail.db`, and run the integrity check of the [v1.8.0 section](#v180) (step 1.2) on it. From v1.12.0 on, the installed image runs the check with another command, given in step 4 of the [v1.12.0 section](#v1120). Without Docker, from `backend/` in a checkout of the installed version (after `npm ci`):
 
 ```bash
+# v1.12.0 and later
+DATABASE_URL=file:/absolute/path/to/database.db npx tsx src/scripts/check-integrity.ts
+# v1.8.0 to v1.11.x
 DATABASE_URL=file:/absolute/path/to/database.db npx tsx scripts/check-integrity.ts
 ```
 

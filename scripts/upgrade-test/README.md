@@ -60,7 +60,7 @@ A layout is a folder in `layouts/` with a `layout.mjs`, one compose template per
 
 - `profile`: how the version behaves (upload folder, migrations, journal mode, expected log lines, known bugs, clean refusals). A version without a hook file inherits the profile of the previous one.
   - `uniqueCategoryNames`: the release refuses two categories with the same name (v1.8.0), see `--inject-duplicate`.
-  - `refusals`: the clean refusals that the release adds, defined in `lib/checks.mjs`; they add up with the ones of older releases. `BASELINE_REFUSAL` (v1.6.0): a `db push` database that does not match `0_init`. `FAILED_MIGRATION_REFUSAL`: a migration that fails, for example on duplicates (C-18, to list in the hook file of the release that ships it).
+  - `refusals`: the clean refusals that the release adds, defined in `lib/checks.mjs`; they add up with the ones of older releases. `BASELINE_REFUSAL` (v1.6.0): a `db push` database that does not match `0_init`. `FAILED_MIGRATION_REFUSAL` (v1.12.0, C-18): a migration that fails, for example on duplicates.
 - `before` / `after`: the required actions, each linked to its step in the notes. Actions are implemented in `lib/actions.mjs` and follow the notes for any layout, from what `docker inspect` shows:
   - `rescueUploads`: copies the photos out of the old container, unless their folder is a mount;
   - `checkPhotoMount`: on v1.5.0, checks that `/app/uploads` is a mount, and copies the photos out if it is not;

@@ -114,7 +114,7 @@ ADMIN_PASSWORD=<at least 12 characters>        # required on first start
 
 #### Upgrading
 
-Some versions require actions before or after the upgrade (new variables in `.env`, files to copy out of the old container…). **Read [`UPGRADING.md`](UPGRADING.md) before pulling a new version**, and apply the sections of every version newer than yours, in order. Upgrading from v1.4.0 or older to v1.5.0 requires a `JWT_SECRET` and a copy of the existing cocktail photos.
+Some versions require actions before or after the upgrade (new variables in `.env`, files to copy out of the old container…). **Read [`UPGRADING.md`](UPGRADING.md) before pulling a new version**, and apply the sections of every version newer than yours, in order. Upgrading from v1.4.0 or older to v1.5.0 requires a `JWT_SECRET` and a copy of the existing cocktail photos. Upgrading to v1.12.0 requires giving the data folders to uid 1000 first (see below).
 
 #### Data folders and the node user
 
@@ -124,7 +124,7 @@ By default, the backend runs as the `node` user (uid 1000, gid 1000), never as r
 mkdir -p data uploads && sudo chown 1000:1000 data uploads
 ```
 
-Versions before the `node` user ran as root, so the volumes and folders of an existing install belong to root: follow the required actions of that version in [`UPGRADING.md`](UPGRADING.md). If a folder is not writable, the backend stops at startup with the `chown` command to run.
+Versions before v1.12.0 ran as root, so the volumes and folders of an existing install belong to root: follow the [v1.12.0 section of `UPGRADING.md`](UPGRADING.md#v1120). If a folder is not writable, the backend stops at startup with the `chown` command to run.
 
 **Another uid and gid.** The compose files run the backend as `${CARTA_UID:-1000}:${CARTA_GID:-1000}`. Set both variables in the `.env` file next to the compose file when the data folders must belong to another owner, then recreate the backend (`docker compose -f docker-compose.prod.yml up -d`):
 
