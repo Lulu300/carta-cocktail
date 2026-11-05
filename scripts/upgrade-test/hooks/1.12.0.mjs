@@ -22,7 +22,7 @@ export default {
     {
       step: 'Before 4',
       action: 'manual',
-      note: 'integrity check with the new command: only asked by the v1.8.0 notes, whose hook covers it',
+      note: 'integrity check with the new command: only asked by the v1.8.0 notes, whose hook marks it manual (no duplicates in the fixture)',
     },
     {
       step: 'Before 5',
@@ -37,9 +37,10 @@ export default {
     },
   ],
   after: [
-    { step: 'After 1', action: 'manual', note: 'API running line and node processes: covered by the startup checks' },
-    { step: 'After 2', action: 'manual', note: 'both services healthy: the templates have no healthcheck' },
-    { step: 'After 3', action: 'manual', note: 'Aperitifs and Digestifs menus hold every checked bottle: run the two counts of C-06 on the fixture copy' },
+    { step: 'After 1-2', action: 'manual', note: 'API running line and node processes: covered by the startup checks' },
+    { step: 'After 3-6', action: 'manual', note: 'both services healthy, /api/health: the templates have no healthcheck' },
+    { step: 'After 7', action: 'manual', note: 'SQLITE_WAL=false only for a database on SMB/NFS: not the case on the bench' },
+    { step: 'After 8', action: 'manual', note: 'Aperitifs and Digestifs menus hold every checked bottle: run the two counts of C-06 on the fixture copy' },
   ],
   // What the notes say breaks when only the image tag changes.
   naiveMayFail: {

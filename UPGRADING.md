@@ -111,6 +111,8 @@ docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d --wait
 ```
 
+`--wait` needs Docker Compose v2.1.1 or later. With an older Compose, run `up -d`, then check `docker compose ps` until both services show `(healthy)`.
+
 ### After upgrading
 
 1. `docker compose logs carta-cocktail-backend` shows `API running on port 3001`.
@@ -122,7 +124,7 @@ docker compose -f docker-compose.prod.yml up -d --wait
 7. With `SQLITE_WAL=false`, the startup log shows `SQLite journal mode: delete`.
 8. **Check the Apéritifs and Digestifs menus**. "Synchronize", or a bottle import, adds every bottle checked for the menu's type, **empty ones included** (hidden on the public page while empty). Creating or editing a bottle syncs that bottle only. Check both menus and remove, in the menu editor, the bottles that should not be there: a removed bottle stays out of that menu, and the "Removed bottles" section puts it back.
 
-**After restoring a backup made with an earlier version**: restart the backend before using bottles and menus (`docker compose -f docker-compose.prod.yml restart carta-cocktail-backend`). The new table is created by the migrations at the next start; until then, creating, editing or importing bottles, removing a bottle from a menu, the sync and the exclusion routes answer 500.
+**After restoring a backup made with an earlier version**: restart the backend before using bottles and menus (`docker compose -f docker-compose.prod.yml restart carta-cocktail-backend`). The new table is created by the migrations at the next start; until then, creating or editing a bottle checked as aperitif or digestif, the bottle import, "Synchronize", and removing or putting back a bottle on the Apéritifs and Digestifs menus answer 500.
 
 ### Rolling back
 
