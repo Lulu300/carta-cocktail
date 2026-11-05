@@ -11,7 +11,7 @@ depends_on: [B-06]
 touches: [frontend/vite.config.ts, .github/scripts/css-media-ranges.mjs, .github/scripts/css-media-ranges.test.mjs, .github/workflows/ci.yml, frontend/AGENTS.md, docs/plan/README.md, docs/plan/tasks/B-06-deps-vite.md]
 sources: ["08-dependencies.md §3.3"]
 branch: fix/E-36-browser-target
-pr: PR_URL
+pr: https://github.com/Lulu300/carta-cocktail/pull/159
 ---
 
 ## Décisions validées (2026-11-05)
@@ -60,5 +60,5 @@ Mesuré sur `v1.11.0` et `origin/develop` (28986cd), builds de production compar
 ## Journal
 
 - 2026-11-05 : tâche créée à partir de l'écart G5 de la relecture des notes v1.12.0 (PR #152), décision de l'humain du jour.
-- 2026-11-05 : PR PR_URL. Faits établis sur des builds de `v1.11.0` et de `develop` (voir « Problème constaté ») : seule régression, les media queries d'intervalle laissées par Lightning CSS avec la cible Safari 16.4. `build.target` ramené aux cibles de v1.11 pour toute l'application, contrôle CI `css-media-ranges.mjs` et ses 7 tests. Hors `touches` initial : aucun. Pas de constat hors périmètre.
+- 2026-11-05 : PR #159. Faits établis sur des builds de `v1.11.0` et de `develop` (voir « Problème constaté ») : seule régression, les media queries d'intervalle laissées par Lightning CSS avec la cible Safari 16.4. `build.target` ramené aux cibles de v1.11 pour toute l'application, contrôle CI `css-media-ranges.mjs` et ses 7 tests. Hors `touches` initial : aucun. Pas de constat hors périmètre.
 - 2026-11-05 : Notes de version : aucune action requise. Cible navigateurs ramenée à celle de v1.11 (Safari et iOS 16.0, Chrome et Edge 107, Firefox 104) : le relèvement à Safari 16.4 de B-06 (#105) ne sort pas, la ligne correspondante des notes v1.12.0 (#152, « Public menu ») est à retirer. Sans ce correctif, Safari et iOS 16.0 à 16.3 perdaient toute la mise en page responsive, admin comprise.
