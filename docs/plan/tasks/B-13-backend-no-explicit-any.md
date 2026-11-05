@@ -5,13 +5,13 @@ phase: B
 lane: backend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [B-05]
-touches: [backend/eslint.config.js, backend/src/routes/cocktails.ts, backend/src/routes/public.ts, backend/src/routes/categories.ts, backend/src/utils/bottlesImport.ts, backend/src/utils/translations.ts, backend/src/routes/bottles.test.ts, backend/src/routes/categoryTypes.test.ts, backend/src/routes/cocktails.test.ts, backend/src/routes/menus.test.ts, backend/src/routes/public.test.ts]
+touches: [backend/eslint.config.js, backend/src/routes/categories.ts, backend/src/utils/translations.ts, backend/src/utils/translations.test.ts, backend/src/utils/records.ts, backend/src/utils/bottlesImport.ts, backend/src/test/helpers.ts, backend/src/routes/bottles.test.ts, backend/src/routes/categoryTypes.test.ts, backend/src/routes/cocktails.test.ts, backend/src/routes/menus.test.ts, backend/src/routes/public.test.ts]
 sources: []
-branch:
-pr:
+branch: chore/B-13-backend-no-explicit-any
+pr: "#147"
 ---
 
 ## Contexte
@@ -33,9 +33,9 @@ B-05 a posé ESLint sur le backend. Pour garder la PR petite, la règle `@typesc
 
 ## Critères d'acceptation
 
-- [ ] `npm run lint` dans `backend/` : 0 erreur, 0 avertissement.
-- [ ] Plus de dérogation `no-explicit-any` dans `backend/eslint.config.js`.
-- [ ] `npx tsc --noEmit` et `npm test` verts.
+- [x] `npm run lint` dans `backend/` : 0 erreur, 0 avertissement.
+- [x] Plus de dérogation `no-explicit-any` dans `backend/eslint.config.js`.
+- [x] `npx tsc --noEmit` et `npm test` verts.
 
 ## Tests à ajouter ou adapter
 
@@ -49,3 +49,4 @@ Aucun nouveau test : seuls les types changent. Les tests existants doivent reste
 ## Journal
 
 - 2026-10-12 : tâche créée par B-05, qui a laissé `no-explicit-any` en `warn`.
+- 2026-11-05 : fait dans la PR #147. Le 2026-11-05, il restait 25 avertissements au lieu de 45 : `routes/categories.ts` (1), `utils/translations.ts` (2) et 6 fichiers de test. `routes/cocktails.ts`, `routes/public.ts` et `bottlesImport.ts` n'en contenaient plus. Dans `integrityService.ts` et `uploadsCheck.ts`, `any` n'apparaît que dans des commentaires. `parseNameTranslations` passe en `unknown` → `unknown` : la fonction transforme son entrée, et son résultat ne sert qu'à `res.json()`. `isRecord` est extrait de `bottlesImport.ts` vers `utils/records.ts` pour être partagé. `enrichWithCategoryType` devient générique. Dans les tests, les corps de réponse sont typés avec les types existants (charges d'export et d'import, modèles Prisma) ou de petites interfaces locales, et un helper `lineOfSource()` est ajouté dans `test/helpers.ts`. Aucun `as unknown as`. Aucune incohérence de type trouvée, donc ni B-17 ni B-18. `touches` mis à jour (ajout de `records.ts`, `translations.test.ts` et `test/helpers.ts` ; retrait de `cocktails.ts` et `public.ts`, qui n'ont pas changé).
