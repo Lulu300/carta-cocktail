@@ -11,7 +11,7 @@ depends_on: [C-10]
 touches: [backend/src/utils/bottlesImport.ts, backend/src/utils/bottlesImport.test.ts]
 sources: []
 branch: fix/C-43-import-number-units
-pr: "#TBD"
+pr: "#154"
 ---
 
 ## Contexte
@@ -55,5 +55,5 @@ Excel écrit dans un CSV la valeur affichée. Une colonne au format monétaire, 
 
 ## Journal
 
-- 2026-11-05 : tâche créée et faite (PR #TBD), suite à l'écart G2 de la relecture des notes de v1.12.0 (PR #152). `toNumber` reçoit l'unité de la colonne (`COLUMN_UNITS`) : `stripUnit` retire l'unité finale (casse ignorée, espaces de toute sorte avant elle), une unité seule donne `invalidNumber`, puis `SPACE_GROUPED_THOUSANDS` retire les espaces qui groupent les milliers par trois avant la lecture de la virgule décimale. `RowReader.quantity` et `desiredStock` n'ont pas d'unité. Frontend inchangé.
+- 2026-11-05 : tâche créée et faite (PR #154), suite à l'écart G2 de la relecture des notes de v1.12.0 (PR #152). `toNumber` reçoit l'unité de la colonne (`COLUMN_UNITS`) : `stripUnit` retire l'unité finale (casse ignorée, espaces de toute sorte avant elle), une unité seule donne `invalidNumber`, puis `SPACE_GROUPED_THOUSANDS` retire les espaces qui groupent les milliers par trois avant la lecture de la virgule décimale. `RowReader.quantity` et `desiredStock` n'ont pas d'unité. Frontend inchangé.
 - Notes de version : à l'import de bouteilles, les cellules affichées par Excel avec l'unité de leur colonne (`25,90 €`, `40 %`, `700 ml`, milliers groupés par des espaces : `1 234,50 €`) se lisent comme des nombres. Une autre unité (`70 cl` dans la capacité, `40°`) écarte la ligne, listée dans l'assistant ; en v1.11 elle était lue de travers (`70 cl` = 70 ml) ou perdue sans le dire.
