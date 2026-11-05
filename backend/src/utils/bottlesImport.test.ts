@@ -73,6 +73,48 @@ describe('parseCsvBottles', () => {
     })]);
   });
 
+  describe('numbers displayed with their unit', () => {
+    const NBSP = ' ';
+    const NARROW_NBSP = ' ';
+    const UNIT_HEADER = 'name;capacityMl;remainingPercent;alcoholPercentage;purchasePrice';
+
+    function unitRow(cells: string): ReturnType<typeof parseCsvBottles> {
+      return parseCsvBottles(`${UNIT_HEADER}\nHavana;${cells}`, 'fr');
+    }
+
+    it('reads the cells Excel in French writes for currency, percent and ml formats', () => {
+      const payload = unitRow(`700${NBSP}ml;75${NBSP}%;40,5${NARROW_NBSP}%;1${NARROW_NBSP}234,50${NBSP}€`);
+
+      expect(payload.errors).toEqual([]);
+      expect(payload.bottles[0]).toMatchObject({
+        capacityMl: 700, remainingPercent: 75, alcoholPercentage: 40.5, purchasePrice: 1234.5,
+      });
+    });
+
+    it('reads a unit without a space, in any case, and plain spaces', () => {
+      const payload = unitRow('1 000 ML;75%;40 %;25.90€');
+
+      expect(payload.errors).toEqual([]);
+      expect(payload.bottles[0]).toMatchObject({
+        capacityMl: 1000, remainingPercent: 75, alcoholPercentage: 40, purchasePrice: 25.9,
+      });
+    });
+
+    it.each([
+      ['another unit of volume', '70 cl;;;', 'capacityMl'],
+      ['a percent in the price column', '700;;;40 %', 'purchasePrice'],
+      ['a currency in a percent column', '700;;25 €;', 'alcoholPercentage'],
+      ['a unit without a number', '700;;;€', 'purchasePrice'],
+      ['spaces that do not group thousands', '7 00;;;', 'capacityMl'],
+      ['a space inside a decimal', '700;;;25, 90', 'purchasePrice'],
+    ])('leaves out a row with %s', (_label, cells, field) => {
+      const payload = unitRow(cells);
+
+      expect(payload.bottles).toEqual([]);
+      expect(payload.errors).toEqual([{ source: 'bottles', line: 2, field, code: 'invalidNumber' }]);
+    });
+  });
+
   it('keeps a semicolon inside a quoted field', () => {
     const payload = parseCsvBottles('name;capacityMl;location\n"Gin; London Dry";700;"Bar; top shelf"', 'en');
     expect(payload.bottles[0]).toMatchObject({ name: 'Gin; London Dry', location: 'Bar; top shelf' });
@@ -210,6 +252,23 @@ describe('parseJsonBottles', () => {
       alcoholPercentage: null, purchasePrice: null, location: null, openedAt: null,
       isApero: false, isDigestif: true, quantity: 3,
     });
+  });
+
+  it('reads numbers given as text with their unit as a CSV cell, and refuses another unit', () => {
+    const payload = parseJsonBottles({
+      version: 1,
+      categories: [{ name: 'Rhum', minimumPercent: '25 %' }],
+      bottles: [
+        jsonBottle({ capacityMl: '700 ml', alcoholPercentage: '40 %', purchasePrice: '25,90 €' }),
+        jsonBottle({ capacityMl: '70 cl' }),
+      ],
+    }, 'en');
+
+    expect(payload.categories[0].minimumPercent).toBe(25);
+    expect(payload.bottles).toEqual([expect.objectContaining({
+      capacityMl: 700, alcoholPercentage: 40, purchasePrice: 25.9,
+    })]);
+    expect(payload.errors).toEqual([{ source: 'bottles', line: 2, field: 'capacityMl', code: 'invalidNumber' }]);
   });
 
   it('numbers the rows from 1 in errors', () => {
