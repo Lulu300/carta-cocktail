@@ -4,7 +4,7 @@
 # ($BUILDPLATFORM): the compiled JavaScript and the generated Prisma client do
 # not depend on the CPU, so the multi-platform release build compiles once,
 # natively, instead of once per platform under QEMU emulation.
-FROM --platform=$BUILDPLATFORM node:24.21-alpine AS build
+FROM --platform=$BUILDPLATFORM node:24.22-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 # The postinstall script generates the Prisma client from prisma/schema.prisma
@@ -24,7 +24,7 @@ RUN npm run build
 # Pruning keeps what `npm ci` installed and built without a second download.
 # The runtime tree has no optional dependency of its own: --omit=optional drops the
 # optional peers that only the dev tooling uses (typescript, for @prisma/client and i18next).
-FROM node:24.21-alpine AS prod-deps
+FROM node:24.22-alpine AS prod-deps
 WORKDIR /app
 COPY package*.json ./
 COPY prisma/schema.prisma ./prisma/schema.prisma
@@ -57,7 +57,7 @@ RUN node /tmp/prune-unused-deps.mjs \
 # Without network, as in a container that cannot reach the registry.
 RUN --network=none CHECKPOINT_DISABLE=1 node_modules/.bin/prisma --version
 
-FROM node:24.21-alpine AS runtime
+FROM node:24.22-alpine AS runtime
 # tini forwards SIGTERM to the entrypoint, then to Node once the entrypoint has exec'd it
 RUN apk add --no-cache tini
 ENV NODE_ENV=production
