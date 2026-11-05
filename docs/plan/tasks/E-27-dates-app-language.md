@@ -5,13 +5,13 @@ phase: E
 lane: frontend
 criticite: basse
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [C-35]
-touches: [frontend/src/components/admin/bottles/BottleFormModal.tsx, frontend/src/components/admin/bottles/bottleForm.ts, frontend/src/components/admin/bottles/BottleFormModal.test.tsx, frontend/src/components/ui/DateInput.tsx, frontend/src/components/ui/DateInput.test.tsx, frontend/src/utils/dates.ts, frontend/src/utils/dates.test.ts, frontend/src/components/import/BottleImportRowErrors.tsx, frontend/src/components/import/BottleImportRowErrors.test.tsx, frontend/src/i18n/locales/]
+touches: [frontend/src/components/admin/bottles/BottleFormModal.tsx, frontend/src/components/admin/bottles/bottleForm.ts, frontend/src/components/admin/bottles/BottleFormModal.test.tsx, frontend/src/components/ui/DateInput.tsx, frontend/src/components/ui/DateInput.test.tsx, frontend/src/utils/dates.ts, frontend/src/utils/dates.test.ts, frontend/src/components/import/BottleImportRowErrors.tsx, frontend/src/components/import/BottleImportRowErrors.test.tsx, frontend/src/i18n/locales/, frontend/src/pages/admin/BottlesPage.test.tsx, frontend/AGENTS.md]
 sources: []
-branch:
-pr:
+branch: feat/E-27-dates-app-language
+pr: "#158"
 ---
 
 ## Décisions validées (2026-10-12)
@@ -44,11 +44,11 @@ La langue de l'application vient de `i18n.language` (sélecteur `LanguageSelecto
 
 ## Critères d'acceptation
 
-- [ ] App en français : la date d'ouverture s'affiche et se saisit en `jj/mm/aaaa`, quelle que soit la langue du navigateur.
-- [ ] App en anglais : elle s'affiche et se saisit en `mm/dd/yyyy` (anglais américain, comme C-35).
-- [ ] `31/02/2024` ou `abc` affiche une erreur traduite et n'est pas envoyé.
-- [ ] L'API reçoit toujours `aaaa-mm-jj` ; une bouteille enregistrée puis rouverte garde sa date.
-- [ ] Changer de langue réaffiche la date saisie dans le nouveau format.
+- [x] App en français : la date d'ouverture s'affiche et se saisit en `jj/mm/aaaa`, quelle que soit la langue du navigateur.
+- [x] App en anglais : elle s'affiche et se saisit en `mm/dd/yyyy` (anglais américain, comme C-35).
+- [x] `31/02/2024` ou `abc` affiche une erreur traduite et n'est pas envoyé.
+- [x] L'API reçoit toujours `aaaa-mm-jj` ; une bouteille enregistrée puis rouverte garde sa date.
+- [x] Changer de langue réaffiche la date saisie dans le nouveau format.
 
 ## Tests à ajouter ou adapter
 
@@ -69,3 +69,7 @@ La langue de l'application vient de `i18n.language` (sélecteur `LanguageSelecto
 - 2026-10-12 : décision de l'humain reportée par C-35 : le format anglais retenu est en-US (`mm/dd/yyyy`) ; English (UK) suivra avec C-39.
 - 2026-10-13 : relecture de C-35 (PR #132). L'import est maintenant strict : formats à barres ou à points de la langue, ou ISO 8601, années à deux chiffres et date + heure refusées. Or le message `bottles.importWizard.rowErrors.code.invalidDate` (`frontend/src/i18n/locales/admin/{en,fr}.json`, « … n'est pas une date valide ») ne dit pas quel format est attendu. Ajouter le format de la langue (`jj/mm/aaaa ou aaaa-mm-jj`, `mm/dd/yyyy or yyyy-mm-dd`) par interpolation (`{{pattern}}`, rempli avec `datePattern(i18n.language)` dans `BottleImportRowErrors.tsx`), pas écrit dans le JSON : `en-GB` (C-39) n'aura pas de fichier de messages et doit montrer son propre format. `frontend/src/components/import/BottleImportRowErrors.tsx` et son test sont ajoutés à `touches`.
 - 2026-10-13 : relecture de C-35 (PR #132). Un horodatage ISO avec décalage est gardé tel quel : `2024-03-12T23:30:00-05:00` est enregistré à `2024-03-13T04:30Z`, donc un affichage en UTC montrera le 13. C'était déjà le cas avant C-35, et l'export écrit toujours `Z`. À garder en tête pour `formatDate`.
+- 2026-11-05 : décision de l'humain : E-27 avant v1.12.0-rc.1, puis C-39 (en-GB) par-dessus.
+- 2026-11-05 : réalisée (PR #158). `utils/dates.ts` : table `DATE_FORMATS` (ordre des champs + séparateur) cherchée par code exact, langue de base puis `en` ; `formatDate` lit le jour UTC avec une année à quatre chiffres ; `parseDateInput` strict (format de la langue, année à quatre chiffres, `31/02` refusé) ; `datePattern(language, t)` et `isoDatePattern(t)` prennent les lettres (`jj`, `mm`, `aaaa`) dans les messages et l'ordre dans la table : C-39 ajoute seulement une entrée `en-GB` et obtient `dd/mm/yyyy`. `DateInput` : champ texte dans `Field`, gabarit en placeholder et en aide reliée par `aria-describedby`, date invalide refusée à l'envoi par `setCustomValidity` (message annoncé par le navigateur) et affichée en erreur après la sortie du champ. Le message d'import `invalidDate` donne les formats attendus par `{{pattern}}` et `{{isoPattern}}`. Ajouts à `touches` : `BottlesPage.test.tsx` (deux lignes adaptées au champ texte) et `frontend/AGENTS.md` (règle « Dates » et étape `DATE_FORMATS` pour une nouvelle langue). Budget public : 131,94 kB gzip sur 140, le code des dates est dans le chunk `BottlesPage`.
+- 2026-11-05 : Notes de version : aucune action requise. La date d'ouverture d'une bouteille s'affiche et se saisit dans le format de la langue de l'app (`jj/mm/aaaa` en français, `mm/dd/yyyy` en anglais) au lieu de celui du navigateur ; le message d'import d'une date invalide indique les formats attendus.
+- 2026-11-05 : relecture de la PR #158 (tests seulement). Les tests de `formatDate` fixent un fuseau à l'ouest de UTC (`vi.stubEnv('TZ', 'America/Los_Angeles')`, avec un test qui vérifie que le fuseau est bien appliqué) : la CI tourne en UTC, où une lecture en heure locale passait inaperçue. Un test couvre l'envoi par Entrée d'une date invalide sans quitter le champ (`onInvalid`). Les deux sabotages décrits par le relecteur font échouer les tests sous `TZ=UTC`.

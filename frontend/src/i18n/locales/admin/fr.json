@@ -146,7 +146,7 @@
         "code": {
           "required": "{{field}} manquant",
           "outOfRange": "{{field}} hors limites",
-          "invalidDate": "{{field}} n'est pas une date valide",
+          "invalidDate": "{{field}} n'est pas une date valide (attendu : {{pattern}} ou {{isoPattern}})",
           "invalidNumber": "{{field}} n'est pas un nombre valide",
           "unknown": "{{field}} invalide"
         }
@@ -476,6 +476,13 @@
     "required": "Obligatoire",
     "positive": "Doit être supérieur à 0",
     "sourceRequired": "Choisissez un élément"
+  },
+  "dates": {
+    "day": "jj",
+    "month": "mm",
+    "year": "aaaa",
+    "format": "Format : {{pattern}}",
+    "invalid": "Saisissez une date valide au format {{pattern}}"
   },
   "iconPicker": {
     "hint": "Choisissez un emoji pour représenter cet ingrédient",
