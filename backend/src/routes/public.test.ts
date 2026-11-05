@@ -21,6 +21,18 @@ interface PublicRecipeLine {
   ingredient: { name: string } | null;
 }
 
+/** A recipe line of GET /api/public/cocktails/:id for the admin, with its preferred bottles. */
+interface AdminRecipeLine {
+  sourceType: string;
+  preferredBottles: { bottle: { name: string } }[];
+}
+
+/** The names a GET /api/public/menus/:slug body lists, as these tests read them. */
+interface PublicMenuNames {
+  cocktails: { cocktail: { name: string } }[];
+  bottles: { bottle: { name: string } }[];
+}
+
 /** Put a cocktail in a menu, creating the menu on first use. */
 async function addCocktailToMenu(
   cocktailId: number,
@@ -197,8 +209,9 @@ describe('GET /api/public/menus/:slug', () => {
     for (const headers of [{}, authHeader()]) {
       const res = await request.get('/api/public/menus/mixed').set(headers);
       expect(res.status).toBe(200);
-      expect(res.body.cocktails.map((mc: { cocktail: { name: string } }) => mc.cocktail.name)).toEqual(['Visible']);
-      expect(res.body.bottles.map((mb: { bottle: { name: string } }) => mb.bottle.name)).toEqual(['Visible bottle']);
+      const { cocktails, bottles }: PublicMenuNames = res.body;
+      expect(cocktails.map((mc) => mc.cocktail.name)).toEqual(['Visible']);
+      expect(bottles.map((mb) => mb.bottle.name)).toEqual(['Visible bottle']);
     }
   });
 
@@ -325,7 +338,7 @@ describe('GET /api/public/cocktails/:id', () => {
     const admin = await request.get(`/api/public/cocktails/${cocktail.id}`).set(authHeader());
     expect(admin.status).toBe(200);
     expect(admin.body.notes).toBe('Use the good rum');
-    const adminLines: { sourceType: string; preferredBottles: { bottle: { name: string } }[] }[] = admin.body.ingredients;
+    const adminLines: AdminRecipeLine[] = admin.body.ingredients;
     const categoryIngredient = lineOfSource(adminLines, 'CATEGORY');
     expect(categoryIngredient.preferredBottles[0].bottle.name).toBe('Havana Club');
     expectNoPrivateBottleFields(admin.body);
