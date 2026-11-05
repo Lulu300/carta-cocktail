@@ -16,7 +16,7 @@ pr: https://github.com/Lulu300/carta-cocktail/pull/105
 
 ## Décisions validées (2026-10-08)
 
-- **Cible navigateurs** : on garde la cible par défaut de Vite 8 (Safari et iOS ≥ 16.4, Chrome et Edge ≥ 111, Firefox ≥ 114). Pas de `build.target` personnalisé.
+- **Cible navigateurs** : on garde la cible par défaut de Vite 8 (Safari et iOS ≥ 16.4, Chrome et Edge ≥ 111, Firefox ≥ 114). Pas de `build.target` personnalisé (remplacée par E-36, 2026-11-05).
 
 ## Contexte
 
@@ -63,3 +63,4 @@ Aucun test nouveau ; si `jszip` pose problème à l'exécution, ajouter un test 
 - 2026-10-12 : PR #105. Vite 8.3.4 puis plugin-react 6.1.2, en deux commits. `manualChunks` (forme objet) remplacé par `build.rolldownOptions.output.codeSplitting.groups`, avec `react-router` ajouté au groupe `vendor-react` (Rolldown ne le suit pas via `react-router-dom`). Chargement initial du menu public : 137,53 kB → 136,11 kB gzip, en 8 fichiers au lieu de 3. Hors `touches` : `.github/scripts/bundle-budget.mjs` et son test (le chunk `rolldown-runtime` n'a pas de source map), et la version de Vite dans `AGENTS.md`, `frontend/AGENTS.md` et `README.md`. Export puis import ZIP vérifiés dans Chrome headless sur le build de production et sur le serveur de dev, avec un vrai backend. Constat hors périmètre : tâche B-15 (fichiers de même nom écrasés dans l'export ZIP).
 - 2026-10-12 : Notes de version : aucune action requise ; cible navigateurs relevée de Safari/iOS 16.0 à 16.4 (Chrome/Edge 111, Firefox 114).
 - 2026-10-12 : relecture de la PR #105. `bundle-budget.mjs` n'exempte plus que le chunk `rolldown-runtime-*.js` (par son nom) : tout autre chunk préchargé sans source map fait échouer le contrôle, test ajouté. Commentaire dans `vite.config.ts` sur la présence de `react-router` dans `vendor-react`.
+- 2026-11-05 : décision « Cible navigateurs » remplacée par E-36 : retour aux cibles de v1.11 (Safari et iOS 16.0, Chrome et Edge 107, Firefox 104). Avec la cible Safari 16.4, le CSS gardait les media queries d'intervalle de Tailwind, ignorées avant Safari 16.4.

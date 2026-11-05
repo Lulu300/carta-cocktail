@@ -134,7 +134,7 @@ Décisions prises par l'humain le 2026-10-08, complétées le 2026-10-09 et le 2
 | Photos déjà en production | L'humain les récupère avec `docker cp` avant de déployer le correctif | A-01 |
 | Passage aux migrations | Bascule automatique avec garde-fous (sauvegarde, baseline `0_init` si la base correspond, refus sinon) ; vérification humaine sur une copie avant le premier déploiement | C-01 |
 | Seuil de couverture | Cliquet : seuil fixé au chiffre mesuré s'il est sous 60 %, jamais abaissé ensuite, remonté jusqu'à 60 % | B-02, B-10 |
-| Navigateurs supportés | Cible par défaut de Vite 8 : Safari et iOS ≥ 16.4 | B-06 |
+| Navigateurs supportés (révisée le 2026-11-05) | Cibles de v1.11 : Safari et iOS ≥ 16.0, Chrome et Edge ≥ 107, Firefox ≥ 104 (`build.target`). Remplace la cible par défaut de Vite 8 (Safari 16.4) retenue par B-06 | B-06, E-36 |
 | TypeScript | Étape TypeScript 6.0 après Prisma 7 ; TypeScript 7 quand typescript-eslint le supportera | F-07 |
 | Conventions Git | Conventional Commits pour les commits, titres de PR `ID: titre`, `.mailmap` vers `Ludwig SIMON <ludwig@simonl.fr>` | D-07 |
 | Suppression d'un élément utilisé | Bloquée par défaut avec la liste des impacts ; suppression forcée en cascade possible après confirmation explicite des risques ; pas de forçage pour les unités | C-07, E-04, E-05, E-15 |

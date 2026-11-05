@@ -60,7 +60,7 @@ jobs:
       - name: Build
         run: npm run build
 
-      # Tests of every CI script in .github/scripts (delta coverage, bundle budget).
+      # Tests of every CI script in .github/scripts (delta coverage, bundle budget, CSS media ranges).
       - name: CI script tests
         run: node --test '../.github/scripts/*.test.mjs'
 
@@ -140,6 +140,10 @@ jobs:
       # section navigation).
       - name: Bundle budget (initial load of the public menu)
         run: node ../.github/scripts/bundle-budget.mjs dist 140
+
+      # Safari and iOS before 16.4 ignore media queries in range syntax (E-36).
+      - name: CSS media queries readable by Safari 16
+        run: node ../.github/scripts/css-media-ranges.mjs dist
 
       - name: Tests with coverage
         run: npm run test:coverage
