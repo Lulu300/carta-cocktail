@@ -40,7 +40,7 @@ export default {
     { step: 'After 1-2', action: 'manual', note: 'API running line and node processes: covered by the startup checks' },
     { step: 'After 3-6', action: 'manual', note: 'both services healthy, /api/health: the templates have no healthcheck' },
     { step: 'After 7', action: 'manual', note: 'SQLITE_WAL=false only for a database on SMB/NFS: not the case on the bench' },
-    { step: 'After 8', action: 'manual', note: 'Aperitifs and Digestifs menus hold every checked bottle: run the two counts of C-06 on the fixture copy' },
+    { step: 'After 8', action: 'manual', note: 'Aperitifs and Digestifs menus: run the two counts of C-06 (personal bottle menus, empty checked bottles that Synchronize will add) on the fixture copy' },
   ],
   // What the notes say breaks when only the image tag changes.
   naiveMayFail: {

@@ -117,7 +117,7 @@ docker compose -f docker-compose.prod.yml up -d --wait
 ### After upgrading
 
 1. `docker compose logs carta-cocktail-backend` shows `API running on port 3001`.
-2. Optional: `docker compose exec carta-cocktail-backend ps -o user,args` shows `node` for every process.
+2. Optional: `docker compose exec carta-cocktail-backend ps -o user,args` shows `node` (or the `CARTA_UID` you set) for every process.
 3. `docker compose up -d --wait` returns once both services are healthy (or fails if one is not).
 4. `docker compose ps` shows `(healthy)` for both services.
 5. `curl http://<host>:<frontend port>/api/health` answers `{"status":"ok","version":"…"}`.
