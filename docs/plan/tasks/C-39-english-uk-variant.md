@@ -5,13 +5,13 @@ phase: C
 lane: frontend
 criticite: basse
 effort: S
-status: todo
-owner: mixed
+status: done
+owner: agent
 depends_on: [C-35, E-10, E-27]
-touches: [frontend/src/i18n/index.ts, frontend/src/i18n/index.test.ts, frontend/src/utils/localization.ts, frontend/src/utils/localization.test.ts, frontend/src/components/ui/LanguageSelector.tsx, frontend/src/components/ui/LanguageSelector.test.tsx, frontend/src/components/admin/TranslationFields.tsx, frontend/src/components/admin/TranslationFields.test.tsx, frontend/src/services/api.ts, frontend/src/services/api.test.ts, frontend/src/utils/dates.ts, frontend/src/utils/dates.test.ts, backend/src/utils/importDates.ts, backend/src/utils/importDates.test.ts]
+touches: [frontend/src/i18n/index.ts, frontend/src/i18n/index.test.ts, frontend/src/utils/localization.ts, frontend/src/utils/localization.test.ts, frontend/src/components/ui/LanguageSelector.tsx, frontend/src/components/ui/LanguageSelector.test.tsx, frontend/src/components/admin/TranslationFields.tsx, frontend/src/components/admin/TranslationFields.test.tsx, frontend/src/services/api.ts, frontend/src/services/api.test.ts, frontend/src/utils/dates.ts, frontend/src/utils/dates.test.ts, backend/src/utils/importDates.ts, backend/src/utils/importDates.test.ts, backend/src/routes/bottles.test.ts, frontend/src/components/ui/DateInput.test.tsx, frontend/AGENTS.md]
 sources: []
-branch:
-pr:
+branch: feat/C-39-english-uk
+pr: 160
 ---
 
 ## Décisions validées (2026-10-12)
@@ -20,6 +20,12 @@ pr:
 - **`en` = English (US)** : en `en`, une date à barres ou à points se lit mois/jour/année (`12/03/2024` = 3 décembre 2024).
 - **English (UK)** : une variante `en-GB` s'ajoute aux langues de l'application. Elle reprend les traductions `en` par le repli d'i18next (aucun fichier de traduction copié) ; seul le format de date change : jour/mois/année (`12/03/2024` = 12 mars 2024).
 - **Libellés** : « English (US) » pour `en`, « English (UK) » pour `en-GB`.
+
+## Décisions validées (2026-11-05)
+
+- **Ordre** : E-27 d'abord, C-39 ensuite (E-27 est mergée, PR #158).
+- **Autres variantes de l'anglais** (`en-AU`, `en-IE`, `en-NZ`, `en-IN`) : réduites à `en` (US), comme aujourd'hui. Seul `en-GB` lit jour/mois.
+- **Bouton du sélecteur** : `UK` avec le drapeau britannique pour English (UK), `EN` avec le drapeau américain pour English (US).
 
 ## Contexte
 
@@ -49,11 +55,11 @@ Un admin britannique ne peut donc ni choisir le format jour/mois en anglais, ni 
 
 ## Critères d'acceptation
 
-- [ ] Le sélecteur propose « English (US) » et « English (UK) » ; choisir English (UK) garde les textes anglais.
-- [ ] En English (UK), la date d'ouverture s'affiche et se saisit en `dd/mm/yyyy` ; en English (US), en `mm/dd/yyyy`.
-- [ ] En English (UK), un import CSV avec `12/03/2024` donne le 12 mars 2024 ; en English (US), le 3 décembre 2024.
-- [ ] Un navigateur en `en-GB` sans choix enregistré démarre en English (UK) ; un navigateur en `de` démarre en anglais (repli `en`).
-- [ ] Un admin qui avait choisi `en` (localStorage) reste en English (US).
+- [x] Le sélecteur propose « English (US) » et « English (UK) » ; choisir English (UK) garde les textes anglais.
+- [x] En English (UK), la date d'ouverture s'affiche et se saisit en `dd/mm/yyyy` ; en English (US), en `mm/dd/yyyy`.
+- [x] En English (UK), un import CSV avec `12/03/2024` donne le 12 mars 2024 ; en English (US), le 3 décembre 2024.
+- [x] Un navigateur en `en-GB` sans choix enregistré démarre en English (UK) ; un navigateur en `de` démarre en anglais (repli `en`).
+- [x] Un admin qui avait choisi `en` (localStorage) reste en English (US).
 
 ## Tests à ajouter ou adapter
 
@@ -77,3 +83,6 @@ Un admin britannique ne peut donc ni choisir le format jour/mois en anglais, ni 
 - 2026-10-13 : relecture de la PR #132 : `frontend/src/i18n/index.test.ts` ajouté à `touches`, `LanguageSelector` lit `i18n.language`.
 - 2026-10-13 : E-30 (PR #133) : les tables de messages d'`i18n/index.ts` et d'`i18n/admin.ts` sont typées par `TRANSLATED_LANGUAGES` (langues qui ont leurs propres fichiers), dont part `SUPPORTED_LANGUAGES`. `en-GB` s'ajoute à `SUPPORTED_LANGUAGES` et à `LanguageSelector` seulement, pas à `TRANSLATED_LANGUAGES` ni aux tables : i18next lui sert les messages `en`.
 - 2026-10-13 : relecture d'E-10 (PR #134). E-10 ajoute une constante `LANGUAGE_NAMES` (`frontend/src/utils/localization.ts`), utilisée à la fois par `LanguageSelector` et par les libellés de `TranslationFields`. Si C-39 renomme `en` en « English (US) », le champ de traduction anglais prendra ce nom, alors que `nameTranslations.en` sert aussi à `en-GB`. Il faut séparer les noms affichés dans le sélecteur des noms des langues de contenu. La règle attendue au dernier point d'attention est fixée : les noms de langues sont des endonymes, jamais traduits, rangés dans `LANGUAGE_NAMES`. `frontend/src/components/admin/TranslationFields.tsx` (et son test) sont ajoutés à `touches`.
+- 2026-11-05 : décisions de l'humain enregistrées (variantes `en-AU`… réduites à `en`, bouton `UK`), `owner: agent`.
+- 2026-11-05 : réalisée (PR #160). `en-GB` dans `SUPPORTED_LANGUAGES`, `DATE_FORMATS` et `DAY_MONTH_ORDERS`. Le détecteur garde un code supporté (sans tenir compte de la casse : `en-gb`) et réduit les autres à leur langue de base. `Accept-Language` et `LanguageSelector` lisent `i18n.language`. Pour séparer les noms du sélecteur de ceux des champs de traduction, `LANGUAGE_NAMES` liste les langues de l'application et `CONTENT_LANGUAGE_NAMES` les langues des noms d'entités (le champ anglais reste « English »). Le menu passe de `w-40` à `w-48` pour les noms plus longs. `touches` complété : `backend/src/routes/bottles.test.ts` (import avec `Accept-Language: en-GB`), `frontend/src/components/ui/DateInput.test.tsx` (saisie en English (UK)) et `frontend/AGENTS.md` (paragraphe « Locale bundles »). Bundle public : 132,11 kB gzip (131,94 kB sur `develop`), budget 140 kB.
+- Notes de version : aucune action requise, pas de changement cassant. Nouveauté : English (UK) dans le sélecteur de langue, avec les dates jour/mois/année (champs, affichage, import de bouteilles). Un navigateur en anglais britannique sans choix enregistré démarre en English (UK) ; un admin qui avait choisi l'anglais reste en English (US). L'entrée anglaise du menu devient « English (US) », avec le drapeau américain.
