@@ -51,3 +51,4 @@ Aucun si aucune ligne de code ne change : les tests de sauvegarde couvrent `arch
 ## Journal
 
 - 2026-11-05 : tâche créée par B-19 (PR #146) après l'audit complet du backend.
+- 2026-11-05 : B-16 (PR #150) monte Prisma en 7.10.1 et retire les surcharges `deepmerge-ts` / `mysql2`. Les avis listés plus haut ne changent pas. `fast-uri` reste en 3.1.8 par le même chemin : `@prisma/dev` 0.24.17 ne change pas en 7.10.1, même si les notes de version de Prisma citent `fast-uri`. `npm audit --omit=dev` reste à 5 `moderate` (14 avec le dev). Le point d'attention ne vaut plus : B-16 n'attend plus de version de Prisma. Lancer B-20 après son merge (même lockfile).
