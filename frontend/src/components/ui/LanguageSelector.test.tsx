@@ -129,6 +129,21 @@ describe('LanguageSelector', () => {
     expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('en-GB');
   });
 
+  it('still switches the language when the browser blocks site data', async () => {
+    const user = userEvent.setup();
+    render(<LanguageSelector />);
+    await user.click(getLanguageButton());
+    // `Once` on the localStorage mock of src/test/setup.ts: the next tests get it working.
+    vi.mocked(localStorage.setItem).mockImplementationOnce(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+
+    await user.click(screen.getByText('English (UK)'));
+
+    expect(localStorage.setItem).toHaveBeenCalledWith(LANGUAGE_STORAGE_KEY, 'en-GB');
+    expect(mockChangeLanguage).toHaveBeenCalledWith('en-GB');
+  });
+
   it('should call changeLanguage when selecting a language', async () => {
     const user = userEvent.setup();
     render(<LanguageSelector />);

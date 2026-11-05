@@ -23,6 +23,16 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/**
+ * Makes the next call of a method of the localStorage mock (src/test/setup.ts) throw, as a
+ * browser that blocks site data does. `Once`: the next tests get the working mock back.
+ */
+function blockStorageOnce(method: 'getItem' | 'setItem') {
+  vi.mocked(localStorage[method]).mockImplementationOnce(() => {
+    throw new DOMException('blocked', 'SecurityError');
+  });
+}
+
 describe('storeLanguageChoice', () => {
   it('stores the picked language', () => {
     storeLanguageChoice('en-GB');
@@ -30,10 +40,10 @@ describe('storeLanguageChoice', () => {
   });
 
   it('keeps going when the browser blocks site data', () => {
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new DOMException('blocked', 'SecurityError');
-    });
+    blockStorageOnce('setItem');
     expect(() => storeLanguageChoice('fr')).not.toThrow();
+    expect(localStorage.setItem).toHaveBeenCalledWith(LANGUAGE_STORAGE_KEY, 'fr');
+    expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBeNull();
   });
 });
 
@@ -86,9 +96,9 @@ describe('migrateLegacyLanguage', () => {
   });
 
   it('keeps going when the browser blocks site data', () => {
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
-      throw new DOMException('blocked', 'SecurityError');
-    });
+    stubBrowserLanguages(['fr-FR']);
+    blockStorageOnce('getItem');
     expect(() => migrateLegacyLanguage()).not.toThrow();
+    expect(localStorage.getItem).toHaveBeenCalledWith(LEGACY_LANGUAGE_STORAGE_KEY);
   });
 });
