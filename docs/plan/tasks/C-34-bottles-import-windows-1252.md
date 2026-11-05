@@ -5,7 +5,7 @@ phase: C
 lane: backend
 criticite: basse
 effort: S
-status: todo
+status: dropped
 owner: agent
 depends_on: [C-10]
 touches: [backend/src/utils/bottlesImport.ts, backend/src/utils/bottlesImport.test.ts, backend/src/i18n/]
@@ -49,3 +49,4 @@ Constaté en écrivant C-10, hors de son périmètre.
 ## Journal
 
 - 2026-10-12 : tâche créée par C-10 (import d'un CSV Excel en locale française, hors périmètre de C-10).
+- 2026-11-05 : abandonnée, remplacée par C-44 (PR #155), créée pour le même problème à partir de l'écart G4b de la relecture des notes de v1.12.0. Le correctif suit ce qui est décrit ici : UTF-8 strict, puis Windows-1252 ; un fichier avec un BOM UTF-8 reste lu en UTF-8.
