@@ -22,7 +22,7 @@ The commands below assume the default `docker-compose.prod.yml`, run from its fo
 
 ## v1.12.0
 
-**Breaking:** the backend container now runs as the `node` user (uid 1000) and never starts as root: every existing install must give its volumes or host folders to uid 1000 before upgrading (step 3), otherwise the backend **stops at startup**. `docker-compose.prod.yml` changes (healthchecks) and no longer publishes the backend port 3001: scripts and reverse proxies that call port 3001 must go through nginx (step 5). At the first start, the backend copies the database to `backups/pre-migrate-<date>.db` and applies one migration (a new table). Release notes: [`docs/releases/v1.12.0.md`](docs/releases/v1.12.0.md).
+**Breaking:** the backend container now runs as the `node` user (uid 1000) and never starts as root: every existing install must give its volumes or host folders to uid 1000 (or to `CARTA_UID`:`CARTA_GID` on a network share) before upgrading (step 3), otherwise the backend **stops at startup**. `docker-compose.prod.yml` changes (healthchecks) and no longer publishes the backend port 3001: scripts and reverse proxies that call port 3001 must go through nginx (step 5). At the first start, the backend copies the database to `backups/pre-migrate-<date>.db` and applies one migration (a new table). Release notes: [`docs/releases/v1.12.0.md`](docs/releases/v1.12.0.md).
 
 Instances older than v1.8.0: upgrade to v1.8.0 first, following the [v1.8.0 section](#v180) (and the sections before it), check that it works, then apply this one.
 
@@ -62,6 +62,7 @@ The backend container now runs as the `node` user (uid 1000, gid 1000) and never
      or, on the host, `sudo chown -R 1000:1000 data uploads`;
    - **compose file that sets `user:`** for the backend (for example `user: "1026:100"`): run the same command with that uid and gid instead of `1000:1000`;
    - **Docker rootless**: run the alpine command of your case with the rootless Docker. Root in the container changes the owner inside the user namespace. The host then shows a subordinate uid; this is expected. Not tested for this release (no rootless host).
+   - **Database or photos on a network share (SMB/NFS)**: `chown` may be refused or have no effect. Set `CARTA_UID` and `CARTA_GID` in `.env` to the uid and gid the share gives to its files: the `uid=`/`gid=` mount options for CIFS; for NFS with `root_squash`, the owner of the exported folders, as `ls -n` shows it with NFSv3, or NFSv4 with matching idmap domains (`4294967294` or `65534` means nobody: fix the idmapping first); `anonuid`/`anongid` with `all_squash`. Or mount the share with `uid=1000,gid=1000` (CIFS; if the options show `uid=0`, remount rather than set `CARTA_UID=0`: never run the backend as root), or change the owner on the NAS. With NAS ACLs, give that uid read and write access. See [README › "Data folders and the node user"](README.md#data-folders-and-the-node-user). With a compose file of your own: `user: "<uid>:<gid>"` on the backend. With the named volumes, keep the default: they belong to 1000:1000, and another uid stops the backend until the printed `chown`.
 4. **Integrity check** (when the notes ask for it): the old command `--entrypoint npx <image> tsx scripts/check-integrity.ts` no longer works (no `tsx`, no sources in the image). New command, on a copy (not `:ro`: SQLite writes `-shm` next to it):
 
    ```bash
@@ -85,7 +86,7 @@ The backend container now runs as the `node` user (uid 1000, gid 1000) and never
            - "127.0.0.1:3001:3001"
      ```
    - **A custom compose file** copied from an older `docker-compose.prod.yml`: copy the new `healthcheck` blocks and the `depends_on` condition, and remove the backend `ports` entry (or bind it to `127.0.0.1`).
-6. **New compose file.** `docker-compose.prod.yml` changed for the first time since v1.8.0 (step 5). Download it, then put your own changes back in it (ports, volumes, extra variables), and pin both images to `:1.12.0`:
+6. **New compose file.** `docker-compose.prod.yml` changed for the first time since v1.8.0 (step 5). Download it, then put your own changes back in it (ports, volumes, extra variables), and pin both images to `:1.12.0`. The new file runs the backend as `${CARTA_UID:-1000}:${CARTA_GID:-1000}`: if your file set `user:`, put the same values in `CARTA_UID` and `CARTA_GID` in `.env` instead.
 
    ```bash
    cp docker-compose.prod.yml docker-compose.prod.yml.bak
@@ -122,7 +123,7 @@ docker compose -f docker-compose.prod.yml up -d --wait
 5. `curl http://<host>:<frontend port>/api/health` answers `{"status":"ok","version":"…"}`.
 6. If the backend fails to start, the frontend is not started either: read `docker compose logs carta-cocktail-backend`, fix the cause, then run `docker compose up -d` again.
 7. With `SQLITE_WAL=false`, the startup log shows `SQLite journal mode: delete`.
-8. **Check the Apéritifs and Digestifs menus**. "Synchronize", or a bottle import, adds every bottle checked for the menu's type, **empty ones included** (hidden on the public page while empty). Creating or editing a bottle syncs that bottle only. Check both menus and remove, in the menu editor, the bottles that should not be there: a removed bottle stays out of that menu, and the "Removed bottles" section puts it back.
+8. **Check the Apéritifs and Digestifs menus**. A checked bottle now stays in them, or joins them, **empty or not** (hidden on the public page while empty). Creating or editing a bottle syncs that bottle only, and a bottle import adds the bottles it creates, empty ones included, without removing anything. Only "Synchronize" adds the checked bottles missing from its menu and removes the bottles that are not checked for its type, including bottles added by hand. Check both menus and remove, in the menu editor, the bottles that should not be there: a removed bottle stays out of that menu, and the "Removed bottles" section puts it back.
 
 **After restoring a backup made with an earlier version**: restart the backend before using bottles and menus (`docker compose -f docker-compose.prod.yml restart carta-cocktail-backend`). The new table is created by the migrations at the next start; until then, creating or editing a bottle checked as aperitif or digestif, the bottle import, "Synchronize", and removing or putting back a bottle on the Apéritifs and Digestifs menus answer 500.
 
@@ -130,6 +131,7 @@ docker compose -f docker-compose.prod.yml up -d --wait
 
 - **Rollback**: after going back to a version before this one (README › "Restoring a pre-migration backup"), which runs as root, run step 3 again before upgrading again.
 - An image older than this release has no `/api/health`: with the new compose file its backend stays `unhealthy` and the frontend never starts. When rolling back to an older image, go back to the previous compose file too (or drop the backend `healthcheck` and the `depends_on` condition). The same applies when using the new compose file with an older tag, or when taking it from `main` before the matching `latest` image is published.
+- With the current compose file and an image of v1.11.x or older, also remove the `user` line of the backend: those images start as root.
 
 The full procedure, with the `docker-compose.prod.yml.bak` kept at step 6: [README › "Running a previous version"](README.md#running-a-previous-version), then [README › "Restoring a pre-migration backup"](README.md#restoring-a-pre-migration-backup).
 

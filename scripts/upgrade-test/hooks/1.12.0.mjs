@@ -33,7 +33,7 @@ export default {
       step: 'Before 6',
       action: 'updateCompose',
       generation: '1.8.0',
-      note: 'new compose file (healthchecks, no backend port): not in the templates, which keep the 1.8.0 generation; own changes kept, images pinned',
+      note: 'new compose file (healthchecks, no backend port, user ${CARTA_UID:-1000}:${CARTA_GID:-1000}): not in the templates, which keep the 1.8.0 generation; the default user is the uid of USER node; own changes kept, images pinned',
     },
   ],
   after: [
