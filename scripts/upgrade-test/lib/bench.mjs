@@ -13,10 +13,7 @@ import { createAnonymizedCopy, fillVolume, injectDuplicateCategory, takeSnapshot
 import {
   containerLogs, containerMounts, containerState, docker, removeResources, RESOURCE_PREFIX,
 } from './docker.mjs';
-import {
-  allowedActionFailures, allowedFailures, failedGroups, isRequirementMet, markExpected, markExpectedActions,
-  unexpectedFailures,
-} from './expectations.mjs';
+import { failedGroups, isRequirementMet, judgeStep, unexpectedFailures } from './expectations.mjs';
 import { BACKEND_SERVICE, FRONTEND_SERVICE, Instance, waitForHttp, waitForStart } from './instance.mjs';
 import { hooksForJump, profileOf, releaseOf } from './versions.mjs';
 
@@ -115,7 +112,7 @@ export class BenchRun {
       : path.join(this.workDir, 'seed-data');
     const users = createAnonymizedCopy(this.fixtureDir, dataDir, { email: ADMIN_EMAIL, passwordHash });
     // Before the snapshot: the row counts of reference include the duplicate.
-    const injectedDuplicates = this.injectDuplicate ? this.addDuplicateCategory(dataDir) : undefined;
+    const injectedDuplicates = this.injectDuplicate ? injectDuplicateCategory(dataDir) : undefined;
     const photosDir = extractPhotos(path.join(this.fixtureDir, 'uploads.tgz'), this.workDir);
     this.baseline = takeSnapshot(dataDir);
     this.lastSnapshot = this.baseline;
@@ -137,13 +134,6 @@ export class BenchRun {
     this.instance.create();
     if (this.layout.database.kind === 'volume') fillVolume(this.instance.dataMount(), dataDir);
     this.placePhotos(photosDir);
-  }
-
-  /** --inject-duplicate: one category copied under a new id, so that v1.8.0 and later refuse the database. */
-  addDuplicateCategory(dataDir) {
-    const added = injectDuplicateCategory(dataDir);
-    if (added === 0) throw new Error('--inject-duplicate: the fixture has no category to duplicate');
-    return added;
   }
 
   placePhotos(photosDir) {
@@ -235,16 +225,17 @@ export class BenchRun {
     if (outcome.started) step.checks.push(this.shutdownRow(ctx, backend, Date.now() - stopStartedAt));
     step.checks.push(...this.databaseChecks(ctx, outcome, refusal));
 
-    const allowed = allowedFailures({
+    judgeStep(step, {
       mode: this.mode,
       profile: ctx.profile,
       crossedHooks: ctx.crossedHooks,
       unmetRequirements: unmet,
       layoutReasons: this.photoMountReasons(ctx.profile),
       injectedDuplicate: this.injectDuplicate,
+      started: outcome.started,
+      refusal,
+      previousFailedGroups: this.previousFailedGroups,
     });
-    markExpected(step.checks, { mode: this.mode, allowed, previousFailedGroups: this.previousFailedGroups });
-    markExpectedActions(step.actions, allowedActionFailures({ profile: ctx.profile, injectedDuplicate: this.injectDuplicate }));
     this.previousFailedGroups = failedGroups(step.checks);
     const unexpected = unexpectedFailures([...step.actions, ...step.checks]).length;
     this.log(`${title}: ${outcome.started ? 'started' : 'refused'}, ${unexpected} unexpected failure(s)`);

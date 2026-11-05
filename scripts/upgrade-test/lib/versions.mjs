@@ -1,5 +1,9 @@
 // Version strings, upgrade paths and the selection of the hook files that apply to a jump.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
+const HOOKS_DIR = fileURLToPath(new URL('../hooks/', import.meta.url));
 const VERSION_PATTERN = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/;
 export const LOCAL_STEP = 'local';
 
@@ -144,6 +148,12 @@ export function checkDuplicateInjectionPath(steps, hookFiles) {
   const since = sortedByRelease(hookFiles).find((hooks) => hooks.profile.uniqueCategoryNames).version;
   throw new Error(`--inject-duplicate needs a path that starts before v${since}: from v${since} on, `
     + `duplicate category names are refused, so the first start (${first.label}) would already fail`);
+}
+
+/** Every hook file of `hooks/` (one per release with required actions), in no particular order. */
+export async function loadHookFiles() {
+  const files = fs.readdirSync(HOOKS_DIR).filter((file) => file.endsWith('.mjs'));
+  return Promise.all(files.map(async (file) => (await import(pathToFileURL(path.join(HOOKS_DIR, file)))).default));
 }
 
 export function latestHookVersion(hookFiles) {

@@ -5,13 +5,13 @@ phase: C
 lane: ci
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-41]
 touches: [scripts/upgrade-test/]
 sources: []
-branch:
-pr:
+branch: chore/C-42-bench-inject-duplicate-require-refusal
+pr: #149
 ---
 
 ## Contexte
@@ -36,11 +36,11 @@ Relevé par la relecture de la PR #137 (points 1 à 4, non bloquants) :
 
 ## Critères d'acceptation
 
-- [ ] Un démarrage réussi sur une étape `uniqueCategoryNames` avec l'option donne 1 échec inattendu (test unitaire avec une étape simulée).
-- [ ] Une copie `checkDatabaseCopy` qui démarre avec l'option reste un échec inattendu ; une copie refusée reste attendue.
-- [ ] `loadHookFiles` n'existe plus qu'une fois.
-- [ ] `--path 1.4.0,local --layout friend --inject-duplicate`, naïf et conforme, sur une copie du jeu d'essai : mêmes résultats qu'avec C-41 (0 échec inattendu, refus reconnu).
-- [ ] Tests unitaires du banc (`node --test scripts/upgrade-test/test/*.test.mjs`) verts.
+- [x] Un démarrage réussi sur une étape `uniqueCategoryNames` avec l'option donne 1 échec inattendu (test unitaire avec une étape simulée).
+- [x] Une copie `checkDatabaseCopy` qui démarre avec l'option reste un échec inattendu ; une copie refusée reste attendue.
+- [x] `loadHookFiles` n'existe plus qu'une fois.
+- [x] `--path 1.4.0,local --layout friend --inject-duplicate`, naïf et conforme, sur une copie du jeu d'essai : mêmes résultats qu'avec C-41 (0 échec inattendu, refus reconnu).
+- [x] Tests unitaires du banc (`node --test scripts/upgrade-test/test/*.test.mjs`) verts.
 
 ## Tests à ajouter ou adapter
 
@@ -55,3 +55,5 @@ Relevé par la relecture de la PR #137 (points 1 à 4, non bloquants) :
 ## Journal
 
 - 2026-10-13 : tâche créée par la PR docs de suivi du lot E-13/B-12/C-41/D-30, à partir de la relecture de la PR #137 (C-41).
+- 2026-11-05 : fait (PR #149). Avec `--inject-duplicate`, chaque étape `uniqueCategoryNames` a une ligne `injected duplicate refused` (groupe `duplicateRefusal`, jamais autorisé) : OK si le backend refuse, KO « expected refusal missing » s'il démarre (`checkInjectedDuplicateRefused`, `lib/expectations.mjs`). `checkDatabaseCopy` renvoie `refused: true` quand la copie sort sans démarrer, et `markExpectedActions` ne marque plus que ce cas. `loadHookFiles` exporté par `lib/versions.mjs`, utilisé par `run.mjs` et `test/versions.test.mjs`. Jeu d'essai sans catégorie : refus de l'option (code 2) avec le contrôle de `Category_name_key`, par une seule lecture du helper (`readFixtureCategories`, `checkFixtureAcceptsDuplicate` dans `lib/database.mjs`), avant `resolveImages` ; la vérification dans `prepare()` disparaît. Banc sur une copie temporaire du jeu d'essai, layout `friend`, `1.4.0,local`, avec le `hooks/1.12.0.mjs` temporaire non commité : naïf et conforme OK, 0 échec inattendu, 2 échecs attendus chacun comme avec C-41 (759 lignes de référence, 761 après le saut, aucune perte), refus reconnu, ligne `injected duplicate refused` OK. Sonde de bout en bout (profil de 1.7.0 modifié pour l'essai, `1.4.0,1.7.0`, naïf) : démarrage, 1 échec inattendu `injected duplicate refused`, code 1. Copie sans catégorie : code 2 sans construire d'image.
+- 2026-11-05 : suites de la relecture de la PR #149 (points non bloquants). (1) `injected duplicate refused` n'est OK que pour le refus de la migration en échec (`FAILED_MIGRATION_REFUSAL`) ; le détail nomme le refus trouvé (`refused, but not by the failed migration: …` sinon). (2) Couverture sans Docker : `judgeStep` (`lib/expectations.mjs`) ajoute la ligne du doublon et marque les échecs attendus pour `runStep` ; `judgeDatabaseCopy` (`lib/actions.mjs`) construit le résultat de `checkDatabaseCopy` ; `runAction` accepte une table d'actions pour les tests. Retirer chacune de ces parties fait échouer un test. (3) Message de `checkFixtureAcceptsDuplicate` construit avec `UNIQUE_CATEGORY_NAME_INDEX`. Banc rejoué (même protocole) : `1.4.0,local` naïf et conforme OK, 0 échec inattendu, ligne OK `refused: "failed. The backend will not start."` ; `1.4.0,1.11.0` naïf : code 1, ligne KO `refused, but not by the failed migration: no known refusal message`, comme le README l'annonce pour v1.8.0 à v1.11.0.

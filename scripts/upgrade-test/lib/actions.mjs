@@ -1,5 +1,6 @@
 // Required actions of the release notes, as listed in the hook files. Each action returns
-// { status, detail }: status is done, skipped, manual, "not met" or failed.
+// { status, detail }: status is done, skipped, manual, "not met" or failed. A failed action that
+// was refused by the new image also returns `refused: true` (see markExpectedActions).
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -132,6 +133,27 @@ function copyDatabase(ctx) {
   return { status: 'done', detail: `${files} database files (${DB_FILE_NAME}*) copied out of ${source}` };
 }
 
+/**
+ * Result of the database copy check: refused (`refused: true`), or started with every expected log
+ * line and an up-to-date migration status. `readMigrateStatus` is only called on a started copy.
+ */
+export function judgeDatabaseCopy(outcome, expectedStartLogs, readMigrateStatus) {
+  if (!outcome.started) {
+    return {
+      status: 'failed',
+      refused: true,
+      detail: `the copy was refused (exit code ${outcome.exitCode ?? 'none'}): the notes say not to upgrade`,
+    };
+  }
+  const lines = checkLogLines(outcome.logs, expectedStartLogs);
+  const found = lines.filter((line) => line.status === 'ok').length;
+  const upToDate = readMigrateStatus().includes(MIGRATE_STATUS_OK);
+  return {
+    status: found === lines.length && upToDate ? 'done' : 'failed',
+    detail: `copy started, ${found}/${lines.length} expected log lines, migrate status ${upToDate ? 'up to date' : 'NOT up to date'}`,
+  };
+}
+
 /** Starts the new backend image on a second copy of the database, as the notes describe. */
 async function checkDatabaseCopy(ctx) {
   const checkDir = path.join(ctx.workDir, `db-check-${ctx.target.label}`);
@@ -143,18 +165,8 @@ async function checkDatabaseCopy(ctx) {
     ctx.target.images.backend]);
   try {
     const outcome = await waitForStart(name, ctx.timeoutMs);
-    if (!outcome.started) {
-      return { status: 'failed', detail: `the copy was refused (exit code ${outcome.exitCode ?? 'none'}): the notes say not to upgrade` };
-    }
-    const lines = checkLogLines(outcome.logs, ctx.expectedStartLogs);
-    const found = lines.filter((line) => line.status === 'ok').length;
-    const status = docker(['exec', name, 'npx', 'prisma', 'migrate', 'status'], { allowFailure: true }).stdout;
-    const upToDate = status.includes(MIGRATE_STATUS_OK);
-    const ok = found === lines.length && upToDate;
-    return {
-      status: ok ? 'done' : 'failed',
-      detail: `copy started, ${found}/${lines.length} expected log lines, migrate status ${upToDate ? 'up to date' : 'NOT up to date'}`,
-    };
+    return judgeDatabaseCopy(outcome, ctx.expectedStartLogs,
+      () => docker(['exec', name, 'npx', 'prisma', 'migrate', 'status'], { allowFailure: true }).stdout);
   } finally {
     docker(['rm', '--force', '--volumes', name], { allowFailure: true });
   }
@@ -224,13 +236,13 @@ const ACTIONS = {
   manual,
 };
 
-export async function runAction(ctx, hook) {
-  const run = ACTIONS[hook.action];
+/** Runs one required action of a hook file. Tests pass their own `actions` to run without Docker. */
+export async function runAction(ctx, hook, actions = ACTIONS) {
+  const run = actions[hook.action];
   if (!run) throw new Error(`Unknown action "${hook.action}" in the hooks of v${ctx.hooksVersion}`);
   const result = { step: `v${ctx.hooksVersion} ${hook.step}`, action: hook.action, note: hook.note };
   try {
-    const { status, detail } = await run(ctx, hook);
-    return { ...result, status, detail };
+    return { ...result, ...await run(ctx, hook) };
   } catch (error) {
     return { ...result, status: 'failed', detail: error.message };
   }
