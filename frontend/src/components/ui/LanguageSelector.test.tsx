@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '../../test/test-utils';
 import userEvent from '@testing-library/user-event';
 import LanguageSelector from './LanguageSelector';
+import { LANGUAGE_STORAGE_KEY } from '../../utils/languageChoice';
 
 // Override the global i18n mock for this file to track changeLanguage and vary the detected language
 const mockChangeLanguage = vi.fn();
@@ -114,6 +115,18 @@ describe('LanguageSelector', () => {
     await user.click(screen.getByText('English (UK)'));
 
     expect(mockChangeLanguage).toHaveBeenCalledWith('en-GB');
+  });
+
+  // The detector stores nothing: the selector keeps the choice for the next visits.
+  it('stores the picked language, and only a picked one', async () => {
+    const user = userEvent.setup();
+    render(<LanguageSelector />);
+    await user.click(getLanguageButton());
+    expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBeNull();
+
+    await user.click(screen.getByText('English (UK)'));
+
+    expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('en-GB');
   });
 
   it('should call changeLanguage when selecting a language', async () => {

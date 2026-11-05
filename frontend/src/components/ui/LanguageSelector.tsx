@@ -1,5 +1,6 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { storeLanguageChoice } from '../../utils/languageChoice';
 import { FALLBACK_LANGUAGE, LANGUAGE_NAMES, getBaseLanguage } from '../../utils/localization';
 import { cx } from './classNames';
 import Icon from './Icon';
@@ -67,8 +68,8 @@ export default function LanguageSelector() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // The chosen code, not resolvedLanguage: English (UK) resolves to the messages of "en".
-  // Defensive: i18n config already yields a supported code, but never trust a regional or unknown
-  // one here. Fall back to English like i18next does, not to the first entry of the list.
+  // Defensive: i18n config already yields a supported code, but never trust an unsupported regional
+  // or unknown code here. Fall back to English like i18next does, not to the first entry of the list.
   const languageCode = i18n.language ?? FALLBACK_LANGUAGE;
   const currentLanguage =
     languages.find(lang => lang.code === languageCode) ??
@@ -81,6 +82,8 @@ export default function LanguageSelector() {
   }, [isOpen]);
 
   const handleLanguageChange = (langCode: string) => {
+    // Only a picked language is stored: a detected one follows the browser (see languageChoice).
+    storeLanguageChoice(langCode);
     i18n.changeLanguage(langCode);
     // Menu button pattern: the chosen item disappears, the focus goes back to the button.
     closeAndFocusTrigger();

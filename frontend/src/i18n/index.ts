@@ -4,6 +4,7 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 import en from './locales/public/en.json';
 import fr from './locales/public/fr.json';
 import { FALLBACK_LANGUAGE, getBaseLanguage } from '../utils/localization';
+import { LANGUAGE_STORAGE_KEY, migrateLegacyLanguage } from '../utils/languageChoice';
 
 // Languages with their own message files. A regional variant without files ("en-GB") is only
 // added to SUPPORTED_LANGUAGES: i18next serves it the messages of its base language.
@@ -33,6 +34,9 @@ const PUBLIC_RESOURCES = {
   fr: { translation: fr },
 } satisfies Record<TranslatedLanguage, { translation: typeof en }>;
 
+// Before the detector reads the stored choice.
+migrateLegacyLanguage();
+
 // Registered before init so the language picked by the detector is applied too.
 i18n.on('languageChanged', (language) => {
   document.documentElement.lang = language || FALLBACK_LANGUAGE;
@@ -46,8 +50,12 @@ i18n
     detection: {
       // Default order without 'htmlTag' and 'cookie'. <html lang> is written by the listener above,
       // so reading it back would make an unsupported browser language ("de") inherit the previous
-      // choice. No cookie is ever written (the choice is cached in localStorage only).
+      // choice. No cookie is ever written.
       order: ['querystring', 'localStorage', 'sessionStorage', 'navigator'],
+      // The detector caches nothing: only the language picked in the selector is stored
+      // (utils/languageChoice.ts), so a language nobody picked is detected again at each start.
+      lookupLocalStorage: LANGUAGE_STORAGE_KEY,
+      caches: [],
       // Detected codes must match supportedLngs exactly: i18next would refuse "fr-FR".
       convertDetectedLanguage: toSupportedLanguage,
     },
