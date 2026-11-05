@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import AdmZip from 'adm-zip';
 import {
+  decodeCsvBytes,
   ImportParseError,
   MAX_ZIP_ENTRY_BYTES,
   parseCsvBottles,
@@ -10,6 +11,7 @@ import {
   stripBom,
 } from './bottlesImport';
 import { MAX_IMPORT_ROWS } from '../validation/bottleImport';
+import { windows1252Bytes } from '../test/windows1252';
 
 const BOM = '\uFEFF';
 const HEADER = 'name,categoryName,categoryType,capacityMl,quantity,remainingPercent,alcoholPercentage,purchasePrice,location,openedAt,isApero,isDigestif';
@@ -31,6 +33,25 @@ function parseError(parse: () => unknown): ImportParseError {
   }
   throw new Error('expected an ImportParseError');
 }
+
+describe('decodeCsvBytes', () => {
+  const ACCENTS = 'é è à œ €';
+
+  it('reads a Windows-1252 file, whose accents are not valid UTF-8', () => {
+    expect(decodeCsvBytes(windows1252Bytes(ACCENTS))).toBe(ACCENTS);
+  });
+
+  it('reads a UTF-8 file as UTF-8, although its bytes are also valid Windows-1252', () => {
+    // As Windows-1252, the UTF-8 bytes of "é" (C3 A9) would read "Ã©"
+    expect(decodeCsvBytes(Buffer.from(ACCENTS))).toBe(ACCENTS);
+    expect(decodeCsvBytes(Buffer.from(BOM + ACCENTS))).toBe(BOM + ACCENTS);
+  });
+
+  it('keeps reading a file with a UTF-8 BOM as UTF-8, even with a byte that is not UTF-8', () => {
+    const file = Buffer.concat([Buffer.from(`${BOM}Caf`), windows1252Bytes('é')]);
+    expect(decodeCsvBytes(file)).toBe(`${BOM}Caf\uFFFD`);
+  });
+});
 
 describe('stripBom', () => {
   it('removes a leading byte order mark only', () => {
@@ -279,6 +300,18 @@ describe('parseImportFile', () => {
     expect(parseImportFile('bottles.csv', file, 'en').bottles).toHaveLength(1);
   });
 
+  it('reads a CSV saved by Excel in Windows-1252, without losing its accents', () => {
+    const file = windows1252Bytes('name;categoryName;capacityMl;location;purchasePrice\r\n'
+      + 'Crème de cassis;Liqueur à l\'œuf;700;Cellier 20 €;12,5\r\n');
+
+    const payload = parseImportFile('bottles.csv', file, 'en');
+
+    expect(payload.errors).toEqual([]);
+    expect(payload.bottles).toMatchObject([
+      { name: 'Crème de cassis', categoryName: 'Liqueur à l\'œuf', location: 'Cellier 20 €', purchasePrice: 12.5 },
+    ]);
+  });
+
   it('refuses a JSON file that does not parse', () => {
     expect(parseError(() => parseImportFile('bottles.json', Buffer.from('{ nope'), 'en')).code).toBe('invalidJson');
   });
@@ -309,6 +342,18 @@ describe('parseZipBottles', () => {
       { name: 'Rhum', type: 'SPIRIT', desiredStock: 3, minimumPercent: 25, nameTranslations: { fr: 'Rhum' } },
     ]);
     expect(payload.errors).toEqual([{ source: 'categories', line: 3, field: 'desiredStock', code: 'outOfRange' }]);
+  });
+
+  it('reads bottles.csv and categories.csv saved in Windows-1252', () => {
+    const zip = zipOf({
+      'bottles.csv': windows1252Bytes(csvOf('Crème,Liqueur à l\'œuf,SPIRIT,700,1,,,,Cellier €,,,')),
+      'categories.csv': windows1252Bytes('name;type;desiredStock\nLiqueur à l\'œuf;SPIRIT;2\nLiqueur de café;SPIRIT;1'),
+    });
+
+    const payload = parseZipBottles(zip, 'en');
+
+    expect(payload.bottles).toMatchObject([{ name: 'Crème', categoryName: 'Liqueur à l\'œuf', location: 'Cellier €' }]);
+    expect(payload.categories.map((c) => c.name)).toEqual(['Liqueur à l\'œuf', 'Liqueur de café']);
   });
 
   it('ignores a categories.csv without a name column', () => {
