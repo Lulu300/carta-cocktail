@@ -6,8 +6,9 @@
 # Start the stack from docker-compose.yml in a dedicated compose project, then run this
 # script with the same environment:
 #   export COMPOSE_PROJECT_NAME=carta-smoke JWT_SECRET=$(openssl rand -hex 32) ADMIN_PASSWORD=$(openssl rand -hex 16)
-#   docker compose up -d --build --wait && ./scripts/smoke/smoke.sh
-#   docker compose down -v
+#   docker compose -p carta-smoke up -d --build --wait && ./scripts/smoke/smoke.sh
+#   docker compose -p carta-smoke down -v --remove-orphans --rmi local
+# All in the same shell call: step 10 reads COMPOSE_PROJECT_NAME.
 # Never the default project (the folder name): it is the local stack of a plain
 # `docker compose up`. `down -v` would delete its database and photos, the script would add
 # its test cocktail there, and the login fails when that admin was created with another

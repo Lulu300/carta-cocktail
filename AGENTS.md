@@ -32,10 +32,10 @@ The machine is shared with other projects and its disk fills up. Before its fina
   - local images: `carta-<task id in lowercase>-<name>`, or `carta-review-<PR number>` for a reviewer.
   The upgrade bench already prefixes its containers, volumes and networks with `carta-ut-<run id>` (`scripts/upgrade-test/README.md`).
 - **Temporary files**: delete the files and folders you created, copies of a test fixture included, by their exact paths. Never with a pattern such as `carta.*` or `carta-uploads-*`: another session may be using a file with the same prefix.
-- **Docker**: pass `-p <project>` to every `docker compose` command, `down` included. Variables exported in one shell call are gone in the next one, and a `down -v` on the default project would delete the local stack's data. End with `docker compose -p <project> down -v --remove-orphans --rmi local`. Then remove, by name or by id, only the images you built or pulled for the task:
+- **Docker**: pass `-p <project>` to every `docker compose` command, `down` included. Variables exported in one shell call are gone in the next one, and a `down -v` on the default project would delete the local stack's data. End with `docker compose -p <project> down -v --remove-orphans --rmi local`. Then remove, by name or by id, only the images you built or pulled for the task, except the images shared by the batch that the coordinator removes (listed below):
   - images named `carta-*`;
   - `ghcr.io/lulu300/carta-cocktail/*` images, including the `<none>` ones the bench pulls by digest.
-  Never remove a base image (`node`, `nginx`, `alpine`…) and never use `-f`. Then check with name filters, because other projects' containers show in the same lists: `docker ps -a --filter name=carta`, `docker volume ls --filter name=carta`, `docker network ls --filter name=carta`, and `docker images | grep -E 'carta|<none>'`.
+  Never remove a base image (`node`, `nginx`, `alpine`…) and never use `-f`. Then check with name filters, because other projects' resources show in the same lists: `docker ps -a --filter name=carta`, `docker volume ls --filter name=carta`, `docker network ls --filter name=carta`, and `docker images -a --digests --filter reference='carta*' --filter reference='ghcr.io/lulu300/carta-cocktail/*'`. An untagged image these filters do not show is not yours: leave it.
 - **Upgrade bench**: a run removes its own resources, also when interrupted with Ctrl+C. After a `--keep` run or a `kill -9`, remove that run's `carta-ut-<run id>` containers, volumes and networks by name. `run.mjs --clean-all` removes those of every run: only the coordinator uses it, when no bench is running. The helper image `carta-upgrade-test-sqlite:1` stays.
 - **Never**:
   - any `docker … prune` or `npm cache clean`;
@@ -46,7 +46,7 @@ The machine is shared with other projects and its disk fills up. Before its fina
 - **The coordinator, at the end of a batch**:
   - removes the batch's worktrees and branches, and empties its scratchpad;
   - removes the images shared by the batch: `carta-upgrade-test/*:local`, the `ghcr.io/lulu300/carta-cocktail/*` images pulled for the bench, and the reviewers' `carta-review-*`;
-  - removes the empty `carta-uploads-*` folders older than a day, which interrupted backend test runs leave in the system temp folder;
+  - removes the `carta-uploads-*` folders older than a day, which interrupted backend test runs leave in the system temp folder;
   - runs the Docker check above again.
   A worktree, container or image that another running session still uses stays.
 
@@ -111,7 +111,7 @@ Coverage is enforced automatically by CI. Run `npm test -- --coverage` in either
 
 **Smoke** (`.github/workflows/smoke.yml`) — runs on PRs to `main`/`develop` and on demand:
 - Builds and starts `docker-compose.yml`, then runs `scripts/smoke/smoke.sh` through nginx: login, 2.4 MB photo upload, photo still served after the backend container is recreated, backup export
-- Locally, always in a dedicated compose project: `export COMPOSE_PROJECT_NAME=carta-smoke JWT_SECRET=$(openssl rand -hex 32) ADMIN_PASSWORD=$(openssl rand -hex 16)`, then `docker compose up -d --build --wait && ./scripts/smoke/smoke.sh`, then `docker compose -p carta-smoke down -v --remove-orphans --rmi local`, all in the same shell call (`smoke.sh` reads `COMPOSE_PROJECT_NAME` to recreate the backend). The default project is your local stack: `down -v` would delete its data (see the header of `smoke.sh`)
+- Locally, always in a dedicated compose project: `export COMPOSE_PROJECT_NAME=carta-smoke JWT_SECRET=$(openssl rand -hex 32) ADMIN_PASSWORD=$(openssl rand -hex 16)`, then `docker compose -p carta-smoke up -d --build --wait && ./scripts/smoke/smoke.sh`, then `docker compose -p carta-smoke down -v --remove-orphans --rmi local`, all in the same shell call (`smoke.sh` reads `COMPOSE_PROJECT_NAME` to recreate the backend). The default project is your local stack: `down -v` would delete its data (see the header of `smoke.sh`)
 
 **Release** (`.github/workflows/release.yml`) — runs on tag push `v*`:
 - Builds backend and frontend Docker images
