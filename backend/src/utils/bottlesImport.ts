@@ -248,9 +248,12 @@ const COLUMN_UNITS: Partial<Record<string, ColumnUnit>> = {
   minimumPercent: '%',
 };
 
-/** `700 ml`, `700ML`, `40 %`, `25,90 €`: the number without the unit, or the text unchanged. */
+/** `700 ml`, `700ML`, `40 %`, `25,90 €`, `€25.00`: the number without the unit, or the text unchanged. */
 function stripUnit(text: string, unit: ColumnUnit | undefined): string {
-  if (unit === undefined || !text.toLowerCase().endsWith(unit)) return text;
+  if (unit === undefined) return text;
+  // Excel in an English locale writes the euro sign before the number
+  if (unit === '€' && text.startsWith(unit)) return text.slice(unit.length).trimStart();
+  if (!text.toLowerCase().endsWith(unit)) return text;
   return text.slice(0, -unit.length).trimEnd();
 }
 

@@ -100,8 +100,18 @@ describe('parseCsvBottles', () => {
       });
     });
 
+    it.each(['€25.00', '€ 25.00', `€${NBSP}25,00`])('reads the euro sign Excel in English writes first: %s', (price) => {
+      const payload = unitRow(`700;;;${price}`);
+
+      expect(payload.errors).toEqual([]);
+      expect(payload.bottles[0].purchasePrice).toBe(25);
+    });
+
     it.each([
       ['another unit of volume', '70 cl;;;', 'capacityMl'],
+      ['English thousands separators after a leading euro sign', '700;;;€1,234.50', 'purchasePrice'],
+      ['a euro sign on both sides', '700;;;€25 €', 'purchasePrice'],
+      ['a leading percent sign', '700;;%40;', 'alcoholPercentage'],
       ['a percent in the price column', '700;;;40 %', 'purchasePrice'],
       ['a currency in a percent column', '700;;25 €;', 'alcoholPercentage'],
       ['a unit without a number', '700;;;€', 'purchasePrice'],
