@@ -239,6 +239,16 @@ export interface RecipeLineSource {
   quantity?: number;
 }
 
+/** The recipe line of a response with the given source type; fails the test when there is none. */
+export function lineOfSource<Line extends { sourceType: string }>(
+  lines: Line[],
+  sourceType: RecipeLineSource['sourceType'],
+): Line {
+  const line = lines.find((candidate) => candidate.sourceType === sourceType);
+  if (!line) throw new Error(`No ${sourceType} line in the response`);
+  return line;
+}
+
 /** Nested create of recipe lines, in the order of `sources`, all in the given unit. */
 function recipeLinesData(unitId: number, sources: RecipeLineSource[]) {
   return {

@@ -2,14 +2,36 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
   request, authHeader, getAuthToken, prisma, seedCocktail, seedCategory, seedBottle, seedUnit, seedIngredient,
-  seedMenu,
+  seedMenu, lineOfSource,
 } from '../test/helpers';
+import type { CocktailExportFile } from '../services/cocktail/cocktailExport';
 
 beforeAll(async () => { await setupTestDatabase(); });
 afterAll(async () => { await teardownTestDatabase(); });
 beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
 
 const PRIVATE_BOTTLE_FIELDS = ['purchasePrice', 'openedAt', 'remainingPercent'];
+
+/** The fields of a recipe line of GET /api/public/cocktails/:id these tests read. */
+interface PublicRecipeLine {
+  sourceType: string;
+  unit: { abbreviation: string };
+  bottle: { name: string; category: { name: string } } | null;
+  category: { name: string } | null;
+  ingredient: { name: string } | null;
+}
+
+/** A recipe line of GET /api/public/cocktails/:id for the admin, with its preferred bottles. */
+interface AdminRecipeLine {
+  sourceType: string;
+  preferredBottles: { bottle: { name: string } }[];
+}
+
+/** The names a GET /api/public/menus/:slug body lists, as these tests read them. */
+interface PublicMenuNames {
+  cocktails: { cocktail: { name: string } }[];
+  bottles: { bottle: { name: string } }[];
+}
 
 /** Put a cocktail in a menu, creating the menu on first use. */
 async function addCocktailToMenu(
@@ -187,8 +209,9 @@ describe('GET /api/public/menus/:slug', () => {
     for (const headers of [{}, authHeader()]) {
       const res = await request.get('/api/public/menus/mixed').set(headers);
       expect(res.status).toBe(200);
-      expect(res.body.cocktails.map((mc: any) => mc.cocktail.name)).toEqual(['Visible']);
-      expect(res.body.bottles.map((mb: any) => mb.bottle.name)).toEqual(['Visible bottle']);
+      const { cocktails, bottles }: PublicMenuNames = res.body;
+      expect(cocktails.map((mc) => mc.cocktail.name)).toEqual(['Visible']);
+      expect(bottles.map((mb) => mb.bottle.name)).toEqual(['Visible bottle']);
     }
   });
 
@@ -315,7 +338,8 @@ describe('GET /api/public/cocktails/:id', () => {
     const admin = await request.get(`/api/public/cocktails/${cocktail.id}`).set(authHeader());
     expect(admin.status).toBe(200);
     expect(admin.body.notes).toBe('Use the good rum');
-    const categoryIngredient = admin.body.ingredients.find((i: any) => i.sourceType === 'CATEGORY');
+    const adminLines: AdminRecipeLine[] = admin.body.ingredients;
+    const categoryIngredient = lineOfSource(adminLines, 'CATEGORY');
     expect(categoryIngredient.preferredBottles[0].bottle.name).toBe('Havana Club');
     expectNoPrivateBottleFields(admin.body);
   });
@@ -468,7 +492,7 @@ describe('GET /api/public/cocktails/:id/export - all 3 source types', () => {
     expect(res.status).toBe(200);
     expect(res.body.version).toBe(1);
 
-    const c = res.body.cocktail;
+    const c: CocktailExportFile['payload']['cocktail'] = res.body.cocktail;
     expect(c.name).toBe('Rich Mojito');
     expect(c.description).toBe('A classic mojito');
     expect(c.notes).toBe('Shake well');
@@ -481,27 +505,24 @@ describe('GET /api/public/cocktails/:id/export - all 3 source types', () => {
     expect(c.instructions[0].text).toBe('Muddle the lime.');
 
     // Find the BOTTLE ingredient
-    const bottleIngResult = c.ingredients.find((i: any) => i.sourceType === 'BOTTLE');
-    expect(bottleIngResult).toBeDefined();
+    const bottleIngResult = lineOfSource(c.ingredients, 'BOTTLE');
     expect(bottleIngResult.sourceName).toBe('Havana Club 3 ans');
     expect(bottleIngResult.sourceDetail.categoryName).toBe('Rum');
     expect(bottleIngResult.sourceDetail.categoryType).toBe('SPIRIT');
 
     // Find the CATEGORY ingredient
-    const categoryIngResult = c.ingredients.find((i: any) => i.sourceType === 'CATEGORY');
-    expect(categoryIngResult).toBeDefined();
+    const categoryIngResult = lineOfSource(c.ingredients, 'CATEGORY');
     expect(categoryIngResult.sourceName).toBe('Rum');
     expect(categoryIngResult.sourceDetail.type).toBe('SPIRIT');
     // Desired stock is inventory data: never exported
     expect(categoryIngResult.sourceDetail).not.toHaveProperty('desiredStock');
     // Preferred bottles mapped
     expect(categoryIngResult.preferredBottles).toHaveLength(1);
-    expect(categoryIngResult.preferredBottles[0].name).toBe('Havana Club 3 ans');
-    expect(categoryIngResult.preferredBottles[0].categoryName).toBe('Rum');
+    expect(categoryIngResult.preferredBottles?.[0].name).toBe('Havana Club 3 ans');
+    expect(categoryIngResult.preferredBottles?.[0].categoryName).toBe('Rum');
 
     // Find the INGREDIENT ingredient
-    const ingredientIngResult = c.ingredients.find((i: any) => i.sourceType === 'INGREDIENT');
-    expect(ingredientIngResult).toBeDefined();
+    const ingredientIngResult = lineOfSource(c.ingredients, 'INGREDIENT');
     expect(ingredientIngResult.sourceName).toBe('Fresh Lime Juice');
     expect(ingredientIngResult.sourceDetail.icon).toBe('lime');
   });
@@ -556,21 +577,18 @@ describe('GET /api/public/cocktails/:id - rich data with all source types', () =
     expect(res.status).toBe(200);
     expect(res.body.name).toBe('Gin Tonic Deluxe');
 
-    const ingredients = res.body.ingredients;
+    const ingredients: PublicRecipeLine[] = res.body.ingredients;
     expect(ingredients).toHaveLength(3);
 
-    const bottleIng = ingredients.find((i: any) => i.sourceType === 'BOTTLE');
-    expect(bottleIng).toBeDefined();
-    expect(bottleIng.bottle.name).toBe('Hendricks');
-    expect(bottleIng.bottle.category.name).toBe('Gin');
+    const bottleIng = lineOfSource(ingredients, 'BOTTLE');
+    expect(bottleIng.bottle?.name).toBe('Hendricks');
+    expect(bottleIng.bottle?.category.name).toBe('Gin');
 
-    const categoryIng = ingredients.find((i: any) => i.sourceType === 'CATEGORY');
-    expect(categoryIng).toBeDefined();
-    expect(categoryIng.category.name).toBe('Gin');
+    const categoryIng = lineOfSource(ingredients, 'CATEGORY');
+    expect(categoryIng.category?.name).toBe('Gin');
 
-    const ingredientIng = ingredients.find((i: any) => i.sourceType === 'INGREDIENT');
-    expect(ingredientIng).toBeDefined();
-    expect(ingredientIng.ingredient.name).toBe('Tonic Water');
+    const ingredientIng = lineOfSource(ingredients, 'INGREDIENT');
+    expect(ingredientIng.ingredient?.name).toBe('Tonic Water');
     expect(ingredientIng.unit.abbreviation).toBe('ml');
   });
 });

@@ -6,8 +6,10 @@ import { config } from '../config';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
   request, authHeader, prisma, seedCategory, seedUnit, seedBottle, seedIngredient, seedCocktail,
-  seedFullCocktail,
+  seedFullCocktail, lineOfSource,
 } from '../test/helpers';
+import type { CocktailIngredient } from '../generated/prisma/client';
+import type { CocktailExportFile } from '../services/cocktail/cocktailExport';
 
 beforeAll(async () => { await setupTestDatabase(); });
 afterAll(async () => { await teardownTestDatabase(); });
@@ -257,11 +259,17 @@ describe('PUT /api/cocktails/:id', () => {
     return { id: res.body.id as number, unit };
   }
 
-  function expectRecipeIntact(body: any) {
+  /** The fields of a GET /api/cocktails/:id body that expectRecipeIntact reads. */
+  interface RecipeBody {
+    ingredients: { sourceType: string; preferredBottles: unknown[] }[];
+    instructions: { text: string }[];
+  }
+
+  function expectRecipeIntact(body: RecipeBody) {
     expect(body.ingredients).toHaveLength(2);
     expect(body.ingredients[0].sourceType).toBe('BOTTLE');
     expect(body.ingredients[1].preferredBottles).toHaveLength(1);
-    expect(body.instructions.map((i: any) => i.text)).toEqual(['Shake', 'Strain']);
+    expect(body.instructions.map((i) => i.text)).toEqual(['Shake', 'Strain']);
   }
 
   it('should keep ingredients, instructions, tags and preferred bottles on a partial update', async () => {
@@ -423,7 +431,8 @@ describe('PUT /api/cocktails/:id - recipe defects already stored', () => {
   // The recipe lines as CocktailFormPage loads them and sends them back on save
   async function formLines(id: number) {
     const res = await request.get(`/api/cocktails/${id}`).set(authHeader());
-    return res.body.ingredients.map((ing: any) => ({
+    const lines: CocktailIngredient[] = res.body.ingredients;
+    return lines.map((ing) => ({
       sourceType: ing.sourceType,
       bottleId: ing.sourceType === 'BOTTLE' ? ing.bottleId : null,
       categoryId: ing.sourceType === 'CATEGORY' ? ing.categoryId : null,
@@ -630,27 +639,24 @@ describe('GET /api/cocktails/:id/export - rich data with all source types', () =
     expect(res.body.cocktail.notes).toBe('Shake hard');
     expect(res.body.cocktail.tags).toEqual(['classic', 'fruity']);
 
-    const ings = res.body.cocktail.ingredients;
+    const ings: CocktailExportFile['payload']['cocktail']['ingredients'] = res.body.cocktail.ingredients;
     expect(ings).toHaveLength(3);
 
     // BOTTLE branch
-    const bottleIng = ings.find((i: any) => i.sourceType === 'BOTTLE');
-    expect(bottleIng).toBeDefined();
+    const bottleIng = lineOfSource(ings, 'BOTTLE');
     expect(bottleIng.sourceName).toBe('Havana 3 Ans');
     expect(bottleIng.sourceDetail.categoryName).toBe('Rum');
     expect(bottleIng.sourceDetail.categoryType).toBe('SPIRIT');
 
     // CATEGORY branch
-    const catIng = ings.find((i: any) => i.sourceType === 'CATEGORY');
-    expect(catIng).toBeDefined();
+    const catIng = lineOfSource(ings, 'CATEGORY');
     expect(catIng.sourceName).toBe('Rum');
     expect(catIng.sourceDetail.type).toBe('SPIRIT');
     expect(catIng.preferredBottles).toHaveLength(1);
-    expect(catIng.preferredBottles[0].name).toBe('Havana 3 Ans');
+    expect(catIng.preferredBottles?.[0].name).toBe('Havana 3 Ans');
 
     // INGREDIENT branch
-    const ingIng = ings.find((i: any) => i.sourceType === 'INGREDIENT');
-    expect(ingIng).toBeDefined();
+    const ingIng = lineOfSource(ings, 'INGREDIENT');
     expect(ingIng.sourceName).toBe('Lime Juice');
     expect(ingIng.sourceDetail).toHaveProperty('icon');
   });

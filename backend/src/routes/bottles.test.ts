@@ -5,6 +5,8 @@ import {
   request, authHeader, prisma, seedCategory, seedBottle, seedUnit, seedCocktailUsing,
   seedMenu, seedMenuSection, addBottleToMenu, excludeBottleFromMenu, findSystemMenu,
 } from '../test/helpers';
+import type { BottlesExportPayload } from '../utils/bottlesExport';
+import type { ImportCategoryRecord } from '../utils/bottlesImport';
 
 beforeAll(async () => { await setupTestDatabase(); });
 afterAll(async () => { await teardownTestDatabase(); });
@@ -480,7 +482,8 @@ describe('GET /api/bottles/export', () => {
 
     const res = await request.get('/api/bottles/export').set(authHeader());
     expect(res.body.bottles).toHaveLength(2);
-    const sorted = [...res.body.bottles].sort((a: any, b: any) => b.remainingPercent - a.remainingPercent);
+    const { bottles }: BottlesExportPayload = res.body;
+    const sorted = [...bottles].sort((a, b) => b.remainingPercent - a.remainingPercent);
     expect(sorted[0].remainingPercent).toBe(100);
     expect(sorted[0].quantity).toBe(1);
     expect(sorted[1].remainingPercent).toBe(50);
@@ -746,8 +749,9 @@ describe('POST /api/bottles/import/preview', () => {
     expect(res.body.payload.bottles).toHaveLength(1);
     // categories.csv overrides — Rhum's desiredStock from the explicit file (3), plus Gin
     expect(res.body.payload.categories).toHaveLength(2);
-    const rhum = res.body.payload.categories.find((c: any) => c.name === 'Rhum');
-    expect(rhum.desiredStock).toBe(3);
+    const categories: ImportCategoryRecord[] = res.body.payload.categories;
+    const rhum = categories.find((c) => c.name === 'Rhum');
+    expect(rhum?.desiredStock).toBe(3);
   });
 
   it('should reject a ZIP without bottles.csv or bottles.json', async () => {

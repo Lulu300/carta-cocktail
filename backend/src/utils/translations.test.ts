@@ -10,16 +10,21 @@ describe('parseNameTranslations', () => {
     expect(parseNameTranslations(undefined)).toBeUndefined();
   });
 
+  it('should return other values than objects and arrays unchanged', () => {
+    expect(parseNameTranslations('Rum')).toBe('Rum');
+    expect(parseNameTranslations(42)).toBe(42);
+  });
+
   it('should parse a valid JSON string in nameTranslations', () => {
     const obj = { name: 'Vodka', nameTranslations: '{"fr":"Vodka","en":"Vodka"}' };
     const result = parseNameTranslations(obj);
-    expect(result.nameTranslations).toEqual({ fr: 'Vodka', en: 'Vodka' });
+    expect(result).toEqual({ name: 'Vodka', nameTranslations: { fr: 'Vodka', en: 'Vodka' } });
   });
 
   it('should set nameTranslations to null on invalid JSON', () => {
     const obj = { name: 'Test', nameTranslations: 'invalid-json' };
     const result = parseNameTranslations(obj);
-    expect(result.nameTranslations).toBeNull();
+    expect(result).toEqual({ name: 'Test', nameTranslations: null });
   });
 
   it('should handle arrays of objects recursively', () => {
@@ -28,8 +33,10 @@ describe('parseNameTranslations', () => {
       { name: 'B', nameTranslations: '{"fr":"B-fr"}' },
     ];
     const result = parseNameTranslations(arr);
-    expect(result[0].nameTranslations).toEqual({ fr: 'A-fr' });
-    expect(result[1].nameTranslations).toEqual({ fr: 'B-fr' });
+    expect(result).toEqual([
+      { name: 'A', nameTranslations: { fr: 'A-fr' } },
+      { name: 'B', nameTranslations: { fr: 'B-fr' } },
+    ]);
   });
 
   it('should recurse into known relation fields', () => {
@@ -40,8 +47,12 @@ describe('parseNameTranslations', () => {
       category: { name: 'Spirit', nameTranslations: '{"fr":"Spiritueux"}' },
     };
     const result = parseNameTranslations(obj);
-    expect(result.unit.nameTranslations).toEqual({ fr: 'centilitre' });
-    expect(result.category.nameTranslations).toEqual({ fr: 'Spiritueux' });
+    expect(result).toEqual({
+      name: 'Cocktail',
+      nameTranslations: null,
+      unit: { name: 'cl', nameTranslations: { fr: 'centilitre' } },
+      category: { name: 'Spirit', nameTranslations: { fr: 'Spiritueux' } },
+    });
   });
 
   it('should not modify objects without nameTranslations', () => {
@@ -63,13 +74,22 @@ describe('parseNameTranslations', () => {
       ],
     };
     const result = parseNameTranslations(obj);
-    expect(result.ingredients[0].nameTranslations).toEqual({ fr: 'Ing1-fr' });
-    expect(result.ingredients[0].bottle.nameTranslations).toEqual({ fr: 'Bouteille' });
+    expect(result).toEqual({
+      name: 'Test',
+      nameTranslations: null,
+      ingredients: [
+        {
+          name: 'Ing1',
+          nameTranslations: { fr: 'Ing1-fr' },
+          bottle: { name: 'Bottle', nameTranslations: { fr: 'Bouteille' } },
+        },
+      ],
+    });
   });
 
   it('should leave non-string nameTranslations as-is', () => {
     const obj = { name: 'Test', nameTranslations: { fr: 'already parsed' } };
     const result = parseNameTranslations(obj);
-    expect(result.nameTranslations).toEqual({ fr: 'already parsed' });
+    expect(result).toEqual({ name: 'Test', nameTranslations: { fr: 'already parsed' } });
   });
 });
