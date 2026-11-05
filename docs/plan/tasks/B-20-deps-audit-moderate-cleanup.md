@@ -44,11 +44,12 @@ Aucun si aucune ligne de code ne change : les tests de sauvegarde couvrent `arch
 
 ## Points d'attention
 
-- Une seule tâche à la fois sur `backend/package-lock.json` : ne pas lancer en même temps que B-16 (même lockfile). B-16 attend une version stable de Prisma, elle ne bloque donc pas cette tâche.
-- `fast-uri` vient de la CLI Prisma, dont le `Dockerfile` coupe des arêtes du graphe (D-30, `backend/docker/prune-unused-deps.mjs`) : vérifier le job « Docker build (backend) ». Une montée de Prisma faite par B-16 peut aussi faire disparaître l'avis.
+- Une seule tâche à la fois sur `backend/package-lock.json`.
+- `fast-uri` vient de la CLI Prisma, dont le `Dockerfile` coupe des arêtes du graphe (D-30, `backend/docker/prune-unused-deps.mjs`) : vérifier le job « Docker build (backend) ». L'arête `@prisma/dev:@prisma/streams-local` est déjà coupée : `fast-uri` est absent de l'image livrée, l'avis ne concerne que l'audit du lockfile (relevé par la relecture de la PR #146, vérifié sur l'image construite par celle de la PR #150).
 - Pas de `npm audit fix --force` ; ne pas baisser le seuil de l'audit dans `ci.yml`.
 
 ## Journal
 
 - 2026-11-05 : tâche créée par B-19 (PR #146) après l'audit complet du backend.
 - 2026-11-05 : B-16 (PR #150) monte Prisma en 7.10.1 et retire les surcharges `deepmerge-ts` / `mysql2`. Les avis listés plus haut ne changent pas. `fast-uri` reste en 3.1.8 par le même chemin : `@prisma/dev` 0.24.17 ne change pas en 7.10.1, même si les notes de version de Prisma citent `fast-uri`. `npm audit --omit=dev` reste à 5 `moderate` (14 avec le dev). Le point d'attention ne vaut plus : B-16 n'attend plus de version de Prisma. Lancer B-20 après son merge (même lockfile).
+- 2026-11-05 : PR docs de suivi du lot E-15/B-13/C-42/B-19/B-16. Points d'attention mis à jour après le merge de B-16 (PR #150) : la contrainte de lockfile partagé avec B-16 et l'attente d'une version de Prisma ne valent plus ; `fast-uri` est absent de l'image livrée (coupe D-30), relevé par la relecture de la PR #146 et vérifié sur l'image par celle de la PR #150.
