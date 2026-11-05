@@ -16,7 +16,7 @@ pr: https://github.com/Lulu300/carta-cocktail/pull/105
 
 ## Décisions validées (2026-10-08)
 
-- **Cible navigateurs** : on garde la cible par défaut de Vite 8 (Safari et iOS ≥ 16.4, Chrome et Edge ≥ 111, Firefox ≥ 114). Pas de `build.target` personnalisé.
+- **Cible navigateurs** : on garde la cible par défaut de Vite 8 (Safari et iOS ≥ 16.4, Chrome et Edge ≥ 111, Firefox ≥ 114). Pas de `build.target` personnalisé (remplacée par E-36, 2026-11-05).
 
 ## Contexte
 

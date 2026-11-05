@@ -25,7 +25,7 @@ import { join, resolve } from 'node:path';
 
 // A media condition with a comparison operator: (width>=40rem), (40rem<=width<64rem).
 // The legacy form only uses a colon: (min-width:40rem).
-const RANGE_MEDIA_QUERY = /@media[^{;]*\([^()]*[<>=][^()]*\)[^{;]*/g;
+const RANGE_MEDIA_QUERY = /@media[^{;]*\([^()]*[<>=][^()]*\)[^{;]*/gi;
 
 function fail(message) {
   console.error(message);

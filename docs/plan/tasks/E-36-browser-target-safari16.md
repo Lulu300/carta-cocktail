@@ -48,7 +48,7 @@ Mesuré sur `v1.11.0` et `origin/develop` (28986cd), builds de production compar
 
 ## Tests à ajouter ou adapter
 
-- `.github/scripts/css-media-ranges.test.mjs` : CSS en `min-width` accepté, requêtes d'intervalle refusées (minifiées, à deux bornes, non minifiées), une seule ligne par requête, opérateurs hors `@media` ignorés, dossier sans feuille de style, dossier `assets` absent, usage.
+- `.github/scripts/css-media-ranges.test.mjs` : CSS en `min-width` accepté, requêtes d'intervalle refusées (minifiées, à deux bornes, non minifiées, en majuscules), une seule ligne par requête, opérateurs hors `@media` ignorés, dossier sans feuille de style, dossier `assets` absent, usage.
 - Étape CI « CSS media queries readable by Safari 16 » après le budget, sur le vrai build.
 
 ## Points d'attention
@@ -60,5 +60,6 @@ Mesuré sur `v1.11.0` et `origin/develop` (28986cd), builds de production compar
 ## Journal
 
 - 2026-11-05 : tâche créée à partir de l'écart G5 de la relecture des notes v1.12.0 (PR #152), décision de l'humain du jour.
-- 2026-11-05 : PR #159. Faits établis sur des builds de `v1.11.0` et de `develop` (voir « Problème constaté ») : seule régression, les media queries d'intervalle laissées par Lightning CSS avec la cible Safari 16.4. `build.target` ramené aux cibles de v1.11 pour toute l'application, contrôle CI `css-media-ranges.mjs` et ses 7 tests. Hors `touches` initial : aucun. Pas de constat hors périmètre.
+- 2026-11-05 : PR #159. Faits établis sur des builds de `v1.11.0` et de `develop` (voir « Problème constaté ») : seule régression, les media queries d'intervalle laissées par Lightning CSS avec la cible Safari 16.4. `build.target` ramené aux cibles de v1.11 pour toute l'application, contrôle CI `css-media-ranges.mjs` et ses tests. Hors `touches` initial : aucun. Pas de constat hors périmètre.
 - 2026-11-05 : Notes de version : aucune action requise. Cible navigateurs ramenée à celle de v1.11 (Safari et iOS 16.0, Chrome et Edge 107, Firefox 104) : le relèvement à Safari 16.4 de B-06 (#105) ne sort pas, la ligne correspondante des notes v1.12.0 (#152, « Public menu ») est à retirer. Sans ce correctif, Safari et iOS 16.0 à 16.3 perdaient toute la mise en page responsive, admin comprise.
+- 2026-11-05 : relecture de la PR #159 (approuvée), trois suggestions appliquées : `frontend/AGENTS.md` demande de tester toute API plus récente que l'une des cibles (pas seulement Safari 16.0, ex. `toSorted` : Chrome 110, Firefox 115) ; drapeau `i` sur `RANGE_MEDIA_QUERY` avec un test en majuscules ; la décision de B-06 renvoie à E-36.

@@ -76,6 +76,15 @@ describe('css-media-ranges.mjs CLI', () => {
     assert.match(run.stderr, /@media \(40rem <= width < 64rem\)/);
   });
 
+  it('fails on an uppercase at-rule, which CSS keywords allow', () => {
+    writeStylesheet('index-abc.css', '@MEDIA (WIDTH>=40rem){.sm\\:flex{display:flex}}');
+
+    const run = runCli([distDir]);
+
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /assets\/index-abc\.css: @MEDIA \(WIDTH>=40rem\)/);
+  });
+
   it('ignores operators outside media queries', () => {
     writeStylesheet('index-abc.css', '.a[data-x="1"]{width:calc(100% - 1rem)}.b>.c{color:red}');
 
