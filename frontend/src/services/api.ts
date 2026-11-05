@@ -3,7 +3,7 @@ import type {
   CocktailInput, MenuInput, CocktailAvailability, SiteSettings,
   CocktailExportFormat, ImportPreviewResponse, EntityResolutionAction,
   BottleImportPayload, BottleImportPreviewResponse, BottleImportResolutions,
-  BottleImportConfirmResponse,
+  BottleImportConfirmResponse, DeleteOptions, DeletionResponse,
 } from '../types';
 
 import i18n from '../i18n';
@@ -110,6 +110,11 @@ async function requestCocktailExport(url: string, id: number): Promise<CocktailE
   return { filename: attachmentFilename(res, `cocktail-${id}.json`), data: await res.json() };
 }
 
+/** URL of a DELETE that may be forced: `?force=true` also deletes what uses the item. */
+function deletionUrl(path: string, { force = false }: DeleteOptions): string {
+  return force ? `${path}?force=true` : path;
+}
+
 // Auth
 export const auth = {
   login: (email: string, password: string) =>
@@ -139,8 +144,8 @@ export const categories = {
     request<Category>('/categories', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: Partial<Category>) =>
     request<Category>(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (id: number) =>
-    request<{ message: string }>(`/categories/${id}`, { method: 'DELETE' }),
+  delete: (id: number, options: DeleteOptions = {}) =>
+    request<DeletionResponse>(deletionUrl(`/categories/${id}`, options), { method: 'DELETE' }),
 };
 
 // Bottles
@@ -157,8 +162,8 @@ export const bottles = {
     request<Bottle | Bottle[]>('/bottles', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: Partial<Bottle>) =>
     request<Bottle>(`/bottles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (id: number) =>
-    request<{ message: string }>(`/bottles/${id}`, { method: 'DELETE' }),
+  delete: (id: number, options: DeleteOptions = {}) =>
+    request<DeletionResponse>(deletionUrl(`/bottles/${id}`, options), { method: 'DELETE' }),
   exportFile: async (
     format: 'json' | 'csv',
     filters?: { categoryId?: number; type?: string; search?: string; location?: string }
@@ -201,8 +206,8 @@ export const ingredients = {
     request<Ingredient>('/ingredients', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: { name?: string; icon?: string | null; isAvailable?: boolean; nameTranslations?: Record<string, string> | null }) =>
     request<Ingredient>(`/ingredients/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (id: number) =>
-    request<{ message: string }>(`/ingredients/${id}`, { method: 'DELETE' }),
+  delete: (id: number, options: DeleteOptions = {}) =>
+    request<DeletionResponse>(deletionUrl(`/ingredients/${id}`, options), { method: 'DELETE' }),
   bulkAvailability: (data: { available: boolean }) =>
     request<{ updated: number }>('/ingredients/bulk-availability', { method: 'POST', body: JSON.stringify(data) }),
 };

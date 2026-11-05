@@ -1,11 +1,6 @@
 import type { TFunction } from 'i18next';
 import { ApiError } from '../services/api';
-
-/** What a refused deletion would break, sent by the backend as `details` of a 409. */
-export interface DeletionImpact {
-  cocktails: { id: number; name: string; removedLines: number }[];
-  bottles: { id: number; name: string }[];
-}
+import type { DeletionImpact } from '../types';
 
 // Enough to recognise the items in a toast; a category may hold dozens of bottles.
 const MAX_LISTED_NAMES = 5;
@@ -31,14 +26,16 @@ function listNames(t: TFunction, items: { name: string }[]): string {
 /**
  * The error to show for a failed mutation. A deletion refused because the item
  * is in use keeps the backend message and names the cocktails and bottles that
- * use it, so the admin knows what to change first.
+ * use it, so the admin knows what to change first. `inUseHint`, already
+ * translated, tells how to do it.
  */
-export function describeMutationError(error: unknown, t: TFunction): unknown {
+export function describeMutationError(error: unknown, t: TFunction, inUseHint?: string): unknown {
   const impact = readDeletionImpact(error);
   if (!impact) return error;
 
   const parts = [(error as Error).message];
   if (impact.cocktails.length > 0) parts.push(t('deletion.usedByCocktails', { names: listNames(t, impact.cocktails) }));
   if (impact.bottles.length > 0) parts.push(t('deletion.usedByBottles', { names: listNames(t, impact.bottles) }));
+  if (inUseHint) parts.push(inUseHint);
   return new Error(parts.join(' '));
 }

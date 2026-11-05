@@ -10,6 +10,8 @@ interface EntityMutationOptions<Variables, Result> {
   invalidates: QueryKey[];
   /** i18n key of the success toast. Left out when the page already shows the change, e.g. a toggle. */
   successMessage?: string;
+  /** i18n key added to the error toast of an item in use, e.g. what to change before deleting it. */
+  inUseHint?: string;
   /**
    * Ignores a call while the previous one is in flight, for a form submission.
    * Its button is only disabled once React re-renders, which TanStack Query
@@ -37,6 +39,7 @@ export function useEntityMutation<Variables, Result = unknown>({
   mutationFn,
   invalidates,
   successMessage,
+  inUseHint,
   ignoreWhilePending = false,
 }: EntityMutationOptions<Variables, Result>): EntityMutation<Variables, Result> {
   const { t } = useTranslation();
@@ -50,7 +53,7 @@ export function useEntityMutation<Variables, Result = unknown>({
       invalidateQueries(invalidates);
     },
     onError: (error) => {
-      toast.error(describeMutationError(error, t));
+      toast.error(describeMutationError(error, t, inUseHint && t(inUseHint)));
     },
     onSettled: () => {
       inFlight.current = false;
@@ -82,8 +85,8 @@ interface CrudMutationsOptions<Input> {
   api: CrudApi<Input>;
   /** Other queries that show this entity, e.g. the cocktail availability. */
   invalidates?: QueryKey[];
-  /** i18n keys of the success toasts. */
-  messages: { created: string; updated: string; deleted: string };
+  /** i18n keys of the success toasts, and of the hint shown when a deletion is refused because the item is in use. */
+  messages: { created: string; updated: string; deleted: string; inUse?: string };
 }
 
 export interface CrudMutations<Input> {
@@ -117,6 +120,7 @@ export function useCrudMutations<Input>({
     mutationFn: (id) => api.delete(id),
     invalidates: refreshed,
     successMessage: messages.deleted,
+    inUseHint: messages.inUse,
   });
 
   return { create, update, remove };

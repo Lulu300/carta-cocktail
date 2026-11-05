@@ -216,6 +216,10 @@ describe('UnitsPage', () => {
 
     const alert = await screen.findByText(/This unit is used by cocktails/);
     expect(alert).toHaveTextContent('deletion.usedByCocktails');
+    expect(alert).toHaveTextContent('units.inUseHint');
+    // A recipe line needs a unit: there is nothing to force.
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'deletion.forced.confirm' })).not.toBeInTheDocument();
     expect(screen.getByText('Centiliter')).toBeInTheDocument();
   });
 

@@ -8,6 +8,7 @@ import {
   mockApiError,
   mockApiPending,
   mockApiResponse,
+  mockItemInUse,
   mockNetworkError,
   pendingResponse,
   readJsonObject,
@@ -31,6 +32,15 @@ describe('fake backend', () => {
     mockApiResponse('get', '/api/units', [buildUnit({ name: 'Once' })]);
 
     expect((await units.list())[0].name).toBe('Once');
+  });
+
+  it('refuses to delete an item in use unless the deletion is forced', async () => {
+    const impact = { cocktails: [{ id: 5, name: 'Mojito', removedLines: 1 }], bottles: [] };
+    const requests = mockItemInUse('/api/categories/:id', impact, 'In use');
+
+    await expect(categories.delete(2)).rejects.toMatchObject({ status: 409, message: 'In use', body: { details: impact } });
+    await expect(categories.delete(2, { force: true })).resolves.toEqual({ message: 'Deleted', deleted: true, impact });
+    expect(requests.map((url) => url.search)).toEqual(['', '?force=true']);
   });
 
   it('turns an error response into an ApiError carrying the server message', async () => {

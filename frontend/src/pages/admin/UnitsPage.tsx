@@ -63,7 +63,8 @@ export default function UnitsPage() {
     key: qk.units,
     api: unitsApi,
     invalidates: [qk.availability],
-    messages: { created: 'units.created', updated: 'units.updated', deleted: 'units.deleted' },
+    // No forced deletion for a unit: a recipe line needs one.
+    messages: { created: 'units.created', updated: 'units.updated', deleted: 'units.deleted', inUse: 'units.inUseHint' },
   });
   const unitForm = useEntityForm(toUnitForm);
   const { form, setField, editing } = unitForm;

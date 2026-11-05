@@ -45,7 +45,7 @@
     "desiredStock": "Stock souhaité",
     "minimumPercent": "Seuil d'alerte (%)",
     "bottleCount": "Bouteilles",
-    "confirmDelete": "Supprimer cette catégorie ? Toutes les bouteilles associées seront aussi supprimées.",
+    "confirmDelete": "Supprimer cette catégorie ?",
     "created": "Catégorie créée",
     "updated": "Catégorie mise à jour",
     "deleted": "Catégorie supprimée",
@@ -187,6 +187,7 @@
     "created": "Unité créée",
     "updated": "Unité mise à jour",
     "deleted": "Unité supprimée",
+    "inUseHint": "Changez d'abord l'unité de ces lignes de recette, puis supprimez-la.",
     "search": "Rechercher une unité",
     "conversionFactor": "Facteur de conversion (ml)",
     "conversionFactorHint": "Ex. : 1 cl = 10 ml, donc facteur = 10. Laisser vide pour les unités de pièce.",
@@ -447,6 +448,28 @@
   },
   "confirm": {
     "deleteTitle": "Supprimer ?"
+  },
+  "deletion": {
+    "forced": {
+      "title": "Supprimer un élément utilisé ?",
+      "recipesWarning": "Ces recettes perdront les lignes correspondantes et deviendront incomplètes.",
+      "bottlesWarning": "Les bouteilles de cette catégorie seront aussi supprimées.",
+      "final": "Cette action est définitive.",
+      "cocktails_one": "{{count}} cocktail modifié :",
+      "cocktails_other": "{{count}} cocktails modifiés :",
+      "cocktailLines_one": "{{name}} : {{count}} ligne retirée",
+      "cocktailLines_other": "{{name}} : {{count}} lignes retirées",
+      "bottles_one": "{{count}} bouteille supprimée :",
+      "bottles_other": "{{count}} bouteilles supprimées :",
+      "acknowledgeRecipes": "Je comprends que ces recettes seront modifiées",
+      "acknowledgeBottles": "Je comprends que ces bouteilles seront supprimées",
+      "confirm": "Supprimer quand même",
+      "summary": "{{deleted}} : {{changes}}.",
+      "bottlesDeleted_one": "{{count}} bouteille supprimée",
+      "bottlesDeleted_other": "{{count}} bouteilles supprimées",
+      "cocktailsChanged_one": "{{count}} cocktail modifié",
+      "cocktailsChanged_other": "{{count}} cocktails modifiés"
+    }
   },
   "validation": {
     "required": "Obligatoire",

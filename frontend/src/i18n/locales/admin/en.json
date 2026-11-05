@@ -45,7 +45,7 @@
     "desiredStock": "Desired Stock",
     "minimumPercent": "Alert threshold (%)",
     "bottleCount": "Bottles",
-    "confirmDelete": "Delete this category? All associated bottles will also be deleted.",
+    "confirmDelete": "Delete this category?",
     "created": "Category created",
     "updated": "Category updated",
     "deleted": "Category deleted",
@@ -187,6 +187,7 @@
     "created": "Unit created",
     "updated": "Unit updated",
     "deleted": "Unit deleted",
+    "inUseHint": "Change the unit of these recipe lines first, then delete it.",
     "search": "Search units",
     "conversionFactor": "Conversion factor (ml)",
     "conversionFactorHint": "E.g. 1 cl = 10 ml, so the factor is 10. Leave empty for units counted by the piece.",
@@ -447,6 +448,28 @@
   },
   "confirm": {
     "deleteTitle": "Delete?"
+  },
+  "deletion": {
+    "forced": {
+      "title": "Delete an item in use?",
+      "recipesWarning": "These recipes will lose the matching lines and become incomplete.",
+      "bottlesWarning": "The bottles of this category will be deleted too.",
+      "final": "This action cannot be undone.",
+      "cocktails_one": "{{count}} cocktail changed:",
+      "cocktails_other": "{{count}} cocktails changed:",
+      "cocktailLines_one": "{{name}}: {{count}} line removed",
+      "cocktailLines_other": "{{name}}: {{count}} lines removed",
+      "bottles_one": "{{count}} bottle deleted:",
+      "bottles_other": "{{count}} bottles deleted:",
+      "acknowledgeRecipes": "I understand that these recipes will be changed",
+      "acknowledgeBottles": "I understand that these bottles will be deleted",
+      "confirm": "Delete anyway",
+      "summary": "{{deleted}}: {{changes}}.",
+      "bottlesDeleted_one": "{{count}} bottle deleted",
+      "bottlesDeleted_other": "{{count}} bottles deleted",
+      "cocktailsChanged_one": "{{count}} cocktail changed",
+      "cocktailsChanged_other": "{{count}} cocktails changed"
+    }
   },
   "validation": {
     "required": "Required",

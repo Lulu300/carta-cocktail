@@ -4,7 +4,7 @@ import { createTestQueryClient, fireEvent, screen, waitFor, within } from '../..
 import { clearToasts, renderWithFeedback } from '../../test/feedback';
 import { qk } from '../../queries/keys';
 import { buildCategory, buildCategoryType } from '../../test/factories';
-import { captureRequest, mockApiError, mockApiPending, mockApiResponse } from '../../test/msw/utils';
+import { captureRequest, mockApiError, mockApiPending, mockApiResponse, mockItemInUse } from '../../test/msw/utils';
 import CategoriesPage from './CategoriesPage';
 
 const spirit = buildCategoryType({ name: 'SPIRIT', color: 'blue', _count: { categories: 1 } });
@@ -239,15 +239,33 @@ describe('CategoriesPage', () => {
       expect(deleted.count()).toBe(0);
     });
 
-    it('shows the backend message and the bottles of a category that still has some', async () => {
+    it('lists the bottles a forced deletion of the category deletes with it', async () => {
       const user = userEvent.setup();
-      mockApiResponse('delete', '/api/categories/:id', {
-        error: 'This category still has bottles',
-        details: { cocktails: [], bottles: [{ id: 7, name: 'Absolut' }] },
-      }, 409);
+      const requests = mockItemInUse('/api/categories/:id', {
+        cocktails: [{ id: 4, name: 'Moscow Mule', removedLines: 1 }],
+        bottles: [{ id: 7, name: 'Absolut' }, { id: 8, name: 'Grey Goose' }],
+      }, 'This category still has bottles');
       await renderLoadedPage();
 
       await deleteFirstCategory(user);
+
+      const forced = await screen.findByRole('alertdialog', { name: 'deletion.forced.title' });
+      const listed = within(forced).getAllByRole('listitem').map((item) => item.textContent);
+      expect(listed).toEqual(['deletion.forced.cocktailLines', 'Absolut', 'Grey Goose']);
+      await user.click(within(forced).getByRole('checkbox'));
+      await user.click(within(forced).getByRole('button', { name: 'deletion.forced.confirm' }));
+
+      expect(await screen.findByText('deletion.forced.summary')).toBeInTheDocument();
+      expect(requests.map((url) => url.search)).toEqual(['', '?force=true']);
+    });
+
+    it('keeps a category that still has bottles when the forced deletion is cancelled', async () => {
+      const user = userEvent.setup();
+      mockItemInUse('/api/categories/:id', { cocktails: [], bottles: [{ id: 7, name: 'Absolut' }] }, 'This category still has bottles');
+      await renderLoadedPage();
+
+      await deleteFirstCategory(user);
+      await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'common.cancel' }));
 
       await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('This category still has bottles'));
       expect(screen.getByRole('alert')).toHaveTextContent('deletion.usedByBottles');
