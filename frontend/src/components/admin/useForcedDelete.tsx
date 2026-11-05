@@ -39,6 +39,13 @@ function forcedDeletionWarning(t: TFunction, { cocktails, bottles }: DeletionImp
   return parts.join(' ');
 }
 
+/** The box names every change the admin accepts: recipes changed, bottles deleted, or both. */
+function acknowledgeKey({ cocktails, bottles }: DeletionImpact): string {
+  if (bottles.length === 0) return 'deletion.forced.acknowledgeRecipes';
+  if (cocktails.length === 0) return 'deletion.forced.acknowledgeBottles';
+  return 'deletion.forced.acknowledgeRecipesAndBottles';
+}
+
 /**
  * Deletes an item. When the backend refuses because recipes or bottles use it,
  * lists them and offers to delete anyway, once the admin has ticked that they
@@ -54,7 +61,7 @@ export function useForcedDelete({ deleteItem, invalidates, deletedMessage }: For
     title: t('deletion.forced.title'),
     message: forcedDeletionWarning(t, impact),
     details: <DeletionImpactList impact={impact} />,
-    acknowledgeLabel: t(impact.cocktails.length > 0 ? 'deletion.forced.acknowledgeRecipes' : 'deletion.forced.acknowledgeBottles'),
+    acknowledgeLabel: t(acknowledgeKey(impact)),
     confirmLabel: t('deletion.forced.confirm'),
     tone: 'danger',
   });

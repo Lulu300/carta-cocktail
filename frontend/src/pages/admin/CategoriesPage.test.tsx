@@ -252,7 +252,7 @@ describe('CategoriesPage', () => {
       const forced = await screen.findByRole('alertdialog', { name: 'deletion.forced.title' });
       const listed = within(forced).getAllByRole('listitem').map((item) => item.textContent);
       expect(listed).toEqual(['deletion.forced.cocktailLines', 'Absolut', 'Grey Goose']);
-      await user.click(within(forced).getByRole('checkbox'));
+      await user.click(within(forced).getByRole('checkbox', { name: 'deletion.forced.acknowledgeRecipesAndBottles' }));
       await user.click(within(forced).getByRole('button', { name: 'deletion.forced.confirm' }));
 
       expect(await screen.findByText('deletion.forced.summary')).toBeInTheDocument();

@@ -214,11 +214,12 @@ describe('IngredientsPage', () => {
     expect(updated.count()).toBe(1);
   });
 
-  it('deletes an ingredient after confirmation and confirms with a toast', async () => {
+  it('deletes an ingredient after confirmation, confirms with a toast and reloads the list', async () => {
     const user = userEvent.setup();
     await renderLoadedPage();
     const deleted = captureRequest('delete', '/api/ingredients/:id');
     const updated = captureRequest('put', '/api/ingredients/:id');
+    const reloaded = captureRequest('get', '/api/ingredients');
 
     await confirmDeletion(user);
 
@@ -226,6 +227,7 @@ describe('IngredientsPage', () => {
     expect((await deleted.url).pathname).toBe('/api/ingredients/1');
     // The delete button does not toggle the card it sits on.
     expect(updated.count()).toBe(0);
+    await waitFor(() => expect(reloaded.count()).toBe(1));
   });
 
   it('does not delete when the dialog is cancelled', async () => {
@@ -247,6 +249,7 @@ describe('IngredientsPage', () => {
       bottles: [],
     });
     await renderLoadedPage();
+    const reloaded = captureRequest('get', '/api/ingredients');
 
     await confirmDeletion(user);
     const forced = await screen.findByRole('alertdialog', { name: 'deletion.forced.title' });
@@ -255,6 +258,7 @@ describe('IngredientsPage', () => {
 
     expect(await screen.findByText('deletion.forced.summary')).toBeInTheDocument();
     expect(requests.map((url) => `${url.pathname}${url.search}`)).toEqual(['/api/ingredients/1', '/api/ingredients/1?force=true']);
+    await waitFor(() => expect(reloaded.count()).toBe(1));
   });
 
   it('shows the backend message when the forced deletion is cancelled', async () => {

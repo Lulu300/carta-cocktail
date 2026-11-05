@@ -463,6 +463,7 @@
       "bottles_other": "{{count}} bouteilles supprimées :",
       "acknowledgeRecipes": "Je comprends que ces recettes seront modifiées",
       "acknowledgeBottles": "Je comprends que ces bouteilles seront supprimées",
+      "acknowledgeRecipesAndBottles": "Je comprends que ces recettes seront modifiées et ces bouteilles supprimées",
       "confirm": "Supprimer quand même",
       "summary": "{{deleted}} : {{changes}}.",
       "bottlesDeleted_one": "{{count}} bouteille supprimée",

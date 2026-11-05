@@ -463,6 +463,7 @@
       "bottles_other": "{{count}} bottles deleted:",
       "acknowledgeRecipes": "I understand that these recipes will be changed",
       "acknowledgeBottles": "I understand that these bottles will be deleted",
+      "acknowledgeRecipesAndBottles": "I understand that these recipes will be changed and these bottles deleted",
       "confirm": "Delete anyway",
       "summary": "{{deleted}}: {{changes}}.",
       "bottlesDeleted_one": "{{count}} bottle deleted",

@@ -135,6 +135,25 @@ describe('useForcedDelete', () => {
     )).toBeInTheDocument();
   });
 
+  it('asks to accept both the changed recipes and the deleted bottles of a category', async () => {
+    const user = userEvent.setup();
+    mockItemInUse(CATEGORY_PATH, { cocktails: usedByRecipes.cocktails, bottles: holdsBottles.bottles });
+    renderButton();
+
+    await requestDeletion(user);
+
+    const confirmation = await screen.findByRole('alertdialog');
+    expect(confirmation).toHaveAccessibleDescription(
+      'deletion.forced.recipesWarning deletion.forced.bottlesWarning deletion.forced.final',
+    );
+    await user.click(within(confirmation).getByRole('checkbox', { name: 'deletion.forced.acknowledgeRecipesAndBottles' }));
+    await user.click(deleteAnywayButton());
+
+    expect(await screen.findByText(
+      'deletion.forced.summary(categories.deleted,deletion.forced.bottlesDeleted(1), deletion.forced.cocktailsChanged(2))',
+    )).toBeInTheDocument();
+  });
+
   it('deletes nothing when cancelled and keeps the list in an error toast', async () => {
     const user = userEvent.setup();
     const requests = mockItemInUse(CATEGORY_PATH, usedByRecipes, 'Used by cocktail recipes');

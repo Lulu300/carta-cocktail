@@ -488,15 +488,20 @@ describe('BottlesPage', () => {
   });
 
   describe('deletion', () => {
-    it('deletes a bottle after confirmation and confirms with a toast', async () => {
+    it('deletes a bottle after confirmation and refreshes everything that shows bottles', async () => {
       const user = userEvent.setup();
-      await renderLoadedPage();
+      const queryClient = createTestQueryClient();
+      const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+      renderWithFeedback(<BottlesPage />, { queryClient });
+      await screen.findByText('Absolut');
       const deleted = captureRequest('delete', '/api/bottles/:id');
 
       await confirmDeletion(user);
 
       expect(await screen.findByText('bottles.deleted')).toBeInTheDocument();
       expect((await deleted.url).pathname).toBe('/api/bottles/1');
+      const refreshed = invalidate.mock.calls.map(([filters]) => filters?.queryKey);
+      expect(refreshed).toEqual([qk.bottles, qk.shortages, qk.categories, qk.menus, qk.availability]);
     });
 
     it('deletes an empty bottle from the history', async () => {
