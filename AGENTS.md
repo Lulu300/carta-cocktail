@@ -22,6 +22,17 @@ A full review (2026-10-08) produced an action plan in `docs/plan/`. Before picki
 - Merge only after an approved review and green CI. Then re-run `--ready` to pick the next tasks.
 - Stop and ask the human when a task needs a human action or decision (`owner: mixed` or `human`, or flagged in "Points d'attention").
 
+### Cleaning up after a task
+
+The machine is shared with other projects and its disk fills up. Before its final report, every agent removes what it created for the task, and only that.
+
+- **Name what you create after the project**, so that it can be found again: temporary files and folders with `mktemp "${TMPDIR:-/tmp}/carta.XXXXXX"` (add `-d` for a folder), compose projects with `COMPOSE_PROJECT_NAME=carta-<task id>`, local images with a `carta-` name. The upgrade bench already prefixes its own resources with `carta-ut-` and removes them at the end of each run (`scripts/upgrade-test/README.md`).
+- **Temporary files**: delete your `mktemp` files and folders, copies of a test fixture included, and the `carta-uploads-*` folders that an interrupted backend test run leaves in the system temp folder.
+- **Docker**: stop each compose project you started with `docker compose down -v --remove-orphans --rmi local`, and remove the images you built or pulled for the task with `docker image rm`. Then `docker ps -a`, `docker volume ls`, `docker network ls` and `docker images` must show nothing of yours.
+- **Never clean globally**: no `docker system prune`, `docker volume prune`, `docker image prune -a`, `docker builder prune` or `npm cache clean`, and nothing deleted outside this repository's worktrees and your own temporary files. Other projects keep containers, volumes and caches on this machine that must survive.
+- **Build outputs** (`node_modules`, `dist`, `coverage`) stay inside your worktree, and go away with it.
+- **The coordinator, at the end of a batch**: removes the batch's worktrees and branches and empties its scratchpad. It also removes the images shared by the batch: `carta-upgrade-test/*:local`, the `ghcr.io/lulu300/carta-cocktail/*` images pulled for the upgrade bench, and reviewers' `carta-review-*` images. It then runs the Docker check above again. A worktree, container or image that another running session still uses stays.
+
 ## Coding Conventions
 
 - **English everywhere in code**: identifiers, comments, commit messages, PR titles and descriptions. User-facing text goes through i18n (en/fr), never hard-coded. The plan and review documents in `docs/` are written in French.
