@@ -10,9 +10,12 @@ import DateInput from './DateInput';
 const mockI18n = vi.hoisted(() => ({ language: 'fr' }));
 vi.mock('react-i18next', async () => {
   const { translateWithValues: translate } = await import('../../test/translateWithValues');
+  const english = { 'dates.day': 'dd', 'dates.month': 'mm', 'dates.year': 'yyyy' };
   const letters: Record<string, Record<string, string>> = {
     fr: { 'dates.day': 'jj', 'dates.month': 'mm', 'dates.year': 'aaaa' },
-    en: { 'dates.day': 'dd', 'dates.month': 'mm', 'dates.year': 'yyyy' },
+    en: english,
+    // English (UK) has no messages of its own: i18next serves it those of en.
+    'en-GB': english,
   };
   return {
     useTranslation: () => ({
@@ -143,6 +146,21 @@ describe('DateInput', () => {
     await user.click(dateField());
     await user.type(dateField(), '2/2024');
     expect(screen.queryByText(/dates\.invalid/)).not.toBeInTheDocument();
+  });
+
+  it('shows and reads a date day first in English (UK)', async () => {
+    mockI18n.language = 'en-GB';
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(<DateForm initialValue="2024-12-03" onSubmit={onSubmit} />);
+    expect(dateField()).toHaveValue('03/12/2024');
+    expect(dateField()).toHaveAttribute('placeholder', 'dd/mm/yyyy');
+
+    await user.clear(dateField());
+    await user.type(dateField(), '12/03/2024');
+    await user.click(screen.getByRole('button', { name: 'common.save' }));
+
+    expect(onSubmit).toHaveBeenCalledWith('2024-03-12');
   });
 
   it('shows the same date in the new format when the language changes', () => {

@@ -28,6 +28,10 @@ describe('formatDate', () => {
     expect(formatDate('2024-12-03', 'en')).toBe('12/03/2024');
   });
 
+  it('writes the day first in British English', () => {
+    expect(formatDate('2024-12-03', 'en-GB')).toBe('03/12/2024');
+  });
+
   it('keeps the stored day of a midnight UTC timestamp, whatever the time zone', () => {
     expect(formatDate('2024-12-03T00:00:00.000Z', 'fr')).toBe('03/12/2024');
   });
@@ -38,6 +42,7 @@ describe('formatDate', () => {
 
   it('uses the base language of a regional code, then English', () => {
     expect(formatDate('2024-12-03', 'fr-CA')).toBe('03/12/2024');
+    expect(formatDate('2024-12-03', 'en-AU')).toBe('12/03/2024');
     expect(formatDate('2024-12-03', 'de')).toBe('12/03/2024');
   });
 
@@ -54,6 +59,11 @@ describe('parseDateInput', () => {
 
   it('reads an English date month first', () => {
     expect(parseDateInput('12/03/2024', 'en')).toBe('2024-12-03');
+  });
+
+  it('reads a British English date day first', () => {
+    expect(parseDateInput('12/03/2024', 'en-GB')).toBe('2024-03-12');
+    expect(parseDateInput('03/13/2024', 'en-GB')).toBeNull();
   });
 
   it('accepts a one-digit day and month and surrounding spaces', () => {
@@ -85,7 +95,7 @@ describe('parseDateInput', () => {
   });
 
   it('reads back what formatDate writes', () => {
-    for (const language of ['fr', 'en']) {
+    for (const language of ['fr', 'en', 'en-GB']) {
       expect(parseDateInput(formatDate('2026-10-11', language), language)).toBe('2026-10-11');
     }
   });
@@ -95,6 +105,7 @@ describe('datePattern', () => {
   it('orders the translated letters as the language writes a date', () => {
     expect(datePattern('fr', french)).toBe('jj/mm/aaaa');
     expect(datePattern('en', english)).toBe('mm/dd/yyyy');
+    expect(datePattern('en-GB', english)).toBe('dd/mm/yyyy');
   });
 
   it('falls back to the English order for a language without a format', () => {

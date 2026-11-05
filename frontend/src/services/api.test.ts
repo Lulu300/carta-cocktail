@@ -154,6 +154,19 @@ describe('API request helper', () => {
     expect(mockFetch.mock.calls[1][1].headers['Accept-Language']).toBe('fr');
   });
 
+  // English (UK) has no messages of its own (resolvedLanguage is "en"), but the import reads its
+  // dates day first: the server must receive the chosen code.
+  it('should send en-GB in Accept-Language when English (UK) is chosen', async () => {
+    mockOk([]);
+    const api = await getApi();
+
+    await i18n.changeLanguage('en-GB');
+    await api.publicApi.listMenus();
+
+    expect(i18n.resolvedLanguage).toBe('en');
+    expect(mockFetch.mock.calls[0][1].headers['Accept-Language']).toBe('en-GB');
+  });
+
   it('should return undefined on a 204 response', async () => {
     localStorage.setItem('token', 'my-token');
     mockFetch.mockResolvedValueOnce({

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { SUPPORTED_LANGUAGES } from '../i18n';
-import { LANGUAGE_NAMES, getBaseLanguage, getLocalizedName } from './localization';
+import { SUPPORTED_LANGUAGES, TRANSLATED_LANGUAGES } from '../i18n';
+import { CONTENT_LANGUAGE_NAMES, LANGUAGE_NAMES, getBaseLanguage, getLocalizedName } from './localization';
 
 describe('getBaseLanguage', () => {
   it('should strip the region from a regional locale', () => {
@@ -25,6 +25,10 @@ describe('getLocalizedName', () => {
 
   it('should fall back to English for an unsupported language', () => {
     expect(getLocalizedName(rum, 'de')).toBe('Rum');
+  });
+
+  it('should use the English translation in English (UK)', () => {
+    expect(getLocalizedName(rum, 'en-GB')).toBe('Rum');
   });
 
   it('should prefer an exact regional translation when one exists', () => {
@@ -74,5 +78,18 @@ describe('LANGUAGE_NAMES', () => {
   // The language selector lists LANGUAGE_NAMES: a supported language without a name would be missing.
   it('names exactly the supported languages', () => {
     expect(Object.keys(LANGUAGE_NAMES)).toEqual([...SUPPORTED_LANGUAGES]);
+  });
+
+  it('tells US and British English apart', () => {
+    expect(LANGUAGE_NAMES.en).toBe('English (US)');
+    expect(LANGUAGE_NAMES['en-GB']).toBe('English (UK)');
+  });
+});
+
+describe('CONTENT_LANGUAGE_NAMES', () => {
+  // Entity names are translated per base language: "en" serves English (US) and English (UK) alike.
+  it('names the languages with their own messages, English without a region', () => {
+    expect(Object.keys(CONTENT_LANGUAGE_NAMES)).toEqual([...TRANSLATED_LANGUAGES]);
+    expect(CONTENT_LANGUAGE_NAMES.en).toBe('English');
   });
 });

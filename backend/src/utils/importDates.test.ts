@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { parseImportDate } from './importDates';
 
-const LANGUAGES = ['fr', 'en'];
+const LANGUAGES = ['fr', 'en', 'en-GB'];
 
 describe('parseImportDate', () => {
   describe.each(LANGUAGES)('in %s', (language) => {
@@ -79,11 +79,26 @@ describe('parseImportDate', () => {
     });
   });
 
+  describe('in en-GB: day/month/year (British English)', () => {
+    it.each([
+      ['12/03/2024', '2024-03-12'],
+      ['12.03.2024', '2024-03-12'],
+      ['25/03/2024', '2024-03-25'],
+    ])('reads %j as %j', (text, expected) => {
+      expect(parseImportDate(text, 'en-GB')).toBe(expected);
+    });
+
+    it('refuses a month above 12', () => {
+      expect(parseImportDate('03/25/2024', 'en-GB')).toBeNull();
+    });
+  });
+
   describe('language lookup', () => {
     it.each([
       ['fr-FR', '2024-03-12'],
       ['fr-CA', '2024-03-12'],
       ['en-US', '2024-12-03'],
+      ['en-AU', '2024-12-03'],
     ])('reads a regional code (%s) with its base language', (language, expected) => {
       expect(parseImportDate('12/03/2024', language)).toBe(expected);
     });

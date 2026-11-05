@@ -824,6 +824,9 @@ describe('POST /api/bottles/import/preview', () => {
       ['fr', '2024-03-12'],
       ['fr-FR,fr;q=0.9', '2024-03-12'],
       ['en', '2024-12-03'],
+      ['en-US', '2024-12-03'],
+      ['en-GB', '2024-03-12'],
+      ['en-gb', '2024-03-12'],
     ])('should read 12/03/2024 with Accept-Language %s as %s', async (language, expected) => {
       const res = await request.post('/api/bottles/import/preview').set(authHeader())
         .set('Accept-Language', language)

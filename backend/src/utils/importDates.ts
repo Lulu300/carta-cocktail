@@ -14,10 +14,13 @@ type DayMonthOrder = 'dayFirst' | 'monthFirst';
 /**
  * One entry per application language; a new language adds its order here, with a test.
  * `en` is US English, as Excel in English (US) writes it: `3/12/2024` is March 12.
+ * `en-GB` is British English (the frontend's English (UK)): `3/12/2024` is 3 December. Other
+ * regional variants of English (`en-AU`) read the dates of `en`, as the frontend sends them `en`.
  * A Map, not an object: the language comes from a request header (`constructor` is no language).
  */
 const DAY_MONTH_ORDERS = new Map<string, DayMonthOrder>([
   ['en', 'monthFirst'],
+  ['en-GB', 'dayFirst'],
   ['fr', 'dayFirst'],
 ]);
 
