@@ -12,7 +12,7 @@ import { CategoryCreate, CategoryUpdate } from '../validation/categories';
 const router = Router();
 
 // Helper: enrich categories with their CategoryType metadata
-async function enrichWithCategoryType(categories: any[]) {
+async function enrichWithCategoryType<C extends { type: string }>(categories: C[]) {
   const categoryTypes = await prisma.categoryType.findMany();
   const typeMap = new Map(categoryTypes.map(ct => [ct.name, ct]));
   return categories.map(c => ({

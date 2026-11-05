@@ -4,6 +4,7 @@ import {
   request, authHeader, prisma, seedCocktail, seedBottle, seedMenu, seedMenuSection, addCocktailToMenu,
   addBottleToMenu,
 } from '../test/helpers';
+import type { MenuBottle, MenuCocktail } from '../generated/prisma/client';
 
 beforeAll(async () => { await setupTestDatabase(); });
 afterAll(async () => { await teardownTestDatabase(); });
@@ -141,9 +142,8 @@ describe('PUT /api/menus/:id - sections', () => {
     expect(put.status).toBe(200);
 
     const res = await request.get(`/api/menus/${menu.id}`).set(authHeader());
-    const sectionByCocktail = Object.fromEntries(
-      res.body.cocktails.map((mc: any) => [mc.cocktailId, mc.menuSectionId]),
-    );
+    const entries: Pick<MenuCocktail, 'cocktailId' | 'menuSectionId'>[] = res.body.cocktails;
+    const sectionByCocktail = Object.fromEntries(entries.map((mc) => [mc.cocktailId, mc.menuSectionId]));
     expect(sectionByCocktail[mojito.id]).toBe(section.id);
     expect(sectionByCocktail[negroni.id]).toBeNull();
   });
@@ -163,9 +163,8 @@ describe('PUT /api/menus/:id - sections', () => {
     expect(put.status).toBe(200);
 
     const res = await request.get(`/api/menus/${menu.id}`).set(authHeader());
-    const sectionByBottle = Object.fromEntries(
-      res.body.bottles.map((mb: any) => [mb.bottleId, mb.menuSectionId]),
-    );
+    const entries: Pick<MenuBottle, 'bottleId' | 'menuSectionId'>[] = res.body.bottles;
+    const sectionByBottle = Object.fromEntries(entries.map((mb) => [mb.bottleId, mb.menuSectionId]));
     expect(sectionByBottle[rum.id]).toBe(section.id);
     expect(sectionByBottle[gin.id]).toBeNull();
   });

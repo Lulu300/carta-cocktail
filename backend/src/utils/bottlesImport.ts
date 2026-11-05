@@ -6,6 +6,7 @@ import { DesiredStock } from '../validation/categories';
 import { MAX_IMPORT_BOTTLES, MAX_IMPORT_ROWS, totalQuantity } from '../validation/bottleImport';
 import { unprotectFormula, UTF8_BOM } from './bottlesExport';
 import { parseImportDate } from './importDates';
+import { isRecord } from './records';
 
 export const BOTTLE_IMPORT_VERSION = 1;
 
@@ -425,10 +426,6 @@ export function parseCsvBottles(csv: string, language: string): NormalizedImport
     bottles: kept.map(({ bottle }) => bottle),
     errors,
   };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /** JSON arrays numbered from 1, as the admin counts them. */

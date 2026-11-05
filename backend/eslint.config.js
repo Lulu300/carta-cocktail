@@ -15,10 +15,5 @@ module.exports = defineConfig([
     languageOptions: {
       globals: globals.node,
     },
-    rules: {
-      // Temporary: the routes and their tests still hold about 45 `any` from before the
-      // linter existed. Warn for now; task B-13 types them and removes this override.
-      '@typescript-eslint/no-explicit-any': 'warn',
-    },
   },
 ]);
