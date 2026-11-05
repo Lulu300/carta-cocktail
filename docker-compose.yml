@@ -7,6 +7,10 @@ services:
     # The browser goes through nginx, on the frontend port.
     ports:
       - "127.0.0.1:3001:3001"
+    # uid:gid of the backend process. The default is the node user of the image. Set
+    # CARTA_UID and CARTA_GID in .env when the data folders must belong to another
+    # owner, such as a network share (see README, "Data folders and the node user").
+    user: "${CARTA_UID:-1000}:${CARTA_GID:-1000}"
     environment:
       - DATABASE_URL=file:/app/data/carta_cocktail.db
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set (openssl rand -hex 32)}

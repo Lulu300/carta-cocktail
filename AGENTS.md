@@ -110,7 +110,7 @@ Coverage is enforced automatically by CI. Run `npm test -- --coverage` in either
 - Both jobs run in parallel on Node 24, the version used by the Docker images (`.nvmrc`); `engines` in both `package.json` require Node >= 24
 
 **Smoke** (`.github/workflows/smoke.yml`) — runs on PRs to `main`/`develop` and on demand:
-- Builds and starts `docker-compose.yml`, then runs `scripts/smoke/smoke.sh` through nginx: login, 2.4 MB photo upload, photo still served after the backend container is recreated, backup export
+- Builds and starts `docker-compose.yml`, then runs `scripts/smoke/smoke.sh` through nginx: login, 2.4 MB photo upload, photo still served after the backend container is recreated, backup export. Then `scripts/smoke/custom-uid.sh` recreates the backend with `CARTA_UID`/`CARTA_GID`: refused on volumes of uid 1000, then started after a `chown`, and `smoke.sh` again
 - Locally, always in a dedicated compose project: `export COMPOSE_PROJECT_NAME=carta-smoke JWT_SECRET=$(openssl rand -hex 32) ADMIN_PASSWORD=$(openssl rand -hex 16)`, then `docker compose -p carta-smoke up -d --build --wait && ./scripts/smoke/smoke.sh`, then `docker compose -p carta-smoke down -v --remove-orphans --rmi local`, all in the same shell call (`smoke.sh` reads `COMPOSE_PROJECT_NAME` to recreate the backend). The default project is your local stack: `down -v` would delete its data (see the header of `smoke.sh`)
 
 **Release** (`.github/workflows/release.yml`) — runs on tag push `v*`:
