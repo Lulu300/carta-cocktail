@@ -118,13 +118,30 @@ Some versions require actions before or after the upgrade (new variables in `.en
 
 #### Data folders and the node user
 
-The backend runs as the `node` user (uid 1000, gid 1000), never as root. The named volumes of the compose files need nothing: Docker gives a new volume the owner of the image folder. Host folders mounted on `/app/data` and `/app/uploads` must belong to uid 1000 (or to the uid set with `user:` in your compose file). Create them before the first start:
+By default, the backend runs as the `node` user (uid 1000, gid 1000), never as root. The named volumes of the compose files need nothing: Docker gives a new volume the owner of the image folder. Host folders mounted on `/app/data` and `/app/uploads` must belong to uid 1000, or to the uid and gid set with `CARTA_UID` and `CARTA_GID` (see below). Create them before the first start:
 
 ```bash
 mkdir -p data uploads && sudo chown 1000:1000 data uploads
 ```
 
 Versions before the `node` user ran as root, so the volumes and folders of an existing install belong to root: follow the required actions of that version in [`UPGRADING.md`](UPGRADING.md). If a folder is not writable, the backend stops at startup with the `chown` command to run.
+
+**Another uid and gid.** The compose files run the backend as `${CARTA_UID:-1000}:${CARTA_GID:-1000}`. Set both variables in the `.env` file next to the compose file when the data folders must belong to another owner, then recreate the backend (`docker compose -f docker-compose.prod.yml up -d`):
+
+```bash
+CARTA_UID=1026
+CARTA_GID=100
+```
+
+The folders must be writable by that uid and gid. Keep the default with the named volumes: they belong to 1000:1000, and with another uid the backend stops until you run the `chown` command it prints. A compose file of your own sets the same with `user: "<uid>:<gid>"` on `carta-cocktail-backend`.
+
+**Data on a network share (SMB/NFS).** `chown` is often refused or has no effect there, so the command printed by the backend cannot help. Instead, run the backend as the owner the share gives to its files:
+
+- **SMB/CIFS**: the owner of every file is set by the `uid=` and `gid=` mount options. Mount the share with `uid=1000,gid=1000`, or set `CARTA_UID` and `CARTA_GID` to the values of those options (`mount | grep cifs` shows them). If they show `uid=0`, remount with `uid=1000,gid=1000` (or the uid and gid you chose) rather than setting `CARTA_UID=0`: never run the backend as root. The `file_mode` and `dir_mode` options must give that owner write access.
+- **NFS**: with `root_squash` (the default), `chown` run as root in a container is refused (`Operation not permitted`). Change the owner of the folders on the NAS itself, or set `CARTA_UID` and `CARTA_GID` to the uid and gid that own the exported folders (`ls -n` on the client, with NFSv3, or NFSv4 with matching idmap domains; `4294967294` or `65534` means nobody: fix the idmapping first). With `all_squash`, the NAS maps every uid to the `anonuid` and `anongid` of the export: they must own the folders on the NAS.
+- **NAS ACLs** (Synology, QNAP…) can refuse writes even to the owner: give that uid read and write access in the NAS settings.
+
+The backend tests its write access at startup and names the folder it cannot write to. A database on a network share also needs `SQLITE_WAL=false` (next section).
 
 #### Database files and network shares
 
@@ -176,7 +193,7 @@ npm run db:check      # exit 0: the migrations match schema.prisma
 
 `backend/docker-entrypoint.sh` runs before the API:
 
-1. The container runs as the `node` user (uid 1000). The entrypoint first checks that it can write to the database folder and the upload folder. Otherwise it stops and prints the `chown` command to run (see [Data folders and the node user](#data-folders-and-the-node-user)). A command given to the container (`docker compose run carta-cocktail-backend <command>`) runs instead of the steps below.
+1. The container runs as the `node` user (uid 1000), or as `CARTA_UID`:`CARTA_GID` when they are set. The entrypoint first checks that it can write to the database folder and the upload folder. Otherwise it stops and prints the `chown` command to run (see [Data folders and the node user](#data-folders-and-the-node-user)). A command given to the container (`docker compose run carta-cocktail-backend <command>`) runs instead of the steps below.
 2. If the database exists and a migration of the image is not applied yet (no migration history, a new migration, or one marked rolled back with `prisma migrate resolve --rolled-back`), it copies the database to `backups/pre-migrate-<date>.db`, next to the database (`/app/data/backups/` in the `db-data` volume). It keeps the 10 most recent copies, and skips the copy when the database has not changed since the last one. It makes no copy while a migration is marked failed: the newest copy stays the one made before the failed attempt.
 3. It applies the pending migrations with `prisma migrate deploy`. A new database is created from scratch. If a migration fails, **it refuses to start** and names the migration and the copy to restore: see [Recovering from a failed migration](#recovering-from-a-failed-migration).
 4. A database created by `db push` (v1.5.0 and older) has no migration history. If its schema is exactly the one of the first migration, `0_init`, the entrypoint marks `0_init` as applied and continues. Otherwise **it refuses to start**: it prints the differences, leaves the database untouched, and the container exits.
@@ -214,8 +231,8 @@ If the database differs from `0_init`, it usually comes from an older version: s
 
 The current `docker-compose.prod.yml` does not fit images of v1.11.x or older, so going back to one takes more than changing the image tags:
 
-- **Compose file.** Those images have no `/api/health`: with the current file, their backend stays `unhealthy` and the frontend never starts. Use the compose file of that version, `https://raw.githubusercontent.com/Lulu300/carta-cocktail/v<version>/docker-compose.prod.yml`, with your own changes (keep a copy of the current one). Or remove the backend `healthcheck` block and the frontend `depends_on` condition from the current file. Up to v1.7.0, the frontend also listens on port 80, not 8080: its port mapping is `"<port>:80"`.
-- **Data folder owner.** Those images run as root, and may leave files that the `node` user cannot write. Before upgrading again, give the folders back to uid 1000 as in [Data folders and the node user](#data-folders-and-the-node-user): the backend otherwise stops with the `chown` command to run.
+- **Compose file.** Those images have no `/api/health`: with the current file, their backend stays `unhealthy` and the frontend never starts. Use the compose file of that version, `https://raw.githubusercontent.com/Lulu300/carta-cocktail/v<version>/docker-compose.prod.yml`, with your own changes (keep a copy of the current one). Or remove the backend `healthcheck` block and `user` line (those images start as root), and the frontend `depends_on` condition, from the current file. Up to v1.7.0, the frontend also listens on port 80, not 8080: its port mapping is `"<port>:80"`.
+- **Data folder owner.** Those images run as root, and may leave files that the `node` user cannot write. Before upgrading again, give the folders back to uid 1000 (or to `CARTA_UID`:`CARTA_GID`) as in [Data folders and the node user](#data-folders-and-the-node-user): the backend otherwise stops with the `chown` command to run.
 
 To upgrade again, go back to the current compose file with the new image tags.
 
@@ -270,7 +287,7 @@ The Prisma error just above gives the cause, for example `UNIQUE constraint fail
    ```
 
    Exit code `0`: nothing blocks the migration. Exit code `1`: the output lists what is left to fix. Repeat steps 3 and 4 until it exits `0`.
-5. Stop the backend, go back to the current compose file with the new image tags, give the data folders back to uid 1000 if the previous version ran as root (see [Running a previous version](#running-a-previous-version)), and start. The entrypoint copies the fixed database to a new `pre-migrate-<date>.db`, then runs the migration again.
+5. Stop the backend, go back to the current compose file with the new image tags, give the data folders back to uid 1000 (or to `CARTA_UID`:`CARTA_GID`) if the previous version ran as root (see [Running a previous version](#running-a-previous-version)), and start. The entrypoint copies the fixed database to a new `pre-migrate-<date>.db`, then runs the migration again.
 
 **Without restoring.** Only when the migration failed before changing anything: the statement in the error is one of those at the top of its `migration.sql`, before any table is rebuilt (for `20261010173910_schema_integrity`, the unique indexes: `UNIQUE constraint failed: Category.name` or `Unit.abbreviation`). If in doubt, restore the copy.
 
@@ -329,6 +346,7 @@ carta-cocktail/
 | `ADMIN_EMAIL` | Admin login email, used when the admin is created or reset | `admin@carta.local` |
 | `ADMIN_PASSWORD` | Admin password, at least 12 characters, used when the admin is created or reset | **required** on first start, no default |
 | `ADMIN_RESET_PASSWORD` | Exactly `true` resets the existing admin's email and password from the two variables above at startup; other values are ignored with a warning | `false` |
+| `CARTA_UID`, `CARTA_GID` | Docker only, read by the compose files from `.env`: uid and gid the backend runs as. Set them when the data folders must belong to another owner, such as a network share (see [Data folders and the node user](#data-folders-and-the-node-user)) | `1000` |
 | `SQLITE_WAL` | `false` keeps the rollback journal instead of WAL; required when the database is on a network share (SMB/NFS). Other values use WAL. In Docker, set it in the compose file (see [Database files and network shares](#database-files-and-network-shares)) | `true` |
 | `JWT_EXPIRES_IN` | Lifetime of the admin session token: a number of seconds (`86400`) or a timespan (`24h`, `7d`). Applies to tokens issued after the restart. The backend refuses to start with a value it cannot read | `7d` |
 | `LOGIN_RATE_LIMIT` | Failed logins allowed per client IP address in 15 minutes; beyond that, the login answers 429 (Too Many Requests). Successful logins do not count. A positive integer, otherwise the backend refuses to start | `10` |

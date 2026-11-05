@@ -39,11 +39,13 @@ refuse_unwritable() {
   {
     echo "ERROR: the backend runs as uid $(id -u) and cannot write to $1."
     echo "Images before this version ran as root, so the files of an existing install belong to root."
-    echo "The folder may also belong to another uid (see \`user:\` in the compose file), or be mounted read-only."
+    echo "The folder may also belong to another uid (see CARTA_UID and CARTA_GID in .env, or \`user:\` in the compose file), or be mounted read-only."
     echo "Stop the backend, give the volume or host folder mounted on $2 to $owner (mounted read-write), then start again:"
     echo "  named volume: docker run --rm -v <volume>:/data alpine chown -R $owner /data"
     echo "  host folder:  sudo chown -R $owner <host folder>"
-    echo "See the required actions of this version in UPGRADING.md."
+    echo "On a network share (SMB/NFS), chown may be refused or have no effect: set CARTA_UID and CARTA_GID in .env"
+    echo "to the uid and gid that own the files on the share (the uid= and gid= mount options for SMB), or change the owner on the NAS."
+    echo "See README.md, \"Data folders and the node user\", and the required actions of this version in UPGRADING.md."
   } >&2
   exit 1
 }

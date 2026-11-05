@@ -2,7 +2,8 @@ name: Smoke
 
 # Starts the stack of docker-compose.yml (images built from the pull request) and runs
 # scripts/smoke/smoke.sh through nginx: login, photo upload, persistence after a
-# recreation of the backend, backup export. Separate from ci.yml so that it can be
+# recreation of the backend, backup export. Then scripts/smoke/custom-uid.sh runs the
+# backend as another uid (CARTA_UID, CARTA_GID). Separate from ci.yml so that it can be
 # made a required check on its own once it has proven stable.
 on:
   pull_request:
@@ -41,6 +42,10 @@ jobs:
 
       - name: Smoke test
         run: set -a && . ./.env && set +a && ./scripts/smoke/smoke.sh
+
+      # Last: it leaves the volumes to another uid
+      - name: Backend as another uid (CARTA_UID)
+        run: set -a && . ./.env && set +a && ./scripts/smoke/custom-uid.sh
 
       - name: Collect container logs
         if: failure()
