@@ -17,7 +17,7 @@ ENV VITE_APP_VERSION=$APP_VERSION
 RUN npm run build
 
 # Non-root nginx (uid 101) listening on 8080. Pinned on a minor version of the stable branch.
-FROM nginxinc/nginx-unprivileged:1.30-alpine
+FROM nginxinc/nginx-unprivileged:1.31-alpine
 
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
