@@ -1320,6 +1320,34 @@ describe('bottle menus', () => {
     expect(await bottleIdsOf(personal.id)).toEqual([]);
   });
 
+  it('should keep the bottles already in the menus on import, unchecked or excluded ones included', async () => {
+    await seedCategory({ name: 'Apero' });
+    const aperitifs = await findSystemMenu('aperitifs');
+    const digestifs = await findSystemMenu('digestifs');
+    const personal = await seedMenu({ type: 'APEROS' });
+    const section = await seedMenuSection(aperitifs.id, { name: 'Bitters' });
+    // Put in the menus by hand in v1.11, without the box checked
+    const handAdded = await seedBottle({ name: 'Hand added' });
+    await addBottleToMenu(aperitifs.id, handAdded.id, { position: 0, isHidden: true, menuSectionId: section.id });
+    await addBottleToMenu(digestifs.id, handAdded.id);
+    await addBottleToMenu(personal.id, handAdded.id);
+    const excluded = await seedBottle({ name: 'Excluded', isApero: true });
+    await excludeBottleFromMenu(aperitifs.id, excluded.id);
+    const before = await prisma.menuBottle.findMany({ orderBy: { id: 'asc' } });
+
+    const res = await request.post('/api/bottles/import/confirm').set(authHeader())
+      .send({ payload: importPayload([{ name: 'Aperol', isApero: true }]), resolutions: {} });
+
+    expect(res.status).toBe(201);
+    const after = await prisma.menuBottle.findMany({ orderBy: { id: 'asc' } });
+    expect(after.slice(0, before.length)).toEqual(before);
+    const imported = await prisma.bottle.findFirstOrThrow({ where: { name: 'Aperol' } });
+    expect(after.slice(before.length)).toEqual([
+      expect.objectContaining({ menuId: aperitifs.id, bottleId: imported.id, position: 1, menuSectionId: null, isHidden: false }),
+    ]);
+    expect(await prisma.menuBottleExclusion.findMany()).toEqual([expect.objectContaining({ bottleId: excluded.id })]);
+  });
+
   it('should give the same menus whatever the route: POST, PUT, import or sync', async () => {
     const category = await seedCategory({ name: 'Apero' });
     const aperitifs = await findSystemMenu('aperitifs');

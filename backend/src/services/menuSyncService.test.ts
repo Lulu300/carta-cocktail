@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData, prisma,
-  seedBottle, seedMenu, seedMenuSection, addBottleToMenu, excludeBottleFromMenu, findSystemMenu,
+  seedBottle, seedCategory, seedMenu, seedMenuSection, addBottleToMenu, excludeBottleFromMenu, findSystemMenu,
 } from '../test/helpers';
 import {
   assertBottlesAllowed, BottleMenuType, excludeBottles, isAvailableFor, isEligible, isSystemMenu,
-  restoreBottle, syncAllBottleMenus, syncBottle, syncMenu,
+  restoreBottle, syncBottle, syncMenu, syncNewBottles,
 } from './menuSyncService';
 
 beforeAll(async () => { await setupTestDatabase(); });
@@ -198,29 +198,71 @@ describe('syncBottle', () => {
   });
 });
 
-describe('syncAllBottleMenus', () => {
-  it('fills both system menus and removes unchecked bottles from personal menus', async () => {
+describe('syncNewBottles', () => {
+  it('adds the new bottles to both system menus, at the end, visible and outside any section, by category then name', async () => {
     const aperitifs = await findSystemMenu('aperitifs');
     const digestifs = await findSystemMenu('digestifs');
-    const personal = await seedMenu({ type: 'DIGESTIFS' });
-    const apero = await seedBottle({ isApero: true });
-    const digestif = await seedBottle({ isDigestif: true });
-    const unchecked = await seedBottle();
-    await addBottleToMenu(personal.id, digestif.id);
-    await addBottleToMenu(personal.id, unchecked.id, { position: 1 });
+    const section = await seedMenuSection(aperitifs.id);
+    const present = await seedBottle({ isApero: true });
+    await addBottleToMenu(aperitifs.id, present.id, { position: 4, menuSectionId: section.id });
+    const vermouth = await seedCategory({ name: 'Vermouth' });
+    const bitter = await seedCategory({ name: 'Bitter' });
+    const lillet = await seedBottle({ name: 'Lillet', categoryId: vermouth.id, isApero: true, isDigestif: true });
+    const campari = await seedBottle({ name: 'Campari', categoryId: bitter.id, isApero: true });
+    const aperol = await seedBottle({ name: 'Aperol', categoryId: bitter.id, isApero: true });
+    const unchecked = await seedBottle({ name: 'Water', categoryId: bitter.id });
 
-    await syncAllBottleMenus(prisma);
+    await syncNewBottles(prisma, [lillet.id, campari.id, aperol.id, unchecked.id]);
 
-    expect(await bottleIdsOf(aperitifs.id)).toEqual([apero.id]);
-    expect(await bottleIdsOf(digestifs.id)).toEqual([digestif.id]);
-    expect(await bottleIdsOf(personal.id)).toEqual([digestif.id]);
+    const entries = await prisma.menuBottle.findMany({ where: { menuId: aperitifs.id }, orderBy: { position: 'asc' } });
+    expect(entries.map(({ bottleId, position, menuSectionId, isHidden }) => ({ bottleId, position, menuSectionId, isHidden })))
+      .toEqual([
+        { bottleId: present.id, position: 4, menuSectionId: section.id, isHidden: false },
+        { bottleId: aperol.id, position: 5, menuSectionId: null, isHidden: false },
+        { bottleId: campari.id, position: 6, menuSectionId: null, isHidden: false },
+        { bottleId: lillet.id, position: 7, menuSectionId: null, isHidden: false },
+      ]);
+    expect(await bottleIdsOf(digestifs.id)).toEqual([lillet.id]);
+  });
+
+  it('leaves the other bottles of the system and personal menus as they are', async () => {
+    const aperitifs = await findSystemMenu('aperitifs');
+    const personal = await seedMenu({ type: 'APEROS' });
+    const section = await seedMenuSection(aperitifs.id);
+    // Added by hand before C-06 checked the boxes: kept, with its section and hidden state
+    const handAdded = await seedBottle();
+    await addBottleToMenu(aperitifs.id, handAdded.id, { position: 0, isHidden: true, menuSectionId: section.id });
+    await addBottleToMenu(personal.id, handAdded.id);
+    // Checked but missing from the menu: only "Synchronize" adds it
+    const missing = await seedBottle({ isApero: true });
+    const created = await seedBottle({ isApero: true });
+    const before = await prisma.menuBottle.findMany({ orderBy: { id: 'asc' } });
+
+    await syncNewBottles(prisma, [created.id]);
+
+    const after = await prisma.menuBottle.findMany({ orderBy: { id: 'asc' } });
+    expect(after.slice(0, before.length)).toEqual(before);
+    expect(await bottleIdsOf(aperitifs.id)).toEqual([handAdded.id, created.id]);
+    expect(await bottleIdsOf(personal.id)).toEqual([handAdded.id]);
+    expect(await bottleIdsOf(aperitifs.id)).not.toContain(missing.id);
+  });
+
+  it('never adds an excluded bottle', async () => {
+    const aperitifs = await findSystemMenu('aperitifs');
+    const excluded = await seedBottle({ isApero: true });
+    await excludeBottleFromMenu(aperitifs.id, excluded.id);
+
+    await syncNewBottles(prisma, [excluded.id]);
+
+    expect(await bottleIdsOf(aperitifs.id)).toEqual([]);
+    expect(await excludedIdsOf(aperitifs.id)).toEqual([excluded.id]);
   });
 
   it('skips a missing system menu', async () => {
     await prisma.menu.delete({ where: { slug: 'digestifs' } });
     const apero = await seedBottle({ isApero: true });
 
-    await syncAllBottleMenus(prisma);
+    await syncNewBottles(prisma, [apero.id]);
 
     expect(await bottleIdsOf((await findSystemMenu('aperitifs')).id)).toEqual([apero.id]);
   });
