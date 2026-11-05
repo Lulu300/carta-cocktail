@@ -114,7 +114,7 @@ ADMIN_PASSWORD=<at least 12 characters>        # required on first start
 
 #### Upgrading
 
-Some versions require actions before or after the upgrade (new variables in `.env`, files to copy out of the old container…). **Read [`UPGRADING.md`](UPGRADING.md) before pulling a new version**, and apply the sections of every version newer than yours, in order. Upgrading from v1.4.0 or older to v1.5.0 requires a `JWT_SECRET` and a copy of the existing cocktail photos.
+Some versions require actions before or after the upgrade (new variables in `.env`, files to copy out of the old container…). **Read [`UPGRADING.md`](UPGRADING.md) before pulling a new version**, and apply the sections of every version newer than yours, in order. Upgrading from v1.4.0 or older to v1.5.0 requires a `JWT_SECRET` and a copy of the existing cocktail photos. Upgrading to v1.12.0 requires giving the data folders to uid 1000 first (see below).
 
 #### Data folders and the node user
 
@@ -124,7 +124,7 @@ By default, the backend runs as the `node` user (uid 1000, gid 1000), never as r
 mkdir -p data uploads && sudo chown 1000:1000 data uploads
 ```
 
-Versions before the `node` user ran as root, so the volumes and folders of an existing install belong to root: follow the required actions of that version in [`UPGRADING.md`](UPGRADING.md). If a folder is not writable, the backend stops at startup with the `chown` command to run.
+Versions before v1.12.0 ran as root, so the volumes and folders of an existing install belong to root: follow the [v1.12.0 section of `UPGRADING.md`](UPGRADING.md#v1120). If a folder is not writable, the backend stops at startup with the `chown` command to run.
 
 **Another uid and gid.** The compose files run the backend as `${CARTA_UID:-1000}:${CARTA_GID:-1000}`. Set both variables in the `.env` file next to the compose file when the data folders must belong to another owner, then recreate the backend (`docker compose -f docker-compose.prod.yml up -d`):
 
@@ -163,11 +163,11 @@ If you lose the admin password:
 2. Restart the backend: `docker compose -f docker-compose.prod.yml up -d`. The log shows `Admin credentials reset from environment (login email: …)`.
 3. Remove `ADMIN_RESET_PASSWORD` from `.env` (or set it back to `false`) and restart again, otherwise every restart resets the password.
 
-We recommend pinning a version instead of `latest`, so that an upgrade only happens after you have read `UPGRADING.md`. Edit the image tags in `docker-compose.prod.yml`:
+We recommend pinning a version instead of `latest`, so that an upgrade only happens after you have read `UPGRADING.md`. Edit the image tags in `docker-compose.prod.yml` (from v1.12.0, `:1.12` also exists and follows the 1.12.x patch releases):
 
 ```yaml
-image: ghcr.io/lulu300/carta-cocktail/backend:1.5.0
-image: ghcr.io/lulu300/carta-cocktail/frontend:1.5.0
+image: ghcr.io/lulu300/carta-cocktail/backend:1.12.0
+image: ghcr.io/lulu300/carta-cocktail/frontend:1.12.0
 ```
 
 ## Database migrations
@@ -376,9 +376,9 @@ Write values without quotes in this list: compose keeps them as part of the valu
 
 The API then uses the address the first proxy sees and ignores what clients write in `X-Forwarded-For`. This removes the bypass and adds no risk of blocking the admin: clients that shared a counter still share it, and the others (IPv4 clients in the `docker-proxy` case) keep their own. Clients that share a counter can still block the admin with their failures; raise `LOGIN_RATE_LIMIT` if that happens too often. The counters are kept in memory: restarting the backend clears them.
 
-These settings hold only when clients cannot skip a proxy. The compose files publish the backend port 3001. A client that connects to it directly passes for the first proxy, and the API reads the address that client wrote in `X-Forwarded-For`: with `TRUST_PROXY=1` or `2`, and also with the default when the connection arrives under a private address, as in the installs listed above (in the `docker-proxy` case, only over IPv6). Behind SWAG, the same goes for nginx's port when a client reaches it without SWAG.
+These settings hold only when clients cannot skip a proxy. From v1.12.0, `docker-compose.prod.yml` does not publish the backend port 3001, and `docker-compose.yml` (local build) binds it to `127.0.0.1`. If you published it again, or use a compose file from an older version, a client that connects to it directly passes for the first proxy, and the API reads the address that client wrote in `X-Forwarded-For`: with `TRUST_PROXY=1` or `2`, and also with the default when the connection arrives under a private address, as in the installs listed above (in the `docker-proxy` case, only over IPv6). Behind SWAG, the same goes for nginx's port when a client reaches it without SWAG.
 
-Do not publish these ports. Remove the `ports` entry of `carta-cocktail-backend`: nginx reaches the backend over the compose network and does not need it. If you call the API from the host, bind the port to the loopback address instead:
+Do not publish these ports. Keep `carta-cocktail-backend` without a `ports` entry, as in `docker-compose.prod.yml`: nginx reaches the backend over the compose network and does not need it. If you call the API from the host, bind the port to the loopback address instead:
 
 ```yaml
     ports:
@@ -415,7 +415,7 @@ The **Release** workflow (`.github/workflows/release.yml`) runs on version tags 
 | Tag | Tagged on | Docker images | GitHub Release |
 | --- | --- | --- | --- |
 | `vX.Y.Z-rc.N` (pre-release) | a commit of `develop` | `:X.Y.Z-rc.N` only, `latest` does not move | marked as pre-release |
-| `vX.Y.Z` (final) | a commit of `main` | `:X.Y.Z` and `latest` | normal release, marked as latest |
+| `vX.Y.Z` (final) | a commit of `main` | `:X.Y.Z`, `:X.Y`, `:X` and `latest` | normal release, marked as latest |
 
 1. **Notes first.** On `develop`, copy `docs/releases/TEMPLATE.md` to `docs/releases/vX.Y.Z.md` (summary, detailed changes, required actions before and after the upgrade, `breaking`), and add the version's section to `UPGRADING.md`. A pre-release uses the notes of its target version, unless `docs/releases/vX.Y.Z-rc.N.md` exists.
 2. **Pre-release.** Push `develop`, then tag it: `git tag vX.Y.Z-rc.N origin/develop && git push origin vX.Y.Z-rc.N`.
@@ -431,8 +431,8 @@ The GitHub Release contains the notes file (without its front matter), the list 
 ### Pulling release images
 
 ```bash
-docker pull ghcr.io/lulu300/carta-cocktail/backend:1.5.0
-docker pull ghcr.io/lulu300/carta-cocktail/frontend:1.5.0
+docker pull ghcr.io/lulu300/carta-cocktail/backend:1.12.0
+docker pull ghcr.io/lulu300/carta-cocktail/frontend:1.12.0
 ```
 
 ## API Overview
