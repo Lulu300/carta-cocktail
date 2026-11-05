@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../../hooks/useLocalizedName';
 import type { Bottle, Category } from '../../../types';
 import Button from '../../ui/Button';
+import DateInput from '../../ui/DateInput';
 import Field from '../../ui/Field';
 import Input from '../../ui/Input';
 import Modal from '../../ui/Modal';
@@ -96,9 +97,7 @@ export default function BottleFormModal({ entityForm, categories, isSaving, onSu
             className="w-full accent-accent"
           />
         </div>
-        <Field label={t('bottles.openedAt')}>
-          <Input type="date" value={form.openedAt} onChange={(event) => setField('openedAt', event.target.value)} />
-        </Field>
+        <DateInput label={t('bottles.openedAt')} value={form.openedAt} onChange={(value) => setField('openedAt', value)} />
         <Field label={t('bottles.alcoholPercentage')}>
           <Input
             type="number"

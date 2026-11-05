@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { BottleImportRowError } from '../../types';
+import { datePattern, isoDatePattern } from '../../utils/dates';
 
 // Codes and sources this version can name. A newer backend may send others:
 // they get a generic reason, or the raw source, rather than an i18n key.
@@ -8,8 +9,11 @@ const KNOWN_SOURCES: readonly string[] = ['bottles', 'categories'];
 
 /** Rows of the file the backend left out, with the line and the reason. */
 export default function BottleImportRowErrors({ errors }: { errors: BottleImportRowError[] }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   if (errors.length === 0) return null;
+
+  // The formats the import reads, for an invalid date: the language's, or ISO 8601.
+  const dateFormats = { pattern: datePattern(i18n.language, t), isoPattern: isoDatePattern(t) };
 
   const sourceLabel = (source: string) =>
     KNOWN_SOURCES.includes(source) ? t(`bottles.importWizard.rowErrors.source.${source}`) : source;
@@ -25,7 +29,7 @@ export default function BottleImportRowErrors({ errors }: { errors: BottleImport
             <span className="font-medium">
               {t('bottles.importWizard.rowErrors.position', { source: sourceLabel(error.source), line: error.line })}
             </span>{' '}
-            <span>{t(reasonKey(error.code), { field: error.field })}</span>
+            <span>{t(reasonKey(error.code), { field: error.field, ...dateFormats })}</span>
           </li>
         ))}
       </ul>

@@ -340,7 +340,7 @@ describe('BottlesPage', () => {
       fireEvent.change(form.getByLabelText('bottles.capacityMl'), { target: { value: '1000' } });
       await user.type(form.getByLabelText('bottles.purchasePrice'), '32.5');
       fireEvent.change(form.getByLabelText(/bottles\.remainingPercent/), { target: { value: '60' } });
-      fireEvent.change(form.getByLabelText('bottles.openedAt'), { target: { value: '2026-10-01' } });
+      await user.type(form.getByLabelText('bottles.openedAt'), '10/01/2026');
       await user.type(form.getByLabelText('bottles.alcoholPercentage'), '43.1');
       await user.type(form.getByLabelText('bottles.location'), 'Shelf');
       await user.click(form.getByLabelText('bottles.usableAsDigestif'));
@@ -443,7 +443,7 @@ describe('BottlesPage', () => {
 
       expect(screen.getByText('bottles.edit')).toBeInTheDocument();
       expect(nameInput()).toHaveValue('Hendricks');
-      expect(within(dialog()).getByLabelText('bottles.openedAt')).toHaveValue('2024-06-01');
+      expect(within(dialog()).getByLabelText('bottles.openedAt')).toHaveValue('06/01/2024');
       expect(within(dialog()).getByLabelText('bottles.usableAsApero')).toBeChecked();
       expect(within(dialog()).getByLabelText('bottles.usableAsDigestif')).not.toBeChecked();
       expect(within(dialog()).queryByRole('button', { name: 'bottles.saveDuplicate' })).not.toBeInTheDocument();

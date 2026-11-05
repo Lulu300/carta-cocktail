@@ -20,14 +20,23 @@ describe('BottleImportRowErrors', () => {
     render(<BottleImportRowErrors errors={[rowError({})]} />);
 
     expect(screen.getByText(/rowErrors\.position .*"source":"bottles\.importWizard\.rowErrors\.source\.bottles","line":3/)).toBeInTheDocument();
-    expect(screen.getByText('bottles.importWizard.rowErrors.code.required {"field":"capacityMl"}')).toBeInTheDocument();
+    expect(screen.getByText(/^bottles\.importWizard\.rowErrors\.code\.required \{"field":"capacityMl"/)).toBeInTheDocument();
   });
 
   it('falls back on a generic reason and the raw source when the backend sends unknown values', () => {
     render(<BottleImportRowErrors errors={[rowError({ source: 'menus', code: 'tooLong', field: 'name' })]} />);
 
     expect(screen.getByText(/rowErrors\.position .*"source":"menus"/)).toBeInTheDocument();
-    expect(screen.getByText('bottles.importWizard.rowErrors.code.unknown {"field":"name"}')).toBeInTheDocument();
+    expect(screen.getByText(/^bottles\.importWizard\.rowErrors\.code\.unknown \{"field":"name"/)).toBeInTheDocument();
+  });
+
+  it('names the date formats of the app language for an invalid date', () => {
+    render(<BottleImportRowErrors errors={[rowError({ field: 'openedAt', code: 'invalidDate' })]} />);
+
+    expect(screen.getByText(
+      'bottles.importWizard.rowErrors.code.invalidDate '
+      + '{"field":"openedAt","pattern":"dates.month/dates.day/dates.year","isoPattern":"dates.year-dates.month-dates.day"}',
+    )).toBeInTheDocument();
   });
 
   it('renders nothing without errors', () => {
