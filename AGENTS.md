@@ -24,14 +24,31 @@ A full review (2026-10-08) produced an action plan in `docs/plan/`. Before picki
 
 ### Cleaning up after a task
 
-The machine is shared with other projects and its disk fills up. Before its final report, every agent removes what it created for the task, and only that.
+The machine is shared with other projects and its disk fills up. Before its final report, every agent removes what it created for the task, and only that: other projects and other sessions of this project use the same Docker and the same temporary folder.
 
-- **Name what you create after the project**, so that it can be found again: temporary files and folders with `mktemp "${TMPDIR:-/tmp}/carta.XXXXXX"` (add `-d` for a folder), compose projects with `COMPOSE_PROJECT_NAME=carta-<task id>`, local images with a `carta-` name. The upgrade bench already prefixes its own resources with `carta-ut-` and removes them at the end of each run (`scripts/upgrade-test/README.md`).
-- **Temporary files**: delete your `mktemp` files and folders, copies of a test fixture included, and the `carta-uploads-*` folders that an interrupted backend test run leaves in the system temp folder.
-- **Docker**: stop each compose project you started with `docker compose down -v --remove-orphans --rmi local`, and remove the images you built or pulled for the task with `docker image rm`. Then `docker ps -a`, `docker volume ls`, `docker network ls` and `docker images` must show nothing of yours.
-- **Never clean globally**: no `docker system prune`, `docker volume prune`, `docker image prune -a`, `docker builder prune` or `npm cache clean`, and nothing deleted outside this repository's worktrees and your own temporary files. Other projects keep containers, volumes and caches on this machine that must survive.
+- **Name what you create after the project and the task**, so that it can be found again:
+  - temporary files and folders: `mktemp "${TMPDIR:-/tmp}/carta.XXXXXX"` (add `-d` for a folder);
+  - compose projects: `carta-<task id in lowercase>`, for example `carta-a-02` (compose refuses uppercase);
+  - local images: `carta-<task id in lowercase>-<name>`, or `carta-review-<PR number>` for a reviewer.
+  The upgrade bench already prefixes its containers, volumes and networks with `carta-ut-<run id>` (`scripts/upgrade-test/README.md`).
+- **Temporary files**: delete the files and folders you created, copies of a test fixture included, by their exact paths. Never with a pattern such as `carta.*` or `carta-uploads-*`: another session may be using a file with the same prefix.
+- **Docker**: pass `-p <project>` to every `docker compose` command, `down` included. Variables exported in one shell call are gone in the next one, and a `down -v` on the default project would delete the local stack's data. End with `docker compose -p <project> down -v --remove-orphans --rmi local`. Then remove, by name or by id, only the images you built or pulled for the task:
+  - images named `carta-*`;
+  - `ghcr.io/lulu300/carta-cocktail/*` images, including the `<none>` ones the bench pulls by digest.
+  Never remove a base image (`node`, `nginx`, `alpine`…) and never use `-f`. Then check with name filters, because other projects' containers show in the same lists: `docker ps -a --filter name=carta`, `docker volume ls --filter name=carta`, `docker network ls --filter name=carta`, and `docker images | grep -E 'carta|<none>'`.
+- **Upgrade bench**: a run removes its own resources, also when interrupted with Ctrl+C. After a `--keep` run or a `kill -9`, remove that run's `carta-ut-<run id>` containers, volumes and networks by name. `run.mjs --clean-all` removes those of every run: only the coordinator uses it, when no bench is running. The helper image `carta-upgrade-test-sqlite:1` stays.
+- **Never**:
+  - any `docker … prune` or `npm cache clean`;
+  - the BuildKit build cache, which is shared and cannot be cleared for this project alone;
+  - anything outside this repository's worktrees and your own temporary files;
+  - `~/carta-fixtures/`: the fixture itself is never deleted, only your copies of it.
 - **Build outputs** (`node_modules`, `dist`, `coverage`) stay inside your worktree, and go away with it.
-- **The coordinator, at the end of a batch**: removes the batch's worktrees and branches and empties its scratchpad. It also removes the images shared by the batch: `carta-upgrade-test/*:local`, the `ghcr.io/lulu300/carta-cocktail/*` images pulled for the upgrade bench, and reviewers' `carta-review-*` images. It then runs the Docker check above again. A worktree, container or image that another running session still uses stays.
+- **The coordinator, at the end of a batch**:
+  - removes the batch's worktrees and branches, and empties its scratchpad;
+  - removes the images shared by the batch: `carta-upgrade-test/*:local`, the `ghcr.io/lulu300/carta-cocktail/*` images pulled for the bench, and the reviewers' `carta-review-*`;
+  - removes the empty `carta-uploads-*` folders older than a day, which interrupted backend test runs leave in the system temp folder;
+  - runs the Docker check above again.
+  A worktree, container or image that another running session still uses stays.
 
 ## Coding Conventions
 
@@ -94,7 +111,7 @@ Coverage is enforced automatically by CI. Run `npm test -- --coverage` in either
 
 **Smoke** (`.github/workflows/smoke.yml`) — runs on PRs to `main`/`develop` and on demand:
 - Builds and starts `docker-compose.yml`, then runs `scripts/smoke/smoke.sh` through nginx: login, 2.4 MB photo upload, photo still served after the backend container is recreated, backup export
-- Locally, always in a dedicated compose project: `export COMPOSE_PROJECT_NAME=carta-smoke JWT_SECRET=$(openssl rand -hex 32) ADMIN_PASSWORD=$(openssl rand -hex 16)`, then `docker compose up -d --build --wait && ./scripts/smoke/smoke.sh`, then `docker compose down -v`. The default project is your local stack: `down -v` would delete its data (see the header of `smoke.sh`)
+- Locally, always in a dedicated compose project: `export COMPOSE_PROJECT_NAME=carta-smoke JWT_SECRET=$(openssl rand -hex 32) ADMIN_PASSWORD=$(openssl rand -hex 16)`, then `docker compose up -d --build --wait && ./scripts/smoke/smoke.sh`, then `docker compose -p carta-smoke down -v --remove-orphans --rmi local`, all in the same shell call (`smoke.sh` reads `COMPOSE_PROJECT_NAME` to recreate the backend). The default project is your local stack: `down -v` would delete its data (see the header of `smoke.sh`)
 
 **Release** (`.github/workflows/release.yml`) — runs on tag push `v*`:
 - Builds backend and frontend Docker images
