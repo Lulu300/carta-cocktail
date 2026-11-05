@@ -178,6 +178,10 @@ Dates follow the app's language (`i18n.language`), never the browser's: a date f
 
 Uses `@import "tailwindcss"` syntax (not `@tailwind` directives). Dark theme with `bg-[#0f0f1a]` as base background. Custom theme values via `@theme { }` block.
 
+### Supported browsers
+
+Safari and iOS 16.0+, Chrome and Edge 107+, Firefox 104+ (`build.target` in `vite.config.ts`, the targets of v1.11; Vite 8's default would require Safari 16.4). Old tablets serve as menu displays and for the admin. Do not remove the target: Tailwind writes its breakpoints as range media queries (`width>=40rem`), which Safari before 16.4 ignores, and only this target makes the minifier rewrite them as `min-width`. CI checks the built CSS with `.github/scripts/css-media-ranges.mjs`. The target lowers syntax, not APIs: guard a browser API newer than Safari 16.0 (`URL.canParse`, `Object.groupBy`, `Promise.withResolvers`…) or avoid it.
+
 ### Import/Export
 
 - Single cocktail: JSON export/import with dependency resolution wizard
