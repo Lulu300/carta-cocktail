@@ -8,7 +8,7 @@ import { parseNameTranslations } from '../utils/translations';
 import { buildExportPayload, buildCsvPayload } from '../utils/bottlesExport';
 import { ImportParseError, parseImportFile, NormalizedImportPayload } from '../utils/bottlesImport';
 import { deleteBottle, isForceRequested } from '../services/deletionService';
-import { syncAllBottleMenus, syncBottle } from '../services/menuSyncService';
+import { syncBottle, syncNewBottles } from '../services/menuSyncService';
 import { valid, validate } from '../validation/validate';
 import { deleteRequest, IdParams, idRequest } from '../validation/common';
 import { BottleCreate, BottleExportQuery, BottleListQuery, BottleUpdate } from '../validation/bottles';
@@ -194,12 +194,17 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
       for (let q = 0; q < b.quantity; q++) rows.push(data);
     }
 
+    const createdIds: number[] = [];
     for (let start = 0; start < rows.length; start += CREATE_BATCH_SIZE) {
-      await tx.bottle.createMany({ data: rows.slice(start, start + CREATE_BATCH_SIZE) });
+      const batch = await tx.bottle.createManyAndReturn({
+        data: rows.slice(start, start + CREATE_BATCH_SIZE),
+        select: { id: true },
+      });
+      createdIds.push(...batch.map((bottle) => bottle.id));
     }
 
     // Inside the transaction: a failed sync also cancels the import
-    await syncAllBottleMenus(tx);
+    await syncNewBottles(tx, createdIds);
     return { createdCount: rows.length, skippedNoCategory, duplicatesCreated };
   }, { timeout: IMPORT_TRANSACTION_TIMEOUT_MS });
 

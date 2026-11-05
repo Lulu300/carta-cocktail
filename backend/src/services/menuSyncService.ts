@@ -87,9 +87,16 @@ function systemMenuType(menu: MenuIdentity): BottleMenuType {
 /**
  * Brings a system menu in line with the bottles: eligible bottles missing from it are
  * added at the end, in category and name order; the others are removed.
+ * With `onlyBottleIds`, the bottles outside that set are left as they are.
  */
-export async function syncMenu(db: Db, menuId: number): Promise<{ added: number; removed: number }> {
+export async function syncMenu(
+  db: Db,
+  menuId: number,
+  onlyBottleIds?: ReadonlySet<number>,
+): Promise<{ added: number; removed: number }> {
   const type = systemMenuType(await findMenu(db, menuId));
+  // Filtered here rather than in the queries: an import's id list could pass SQLite's parameter limit
+  const inScope = (bottleId: number) => !onlyBottleIds || onlyBottleIds.has(bottleId);
 
   const exclusions = await db.menuBottleExclusion.findMany({ where: { menuId }, select: { bottleId: true } });
   const excludedIds = new Set(exclusions.map((exclusion) => exclusion.bottleId));
@@ -97,10 +104,13 @@ export async function syncMenu(db: Db, menuId: number): Promise<{ added: number;
     select: BOTTLE_FLAGS_SELECT,
     orderBy: [{ category: { name: 'asc' } }, { name: 'asc' }],
   });
-  const eligibleIds = bottles.filter((bottle) => isEligible(bottle, type, excludedIds)).map((bottle) => bottle.id);
+  const eligibleIds = bottles
+    .filter((bottle) => inScope(bottle.id) && isEligible(bottle, type, excludedIds))
+    .map((bottle) => bottle.id);
   const eligibleSet = new Set(eligibleIds);
 
-  const entries = await db.menuBottle.findMany({ where: { menuId }, select: { id: true, bottleId: true } });
+  const menuEntries = await db.menuBottle.findMany({ where: { menuId }, select: { id: true, bottleId: true } });
+  const entries = menuEntries.filter((entry) => inScope(entry.bottleId));
   const presentIds = new Set(entries.map((entry) => entry.bottleId));
   const toAdd = eligibleIds.filter((bottleId) => !presentIds.has(bottleId));
   const toRemove = entries.filter((entry) => !eligibleSet.has(entry.bottleId));
@@ -148,25 +158,18 @@ export async function syncBottle(db: Db, bottleId: number): Promise<void> {
   }
 }
 
-async function removeUnavailableBottles(db: Db): Promise<void> {
-  const entries = await db.menuBottle.findMany({
-    where: { menu: { type: { in: BOTTLE_MENU_TYPES } } },
-    select: { id: true, menu: { select: { type: true } }, bottle: { select: BOTTLE_FLAGS_SELECT } },
-  });
-  const unavailableIds = entries
-    .filter(({ menu, bottle }) => isBottleMenuType(menu.type) && !isAvailableFor(bottle, menu.type))
-    .map((entry) => entry.id);
-  if (unavailableIds.length > 0) await db.menuBottle.deleteMany({ where: { id: { in: unavailableIds } } });
-}
-
-/** Synchronizes every bottle menu at once, e.g. after an import of many bottles. */
-export async function syncAllBottleMenus(db: Db): Promise<void> {
+/**
+ * Adds bottles just created, e.g. by an import, to the system menus they are eligible for,
+ * at the end in category and name order. Every other bottle stays as it is: an import never
+ * removes a bottle the admin put in a menu (task C-45). New bottles are in no menu yet, so
+ * there is nothing to remove from personal menus.
+ */
+export async function syncNewBottles(db: Db, bottleIds: readonly number[]): Promise<void> {
+  const newIds = new Set(bottleIds);
   for (const slug of Object.values(SYSTEM_MENU_SLUGS)) {
     const menu = await db.menu.findUnique({ where: { slug }, select: { id: true } });
-    if (menu) await syncMenu(db, menu.id);
+    if (menu) await syncMenu(db, menu.id, newIds);
   }
-  // The system menus are already clean: this removes unchecked bottles from personal menus
-  await removeUnavailableBottles(db);
 }
 
 /**
