@@ -282,7 +282,7 @@ router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Respons
       data: Array.from({ length: count }, () => data),
       include: { category: true },
     });
-    // Per bottle, not syncAllBottleMenus: only the new bottles join the menus, in creation order
+    // Per bottle, not syncNewBottles: the new bottles join the menus in creation order
     for (const bottle of created) await syncBottle(tx, bottle.id);
     return created;
   });
