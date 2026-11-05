@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { datePattern, formatDate, isoDatePattern, parseDateInput } from './dates';
 
 const FRENCH_LETTERS: Record<string, string> = { 'dates.day': 'jj', 'dates.month': 'mm', 'dates.year': 'aaaa' };
@@ -7,6 +7,19 @@ const french = (key: string) => FRENCH_LETTERS[key];
 const english = (key: string) => ENGLISH_LETTERS[key];
 
 describe('formatDate', () => {
+  // West of UTC, a midnight-UTC date read in local time is the day before. Pinned here because
+  // CI runs in UTC, where reading local time would go unnoticed.
+  beforeEach(() => {
+    vi.stubEnv('TZ', 'America/Los_Angeles');
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('runs west of UTC', () => {
+    expect(new Date('2024-12-03T00:00:00.000Z').getDate()).toBe(2);
+  });
+
   it('writes the day first in French', () => {
     expect(formatDate('2024-12-03', 'fr')).toBe('03/12/2024');
   });
@@ -16,7 +29,6 @@ describe('formatDate', () => {
   });
 
   it('keeps the stored day of a midnight UTC timestamp, whatever the time zone', () => {
-    // Formatted in local time, this would be December 2 west of UTC.
     expect(formatDate('2024-12-03T00:00:00.000Z', 'fr')).toBe('03/12/2024');
   });
 

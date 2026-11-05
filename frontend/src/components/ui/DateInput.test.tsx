@@ -118,6 +118,18 @@ describe('DateInput', () => {
     expect(await axe(container)).toHaveNoViolations();
   });
 
+  it('shows the error when Enter submits an invalid date, without leaving the field', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(<DateForm onSubmit={onSubmit} />);
+
+    await user.type(dateField(), '31/02/2024{Enter}');
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(dateField()).toHaveFocus();
+    expect(screen.getByText(/dates\.invalid/)).toBeInTheDocument();
+  });
+
   it('waits for the field to lose the focus before showing the error', async () => {
     const user = userEvent.setup();
     render(<DateForm onSubmit={vi.fn()} />);
