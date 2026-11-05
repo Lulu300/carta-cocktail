@@ -1,10 +1,22 @@
 /** Language used when the requested one is not available (also i18next's fallbackLng). */
 export const FALLBACK_LANGUAGE = 'en';
 
-/** Name of each supported language in that language: endonyms are never translated. */
-export const LANGUAGE_NAMES = {
+// Language names are endonyms: each one is written in its own language and never translated.
+
+/**
+ * Name of each language entity names are translated into (`nameTranslations`). These are keyed by
+ * base language: `en` serves US and UK English alike, so its field is just "English".
+ */
+export const CONTENT_LANGUAGE_NAMES = {
   fr: 'Français',
   en: 'English',
+} as const;
+
+/** Name of each language of the app, as the language selector lists them. */
+export const LANGUAGE_NAMES = {
+  fr: CONTENT_LANGUAGE_NAMES.fr,
+  en: 'English (US)',
+  'en-GB': 'English (UK)',
 } as const;
 
 /**

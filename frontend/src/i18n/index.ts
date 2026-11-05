@@ -10,7 +10,18 @@ import { FALLBACK_LANGUAGE, getBaseLanguage } from '../utils/localization';
 export const TRANSLATED_LANGUAGES = ['fr', 'en'] as const;
 export type TranslatedLanguage = (typeof TRANSLATED_LANGUAGES)[number];
 
-export const SUPPORTED_LANGUAGES: readonly string[] = [...TRANSLATED_LANGUAGES];
+/** The languages of the app: English (UK) only changes the date format. */
+export const SUPPORTED_LANGUAGES: readonly string[] = [...TRANSLATED_LANGUAGES, 'en-GB'];
+
+/**
+ * A detected code as a supported one: kept when the app supports it exactly ("en-GB"), reduced to
+ * its base language otherwise ("fr-FR" -> "fr", "en-AU" -> "en"). Browsers do not all agree on the
+ * case of the region ("en-gb"), so the match ignores it.
+ */
+function toSupportedLanguage(code: string): string {
+  const supported = SUPPORTED_LANGUAGES.find((language) => language.toLowerCase() === code.toLowerCase());
+  return supported ?? getBaseLanguage(code);
+}
 
 // Only the messages of the first load (public pages and the components they share with the
 // admin) ship with the app entry: guests opening a menu from a QR code never need the rest.
@@ -24,7 +35,7 @@ const PUBLIC_RESOURCES = {
 
 // Registered before init so the language picked by the detector is applied too.
 i18n.on('languageChanged', (language) => {
-  document.documentElement.lang = getBaseLanguage(language || FALLBACK_LANGUAGE);
+  document.documentElement.lang = language || FALLBACK_LANGUAGE;
 });
 
 i18n
@@ -37,10 +48,11 @@ i18n
       // so reading it back would make an unsupported browser language ("de") inherit the previous
       // choice. No cookie is ever written (the choice is cached in localStorage only).
       order: ['querystring', 'localStorage', 'sessionStorage', 'navigator'],
-      // Reduce detected codes to their base language ("fr-FR" -> "fr") so they match supportedLngs.
-      convertDetectedLanguage: getBaseLanguage,
+      // Detected codes must match supportedLngs exactly: i18next would refuse "fr-FR".
+      convertDetectedLanguage: toSupportedLanguage,
     },
-    // Unsupported languages ("de") fall through to fallbackLng: i18n.language is always "fr" or "en".
+    // Unsupported languages ("de") fall through to fallbackLng: i18n.language is always one of
+    // SUPPORTED_LANGUAGES. "en-GB" has no messages of its own: i18next serves it those of "en".
     // Neither nonExplicitSupportedLngs nor load: 'languageOnly' may be set: both make i18next
     // accept "fr-FR" as supported and keep the regional code.
     supportedLngs: [...SUPPORTED_LANGUAGES],

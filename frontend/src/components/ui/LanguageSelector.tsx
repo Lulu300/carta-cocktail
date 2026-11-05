@@ -27,9 +27,29 @@ function FlagGB({ className }: { className?: string }) {
   );
 }
 
+// Stars are drawn as dots: a dashed line with round caps, as five-pointed stars would not show
+// at the size of the selector.
+function FlagUS({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" className={className} viewBox="0 0 640 480" xmlns="http://www.w3.org/2000/svg">
+      <rect width="640" height="480" fill="#fff" />
+      <path d="M0 0h640v37H0zm0 74h640v37H0zm0 74h640v37H0zm0 74h640v37H0zm0 74h640v37H0zm0 74h640v37H0zm0 74h640v37H0z" fill="#b22234" />
+      <rect width="256" height="259" fill="#3c3b6e" />
+      <path d="M26 30h204M26 80h204M26 130h204M26 180h204M26 230h204" stroke="#fff" strokeWidth="16" strokeLinecap="round" strokeDasharray="0 51" />
+    </svg>
+  );
+}
+
 const flagComponents: Record<string, ({ className }: { className?: string }) => React.JSX.Element> = {
   fr: FlagFR,
-  en: FlagGB,
+  en: FlagUS,
+  'en-GB': FlagGB,
+};
+
+// The button shows the language code, except for British English: "EN-GB" is too long for it, and
+// "UK" tells it apart from the "EN" of US English.
+const buttonLabels: Record<string, string> = {
+  'en-GB': 'UK',
 };
 
 const languages = Object.entries(LANGUAGE_NAMES).map(([code, name]) => ({ code, name }));
@@ -46,11 +66,13 @@ export default function LanguageSelector() {
   const { isOpen, close, closeAndFocusTrigger, panelId, containerRef, handleKeyDown, triggerProps } = useDisclosure();
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Defensive: i18n config already yields "fr" or "en", but never trust a regional or unknown code
-  // here. Fall back to English like i18next does, not to the first entry of the list.
-  const currentCode = getBaseLanguage(i18n.resolvedLanguage ?? i18n.language ?? FALLBACK_LANGUAGE);
+  // The chosen code, not resolvedLanguage: English (UK) resolves to the messages of "en".
+  // Defensive: i18n config already yields a supported code, but never trust a regional or unknown
+  // one here. Fall back to English like i18next does, not to the first entry of the list.
+  const languageCode = i18n.language ?? FALLBACK_LANGUAGE;
   const currentLanguage =
-    languages.find(lang => lang.code === currentCode) ??
+    languages.find(lang => lang.code === languageCode) ??
+    languages.find(lang => lang.code === getBaseLanguage(languageCode)) ??
     languages.find(lang => lang.code === FALLBACK_LANGUAGE)!;
 
   // Menu button pattern: the open menu takes the focus, on the current language.
@@ -83,7 +105,7 @@ export default function LanguageSelector() {
         {/* Hidden text rather than aria-label: the name keeps the visible code (WCAG 2.5.3, label in name). */}
         <span className="sr-only">{t('nav.changeLanguage')}</span>{' '}
         {flagComponents[currentLanguage.code]?.({ className: 'w-5 h-4 rounded-sm' })}
-        <span className="text-sm uppercase">{currentLanguage.code}</span>
+        <span className="text-sm uppercase">{buttonLabels[currentLanguage.code] ?? currentLanguage.code}</span>
         <Icon
           name="chevron-down"
           className={cx('size-4 transition-transform motion-reduce:transition-none', isOpen && 'rotate-180')}
@@ -97,7 +119,7 @@ export default function LanguageSelector() {
           role="menu"
           aria-label={t('nav.language')}
           onKeyDown={handleMenuKeyDown}
-          className="absolute right-0 mt-2 w-40 bg-surface border border-line-strong rounded-lg shadow-lg overflow-hidden z-50"
+          className="absolute right-0 mt-2 w-48 bg-surface border border-line-strong rounded-lg shadow-lg overflow-hidden z-50"
         >
           {languages.map((lang) => {
             const isCurrent = lang.code === currentLanguage.code;

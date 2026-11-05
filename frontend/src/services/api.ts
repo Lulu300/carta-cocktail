@@ -7,6 +7,7 @@ import type {
 } from '../types';
 
 import i18n from '../i18n';
+import { FALLBACK_LANGUAGE } from '../utils/localization';
 
 const API_BASE = '/api';
 const LOGIN_URL = '/auth/login';
@@ -34,8 +35,10 @@ export function setUnauthorizedHandler(fn: (() => void) | null): void {
 function buildHeaders(init: RequestInit, token: string | null): Record<string, string> {
   const headers: Record<string, string> = {
     ...(init.headers as Record<string, string>),
-    // Server error messages must follow the language chosen in the UI, not the browser's.
-    'Accept-Language': i18n.resolvedLanguage ?? i18n.language ?? 'en',
+    // Server error messages and the import's dates must follow the language chosen in the UI, not
+    // the browser's. The chosen code, not resolvedLanguage: English (UK) resolves to the `en`
+    // messages, but the import reads its dates day first.
+    'Accept-Language': i18n.language || FALLBACK_LANGUAGE,
   };
 
   if (token) {

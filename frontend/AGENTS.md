@@ -78,7 +78,7 @@ frontend/
 │   │   ├── ui/
 │   │   │   ├── ExportCocktailButton.tsx  # Export cocktail as JSON
 │   │   │   ├── IconPicker.tsx            # Emoji selector for category types
-│   │   │   ├── LanguageSelector.tsx      # EN/FR toggle
+│   │   │   ├── LanguageSelector.tsx      # Language menu (FR, EN, UK)
 │   │   │   └── UnitConverter.tsx         # ml conversion display
 │   │   └── import/
 │   │       ├── ImportCocktailWizard.tsx  # Main import orchestrator
@@ -168,7 +168,7 @@ Admin pages are self-contained with inline forms and modals. Each page:
 
 ### Locale bundles
 
-Messages are split in two bundles so guests do not download the admin texts. A key goes in `locales/public/` when a file of the first load (reached from `main.tsx` through static imports) uses it, otherwise in `locales/admin/`; `src/i18n/bundles.test.ts` checks the split and fails with the keys to move. A new lazy chunk behind `/login` or `/admin` goes through `lazyWithAdminMessages` in `App.tsx`. A new language with its own message files goes in `TRANSLATED_LANGUAGES` (`i18n/index.ts`, from which `SUPPORTED_LANGUAGES` derives), in the message maps of `i18n/index.ts` and `i18n/admin.ts` (typed by `TRANSLATED_LANGUAGES`, so `tsc` fails until both list it), in `LANGUAGE_NAMES` (`utils/localization.ts`, the names `LanguageSelector` lists) and in `flagComponents` (`LanguageSelector`). A regional variant without files (`en-GB`) goes in `SUPPORTED_LANGUAGES`, `LANGUAGE_NAMES` and `flagComponents` only: it has no entry in the message maps and i18next serves it the messages of its base language. Every language, regional variant included, also gets its date format in `DATE_FORMATS` (`utils/dates.ts`); without one it uses the format of its base language, then English.
+Messages are split in two bundles so guests do not download the admin texts. A key goes in `locales/public/` when a file of the first load (reached from `main.tsx` through static imports) uses it, otherwise in `locales/admin/`; `src/i18n/bundles.test.ts` checks the split and fails with the keys to move. A new lazy chunk behind `/login` or `/admin` goes through `lazyWithAdminMessages` in `App.tsx`. A new language with its own message files goes in `TRANSLATED_LANGUAGES` (`i18n/index.ts`, from which `SUPPORTED_LANGUAGES` derives), in the message maps of `i18n/index.ts` and `i18n/admin.ts` (typed by `TRANSLATED_LANGUAGES`, so `tsc` fails until both list it), in `LANGUAGE_NAMES` (`utils/localization.ts`, the names `LanguageSelector` lists), in `CONTENT_LANGUAGE_NAMES` (same file, the labels of the entity name fields of `TranslationFields`) and in `flagComponents` (`LanguageSelector`). Language names are endonyms, never translated. A regional variant without files (`en-GB`) goes in `SUPPORTED_LANGUAGES`, `LANGUAGE_NAMES` and `flagComponents` only (plus `buttonLabels` when its code does not fit the selector's button: `UK`): it has no entry in the message maps and i18next serves it the messages of its base language, and entity names use the translation of its base language. The detector keeps a supported regional code (`en-GB`) and reduces the others to their base language (`en-AU` -> `en`). Every language, regional variant included, also gets its date format in `DATE_FORMATS` (`utils/dates.ts`); without one it uses the format of its base language, then English.
 
 ### Dates
 

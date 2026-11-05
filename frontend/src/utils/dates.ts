@@ -16,10 +16,12 @@ interface DateFormat {
 /**
  * One entry per language; a new language (or regional variant) adds its format here, with a test.
  * `en` is US English: `12/03/2024` is December 3, as the import reads it (backend `importDates.ts`).
+ * `en-GB` writes the day first: `12/03/2024` is March 12.
  * A Map, not an object: `constructor` is no language.
  */
 const DATE_FORMATS = new Map<string, DateFormat>([
   ['en', { order: ['month', 'day', 'year'], separator: '/' }],
+  ['en-GB', { order: ['day', 'month', 'year'], separator: '/' }],
   ['fr', { order: ['day', 'month', 'year'], separator: '/' }],
 ]);
 
