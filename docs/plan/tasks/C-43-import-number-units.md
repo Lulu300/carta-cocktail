@@ -8,7 +8,7 @@ effort: S
 status: done
 owner: agent
 depends_on: [C-10]
-touches: [backend/src/utils/bottlesImport.ts, backend/src/utils/bottlesImport.test.ts]
+touches: [backend/src/utils/bottlesImport.ts, backend/src/utils/bottlesImport.test.ts, backend/src/test/windows1252.ts]
 sources: []
 branch: fix/C-43-import-number-units
 pr: "#154"
@@ -46,7 +46,7 @@ Excel écrit dans un CSV la valeur affichée. Une colonne au format monétaire, 
 
 ## Tests à ajouter ou adapter
 
-- `src/utils/bottlesImport.test.ts` : bloc « numbers displayed with their unit » (cellules d'Excel en français, `€` en tête d'Excel en anglais, unité collée ou en majuscules, refus d'une autre unité et des espaces qui ne groupent pas des milliers) ; JSON avec unités en texte.
+- `src/utils/bottlesImport.test.ts` : bloc « numbers displayed with their unit » (cellules d'Excel en français, `€` en tête d'Excel en anglais, unité collée ou en majuscules, refus d'une autre unité et des espaces qui ne groupent pas des milliers) ; JSON avec unités en texte ; CSV Windows-1252 avec `25,90 €` (octets 0xA0 et 0x80) dans `purchasePrice`.
 
 ## Points d'attention
 
@@ -61,3 +61,4 @@ Excel écrit dans un CSV la valeur affichée. Une colonne au format monétaire, 
 - 2026-11-05 : tâche créée et faite (PR #154), suite à l'écart G2 de la relecture des notes de v1.12.0 (PR #152). `toNumber` reçoit l'unité de la colonne (`COLUMN_UNITS`) : `stripUnit` retire l'unité finale (casse ignorée, espaces de toute sorte avant elle), une unité seule donne `invalidNumber`, puis `SPACE_GROUPED_THOUSANDS` retire les espaces qui groupent les milliers par trois avant la lecture de la virgule décimale. `RowReader.quantity` et `desiredStock` n'ont pas d'unité. Frontend inchangé.
 - Notes de version : à l'import de bouteilles, les cellules affichées par Excel avec l'unité de leur colonne (`25,90 €`, `40 %`, `700 ml`, milliers groupés par des espaces : `1 234,50 €`, `€` en tête d'Excel en anglais : `€25.00`) se lisent comme des nombres. Une autre unité (`70 cl` dans la capacité, `40°`) écarte la ligne, listée dans l'assistant ; en v1.11 elle était lue de travers (`70 cl` = 70 ml) ou perdue sans le dire.
 - 2026-11-05 : suite de la relecture de la PR #154 (décision du coordinateur : dans le périmètre, « `toNumber` strips € » ne se limite pas au symbole final). `stripUnit` retire aussi un `€` en tête, avec ou sans espace (`€25.00`, `€ 25.00`) ; `€1,234.50` reste refusé. Points d'attention : format comptabilité `- €`, U+202F et C-44.
+- 2026-11-05 : rebase sur `develop` après le merge de C-44 (PR #155). Test ajouté à la demande du coordinateur (suggestion de la relecture de #155) : un CSV Windows-1252 dont la cellule `purchasePrice` vaut `25,90 €` (octets 0xA0 pour l'espace insécable, 0x80 pour `€`) se lit 25,9. `backend/src/test/windows1252.ts` (helper de C-44) reçoit l'octet 0xA0 et rejoint `touches`.

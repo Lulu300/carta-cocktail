@@ -381,6 +381,16 @@ describe('parseImportFile', () => {
     ]);
   });
 
+  it('reads a Windows-1252 price displayed with a no-break space and a euro sign', () => {
+    const file = windows1252Bytes('name;capacityMl;purchasePrice\r\nHavana;700;25,90\u00A0€\r\n');
+    expect(file.subarray(-4)).toEqual(Buffer.from([0xa0, 0x80, 0x0d, 0x0a]));
+
+    const payload = parseImportFile('bottles.csv', file, 'fr');
+
+    expect(payload.errors).toEqual([]);
+    expect(payload.bottles[0].purchasePrice).toBe(25.9);
+  });
+
   it('refuses a JSON file that does not parse', () => {
     expect(parseError(() => parseImportFile('bottles.json', Buffer.from('{ nope'), 'en')).code).toBe('invalidJson');
   });

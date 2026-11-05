@@ -6,6 +6,8 @@ const WINDOWS_1252_BYTES: Record<string, number> = {
   é: 0xe9,
   œ: 0x9c,
   '€': 0x80,
+  // The no-break space Excel in French writes before € and %
+  '\u00A0': 0xa0,
 };
 
 function windows1252Byte(char: string): number {
