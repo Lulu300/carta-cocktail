@@ -7,6 +7,7 @@ import {
 } from '../test/helpers';
 import type { BottlesExportPayload } from '../utils/bottlesExport';
 import type { ImportCategoryRecord } from '../utils/bottlesImport';
+import { windows1252Bytes } from '../test/windows1252';
 
 beforeAll(async () => { await setupTestDatabase(); });
 afterAll(async () => { await teardownTestDatabase(); });
@@ -714,6 +715,18 @@ describe('POST /api/bottles/import/preview', () => {
     expect(res.body.payload.bottles[1].location).toBe('Étagère 1');
     // Two distinct categories derived from rows
     expect(res.body.payload.categories).toHaveLength(2);
+  });
+
+  it('reads the accents of a CSV saved by Excel in Windows-1252', async () => {
+    const csv = windows1252Bytes('name;categoryName;capacityMl;location\r\nCrème;Liqueur à l\'œuf;700;Cellier é 20 €\r\n');
+    const res = await request.post('/api/bottles/import/preview')
+      .set(authHeader())
+      .attach('file', csv, 'bottles.csv');
+
+    expect(res.status).toBe(200);
+    expect(res.body.payload.bottles).toMatchObject([
+      { name: 'Crème', categoryName: 'Liqueur à l\'œuf', location: 'Cellier é 20 €' },
+    ]);
   });
 
   it('should reject a CSV missing required columns', async () => {

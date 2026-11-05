@@ -100,6 +100,27 @@ export function stripBom(text: string): string {
   return text.startsWith(UTF8_BOM) ? text.slice(UTF8_BOM.length) : text;
 }
 
+const strictUtf8 = new TextDecoder('utf-8', { fatal: true });
+const windows1252 = new TextDecoder('windows-1252');
+
+function startsWithUtf8Bom(bytes: Buffer): boolean {
+  return bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf;
+}
+
+/**
+ * Excel's default French CSV format ("CSV (séparateur : point-virgule)") is Windows-1252, without a BOM.
+ * Read as UTF-8, its accents would become U+FFFD without a warning. Valid UTF-8 always wins, and a BOM
+ * declares UTF-8, so a UTF-8 file is never read as Windows-1252: only bytes that are not UTF-8 are.
+ */
+export function decodeCsvBytes(bytes: Buffer): string {
+  if (startsWithUtf8Bom(bytes)) return bytes.toString('utf8');
+  try {
+    return strictUtf8.decode(bytes);
+  } catch {
+    return windows1252.decode(bytes);
+  }
+}
+
 function parseJsonText(text: string): unknown {
   try {
     return JSON.parse(stripBom(text));
@@ -451,12 +472,12 @@ function parseCategoriesCsv(csv: string, errors: ImportRowError[]): ImportCatego
   return readCategories(rows, errors);
 }
 
-function readZipEntryText(entry: AdmZip.IZipEntry): string {
+function readZipEntryBytes(entry: AdmZip.IZipEntry): Buffer {
   if (entry.header.size > MAX_ZIP_ENTRY_BYTES) {
     throw new ImportParseError('zipEntryTooLarge', { maxMb: MAX_ZIP_ENTRY_BYTES / 1024 / 1024 });
   }
   try {
-    return entry.getData().toString('utf8');
+    return entry.getData();
   } catch {
     throw new ImportParseError('invalidZip');
   }
@@ -478,14 +499,14 @@ export function parseZipBottles(buffer: Buffer, language: string): NormalizedImp
   );
   if (!bottlesEntry) throw new ImportParseError('zipMissingBottles');
 
-  const bottlesText = readZipEntryText(bottlesEntry);
+  const bottlesBytes = readZipEntryBytes(bottlesEntry);
   const payload = bottlesEntry.entryName.endsWith('.csv')
-    ? parseCsvBottles(bottlesText, language)
-    : parseJsonBottles(parseJsonText(bottlesText), language);
+    ? parseCsvBottles(decodeCsvBytes(bottlesBytes), language)
+    : parseJsonBottles(parseJsonText(bottlesBytes.toString('utf8')), language);
 
   const categoriesEntry = entries.find((e) => e.entryName === 'categories.csv');
   if (categoriesEntry) {
-    const explicitCategories = parseCategoriesCsv(readZipEntryText(categoriesEntry), payload.errors);
+    const explicitCategories = parseCategoriesCsv(decodeCsvBytes(readZipEntryBytes(categoriesEntry)), payload.errors);
     const merged = new Map<string, ImportCategoryRecord>();
     for (const c of payload.categories) merged.set(c.name.toLowerCase(), c);
     for (const c of explicitCategories) merged.set(c.name.toLowerCase(), c);
@@ -504,7 +525,7 @@ export function parseImportFile(filename: string, buffer: Buffer, language: stri
     return parseJsonBottles(parseJsonText(buffer.toString('utf8')), language);
   }
   if (lower.endsWith('.csv')) {
-    return parseCsvBottles(buffer.toString('utf8'), language);
+    return parseCsvBottles(decodeCsvBytes(buffer), language);
   }
   throw new ImportParseError('unsupportedFormat');
 }
