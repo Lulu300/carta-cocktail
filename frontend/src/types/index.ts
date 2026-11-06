@@ -175,8 +175,8 @@ export interface CocktailIngredientInput {
 
 export interface CocktailInput {
   name: string;
-  description?: string;
-  notes?: string;
+  description?: string | null;
+  notes?: string | null;
   tags?: string[];
   isAvailable?: boolean;
   ingredients?: CocktailIngredientInput[];
@@ -267,9 +267,10 @@ export interface ImportEntityRef {
   conversionFactorToMl?: number | null;
   nameTranslations?: Record<string, string> | null;
   type?: string;
-  desiredStock?: number;
+  // null while the admin has cleared the field in the wizard
+  desiredStock?: number | null;
   categoryName?: string;
-  capacityMl?: number;
+  capacityMl?: number | null;
   remainingPercent?: number;
   icon?: string | null;
 }
@@ -344,10 +345,24 @@ export interface BottleRowPreview {
   potentialDuplicates: BottleDuplicateEntry[];
 }
 
+export type BottleImportRowErrorCode = 'required' | 'outOfRange' | 'invalidDate' | 'invalidNumber';
+
+/**
+ * A row of the file left out of the import. `line` is the CSV line (header = 1)
+ * or the position in the JSON list (first = 1), within `source`.
+ */
+export interface BottleImportRowError {
+  source: 'bottles' | 'categories';
+  line: number;
+  field: string;
+  code: BottleImportRowErrorCode;
+}
+
 export interface BottleImportPreviewResponse {
   payload: BottleImportPayload;
   categories: BottleCategoryPreview[];
   bottles: BottleRowPreview[];
+  errors: BottleImportRowError[];
 }
 
 export type BottleCategoryResolution =
@@ -376,4 +391,23 @@ export interface BottleImportConfirmResponse {
   created: { bottles: number };
   duplicatesCreated: number;
   skippedNoCategory: number;
+}
+
+/** What a deletion breaks: `details` of a deletion refused with a 409, `impact` once it is done. */
+export interface DeletionImpact {
+  /** Recipes that use the item: a forced deletion removes `removedLines` lines from each. */
+  cocktails: { id: number; name: string; removedLines: number }[];
+  /** Bottles of a category, deleted with it. */
+  bottles: { id: number; name: string }[];
+}
+
+export interface DeletionResponse {
+  message: string;
+  deleted: boolean;
+  impact: DeletionImpact;
+}
+
+export interface DeleteOptions {
+  /** Also deletes what uses the item: the recipe lines, and the bottles of a category. */
+  force?: boolean;
 }

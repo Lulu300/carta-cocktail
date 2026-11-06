@@ -22,6 +22,34 @@ A full review (2026-10-08) produced an action plan in `docs/plan/`. Before picki
 - Merge only after an approved review and green CI. Then re-run `--ready` to pick the next tasks.
 - Stop and ask the human when a task needs a human action or decision (`owner: mixed` or `human`, or flagged in "Points d'attention").
 
+### Cleaning up after a task
+
+The machine is shared with other projects and its disk fills up. Before its final report, every agent removes what it created for the task, and only that: other projects and other sessions of this project use the same Docker and the same temporary folder.
+
+- **Name what you create after the project and the task**, so that it can be found again:
+  - temporary files and folders: `mktemp "${TMPDIR:-/tmp}/carta.XXXXXX"` (add `-d` for a folder);
+  - compose projects: `carta-<task id in lowercase>`, for example `carta-a-02` (compose refuses uppercase);
+  - local images: `carta-<task id in lowercase>-<name>`, or `carta-review-<PR number>` for a reviewer.
+  The upgrade bench already prefixes its containers, volumes and networks with `carta-ut-<run id>` (`scripts/upgrade-test/README.md`).
+- **Temporary files**: delete the files and folders you created, copies of a test fixture included, by their exact paths. Never with a pattern such as `carta.*` or `carta-uploads-*`: another session may be using a file with the same prefix.
+- **Docker**: pass `-p <project>` to every `docker compose` command, `down` included. Variables exported in one shell call are gone in the next one, and a `down -v` on the default project would delete the local stack's data. End with `docker compose -p <project> down -v --remove-orphans --rmi local`. Then remove, by name or by id, only the images you built or pulled for the task, except the images shared by the batch that the coordinator removes (listed below):
+  - images named `carta-*`;
+  - `ghcr.io/lulu300/carta-cocktail/*` images, including the `<none>` ones the bench pulls by digest.
+  Never remove a base image (`node`, `nginx`, `alpine`…) and never use `-f`. Then check with name filters, because other projects' resources show in the same lists: `docker ps -a --filter name=carta`, `docker volume ls --filter name=carta`, `docker network ls --filter name=carta`, and `docker images -a --digests --filter reference='carta*' --filter reference='carta*/*' --filter reference='ghcr.io/lulu300/carta-cocktail/*'`. An untagged image these filters do not show is not yours: leave it.
+- **Upgrade bench**: a run removes its own resources, also when interrupted with Ctrl+C. After a `--keep` run or a `kill -9`, remove that run's `carta-ut-<run id>` containers, volumes and networks by name. `run.mjs --clean-all` removes those of every run: only the coordinator uses it, when no bench is running. The helper image `carta-upgrade-test-sqlite:1` stays.
+- **Never**:
+  - any `docker … prune` or `npm cache clean`;
+  - the BuildKit build cache, which is shared and cannot be cleared for this project alone;
+  - anything outside this repository's worktrees and your own temporary files;
+  - `~/carta-fixtures/`: the fixture itself is never deleted, only your copies of it.
+- **Build outputs** (`node_modules`, `dist`, `coverage`) stay inside your worktree, and go away with it.
+- **The coordinator, at the end of a batch**:
+  - removes the batch's worktrees and branches, and empties its scratchpad;
+  - removes the images shared by the batch: `carta-upgrade-test/*:local`, the `ghcr.io/lulu300/carta-cocktail/*` images pulled for the bench, and the reviewers' `carta-review-*`;
+  - removes the `carta-uploads-*` folders older than a day, which interrupted backend test runs leave in the system temp folder;
+  - runs the Docker check above again.
+  A worktree, container or image that another running session still uses stays.
+
 ## Coding Conventions
 
 - **English everywhere in code**: identifiers, comments, commit messages, PR titles and descriptions. User-facing text goes through i18n (en/fr), never hard-coded. The plan and review documents in `docs/` are written in French.
@@ -35,9 +63,9 @@ A full review (2026-10-08) produced an action plan in `docs/plan/`. Before picki
 | Layer | Technology | Version |
 |-------|-----------|---------|
 | Backend | Express + TypeScript | 5.x |
-| ORM | Prisma | 6.x |
+| ORM | Prisma (better-sqlite3 adapter) | 7.x |
 | Database | SQLite | file-based |
-| Frontend | React + Vite | 19.x / 7.x |
+| Frontend | React + Vite | 19.x / 8.x |
 | Styling | TailwindCSS | 4.x |
 | Routing | React Router | 7.x |
 | i18n | i18next | 25.x |
@@ -51,7 +79,7 @@ For every change:
 1. Create a branch from `develop` (`feature/xxx`, `fix/xxx`)
 2. Make changes
 3. **Add or update tests** for any new or modified feature (see Testing section below)
-4. Ensure lint and tests pass: `cd frontend && npm run lint && npm test` / `cd backend && npm test`
+4. Ensure lint and tests pass: `cd frontend && npm run lint && npm test` / `cd backend && npm run lint && npm test`. Formatting follows the root `.editorconfig` and `.prettierrc`; `npm run format:check` exists in both packages but still fails until the one-off repository reformat is done, so do not reformat files outside your change
 5. Ensure TypeScript compiles: `cd frontend && npx tsc --noEmit` / `cd backend && npx tsc --noEmit`
 6. **Verify coverage thresholds are met** (see Testing section below)
 7. Commit (Conventional Commits, in English) and push the branch
@@ -77,9 +105,13 @@ Coverage is enforced automatically by CI. Run `npm test -- --coverage` in either
 ## CI/CD (GitHub Actions)
 
 **CI** (`.github/workflows/ci.yml`) — runs on PRs and pushes to `main`/`develop`:
-- **Backend job**: `npm ci` → `prisma generate` → `tsc --noEmit` → `npm run build` → `npm test`
+- **Backend job**: `npm ci` (postinstall: `prisma generate`) → `tsc --noEmit` → `npm run build` → `npm test`
 - **Frontend job**: `npm ci` → `tsc --noEmit` → `npm run lint` → `npm run build` → `npm test`
 - Both jobs run in parallel on Node 24, the version used by the Docker images (`.nvmrc`); `engines` in both `package.json` require Node >= 24
+
+**Smoke** (`.github/workflows/smoke.yml`) — runs on PRs to `main`/`develop` and on demand:
+- Builds and starts `docker-compose.yml`, then runs `scripts/smoke/smoke.sh` through nginx: login, 2.4 MB photo upload, photo still served after the backend container is recreated, backup export. Then `scripts/smoke/custom-uid.sh` recreates the backend with `CARTA_UID`/`CARTA_GID`: refused on volumes of uid 1000, then started after a `chown`, and `smoke.sh` again
+- Locally, always in a dedicated compose project: `export COMPOSE_PROJECT_NAME=carta-smoke JWT_SECRET=$(openssl rand -hex 32) ADMIN_PASSWORD=$(openssl rand -hex 16)`, then `docker compose -p carta-smoke up -d --build --wait && ./scripts/smoke/smoke.sh`, then `docker compose -p carta-smoke down -v --remove-orphans --rmi local`, all in the same shell call (`smoke.sh` reads `COMPOSE_PROJECT_NAME` to recreate the backend). The default project is your local stack: `down -v` would delete its data (see the header of `smoke.sh`)
 
 **Release** (`.github/workflows/release.yml`) — runs on tag push `v*`:
 - Builds backend and frontend Docker images

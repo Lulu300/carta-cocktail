@@ -2,7 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import path from 'path';
 import { rateLimit } from 'express-rate-limit';
 import { config } from './config';
 import { HttpError } from './errors';
@@ -24,6 +23,7 @@ import shortageRoutes from './routes/shortages';
 import availabilityRoutes from './routes/availability';
 import settingsRoutes from './routes/settings';
 import backupRoutes from './routes/backup';
+import healthRoutes from './routes/health';
 
 const LOGIN_RATE_WINDOW_MS = 15 * 60_000;
 
@@ -37,12 +37,19 @@ app.set('trust proxy', config.trustProxy);
 // Middleware
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({ origin: config.corsOrigin || false }));
+// Before the request logger: the Docker healthcheck calls it every 30 s and would fill the logs.
+// Public, like /api/auth and /api/public: Docker calls it without a token.
+app.use('/api/health', healthRoutes);
 // Request logs would bury the test results
 if (process.env.NODE_ENV !== 'test') {
   app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 }
 // i18n first, so that body parsing errors are answered in the client's language
 app.use(i18nMiddleware);
+// The confirmation of a bottle import sends back up to 2,000 rows and their resolutions: about
+// 2 MB at most, far above the default 100 kB. Read here, before the global parser (which skips a
+// body already read) and before authMiddleware: the limit stays at a few MB, under nginx's 20 MB.
+app.use('/api/bottles/import/confirm', express.json({ limit: '5mb' }));
 app.use(express.json());
 
 // Only failed attempts count: the admin who mistypes once and logs in is not held back

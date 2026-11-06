@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../generated/prisma/client';
 import { prisma } from '../lib/prisma';
 
 /**

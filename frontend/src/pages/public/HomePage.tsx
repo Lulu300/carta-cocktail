@@ -57,13 +57,13 @@ export default function HomePage() {
 function MenuCard({ menu }: { menu: Menu }) {
   const { t } = useTranslation();
   const countLabel = isBottleMenu(menu)
-    ? t('home.bottleCount', { count: menu._count?.bottles ?? 0 })
-    : t('home.cocktailCount', { count: menu._count?.cocktails ?? 0 });
+    ? t('menus.bottleCount', { count: menu._count?.bottles ?? 0 })
+    : t('menus.cocktailCount', { count: menu._count?.cocktails ?? 0 });
 
   return (
     <Link
       to={`/menu/${menu.slug}`}
-      className="group bg-surface border border-line rounded-xl p-6 hover:border-accent/50 transition-all hover:shadow-lg hover:shadow-accent/5"
+      className="group bg-surface border border-line rounded-xl p-6 hover:border-accent/50 transition-all motion-reduce:transition-none hover:shadow-lg hover:shadow-accent/5"
     >
       <h2 className="text-xl font-bold font-serif text-white group-hover:text-accent transition-colors mb-2">
         {menu.name}
@@ -73,7 +73,7 @@ function MenuCard({ menu }: { menu: Menu }) {
       )}
       <div className="flex items-center justify-between text-xs text-fg-muted">
         <span>{countLabel}</span>
-        <span aria-hidden="true" className="text-accent group-hover:translate-x-1 transition-transform">
+        <span aria-hidden="true" className="text-accent motion-safe:group-hover:translate-x-1 transition-transform motion-reduce:transition-none">
           &rarr;
         </span>
       </div>

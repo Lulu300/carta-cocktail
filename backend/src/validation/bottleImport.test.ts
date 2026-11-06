@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BottleImportConfirm, BottleImportPayload, MAX_IMPORT_ROWS } from './bottleImport';
+import { BottleImportConfirm, BottleImportPayload, MAX_IMPORT_BOTTLES, MAX_IMPORT_ROWS } from './bottleImport';
 
 // A row as POST /bottles/import/preview returns it
 const row = {
@@ -40,9 +40,20 @@ describe('BottleImportPayload', () => {
   });
 
   it(`accepts ${MAX_IMPORT_ROWS} rows and rejects one more`, () => {
-    const rows = Array.from({ length: MAX_IMPORT_ROWS }, () => row);
+    const single = { ...row, quantity: 1 };
+    const rows = Array.from({ length: MAX_IMPORT_ROWS }, () => single);
     expect(BottleImportPayload.safeParse(payloadWith(rows)).success).toBe(true);
-    expect(issuePaths(BottleImportPayload.safeParse(payloadWith([...rows, row])))).toEqual(['bottles']);
+    const tooMany = BottleImportPayload.safeParse(payloadWith([...rows, single]));
+    // 2,001 rows of one bottle each also break the bottle limit: both issues name the array
+    expect(new Set(issuePaths(tooMany))).toEqual(new Set(['bottles']));
+    expect(tooMany.error?.issues[0].code).toBe('too_big');
+  });
+
+  it(`accepts ${MAX_IMPORT_BOTTLES} bottles, quantities included, and rejects one more`, () => {
+    const rows = Array.from({ length: MAX_IMPORT_BOTTLES / 2 }, () => row);
+    expect(BottleImportPayload.safeParse(payloadWith(rows)).success).toBe(true);
+    const oneMore = [...rows, { ...row, quantity: 1 }];
+    expect(issuePaths(BottleImportPayload.safeParse(payloadWith(oneMore)))).toEqual(['bottles']);
   });
 
   it('accepts version 1 only', () => {

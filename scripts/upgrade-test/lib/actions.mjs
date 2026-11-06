@@ -1,11 +1,12 @@
 // Required actions of the release notes, as listed in the hook files. Each action returns
-// { status, detail }: status is done, skipped, manual, "not met" or failed.
+// { status, detail }: status is done, skipped, manual, "not met" or failed. A failed action that
+// was refused by the new image also returns `refused: true` (see markExpectedActions).
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { changeAdminPassword, checkLogLines } from './checks.mjs';
 import { copyDatabaseFiles, DB_FILE_NAME } from './database.mjs';
-import { containerMounts, docker } from './docker.mjs';
+import { containerMounts, docker, runHelper } from './docker.mjs';
 import { isRequirementMet } from './expectations.mjs';
 import { BACKEND_SERVICE, waitForStart } from './instance.mjs';
 
@@ -132,6 +133,27 @@ function copyDatabase(ctx) {
   return { status: 'done', detail: `${files} database files (${DB_FILE_NAME}*) copied out of ${source}` };
 }
 
+/**
+ * Result of the database copy check: refused (`refused: true`), or started with every expected log
+ * line and an up-to-date migration status. `readMigrateStatus` is only called on a started copy.
+ */
+export function judgeDatabaseCopy(outcome, expectedStartLogs, readMigrateStatus) {
+  if (!outcome.started) {
+    return {
+      status: 'failed',
+      refused: true,
+      detail: `the copy was refused (exit code ${outcome.exitCode ?? 'none'}): the notes say not to upgrade`,
+    };
+  }
+  const lines = checkLogLines(outcome.logs, expectedStartLogs);
+  const found = lines.filter((line) => line.status === 'ok').length;
+  const upToDate = readMigrateStatus().includes(MIGRATE_STATUS_OK);
+  return {
+    status: found === lines.length && upToDate ? 'done' : 'failed',
+    detail: `copy started, ${found}/${lines.length} expected log lines, migrate status ${upToDate ? 'up to date' : 'NOT up to date'}`,
+  };
+}
+
 /** Starts the new backend image on a second copy of the database, as the notes describe. */
 async function checkDatabaseCopy(ctx) {
   const checkDir = path.join(ctx.workDir, `db-check-${ctx.target.label}`);
@@ -143,18 +165,8 @@ async function checkDatabaseCopy(ctx) {
     ctx.target.images.backend]);
   try {
     const outcome = await waitForStart(name, ctx.timeoutMs);
-    if (!outcome.started) {
-      return { status: 'failed', detail: `the copy was refused (exit code ${outcome.exitCode ?? 'none'}): the notes say not to upgrade` };
-    }
-    const lines = checkLogLines(outcome.logs, ctx.expectedStartLogs);
-    const found = lines.filter((line) => line.status === 'ok').length;
-    const status = docker(['exec', name, 'npx', 'prisma', 'migrate', 'status'], { allowFailure: true }).stdout;
-    const upToDate = status.includes(MIGRATE_STATUS_OK);
-    const ok = found === lines.length && upToDate;
-    return {
-      status: ok ? 'done' : 'failed',
-      detail: `copy started, ${found}/${lines.length} expected log lines, migrate status ${upToDate ? 'up to date' : 'NOT up to date'}`,
-    };
+    return judgeDatabaseCopy(outcome, ctx.expectedStartLogs,
+      () => docker(['exec', name, 'npx', 'prisma', 'migrate', 'status'], { allowFailure: true }).stdout);
   } finally {
     docker(['rm', '--force', '--volumes', name], { allowFailure: true });
   }
@@ -181,6 +193,31 @@ async function changeWeakAdminPassword(ctx, hook) {
   return { status: 'done', detail: `password of ${current.length} characters changed to ${newPassword.length} characters${envNote}` };
 }
 
+/**
+ * Mounts of the container on `destinations`, in that order, with their `-v` source: the volume
+ * name, or the host folder of a bind mount. Destinations without a mount are left out.
+ */
+export function mountsToChown(mounts, destinations) {
+  return destinations
+    .map((destination) => mounts.find((mount) => mount.Destination === destination))
+    .filter(Boolean)
+    .map((mount) => ({ destination: mount.Destination, type: mount.Type, source: mount.Type === 'volume' ? mount.Name : mount.Source }));
+}
+
+/**
+ * The backend image runs as a non-root user: the volumes and host folders mounted on
+ * `destinations` are given to `owner` with a helper container, as the notes do with an alpine
+ * container. Runs before the jump, on the mounts of the stopped container.
+ */
+function chownMounts(ctx, { destinations, owner }) {
+  const container = ctx.instance.containerId(BACKEND_SERVICE);
+  const mounts = mountsToChown(containerMounts(container), destinations);
+  if (mounts.length === 0) return { status: 'skipped', detail: `no mount on ${destinations.join(', ')}` };
+  for (const mount of mounts) runHelper([`${mount.source}:/target`], `chown -R ${owner} /target`);
+  const list = mounts.map((mount) => `${mount.destination} (${mount.type})`).join(', ');
+  return { status: 'done', detail: `${list} given to ${owner}` };
+}
+
 function manual(ctx, { note }) {
   return { status: 'manual', detail: note };
 }
@@ -195,17 +232,19 @@ const ACTIONS = {
   restoreUploads,
   checkPhotoMount,
   changeWeakAdminPassword,
+  chownMounts,
   manual,
 };
 
-export async function runAction(ctx, hook) {
-  const run = ACTIONS[hook.action];
+/** Runs one required action of a hook file. Tests pass their own `actions` to run without Docker. */
+export async function runAction(ctx, hook, actions = ACTIONS) {
+  const run = actions[hook.action];
   if (!run) throw new Error(`Unknown action "${hook.action}" in the hooks of v${ctx.hooksVersion}`);
+  const result = { step: `v${ctx.hooksVersion} ${hook.step}`, action: hook.action, note: hook.note };
   try {
-    const { status, detail } = await run(ctx, hook);
-    return { step: `v${ctx.hooksVersion} ${hook.step}`, note: hook.note, status, detail };
+    return { ...result, ...await run(ctx, hook) };
   } catch (error) {
-    return { step: `v${ctx.hooksVersion} ${hook.step}`, note: hook.note, status: 'failed', detail: error.message };
+    return { ...result, status: 'failed', detail: error.message };
   }
 }
 

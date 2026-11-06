@@ -1,24 +1,101 @@
-FROM node:24.21-alpine
+# Literal tags in every FROM: Dependabot does not update a tag built from an ARG.
 
+# Compiles the application on the platform of the machine that runs the build
+# ($BUILDPLATFORM): the compiled JavaScript and the generated Prisma client do
+# not depend on the CPU, so the multi-platform release build compiles once,
+# natively, instead of once per platform under QEMU emulation.
+FROM --platform=$BUILDPLATFORM node:24.22-alpine AS build
 WORKDIR /app
-
 COPY package*.json ./
+# The postinstall script generates the Prisma client from prisma/schema.prisma
+# into src/generated/, which `npm run build` compiles with the sources. The
+# schema alone is enough: a new migration does not invalidate this layer.
+COPY prisma/schema.prisma ./prisma/schema.prisma
 RUN npm ci
-
-COPY prisma ./prisma
-RUN npx prisma generate
-
-COPY . .
+COPY tsconfig.json ./
+COPY src ./src
+# Also compiles src/scripts/ (seed, integrity check): the image has no tsx
 RUN npm run build
 
-RUN mkdir -p /app/data /app/uploads
+# Runtime dependencies only, installed for the target platform: they hold the
+# native better-sqlite3 binary and the Prisma schema engine. The first steps
+# repeat those of the build stage on purpose: when both platforms are the same
+# (local and CI builds), BuildKit runs them only once.
+# Pruning keeps what `npm ci` installed and built without a second download.
+# The runtime tree has no optional dependency of its own: --omit=optional drops the
+# optional peers that only the dev tooling uses (typescript, for @prisma/client and i18next).
+FROM node:24.22-alpine AS prod-deps
+WORKDIR /app
+COPY package*.json ./
+COPY prisma/schema.prisma ./prisma/schema.prisma
+RUN npm ci
+RUN npm prune --omit=dev --omit=optional
+# The entrypoint and the documented recovery commands need the Prisma CLI
+# (migrate deploy, diff, resolve, status) and its schema engine. The CLI also
+# brings what only `prisma studio` (a web UI built with React) and `prisma dev`
+# (a local Postgres server) use. Whatever the command, it loads at startup the
+# data modules of @prisma/studio-core and dist/state.cjs of @prisma/dev, which
+# need none of the dependencies cut below. Only Studio imports the MySQL and
+# Postgres drivers.
+# better-sqlite3 only runs prebuild-install during `npm ci`, to get its binary.
+COPY docker/prune-unused-deps.mjs /tmp/
+RUN node /tmp/prune-unused-deps.mjs \
+    '@prisma/studio-core:*' \
+    @prisma/dev:@electric-sql/pglite \
+    @prisma/dev:@electric-sql/pglite-socket \
+    @prisma/dev:@electric-sql/pglite-tools \
+    @prisma/dev:@prisma/get-platform \
+    @prisma/dev:@prisma/query-plan-executor \
+    @prisma/dev:@prisma/streams-local \
+    @prisma/dev:find-my-way \
+    @prisma/dev:foreground-child \
+    prisma:mysql2 \
+    prisma:postgres \
+    better-sqlite3:prebuild-install
+# Fails the build, on every platform, when a Prisma update makes the CLI load at
+# startup a package cut above: otherwise only the first container start would show it.
+# Without network, as in a container that cannot reach the registry.
+RUN --network=none CHECKPOINT_DISABLE=1 node_modules/.bin/prisma --version
+
+FROM node:24.22-alpine AS runtime
+# tini forwards SIGTERM to the entrypoint, then to Node once the entrypoint has exec'd it
+RUN apk add --no-cache tini
+ENV NODE_ENV=production
+# Keeps the startup logs to the entrypoint, migrations and API lines. The
+# entrypoint runs the Prisma CLI through npx at each start: without these, npx
+# prints an npm update notice (the node user's npm cache is new), and the CLI
+# calls checkpoint.prisma.io (telemetry) and may print a Prisma update box.
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false \
+  CHECKPOINT_DISABLE=1
+WORKDIR /app
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+COPY package.json prisma.config.ts ./
+# The Prisma CLI config resolves the database path with this file (loaded as
+# TypeScript by the CLI): the rest of src/ stays out of the image
+COPY src/lib/databasePath.ts ./src/lib/
+COPY prisma ./prisma
+COPY docker-entrypoint.sh ./
+# The executable bit can be lost on checkouts that do not keep file modes.
+# The code stays owned by root: the node user only writes to the two data folders.
+RUN chmod +x docker-entrypoint.sh \
+  && mkdir -p /app/data /app/uploads \
+  && chown node:node /app/data /app/uploads
+
 # Compiled code runs from /app/dist, so the default upload path would miss the volume
 ENV UPLOAD_DIR=/app/uploads
 
-# The executable bit can be lost on checkouts that do not keep file modes
-RUN chmod +x /app/docker-entrypoint.sh
+USER node
 
 EXPOSE 3001
 
-# Backs up the database, applies the Prisma migrations, seeds, then runs Node
-ENTRYPOINT ["/app/docker-entrypoint.sh"]
+# Version of the running backend, read by the application. The release workflow
+# passes the tag version (e.g. 1.12.0 or 1.12.0-rc.1); local and other builds
+# keep "dev". Declared last so a new version only rebuilds this layer.
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
+
+# Checks that the data folders are writable, backs up the database, applies the
+# Prisma migrations, seeds, then runs Node. A command given to `docker run`
+# replaces those steps.
+ENTRYPOINT ["/sbin/tini", "--", "/app/docker-entrypoint.sh"]

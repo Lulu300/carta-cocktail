@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../../hooks/useLocalizedName';
 import type { Bottle, Category } from '../../../types';
 import Button from '../../ui/Button';
+import DateInput from '../../ui/DateInput';
 import Field from '../../ui/Field';
 import Input from '../../ui/Input';
 import Modal from '../../ui/Modal';
@@ -96,10 +97,8 @@ export default function BottleFormModal({ entityForm, categories, isSaving, onSu
             className="w-full accent-accent"
           />
         </div>
-        <Field label={t('bottles.openedAt')}>
-          <Input type="date" value={form.openedAt} onChange={(event) => setField('openedAt', event.target.value)} />
-        </Field>
-        <Field label="Alcool % (vol.)">
+        <DateInput label={t('bottles.openedAt')} value={form.openedAt} onChange={(value) => setField('openedAt', value)} />
+        <Field label={t('bottles.alcoholPercentage')}>
           <Input
             type="number"
             step="0.1"
@@ -107,7 +106,7 @@ export default function BottleFormModal({ entityForm, categories, isSaving, onSu
             max="100"
             value={form.alcoholPercentage}
             onChange={(event) => setField('alcoholPercentage', event.target.value)}
-            placeholder="Ex: 40"
+            placeholder="40"
           />
         </Field>
         <Field label={t('bottles.location')}>
@@ -118,7 +117,7 @@ export default function BottleFormModal({ entityForm, categories, isSaving, onSu
           />
         </Field>
         <fieldset className="space-y-2">
-          <legend className="block text-sm text-fg-muted mb-2">Utilisation</legend>
+          <legend className="block text-sm text-fg-muted mb-2">{t('bottles.usage')}</legend>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
@@ -126,7 +125,7 @@ export default function BottleFormModal({ entityForm, categories, isSaving, onSu
               onChange={(event) => setField('isApero', event.target.checked)}
               className="size-4 accent-accent"
             />
-            <span className="text-sm">Utilisable comme apéritif</span>
+            <span className="text-sm">{t('bottles.usableAsApero')}</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -135,7 +134,7 @@ export default function BottleFormModal({ entityForm, categories, isSaving, onSu
               onChange={(event) => setField('isDigestif', event.target.checked)}
               className="size-4 accent-accent"
             />
-            <span className="text-sm">Utilisable comme digestif</span>
+            <span className="text-sm">{t('bottles.usableAsDigestif')}</span>
           </label>
         </fieldset>
         {!editing && (

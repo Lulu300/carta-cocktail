@@ -16,6 +16,7 @@ import SearchInput from '../../components/ui/SearchInput';
 import { cx } from '../../components/ui/classNames';
 import DataTable, { type Column } from '../../components/admin/DataTable';
 import { useConfirmDelete } from '../../components/admin/useConfirmDelete';
+import { useForcedDelete } from '../../components/admin/useForcedDelete';
 import { useEntityForm } from '../../components/admin/useEntityForm';
 import CategoryFormModal from '../../components/admin/categories/CategoryFormModal';
 import CategoryTypesManager from '../../components/admin/categories/CategoryTypesManager';
@@ -28,11 +29,17 @@ export default function CategoriesPage() {
   const categoriesQuery = useCategories();
   const categoryTypes = useCategoryTypes().data ?? [];
   // Bottles, shortages and availability all depend on the category of a bottle.
-  const { create, update, remove } = useCrudMutations<CategoryInput>({
+  const refreshedKeys = [qk.categoryTypes, qk.bottles, qk.shortages, qk.availability];
+  const { create, update } = useCrudMutations<CategoryInput>({
     key: qk.categories,
     api: categoriesApi,
-    invalidates: [qk.categoryTypes, qk.bottles, qk.shortages, qk.availability],
+    invalidates: refreshedKeys,
     messages: { created: 'categories.created', updated: 'categories.updated', deleted: 'categories.deleted' },
+  });
+  const deleteCategory = useForcedDelete({
+    deleteItem: categoriesApi.delete,
+    invalidates: [qk.categories, ...refreshedKeys],
+    deletedMessage: 'categories.deleted',
   });
   const categoryForm = useEntityForm((category?: Category) => toCategoryForm(categoryTypes, category));
   const [showTypesManager, setShowTypesManager] = useState(false);
@@ -58,7 +65,7 @@ export default function CategoriesPage() {
   };
 
   const handleDelete = async (category: Category) => {
-    if (await confirmDelete(t('categories.confirmDelete'))) remove.mutate(category.id);
+    if (await confirmDelete(t('categories.confirmDelete'))) await deleteCategory(category.id);
   };
 
   const columns: Column<Category>[] = [
@@ -100,7 +107,7 @@ export default function CategoriesPage() {
         </div>
         <Button onClick={() => categoryForm.open()}>{t('categories.add')}</Button>
       </div>
-      <SearchInput value={search} onChange={setSearch} className="max-w-sm mb-4" />
+      <SearchInput value={search} onChange={setSearch} label={t('categories.search')} className="max-w-sm mb-4" />
       <DataTable
         columns={columns}
         rows={pagination.paginatedItems}
@@ -111,6 +118,7 @@ export default function CategoriesPage() {
         isError={categoriesQuery.isError}
         onRetry={() => categoriesQuery.refetch()}
         emptyLabel={t('common.noResults')}
+        isFiltered={search.trim() !== ''}
       />
       <CategoryFormModal
         entityForm={categoryForm}

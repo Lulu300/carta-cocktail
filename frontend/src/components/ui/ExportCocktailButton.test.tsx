@@ -1,70 +1,96 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '../../test/test-utils';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { http, HttpResponse } from 'msw';
+import { render, screen, waitFor } from '../../test/test-utils';
 import userEvent from '@testing-library/user-event';
+import { mockDownload } from '../../test/download';
+import { server } from '../../test/msw/server';
+import { captureRequest, mockApiError } from '../../test/msw/utils';
+import type { CocktailExportFormat } from '../../types';
 import ExportCocktailButton from './ExportCocktailButton';
 
-vi.mock('../../services/api', () => ({
-  cocktails: { exportRecipe: vi.fn() },
-  publicApi: { exportCocktail: vi.fn() },
-}));
+const piñaColada: CocktailExportFormat = {
+  version: 1,
+  exportedAt: '2024-01-01',
+  cocktail: { name: 'Piña Colada', description: null, notes: null, tags: [], ingredients: [], instructions: [] },
+};
 
-import { cocktails as cocktailsApi, publicApi } from '../../services/api';
+/** The export endpoints name the file in Content-Disposition, accents removed. */
+function mockExport(path: string) {
+  server.use(
+    http.get(path, () =>
+      HttpResponse.json(piñaColada, {
+        headers: { 'Content-Disposition': 'attachment; filename="cocktail-pina-colada.json"' },
+      }),
+    ),
+  );
+}
+
+let downloads: string[];
 
 beforeEach(() => {
-  vi.clearAllMocks();
-  vi.mocked(cocktailsApi.exportRecipe).mockResolvedValue({
-    version: 1,
-    exportedAt: '2024-01-01',
-    cocktail: { name: 'Mojito', description: null, notes: null, tags: [], ingredients: [], instructions: [] },
-  } as never);
-  vi.mocked(publicApi.exportCocktail).mockResolvedValue({
-    version: 1,
-    exportedAt: '2024-01-01',
-    cocktail: { name: 'Mojito', description: null, notes: null, tags: [], ingredients: [], instructions: [] },
-  } as never);
+  downloads = mockDownload();
+});
 
-  // Mock URL.createObjectURL and revokeObjectURL
-  global.URL.createObjectURL = vi.fn(() => 'blob:test');
-  global.URL.revokeObjectURL = vi.fn();
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('ExportCocktailButton', () => {
-  it('should render export button with title', () => {
-    render(<ExportCocktailButton cocktailId={1} cocktailName="Mojito" />);
-    expect(screen.getByTitle('cocktails.export')).toBeInTheDocument();
-  });
-
-  it('should call exportRecipe on click (admin mode)', async () => {
+  it('downloads the admin export under the name given by the server', async () => {
     const user = userEvent.setup();
-    render(<ExportCocktailButton cocktailId={1} cocktailName="Mojito" />);
+    mockExport('/api/cocktails/:id/export');
+    const request = captureRequest('get', '/api/cocktails/:id/export');
+    render(<ExportCocktailButton cocktailId={1} />);
 
     await user.click(screen.getByTitle('cocktails.export'));
-    expect(cocktailsApi.exportRecipe).toHaveBeenCalledWith(1);
+
+    expect((await request.url).pathname).toBe('/api/cocktails/1/export');
+    await waitFor(() => expect(downloads).toEqual(['cocktail-pina-colada.json']));
   });
 
-  it('should call publicApi.exportCocktail when isPublic', async () => {
+  it('saves the recipe as indented JSON', async () => {
     const user = userEvent.setup();
-    render(<ExportCocktailButton cocktailId={1} cocktailName="Mojito" isPublic />);
+    const createObjectURL = vi.mocked(URL.createObjectURL);
+    mockExport('/api/cocktails/:id/export');
+    render(<ExportCocktailButton cocktailId={1} />);
 
     await user.click(screen.getByTitle('cocktails.export'));
-    expect(publicApi.exportCocktail).toHaveBeenCalledWith(1);
+
+    await waitFor(() => expect(downloads).toHaveLength(1));
+    const saved = createObjectURL.mock.calls[0][0];
+    expect(saved).toBeInstanceOf(Blob);
+    if (saved instanceof Blob) {
+      expect(saved.type).toBe('application/json');
+      expect(await saved.text()).toBe(JSON.stringify(piñaColada, null, 2));
+    }
   });
 
-  it('should use custom className when provided', () => {
-    render(<ExportCocktailButton cocktailId={1} cocktailName="Mojito" className="custom-class" />);
-    const button = screen.getByTitle('cocktails.export');
-    expect(button.className).toContain('custom-class');
-  });
-
-  it('should handle export error gracefully', async () => {
-    vi.mocked(cocktailsApi.exportRecipe).mockRejectedValue(new Error('fail'));
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('uses the public export when isPublic', async () => {
     const user = userEvent.setup();
+    mockExport('/api/public/cocktails/:id/export');
+    const request = captureRequest('get', '/api/public/cocktails/:id/export');
+    render(<ExportCocktailButton cocktailId={7} isPublic />);
 
-    render(<ExportCocktailButton cocktailId={1} cocktailName="Mojito" />);
     await user.click(screen.getByTitle('cocktails.export'));
 
-    expect(consoleSpy).toHaveBeenCalledWith('Export failed:', expect.any(Error));
-    consoleSpy.mockRestore();
+    expect((await request.url).pathname).toBe('/api/public/cocktails/7/export');
+    await waitFor(() => expect(downloads).toEqual(['cocktail-pina-colada.json']));
+  });
+
+  it('uses the custom className when provided', () => {
+    render(<ExportCocktailButton cocktailId={1} className="custom-class" />);
+    expect(screen.getByTitle('cocktails.export')).toHaveClass('custom-class');
+  });
+
+  it('logs a failed export and downloads nothing', async () => {
+    const user = userEvent.setup();
+    mockApiError('get', '/api/cocktails/:id/export', 404, 'Cocktail not found');
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(<ExportCocktailButton cocktailId={1} />);
+
+    await user.click(screen.getByTitle('cocktails.export'));
+
+    await waitFor(() => expect(consoleError).toHaveBeenCalledWith('Export failed:', expect.objectContaining({ status: 404 })));
+    expect(downloads).toEqual([]);
   });
 });

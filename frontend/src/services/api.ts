@@ -3,10 +3,11 @@ import type {
   CocktailInput, MenuInput, CocktailAvailability, SiteSettings,
   CocktailExportFormat, ImportPreviewResponse, EntityResolutionAction,
   BottleImportPayload, BottleImportPreviewResponse, BottleImportResolutions,
-  BottleImportConfirmResponse,
+  BottleImportConfirmResponse, DeleteOptions, DeletionResponse,
 } from '../types';
 
 import i18n from '../i18n';
+import { FALLBACK_LANGUAGE } from '../utils/localization';
 
 const API_BASE = '/api';
 const LOGIN_URL = '/auth/login';
@@ -34,8 +35,10 @@ export function setUnauthorizedHandler(fn: (() => void) | null): void {
 function buildHeaders(init: RequestInit, token: string | null): Record<string, string> {
   const headers: Record<string, string> = {
     ...(init.headers as Record<string, string>),
-    // Server error messages must follow the language chosen in the UI, not the browser's.
-    'Accept-Language': i18n.resolvedLanguage ?? i18n.language ?? 'en',
+    // Server error messages and the import's dates must follow the language chosen in the UI, not
+    // the browser's. The chosen code, not resolvedLanguage: English (UK) resolves to the `en`
+    // messages, but the import reads its dates day first.
+    'Accept-Language': i18n.language || FALLBACK_LANGUAGE,
   };
 
   if (token) {
@@ -88,6 +91,33 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
+/** File name suggested by the Content-Disposition header, or `fallback` when the server sends none. */
+function attachmentFilename(res: Response, fallback: string): string {
+  const disposition = res.headers.get('Content-Disposition') ?? '';
+  const match = disposition.match(/filename="?([^";]+)"?/);
+  return match ? match[1] : fallback;
+}
+
+/** A cocktail export with the file name chosen by the server. */
+export interface CocktailExportFile {
+  filename: string;
+  data: CocktailExportFormat;
+}
+
+/**
+ * The backend names the file (accents removed, `cocktail-<id>.json` when the name has
+ * no latin letter): the fallback only covers a response without the header.
+ */
+async function requestCocktailExport(url: string, id: number): Promise<CocktailExportFile> {
+  const res = await send(url);
+  return { filename: attachmentFilename(res, `cocktail-${id}.json`), data: await res.json() };
+}
+
+/** URL of a DELETE that may be forced: `?force=true` also deletes what uses the item. */
+function deletionUrl(path: string, { force = false }: DeleteOptions): string {
+  return force ? `${path}?force=true` : path;
+}
+
 // Auth
 export const auth = {
   login: (email: string, password: string) =>
@@ -117,8 +147,8 @@ export const categories = {
     request<Category>('/categories', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: Partial<Category>) =>
     request<Category>(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (id: number) =>
-    request<{ message: string }>(`/categories/${id}`, { method: 'DELETE' }),
+  delete: (id: number, options: DeleteOptions = {}) =>
+    request<DeletionResponse>(deletionUrl(`/categories/${id}`, options), { method: 'DELETE' }),
 };
 
 // Bottles
@@ -135,8 +165,8 @@ export const bottles = {
     request<Bottle | Bottle[]>('/bottles', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: Partial<Bottle>) =>
     request<Bottle>(`/bottles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (id: number) =>
-    request<{ message: string }>(`/bottles/${id}`, { method: 'DELETE' }),
+  delete: (id: number, options: DeleteOptions = {}) =>
+    request<DeletionResponse>(deletionUrl(`/bottles/${id}`, options), { method: 'DELETE' }),
   exportFile: async (
     format: 'json' | 'csv',
     filters?: { categoryId?: number; type?: string; search?: string; location?: string }
@@ -149,10 +179,7 @@ export const bottles = {
     const res = await send(`/bottles/export?${searchParams.toString()}`);
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
-    const disposition = res.headers.get('Content-Disposition') || '';
-    const match = disposition.match(/filename="?([^";]+)"?/);
-    const fallback = `bottles-${new Date().toISOString().slice(0, 10)}.${format}`;
-    const filename = match ? match[1] : fallback;
+    const filename = attachmentFilename(res, `bottles-${new Date().toISOString().slice(0, 10)}.${format}`);
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
@@ -182,8 +209,8 @@ export const ingredients = {
     request<Ingredient>('/ingredients', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: { name?: string; icon?: string | null; isAvailable?: boolean; nameTranslations?: Record<string, string> | null }) =>
     request<Ingredient>(`/ingredients/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (id: number) =>
-    request<{ message: string }>(`/ingredients/${id}`, { method: 'DELETE' }),
+  delete: (id: number, options: DeleteOptions = {}) =>
+    request<DeletionResponse>(deletionUrl(`/ingredients/${id}`, options), { method: 'DELETE' }),
   bulkAvailability: (data: { available: boolean }) =>
     request<{ updated: number }>('/ingredients/bulk-availability', { method: 'POST', body: JSON.stringify(data) }),
 };
@@ -218,8 +245,7 @@ export const cocktails = {
       body: formData,
     });
   },
-  exportRecipe: (id: number) =>
-    request<CocktailExportFormat>(`/cocktails/${id}/export`),
+  exportRecipe: (id: number) => requestCocktailExport(`/cocktails/${id}/export`, id),
   importPreview: (data: CocktailExportFormat) =>
     request<ImportPreviewResponse>('/cocktails/import/preview', {
       method: 'POST',
@@ -244,6 +270,14 @@ export const menus = {
     request<{ message: string }>(`/menus/${id}`, { method: 'DELETE' }),
 };
 
+/** A bottle removed from a system menu: the sync never adds it back. */
+export interface MenuBottleExclusion {
+  menuId: number;
+  bottleId: number;
+  bottle: Bottle;
+  createdAt: string;
+}
+
 // Menu Bottles
 export const menuBottles = {
   listByMenu: (menuId: number) => request<MenuBottle[]>(`/menu-bottles/menu/${menuId}`),
@@ -255,6 +289,20 @@ export const menuBottles = {
     request<{ message: string }>(`/menu-bottles/${id}`, { method: 'DELETE' }),
   sync: (menuId: number) =>
     request<{ message: string; added: number; removed: number }>(`/menu-bottles/menu/${menuId}/sync`, { method: 'POST' }),
+  /** `ids` lists every entry (`MenuBottle.id`) of the menu, in the new order: one transaction. */
+  reorder: (menuId: number, ids: number[]) =>
+    request<{ message: string }>(`/menu-bottles/menu/${menuId}/reorder`, { method: 'POST', body: JSON.stringify({ ids }) }),
+  exclusions: (menuId: number) =>
+    request<MenuBottleExclusion[]>(`/menu-bottles/menu/${menuId}/exclusions`),
+  /** Removes these bottles from a system menu, all of them or none. */
+  exclude: (menuId: number, bottleIds: number[]) =>
+    request<{ message: string }>(`/menu-bottles/menu/${menuId}/exclusions`, {
+      method: 'POST',
+      body: JSON.stringify({ bottleIds }),
+    }),
+  /** Puts an excluded bottle back at the end of the menu. */
+  restore: (menuId: number, bottleId: number) =>
+    request<{ message: string }>(`/menu-bottles/menu/${menuId}/exclusions/${bottleId}`, { method: 'DELETE' }),
 };
 
 // Menu Sections
@@ -278,8 +326,7 @@ export const publicApi = {
   listMenus: () => request<Menu[]>('/public/menus'),
   getMenu: (slug: string) => request<Menu>(`/public/menus/${slug}`),
   getCocktail: (id: number) => request<Cocktail>(`/public/cocktails/${id}`),
-  exportCocktail: (id: number) =>
-    request<CocktailExportFormat>(`/public/cocktails/${id}/export`),
+  exportCocktail: (id: number) => requestCocktailExport(`/public/cocktails/${id}/export`, id),
   getSettings: () => request<SiteSettings>('/public/settings'),
   listUnits: () => request<Unit[]>('/public/units'),
 };
@@ -319,9 +366,7 @@ export const backup = {
     const res = await send('/backup/export');
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
-    const disposition = res.headers.get('Content-Disposition') || '';
-    const match = disposition.match(/filename=(.+)/);
-    const filename = match ? match[1] : `backup-${new Date().toISOString().slice(0, 10)}.zip`;
+    const filename = attachmentFilename(res, `backup-${new Date().toISOString().slice(0, 10)}.zip`);
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;

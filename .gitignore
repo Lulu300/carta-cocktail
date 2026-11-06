@@ -28,12 +28,18 @@ uploads/*
 *.swo
 .claude/
 
+# Local agent tooling
+.omc/
+
 # OS
 .DS_Store
 Thumbs.db
 
 # Vitest 5 reports and attachments
 .vitest/
+
+# Coverage reports (npm test -- --coverage)
+coverage/
 
 # Logs
 *.log

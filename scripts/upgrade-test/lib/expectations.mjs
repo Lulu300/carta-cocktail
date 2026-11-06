@@ -1,5 +1,13 @@
 // Decides which failures a step may have without failing the bench.
+import { FAILED_MIGRATION_REFUSAL, row } from './checks.mjs';
 import { releaseOf } from './versions.mjs';
+
+export const INJECTED_DUPLICATE_REASON = 'duplicate injected by --inject-duplicate: '
+  + 'the schema_integrity migration refuses duplicate category names';
+
+function refusesInjectedDuplicate(profile, injectedDuplicate) {
+  return injectedDuplicate && Boolean(profile.uniqueCategoryNames);
+}
 
 /**
  * `requireStarted` hooks: the version must have started earlier on the path, unless the jump
@@ -16,12 +24,16 @@ export function isRequirementMet(hook, startedReleases, previousVersion) {
  * - in naive mode, what the release notes of the crossed versions say breaks without their actions.
  *   The notes describe the default setup: `layoutReasons` replaces their reason when the layout
  *   knows the real cause;
- * - a refused start when the path skips a version that the notes require to start first.
+ * - a refused start when the path skips a version that the notes require to start first;
+ * - with --inject-duplicate (`injectedDuplicate`), a refused start on a version that refuses
+ *   duplicate category names: this reason replaces the one of the notes.
  * Photos that the backend does not serve cannot reach the frontend nginx either: whenever
  * `images` may fail, `frontendImages` may fail for the same reason, unless the notes give it
  * a reason of their own.
  */
-export function allowedFailures({ mode, profile, crossedHooks, unmetRequirements, layoutReasons = {} }) {
+export function allowedFailures({
+  mode, profile, crossedHooks, unmetRequirements, layoutReasons = {}, injectedDuplicate = false,
+}) {
   const allowed = { ...profile.knownIssues };
   if (mode === 'naive') {
     for (const hooks of crossedHooks) Object.assign(allowed, hooks.naiveMayFail);
@@ -33,7 +45,47 @@ export function allowedFailures({ mode, profile, crossedHooks, unmetRequirements
   if (unmetRequirements.length) {
     allowed.startup = `the path skips ${unmetRequirements.join(', ')}, which the notes require to start first`;
   }
+  if (refusesInjectedDuplicate(profile, injectedDuplicate)) allowed.startup = INJECTED_DUPLICATE_REASON;
   return allowed;
+}
+
+function injectedDuplicateDetail(started, refusal) {
+  if (started) return 'expected refusal missing: the injected duplicate was not refused';
+  const found = refusal ? `"${refusal.log}"` : 'no known refusal message';
+  return refusal?.log === FAILED_MIGRATION_REFUSAL.log ? `refused: ${found}` : `refused, but not by the failed migration: ${found}`;
+}
+
+/**
+ * --inject-duplicate: a version that refuses duplicate category names must refuse the working copy,
+ * and through the failed migration (`refusal`, found in the logs of a refused start, or null).
+ * `allowedFailures` only allows the refused start: without this row, a start, or a refusal for
+ * another reason, would go unnoticed. Returns no row when the step does not have to refuse.
+ */
+export function checkInjectedDuplicateRefused({ profile, injectedDuplicate = false, started, refusal = null }) {
+  if (!refusesInjectedDuplicate(profile, injectedDuplicate)) return [];
+  const refusedByMigration = !started && refusal?.log === FAILED_MIGRATION_REFUSAL.log;
+  return [row('duplicateRefusal', 'injected duplicate refused', refusedByMigration, injectedDuplicateDetail(started, refusal))];
+}
+
+/**
+ * Required actions whose refusal is expected, by action name (`action` of the hook), with the
+ * reason shown in the report. With --inject-duplicate, the new image refuses the copy of the
+ * database (`checkDatabaseCopy`) as it refuses the database itself.
+ */
+export function allowedActionFailures({ profile, injectedDuplicate = false }) {
+  return refusesInjectedDuplicate(profile, injectedDuplicate) ? { checkDatabaseCopy: INJECTED_DUPLICATE_REASON } : {};
+}
+
+/**
+ * Marks the refused actions (`refused: true`) that `allowed` (from allowedActionFailures) expects.
+ * Any other failure stays unexpected: a database copy that started, but without the expected log
+ * lines or migration status, means that the copy was not refused.
+ */
+export function markExpectedActions(actions, allowed) {
+  for (const result of actions) {
+    if (result.status === 'failed' && result.refused && allowed[result.action]) result.expected = allowed[result.action];
+  }
+  return actions;
 }
 
 /**
@@ -47,6 +99,23 @@ export function markExpected(rows, { mode, allowed, previousFailedGroups }) {
     else if (mode === 'naive' && previousFailedGroups.has(result.group)) result.expected = 'already failing at the previous step';
   }
   return rows;
+}
+
+/**
+ * Judges a step once its actions and checks are in (BenchRun.runStep): adds the row of the injected
+ * duplicate next to the startup row it explains, then marks the expected failures of the checks and
+ * of the actions. `refusal` is the refusal found in the logs of a refused start, or null.
+ */
+export function judgeStep(step, {
+  mode, profile, crossedHooks, unmetRequirements, layoutReasons = {}, injectedDuplicate = false, started, refusal = null,
+  previousFailedGroups,
+}) {
+  const startupIndex = step.checks.findIndex((result) => result.group === 'startup');
+  step.checks.splice(startupIndex + 1, 0, ...checkInjectedDuplicateRefused({ profile, injectedDuplicate, started, refusal }));
+  const allowed = allowedFailures({ mode, profile, crossedHooks, unmetRequirements, layoutReasons, injectedDuplicate });
+  markExpected(step.checks, { mode, allowed, previousFailedGroups });
+  markExpectedActions(step.actions, allowedActionFailures({ profile, injectedDuplicate }));
+  return step;
 }
 
 export function failedGroups(rows) {

@@ -1,6 +1,6 @@
 /**
  * Stand-in for i18next's `t` that keeps the interpolation values visible, so a test
- * can check counts and plurals: t('home.bottleCount', { count: 2 }) gives "home.bottleCount(2)".
+ * can check counts and plurals: t('menus.bottleCount', { count: 2 }) gives "menus.bottleCount(2)".
  */
 export function translateWithValues(key: string, options?: Record<string, unknown>): string {
   if (!options) return key;

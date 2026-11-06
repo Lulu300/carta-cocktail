@@ -5,13 +5,13 @@ phase: D
 lane: docs
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: mixed
 depends_on: []
-touches: [.mailmap, .github/]
+touches: [.mailmap, .github/, docs/plan/tasks/D-04-ci-hardening.md, docs/plan/tasks/D-08-smoke-e2e-compose.md, docs/plan/tasks/D-09-docs-sync-ops-guide.md, docs/plan/tasks/D-24-pr-auto-labels.md]
 sources: ["07-devops-history.md §1.3"]
-branch:
-pr:
+branch: docs/D-07-git-governance
+pr: "#97"
 ---
 
 ## Décisions validées (2026-10-08)
@@ -20,6 +20,13 @@ pr:
 - **Titres de PR** : `ID: titre` (ex. `A-02: keep menu sections when saving`, en anglais).
 - **`.mailmap`** : identité canonique `Ludwig SIMON <ludwig@simonl.fr>`.
 - Les réglages GitHub (protection de `main` et `develop`, suppression automatique des branches) restent à faire par l'humain après le merge.
+
+## Décisions validées (2026-10-12)
+
+- **Mode de merge** : merge commit partout (feature → `develop` et `develop` → `main`) ; squash et rebase désactivés.
+- **Rulesets** : un ruleset pour `main` et `develop` avec `pull_request` (`allowed_merge_methods: ["merge"]`, 0 approbation) et `required_status_checks` (`Backend`, `Frontend`, `strict_required_status_checks_policy: false`), contournable par le rôle admin en mode `pull_request` seulement. `deletion` et `non_fast_forward` sont dans un ruleset distinct, sans contournement, pour que la suppression automatique des branches ne puisse jamais supprimer `develop`.
+- **Contournement admin** conservé pour les urgences ; les agents n'utilisent jamais `gh pr merge --admin` (transmis à D-09).
+- **Sécurité** : CodeQL en « default setup » (check non obligatoire au début) et signalement privé des vulnérabilités activés.
 
 ## Contexte
 
@@ -65,12 +72,12 @@ Partie humaine (réglages GitHub, à faire après merge) :
 
 ## Critères d'acceptation
 
-- [ ] `git shortlog -sne` n'affiche plus qu'une seule identité.
-- [ ] `.github/pull_request_template.md` et `.github/release.yml` existent.
-- [ ] (humain) Un `git push origin main` direct est refusé.
-- [ ] (humain) Une PR vers `develop` avec le check `Backend` rouge ne peut pas être mergée.
-- [ ] (humain) La branche d'une PR mergée est supprimée automatiquement.
-- [ ] (humain) `git branch -r` ne liste plus que `main`, `develop` et les branches ouvertes.
+- [x] `git shortlog -sne` n'affiche plus qu'une seule identité (hors `dependabot[bot]`).
+- [x] `.github/pull_request_template.md` et `.github/release.yml` existent.
+- [x] (humain) Un `git push origin main` direct est refusé.
+- [x] (humain) Une PR vers `develop` avec le check `Backend` rouge ne peut pas être mergée (constaté sur la PR #115 : `BLOCKED` tant que les checks requis n'étaient pas verts ; pas de PR rouge volontaire).
+- [x] (humain) La branche d'une PR mergée est supprimée automatiquement (PR #115, mergée sans `--delete-branch`).
+- [x] (humain) `git branch -r` ne liste plus que `main`, `develop` et les branches ouvertes.
 
 ## Tests à ajouter ou adapter
 
@@ -90,3 +97,18 @@ Partie humaine (réglages GitHub, à faire après merge) :
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : décisions validées par l'humain (voir « Décisions validées »).
 - 2026-10-09 : les notes de release (liste des PR classée par labels) relèvent désormais de D-11, plus de D-05 : renvoi corrigé.
+- 2026-10-12 : partie agent faite (PR #97) : `.mailmap`, `.github/pull_request_template.md`, `.github/release.yml` (catégories par label ; `bug`, `enhancement` et `documentation` acceptés comme alias ; catégorie « Other changes » pour les PR sans label ; label `skip-changelog` exclu). La partie humaine (étapes 5 à 10) est décrite dans la PR, avec l'état actuel relevé en lecture seule et les commandes prêtes à copier. Les critères « (humain) » restent à cocher après les réglages.
+- 2026-10-12 : état relevé en lecture seule. `user.email` global vaut déjà `ludwig@simonl.fr` (étape 9 faite) ; `user.name` vaut `Lulu300`, ramené à `Ludwig SIMON` par le `.mailmap`. Secret scanning et push protection actifs, Dependabot alerts actives, security updates désactivées (décision de D-21), CodeQL non configuré. 35 branches distantes mergées dans `main`. Aucune PR du plan ne porte de label : création de D-24 (labels automatiques depuis le préfixe de branche). Convention de commit transmise à D-09 (Points d'attention) ; `AGENTS.md` la contient déjà.
+- 2026-10-12 : décisions humaines sur la partie humaine (voir « Décisions validées (2026-10-12) ») : merge commit partout, un ruleset contournable (PR + checks) et un ruleset sans contournement (`deletion`, `non_fast_forward`), `strict` à `false`, CodeQL et signalement privé activés. Revue de la PR #97 traitée : procédure de reprise si `develop` est supprimée au premier merge `develop` → `main` (les PR ouvertes sur `develop` sont alors reciblées vers `main`), test de push direct sur `main` et `develop` après lecture de `rules/branches/<branche>`, suppression des branches distantes depuis la liste prévisualisée (avec SHA), contrôle à la première pré-version que les notes lisent bien `.github/release.yml`, contrôle de D-24 après son merge, et passage de relais à D-09 complété (corps de PR à partir du modèle, jamais `gh pr merge --admin`).
+- 2026-10-12 : seconde revue de la PR #97. Si le ruleset PR/CI refuse de recréer `develop` (étape 6 de la PR), le passer en `disabled`, recréer la branche, puis le remettre en `active`. L'étape 3 de la PR récupère l'id du ruleset PR/CI (`--jq .id`) ; D-04 et D-08 le lisent dans ce Journal pour y ajouter leurs checks (Points d'attention de ces deux tâches complétés, fichiers ajoutés à `touches`).
+- Rulesets : « Require PR and CI on main and develop », id 24936910 (créé le 2026-10-12) ; « Protect main and develop from deletion and force push », id 13123732.
+- 2026-10-12 : partie humaine faite par l'humain, guidée par le coordinateur (une commande `gh` à la fois, chaque résultat vérifié) :
+  - étape 3 : ruleset « Require PR and CI on main and develop » créé (id 24936910), `active` sur `main` et `develop`, contournement admin en mode `pull_request` seulement, PR obligatoire (merge commit seul), checks requis `Backend`, `Frontend`, `Docker build (backend)` et `Docker build (frontend)` (les deux derniers ajoutés d'emblée, cas A de la PR #112 de D-04). GitHub y a ajouté `require_extra_approval_for_unattributed_changes: true`, sans effet attendu avec 0 approbation : premier réglage à vérifier si une PR Dependabot reste bloquée sans raison visible ;
+  - étape 1 : labels `breaking`, `feature`, `fix`, `docs` et `skip-changelog` créés ;
+  - étape 2 : ruleset 13123732 renommé « Protect main and develop from deletion and force push », `active` sur `main` et `develop`, `deletion` et `non_fast_forward`, sans contournement. `rules/branches/main` et `rules/branches/develop` listent les quatre règles ;
+  - étape 4 (après l'étape 2) : merge commit seul (`allow_squash_merge` et `allow_rebase_merge` à `false`), `delete_branch_on_merge: true` ;
+  - étape 5 : un push direct d'un commit vide sur `main` et sur `develop`, depuis un clone jetable, est refusé avec `GH013` ;
+  - étape 7 : les 35 branches distantes mergées dans `main` sont supprimées ; la liste avec les SHA est conservée hors dépôt par l'humain (restauration : `git push origin <sha>:refs/heads/<branche>`) ;
+  - étape 8 : CodeQL (configuration par défaut) `configured`, signalement privé des vulnérabilités activé ; le check `CodeQL` n'est pas requis.
+  Restent : critère « branche supprimée automatiquement » à constater au merge de la PR #115 ; étape 6 (`develop` intacte après le premier merge `develop` → `main`) et étape 9 (notes de la première pré-version tirées de `.github/release.yml`) à la prochaine release . Décision humaine : `user.name` reste `Lulu300` (le nom utilisé sur GitHub et sur les autres serveurs git de l'humain) ; `.mailmap` suffit.
+- 2026-10-12 : PR #115 mergée sans `--delete-branch` : GitHub a supprimé `docs/D-07-pr-ci-ruleset-id` (`delete_branch_on_merge`), critère coché. Restent les étapes 6 et 9, à la prochaine release.

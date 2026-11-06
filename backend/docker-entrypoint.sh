@@ -1,17 +1,25 @@
 #!/bin/sh
-# Container entrypoint: back up the SQLite database, apply the versioned Prisma
-# migrations, seed, then replace this shell with Node so that it receives SIGTERM.
+# Container entrypoint, run as the node user: check that the data folders are
+# writable, back up the SQLite database, apply the versioned Prisma migrations,
+# seed, then replace this shell with Node so that it receives SIGTERM (through
+# tini). A command given to the container (`docker compose run … sh`) runs
+# instead of those startup steps.
 set -eu
 
-: "${DATABASE_URL:?DATABASE_URL must be set, for example file:/app/data/carta_cocktail.db}"
-
 cd "$(dirname "$0")"
+
+if [ "$#" -gt 0 ]; then
+  exec "$@"
+fi
+
+: "${DATABASE_URL:?DATABASE_URL must be set, for example file:/app/data/carta_cocktail.db}"
 
 BASELINE_MIGRATION=0_init
 MAX_BACKUPS=10
 
-# Prisma resolves a relative SQLite path from the schema folder, not from the
-# working directory.
+# Same rule as src/lib/databasePath.ts, which the application and the Prisma CLI
+# (prisma.config.ts) use: a relative SQLite path starts from the schema folder,
+# not from the working directory.
 resolve_db_file() {
   path="${DATABASE_URL#file:}"
   path="${path%%\?*}"
@@ -22,7 +30,77 @@ resolve_db_file() {
 }
 
 DB_FILE="$(resolve_db_file)"
-BACKUP_DIR="$(dirname "$DB_FILE")/backups"
+DB_DIR="$(dirname "$DB_FILE")"
+BACKUP_DIR="$DB_DIR/backups"
+UPLOAD_DIR="${UPLOAD_DIR:-/app/uploads}"
+
+refuse_unwritable() {
+  owner="$(id -u):$(id -g)"
+  {
+    echo "ERROR: the backend runs as uid $(id -u) and cannot write to $1."
+    echo "Images before this version ran as root, so the files of an existing install belong to root."
+    echo "The folder may also belong to another uid (see CARTA_UID and CARTA_GID in .env, or \`user:\` in the compose file), or be mounted read-only."
+    echo "Stop the backend, give the volume or host folder mounted on $2 to $owner (mounted read-write), then start again:"
+    echo "  named volume: docker run --rm -v <volume>:/data alpine chown -R $owner /data"
+    echo "  host folder:  sudo chown -R $owner <host folder>"
+    echo "On a network share (SMB/NFS), chown may be refused or have no effect: set CARTA_UID and CARTA_GID in .env"
+    echo "to the uid and gid that own the files on the share (the uid= and gid= mount options for SMB), or change the owner on the NAS."
+    echo "See README.md, \"Data folders and the node user\", and the required actions of this version in UPGRADING.md."
+  } >&2
+  exit 1
+}
+
+# Real write tests: busybox `test -w` only compares mode bits, so it misses
+# read-only mounts, ACLs and the uid mapping of network shares. They change
+# nothing and leave nothing behind.
+can_write_dir() {
+  probe="$(mktemp -p "$1" .write-test.XXXXXX 2>/dev/null)" && rm -f "$probe"
+}
+
+# Opens the file for appending and writes nothing: content and mtime unchanged.
+can_write_file() {
+  (: >>"$1") 2>/dev/null
+}
+
+# require_writable <mount point> <path>...: every existing folder or file must be
+# writable. Without this check, the first write fails later, deep inside Prisma
+# or SQLite, or only when a photo is uploaded.
+require_writable() {
+  mount_point="$1"
+  shift
+  for path in "$@"; do
+    if [ -d "$path" ]; then
+      can_write_dir "$path" || refuse_unwritable "$path" "$mount_point"
+    elif [ -e "$path" ]; then
+      can_write_file "$path" || refuse_unwritable "$path" "$mount_point"
+    fi
+  done
+}
+
+# A backup restore renames the folders directly in UPLOAD_DIR: a subfolder left
+# to root by a non-recursive chown would make it fail. Photos only need their
+# folder to be writable.
+require_writable_upload_dirs() {
+  find "$UPLOAD_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r dir; do
+    require_writable "$UPLOAD_DIR" "$dir"
+  done
+}
+
+# SQLite migrations are not transactional: one stopped halfway is marked as
+# failed, and every later start refuses to go on (P3009). A stop request (tini
+# forwards SIGTERM to this shell only) lets the running command finish and
+# starts no new step. Docker still kills the container after its stop timeout
+# (10 s by default).
+stop_status=
+trap 'stop_status=143' TERM
+trap 'stop_status=130' INT
+
+exit_if_stop_requested() {
+  if [ -n "$stop_status" ]; then
+    echo "Stop requested: exiting before $1."
+    exit "$stop_status"
+  fi
+}
 
 latest_backup() {
   ls -1 "$BACKUP_DIR"/pre-migrate-*.db 2>/dev/null | sort -r | head -n 1
@@ -80,16 +158,55 @@ backup_database() {
   prune_backups
 }
 
+# Lines "unapplied <name>" and "failed <name>" read from the migration history
+# (src/bootstrap/migrationState.ts). Read-only.
+migration_state() {
+  node dist/scripts/migration-state.js
+}
+
+# Back up before any migration runs, including one marked rolled back with
+# `prisma migrate resolve --rolled-back`, which `migrate status` reports as up to
+# date. No copy while a migration is marked failed: the deploy refuses to run
+# (P3009), and a copy of the half-migrated database would become the newest one,
+# ahead of the copy made before the failed attempt. When the history cannot be
+# read, back up anyway: the deploy reports the error.
+needs_backup() {
+  state="$(migration_state)" || return 0
+  echo "$state" | grep -q '^unapplied ' && ! echo "$state" | grep -q '^failed '
+}
+
+# Never restores anything: which copy to put back, and when, is the admin's call.
+refuse_failed_migration() {
+  failed=
+  # After a stop request, no new command: the Prisma error above names the migration.
+  if [ -z "$stop_status" ]; then
+    failed="$(migration_state | sed -n 's/^failed //p' | tr '\n' ' ')"
+  fi
+  backup="$(latest_backup)"
+  {
+    echo "ERROR: migration ${failed:-(see the Prisma error above) }failed. The backend will not start."
+    echo "SQLite does not run a migration in a transaction: the statements before the one that failed stay applied."
+    echo "Prisma applies no migration until this one is resolved: previous images (v1.6.0 and later) stop on P3009 too."
+    if [ -n "$backup" ]; then
+      echo "Newest copy made before a migration: $backup (with its -wal file when there is one)."
+    else
+      echo "No pre-migrate copy in $BACKUP_DIR."
+    fi
+    echo "Nothing was restored. Follow \"Recovering from a failed migration\" in README.md (section \"Database migrations\")."
+  } >&2
+  exit 1
+}
+
 refuse_baseline() {
-  baseline_db="$1"
+  baseline_dir="$1"
   {
     echo "ERROR: the existing database at $DB_FILE has no migration history and does not match migration $BASELINE_MIGRATION."
     echo "The backend will not start, and its data and schema were not modified. A copy is in $BACKUP_DIR."
     echo "SQL that would bring the database to $BASELINE_MIGRATION (for review only, do not run it blindly):"
-    npx prisma migrate diff --from-url "file:$DB_FILE" --to-url "file:$baseline_db" --script || true
+    npx prisma migrate diff --from-config-datasource --to-migrations "$baseline_dir" --script || true
     echo "Follow the manual baseline procedure in README.md (section \"Database migrations\")."
   } >&2
-  rm -f "$baseline_db"
+  rm -rf "$baseline_dir"
   exit 1
 }
 
@@ -97,43 +214,67 @@ refuse_baseline() {
 # migration history. Mark the first migration as applied only when the schema
 # is exactly the one it would create, then apply the newer migrations.
 baseline_existing_database() {
-  baseline_db="/tmp/carta-baseline-$$.db"
-  rm -f "$baseline_db"
-  npx prisma db execute --url "file:$baseline_db" --file "prisma/migrations/$BASELINE_MIGRATION/migration.sql" >/dev/null
+  # A migrations folder that holds the baseline alone. `migrate diff` replays it
+  # on an in-memory shadow database and only reads the database (DATABASE_URL).
+  baseline_dir="$(mktemp -d)"
+  cp -R "prisma/migrations/$BASELINE_MIGRATION" prisma/migrations/migration_lock.toml "$baseline_dir/"
 
   diff_status=0
-  npx prisma migrate diff --from-url "file:$DB_FILE" --to-url "file:$baseline_db" --exit-code >/dev/null || diff_status=$?
+  npx prisma migrate diff --from-config-datasource --to-migrations "$baseline_dir" --exit-code >/dev/null || diff_status=$?
   if [ "$diff_status" -ne 0 ]; then
-    refuse_baseline "$baseline_db"
+    refuse_baseline "$baseline_dir"
   fi
-  rm -f "$baseline_db"
+  rm -rf "$baseline_dir"
 
+  exit_if_stop_requested "marking $BASELINE_MIGRATION as applied"
   echo "Existing database matches $BASELINE_MIGRATION: marking it as applied."
   npx prisma migrate resolve --applied "$BASELINE_MIGRATION"
-  npx prisma migrate deploy
+  exit_if_stop_requested "the migrations after $BASELINE_MIGRATION"
+  deploy_migrations || exit_after_failed_deploy
 }
 
-apply_migrations() {
+# Runs `migrate deploy`, prints its output and keeps it in deploy_output.
+deploy_migrations() {
   deploy_status=0
   deploy_output="$(npx prisma migrate deploy 2>&1)" || deploy_status=$?
   echo "$deploy_output"
-  if [ "$deploy_status" -eq 0 ]; then
+  [ "$deploy_status" -eq 0 ]
+}
+
+# P3018: a migration failed during this deploy. P3009: one failed at an earlier
+# start, and Prisma applies nothing until it is resolved.
+exit_after_failed_deploy() {
+  if echo "$deploy_output" | grep -qE 'P3018|P3009'; then
+    refuse_failed_migration
+  fi
+  exit "$deploy_status"
+}
+
+apply_migrations() {
+  if deploy_migrations; then
     return
   fi
   # P3005: the database is not empty but has no migration history.
   if echo "$deploy_output" | grep -q P3005; then
     baseline_existing_database
   else
-    exit "$deploy_status"
+    exit_after_failed_deploy
   fi
 }
 
-# `migrate status` fails when migrations are pending or the database has no
-# migration history: the two cases where the next step may change it.
-if [ -f "$DB_FILE" ] && ! npx prisma migrate status; then
+require_writable "$DB_DIR" "$DB_DIR" "$DB_FILE" "$DB_FILE-wal" "$DB_FILE-shm" "$BACKUP_DIR"
+require_writable "$UPLOAD_DIR" "$UPLOAD_DIR"
+require_writable_upload_dirs || exit 1
+
+if [ -f "$DB_FILE" ] && needs_backup; then
+  exit_if_stop_requested "the backup"
   backup_database
 fi
 
+exit_if_stop_requested "the migrations"
 apply_migrations
-npm run db:seed
+exit_if_stop_requested "the seed"
+trap - TERM INT
+
+node dist/scripts/seed.js
 exec node dist/index.js

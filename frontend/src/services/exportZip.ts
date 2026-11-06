@@ -1,29 +1,29 @@
 import { cocktails as cocktailsApi } from './api';
-import type { Cocktail } from '../types';
 
-export async function exportCocktailsAsZip(
-  ids: number[],
-  cocktailList: Cocktail[],
-): Promise<void> {
+/**
+ * Cocktail names are not unique, so two exports can get the same server file name,
+ * and JSZip replaces an entry of the same name. Adds -2, -3… until the name is free.
+ */
+function uniqueFilename(filename: string, taken: Set<string>): string {
+  const base = filename.replace(/\.json$/, '');
+  let candidate = filename;
+  for (let suffix = 2; taken.has(candidate); suffix++) {
+    candidate = `${base}-${suffix}.json`;
+  }
+  taken.add(candidate);
+  return candidate;
+}
+
+export async function exportCocktailsAsZip(ids: number[]): Promise<void> {
   // Loaded on demand: only batch exports need it
   const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
 
-  const exports = await Promise.all(
-    ids.map(async (id) => {
-      const data = await cocktailsApi.exportRecipe(id);
-      const cocktail = cocktailList.find((c) => c.id === id);
-      const name = cocktail?.name || data.cocktail.name;
-      const slug = name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '');
-      return { slug, data };
-    }),
-  );
+  const exports = await Promise.all(ids.map((id) => cocktailsApi.exportRecipe(id)));
 
-  for (const { slug, data } of exports) {
-    zip.file(`cocktail-${slug}.json`, JSON.stringify(data, null, 2));
+  const taken = new Set<string>();
+  for (const { filename, data } of exports) {
+    zip.file(uniqueFilename(filename, taken), JSON.stringify(data, null, 2));
   }
 
   const blob = await zip.generateAsync({ type: 'blob' });

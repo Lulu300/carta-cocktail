@@ -92,10 +92,14 @@ function CategoryTypesPanel({ categoryTypes }: { categoryTypes: CategoryType[] }
                 key={color}
                 type="button"
                 onClick={() => setField('color', color)}
+                aria-pressed={form.color === color}
+                aria-label={t(`colors.${color}`)}
+                title={t(`colors.${color}`)}
                 className={cx(
-                  'w-8 h-8 rounded-full transition-all',
+                  // motion-safe: Tailwind 4 scales with the `scale` property, which transform-none would not reset.
+                  'w-8 h-8 rounded-full transition-all motion-reduce:transition-none',
                   getDotClasses(color),
-                  form.color === color ? 'ring-2 ring-fg ring-offset-2 ring-offset-surface scale-110' : 'opacity-60 hover:opacity-100',
+                  form.color === color ? 'ring-2 ring-fg ring-offset-2 ring-offset-surface motion-safe:scale-110' : 'opacity-60 hover:opacity-100',
                 )}
               />
             ))}

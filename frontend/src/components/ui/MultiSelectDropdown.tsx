@@ -1,6 +1,9 @@
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useClickOutside } from '../../hooks/useClickOutside';
+import { cx } from './classNames';
+import { controlClasses } from './fieldContext';
+import Icon from './Icon';
+import { useDisclosure } from './useDisclosure';
 
 interface Option {
   value: string;
@@ -15,13 +18,16 @@ interface MultiSelectDropdownProps {
   className?: string;
 }
 
+/**
+ * Button that shows a panel with a search field and one checkbox per option.
+ * A disclosure, not a listbox: the panel holds real form controls.
+ */
 export default function MultiSelectDropdown({
   options, selected, onChange, placeholder, className = '',
 }: MultiSelectDropdownProps) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
   const [filterText, setFilterText] = useState('');
-  const ref = useClickOutside<HTMLDivElement>(useCallback(() => { setOpen(false); setFilterText(''); }, []));
+  const { isOpen, panelId, containerRef, handleKeyDown, triggerProps } = useDisclosure(useCallback(() => setFilterText(''), []));
 
   const toggle = (value: string) => {
     onChange(
@@ -31,37 +37,46 @@ export default function MultiSelectDropdown({
     );
   };
 
+  const visibleOptions = options.filter(
+    (opt) => !filterText || opt.label.toLowerCase().includes(filterText.toLowerCase()),
+  );
+
   return (
-    <div ref={ref} className={`relative ${className}`}>
+    <div ref={containerRef} onKeyDown={handleKeyDown} className={`relative ${className}`}>
       <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="w-full bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-left text-sm focus:outline-none focus:border-amber-400 transition-colors flex items-center justify-between"
+        {...triggerProps}
+        className={cx(controlClasses, 'text-left text-sm flex items-center justify-between')}
       >
-        <span className={selected.length > 0 ? 'text-white' : 'text-gray-500'}>
-          {selected.length > 0
-            ? t('common.selected', { count: selected.length })
-            : placeholder}
-        </span>
-        <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
-          fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        {selected.length > 0 ? (
+          <span className="text-fg">
+            {/* The count alone would lose what the button filters on. */}
+            <span className="sr-only">{placeholder}</span>{' '}
+            {t('common.selected', { count: selected.length })}
+          </span>
+        ) : (
+          <span className="text-fg-muted">{placeholder}</span>
+        )}
+        <Icon
+          name="chevron-down"
+          className={cx('size-4 text-fg-muted transition-transform motion-reduce:transition-none', isOpen && 'rotate-180')}
+        />
       </button>
 
       {selected.length > 0 && (
         <div className="flex flex-wrap gap-1 mt-1.5">
           {selected.map((val) => {
-            const opt = options.find((o) => o.value === val);
+            const label = options.find((o) => o.value === val)?.label ?? val;
             return (
               <span key={val}
-                className="inline-flex items-center gap-1 bg-amber-400/10 text-amber-400 text-xs px-2 py-0.5 rounded-full">
-                {opt?.label ?? val}
-                <button type="button" onClick={() => toggle(val)}
-                  className="hover:text-amber-200">
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                className="inline-flex items-center gap-1 bg-accent/10 text-accent text-xs pl-2 rounded-full">
+                {label}
+                <button
+                  type="button"
+                  onClick={() => toggle(val)}
+                  aria-label={t('common.removeItem', { name: label })}
+                  className="p-1.5 rounded-full hover:text-accent-soft"
+                >
+                  <Icon name="close" className="size-3" />
                 </button>
               </span>
             );
@@ -69,35 +84,39 @@ export default function MultiSelectDropdown({
         </div>
       )}
 
-      {open && (
-        <div className="absolute z-30 mt-1 w-full bg-[#1a1a2e] border border-gray-700 rounded-lg shadow-lg max-h-72 overflow-hidden">
-          <div className="p-2 border-b border-gray-700">
+      {isOpen && (
+        <div
+          id={panelId}
+          role="group"
+          aria-label={placeholder}
+          className="absolute z-30 mt-1 w-full bg-surface border border-line-strong rounded-lg shadow-lg max-h-72 overflow-hidden"
+        >
+          <div className="p-2 border-b border-line-strong">
             <input
-              type="text"
+              type="search"
               value={filterText}
               onChange={(e) => setFilterText(e.target.value)}
+              aria-label={t('common.filterOptions')}
               placeholder={t('common.search')}
-              className="w-full bg-[#0f0f1a] border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400"
+              className="w-full bg-canvas border border-line-strong rounded px-3 py-1.5 text-sm text-fg placeholder:text-fg-muted"
               autoFocus
             />
           </div>
           <div className="overflow-y-auto max-h-56 py-1">
-            {options
-              .filter((opt) => !filterText || opt.label.toLowerCase().includes(filterText.toLowerCase()))
-              .map((opt) => (
-                <label key={opt.value}
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-800/50 cursor-pointer text-sm">
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(opt.value)}
-                    onChange={() => toggle(opt.value)}
-                    className="w-4 h-4 rounded bg-[#0f0f1a] border-gray-700 text-amber-400 accent-amber-400"
-                  />
-                  <span className="text-gray-300">{opt.label}</span>
-                </label>
-              ))}
-            {options.filter((opt) => !filterText || opt.label.toLowerCase().includes(filterText.toLowerCase())).length === 0 && (
-              <div className="px-3 py-2 text-sm text-gray-500">{t('common.noResults')}</div>
+            {visibleOptions.map((opt) => (
+              <label key={opt.value}
+                className="flex items-center gap-2 px-3 py-2 hover:bg-line/50 cursor-pointer text-sm">
+                <input
+                  type="checkbox"
+                  checked={selected.includes(opt.value)}
+                  onChange={() => toggle(opt.value)}
+                  className="w-4 h-4 rounded accent-accent"
+                />
+                <span className="text-fg">{opt.label}</span>
+              </label>
+            ))}
+            {visibleOptions.length === 0 && (
+              <div className="px-3 py-2 text-sm text-fg-muted">{t('common.noResults')}</div>
             )}
           </div>
         </div>

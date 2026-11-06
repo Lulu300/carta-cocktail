@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import supertest from 'supertest';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../generated/prisma/client';
 import app from '../app';
 import { prisma } from '../lib/prisma';
 
@@ -25,9 +25,12 @@ export async function teardownTestDatabase(): Promise<void> {
   await prisma.$disconnect();
 }
 
-/** Tables of every model of schema.prisma, so that a model added later is emptied too. */
+/**
+ * Tables of every model of schema.prisma, so that a model added later is emptied too.
+ * No model renames its table (@@map): each table has the name of its model.
+ */
 export function schemaTables(): string[] {
-  return Prisma.dmmf.datamodel.models.map((model) => model.dbName ?? model.name);
+  return Object.values(Prisma.ModelName);
 }
 
 /**
@@ -164,6 +167,7 @@ export async function seedBottle(overrides: Partial<{
   alcoholPercentage: number | null;
   purchasePrice: number | null;
   location: string | null;
+  openedAt: Date | null;
   isApero: boolean;
   isDigestif: boolean;
 }> = {}) {
@@ -188,6 +192,7 @@ export async function seedBottle(overrides: Partial<{
       alcoholPercentage: overrides.alcoholPercentage ?? null,
       purchasePrice: overrides.purchasePrice ?? null,
       location: overrides.location ?? null,
+      openedAt: overrides.openedAt ?? null,
       isApero: overrides.isApero ?? false,
       isDigestif: overrides.isDigestif ?? false,
     },
@@ -232,6 +237,16 @@ export interface RecipeLineSource {
   preferredBottleIds?: number[];
   /** Defaults to 1. */
   quantity?: number;
+}
+
+/** The recipe line of a response with the given source type; fails the test when there is none. */
+export function lineOfSource<Line extends { sourceType: string }>(
+  lines: Line[],
+  sourceType: RecipeLineSource['sourceType'],
+): Line {
+  const line = lines.find((candidate) => candidate.sourceType === sourceType);
+  if (!line) throw new Error(`No ${sourceType} line in the response`);
+  return line;
 }
 
 /** Nested create of recipe lines, in the order of `sources`, all in the given unit. */
@@ -350,4 +365,14 @@ export async function addCocktailToMenu(menuId: number, cocktailId: number, opti
 
 export async function addBottleToMenu(menuId: number, bottleId: number, options: MenuEntryOptions = {}) {
   return prisma.menuBottle.create({ data: { menuId, bottleId, ...menuEntryData(options) } });
+}
+
+/** One of the two system menus that seedRequiredData creates. */
+export async function findSystemMenu(slug: 'aperitifs' | 'digestifs') {
+  return prisma.menu.findUniqueOrThrow({ where: { slug } });
+}
+
+/** Records that the admin removed the bottle from a system menu, as `DELETE /menu-bottles/:id` does. */
+export async function excludeBottleFromMenu(menuId: number, bottleId: number) {
+  return prisma.menuBottleExclusion.create({ data: { menuId, bottleId } });
 }

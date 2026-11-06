@@ -5,13 +5,13 @@ phase: B
 lane: deps
 criticite: moyenne
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [A-07]
-touches: [frontend/package.json, frontend/package-lock.json, frontend/eslint.config.js, backend/package.json, backend/package-lock.json, backend/eslint.config.js, .prettierrc, .prettierignore, .editorconfig]
+touches: [frontend/package.json, frontend/package-lock.json, frontend/eslint.config.js, backend/package.json, backend/package-lock.json, backend/eslint.config.js, .prettierrc, .prettierignore, .editorconfig, backend/src/app.ts, frontend/src/pages/admin/CocktailsPage.tsx, frontend/src/pages/admin/CocktailsPage.test.tsx, frontend/src/pages/admin/MenuBottleEditPage.tsx, frontend/src/pages/admin/MenuBottleEditPage.test.tsx, AGENTS.md, backend/AGENTS.md, frontend/AGENTS.md, docs/plan/tasks/E-16-react-hooks-plugin-7-1.md, docs/plan/tasks/E-14-lint-hardening.md]
 sources: ["08-dependencies.md §3.4", "07-devops-history.md §3.3", "05-frontend-archi.md §8"]
-branch:
-pr:
+branch: feature/B-05-eslint-prettier
+pr: "#98"
 ---
 
 ## Contexte
@@ -38,10 +38,10 @@ ESLint 9 est en fin de vie depuis le 6 août 2026. Le backend n'a ni linter ni f
 
 ## Critères d'acceptation
 
-- [ ] ESLint 10 dans les deux paquets, `npm run lint` vert des deux côtés.
-- [ ] `backend/eslint.config.js` présent et documenté.
-- [ ] `.editorconfig` et `.prettierrc` présents, `npm run format:check` existe (il peut échouer tant que le reformatage n'est pas fait : le dire dans la PR).
-- [ ] Aucune règle désactivée globalement sans commentaire.
+- [x] ESLint 10 dans les deux paquets, `npm run lint` vert des deux côtés.
+- [x] `backend/eslint.config.js` présent et documenté.
+- [x] `.editorconfig` et `.prettierrc` présents, `npm run format:check` existe (il peut échouer tant que le reformatage n'est pas fait : le dire dans la PR).
+- [x] Aucune règle désactivée globalement sans commentaire.
 
 ## Tests à ajouter ou adapter
 
@@ -55,3 +55,4 @@ Aucun. Les tests existants doivent rester verts après les corrections de lint.
 ## Journal
 
 - 2026-10-08 : tâche créée à partir du rapport de dépendances et de la revue DevOps.
+- 2026-10-12 : fait dans la PR #98. Frontend : eslint 10.12, @eslint/js 10, globals 17, react-refresh 0.5.7 ; `eslint-plugin-react-hooks` monté en `^7.1.1` (la 7.0.x refuse ESLint 10 en peer) : B-05 intègre E-16 (décision humaine), qui passe en `dropped`. Les deux `set-state-in-effect` de `CocktailsPage` et `MenuBottleEditPage` sont corrigés sans directive, avec des tests de chargement initial et de rechargement. Les nouvelles règles d'ESLint 10 ne signalent rien. Backend : `eslint.config.js` en CommonJS (paquet `commonjs`), `no-explicit-any` en `warn` (45 `any` ; C-04 étant déjà fait, B-13 créée pour les typer) ; seule erreur : import `path` inutilisé dans `app.ts`, ajouté à `touches`. Prettier : `format:check` échoue (≈ 210 fichiers sur 286), rien n'est reformaté ; B-14 créée pour le reformatage isolé. `touches` complété (pages, tests, `app.ts`, AGENTS.md, E-16, E-14).

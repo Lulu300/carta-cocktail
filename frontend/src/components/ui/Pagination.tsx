@@ -1,4 +1,6 @@
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
+import { cx } from './classNames';
 
 interface PaginationProps {
   page: number;
@@ -10,12 +12,21 @@ interface PaginationProps {
   pageSizeOptions?: number[];
 }
 
+// 40x40 px minimum hit area, like IconButton.
+const PAGE_BUTTON_BASE = 'inline-flex items-center justify-center min-w-10 min-h-10 px-2 text-sm rounded-lg transition-colors';
+const PAGE_BUTTON_CLASSES = cx(
+  PAGE_BUTTON_BASE,
+  'text-fg-muted hover:text-fg hover:bg-line disabled:opacity-30 disabled:cursor-not-allowed',
+);
+const CURRENT_PAGE_CLASSES = cx(PAGE_BUTTON_BASE, 'bg-accent text-on-accent font-semibold');
+
 export default function Pagination({
   page, totalPages, pageSize, totalItems,
   onPageChange, onPageSizeChange,
   pageSizeOptions = [10, 25, 50, 100],
 }: PaginationProps) {
   const { t } = useTranslation();
+  const pageSizeId = useId();
 
   if (totalItems === 0) return null;
 
@@ -23,13 +34,15 @@ export default function Pagination({
   const end = Math.min(page * pageSize, totalItems);
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-6 py-3 border-t border-gray-800">
-      <div className="flex items-center gap-3 text-sm text-gray-400">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-6 py-3 border-t border-line">
+      <div className="flex items-center gap-3 text-sm text-fg-muted">
         <span>{t('pagination.showing', { start, end, total: totalItems })}</span>
+        <label htmlFor={pageSizeId} className="sr-only">{t('pagination.pageSize')}</label>
         <select
+          id={pageSizeId}
           value={pageSize}
           onChange={(e) => onPageSizeChange(Number(e.target.value))}
-          className="bg-[#0f0f1a] border border-gray-700 rounded px-2 py-1 text-white text-sm focus:outline-none focus:border-amber-400"
+          className="bg-canvas border border-line-strong rounded px-2 py-1 text-fg text-sm"
         >
           {pageSizeOptions.map((size) => (
             <option key={size} value={size}>{size} / {t('pagination.page')}</option>
@@ -38,34 +51,37 @@ export default function Pagination({
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center gap-1">
+        <nav aria-label={t('pagination.label')} className="flex items-center gap-1">
           <button
+            type="button"
             onClick={() => onPageChange(1)}
             disabled={page === 1}
-            className="px-2 py-1 text-sm rounded text-gray-400 hover:text-white hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed"
+            aria-label={t('pagination.first')}
+            className={PAGE_BUTTON_CLASSES}
           >
-            ««
+            <span aria-hidden="true">««</span>
           </button>
           <button
+            type="button"
             onClick={() => onPageChange(page - 1)}
             disabled={page === 1}
-            className="px-2 py-1 text-sm rounded text-gray-400 hover:text-white hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed"
+            aria-label={t('pagination.previous')}
+            className={PAGE_BUTTON_CLASSES}
           >
-            «
+            <span aria-hidden="true">«</span>
           </button>
 
           {getPageNumbers(page, totalPages).map((p, i) =>
             p === '...' ? (
-              <span key={`ellipsis-${i}`} className="px-2 py-1 text-sm text-gray-600">...</span>
+              <span key={`ellipsis-${i}`} aria-hidden="true" className="px-2 text-sm text-fg-muted">...</span>
             ) : (
               <button
                 key={p}
+                type="button"
                 onClick={() => onPageChange(p as number)}
-                className={`px-3 py-1 text-sm rounded transition-colors ${
-                  p === page
-                    ? 'bg-amber-400 text-[#0f0f1a] font-semibold'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-800'
-                }`}
+                aria-label={t('pagination.goToPage', { page: p })}
+                aria-current={p === page ? 'page' : undefined}
+                className={p === page ? CURRENT_PAGE_CLASSES : PAGE_BUTTON_CLASSES}
               >
                 {p}
               </button>
@@ -73,20 +89,24 @@ export default function Pagination({
           )}
 
           <button
+            type="button"
             onClick={() => onPageChange(page + 1)}
             disabled={page === totalPages}
-            className="px-2 py-1 text-sm rounded text-gray-400 hover:text-white hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed"
+            aria-label={t('pagination.next')}
+            className={PAGE_BUTTON_CLASSES}
           >
-            »
+            <span aria-hidden="true">»</span>
           </button>
           <button
+            type="button"
             onClick={() => onPageChange(totalPages)}
             disabled={page === totalPages}
-            className="px-2 py-1 text-sm rounded text-gray-400 hover:text-white hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed"
+            aria-label={t('pagination.last')}
+            className={PAGE_BUTTON_CLASSES}
           >
-            »»
+            <span aria-hidden="true">»»</span>
           </button>
-        </div>
+        </nav>
       )}
     </div>
   );

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '../generated/prisma/client';
+import { createPrismaClient } from '../lib/prisma';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
   prisma, seedCategory, seedUnit, seedBottle, seedIngredient, seedCocktailUsing,
@@ -272,7 +273,7 @@ describe('computeAvailability', () => {
 describe('loading the stock', () => {
   /** Runs a calculation on a throwaway client that counts the SQL queries it sends. */
   async function countQueries(run: (db: PrismaClient) => Promise<unknown>): Promise<number> {
-    const db = new PrismaClient({ log: [{ emit: 'event', level: 'query' }] });
+    const db = createPrismaClient(undefined, { log: [{ emit: 'event', level: 'query' }] });
     let queries = 0;
     db.$on('query', () => { queries += 1; });
     try {

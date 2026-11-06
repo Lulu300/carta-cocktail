@@ -78,3 +78,4 @@ Les premières secondes d'une visite sont soignées nulle part : écran blanc pu
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-12 : revue de la PR #105 (B-06, Vite 8) : TanStack Query est réparti entre le chunk `keys` (avec `src/queries/keys.ts`) et l'entrée, sans cache long terme : retéléchargé à chaque release ou changement de `keys.ts`. Non régressif (il était dans l'entrée sous Vite 7). Un groupe `vendor-query` dans `build.rolldownOptions.output.codeSplitting.groups` (`vite.config.ts`) le réglerait ; mesurer avec `bundle-budget.mjs`.

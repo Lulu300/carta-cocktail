@@ -3,7 +3,8 @@ import express from 'express';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import path from 'path';
 
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
+// Quiet: dotenv logs each load by default, and the Docker image has no .env to report.
+dotenv.config({ path: path.resolve(__dirname, '../.env'), quiet: true });
 
 /**
  * Resolves the folder where uploaded images are stored.

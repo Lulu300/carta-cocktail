@@ -8,7 +8,7 @@ effort: M
 status: todo
 owner: agent
 depends_on: [C-07, C-14]
-touches: [backend/prisma/schema.prisma, backend/prisma/migrations/, backend/prisma/seed.ts, backend/src/routes/categories.ts, backend/src/routes/categoryTypes.ts, backend/src/routes/bottles.ts, backend/src/routes/cocktails.ts, backend/src/services/categoryTypeService.ts, backend/src/i18n/]
+touches: [backend/prisma/schema.prisma, backend/prisma/migrations/, backend/src/scripts/seed.ts, backend/src/routes/categories.ts, backend/src/routes/categoryTypes.ts, backend/src/routes/bottles.ts, backend/src/routes/cocktails.ts, backend/src/services/categoryTypeService.ts, backend/src/i18n/]
 sources: ["02-backend-data-perf.md §2.3"]
 branch:
 pr:
@@ -53,3 +53,4 @@ pr:
 ## Journal
 
 - 2026-10-10 : tâche créée pendant C-07 (étape 7 optionnelle non faite, pour rester dans l'effort M).
+- 2026-10-12 : D-01 (PR #108) déplace le seed de `backend/prisma/seed.ts` vers `backend/src/scripts/seed.ts` (compilé dans `dist/`, l'image n'a plus `tsx`) : `touches` mis à jour.

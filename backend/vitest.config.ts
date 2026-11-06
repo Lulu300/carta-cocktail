@@ -27,9 +27,15 @@ export default defineConfig({
       },
       exclude: [
         'src/test/**',
+        // Prisma client: generated, not versioned, so never in the ci.yml delta
+        'src/generated/**',
         'dist/**',
         '*.config.*',
         'src/index.ts',
+        // Entry points of their own process, like src/index.ts: their logic is in tested modules
+        'src/scripts/seed.ts',
+        'src/scripts/check-integrity.ts',
+        'src/scripts/migration-state.ts',
         'src/**/*.test.ts',
         'src/**/*.d.ts',
       ],

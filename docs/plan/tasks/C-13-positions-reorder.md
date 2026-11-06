@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: moyenne
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-03]
-touches: [backend/src/services/positions.ts, backend/src/routes/menuSections.ts, backend/src/routes/menuBottles.ts, backend/src/i18n/]
+touches: [backend/src/services/positions.ts, backend/src/routes/menuSections.ts, backend/src/routes/menuBottles.ts, backend/src/i18n/, backend/src/services/menuSyncService.ts, backend/src/validation/menuBottles.ts]
 sources: ["01-backend-routes.md §H6", "01-backend-routes.md §R5", "05-frontend-archi.md §H5"]
-branch:
-pr:
+branch: feature/C-13-positions-reorder
+pr: https://github.com/Lulu300/carta-cocktail/pull/100
 ---
 
 ## Contexte
@@ -58,12 +58,12 @@ Les menus ordonnent cocktails, bouteilles et sections par un champ `position`. L
 
 ## Critères d'acceptation
 
-- [ ] Reorder avec un id d'un autre menu → 400, et **aucune** position modifiée.
-- [ ] Reorder avec doublon ou liste incomplète → 400.
-- [ ] `POST /menu-bottles` sans `position` → max + 1.
-- [ ] `menuSectionId` d'un autre menu → 400 (POST et PUT).
-- [ ] Ajouter une bouteille à un menu `COCKTAILS` → 400.
-- [ ] `POST /menu-bottles/menu/:id/reorder` réordonne toutes les bouteilles en une requête.
+- [x] Reorder avec un id d'un autre menu → 400, et **aucune** position modifiée.
+- [x] Reorder avec doublon ou liste incomplète → 400.
+- [x] `POST /menu-bottles` sans `position` → max + 1.
+- [x] `menuSectionId` d'un autre menu → 400 (POST et PUT).
+- [x] Ajouter une bouteille à un menu `COCKTAILS` → 400.
+- [x] `POST /menu-bottles/menu/:id/reorder` réordonne toutes les bouteilles en une requête.
 
 ## Tests à ajouter ou adapter
 
@@ -83,3 +83,4 @@ Les menus ordonnent cocktails, bouteilles et sections par un champ `position`. L
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-10-12 : faite (PR #100). `services/positions.ts` (`nextPosition`, `reorder`, `assertSectionInMenu`), reorder des sections et nouvel endpoint `POST /menu-bottles/menu/:menuId/reorder { ids }` en transaction, `menuSectionId` contrôlé au POST (champ ajouté au schéma de création) et au PUT. Écarts : menu inconnu au `POST /menu-bottles` toujours 400 (choix de C-06), menu `COCKTAILS` refusé avec la clé existante `errors.bottleNotAllowedInMenu`, `reorder` répond 404 pour un menu inconnu. Fichiers ajoutés à `touches` : `menuSyncService.ts` (réutilise `nextPosition`), `validation/menuBottles.ts`. Contrat de l'endpoint pour E-07 dans la description de la PR.

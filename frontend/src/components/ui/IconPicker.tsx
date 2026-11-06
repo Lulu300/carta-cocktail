@@ -1,4 +1,8 @@
-import { useState } from 'react';
+import { useState, type KeyboardEvent } from 'react';
+import { useTranslation } from 'react-i18next';
+import Button from './Button';
+import Input from './Input';
+import { cx } from './classNames';
 
 interface IconPickerProps {
   value: string;
@@ -6,40 +10,37 @@ interface IconPickerProps {
 }
 
 const commonEmojis = [
-  // Agrumes / Citrus
+  // Citrus
   '🍋', '🟡', '🍊', '🟠',
-  // Fruits rouges / Berries
+  // Berries
   '🍒', '🍓', '🫐', '🍇',
-  // Fruits tropicaux / Tropical
+  // Tropical fruits
   '🍍', '🥭', '🥥', '🍌', '🍑', '🍉', '🍈', '🥝',
-  // Fruits à pépins / Stone fruits
+  // Pome fruits
   '🍎', '🍏', '🍐', '🍅',
-  // Herbes aromatiques / Aromatic herbs
+  // Aromatic herbs
   '🌿', '🍃', '🌱', '🪴',
-  // Légumes / Vegetables
+  // Vegetables
   '🥒', '🌶️', '🫑', '🥕', '🧅', '🧄', '🌽',
-  // Épices & Aromates / Spices
+  // Spices
   '🫚', '⭐',
-  // Sucreries & Sirops / Sweeteners & Syrups
+  // Sweeteners and syrups
   '🍯', '🧂', '🧊', '🍬',
-  // Produits laitiers / Dairy
+  // Dairy
   '🥛', '🧈', '🥚',
-  // Noix & Graines / Nuts & Seeds
+  // Nuts and seeds
   '🥜', '🌰',
-  // Olives & Fruits secs
+  // Olives
   '🫒',
-  // Fleurs & Déco naturelle / Flowers & Natural garnish
+  // Flowers and natural garnish
   '🌸', '🌺', '🌹', '🏵️',
-  // Autres / Other
+  // Other
   '💧', '☕',
 ];
 
 export default function IconPicker({ value, onChange }: IconPickerProps) {
+  const { t } = useTranslation();
   const [customInput, setCustomInput] = useState('');
-
-  const handleEmojiClick = (emoji: string) => {
-    onChange(emoji);
-  };
 
   const handleCustomSubmit = () => {
     if (customInput.trim()) {
@@ -48,65 +49,71 @@ export default function IconPicker({ value, onChange }: IconPickerProps) {
     }
   };
 
+  // The picker sits inside forms: Enter uses the custom emoji instead of submitting the form.
+  const handleCustomKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    handleCustomSubmit();
+  };
+
   return (
     <div className="space-y-3">
-      {/* Helper text */}
-      <div className="text-xs text-gray-500">
-        Sélectionne un emoji pour représenter cet ingrédient
-      </div>
+      <p className="text-xs text-fg-muted">{t('iconPicker.hint')}</p>
 
-      <div className="grid grid-cols-10 gap-2 max-h-64 overflow-y-auto p-2 bg-[#0f0f1a]/50 rounded-lg">
-        {commonEmojis.map((emoji, idx) => (
-          <button
-            key={`${emoji}-${idx}`}
-            type="button"
-            onClick={() => handleEmojiClick(emoji)}
-            className={`
-              text-2xl p-2 rounded-lg border transition-all
-              ${value === emoji
-                ? 'border-amber-400 bg-amber-400/10 scale-110 shadow-lg shadow-amber-400/20'
-                : 'border-gray-700 bg-[#1a1a2e] hover:border-amber-400/50 hover:bg-amber-400/5'
-              }
-            `}
-            title={emoji}
-          >
-            {emoji}
-          </button>
-        ))}
+      <div
+        role="group"
+        aria-label={t('iconPicker.suggestions')}
+        className="grid grid-cols-10 gap-2 max-h-64 overflow-y-auto p-2 bg-canvas/50 rounded-lg"
+      >
+        {commonEmojis.map((emoji) => {
+          const isSelected = value === emoji;
+          // Emojis have no reliable name across screen readers: a generic one says what the button does.
+          const label = t('iconPicker.emoji', { emoji });
+          return (
+            <button
+              key={emoji}
+              type="button"
+              onClick={() => onChange(emoji)}
+              aria-pressed={isSelected}
+              aria-label={label}
+              title={label}
+              className={cx(
+                'text-2xl p-2 rounded-lg border transition-colors',
+                isSelected
+                  ? 'border-accent bg-accent/10 shadow-lg shadow-accent/20'
+                  : 'border-line-strong bg-surface hover:border-accent/50 hover:bg-accent/5',
+              )}
+            >
+              {emoji}
+            </button>
+          );
+        })}
       </div>
 
       <div className="flex gap-2">
-        <input
+        <Input
           type="text"
           value={customInput}
           onChange={(e) => setCustomInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleCustomSubmit())}
-          placeholder="Ou collez un emoji personnalisé..."
-          className="flex-1 bg-[#0f0f1a] border border-gray-700 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-amber-400"
+          onKeyDown={handleCustomKeyDown}
+          aria-label={t('iconPicker.customLabel')}
+          placeholder={t('iconPicker.customPlaceholder')}
+          className="flex-1"
         />
-        <button
-          type="button"
-          onClick={handleCustomSubmit}
-          disabled={!customInput.trim()}
-          className="bg-amber-400/20 hover:bg-amber-400/30 disabled:bg-gray-800 disabled:text-gray-600 text-amber-400 px-4 py-2 rounded-lg transition-colors"
-        >
-          OK
-        </button>
+        <Button variant="secondary" onClick={handleCustomSubmit} disabled={!customInput.trim()}>
+          {t('iconPicker.useCustom')}
+        </Button>
       </div>
 
       {value && (
-        <div className="flex items-center justify-between p-3 bg-[#0f0f1a] border border-gray-700 rounded-lg">
+        <div className="flex items-center justify-between p-3 bg-canvas border border-line-strong rounded-lg">
           <div className="flex items-center gap-3">
             <span className="text-3xl">{value}</span>
-            <span className="text-sm text-gray-400">Sélectionné</span>
+            <span className="text-sm text-fg-muted">{t('iconPicker.selected')}</span>
           </div>
-          <button
-            type="button"
-            onClick={() => onChange('')}
-            className="text-red-400 hover:text-red-300 text-sm"
-          >
-            Effacer
-          </button>
+          <Button variant="danger" size="sm" onClick={() => onChange('')}>
+            {t('common.clear')}
+          </Button>
         </div>
       )}
     </div>

@@ -1,0 +1,90 @@
+---
+id: C-33
+title: "Cocktails : service CRUD et import fiable (suite de C-09)"
+phase: C
+lane: backend
+criticite: moyenne
+effort: M
+status: done
+owner: agent
+depends_on: [C-09]
+touches: [backend/src/routes/cocktails.ts, backend/src/services/cocktail, backend/src/routes/cocktails.test.ts, backend/src/i18n/]
+sources: ["01-backend-routes.md §H4", "01-backend-routes.md §H5", "01-backend-routes.md §M2", "02-backend-data-perf.md §2.2"]
+branch: feature/C-33-cocktail-service-import
+pr: "#127"
+---
+
+## Décisions validées (2026-10-08)
+
+- **Nom de cocktail** : pas unique (décision C-07). L'aperçu d'import signale un cocktail existant de même nom sans tenir compte de la casse (`alreadyExists`), sans bloquer l'import.
+
+## Contexte
+
+Seconde moitié de C-09, découpée le 2026-10-12 (décision de l'humain, diff estimé à ~1 800 lignes). C-09 a livré `services/cocktail/` avec `includes.ts` (`cocktailInclude` admin, `select` public de A-05), `cocktailExport.ts` (builder unique, nom de fichier), `cocktailImage.ts` (upload, suppression best effort, `safeUploadPath`) et `cocktailService.removeCocktail(id)`. Il reste dans `routes/cocktails.ts` le CRUD et l'import (preview, confirm), soit environ 430 lignes.
+
+## Problème constaté
+
+Import (`routes/cocktails.ts`, handler `POST /import/confirm`) :
+- `unitId: unitId || 0` : unité non résolue → FK sur l'id 0 → rollback et 500, sans dire quelle unité.
+- Bouteille ignorée et catégorie non résolue → `sourceType: 'INGREDIENT'` avec `ingredientId: null`. Même chose pour `CATEGORY` et `INGREDIENT` non résolus : ligne orpheline écrite.
+- `continue` silencieux si la catégorie d'une bouteille à créer n'est pas résolue.
+- 4 boucles de résolution quasi identiques ; handler d'environ 150 lignes.
+- Preview : `name: { equals }` sensible à la casse (« Mojito » ≠ « mojito ») ; `{ id, name: match[matchField], ...match }`, le spread écrase `name`.
+
+CRUD :
+- Existence de `unitId`, `bottleId`, `categoryId`, `ingredientId`, `preferredBottleIds` non vérifiée : erreur de FK, 400 générique sans détail.
+- `mapIngredient` (CRUD) et la construction des lignes de l'import sont deux mappings distincts.
+
+## Ce qu'il faut faire
+
+1. `services/cocktail/cocktailService.ts` (déjà créé par C-09 avec `removeCocktail`) :
+   - `createCocktail(input)`, `updateCocktail(id, input)` : lignes et instructions remplacées **seulement** si le tableau est fourni, en une transaction (A-03), avec `refuseNewRecipeDefects` conservé ;
+   - `toIngredientCreate(line, index)` : mapping unique, utilisé aussi par l'import ;
+   - `assertTargetsExist(tx, lines)` → `BadRequestError('errors.unknownReference', [{ line, field, id }])`.
+2. `services/cocktail/cocktailImport.ts` : `preview(recipe)` et `confirm(recipe, resolutions)` ; une fonction générique `resolveEntities(tx, kind, resolutions)` remplace les 4 boucles ; les champs créés viennent des schémas de C-04 (liste blanche).
+3. Règles d'import :
+   - chaque ligne doit finir avec une unité résolue et la FK de son `sourceType` résolue. Bouteille ignorée → repli `CATEGORY` si la catégorie est résolue, sinon `BadRequestError('errors.importUnresolved', [{ line, kind, name }])`. Plus de `unitId: 0`, plus d'`ingredientId: null` ;
+   - bouteille à créer sans catégorie résolue → même erreur (plus de `continue`) ;
+   - preview : `alreadyExists` comparé en minuscules ; `{ ...match, id: match.id, name: match[matchField] }`.
+4. Routes : `cocktails.ts` ne garde que validation (C-04), appel de service et réponse. Si besoin, séparer l'import dans `routes/cocktailImport.ts`, monté sous le même préfixe (ajouter le fichier à `touches`).
+5. Clés i18n (en, fr) : `errors.importUnresolved`, `errors.unknownReference`.
+
+## Critères d'acceptation
+
+- [x] `cocktails.ts` < 200 lignes ; aucun handler > 30 lignes.
+- [x] Un seul mapping de lignes d'ingrédient (CRUD et import).
+- [x] Import avec une unité non résolue → 400 qui nomme l'unité ; rien n'est créé.
+- [x] Aucun import ne crée de ligne `CocktailIngredient` dont la FK de `sourceType` est nulle.
+- [x] POST ou PUT avec un `unitId`, `bottleId`, `categoryId`, `ingredientId` ou `preferredBottleIds` inexistant → 400 `unknownReference` qui donne la ligne et le champ.
+- [x] Contrat HTTP inchangé (mêmes routes, mêmes formes de réponse) ; mise à jour partielle de A-03 intacte.
+
+## Tests à ajouter ou adapter
+
+- `src/services/cocktail/cocktailImport.test.ts` (base de test) : unité non résolue → erreur détaillée ; bouteille ignorée + catégorie résolue → ligne `CATEGORY` ; bouteille ignorée sans catégorie → erreur et aucune écriture ; bouteille à créer sans catégorie → erreur ; `alreadyExists` insensible à la casse ; `existingMatch.name` vaut le champ comparé.
+- `cocktails.test.ts` : POST avec `unitId` inexistant → 400 `unknownReference` ; PUT avec `preferredBottleIds` inexistant → 400 `unknownReference`, recette intacte ; tests A-03 existants toujours verts.
+
+## Points d'attention
+
+- Ne pas défaire A-03 (mise à jour partielle transactionnelle, défauts déjà stockés tolérés).
+- Le wizard (`frontend/src/components/import/ImportCocktailWizard.tsx`) affiche le message d'erreur générique (A-10) ; le détail par ligne viendra avec E-08.
+- C-19 (noms insensibles à la casse dans les imports) passe après cette tâche.
+- Ne pas toucher à `public.ts` ni à l'export : réglés par C-09.
+
+## Journal
+
+- 2026-10-12 : tâche créée par découpage de C-09 (décision de l'humain) : service CRUD et import fiable, critères et tests repris de C-09.
+- 2026-10-12 : revue de la PR #106 (C-09) : `services/uploadsCheck.ts:96` construit encore `path.join(uploadDir, imagePath)` (simple `existsSync` pour le comptage au démarrage, sans risque). À faire passer par `safeUploadPath` de `cocktailImage.ts` si cette tâche touche ce fichier ; sinon, à reprendre par la prochaine tâche qui le modifie.
+- 2026-10-12 : PR #127 (branche `feature/C-33-cocktail-service-import`).
+  - `cocktailService.ts` : `createCocktail`/`createCocktailIn(tx)`, `updateCocktail` (A-03 inchangé, `refuseNewRecipeDefects` lancé avant la transaction car il lit avec le client partagé), `toIngredientCreate`, `assertTargetsExist` → 400 `unknownReference`, `details: [{ line, field, id }]`.
+  - `cocktailImport.ts` (`previewImport`, `confirmImport`) et `importReferences.ts` (collecte des références sortie de la route). `importUnresolved` liste toutes les lignes en défaut d'un coup, `details: [{ line, kind, name }]` (`line` = index de la ligne, `name` = `null` pour une ligne sans unité). Seules les entités nommées par la recette sont créées ; les bouteilles préférées ne sont gardées que sur une ligne `CATEGORY`.
+  - `existingMatch.name` d'une unité vaut maintenant son abréviation (champ comparé) ; le wizard ne l'affiche qu'en repli pendant le chargement des listes.
+  - Données réelles (copie migrée du jeu d'essai v1.4.0) : 0 ligne avec une référence vers une ligne absente ni clé de source nulle ; PUT sans changement 42/42 ; export puis import 42/42 (même base, bouteilles ignorées avec 27 replis `CATEGORY`, base vide).
+  - Frontend : l'assistant et le formulaire affichent le message traduit, pas les `details` → C-38 créée.
+  - C-14 : ligne de Journal et `touches` (`backend/src/services/cocktail/`) mis à jour, la copie d'`ensureCategoryType` et les `JSON.stringify(nameTranslations)` de l'import ayant quitté `routes/cocktails.ts`.
+  - `services/uploadsCheck.ts` non touché : le point `safeUploadPath` du Journal reste pour la prochaine tâche qui le modifie.
+- 2026-10-12 : suites de la revue de la PR #127 (rebase sur `develop` avec D-08 et D-16).
+  - PUT sur un cocktail inexistant : 404 vérifié en tête de transaction, avant `assertTargetsExist` (même si une ligne désigne une ligne absente).
+  - `resolveSource` s'appuie sur `SOURCE_KEYS` ; un seul helper `lowercase` (`importReferences.ts`).
+  - `importUnresolved` d'une bouteille à créer sans catégorie : `name` = nom de la source dans le fichier, comme les autres cas et comme C-38 le décrit.
+  - Les bouteilles préférées d'une ligne qui n'est pas `CATEGORY` ne sont plus listées dans l'aperçu : l'assistant ne propose plus de les créer, et un fichier où elles n'ont pas de catégorie n'est plus refusé.
+- 2026-10-12 : points de la relecture de la PR #127 acceptés sans changement. (1) `refuseNewRecipeDefects` lit les lignes stockées avec le client partagé, avant la transaction : contrôle et écriture ne sont pas atomiques (même fenêtre qu'avant C-33, sans effet avec un seul admin). Pour la fermer, `refuseNewRecipeDefects` devrait recevoir `tx` en argument (`services/recipeDefectsService.ts`) ; ne pas déplacer l'appel dans le callback de la transaction : avec le client partagé, il attendrait la fin de la transaction jusqu'au timeout (relecture de #127). (2) Import d'une ligne `BOTTLE` ignorée qui retombe sur `CATEGORY` : ses bouteilles préférées (anciennes données seulement) sont abandonnées sans message, sauf si une autre ligne nomme la même bouteille.

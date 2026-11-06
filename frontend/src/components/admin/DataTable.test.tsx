@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
-import { render, screen } from '../../test/test-utils';
+import { act, render, screen } from '../../test/test-utils';
 import DataTable, { type Column } from './DataTable';
 
 interface Row {
@@ -36,6 +36,7 @@ function renderTable(props: Partial<Parameters<typeof DataTable<Row>>[0]> = {}) 
       isError={false}
       onRetry={onRetry}
       emptyLabel="Nothing here"
+      isFiltered={false}
       {...props}
     />,
   );
@@ -99,5 +100,35 @@ describe('DataTable', () => {
     await user.click(screen.getByText('Name'));
 
     expect(sort.toggleSort).toHaveBeenCalledWith('name');
+  });
+
+  it('announces the number of items to screen readers while a filter is active', async () => {
+    renderTable({ isFiltered: true });
+    expect(await screen.findByText('common.resultCount')).toHaveAttribute('aria-live', 'polite');
+  });
+
+  describe('announces nothing', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    function liveRegion() {
+      act(() => vi.advanceTimersByTime(1000));
+      return document.querySelector('[aria-live="polite"]');
+    }
+
+    it('without an active filter: the whole list is no news', () => {
+      renderTable();
+      expect(liveRegion()).toBeEmptyDOMElement();
+    });
+
+    it('while loading or after a failed load', () => {
+      renderTable({ isFiltered: true, isLoading: true });
+      expect(liveRegion()).toBeEmptyDOMElement();
+    });
   });
 });

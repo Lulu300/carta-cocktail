@@ -63,7 +63,8 @@ export default function UnitsPage() {
     key: qk.units,
     api: unitsApi,
     invalidates: [qk.availability],
-    messages: { created: 'units.created', updated: 'units.updated', deleted: 'units.deleted' },
+    // No forced deletion for a unit: a recipe line needs one.
+    messages: { created: 'units.created', updated: 'units.updated', deleted: 'units.deleted', inUse: 'units.inUseHint' },
   });
   const unitForm = useEntityForm(toUnitForm);
   const { form, setField, editing } = unitForm;
@@ -99,12 +100,12 @@ export default function UnitsPage() {
     { key: 'abbreviation', header: t('units.abbreviation'), sortable: true, className: 'text-fg-muted', render: (unit) => unit.abbreviation },
     {
       key: 'conversionFactorToMl',
-      header: 'Facteur de conversion (ml)',
+      header: t('units.conversionFactor'),
       sortable: true,
       className: 'text-fg-muted',
       render: (unit) => (unit.conversionFactorToMl !== null
-        ? <span>1 {unit.abbreviation} = {unit.conversionFactorToMl} ml</span>
-        : <span className="italic">Non convertible</span>),
+        ? <span>1 {unit.abbreviation} = {t('units.ml', { value: unit.conversionFactorToMl })}</span>
+        : <span className="italic">{t('units.notConvertible')}</span>),
     },
     {
       key: 'actions',
@@ -125,7 +126,7 @@ export default function UnitsPage() {
         <h1 className="text-2xl font-bold font-serif text-accent">{t('units.title')}</h1>
         <Button onClick={() => unitForm.open()}>{t('units.add')}</Button>
       </div>
-      <SearchInput value={search} onChange={setSearch} className="max-w-sm mb-4" />
+      <SearchInput value={search} onChange={setSearch} label={t('units.search')} className="max-w-sm mb-4" />
       <DataTable
         columns={columns}
         rows={pagination.paginatedItems}
@@ -136,6 +137,7 @@ export default function UnitsPage() {
         isError={unitsQuery.isError}
         onRetry={() => unitsQuery.refetch()}
         emptyLabel={t('common.noResults')}
+        isFiltered={search.trim() !== ''}
       />
       <Modal
         open={unitForm.isOpen}
@@ -155,15 +157,15 @@ export default function UnitsPage() {
             <Input value={form.abbreviation} onChange={(event) => setField('abbreviation', event.target.value)} />
           </Field>
           <Field
-            label="Facteur de conversion vers ml"
-            hint="Ex: 1 cl = 10 ml, donc facteur = 10. Laisser vide pour les unités de pièce."
+            label={t('units.conversionFactor')}
+            hint={t('units.conversionFactorHint')}
           >
             <Input
               type="number"
               step="any"
               value={form.conversionFactorToMl}
               onChange={(event) => setField('conversionFactorToMl', event.target.value)}
-              placeholder="Laisser vide si non convertible"
+              placeholder={t('units.notConvertible')}
             />
           </Field>
           <div className="flex justify-end gap-3 pt-2">

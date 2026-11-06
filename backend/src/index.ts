@@ -2,7 +2,7 @@ import app from './app';
 import { config } from './config';
 import { configureSqlite, prisma } from './lib/prisma';
 import { reportUploadsCheck } from './services/uploadsCheck';
-import { resolveDatabasePath } from './services/backupService';
+import { resolveDatabasePath } from './lib/databasePath';
 import { applySessionFloor } from './services/sessionFloor';
 
 // In-flight requests get this long to finish before the process is killed

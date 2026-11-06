@@ -1,6 +1,7 @@
 import { Fragment, type Key, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '../ui/classNames';
+import LiveResultCount from '../ui/LiveResultCount';
 import Pagination from '../ui/Pagination';
 import Skeleton from '../ui/Skeleton';
 import SortableHeader from '../ui/SortableHeader';
@@ -53,6 +54,8 @@ interface DataTableProps<T> {
   isError: boolean;
   onRetry: () => void;
   emptyLabel: string;
+  /** True while a search or filter narrows the rows: their number is then announced to screen readers. */
+  isFiltered: boolean;
 }
 
 const SKELETON_ROWS = 3;
@@ -63,10 +66,11 @@ function alignClass(align: Column<unknown>['align']) {
 
 /** Sortable, paginated admin table that never shows its empty label before the data is there. */
 export default function DataTable<T>({
-  columns, rows, getRowKey, sort, pagination, renderRow, isLoading, isError, onRetry, emptyLabel,
+  columns, rows, getRowKey, sort, pagination, renderRow, isLoading, isError, onRetry, emptyLabel, isFiltered,
 }: DataTableProps<T>) {
   const { t } = useTranslation();
   const isEmpty = !isLoading && !isError && rows.length === 0;
+  const announcedCount = isFiltered && !isLoading && !isError ? pagination.totalItems : null;
 
   const renderCells = (row: T) => (
     <tr className="hover:bg-line/50">
@@ -114,6 +118,7 @@ export default function DataTable<T>({
       {isLoading && <p role="status" className="sr-only">{t('common.loading')}</p>}
       {isError && <LoadError onRetry={onRetry} />}
       {isEmpty && <div className="text-center py-8 text-fg-muted">{emptyLabel}</div>}
+      <LiveResultCount count={announcedCount} />
       <Pagination
         page={pagination.page}
         totalPages={pagination.totalPages}

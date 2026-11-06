@@ -6,8 +6,10 @@ import { config } from '../config';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
   request, authHeader, prisma, seedCategory, seedUnit, seedBottle, seedIngredient, seedCocktail,
-  seedFullCocktail,
+  seedFullCocktail, lineOfSource,
 } from '../test/helpers';
+import type { CocktailIngredient } from '../generated/prisma/client';
+import type { CocktailExportFile } from '../services/cocktail/cocktailExport';
 
 beforeAll(async () => { await setupTestDatabase(); });
 afterAll(async () => { await teardownTestDatabase(); });
@@ -169,6 +171,41 @@ describe('POST /api/cocktails', () => {
     expect(res.status).toBe(201);
     expect(res.body.tags).toBe('classic,fruity');
   });
+
+  it('should return 400 unknownReference with the line and the field for a unit that does not exist', async () => {
+    const lime = await seedIngredient({ name: 'Lime' });
+
+    const res = await request.post('/api/cocktails').set(authHeader()).send({
+      name: 'Broken',
+      ingredients: [{ quantity: 1, unitId: 99999, sourceType: 'INGREDIENT', ingredientId: lime.id }],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/does not exist/);
+    expect(res.body.details).toEqual([{ line: 0, field: 'unitId', id: 99999 }]);
+    expect(await prisma.cocktail.count()).toBe(0);
+  });
+
+  // Each case builds the source of the second line from an existing category id
+  it.each([
+    ['bottleId', () => ({ sourceType: 'BOTTLE', bottleId: 99999 })],
+    ['categoryId', () => ({ sourceType: 'CATEGORY', categoryId: 99999 })],
+    ['ingredientId', () => ({ sourceType: 'INGREDIENT', ingredientId: 99999 })],
+    ['preferredBottleIds', (categoryId: number) => ({ sourceType: 'CATEGORY', categoryId, preferredBottleIds: [99999] })],
+  ])('should return 400 unknownReference for a %s that does not exist', async (field, sourceOf) => {
+    const unit = await seedUnit();
+    const category = await seedCategory();
+
+    const res = await request.post('/api/cocktails').set(authHeader()).send({
+      name: 'Broken',
+      ingredients: [
+        { quantity: 1, unitId: unit.id, sourceType: 'CATEGORY', categoryId: category.id },
+        { quantity: 1, unitId: unit.id, ...sourceOf(category.id) },
+      ],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.details).toEqual([{ line: 1, field, id: 99999 }]);
+    expect(await prisma.cocktail.count()).toBe(0);
+  });
 });
 
 describe('PUT /api/cocktails/:id', () => {
@@ -222,11 +259,17 @@ describe('PUT /api/cocktails/:id', () => {
     return { id: res.body.id as number, unit };
   }
 
-  function expectRecipeIntact(body: any) {
+  /** The fields of a GET /api/cocktails/:id body that expectRecipeIntact reads. */
+  interface RecipeBody {
+    ingredients: { sourceType: string; preferredBottles: unknown[] }[];
+    instructions: { text: string }[];
+  }
+
+  function expectRecipeIntact(body: RecipeBody) {
     expect(body.ingredients).toHaveLength(2);
     expect(body.ingredients[0].sourceType).toBe('BOTTLE');
     expect(body.ingredients[1].preferredBottles).toHaveLength(1);
-    expect(body.instructions.map((i: any) => i.text)).toEqual(['Shake', 'Strain']);
+    expect(body.instructions.map((i) => i.text)).toEqual(['Shake', 'Strain']);
   }
 
   it('should keep ingredients, instructions, tags and preferred bottles on a partial update', async () => {
@@ -290,6 +333,7 @@ describe('PUT /api/cocktails/:id', () => {
       instructions: [{ text: 'Replaced' }],
     });
     expect(res.status).toBe(400);
+    expect(res.body.details).toEqual([{ line: 0, field: 'unitId', id: 99999 }]);
 
     const after = await request.get(`/api/cocktails/${id}`).set(authHeader());
     expect(after.body.name).toBe('Full Recipe');
@@ -307,6 +351,7 @@ describe('PUT /api/cocktails/:id', () => {
       }],
     });
     expect(res.status).toBe(400);
+    expect(res.body.details).toEqual([{ line: 0, field: 'preferredBottleIds', id: 99999 }]);
 
     const after = await request.get(`/api/cocktails/${id}`).set(authHeader());
     expectRecipeIntact(after.body);
@@ -314,6 +359,15 @@ describe('PUT /api/cocktails/:id', () => {
 
   it('should return 404 for a non-existent cocktail', async () => {
     const res = await request.put('/api/cocktails/99999').set(authHeader()).send({ name: 'X' });
+    expect(res.status).toBe(404);
+  });
+
+  it('should return 404 for a non-existent cocktail even when a line names a missing unit', async () => {
+    const lime = await seedIngredient({ name: 'Lime' });
+
+    const res = await request.put('/api/cocktails/99999').set(authHeader()).send({
+      ingredients: [{ quantity: 1, unitId: 99999, sourceType: 'INGREDIENT', ingredientId: lime.id }],
+    });
     expect(res.status).toBe(404);
   });
 
@@ -377,7 +431,8 @@ describe('PUT /api/cocktails/:id - recipe defects already stored', () => {
   // The recipe lines as CocktailFormPage loads them and sends them back on save
   async function formLines(id: number) {
     const res = await request.get(`/api/cocktails/${id}`).set(authHeader());
-    return res.body.ingredients.map((ing: any) => ({
+    const lines: CocktailIngredient[] = res.body.ingredients;
+    return lines.map((ing) => ({
       sourceType: ing.sourceType,
       bottleId: ing.sourceType === 'BOTTLE' ? ing.bottleId : null,
       categoryId: ing.sourceType === 'CATEGORY' ? ing.categoryId : null,
@@ -584,27 +639,24 @@ describe('GET /api/cocktails/:id/export - rich data with all source types', () =
     expect(res.body.cocktail.notes).toBe('Shake hard');
     expect(res.body.cocktail.tags).toEqual(['classic', 'fruity']);
 
-    const ings = res.body.cocktail.ingredients;
+    const ings: CocktailExportFile['payload']['cocktail']['ingredients'] = res.body.cocktail.ingredients;
     expect(ings).toHaveLength(3);
 
     // BOTTLE branch
-    const bottleIng = ings.find((i: any) => i.sourceType === 'BOTTLE');
-    expect(bottleIng).toBeDefined();
+    const bottleIng = lineOfSource(ings, 'BOTTLE');
     expect(bottleIng.sourceName).toBe('Havana 3 Ans');
     expect(bottleIng.sourceDetail.categoryName).toBe('Rum');
     expect(bottleIng.sourceDetail.categoryType).toBe('SPIRIT');
 
     // CATEGORY branch
-    const catIng = ings.find((i: any) => i.sourceType === 'CATEGORY');
-    expect(catIng).toBeDefined();
+    const catIng = lineOfSource(ings, 'CATEGORY');
     expect(catIng.sourceName).toBe('Rum');
     expect(catIng.sourceDetail.type).toBe('SPIRIT');
     expect(catIng.preferredBottles).toHaveLength(1);
-    expect(catIng.preferredBottles[0].name).toBe('Havana 3 Ans');
+    expect(catIng.preferredBottles?.[0].name).toBe('Havana 3 Ans');
 
     // INGREDIENT branch
-    const ingIng = ings.find((i: any) => i.sourceType === 'INGREDIENT');
-    expect(ingIng).toBeDefined();
+    const ingIng = lineOfSource(ings, 'INGREDIENT');
     expect(ingIng.sourceName).toBe('Lime Juice');
     expect(ingIng.sourceDetail).toHaveProperty('icon');
   });
@@ -826,6 +878,25 @@ describe('POST /api/cocktails/import/confirm', () => {
     expect(res.body.ingredients[0].unitId).toBe(unit.id);
   });
 
+  it('should return 400 importUnresolved naming the unit when it is not resolved', async () => {
+    const res = await request.post('/api/cocktails/import/confirm').set(authHeader()).send({
+      recipe: {
+        version: 1,
+        cocktail: {
+          name: 'No Unit',
+          ingredients: [{ sourceType: 'INGREDIENT', sourceName: 'Lime', quantity: 1, unit: { abbreviation: 'cl' } }],
+        },
+      },
+      resolutions: { ingredients: { lime: { action: 'create', data: { name: 'Lime' } } } },
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/cannot be imported/);
+    expect(res.body.details).toEqual([{ line: 0, kind: 'unit', name: 'cl' }]);
+    expect(await prisma.cocktail.count()).toBe(0);
+    expect(await prisma.ingredient.count()).toBe(0);
+  });
+
   it('should return 400 for a created bottle with remainingPercent above 100', async () => {
     const res = await request.post('/api/cocktails/import/confirm').set(authHeader()).send({
       recipe: { version: 1, cocktail: { name: 'Bounds' } },
@@ -1015,5 +1086,143 @@ describe('POST /api/cocktails/:id/image - upload replacing existing', () => {
     expect(res.status).toBe(200);
     expect(fs.existsSync(oldFilePath)).toBe(false);
     expect(fs.existsSync(path.join(config.uploadDir, res.body.imagePath))).toBe(true);
+  });
+});
+
+describe('GET /api/cocktails/:id/export - file name', () => {
+  it('should keep the base letter of accented names', async () => {
+    const cocktail = await seedCocktail({ name: 'Piña Colada' });
+    const res = await request.get(`/api/cocktails/${cocktail.id}/export`).set(authHeader());
+    expect(res.status).toBe(200);
+    expect(res.headers['content-disposition']).toBe('attachment; filename="cocktail-pina-colada.json"');
+  });
+
+  it('should name a cocktail without latin letters after its id', async () => {
+    const cocktail = await seedCocktail({ name: 'モヒート' });
+    const res = await request.get(`/api/cocktails/${cocktail.id}/export`).set(authHeader());
+    expect(res.headers['content-disposition']).toContain(`cocktail-${cocktail.id}.json`);
+  });
+});
+
+function uploadedFiles(): string[] {
+  return fs.existsSync(config.uploadDir) ? fs.readdirSync(config.uploadDir) : [];
+}
+
+function uploadImage(id: number, filename: string, contentType: string) {
+  return request
+    .post(`/api/cocktails/${id}/image`)
+    .set(authHeader())
+    .attach('image', Buffer.from('image-data'), { filename, contentType });
+}
+
+describe('POST /api/cocktails/:id/image - file checks', () => {
+  it('should return 404 and keep no file for a cocktail that does not exist', async () => {
+    const before = uploadedFiles();
+
+    const res = await uploadImage(99999, 'photo.png', 'image/png');
+
+    expect(res.status).toBe(404);
+    expect(uploadedFiles()).toEqual(before);
+  });
+
+  it.each([
+    ['an extension that only contains an accepted one', 'photo.xjpg', 'image/jpeg'],
+    ['an extension that does not match the MIME type', 'photo.png', 'image/jpeg'],
+    ['a MIME type that only starts like an accepted one', 'photo.png', 'image/png-whatever'],
+    ['a file that is not an image', 'notes.txt', 'text/plain'],
+  ])('should return 400 for %s', async (_case, filename, contentType) => {
+    const cocktail = await seedCocktail();
+    const before = uploadedFiles();
+
+    const res = await uploadImage(cocktail.id, filename, contentType);
+
+    expect(res.status).toBe(400);
+    expect(uploadedFiles()).toEqual(before);
+  });
+
+  it('should store the image under a random name with the lowercased extension', async () => {
+    const cocktail = await seedCocktail();
+
+    const res = await uploadImage(cocktail.id, '../My Photo.JPEG', 'image/jpeg');
+
+    expect(res.status).toBe(200);
+    expect(res.body.imagePath).toMatch(/^[0-9a-f-]{36}\.jpeg$/);
+    expect(fs.existsSync(path.join(config.uploadDir, res.body.imagePath))).toBe(true);
+  });
+});
+
+describe('POST /api/cocktails/:id/image - failed update', () => {
+  it('should delete the uploaded file and keep the previous photo when the update fails', async () => {
+    const cocktail = await seedCocktail();
+    const previous = await uploadImage(cocktail.id, 'old.png', 'image/png');
+    const filesBefore = uploadedFiles();
+    // Makes the update itself fail, as a locked database would
+    await prisma.$executeRawUnsafe(
+      `CREATE TRIGGER refuse_cocktail_update BEFORE UPDATE ON "Cocktail" BEGIN SELECT RAISE(ABORT, 'refused'); END`,
+    );
+    try {
+      const res = await uploadImage(cocktail.id, 'new.png', 'image/png');
+      expect(res.status).not.toBe(200);
+    } finally {
+      await prisma.$executeRawUnsafe('DROP TRIGGER refuse_cocktail_update');
+    }
+    expect(uploadedFiles()).toEqual(filesBefore);
+    const stored = await prisma.cocktail.findUniqueOrThrow({ where: { id: cocktail.id } });
+    expect(stored.imagePath).toBe(previous.body.imagePath);
+    expect(fs.existsSync(path.join(config.uploadDir, previous.body.imagePath))).toBe(true);
+  });
+});
+
+describe('DELETE /api/cocktails/:id - image file', () => {
+  it('should return 404 for a cocktail that does not exist', async () => {
+    const res = await request.delete('/api/cocktails/99999').set(authHeader());
+    expect(res.status).toBe(404);
+  });
+
+  it('should delete the image file with the cocktail', async () => {
+    const cocktail = await seedCocktail();
+    const upload = await uploadImage(cocktail.id, 'photo.webp', 'image/webp');
+    const imageFile = path.join(config.uploadDir, upload.body.imagePath);
+    expect(fs.existsSync(imageFile)).toBe(true);
+
+    const res = await request.delete(`/api/cocktails/${cocktail.id}`).set(authHeader());
+
+    expect(res.status).toBe(200);
+    expect(await prisma.cocktail.findUnique({ where: { id: cocktail.id } })).toBeNull();
+    expect(fs.existsSync(imageFile)).toBe(false);
+  });
+
+  it('should keep the image file when the cocktail cannot be deleted', async () => {
+    const cocktail = await seedCocktail();
+    const upload = await uploadImage(cocktail.id, 'photo.png', 'image/png');
+    const imageFile = path.join(config.uploadDir, upload.body.imagePath);
+    // Makes the deletion itself fail, as a locked database would
+    await prisma.$executeRawUnsafe(
+      `CREATE TRIGGER refuse_cocktail_delete BEFORE DELETE ON "Cocktail" BEGIN SELECT RAISE(ABORT, 'refused'); END`,
+    );
+    try {
+      const res = await request.delete(`/api/cocktails/${cocktail.id}`).set(authHeader());
+      expect(res.status).not.toBe(200);
+    } finally {
+      await prisma.$executeRawUnsafe('DROP TRIGGER refuse_cocktail_delete');
+    }
+    expect(await prisma.cocktail.findUnique({ where: { id: cocktail.id } })).not.toBeNull();
+    expect(fs.existsSync(imageFile)).toBe(true);
+  });
+
+  it('should never delete a file outside the upload folder', async () => {
+    const witness = path.join(path.dirname(config.uploadDir), `carta-witness-${process.pid}.txt`);
+    fs.writeFileSync(witness, 'keep me');
+    try {
+      const cocktail = await seedCocktail();
+      await prisma.cocktail.update({ where: { id: cocktail.id }, data: { imagePath: `../${path.basename(witness)}` } });
+
+      const res = await request.delete(`/api/cocktails/${cocktail.id}`).set(authHeader());
+
+      expect(res.status).toBe(200);
+      expect(fs.existsSync(witness)).toBe(true);
+    } finally {
+      fs.rmSync(witness, { force: true });
+    }
   });
 });

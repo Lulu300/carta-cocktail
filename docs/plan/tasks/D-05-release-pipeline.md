@@ -5,13 +5,13 @@ phase: D
 lane: ci
 criticite: moyenne
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [D-04, D-11]
-touches: [.github/workflows/release.yml, backend/Dockerfile, frontend/Dockerfile]
+touches: [.github/workflows/release.yml, backend/Dockerfile, frontend/Dockerfile, docs/plan/tasks/C-23-backend-app-version.md, docs/plan/tasks/D-09-docs-sync-ops-guide.md]
 sources: ["07-devops-history.md §3.4"]
-branch:
-pr:
+branch: chore/D-05-release-pipeline
+pr: "#118"
 ---
 
 ## Décisions validées (2026-10-09)
@@ -98,12 +98,12 @@ Le NAS tire les images publiées sur ghcr.io, en `:latest` d'après `docker-comp
 
 ## Critères d'acceptation
 
-- [ ] La règle de branche et le contrôle des notes de D-11 s'appliquent toujours (job `verify` inchangé).
-- [ ] Un tag valide lance la CI complète avant tout push d'image.
-- [ ] `docker buildx imagetools inspect ghcr.io/lulu300/carta-cocktail/backend:<version>` liste `linux/amd64` et `linux/arm64`.
-- [ ] Les tags `<version>`, `<major>.<minor>`, `<major>` et `latest` sont publiés pour une version finale ; une pré-version (`v1.5.0-rc.1`) ne déplace pas `latest`.
-- [ ] SBOM et provenance visibles (`docker buildx imagetools inspect --format '{{json .SBOM}}'`).
-- [ ] `docker run --rm --entrypoint printenv <image backend> APP_VERSION` renvoie la version du tag.
+- [x] La règle de branche et le contrôle des notes de D-11 s'appliquent toujours (job `verify` inchangé, seul `actions/checkout` est épinglé par SHA).
+- [x] Un tag valide lance la CI complète avant tout push d'image (job `ci` appelant `ci.yml`, `images` en `needs: [verify, ci]` ; à constater sur la première pré-version).
+- [x] `docker buildx imagetools inspect ghcr.io/lulu300/carta-cocktail/backend:<version>` liste `linux/amd64` et `linux/arm64` (index multi-plateforme vérifié en local ; registre à constater sur la première pré-version).
+- [x] Les tags `<version>`, `<major>.<minor>`, `<major>` et `latest` sont publiés pour une version finale ; une pré-version (`v1.5.0-rc.1`) ne déplace pas `latest` (`metadata-action`, `latest` piloté par la sortie `prerelease` du job `verify` ; à constater sur les prochains tags).
+- [x] SBOM et provenance visibles (`docker buildx imagetools inspect --format '{{json .SBOM}}'`) (attestations SPDX et SLSA v1 par plateforme vérifiées en local).
+- [x] `docker run --rm --entrypoint printenv <image backend> APP_VERSION` renvoie la version du tag (`1.12.0-rc.1` en local avec l'argument de build, `dev` sans).
 
 ## Tests à ajouter ou adapter
 
@@ -116,7 +116,9 @@ Le NAS tire les images publiées sur ghcr.io, en `:latest` d'après `docker-comp
 - Impact sur les utilisateurs de `:latest`. Le manifeste multi-arch est transparent pour amd64. En revanche, la première release qui suit D-01, D-02 et D-03 apporte via `latest` un conteneur non-root, un frontend sur le port 8080 et un backend sans port publié. Ces actions sont décrites par les PR de D-01, D-02 et D-03 (section « Required actions », règle de D-11), puis reprises par le coordinateur dans les notes et `UPGRADING.md`. Recommander dans ces notes l'épinglage sur `:<major>.<minor>` si cette tâche est mergée, sinon sur `:<version>`. Décision du 2026-10-09 : v2.0.0 seulement à la fin du plan, donc ces changements cassants sortent dans une version 1.x intermédiaire, avec `breaking: true` dans le front matter des notes.
 - Durée : le build arm64 sous QEMU (npm ci, prisma generate, tsc) peut prendre 10 à 20 minutes. Alternative si c'est trop lent : runners natifs `ubuntu-24.04-arm` (gratuits pour un repo public) et fusion des manifestes, plus complexe.
 - Architectures à confirmer par l'humain : le modèle du NAS (x86 ou ARM) décide si arm64 est nécessaire. armv7 est hors périmètre.
+- Transmis par D-04 : `ci.yml` épingle ses actions par SHA, avec la version en commentaire (`uses: actions/checkout@<sha> # v7.0.1`), suivies par Dependabot. Faire de même dans `release.yml` (les versions de l'exemple ci-dessus sont anciennes : reprendre celles de `ci.yml`). Son groupe de concurrence (`ci-<github.workflow>-<ref de PR ou sha>`, soit `ci-Release-<sha>` dans un appel depuis la release) ne doit jamais être repris par `release.yml`. Le job `ci` de la release ne doit pas recevoir `permissions: {}` : un workflow appelé ne peut pas demander plus que son appelant, et `ci.yml` a besoin de `contents: read`.
 - Les versions de `package.json` restent à `1.0.0` et `0.0.0`. Décision à prendre : les synchroniser à chaque release (commit sur `main` avant le tag) ou assumer que `APP_VERSION` fait foi.
+- Transmis par D-04 (PR #112) : `ci.yml` lance `npm audit --omit=dev` (frontend `high`, backend `critical` jusqu'à B-11). Appelée par la release, cette étape peut bloquer une release si un avis est publié entre le merge et le tag. C'est voulu : la réponse est une PR de montée de version ou de surcharge, jamais une baisse du seuil.
 
 ## Journal
 
@@ -124,3 +126,8 @@ Le NAS tire les images publiées sur ghcr.io, en `:latest` d'après `docker-comp
 - 2026-10-09 : D-11 ajoutée en dépendance. L'étape « le tag doit pointer sur main » est remplacée par la règle de D-11 (version finale sur `main`, pré-version sur `develop` ou `main`). Retirés car traités par D-11 : changelog et `PREV_TAG`, `generate_release_notes` et le job `github-release`, `latest` réservé aux versions finales, permissions par job, critère « les notes listent les PR », note sur `.github/release.yml`.
 - 2026-10-09 : réponses de l'humain. Changements cassants en 1.x acceptés avec garde-fous ; pas de tag jetable : la première vraie pré-version après le merge sert de test.
 - 2026-10-09 : revue de la PR #38. Pré-versions uniquement sur `develop` (la version précédente de cette tâche les autorisait aussi sur `main`) ; commit du tag lu avec `rev-parse` ; épinglage sur `:<version>` tant que le tag `:<majeure>.<mineure>` n'existe pas.
+- 2026-10-12 : décisions de l'humain. Architectures : option B, `linux/amd64` et `linux/arm64` sous QEMU, un seul job et un manifeste multi-arch, stages de compilation en `FROM --platform=$BUILDPLATFORM`. Version : option A, `APP_VERSION` (argument de build) fait foi, les `package.json` ne bougent pas ; `APP_VERSION` injectée dans les deux images. Les métadonnées de sauvegarde lisent encore `backend/package.json` : laissé à C-23 (pas de nouvelle tâche).
+- 2026-10-12 : fait (PR #118). Job `ci` (`uses: ./.github/workflows/ci.yml`) entre `verify` et `images`, sans `permissions` ni reprise du groupe de concurrence de `ci.yml`. `images` : QEMU (arm64), `platforms: linux/amd64,linux/arm64`, `metadata-action` (`X.Y.Z` toujours, `X.Y` et `X` pour une version finale ; `latest` piloté par `verify`), `APP_VERSION` pour les deux images, `sbom: true`, `provenance: mode=max`. Écarts à l'exemple de la tâche : pas de permissions `id-token` / `attestations` (les attestations buildx partent avec l'image, seules les attestations GitHub en auraient besoin) ; cache lu dans le scope de la CI et dans un scope `<service>-release`, écrit dans ce dernier, pour garder les couches arm64 que les pushes de la CI écrasent. Toutes les actions de `release.yml` épinglées par SHA. `backend/Dockerfile` : stage `build` sur `$BUILDPLATFORM`, nouveau stage `prod-deps` sur la plateforme cible (`npm ci` puis `npm prune`), mêmes premières étapes que `build` pour que BuildKit les fusionne quand les plateformes sont égales (`npm ci` une seule fois, vérifié avec `--no-cache`) ; `ARG`/`ENV APP_VERSION` en fin de fichier. `frontend/Dockerfile` : stage `build` sur `$BUILDPLATFORM`. Vérifications : `actionlint` ; en local, image backend amd64 construite depuis un hôte arm64 (client Prisma généré sur l'autre plateforme) : migrations, seed et API OK, `APP_VERSION` = version passée ; index multi-plateforme avec SBOM et provenance. Pas de tag ni de pré-version : la première vraie pré-version après le merge sert de test (étapes dans la PR). Fichiers ajoutés à `touches` : C-23 (Journal) et D-09 (Points d'attention : README, AGENTS.md et `docs/plan/README.md` à aligner sur ce pipeline).
+- 2026-10-12 : Notes de version : images publiées pour `linux/amd64` et `linux/arm64` (un hôte arm64 n'a plus besoin de construire en local), tags `:X.Y` et `:X` pour les versions finales (épinglage `:<majeure>.<mineure>` possible à partir de la première version finale publiée après ce merge), SBOM et provenance attachées aux images. Aucune action, `breaking: false`.
+- 2026-10-12 : décision de l'humain après la relecture (PR #118) : `latest`, `:X` et `:X.Y` suivent la dernière version finale poussée, pas la plus haute ; une garde est confiée à la nouvelle tâche D-28 plutôt que de seulement documenter la règle.
+- 2026-11-05 : PR Dependabot #145 (`docker/login-action` 4.6.0 → 4.7.0, `release.yml`, épinglé par SHA `81c6f93…` vérifié contre le tag). La CI ne couvre pas `release.yml`. À la prochaine pré-version : vérifier dans les deux jobs « Build and push … image » l'étape « Log in to GitHub Container Registry » (`Login Succeeded`), la déconnexion en fin de job et la publication des images `:X.Y.Z-rc.N`. En cas d'échec, revenir à `dbcb813823bdd20940b903addbd779551569679f # v4.6.0` et taguer une nouvelle pré-version.

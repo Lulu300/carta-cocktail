@@ -5,13 +5,13 @@ phase: D
 lane: ci
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [D-15]
 touches: [scripts/upgrade-test/]
 sources: []
-branch:
-pr:
+branch: chore/D-17-upgrade-bench-local-version
+pr: https://github.com/Lulu300/carta-cocktail/pull/101
 ---
 
 ## Contexte
@@ -32,10 +32,10 @@ Le banc de mise à jour (D-15) rejoue un chemin de versions, par exemple `1.4.0,
 
 ## Critères d'acceptation
 
-- [ ] `node scripts/upgrade-test/run.mjs --fixture <dir> --layout friend --path 1.4.0,1.6.0,local --mode conformant` démarre sans `--local-version`.
-- [ ] `--local-version` garde la priorité sur la valeur par défaut.
-- [ ] Un chemin qui descend reste refusé, avec un message qui cite `--local-version`.
-- [ ] README du banc à jour.
+- [x] `node scripts/upgrade-test/run.mjs --fixture <dir> --layout friend --path 1.4.0,1.6.0,local --mode conformant` démarre sans `--local-version`.
+- [x] `--local-version` garde la priorité sur la valeur par défaut.
+- [x] Un chemin qui descend reste refusé, avec un message qui cite `--local-version`.
+- [x] README du banc à jour.
 
 ## Tests à ajouter ou adapter
 
@@ -49,3 +49,5 @@ Le banc de mise à jour (D-15) rejoue un chemin de versions, par exemple `1.4.0,
 ## Journal
 
 - 2026-10-10 : tâche créée pendant B-01 (PR #53) : le banc refusait `1.4.0,1.6.0,local` sans `--local-version 1.7.0`.
+- 2026-10-12 : valeur par défaut de `local` = mineure suivant la plus récente des versions des hooks et des étapes publiées du chemin (`defaultLocalVersion`, `1.12.0` aujourd'hui) ; `--local-version` garde la priorité ; un ordre refusé qui implique `local` cite `--local-version`. Constat : avec `1.11.0.mjs` comme hook le plus récent, `1.4.0,1.6.0,local` passait déjà, l'échec se voyait sur `1.11.0,local` ; README avec cet exemple. Un hook ajouté pour une version en préparation est traversé (testé). Banc réel `friend`, `1.4.0,1.6.0,local`, `conformant`, sans `--local-version` : code 0, 3 étapes OK, 0 échec inattendu. Tests du banc : 33/33 ; couverture des lignes modifiées 85,2 % (23/27).
+- Notes de version : aucune action (outillage).

@@ -5,7 +5,7 @@ Replays Carta Cocktail upgrades with Docker on a copy of a real production datab
 ```bash
 node scripts/upgrade-test/run.mjs --fixture ~/carta-fixtures/ami --layout friend --path 1.4.0,1.5.0,1.6.0-rc.1
 node scripts/upgrade-test/run.mjs --fixture ~/carta-fixtures/ami --layout official --path 1.4.0,1.6.0-rc.1 --mode conformant
-node scripts/upgrade-test/run.mjs --fixture ~/carta-fixtures/ami --layout friend --path 1.6.0-rc.1,local
+node scripts/upgrade-test/run.mjs --fixture ~/carta-fixtures/ami --layout friend --path 1.11.0,local
 node scripts/upgrade-test/run.mjs --clean-all      # remove what a --keep or killed run left behind
 node --test scripts/upgrade-test/test/*.test.mjs  # unit tests of the bench
 ```
@@ -31,11 +31,16 @@ The bench never writes to the fixture. It works on copies in the system temp fol
 | `--layout <name>` | `friend` or `official`, see below (required) |
 | `--path <list>` | versions in order, e.g. `1.4.0,1.5.0,1.6.0-rc.1` (required). `local` builds the backend and frontend images from the checkout |
 | `--mode <mode>` | `naive`, `conformant` or `both` (default) |
-| `--local-version <v>` | release notes followed by a `local` step (default: the newest hook file) |
+| `--local-version <v>` | release notes followed by a `local` step, see below |
 | `--report-dir <dir>` | default `<fixture>/../upgrade-test-reports/<date>/` |
 | `--timeout <s>` | wait for each backend start, default 300 |
+| `--inject-duplicate` | add a duplicate category name to the working copy, to replay the refusal of a failed migration, see below |
 | `--keep` | keep the containers, volumes and work folder of a run that failed |
 | `--clean-all` | remove every `carta-ut-*` container, volume and network and `$TMPDIR/carta-upgrade-test/`, then exit |
+
+**`local` step.** It builds the images from the checkout, which is newer than any published version: by default it follows the notes of the minor release after the newest hook file and the newest version of the path (`1.12.0` when the newest hook file is `1.11.0`). The jump to it therefore goes up and crosses every hook file, including one already added for a release in preparation. `--local-version` forces another version (`--local-version 1.12.0`); it takes priority over the default and must still be newer than the step before `local`. A path that goes down is refused, and when a `local` step is involved the message points to `--local-version`.
+
+**`--inject-duplicate`.** Before the row counts of reference are taken, the bench copies one category of the working copy under a new id, with the same name. The `schema_integrity` migration (v1.8.0) creates the unique index `Category_name_key` and fails on it. The report only gives the number of rows added. On each step whose version refuses duplicate names (`uniqueCategoryNames` in the profile), the refusal of the failed migration (`FAILED_MIGRATION_REFUSAL`) is required, in both modes: a start that goes through, or a start refused for another reason, fails the check `injected duplicate refused`, whose detail names the refusal found. The refused start is expected, with the reason of the injected duplicate instead of the one of the notes; in conformant mode, so is the database copy that the new image refuses (`checkDatabaseCopy`, v1.6.0 Before 4). A copy that starts, even with missing log lines or an outdated migration status, stays an unexpected failure. The refusal itself is still checked: its message must be in `profile.refusals`, and the database check of that refusal must pass. Use a direct jump from a version before v1.8.0 to a version that ships the failed-migration refusal (C-18: v1.12.0 and later, or `local`), for example `--path 1.4.0,local`. A jump to v1.8.0 up to v1.11.0 stops on the Prisma error `P3018` without that message: the refusal is not recognised, `injected duplicate refused` fails, and the database gets the strict check, which fails. The option is refused (exit code 2) when the path starts at v1.8.0 or later (the first start would already be refused), when the fixture already has `Category_name_key` (taken from a v1.8.0 or newer instance), or when it has no category to copy.
 
 Exit code: `0` when every check gives the expected result, `1` when a check or a required action fails unexpectedly, `2` for a setup error (wrong option, missing fixture, image not found), `130` when the run was interrupted (Ctrl+C or `SIGTERM`).
 
@@ -53,7 +58,9 @@ A layout is a folder in `layouts/` with a `layout.mjs`, one compose template per
 
 `hooks/<version>.mjs` describes one release:
 
-- `profile`: how the version behaves (upload folder, migrations, journal mode, expected log lines, known bugs). A version without a hook file inherits the profile of the previous one.
+- `profile`: how the version behaves (upload folder, migrations, journal mode, expected log lines, known bugs, clean refusals). A version without a hook file inherits the profile of the previous one.
+  - `uniqueCategoryNames`: the release refuses two categories with the same name (v1.8.0), see `--inject-duplicate`.
+  - `refusals`: the clean refusals that the release adds, defined in `lib/checks.mjs`; they add up with the ones of older releases. `BASELINE_REFUSAL` (v1.6.0): a `db push` database that does not match `0_init`. `FAILED_MIGRATION_REFUSAL` (v1.12.0, C-18): a migration that fails, for example on duplicates.
 - `before` / `after`: the required actions, each linked to its step in the notes. Actions are implemented in `lib/actions.mjs` and follow the notes for any layout, from what `docker inspect` shows:
   - `rescueUploads`: copies the photos out of the old container, unless their folder is a mount;
   - `checkPhotoMount`: on v1.5.0, checks that `/app/uploads` is a mount, and copies the photos out if it is not;
@@ -63,6 +70,7 @@ A layout is a folder in `layouts/` with a `layout.mjs`, one compose template per
   - `requireStarted`: the version started earlier on the path, or `directFrom` allows a direct jump from that release line;
   - `copyDatabase`, `checkDatabaseCopy`: copy of the database files with the backend stopped (volume or data folder), and check of a second copy with the new image;
   - `changeWeakAdminPassword`: an admin password that is `admin123` or shorter than 12 characters is changed through Settings > Admin Profile, and a short `ADMIN_PASSWORD` is removed from the env file. The bench then logs in with the new password;
+  - `chownMounts`: gives the volumes and host folders mounted on `destinations` (for example `/app/data` and `/app/uploads`) to `owner` (`uid:gid`) with the helper image, before a jump to an image that no longer runs as root;
   - `manual`: reported, not automated.
 - `naiveMayFail`: what the notes say breaks when the actions are skipped. In naive mode, these failures, and the ones already present at the previous step, are reported as expected and do not change the exit code. When the layout mounts the photos on a folder that the version no longer reads (`friend` from v1.5.0), the report gives that cause instead of the reason of the notes.
 
@@ -76,7 +84,7 @@ After each start or jump:
 
 | Check | How |
 |---|---|
-| Start, or clean refusal | API ready line, or container stopped/restarting; a refusal must print the refusal message and leave the database file unchanged |
+| Start, or clean refusal | API ready line, or container stopped/restarting. A refusal must print a message of `profile.refusals`. The `0_init` refusal (or an unknown one) must leave the database file unchanged. A failed migration stays in the database (SQLite migrations are not transactional): the newest `pre-migrate-*.db` copy must then have the SHA-256 of the database before the jump, and the row counts below must show no loss. The exit code comes from the last `die` event: under `restart: unless-stopped`, the state shows the attempt that runs again (code 0) |
 | Log lines | `profile.startupLogs`, plus `profile.baselineLogs` on the first start of a database created by `db push` (backup `pre-migrate-*`, `0_init` baseline) |
 | `prisma migrate status` | versions with migrations |
 | Admin login | `POST /api/auth/login` then `/api/auth/me`. v1.4.0 rewrites the admin password from `ADMIN_PASSWORD` at each start: from then on the bench expects that password, and checks it still works after each jump |

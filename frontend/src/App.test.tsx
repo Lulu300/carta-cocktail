@@ -2,8 +2,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Outlet, useLocation } from 'react-router-dom';
 import App from './App';
+import appSource from './App.tsx?raw';
 
 const mockUseAuth = vi.fn();
+
+// Order in which the admin messages load and the admin and login chunks render.
+const loadEvents = vi.hoisted((): string[] => []);
+
+vi.mock('./i18n/admin', () => {
+  loadEvents.push('admin messages');
+  return {};
+});
 
 vi.mock('./contexts/AuthContext', () => ({
   useAuth: () => mockUseAuth(),
@@ -12,6 +21,7 @@ vi.mock('./contexts/AuthContext', () => ({
 // Shows where ProtectedRoute asked to come back to, instead of the real form
 vi.mock('./pages/auth/LoginPage', () => ({
   default: function LoginPageStub() {
+    loadEvents.push('LoginPage');
     const location = useLocation();
     const from = (location.state as { from?: { pathname: string } } | null)?.from;
     return <div data-testid="login-page">{from?.pathname ?? 'no-from'}</div>;
@@ -19,16 +29,24 @@ vi.mock('./pages/auth/LoginPage', () => ({
 }));
 
 vi.mock('./components/layout/AdminLayout', () => ({
-  default: () => (
-    <div data-testid="admin-layout">
-      <Outlet />
-    </div>
-  ),
+  default: function AdminLayoutStub() {
+    loadEvents.push('AdminLayout');
+    return (
+      <div data-testid="admin-layout">
+        <Outlet />
+      </div>
+    );
+  },
 }));
 
 // These tests only cover routing: stub the other pages so they are not loaded.
 vi.mock('./components/layout/PublicLayout', () => ({ default: () => <Outlet /> }));
-vi.mock('./pages/admin/DashboardPage', () => ({ default: () => <h1>dashboard.title</h1> }));
+vi.mock('./pages/admin/DashboardPage', () => ({
+  default: function DashboardPageStub() {
+    loadEvents.push('DashboardPage');
+    return <h1>dashboard.title</h1>;
+  },
+}));
 vi.mock('./pages/admin/CategoriesPage', () => ({ default: () => null }));
 vi.mock('./pages/admin/BottlesPage', () => ({ default: () => null }));
 vi.mock('./pages/admin/IngredientsPage', () => ({ default: () => null }));
@@ -105,5 +123,55 @@ describe('route code splitting', () => {
     // Synchronous query: the public pages are in the entry chunk, nothing suspends
     expect(screen.getByTestId('home-page')).toBeInTheDocument();
     expect(screen.queryByText('common.loading')).not.toBeInTheDocument();
+  });
+});
+
+describe('admin messages', () => {
+  // The load-order tests below only see the first lazy route of this file to render: the
+  // mocked ./i18n/admin module runs once. This check covers every route, from the source.
+  it('are awaited by every lazy chunk behind /login and /admin', () => {
+    const lazyCalls = appSource.match(/\blazy\(/g) ?? [];
+    // The only lazy() call is the one inside lazyWithAdminMessages
+    expect(lazyCalls).toHaveLength(1);
+    expect(appSource).toContain("return lazy(() => Promise.all([load(), import('./i18n/admin')])");
+
+    const adminChunks = [...appSource.matchAll(/import\('([^']+)'\)/g)]
+      .map((match) => match[1])
+      .filter((path) => /^\.\/pages\/(admin|auth)\/|\/AdminLayout$/.test(path));
+    expect(adminChunks).toEqual(
+      expect.arrayContaining(['./components/layout/AdminLayout', './pages/auth/LoginPage']),
+    );
+    expect(adminChunks.length).toBeGreaterThanOrEqual(14);
+    const unwrapped = adminChunks.filter(
+      (path) => !appSource.includes(`lazyWithAdminMessages(() => import('${path}'))`),
+    );
+    expect(unwrapped).toEqual([]);
+  });
+
+  // The first render of a chunk must come after the admin messages are registered, or raw keys
+  // would flash on screen. Events accumulate across tests: the first occurrence of each counts.
+  function expectRegisteredBeforeFirstRender(component: string) {
+    expect(loadEvents).toContain('admin messages');
+    expect(loadEvents).toContain(component);
+    expect(loadEvents.indexOf('admin messages')).toBeLessThan(loadEvents.indexOf(component));
+  }
+
+  it('are registered before the login page first renders', async () => {
+    mockUseAuth.mockReturnValue({ user: null, isLoading: false });
+
+    renderAt('/login');
+
+    expect(await screen.findByTestId('login-page')).toBeInTheDocument();
+    expectRegisteredBeforeFirstRender('LoginPage');
+  });
+
+  it('are registered before the admin layout and its pages first render', async () => {
+    mockUseAuth.mockReturnValue({ user: { id: 1, email: 'admin@test.local' }, isLoading: false });
+
+    renderAt('/admin');
+
+    expect(await screen.findByText('dashboard.title')).toBeInTheDocument();
+    expectRegisteredBeforeFirstRender('AdminLayout');
+    expectRegisteredBeforeFirstRender('DashboardPage');
   });
 });

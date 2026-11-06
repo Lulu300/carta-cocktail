@@ -3,15 +3,18 @@ import i18n from '../i18n';
 
 // We test the request helper behavior by importing the module and mocking fetch
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
 
 beforeEach(() => {
   localStorage.clear();
   mockFetch.mockReset();
+  // Set after the MSW server of src/test/setup.ts patched fetch: this unit test
+  // checks the exact fetch calls, so it bypasses the fake backend.
+  vi.stubGlobal('fetch', mockFetch);
 });
 
 afterEach(async () => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   const api = await getApi();
   api.setUnauthorizedHandler(null);
   // Some tests switch the UI language: restore the default for the next ones
@@ -29,6 +32,16 @@ function mockOk(data: unknown = {}) {
     ok: true,
     status: 200,
     json: () => Promise.resolve(data),
+  });
+}
+
+/** A JSON response sent as an attachment, with or without a Content-Disposition header. */
+function mockAttachment(data: unknown, disposition: string | null) {
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve(data),
+    headers: { get: (key: string) => (key.toLowerCase() === 'content-disposition' ? disposition : null) },
   });
 }
 
@@ -141,6 +154,19 @@ describe('API request helper', () => {
     expect(mockFetch.mock.calls[1][1].headers['Accept-Language']).toBe('fr');
   });
 
+  // English (UK) has no messages of its own (resolvedLanguage is "en"), but the import reads its
+  // dates day first: the server must receive the chosen code.
+  it('should send en-GB in Accept-Language when English (UK) is chosen', async () => {
+    mockOk([]);
+    const api = await getApi();
+
+    await i18n.changeLanguage('en-GB');
+    await api.publicApi.listMenus();
+
+    expect(i18n.resolvedLanguage).toBe('en');
+    expect(mockFetch.mock.calls[0][1].headers['Accept-Language']).toBe('en-GB');
+  });
+
   it('should return undefined on a 204 response', async () => {
     localStorage.setItem('token', 'my-token');
     mockFetch.mockResolvedValueOnce({
@@ -227,6 +253,22 @@ describe('categories API', () => {
   });
 });
 
+describe('forced deletion', () => {
+  it.each(['bottles', 'categories', 'ingredients'] as const)('adds ?force=true to a forced %s deletion only', async (resource) => {
+    const api = await getApi();
+
+    mockOk({ message: 'ok', deleted: true, impact: { cocktails: [], bottles: [] } });
+    await api[resource].delete(3);
+    mockOk({ message: 'ok', deleted: true, impact: { cocktails: [], bottles: [] } });
+    await api[resource].delete(3, { force: true });
+
+    expect(mockFetch.mock.calls.map(([url, init]) => `${init.method} ${url}`)).toEqual([
+      `DELETE /api/${resource}/3`,
+      `DELETE /api/${resource}/3?force=true`,
+    ]);
+  });
+});
+
 describe('bottles API', () => {
   it('should list with no params', async () => {
     mockOk([]);
@@ -294,6 +336,25 @@ describe('bottles.exportFile', () => {
     expect(mockAnchor.click).toHaveBeenCalled();
   });
 
+  it('saves the CSV export as received, byte order mark included', async () => {
+    const csv = new Blob([new Uint8Array([0xef, 0xbb, 0xbf]), 'name,categoryName\n'], { type: 'text/csv' });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      blob: () => Promise.resolve(csv),
+      headers: { get: () => 'attachment; filename="bottles.csv"' },
+    });
+    vi.spyOn(document, 'createElement').mockReturnValue({ click: vi.fn() } as unknown as HTMLElement);
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fake-url');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+
+    const api = await getApi();
+    await api.bottles.exportFile('csv');
+
+    const saved = createObjectURL.mock.calls[0][0] as Blob;
+    expect([...new Uint8Array(await saved.arrayBuffer()).slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+  });
+
   it('triggers the unauthorized handler on 401', async () => {
     localStorage.setItem('token', 'expired-token');
     mockError(401, { error: 'Unauthorized' });
@@ -358,9 +419,27 @@ describe('cocktails API', () => {
     await api.cocktails.update(1, { name: 'Negroni' });
     mockOk({ message: 'ok' });
     await api.cocktails.delete(1);
-    mockOk({ version: 1 });
+    mockAttachment({ version: 1 }, 'attachment; filename="cocktail-mojito.json"');
     await api.cocktails.exportRecipe(1);
     expect(mockFetch.mock.calls[5][0]).toBe('/api/cocktails/1/export');
+  });
+
+  it('should return the export with the file name chosen by the server', async () => {
+    const api = await getApi();
+    mockAttachment({ version: 1 }, 'attachment; filename="cocktail-pina-colada.json"');
+
+    const file = await api.cocktails.exportRecipe(7);
+
+    expect(file).toEqual({ filename: 'cocktail-pina-colada.json', data: { version: 1 } });
+  });
+
+  it('should fall back on the id-based export name without a Content-Disposition header', async () => {
+    const api = await getApi();
+    mockAttachment({ version: 1 }, null);
+
+    const file = await api.cocktails.exportRecipe(42);
+
+    expect(file.filename).toBe('cocktail-42.json');
   });
 
   it('should upload image with FormData', async () => {
@@ -422,6 +501,36 @@ describe('menuBottles API', () => {
     await api.menuBottles.sync(1);
     expect(mockFetch.mock.calls[4][0]).toBe('/api/menu-bottles/menu/1/sync');
   });
+
+  it('should reorder every entry of a menu in one request', async () => {
+    const api = await getApi();
+    mockOk({ message: 'ok' });
+    await api.menuBottles.reorder(5, [12, 7, 9]);
+
+    const [url, init] = mockFetch.mock.calls[0];
+    expect(url).toBe('/api/menu-bottles/menu/5/reorder');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual({ ids: [12, 7, 9] });
+  });
+
+  it('should list, create and lift the exclusions of a system menu', async () => {
+    const api = await getApi();
+    mockOk([]);
+    await api.menuBottles.exclusions(5);
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/menu-bottles/menu/5/exclusions');
+
+    mockOk({ message: 'ok' });
+    await api.menuBottles.exclude(5, [3, 4]);
+    const [excludeUrl, excludeInit] = mockFetch.mock.calls[1];
+    expect(excludeUrl).toBe('/api/menu-bottles/menu/5/exclusions');
+    expect(excludeInit.method).toBe('POST');
+    expect(JSON.parse(excludeInit.body)).toEqual({ bottleIds: [3, 4] });
+
+    mockOk({ message: 'ok' });
+    await api.menuBottles.restore(5, 3);
+    expect(mockFetch.mock.calls[2][0]).toBe('/api/menu-bottles/menu/5/exclusions/3');
+    expect(mockFetch.mock.calls[2][1].method).toBe('DELETE');
+  });
 });
 
 describe('menuSections API', () => {
@@ -456,9 +565,10 @@ describe('public API', () => {
 
     mockOk({});
     await api.publicApi.getCocktail(1);
-    mockOk({});
-    await api.publicApi.exportCocktail(1);
+    mockAttachment({}, 'attachment; filename="cocktail-negroni.json"');
+    const file = await api.publicApi.exportCocktail(1);
     expect(mockFetch.mock.calls[3][0]).toBe('/api/public/cocktails/1/export');
+    expect(file.filename).toBe('cocktail-negroni.json');
 
     mockOk({});
     await api.publicApi.getSettings();

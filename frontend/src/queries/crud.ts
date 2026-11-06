@@ -4,12 +4,14 @@ import { useMutation, useQueryClient, type QueryKey, type UseMutationResult } fr
 import { toast } from '../components/ui/ToastStore';
 import { describeMutationError } from './deletionImpact';
 
-interface EntityMutationOptions<Variables> {
-  mutationFn: (variables: Variables) => Promise<unknown>;
+interface EntityMutationOptions<Variables, Result> {
+  mutationFn: (variables: Variables) => Promise<Result>;
   /** Queries that show the changed data: refreshed after a success. */
   invalidates: QueryKey[];
   /** i18n key of the success toast. Left out when the page already shows the change, e.g. a toggle. */
   successMessage?: string;
+  /** i18n key added to the error toast of an item in use, e.g. what to change before deleting it. */
+  inUseHint?: string;
   /**
    * Ignores a call while the previous one is in flight, for a form submission.
    * Its button is only disabled once React re-renders, which TanStack Query
@@ -18,7 +20,8 @@ interface EntityMutationOptions<Variables> {
   ignoreWhilePending?: boolean;
 }
 
-export type EntityMutation<Variables> = UseMutationResult<unknown, Error, Variables>;
+/** `Result` is what the request returns, e.g. the created entity. */
+export type EntityMutation<Variables, Result = unknown> = UseMutationResult<Result, Error, Variables>;
 
 /** Refreshes every query shown under one of the given keys. */
 export function useInvalidateQueries(): (keys: QueryKey[]) => void {
@@ -32,31 +35,32 @@ export function useInvalidateQueries(): (keys: QueryKey[]) => void {
  * A mutation that refreshes the given queries and reports its outcome in a toast.
  * Only `mutate` honours `ignoreWhilePending`: `mutateAsync` is TanStack Query's own.
  */
-export function useEntityMutation<Variables>({
+export function useEntityMutation<Variables, Result = unknown>({
   mutationFn,
   invalidates,
   successMessage,
+  inUseHint,
   ignoreWhilePending = false,
-}: EntityMutationOptions<Variables>): EntityMutation<Variables> {
+}: EntityMutationOptions<Variables, Result>): EntityMutation<Variables, Result> {
   const { t } = useTranslation();
   const invalidateQueries = useInvalidateQueries();
   const inFlight = useRef(false);
 
-  const mutation = useMutation<unknown, Error, Variables>({
+  const mutation = useMutation<Result, Error, Variables>({
     mutationFn,
     onSuccess: () => {
       if (successMessage) toast.success(t(successMessage));
       invalidateQueries(invalidates);
     },
     onError: (error) => {
-      toast.error(describeMutationError(error, t));
+      toast.error(describeMutationError(error, t, inUseHint && t(inUseHint)));
     },
     onSettled: () => {
       inFlight.current = false;
     },
   });
 
-  const mutate: EntityMutation<Variables>['mutate'] = (...args) => {
+  const mutate: EntityMutation<Variables, Result>['mutate'] = (...args) => {
     if (ignoreWhilePending && inFlight.current) return;
     inFlight.current = true;
     mutation.mutate(...args);
@@ -81,8 +85,8 @@ interface CrudMutationsOptions<Input> {
   api: CrudApi<Input>;
   /** Other queries that show this entity, e.g. the cocktail availability. */
   invalidates?: QueryKey[];
-  /** i18n keys of the success toasts. */
-  messages: { created: string; updated: string; deleted: string };
+  /** i18n keys of the success toasts, and of the hint shown when a deletion is refused because the item is in use. */
+  messages: { created: string; updated: string; deleted: string; inUse?: string };
 }
 
 export interface CrudMutations<Input> {
@@ -116,6 +120,7 @@ export function useCrudMutations<Input>({
     mutationFn: (id) => api.delete(id),
     invalidates: refreshed,
     successMessage: messages.deleted,
+    inUseHint: messages.inUse,
   });
 
   return { create, update, remove };

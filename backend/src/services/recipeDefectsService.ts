@@ -1,4 +1,4 @@
-import type { CocktailIngredient } from '@prisma/client';
+import type { CocktailIngredient } from '../generated/prisma/client';
 import type { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { BadRequestError } from '../errors';

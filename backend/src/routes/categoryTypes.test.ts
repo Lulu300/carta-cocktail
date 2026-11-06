@@ -8,6 +8,12 @@ beforeAll(async () => { await setupTestDatabase(); });
 afterAll(async () => { await teardownTestDatabase(); });
 beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
 
+/** The fields of GET /api/category-types these tests read. */
+interface CategoryTypeUsage {
+  name: string;
+  _count: { categories: number };
+}
+
 describe('GET /api/category-types', () => {
   it('should return 401 without auth', async () => {
     const res = await request.get('/api/category-types');
@@ -19,14 +25,16 @@ describe('GET /api/category-types', () => {
     const res = await request.get('/api/category-types').set(authHeader());
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
-    const spirit = res.body.find((t: any) => t.name === 'SPIRIT');
-    expect(spirit._count.categories).toBe(1);
+    const types: CategoryTypeUsage[] = res.body;
+    const spirit = types.find((t) => t.name === 'SPIRIT');
+    expect(spirit?._count.categories).toBe(1);
   });
 
   it('should return count of 0 for unused types', async () => {
     const res = await request.get('/api/category-types').set(authHeader());
-    const soft = res.body.find((t: any) => t.name === 'SOFT');
-    expect(soft._count.categories).toBe(0);
+    const types: CategoryTypeUsage[] = res.body;
+    const soft = types.find((t) => t.name === 'SOFT');
+    expect(soft?._count.categories).toBe(0);
   });
 });
 

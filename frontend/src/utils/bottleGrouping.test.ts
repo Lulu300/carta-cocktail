@@ -1,23 +1,10 @@
 import { describe, it, expect } from 'vitest';
+import { buildBottle } from '../test/factories';
 import type { Bottle } from '../types';
 import { bottleGroupKey, groupBottles, isGroup } from './bottleGrouping';
 
 function bottle(overrides: Partial<Bottle>): Bottle {
-  return {
-    id: 1,
-    name: 'Havana 3',
-    categoryId: 10,
-    purchasePrice: null,
-    capacityMl: 700,
-    remainingPercent: 100,
-    openedAt: null,
-    alcoholPercentage: 40,
-    location: null,
-    isApero: false,
-    isDigestif: false,
-    createdAt: '2026-01-01T00:00:00.000Z',
-    ...overrides,
-  };
+  return buildBottle({ id: 1, name: 'Havana 3', categoryId: 10, purchasePrice: null, ...overrides });
 }
 
 describe('bottleGroupKey', () => {

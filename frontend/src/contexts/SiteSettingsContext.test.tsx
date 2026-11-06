@@ -1,24 +1,19 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import type { ReactNode } from 'react';
+import { buildSiteSettings } from '../test/factories';
+import { captureRequest, mockApiResponse, mockNetworkError } from '../test/msw/utils';
 import { SiteSettingsProvider, useSiteSettings } from './SiteSettingsContext';
 
-// Mock the API
-vi.mock('../services/api', () => ({
-  publicApi: {
-    getSettings: vi.fn(),
-  },
-}));
-
-import { publicApi } from '../services/api';
-const mockGetSettings = vi.mocked(publicApi.getSettings);
+function mockSettings(siteName: string, siteIcon = '') {
+  mockApiResponse('get', '/api/public/settings', buildSiteSettings({ siteName, siteIcon }));
+}
 
 function wrapper({ children }: { children: ReactNode }) {
   return <SiteSettingsProvider>{children}</SiteSettingsProvider>;
 }
 
 beforeEach(() => {
-  vi.clearAllMocks();
   // Ensure a link[rel="icon"] exists in document head
   let link = document.querySelector('link[rel="icon"]');
   if (!link) {
@@ -34,26 +29,29 @@ afterEach(() => {
 });
 
 describe('SiteSettingsContext', () => {
-  it('should have default settings initially', () => {
-    mockGetSettings.mockResolvedValueOnce({ siteName: 'Carta Cocktail', siteIcon: '' });
+  it('should have default settings until the saved ones arrive', async () => {
+    mockSettings('My Bar', '🍸');
     const { result } = renderHook(() => useSiteSettings(), { wrapper });
     expect(result.current.siteSettings.siteName).toBe('Carta Cocktail');
     expect(result.current.siteSettings.siteIcon).toBe('');
+
+    await waitFor(() => expect(result.current.siteSettings.siteName).toBe('My Bar'));
   });
 
   it('should fetch settings on mount', async () => {
-    mockGetSettings.mockResolvedValueOnce({ siteName: 'My Bar', siteIcon: 'icon' });
+    mockSettings('My Bar', 'icon');
+    const request = captureRequest('get', '/api/public/settings');
 
     const { result } = renderHook(() => useSiteSettings(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.siteSettings.siteName).toBe('My Bar');
     });
-    expect(mockGetSettings).toHaveBeenCalledTimes(1);
+    expect(request.count()).toBe(1);
   });
 
   it('should update document title when settings change', async () => {
-    mockGetSettings.mockResolvedValueOnce({ siteName: 'Test Title', siteIcon: '' });
+    mockSettings('Test Title');
 
     renderHook(() => useSiteSettings(), { wrapper });
 
@@ -63,14 +61,14 @@ describe('SiteSettingsContext', () => {
   });
 
   it('should keep default settings when API call fails on mount', async () => {
-    mockGetSettings.mockRejectedValueOnce(new Error('Network error'));
+    mockNetworkError('get', '/api/public/settings');
+    const request = captureRequest('get', '/api/public/settings');
 
     const { result } = renderHook(() => useSiteSettings(), { wrapper });
 
     // Wait for the failed fetch to complete
-    await waitFor(() => {
-      expect(mockGetSettings).toHaveBeenCalledTimes(1);
-    });
+    await request.url;
+    await act(async () => {});
 
     // Defaults should be kept
     expect(result.current.siteSettings.siteName).toBe('Carta Cocktail');
@@ -78,7 +76,7 @@ describe('SiteSettingsContext', () => {
   });
 
   it('should update favicon to SVG data URI when siteIcon is set', async () => {
-    mockGetSettings.mockResolvedValueOnce({ siteName: 'My Bar', siteIcon: '🍸' });
+    mockSettings('My Bar', '🍸');
 
     renderHook(() => useSiteSettings(), { wrapper });
 
@@ -89,7 +87,7 @@ describe('SiteSettingsContext', () => {
   });
 
   it('should reset favicon to /vite.svg when siteIcon is empty', async () => {
-    mockGetSettings.mockResolvedValueOnce({ siteName: 'My Bar', siteIcon: '' });
+    mockSettings('My Bar');
 
     renderHook(() => useSiteSettings(), { wrapper });
 
@@ -100,9 +98,7 @@ describe('SiteSettingsContext', () => {
   });
 
   it('should call refresh and re-fetch settings', async () => {
-    mockGetSettings
-      .mockResolvedValueOnce({ siteName: 'Initial', siteIcon: '' })
-      .mockResolvedValueOnce({ siteName: 'Refreshed', siteIcon: '' });
+    mockSettings('Initial');
 
     const { result } = renderHook(() => useSiteSettings(), { wrapper });
 
@@ -110,6 +106,8 @@ describe('SiteSettingsContext', () => {
       expect(result.current.siteSettings.siteName).toBe('Initial');
     });
 
+    mockSettings('Refreshed');
+    const refreshed = captureRequest('get', '/api/public/settings');
     await act(async () => {
       await result.current.refresh();
     });
@@ -117,19 +115,19 @@ describe('SiteSettingsContext', () => {
     await waitFor(() => {
       expect(result.current.siteSettings.siteName).toBe('Refreshed');
     });
-    expect(mockGetSettings).toHaveBeenCalledTimes(2);
+    expect(refreshed.count()).toBe(1);
   });
 
   it('should keep settings when refresh fails', async () => {
-    mockGetSettings
-      .mockResolvedValueOnce({ siteName: 'Initial', siteIcon: '' })
-      .mockRejectedValueOnce(new Error('Refresh failed'));
+    mockSettings('Initial');
 
     const { result } = renderHook(() => useSiteSettings(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.siteSettings.siteName).toBe('Initial');
     });
+
+    mockNetworkError('get', '/api/public/settings');
 
     await act(async () => {
       await result.current.refresh();
@@ -144,7 +142,7 @@ describe('SiteSettingsContext', () => {
     const link = document.querySelector('link[rel="icon"]');
     if (link) link.remove();
 
-    mockGetSettings.mockResolvedValueOnce({ siteName: 'Bar', siteIcon: '🍹' });
+    mockSettings('Bar', '🍹');
 
     // Should not throw even with no link element
     const { result } = renderHook(() => useSiteSettings(), { wrapper });
@@ -158,7 +156,7 @@ describe('SiteSettingsContext', () => {
   });
 
   it('should use fallback title when siteName is empty', async () => {
-    mockGetSettings.mockResolvedValueOnce({ siteName: '', siteIcon: '' });
+    mockSettings('');
 
     renderHook(() => useSiteSettings(), { wrapper });
 

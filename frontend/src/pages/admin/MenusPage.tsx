@@ -24,6 +24,7 @@ import DataTable, { type Column } from '../../components/admin/DataTable';
 import { useConfirmDelete } from '../../components/admin/useConfirmDelete';
 import { useEntityForm } from '../../components/admin/useEntityForm';
 import { isSystemMenu } from '../../components/admin/menus/isSystemMenu';
+import { toSlug } from '../../components/admin/menus/menuSlug';
 
 interface MenuForm {
   name: string;
@@ -34,19 +35,14 @@ interface MenuForm {
 
 const EMPTY_MENU_FORM: MenuForm = { name: '', slug: '', description: '', isPublic: false };
 
-const TYPE_BADGES: Record<Menu['type'], { label: string; color: string }> = {
-  COCKTAILS: { label: 'Cocktails', color: 'purple' },
-  APEROS: { label: 'Apéritifs', color: 'yellow' },
-  DIGESTIFS: { label: 'Digestifs', color: 'orange' },
+const TYPE_BADGES: Record<Menu['type'], { labelKey: string; color: string }> = {
+  COCKTAILS: { labelKey: 'menus.types.cocktails', color: 'purple' },
+  APEROS: { labelKey: 'menus.types.aperos', color: 'yellow' },
+  DIGESTIFS: { labelKey: 'menus.types.digestifs', color: 'orange' },
 };
 
 function isBottleMenu(menu: Menu): boolean {
   return menu.type === 'APEROS' || menu.type === 'DIGESTIFS';
-}
-
-/** A slug holds lowercase letters, digits and dashes only. */
-function toSlug(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9-]/g, '-');
 }
 
 export default function MenusPage() {
@@ -99,17 +95,17 @@ export default function MenusPage() {
           >
             {menu.name}
           </a>
-          {isSystemMenu(menu) && <span className="ml-2 text-xs text-fg-muted">(par défaut)</span>}
+          {isSystemMenu(menu) && <span className="ml-2 text-xs text-fg-muted">{t('menus.default')}</span>}
         </>
       ),
     },
     {
       key: 'type',
-      header: 'Type',
+      header: t('menus.type'),
       sortable: true,
       render: (menu) => (
         <span className={cx('px-2 py-0.5 rounded text-xs font-medium', getBadgeClasses(TYPE_BADGES[menu.type].color))}>
-          {TYPE_BADGES[menu.type].label}
+          {t(TYPE_BADGES[menu.type].labelKey)}
         </span>
       ),
     },
@@ -124,11 +120,11 @@ export default function MenusPage() {
     },
     {
       key: 'content',
-      header: 'Contenu',
+      header: t('menus.content'),
       className: 'text-fg-muted',
       render: (menu) => (isBottleMenu(menu)
-        ? `${menu._count?.bottles ?? 0} bouteille(s)`
-        : `${menu._count?.cocktails ?? 0} cocktail(s)`),
+        ? t('menus.bottleCount', { count: menu._count?.bottles ?? 0 })
+        : t('menus.cocktailCount', { count: menu._count?.cocktails ?? 0 })),
     },
     {
       key: 'actions',
@@ -158,7 +154,7 @@ export default function MenusPage() {
         <h1 className="text-2xl font-bold font-serif text-accent">{t('menus.title')}</h1>
         <Button onClick={() => menuForm.open()}>{t('menus.add')}</Button>
       </div>
-      <SearchInput value={search} onChange={setSearch} className="max-w-sm mb-4" />
+      <SearchInput value={search} onChange={setSearch} label={t('menus.search')} className="max-w-sm mb-4" />
       <DataTable
         columns={columns}
         rows={pagination.paginatedItems}
@@ -169,6 +165,7 @@ export default function MenusPage() {
         isError={menusQuery.isError}
         onRetry={() => menusQuery.refetch()}
         emptyLabel={t('common.noResults')}
+        isFiltered={search.trim() !== ''}
       />
       <Modal open={menuForm.isOpen} onClose={menuForm.close} title={t('menus.add')}>
         <form onSubmit={handleSubmit} className="space-y-4">

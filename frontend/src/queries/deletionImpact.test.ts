@@ -47,6 +47,14 @@ describe('describeMutationError', () => {
     );
   });
 
+  it('ends with the hint that says what to change first', () => {
+    const error = conflict({ cocktails: named(1, 'Mojito'), bottles: [] });
+
+    const described = describeMutationError(error, t, 'Change the unit first.') as Error;
+
+    expect(described.message).toBe('This category still has bottles deletion.usedByCocktails(Mojito 1) Change the unit first.');
+  });
+
   it('lists five names and counts the others', () => {
     const error = conflict({ cocktails: named(7, 'Cocktail'), bottles: [] });
 

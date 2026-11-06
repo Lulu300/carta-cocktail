@@ -1,13 +1,14 @@
 import { Router, Response } from 'express';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../generated/prisma/client';
 import { prisma } from '../lib/prisma';
 import multer from 'multer';
 import { AuthRequest } from '../middleware/auth';
 import { BadRequestError, NotFoundError } from '../errors';
 import { parseNameTranslations } from '../utils/translations';
 import { buildExportPayload, buildCsvPayload } from '../utils/bottlesExport';
-import { parseImportFile, NormalizedImportPayload } from '../utils/bottlesImport';
+import { ImportParseError, parseImportFile, NormalizedImportPayload } from '../utils/bottlesImport';
 import { deleteBottle, isForceRequested } from '../services/deletionService';
+import { syncBottle, syncNewBottles } from '../services/menuSyncService';
 import { valid, validate } from '../validation/validate';
 import { deleteRequest, IdParams, idRequest } from '../validation/common';
 import { BottleCreate, BottleExportQuery, BottleListQuery, BottleUpdate } from '../validation/bottles';
@@ -19,69 +20,6 @@ const importUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
 });
-
-// Helper function to auto-sync bottle menus when bottle flags change
-async function syncBottleMenus(bottleId: number, isApero: boolean, isDigestif: boolean) {
-  // Fetch bottle to check if empty
-  const bottle = await prisma.bottle.findUnique({ where: { id: bottleId }, select: { remainingPercent: true } });
-  const isEmpty = !bottle || bottle.remainingPercent === 0;
-
-  // Get apero and digestif menus
-  const aperoMenu = await prisma.menu.findUnique({ where: { slug: 'aperitifs' } });
-  const digestifMenu = await prisma.menu.findUnique({ where: { slug: 'digestifs' } });
-
-  // Sync apero menu
-  if (aperoMenu) {
-    const existsInApero = await prisma.menuBottle.findFirst({
-      where: { menuId: aperoMenu.id, bottleId },
-    });
-
-    if (isApero && !existsInApero && !isEmpty) {
-      // Add to apero menu (only non-empty bottles)
-      const maxPosition = await prisma.menuBottle.findFirst({
-        where: { menuId: aperoMenu.id },
-        orderBy: { position: 'desc' },
-      });
-      await prisma.menuBottle.create({
-        data: {
-          menuId: aperoMenu.id,
-          bottleId,
-          position: (maxPosition?.position ?? -1) + 1,
-          isHidden: false,
-        },
-      });
-    } else if ((!isApero || isEmpty) && existsInApero) {
-      // Remove from apero menu
-      await prisma.menuBottle.delete({ where: { id: existsInApero.id } });
-    }
-  }
-
-  // Sync digestif menu
-  if (digestifMenu) {
-    const existsInDigestif = await prisma.menuBottle.findFirst({
-      where: { menuId: digestifMenu.id, bottleId },
-    });
-
-    if (isDigestif && !existsInDigestif && !isEmpty) {
-      // Add to digestif menu (only non-empty bottles)
-      const maxPosition = await prisma.menuBottle.findFirst({
-        where: { menuId: digestifMenu.id },
-        orderBy: { position: 'desc' },
-      });
-      await prisma.menuBottle.create({
-        data: {
-          menuId: digestifMenu.id,
-          bottleId,
-          position: (maxPosition?.position ?? -1) + 1,
-          isHidden: false,
-        },
-      });
-    } else if ((!isDigestif || isEmpty) && existsInDigestif) {
-      // Remove from digestif menu
-      await prisma.menuBottle.delete({ where: { id: existsInDigestif.id } });
-    }
-  }
-}
 
 const listSchemas = { query: BottleListQuery };
 
@@ -99,24 +37,52 @@ router.get('/', validate(listSchemas), async (_req: AuthRequest, res: Response) 
   res.json(parseNameTranslations(bottles));
 });
 
+// The confirmation creates the bottles in batches: SQLite caps the parameters of one statement
+const CREATE_BATCH_SIZE = 500;
+// A 2,000-bottle import takes well under a second; the 5 s default leaves no margin on a slow disk
+const IMPORT_TRANSACTION_TIMEOUT_MS = 30_000;
+
+/** Same name, capacity and category, whatever the case: the import warns about such a bottle. */
+function duplicateKey(name: string, capacityMl: number, categoryName: string): string {
+  return `${name.toLowerCase()}|${capacityMl}|${categoryName.toLowerCase()}`;
+}
+
+function parseUploadedFile(file: Express.Multer.File, language: string): NormalizedImportPayload {
+  try {
+    return parseImportFile(file.originalname || '', file.buffer, language);
+  } catch (err) {
+    if (!(err instanceof ImportParseError)) throw err;
+    throw new BadRequestError(`errors.import.${err.code}`, { code: err.code, ...err.params });
+  }
+}
+
 router.post('/import/preview', importUpload.single('file'), async (req: AuthRequest, res: Response) => {
   if (!req.file) throw new BadRequestError();
 
-  let payload: NormalizedImportPayload;
-  try {
-    payload = parseImportFile(req.file.originalname || '', req.file.buffer);
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
-    throw new BadRequestError('errors.invalidImportFile', { reason });
-  }
+  // The rows left out are listed apart: the payload goes back unchanged to /import/confirm
+  // A date typed in a spreadsheet is read in the order of the app's language (Accept-Language)
+  const { errors, ...payload } = parseUploadedFile(req.file, req.language);
 
   const allCategories = await prisma.category.findMany();
   const allBottles = await prisma.bottle.findMany({ include: { category: true } });
 
+  // Indexes instead of a scan per imported row: an import has up to 2,000 rows
+  const categoriesByName = new Map<string, (typeof allCategories)[number]>();
+  for (const category of allCategories) {
+    const key = category.name.toLowerCase();
+    // The first match wins, as before
+    if (!categoriesByName.has(key)) categoriesByName.set(key, category);
+  }
+  const bottlesByKey = new Map<string, typeof allBottles>();
+  for (const bottle of allBottles) {
+    const key = duplicateKey(bottle.name, bottle.capacityMl, bottle.category.name);
+    const sameKey = bottlesByKey.get(key);
+    if (sameKey) sameKey.push(bottle);
+    else bottlesByKey.set(key, [bottle]);
+  }
+
   const categories = payload.categories.map((c) => {
-    const match = allCategories.find(
-      (ac) => ac.name.toLowerCase() === c.name.toLowerCase()
-    );
+    const match = categoriesByName.get(c.name.toLowerCase());
     return {
       ref: c,
       existingMatch: match
@@ -127,12 +93,7 @@ router.post('/import/preview', importUpload.single('file'), async (req: AuthRequ
   });
 
   const bottles = payload.bottles.map((b) => {
-    const duplicates = allBottles
-      .filter((eb) =>
-        eb.name.toLowerCase() === b.name.toLowerCase() &&
-        eb.capacityMl === b.capacityMl &&
-        eb.category.name.toLowerCase() === b.categoryName.toLowerCase()
-      )
+    const duplicates = (bottlesByKey.get(duplicateKey(b.name, b.capacityMl, b.categoryName)) ?? [])
       .map((d) => ({
         id: d.id,
         name: d.name,
@@ -147,7 +108,7 @@ router.post('/import/preview', importUpload.single('file'), async (req: AuthRequ
     };
   });
 
-  res.json({ payload, categories, bottles });
+  res.json({ payload, categories, bottles, errors });
 });
 
 const importConfirmSchemas = { body: BottleImportConfirm };
@@ -186,18 +147,15 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
       }
     }
 
-    const createdBottleRefs: { id: number; isApero: boolean; isDigestif: boolean }[] = [];
-    let createdCount = 0;
     let skippedNoCategory = 0;
     let duplicatesCreated = 0;
+    const rows: Prisma.BottleCreateManyInput[] = [];
 
     const bottleResolutions = resolutions?.bottles || {};
 
-    const existingDuplicateKey = (name: string, capacityMl: number, categoryName: string) =>
-      `${name.toLowerCase()}|${capacityMl}|${categoryName.toLowerCase()}`;
     const existingBottles = await tx.bottle.findMany({ include: { category: true } });
     const existingKeys = new Set(
-      existingBottles.map((b) => existingDuplicateKey(b.name, b.capacityMl, b.category.name))
+      existingBottles.map((b) => duplicateKey(b.name, b.capacityMl, b.category.name))
     );
 
     for (let i = 0; i < payload.bottles.length; i++) {
@@ -217,44 +175,38 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
         continue;
       }
 
-      const isDuplicate = existingKeys.has(
-        existingDuplicateKey(b.name, b.capacityMl, finalCategoryName)
-      );
-
-      for (let q = 0; q < b.quantity; q++) {
-        const newBottle = await tx.bottle.create({
-          data: {
-            name: b.name,
-            categoryId,
-            capacityMl: b.capacityMl,
-            remainingPercent: b.remainingPercent,
-            alcoholPercentage: b.alcoholPercentage,
-            purchasePrice: b.purchasePrice,
-            location: b.location,
-            openedAt: b.openedAt,
-            isApero: b.isApero,
-            isDigestif: b.isDigestif,
-          },
-        });
-        createdBottleRefs.push({
-          id: newBottle.id,
-          isApero: newBottle.isApero,
-          isDigestif: newBottle.isDigestif,
-        });
-        createdCount++;
-        if (isDuplicate) duplicatesCreated++;
+      if (existingKeys.has(duplicateKey(b.name, b.capacityMl, finalCategoryName))) {
+        duplicatesCreated += b.quantity;
       }
+
+      const data: Prisma.BottleCreateManyInput = {
+        name: b.name,
+        categoryId,
+        capacityMl: b.capacityMl,
+        remainingPercent: b.remainingPercent,
+        alcoholPercentage: b.alcoholPercentage,
+        purchasePrice: b.purchasePrice,
+        location: b.location,
+        openedAt: b.openedAt,
+        isApero: b.isApero,
+        isDigestif: b.isDigestif,
+      };
+      for (let q = 0; q < b.quantity; q++) rows.push(data);
     }
 
-    return { createdBottleRefs, createdCount, skippedNoCategory, duplicatesCreated };
-  });
-
-  // Sync menus after the transaction commits so bottles are visible
-  for (const ref of created.createdBottleRefs) {
-    if (ref.isApero || ref.isDigestif) {
-      await syncBottleMenus(ref.id, ref.isApero, ref.isDigestif);
+    const createdIds: number[] = [];
+    for (let start = 0; start < rows.length; start += CREATE_BATCH_SIZE) {
+      const batch = await tx.bottle.createManyAndReturn({
+        data: rows.slice(start, start + CREATE_BATCH_SIZE),
+        select: { id: true },
+      });
+      createdIds.push(...batch.map((bottle) => bottle.id));
     }
-  }
+
+    // Inside the transaction: a failed sync also cancels the import
+    await syncNewBottles(tx, createdIds);
+    return { createdCount: rows.length, skippedNoCategory, duplicatesCreated };
+  }, { timeout: IMPORT_TRANSACTION_TIMEOUT_MS });
 
   res.status(201).json({
     created: { bottles: created.createdCount },
@@ -324,19 +276,17 @@ router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Respons
     isDigestif: fields.isDigestif ?? false,
   };
 
-  if (count === 1) {
-    const bottle = await prisma.bottle.create({ data, include: { category: true } });
-    await syncBottleMenus(bottle.id, bottle.isApero, bottle.isDigestif);
-    res.status(201).json(parseNameTranslations(bottle));
-  } else {
-    const bottles = [];
-    for (let i = 0; i < count; i++) {
-      const bottle = await prisma.bottle.create({ data, include: { category: true } });
-      await syncBottleMenus(bottle.id, bottle.isApero, bottle.isDigestif);
-      bottles.push(bottle);
-    }
-    res.status(201).json(parseNameTranslations(bottles));
-  }
+  // A failed menu sync also cancels the creation of the bottles
+  const bottles = await prisma.$transaction(async (tx) => {
+    const created = await tx.bottle.createManyAndReturn({
+      data: Array.from({ length: count }, () => data),
+      include: { category: true },
+    });
+    // Per bottle, not syncNewBottles: the new bottles join the menus in creation order
+    for (const bottle of created) await syncBottle(tx, bottle.id);
+    return created;
+  });
+  res.status(201).json(parseNameTranslations(count === 1 ? bottles[0] : bottles));
 });
 
 const updateSchemas = { params: IdParams, body: BottleUpdate };
@@ -344,20 +294,20 @@ const updateSchemas = { params: IdParams, body: BottleUpdate };
 router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Response) => {
   const { params: { id }, body } = valid<typeof updateSchemas>(res);
   const { location, ...fields } = body;
-  // Absent fields are undefined, which Prisma leaves untouched
-  const bottle = await prisma.bottle.update({
-    where: { id },
-    data: {
-      ...fields,
-      ...(location !== undefined && { location: location || null }),
-    },
-    include: { category: true },
+  const bottle = await prisma.$transaction(async (tx) => {
+    // Absent fields are undefined, which Prisma leaves untouched
+    const updated = await tx.bottle.update({
+      where: { id },
+      data: {
+        ...fields,
+        ...(location !== undefined && { location: location || null }),
+      },
+      include: { category: true },
+    });
+    // Always: the result must not depend on which fields the client sent
+    await syncBottle(tx, updated.id);
+    return updated;
   });
-
-  // Auto-sync bottle menus if flags changed
-  if (fields.isApero !== undefined || fields.isDigestif !== undefined) {
-    await syncBottleMenus(bottle.id, bottle.isApero, bottle.isDigestif);
-  }
 
   res.json(parseNameTranslations(bottle));
 });

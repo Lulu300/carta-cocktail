@@ -8,7 +8,7 @@ effort: S
 status: todo
 owner: agent
 depends_on: [A-01, A-04, C-01, C-05, D-01, D-03, D-05]
-touches: [AGENTS.md, backend/AGENTS.md, frontend/AGENTS.md, README.md, docs/operations.md, backend/src/bootstrap/ensureAdmin.ts]
+touches: [AGENTS.md, backend/AGENTS.md, frontend/AGENTS.md, README.md, docs/operations.md, backend/src/bootstrap/ensureAdmin.ts, .gitignore, .github/workflows/ci.yml]
 sources: ["07-devops-history.md §5"]
 branch:
 pr:
@@ -84,6 +84,17 @@ Les `AGENTS.md` sont lus par chaque agent avant une tâche : une affirmation fau
 - Transmis par D-11 : `AGENTS.md` décrit encore l'ancien modèle de release (« Git Workflow », étape 10 : `git tag v1.0.0 && git push --tags` ; « CI/CD », Release : tout tag `v*` publie les images et déplace `latest`). L'aligner sur `README.md` (section « Release ») et `docs/plan/README.md` (section « Releases ») : pré-versions `vX.Y.Z-rc.N` sur `develop`, versions finales sur `main`, notes `docs/releases/vX.Y.Z.md` et `UPGRADING.md` mergées avant le tag, branche poussée avant le tag.
 - Transmis par D-11 (revue de la PR #39) : le libellé de l'interface est « Settings > Admin Profile » (`settings.profileConfig`), repris dans les notes de release et `UPGRADING.md`. `README.md` (« change the password from Settings > Profile ») et l'avertissement de `backend/src/bootstrap/ensureAdmin.ts` (« Change it in Settings > Profile ») disent encore « Profile » : les aligner (fichier ajouté à `touches` ; aucun test ne vérifie ce texte).
 - Transmis par C-01 (PR #44) : `npm run db:push` n'existe plus (remplacé par `db:deploy`, `db:status`, `db:check`). `AGENTS.md` (« Running Locally » : `npx prisma db push`) et `backend/AGENTS.md` (tableau « Scripts » : `db:push` ; `prisma/migrations/` absent de « Structure ») sont à aligner sur la section « Database migrations » du `README.md`.
+- Transmis par D-07 : la convention de commit (Conventional Commits) est déjà dans « Coding Conventions » d'`AGENTS.md`, ainsi que le format `ID: titre` des PR. Reste à décrire dans « Git Workflow » (étapes 7 et 8) :
+  - le modèle de PR `.github/pull_request_template.md` : `gh pr create --body-file` l'ignore, donc un agent part de ce fichier pour écrire le corps de sa PR ;
+  - le label de PR qui la classe dans les notes de release (`breaking`, `feature`, `fix`, `dependencies`, `ci`, `docs`, voir `.github/release.yml`) ;
+  - le mode de merge décidé le 2026-10-12 : merge commit partout (feature → `develop` et `develop` → `main`), squash et rebase désactivés ;
+  - les rulesets de D-07 : push direct sur `main` et `develop` refusé, PR et checks `Backend` / `Frontend` obligatoires. Le contournement admin reste possible sur une PR, mais **les agents n'utilisent jamais `gh pr merge --admin`** : seul l'humain contourne, en cas d'urgence.
+- Transmis par D-04 (PR #112) : les descriptions de la CI ne correspondent plus à `.github/workflows/ci.yml`. Les réécrire d'après le `ci.yml` du moment (les deux jobs lancent aussi `npm audit --omit=dev` : `critical` côté backend jusqu'à B-11, `high` côté frontend) :
+  - `AGENTS.md`, section « CI/CD » (lignes 80-82 au 2026-10-12) : le job Backend lance aussi `npm run db:check` et `npm run lint` ; le job Frontend lance `npx tsc -b` (pas `tsc --noEmit`, qui ne vérifie aucun fichier côté frontend) ; quatre jobs en parallèle et non deux : `Backend`, `Frontend`, `Docker build (backend)` et `Docker build (frontend)` (build des images sans push) ; le workflow est aussi appelable par `workflow_call` (release, D-05) ;
+  - `backend/AGENTS.md` (ligne 19) : « CI runs automatically on PRs: prisma generate → tsc → build → test → coverage check » oublie le lint, `db:check` et le build Docker ;
+  - `frontend/AGENTS.md` (ligne 20) : « tsc → lint → build → test → coverage check » ; préciser `tsc -b`, le budget de bundle et le build Docker.
+- Transmis par B-08 (PR #110) : le commentaire `# Plan d'action : page de suivi générée par docs/plan/build.mjs` de `.gitignore` est encore en français ; le traduire en anglais.
+- Transmis par D-05 (PR #118) : le pipeline de release a changé, `README.md` (section « Release », tableau des tags), `AGENTS.md` (« CI/CD », Release) et `docs/plan/README.md` (« Releases ») ne le décrivent pas encore. À dire : la release lance la CI complète (`ci.yml` par `workflow_call`) avant de pousser une image ; images `linux/amd64` et `linux/arm64` ; une version finale publie `:X.Y.Z`, `:X.Y`, `:X` et `latest`, une pré-version `:X.Y.Z-rc.N` seulement ; SBOM et provenance attachées ; les deux images reçoivent `APP_VERSION` (`dev` hors release). Le paragraphe « Pulling release images » peut recommander `:<majeure>.<mineure>`.
 
 ## Journal
 
@@ -94,3 +105,7 @@ Les `AGENTS.md` sont lus par chaque agent avant une tâche : une affirmation fau
 - 2026-10-09 : revue de la PR #39 (D-11). Libellé « Settings > Admin Profile » à aligner dans `README.md` et dans l'avertissement d'`ensureAdmin` (Points d'attention) ; `backend/src/bootstrap/ensureAdmin.ts` ajouté à `touches`.
 - 2026-10-09 : C-01 (PR #44) transmet l'alignement des `AGENTS.md` sur les migrations (Points d'attention).
 - 2026-10-11 : décision humaine : D-09 passe après D-01, D-03, D-05 et C-05, ajoutées à `depends_on` comme le suggéraient les Points d'attention (D-02 déjà faite), pour documenter l'image finale et les backups en une fois. Dans le lot C-04, E-11, D-14, l'humain l'a remplacée par C-16 (`--ready` propose D-13 à cette place).
+- 2026-10-12 : relecture de B-08 (PR #110) : le point « `backend/AGENTS.md:151` » de « Problème constaté » est réglé (`@prisma/client` et `prisma` rangés en « Runtime (database) », plus de `ts-node`). Commentaire français de `.gitignore` ajouté aux Points d'attention (fichier ajouté à `touches`).
+- 2026-10-12 : relecture de D-04 (PR #112, seconde passe) : l'étape d'audit est bien dans `ci.yml`, Points d'attention mis à jour.
+- 2026-10-12 : D-05 (PR #118) transmet la description du nouveau pipeline de release (Points d'attention).
+- 2026-10-12 : relectures de D-03 (PR #117) et D-05 (PR #118), à reprendre ici : section « API Structure » d'`AGENTS.md` (`/api/health` est public, sans auth) ; sections « Auth Pattern » et « Structure » de `backend/AGENTS.md` (`/api/health`, `routes/health.ts`) ; dans le modèle de release, un tag dont le job `ci` échoue ne publie rien (supprimer puis reposer le tag, ou « Re-run failed jobs » dans le run Release) ; le build arm64 n'est testé qu'à la release (le job `docker` de `ci.yml` construit l'amd64 seul) ; corriger le commentaire « Same cache scopes as the release workflow » du job `docker` de `ci.yml` (exact en lecture seulement : la release écrit dans `<service>-release`), fichier ajouté à `touches`.

@@ -5,16 +5,15 @@ import { spawnSync } from 'node:child_process';
 import { MIGRATE_STATUS_OK, randomSecret, runAction } from './actions.mjs';
 import {
   checkAdminLogin, checkFrontendShell, checkImages, checkIntegrity, checkJournalMode, checkLogLines,
-  checkPublicApi, checkRowCounts, checkUploadsPersistent, infoRow, row, tryLogin,
+  checkPublicApi, checkRefusalMessage, checkRefusedDatabase, checkRowCounts, checkUploadsPersistent,
+  findRefusal, infoRow, row, tryLogin,
 } from './checks.mjs';
 import { removeDirectories, workDirOf } from './cleanup.mjs';
-import { createAnonymizedCopy, fillVolume, takeSnapshot } from './database.mjs';
+import { createAnonymizedCopy, fillVolume, injectDuplicateCategory, takeSnapshot } from './database.mjs';
 import {
   containerLogs, containerMounts, containerState, docker, removeResources, RESOURCE_PREFIX,
 } from './docker.mjs';
-import {
-  allowedFailures, failedGroups, isRequirementMet, markExpected, unexpectedFailures,
-} from './expectations.mjs';
+import { failedGroups, isRequirementMet, judgeStep, unexpectedFailures } from './expectations.mjs';
 import { BACKEND_SERVICE, FRONTEND_SERVICE, Instance, waitForHttp, waitForStart } from './instance.mjs';
 import { hooksForJump, profileOf, releaseOf } from './versions.mjs';
 
@@ -46,8 +45,10 @@ function envSecretValues(layout) {
 }
 
 export class BenchRun {
-  constructor({ fixtureDir, layout, layoutDir, mode, steps, images, hookFiles, runId, timeoutMs }) {
-    Object.assign(this, { fixtureDir, layout, mode, steps, images, hookFiles, timeoutMs });
+  constructor({
+    fixtureDir, layout, layoutDir, mode, steps, images, hookFiles, runId, timeoutMs, injectDuplicate = false,
+  }) {
+    Object.assign(this, { fixtureDir, layout, mode, steps, images, hookFiles, timeoutMs, injectDuplicate });
     this.project = `${RESOURCE_PREFIX}${runId}-${layout.name}-${mode}`;
     this.workDir = workDirOf(runId, layout.name, mode);
     this.instance = new Instance({ project: this.project, layout, layoutDir, workDir: this.workDir });
@@ -110,12 +111,15 @@ export class BenchRun {
       ? path.join(this.instance.dir, this.layout.database.hostDir)
       : path.join(this.workDir, 'seed-data');
     const users = createAnonymizedCopy(this.fixtureDir, dataDir, { email: ADMIN_EMAIL, passwordHash });
+    // Before the snapshot: the row counts of reference include the duplicate.
+    const injectedDuplicates = this.injectDuplicate ? injectDuplicateCategory(dataDir) : undefined;
     const photosDir = extractPhotos(path.join(this.fixtureDir, 'uploads.tgz'), this.workDir);
     this.baseline = takeSnapshot(dataDir);
     this.lastSnapshot = this.baseline;
     this.admin = { password: this.testPassword, label: 'test password (hash replaced in the copy)' };
     this.result.setup = {
       users,
+      injectedDuplicates,
       tables: Object.keys(this.baseline.counts).length,
       rows: Object.values(this.baseline.counts).reduce((sum, count) => sum + count, 0),
       photosInArchive: fs.readdirSync(photosDir).length,
@@ -203,6 +207,7 @@ export class BenchRun {
     const outcome = await waitForStart(backend, this.timeoutMs);
     fs.writeFileSync(path.join(this.logsDir, `${index}-${ctx.target.label}.log`), outcome.logs);
     step.checks.push(this.startupRow(outcome));
+    const refusal = outcome.started ? null : findRefusal(ctx.profile.refusals, outcome.logs);
     if (outcome.started) {
       this.startedReleases.add(releaseOf(ctx.target.version));
       if (ctx.profile.seedResetsAdmin) this.trackAdminPasswordReset(ctx);
@@ -210,7 +215,7 @@ export class BenchRun {
       if (conformant) step.actions.push(...await this.runHooks(ctx, 'after'));
       step.checks.push(...await this.runningChecks(ctx, outcome));
     } else {
-      step.checks.push(this.refusalMessageRow(ctx, outcome));
+      step.checks.push(checkRefusalMessage(ctx.profile.refusals, refusal));
       step.checks.push({ group: 'http', label: 'HTTP checks', status: 'skip', detail: 'backend not running' });
     }
     step.checks.push(checkUploadsPersistent(containerMounts(backend), ctx.profile.uploadDir));
@@ -218,16 +223,19 @@ export class BenchRun {
     const stopStartedAt = Date.now();
     this.instance.stopBackend();
     if (outcome.started) step.checks.push(this.shutdownRow(ctx, backend, Date.now() - stopStartedAt));
-    step.checks.push(...this.databaseChecks(ctx, outcome));
+    step.checks.push(...this.databaseChecks(ctx, outcome, refusal));
 
-    const allowed = allowedFailures({
+    judgeStep(step, {
       mode: this.mode,
       profile: ctx.profile,
       crossedHooks: ctx.crossedHooks,
       unmetRequirements: unmet,
       layoutReasons: this.photoMountReasons(ctx.profile),
+      injectedDuplicate: this.injectDuplicate,
+      started: outcome.started,
+      refusal,
+      previousFailedGroups: this.previousFailedGroups,
     });
-    markExpected(step.checks, { mode: this.mode, allowed, previousFailedGroups: this.previousFailedGroups });
     this.previousFailedGroups = failedGroups(step.checks);
     const unexpected = unexpectedFailures([...step.actions, ...step.checks]).length;
     this.log(`${title}: ${outcome.started ? 'started' : 'refused'}, ${unexpected} unexpected failure(s)`);
@@ -249,13 +257,6 @@ export class BenchRun {
       password: envPassword,
       label: `ADMIN_PASSWORD of ${this.layout.envFile} (${envPassword.length} characters), written by the v${releaseOf(ctx.target.version)} seed`,
     };
-  }
-
-  refusalMessageRow(ctx, outcome) {
-    const expected = ctx.profile.refusalLog;
-    if (!expected) return infoRow('refusal', 'refusal message', 'no refusal message defined for this version');
-    const found = outcome.logs.includes(expected);
-    return row('refusal', 'refusal message', found, `"${expected}" ${found ? 'found' : 'missing'}`);
   }
 
   shutdownRow(ctx, backend, durationMs) {
@@ -300,15 +301,13 @@ export class BenchRun {
     return rows;
   }
 
-  databaseChecks(ctx, outcome) {
+  databaseChecks(ctx, outcome, refusal) {
     const snapshot = takeSnapshot(this.instance.dataMount());
     const rows = [checkRowCounts(this.baseline, snapshot), checkIntegrity(snapshot)];
     if (outcome.started) {
       rows.push(checkJournalMode(snapshot, ctx.profile.journalMode));
     } else {
-      const untouched = snapshot.fingerprint === this.lastSnapshot.fingerprint;
-      rows.push(row('refusal', 'database left untouched by the refused start', untouched,
-        untouched ? 'same SHA-256 as before the jump' : 'database file changed'));
+      rows.push(checkRefusedDatabase(refusal, this.lastSnapshot, snapshot));
     }
     if (ctx.fromDbPush && ctx.profile.migrations) {
       const created = snapshot.backups > this.lastSnapshot.backups;

@@ -1,0 +1,23 @@
+// Configuration of the Prisma CLI (generate, migrate, db push, db seed).
+import { config as loadDotenv } from 'dotenv';
+import { defineConfig } from 'prisma/config';
+import { resolveDatabasePath } from './src/lib/databasePath';
+
+// Prisma 7 no longer reads .env by itself. Quiet whatever the dotenv version or
+// DOTENV_QUIET: the container entrypoint runs the CLI at each start, without a .env.
+loadDotenv({ quiet: true });
+
+const databaseUrl = process.env.DATABASE_URL;
+
+export default defineConfig({
+  schema: 'prisma/schema.prisma',
+  migrations: {
+    path: 'prisma/migrations',
+    // Development only (`prisma db seed`): the image has no tsx and runs node dist/scripts/seed.js
+    seed: 'tsx src/scripts/seed.ts',
+  },
+  // `prisma generate` runs without a database (image build, CI): the commands
+  // that need one fail with Prisma's own error when DATABASE_URL is missing.
+  // The absolute path is the file the application opens (src/lib/prisma.ts).
+  datasource: databaseUrl ? { url: `file:${resolveDatabasePath(databaseUrl)}` } : undefined,
+});

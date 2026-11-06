@@ -2,7 +2,7 @@
 
 ## Overview
 
-React 19 SPA with Vite 7, TailwindCSS 4, React Router 7, and react-i18next. Dark theme UI with admin panel and public menu display.
+React 19 SPA with Vite 8, TailwindCSS 4, React Router 7, and react-i18next. Dark theme UI with admin panel and public menu display.
 
 ## Development Workflow
 
@@ -33,10 +33,15 @@ CI runs automatically on PRs: tsc → lint → build → test → coverage check
 
 - Test files live next to their source: `utils/colors.test.ts`, `pages/admin/BottlesPage.test.tsx`
 - Use the shared test utilities from `src/test/test-utils.tsx` (custom render with BrowserRouter)
-- Setup file `src/test/setup.ts` provides jest-dom matchers, i18n mock, and matchMedia mock
+- Setup file `src/test/setup.ts` provides jest-dom matchers, i18n mock, and matchMedia mock, starts the MSW server and resets handlers, factory ids and `localStorage` after each test
 - Environment: jsdom via Vitest
-- API calls are mocked (no real backend needed)
+- API calls go through the real `services/api.ts` to an MSW fake backend (`src/test/msw/handlers.ts`, one default handler per endpoint). Do not `vi.mock('services/api')`: set the answers a test needs with `mockApiResponse`, `mockApiError`, `mockApiPending`, `mockNetworkError`, `holdApiResponse` (answers when the test releases it), `mockItemInUse` (a DELETE refused with the impact of an item in use, accepted with `?force=true`), and check what the page sent with `captureRequest` (`src/test/msw/utils.ts`), called after the answers of the same endpoint (MSW tries the handler added last first). A request without a handler fails the test. A stateful page (menu editors, import wizards) gets its own `server.use(...)` handlers that store the data and record each request, built with the shared `readJsonObject`, `errorResponse` and `pendingResponse` of `src/test/msw/utils.ts`
+- Build test data with the typed factories of `src/test/factories.ts` (`buildBottle`, `buildCategory`…), never with `as never` casts
+- Real providers and components rather than mocks: wrap in `AppProviders` (`src/test/appProviders.tsx`: the real `AuthProvider` and `SiteSettingsProvider`) when a page or hook reads the session or the site settings; store a token in `localStorage` for the admin case. Mock a component only when it has its own tests and the page only needs its outcome (the import wizards, `exportZip`)
+- A file download goes through `mockDownload()` (`src/test/download.ts`), which records the saved file names. `rejectNextFetch(value)` covers code that guards against a non-Error throw. Both undo their stubs when the test ends
 - Run with coverage locally: `npm test -- --coverage`
+- Under an AI agent, Vitest picks its `minimal` reporter, which hides the console of passing tests (`act(...)` warnings, `[MSW]` messages): run `npx vitest run --silent=false` to see it
+- Accessibility: page tests check axe with `expect(await axe(container)).toHaveNoViolations()` (`src/test/axe.ts`, serious and critical violations only). jsdom computes no colors: contrast is checked with Lighthouse in a browser
 
 ## Structure
 
@@ -73,7 +78,7 @@ frontend/
 │   │   ├── ui/
 │   │   │   ├── ExportCocktailButton.tsx  # Export cocktail as JSON
 │   │   │   ├── IconPicker.tsx            # Emoji selector for category types
-│   │   │   ├── LanguageSelector.tsx      # EN/FR toggle
+│   │   │   ├── LanguageSelector.tsx      # Language menu (FR, EN, UK)
 │   │   │   └── UnitConverter.tsx         # ml conversion display
 │   │   └── import/
 │   │       ├── ImportCocktailWizard.tsx  # Main import orchestrator
@@ -96,10 +101,11 @@ frontend/
 │   │   ├── localization.ts       # Localization helpers
 │   │   └── unitConverter.ts      # Unit conversion logic
 │   └── i18n/
-│       ├── index.ts              # i18next + browser language detector
+│       ├── index.ts              # i18next + browser language detector, public messages
+│       ├── admin.ts              # Registers the admin messages (loaded by App.tsx with each /login and /admin chunk)
 │       └── locales/
-│           ├── en.json           # English (~270 keys)
-│           └── fr.json           # French
+│           ├── public/           # en.json, fr.json: keys used by the first load (public pages, shared components)
+│           └── admin/            # en.json, fr.json: every other key (login page and admin)
 ├── package.json
 ├── tsconfig.json
 ├── vite.config.ts
@@ -160,9 +166,21 @@ Admin pages are self-contained with inline forms and modals. Each page:
 3. Uses `useTranslation()` for all UI text
 4. Handles CRUD operations with optimistic or refetch patterns
 
+### Locale bundles
+
+Messages are split in two bundles so guests do not download the admin texts. A key goes in `locales/public/` when a file of the first load (reached from `main.tsx` through static imports) uses it, otherwise in `locales/admin/`; `src/i18n/bundles.test.ts` checks the split and fails with the keys to move. A new lazy chunk behind `/login` or `/admin` goes through `lazyWithAdminMessages` in `App.tsx`. A new language with its own message files goes in `TRANSLATED_LANGUAGES` (`i18n/index.ts`, from which `SUPPORTED_LANGUAGES` derives), in the message maps of `i18n/index.ts` and `i18n/admin.ts` (typed by `TRANSLATED_LANGUAGES`, so `tsc` fails until both list it), in `LANGUAGE_NAMES` (`utils/localization.ts`, the names `LanguageSelector` lists), in `CONTENT_LANGUAGE_NAMES` (same file, the labels of the entity name fields of `TranslationFields`) and in `flagComponents` (`LanguageSelector`). Language names are endonyms, never translated. A regional variant without files (`en-GB`) goes in `SUPPORTED_LANGUAGES`, `LANGUAGE_NAMES` and `flagComponents` only (plus `buttonLabels` when its code does not fit the selector's button: `UK`): it has no entry in the message maps and i18next serves it the messages of its base language, and entity names use the translation of its base language. The detector keeps a supported regional code (`en-GB`) and reduces the others to their base language (`en-AU` -> `en`). Only a language picked in `LanguageSelector` is stored (`storeLanguageChoice`, `utils/languageChoice.ts`): the detector caches nothing, so a language nobody picked is detected again at each start. Every language, regional variant included, also gets its date format in `DATE_FORMATS` (`utils/dates.ts`); without one it uses the format of its base language, then English.
+
+### Dates
+
+Dates follow the app's language (`i18n.language`), never the browser's: a date field is a `DateInput` (`components/ui/DateInput.tsx`, not `<input type="date">`), which shows and reads the language's format and hands the form an ISO `yyyy-mm-dd` value, and a displayed date goes through `formatDate` (`utils/dates.ts`). Dates are stored at midnight UTC, so `formatDate` reads their UTC day.
+
 ### TailwindCSS v4
 
 Uses `@import "tailwindcss"` syntax (not `@tailwind` directives). Dark theme with `bg-[#0f0f1a]` as base background. Custom theme values via `@theme { }` block.
+
+### Supported browsers
+
+Safari and iOS 16.0+, Chrome and Edge 107+, Firefox 104+ (`build.target` in `vite.config.ts`, the targets of v1.11; Vite 8's default would require Safari 16.4). Old tablets serve as menu displays and for the admin. Do not remove the target: Tailwind writes its breakpoints as range media queries (`width>=40rem`), which Safari before 16.4 ignores, and only this target makes the minifier rewrite them as `min-width`. CI checks the built CSS with `.github/scripts/css-media-ranges.mjs`. The target lowers syntax, not APIs: guard a browser API newer than any of these targets (`URL.canParse`, `Object.groupBy`, `Promise.withResolvers`, or `Array.prototype.toSorted`: Chrome 110, Firefox 115…) or avoid it.
 
 ### Import/Export
 
@@ -177,17 +195,19 @@ Uses `@import "tailwindcss"` syntax (not `@tailwind` directives). Dark theme wit
 | `npm run dev` | Vite dev server (port 5173, proxies /api to :3001) |
 | `npm run build` | TypeScript check + Vite production build |
 | `npm run lint` | ESLint |
+| `npm run format:check` | Prettier check (fails until the repository reformat) |
 | `npm run preview` | Preview production build |
 
 ## Dependencies
 
 **Runtime**: react 19, react-dom 19, react-router-dom 7, i18next 25, react-i18next 16, i18next-browser-languagedetector 8, jszip 3
-**Dev**: vite 7, @vitejs/plugin-react, tailwindcss 4, @tailwindcss/vite, typescript 5.9, eslint 9
+**Dev**: vite 8, @vitejs/plugin-react 6, tailwindcss 4, @tailwindcss/vite, typescript 5.9, eslint 10, prettier 3
 
 ## Styling Conventions
 
 - Dark theme: backgrounds `#0f0f1a`, `#1a1a2e`, `#2a2a3e`
 - Accent colors: amber/yellow for primary actions
 - Cards: rounded-xl with subtle borders
-- All text via i18n keys, never hardcoded strings
+- All text via i18n keys, never hardcoded strings: `npm run lint` rejects literal JSX text (`i18next/no-literal-string`; symbols, digits and emojis are allowed)
 - Responsive layout with sidebar navigation on admin
+- Accessibility: `index.css` draws the keyboard focus on every element (`:focus-visible`), never remove it with `outline-none`. Form fields go through `Field`/`Input` or get an `aria-label`; icon-only buttons through `IconButton`. Dropdowns use `useDisclosure` (Escape, click outside, `aria-expanded`), autocompletes `useComboboxKeyboard` with `ComboboxListbox`. Informative text uses `text-fg-muted` or lighter, never `text-gray-500`/`600`; transitions get `motion-reduce:transition-none` and scale effects `motion-safe:`

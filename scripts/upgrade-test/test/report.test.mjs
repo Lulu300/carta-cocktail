@@ -53,3 +53,23 @@ test('renderReport writes a summary column per mode and escapes table cells', ()
   assert.match(report, /Environment kept for inspection/);
   assert.match(report, /\*\*Cleanup warnings\*\*: cannot delete \/x/);
 });
+
+test('renderReport shows an expected action failure and the injected duplicate, only when there is one', () => {
+  const step = {
+    from: '1.4.0', to: 'local',
+    actions: [{ step: 'v1.6.0 Before 4', note: 'check a copy', status: 'failed', detail: 'refused', expected: 'duplicate injected' }],
+    checks: [],
+  };
+  const base = {
+    generatedAt: '2026-10-13T00:00:00.000Z',
+    layout: { name: 'friend', description: 'bind mounts', envSecrets: {} },
+    pathLabels: ['1.4.0', 'local'],
+    images: {},
+  };
+  const injected = renderReport({ ...base, runs: [{ mode: 'conformant', setup: { tables: 15, rows: 759, injectedDuplicates: 1 }, steps: [step] }] });
+  assert.match(injected, /\| v1\.6\.0 Before 4 \| check a copy \| failed \(expected: duplicate injected\) \| refused \|/);
+  assert.match(injected, /- `--inject-duplicate`: 1 category row\(s\) added to the working copy/);
+  assert.equal(stepVerdict(step), 'OK, 1 expected failure(s)');
+  const plain = renderReport({ ...base, runs: [{ mode: 'naive', setup: { tables: 15, rows: 758 }, steps: [okStep] }] });
+  assert.doesNotMatch(plain, /inject-duplicate/);
+});

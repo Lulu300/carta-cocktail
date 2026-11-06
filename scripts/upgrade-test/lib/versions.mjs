@@ -1,5 +1,9 @@
 // Version strings, upgrade paths and the selection of the hook files that apply to a jump.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
+const HOOKS_DIR = fileURLToPath(new URL('../hooks/', import.meta.url));
 const VERSION_PATTERN = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/;
 export const LOCAL_STEP = 'local';
 
@@ -52,22 +56,52 @@ export function compareVersions(a, b) {
 
 /**
  * "1.4.0,1.5.0,local" -> steps. A `local` step is an image built from the checkout; it follows
- * the hooks of `localVersion`.
+ * the hooks of `localVersion`, or of `defaultLocalVersion` when `localVersion` is not given.
  */
-export function parseUpgradePath(text, localVersion) {
+export function parseUpgradePath(text, { hookFiles, localVersion }) {
   const labels = text.split(',').map((label) => label.trim()).filter(Boolean);
   if (labels.length < 2) throw new Error('--path needs at least two versions, for example 1.4.0,1.5.0');
   const steps = labels.map((label) => ({
     label,
-    version: label === LOCAL_STEP ? localVersion : parseVersion(label).text,
+    version: label === LOCAL_STEP ? null : parseVersion(label).text,
     local: label === LOCAL_STEP,
   }));
+  const publishedVersions = steps.filter((step) => !step.local).map((step) => step.version);
+  const checkoutVersion = localVersion ?? defaultLocalVersion(hookFiles, publishedVersions);
+  for (const step of steps.filter((step) => step.local)) step.version = checkoutVersion;
   for (let i = 1; i < steps.length; i++) {
     if (compareVersions(steps[i - 1].version, steps[i].version) >= 0) {
-      throw new Error(`--path must go up: ${steps[i - 1].label} -> ${steps[i].label}`);
+      throw pathOrderError(steps[i - 1], steps[i]);
     }
   }
   return steps;
+}
+
+function pathOrderError(previous, next) {
+  const message = `--path must go up: ${previous.label} -> ${next.label}`;
+  const localStep = [previous, next].find((step) => step.local);
+  if (!localStep) return new Error(message);
+  return new Error(
+    `${message} ("${LOCAL_STEP}" follows the notes of ${localStep.version}; `
+    + 'set --local-version to the version of the checkout)',
+  );
+}
+
+// "1.11.0" -> "1.12.0", "1.12.0-rc.1" -> "1.13.0".
+function nextMinor(version) {
+  const [major, minor] = parseVersion(version).core;
+  return `${major}.${minor + 1}.0`;
+}
+
+/**
+ * Version followed by a `local` step without --local-version: the minor release after the newest
+ * of the hook files and the published versions of the path. The checkout is newer than anything
+ * released, so the jump to it goes up, and it crosses every hook file, including one already added
+ * for a release in preparation.
+ */
+export function defaultLocalVersion(hookFiles, publishedVersions) {
+  const newest = [latestHookVersion(hookFiles), ...publishedVersions].sort(compareVersions).at(-1);
+  return nextMinor(newest);
 }
 
 function sortedByRelease(hookFiles) {
@@ -87,12 +121,39 @@ export function hooksForJump(hookFiles, from, to) {
   );
 }
 
-/** Behaviour of a version (upload folder, migrations…): merged profiles of all releases up to it. */
+/**
+ * Behaviour of a version (upload folder, migrations…): merged profiles of all releases up to it.
+ * A newer profile replaces a field, except `refusals`, which add up: a release that adds a
+ * refusal keeps the ones of the releases before it.
+ */
 export function profileOf(hookFiles, version) {
   const release = releaseOf(version);
   return sortedByRelease(hookFiles)
     .filter((hooks) => compareVersions(hooks.version, release) <= 0)
-    .reduce((profile, hooks) => ({ ...profile, ...hooks.profile }), {});
+    .reduce((profile, hooks) => ({
+      ...profile,
+      ...hooks.profile,
+      refusals: [...profile.refusals, ...(hooks.profile.refusals ?? [])],
+    }), { refusals: [] });
+}
+
+/**
+ * --inject-duplicate needs a first version that accepts two categories of the same name. From the
+ * release whose profile has `uniqueCategoryNames` (v1.8.0), the first start is already refused,
+ * and no running version is left to upgrade from.
+ */
+export function checkDuplicateInjectionPath(steps, hookFiles) {
+  const first = steps[0];
+  if (!profileOf(hookFiles, first.version).uniqueCategoryNames) return;
+  const since = sortedByRelease(hookFiles).find((hooks) => hooks.profile.uniqueCategoryNames).version;
+  throw new Error(`--inject-duplicate needs a path that starts before v${since}: from v${since} on, `
+    + `duplicate category names are refused, so the first start (${first.label}) would already fail`);
+}
+
+/** Every hook file of `hooks/` (one per release with required actions), in no particular order. */
+export async function loadHookFiles() {
+  const files = fs.readdirSync(HOOKS_DIR).filter((file) => file.endsWith('.mjs'));
+  return Promise.all(files.map(async (file) => (await import(pathToFileURL(path.join(HOOKS_DIR, file)))).default));
 }
 
 export function latestHookVersion(hookFiles) {

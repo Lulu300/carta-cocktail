@@ -6,7 +6,8 @@
  * Guards the JavaScript a guest downloads before the first navigation (the
  * public menu opened from a QR code): the entry script of index.html plus its
  * <link rel="modulepreload"> chunks. Fails when:
- *   - one of these chunks contains admin, login or import wizard code, or jszip;
+ *   - one of these chunks contains admin, login or import wizard code, the admin
+ *     messages, or jszip;
  *   - one of these chunks contains the text "JSZip" (safety net);
  *   - their total gzip size exceeds the budget.
  *
@@ -38,10 +39,15 @@ const FORBIDDEN_MODULES = [
   'src/pages/auth/',
   'src/components/layout/AdminLayout.tsx',
   'src/components/import/',
+  'src/i18n/admin.ts',
+  'src/i18n/locales/admin/',
   'node_modules/jszip/',
 ];
 
 const FORBIDDEN_TEXT = 'JSZip';
+
+// Rolldown's CJS interop helpers: generated code only, emitted without a source map.
+const GENERATED_CHUNK = /^assets\/rolldown-runtime-[\w-]+\.js$/;
 
 function fail(message) {
   console.error(message);
@@ -100,10 +106,17 @@ function initialChunks(distDir) {
   ];
 }
 
-/** Source modules of a chunk, relative to the frontend folder, from its source map. */
-function chunkModules(distDir, chunkPath) {
-  const mapPath = join(distDir, `${chunkPath}.map`);
+/**
+ * Source modules of a chunk, relative to the frontend folder, from its source map.
+ *
+ * Every chunk needs its map, except Rolldown's runtime chunk (GENERATED_CHUNK): it
+ * holds no source module, so Rolldown emits no map for it. The text check still
+ * applies to it.
+ */
+function chunkModules(distDir, chunk) {
+  const mapPath = join(distDir, `${chunk.path}.map`);
   if (!existsSync(mapPath)) {
+    if (GENERATED_CHUNK.test(chunk.path)) return [];
     throw new Error(`Source map not found: ${mapPath}. Build with: npm run build -- --sourcemap hidden`);
   }
   const map = JSON.parse(readFileSync(mapPath, 'utf-8'));
@@ -126,7 +139,7 @@ function inspectChunk(distDir, chunk) {
     ...chunk,
     rawBytes: content.length,
     gzipBytes: gzipSync(content, { level: 9 }).length,
-    forbiddenModules: chunkModules(distDir, chunk.path).filter(isForbiddenModule),
+    forbiddenModules: chunkModules(distDir, chunk).filter(isForbiddenModule),
     hasForbiddenText: content.includes(FORBIDDEN_TEXT),
   };
 }

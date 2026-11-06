@@ -17,8 +17,8 @@ A cocktail menu management system with admin panel and public-facing menu displa
 
 | Layer | Technology |
 | --- | --- |
-| Backend | Express 5, TypeScript, Prisma 6, SQLite |
-| Frontend | React 19, Vite 7, TailwindCSS 4, React Router 7 |
+| Backend | Express 5, TypeScript, Prisma 7, SQLite |
+| Frontend | React 19, Vite 8, TailwindCSS 4, React Router 7 |
 | Auth | JWT (single admin) |
 | i18n | i18next |
 | Deploy | Docker Compose |
@@ -114,7 +114,34 @@ ADMIN_PASSWORD=<at least 12 characters>        # required on first start
 
 #### Upgrading
 
-Some versions require actions before or after the upgrade (new variables in `.env`, files to copy out of the old container…). **Read [`UPGRADING.md`](UPGRADING.md) before pulling a new version**, and apply the sections of every version newer than yours, in order. Upgrading from v1.4.0 or older to v1.5.0 requires a `JWT_SECRET` and a copy of the existing cocktail photos.
+Some versions require actions before or after the upgrade (new variables in `.env`, files to copy out of the old container…). **Read [`UPGRADING.md`](UPGRADING.md) before pulling a new version**, and apply the sections of every version newer than yours, in order. Upgrading from v1.4.0 or older to v1.5.0 requires a `JWT_SECRET` and a copy of the existing cocktail photos. Upgrading to v1.12.0 requires giving the data folders to uid 1000 first (see below).
+
+#### Data folders and the node user
+
+By default, the backend runs as the `node` user (uid 1000, gid 1000), never as root. The named volumes of the compose files need nothing: Docker gives a new volume the owner of the image folder. Host folders mounted on `/app/data` and `/app/uploads` must belong to uid 1000, or to the uid and gid set with `CARTA_UID` and `CARTA_GID` (see below). Create them before the first start:
+
+```bash
+mkdir -p data uploads && sudo chown 1000:1000 data uploads
+```
+
+Versions before v1.12.0 ran as root, so the volumes and folders of an existing install belong to root: follow the [v1.12.0 section of `UPGRADING.md`](UPGRADING.md#v1120). If a folder is not writable, the backend stops at startup with the `chown` command to run.
+
+**Another uid and gid.** The compose files run the backend as `${CARTA_UID:-1000}:${CARTA_GID:-1000}`. Set both variables in the `.env` file next to the compose file when the data folders must belong to another owner, then recreate the backend (`docker compose -f docker-compose.prod.yml up -d`):
+
+```bash
+CARTA_UID=1026
+CARTA_GID=100
+```
+
+The folders must be writable by that uid and gid. Keep the default with the named volumes: they belong to 1000:1000, and with another uid the backend stops until you run the `chown` command it prints. A compose file of your own sets the same with `user: "<uid>:<gid>"` on `carta-cocktail-backend`.
+
+**Data on a network share (SMB/NFS).** `chown` is often refused or has no effect there, so the command printed by the backend cannot help. Instead, run the backend as the owner the share gives to its files:
+
+- **SMB/CIFS**: the owner of every file is set by the `uid=` and `gid=` mount options. Mount the share with `uid=1000,gid=1000`, or set `CARTA_UID` and `CARTA_GID` to the values of those options (`mount | grep cifs` shows them). If they show `uid=0`, remount with `uid=1000,gid=1000` (or the uid and gid you chose) rather than setting `CARTA_UID=0`: never run the backend as root. The `file_mode` and `dir_mode` options must give that owner write access.
+- **NFS**: with `root_squash` (the default), `chown` run as root in a container is refused (`Operation not permitted`). Change the owner of the folders on the NAS itself, or set `CARTA_UID` and `CARTA_GID` to the uid and gid that own the exported folders (`ls -n` on the client, with NFSv3, or NFSv4 with matching idmap domains; `4294967294` or `65534` means nobody: fix the idmapping first). With `all_squash`, the NAS maps every uid to the `anonuid` and `anongid` of the export: they must own the folders on the NAS.
+- **NAS ACLs** (Synology, QNAP…) can refuse writes even to the owner: give that uid read and write access in the NAS settings.
+
+The backend tests its write access at startup and names the folder it cannot write to. A database on a network share also needs `SQLITE_WAL=false` (next section).
 
 #### Database files and network shares
 
@@ -136,11 +163,11 @@ If you lose the admin password:
 2. Restart the backend: `docker compose -f docker-compose.prod.yml up -d`. The log shows `Admin credentials reset from environment (login email: …)`.
 3. Remove `ADMIN_RESET_PASSWORD` from `.env` (or set it back to `false`) and restart again, otherwise every restart resets the password.
 
-We recommend pinning a version instead of `latest`, so that an upgrade only happens after you have read `UPGRADING.md`. Edit the image tags in `docker-compose.prod.yml`:
+We recommend pinning a version instead of `latest`, so that an upgrade only happens after you have read `UPGRADING.md`. Edit the image tags in `docker-compose.prod.yml` (from v1.12.0, `:1.12` also exists and follows the 1.12.x patch releases):
 
 ```yaml
-image: ghcr.io/lulu300/carta-cocktail/backend:1.5.0
-image: ghcr.io/lulu300/carta-cocktail/frontend:1.5.0
+image: ghcr.io/lulu300/carta-cocktail/backend:1.12.0
+image: ghcr.io/lulu300/carta-cocktail/frontend:1.12.0
 ```
 
 ## Database migrations
@@ -157,6 +184,7 @@ npm run db:check      # exit 0: the migrations match schema.prisma
 ```
 
 - Review the generated `migration.sql` before committing it: a column rename, for example, is generated as a drop and an add, which loses data.
+- SQLite does not run a migration in a transaction: when a statement fails, the ones before it stay applied. Move the statements that can fail on existing data (unique indexes, `CHECK` constraints) to the top of `migration.sql`, before any table is rebuilt, and write them so that they can run twice (`CREATE UNIQUE INDEX IF NOT EXISTS`). A failure then leaves the data as it was, and the migration can run again after `prisma migrate resolve --rolled-back` (see [Recovering from a failed migration](#recovering-from-a-failed-migration)). `20261010173910_schema_integrity` is an example.
 - Never use `prisma db push` outside the test suite. The CI runs `npm run db:check` and fails when `schema.prisma` changes without a migration.
 - Other scripts: `npm run db:deploy` applies pending migrations without creating any, `npm run db:status` shows which ones are applied.
 - A development database created with `db push` (before migrations existed) must be marked as baselined once: `npx prisma migrate resolve --applied 0_init`.
@@ -165,10 +193,11 @@ npm run db:check      # exit 0: the migrations match schema.prisma
 
 `backend/docker-entrypoint.sh` runs before the API:
 
-1. If the database exists and `prisma migrate status` reports pending migrations or no migration history, it copies the database to `backups/pre-migrate-<date>.db`, next to the database (`/app/data/backups/` in the `db-data` volume). It keeps the 10 most recent copies, and skips the copy when the database has not changed since the last one.
-2. It applies the pending migrations with `prisma migrate deploy`. A new database is created from scratch.
-3. A database created by `db push` (v1.5.0 and older) has no migration history. If its schema is exactly the one of the first migration, `0_init`, the entrypoint marks `0_init` as applied and continues. Otherwise **it refuses to start**: it prints the differences, leaves the database untouched, and the container exits.
-4. It runs the seed, then starts Node.
+1. The container runs as the `node` user (uid 1000), or as `CARTA_UID`:`CARTA_GID` when they are set. The entrypoint first checks that it can write to the database folder and the upload folder. Otherwise it stops and prints the `chown` command to run (see [Data folders and the node user](#data-folders-and-the-node-user)). A command given to the container (`docker compose run carta-cocktail-backend <command>`) runs instead of the steps below.
+2. If the database exists and a migration of the image is not applied yet (no migration history, a new migration, or one marked rolled back with `prisma migrate resolve --rolled-back`), it copies the database to `backups/pre-migrate-<date>.db`, next to the database (`/app/data/backups/` in the `db-data` volume). It keeps the 10 most recent copies, and skips the copy when the database has not changed since the last one. It makes no copy while a migration is marked failed: the newest copy stays the one made before the failed attempt.
+3. It applies the pending migrations with `prisma migrate deploy`. A new database is created from scratch. If a migration fails, **it refuses to start** and names the migration and the copy to restore: see [Recovering from a failed migration](#recovering-from-a-failed-migration).
+4. A database created by `db push` (v1.5.0 and older) has no migration history. If its schema is exactly the one of the first migration, `0_init`, the entrypoint marks `0_init` as applied and continues. Otherwise **it refuses to start**: it prints the differences, leaves the database untouched, and the container exits.
+5. It runs the seed, then starts Node.
 
 ### Checking a production database before the first upgrade
 
@@ -185,9 +214,11 @@ Do this once before deploying the first version with migrations, on a copy of th
 3. From `backend/` in a checkout of the new version (after `npm ci`), compare the copy with `0_init`:
 
    ```bash
-   npx prisma db execute --url "file:$PWD/baseline.db" --file prisma/migrations/0_init/migration.sql
-   npx prisma migrate diff --from-url "file:/absolute/path/to/carta-db-copy/carta_cocktail.db" --to-url "file:$PWD/baseline.db" --script
-   rm baseline.db
+   mkdir baseline
+   cp -R prisma/migrations/0_init prisma/migrations/migration_lock.toml baseline/
+   DATABASE_URL="file:/absolute/path/to/carta-db-copy/carta_cocktail.db" \
+     npx prisma migrate diff --from-config-datasource --to-migrations baseline --script
+   rm -r baseline
    ```
 
    Expected: `-- This is an empty migration.` Otherwise the output is the SQL that would bring the database to `0_init`: read it and fix the database before deploying (see below).
@@ -196,9 +227,18 @@ Do this once before deploying the first version with migrations, on a copy of th
 
 If the database differs from `0_init`, it usually comes from an older version: start v1.5.0 (the last version that synchronizes the schema with `db push`) once on the database, stop it, then compare again. If differences remain, fix them by hand on the copy, check again, and put the fixed copy back into the volume.
 
+### Running a previous version
+
+The current `docker-compose.prod.yml` does not fit images of v1.11.x or older, so going back to one takes more than changing the image tags:
+
+- **Compose file.** Those images have no `/api/health`: with the current file, their backend stays `unhealthy` and the frontend never starts. Use the compose file of that version, `https://raw.githubusercontent.com/Lulu300/carta-cocktail/v<version>/docker-compose.prod.yml`, with your own changes (keep a copy of the current one). Or remove the backend `healthcheck` block and `user` line (those images start as root), and the frontend `depends_on` condition, from the current file. Up to v1.7.0, the frontend also listens on port 80, not 8080: its port mapping is `"<port>:80"`.
+- **Data folder owner.** Those images run as root, and may leave files that the `node` user cannot write. Before upgrading again, give the folders back to uid 1000 (or to `CARTA_UID`:`CARTA_GID`) as in [Data folders and the node user](#data-folders-and-the-node-user): the backend otherwise stops with the `chown` command to run.
+
+To upgrade again, go back to the current compose file with the new image tags.
+
 ### Restoring a pre-migration backup
 
-To roll back an upgrade, pin the images back to the previous version in `docker-compose.prod.yml`, then restore the copy made before the migration.
+To roll back an upgrade, go back to the previous version (see [Running a previous version](#running-a-previous-version)), then restore the copy made before the migration.
 
 1. Stop the backend and list the copies (the newest is last):
 
@@ -220,6 +260,50 @@ To roll back an upgrade, pin the images back to the previous version in `docker-
 
 The restored copy brings back its sessions, including those revoked since it was made: set a new `JWT_SECRET` afterwards, as in [UPGRADING › "Signing in after a restore"](UPGRADING.md#signing-in-after-a-restore).
 
+### Recovering from a failed migration
+
+SQLite does not run a migration in a transaction: when a statement fails, the statements before it stay applied, and Prisma marks the migration as failed in the `_prisma_migrations` table. The backend then stops at every start, on `P3018` the first time and `P3009` after. The site is unavailable: the frontend waits for a healthy backend. Read the backend log with `docker compose -f docker-compose.prod.yml logs carta-cocktail-backend`. It ends with this message, under the Prisma error:
+
+```
+ERROR: migration 20261010173910_schema_integrity failed. The backend will not start.
+SQLite does not run a migration in a transaction: the statements before the one that failed stay applied.
+Prisma applies no migration until this one is resolved: previous images (v1.6.0 and later) stop on P3009 too.
+Newest copy made before a migration: /app/data/backups/pre-migrate-20261012-101500.db (with its -wal file when there is one).
+Nothing was restored. Follow "Recovering from a failed migration" in README.md (section "Database migrations").
+```
+
+The Prisma error just above gives the cause, for example `UNIQUE constraint failed: Category.name` (two categories with the same name). Going back to the previous image does not help: images from v1.6.0 apply migrations too, and Prisma refuses to apply anything while a migration is marked failed (up to v1.5.0, images synchronize the schema with `db push` instead). The entrypoint never restores anything by itself, and makes no new copy while a migration is marked failed: the copy named in the message is the one made before the failed attempt.
+
+**Restore the copy.** This works whatever statement failed.
+
+1. Stop the backend, otherwise the restart policy keeps trying: `docker compose -f docker-compose.prod.yml stop carta-cocktail-backend`.
+2. Put back the copy named in the message, with its `-wal` file: run the `run … sh -c` command of step 2 of [Restoring a pre-migration backup](#restoring-a-pre-migration-backup), not its `up -d` yet.
+3. Start the version you upgraded from, with its own compose file (see [Running a previous version](#running-a-previous-version)): `docker compose -f docker-compose.prod.yml up -d`. Fix the cause in its admin. For duplicates, keep one item, move its bottles and recipe lines to it, then delete the others.
+4. When the cause is a duplicate, check the fixed database with the integrity check of the new image. Stop the backend, copy the database out of its volume into `carta-db-copy` (step 2 of [Checking a production database before the first upgrade](#checking-a-production-database-before-the-first-upgrade)), then run, with your new version:
+
+   ```bash
+   docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/carta-db-copy:/data" -e DATABASE_URL=file:/data/carta_cocktail.db \
+     --entrypoint node ghcr.io/lulu300/carta-cocktail/backend:<new version> dist/scripts/check-integrity.js
+   ```
+
+   Exit code `0`: nothing blocks the migration. Exit code `1`: the output lists what is left to fix. Repeat steps 3 and 4 until it exits `0`.
+5. Stop the backend, go back to the current compose file with the new image tags, give the data folders back to uid 1000 (or to `CARTA_UID`:`CARTA_GID`) if the previous version ran as root (see [Running a previous version](#running-a-previous-version)), and start. The entrypoint copies the fixed database to a new `pre-migrate-<date>.db`, then runs the migration again.
+
+**Without restoring.** Only when the migration failed before changing anything: the statement in the error is one of those at the top of its `migration.sql`, before any table is rebuilt (for `20261010173910_schema_integrity`, the unique indexes: `UNIQUE constraint failed: Category.name` or `Unit.abbreviation`). If in doubt, restore the copy.
+
+1. Stop the backend while the compose file still names the new version.
+2. Mark the migration as rolled back, with the new image:
+
+   ```bash
+   docker compose -f docker-compose.prod.yml run --rm --no-deps carta-cocktail-backend \
+     npx prisma migrate resolve --rolled-back <migration>
+   ```
+
+3. Fix the cause with the previous version and its own compose file, as in steps 3 and 4 above.
+4. Go back to the new version as in step 5 above. The entrypoint copies the database, fixes included, to a new `pre-migrate-<date>.db` before running the migration again: if it fails again, that copy is the one to restore.
+
+A restored copy brings back its sessions: afterwards, set a new `JWT_SECRET`, as in [UPGRADING › "Signing in after a restore"](UPGRADING.md#signing-in-after-a-restore).
+
 ## Project Structure
 
 ```
@@ -230,10 +314,11 @@ carta-cocktail/
 │   │   ├── services/       # Business logic (availability)
 │   │   ├── middleware/      # JWT auth
 │   │   ├── i18n/           # Backend translations
+│   │   ├── scripts/        # Seed (default data), integrity check
 │   │   └── utils/          # Helpers
 │   └── prisma/
 │       ├── schema.prisma   # Database schema (15 models)
-│       └── seed.ts         # Default data
+│       └── migrations/     # Versioned migrations
 ├── frontend/               # React SPA
 │   ├── src/
 │   │   ├── pages/          # Admin (12) + Public (3) pages
@@ -261,6 +346,7 @@ carta-cocktail/
 | `ADMIN_EMAIL` | Admin login email, used when the admin is created or reset | `admin@carta.local` |
 | `ADMIN_PASSWORD` | Admin password, at least 12 characters, used when the admin is created or reset | **required** on first start, no default |
 | `ADMIN_RESET_PASSWORD` | Exactly `true` resets the existing admin's email and password from the two variables above at startup; other values are ignored with a warning | `false` |
+| `CARTA_UID`, `CARTA_GID` | Docker only, read by the compose files from `.env`: uid and gid the backend runs as. Set them when the data folders must belong to another owner, such as a network share (see [Data folders and the node user](#data-folders-and-the-node-user)) | `1000` |
 | `SQLITE_WAL` | `false` keeps the rollback journal instead of WAL; required when the database is on a network share (SMB/NFS). Other values use WAL. In Docker, set it in the compose file (see [Database files and network shares](#database-files-and-network-shares)) | `true` |
 | `JWT_EXPIRES_IN` | Lifetime of the admin session token: a number of seconds (`86400`) or a timespan (`24h`, `7d`). Applies to tokens issued after the restart. The backend refuses to start with a value it cannot read | `7d` |
 | `LOGIN_RATE_LIMIT` | Failed logins allowed per client IP address in 15 minutes; beyond that, the login answers 429 (Too Many Requests). Successful logins do not count. A positive integer, otherwise the backend refuses to start | `10` |
@@ -290,9 +376,9 @@ Write values without quotes in this list: compose keeps them as part of the valu
 
 The API then uses the address the first proxy sees and ignores what clients write in `X-Forwarded-For`. This removes the bypass and adds no risk of blocking the admin: clients that shared a counter still share it, and the others (IPv4 clients in the `docker-proxy` case) keep their own. Clients that share a counter can still block the admin with their failures; raise `LOGIN_RATE_LIMIT` if that happens too often. The counters are kept in memory: restarting the backend clears them.
 
-These settings hold only when clients cannot skip a proxy. The compose files publish the backend port 3001. A client that connects to it directly passes for the first proxy, and the API reads the address that client wrote in `X-Forwarded-For`: with `TRUST_PROXY=1` or `2`, and also with the default when the connection arrives under a private address, as in the installs listed above (in the `docker-proxy` case, only over IPv6). Behind SWAG, the same goes for nginx's port when a client reaches it without SWAG.
+These settings hold only when clients cannot skip a proxy. From v1.12.0, `docker-compose.prod.yml` does not publish the backend port 3001, and `docker-compose.yml` (local build) binds it to `127.0.0.1`. If you published it again, or use a compose file from an older version, a client that connects to it directly passes for the first proxy, and the API reads the address that client wrote in `X-Forwarded-For`: with `TRUST_PROXY=1` or `2`, and also with the default when the connection arrives under a private address, as in the installs listed above (in the `docker-proxy` case, only over IPv6). Behind SWAG, the same goes for nginx's port when a client reaches it without SWAG.
 
-Do not publish these ports. Remove the `ports` entry of `carta-cocktail-backend`: nginx reaches the backend over the compose network and does not need it. If you call the API from the host, bind the port to the loopback address instead:
+Do not publish these ports. Keep `carta-cocktail-backend` without a `ports` entry, as in `docker-compose.prod.yml`: nginx reaches the backend over the compose network and does not need it. If you call the API from the host, bind the port to the loopback address instead:
 
 ```yaml
     ports:
@@ -329,7 +415,7 @@ The **Release** workflow (`.github/workflows/release.yml`) runs on version tags 
 | Tag | Tagged on | Docker images | GitHub Release |
 | --- | --- | --- | --- |
 | `vX.Y.Z-rc.N` (pre-release) | a commit of `develop` | `:X.Y.Z-rc.N` only, `latest` does not move | marked as pre-release |
-| `vX.Y.Z` (final) | a commit of `main` | `:X.Y.Z` and `latest` | normal release, marked as latest |
+| `vX.Y.Z` (final) | a commit of `main` | `:X.Y.Z`, `:X.Y`, `:X` and `latest` | normal release, marked as latest |
 
 1. **Notes first.** On `develop`, copy `docs/releases/TEMPLATE.md` to `docs/releases/vX.Y.Z.md` (summary, detailed changes, required actions before and after the upgrade, `breaking`), and add the version's section to `UPGRADING.md`. A pre-release uses the notes of its target version, unless `docs/releases/vX.Y.Z-rc.N.md` exists.
 2. **Pre-release.** Push `develop`, then tag it: `git tag vX.Y.Z-rc.N origin/develop && git push origin vX.Y.Z-rc.N`.
@@ -345,8 +431,8 @@ The GitHub Release contains the notes file (without its front matter), the list 
 ### Pulling release images
 
 ```bash
-docker pull ghcr.io/lulu300/carta-cocktail/backend:1.5.0
-docker pull ghcr.io/lulu300/carta-cocktail/frontend:1.5.0
+docker pull ghcr.io/lulu300/carta-cocktail/backend:1.12.0
+docker pull ghcr.io/lulu300/carta-cocktail/frontend:1.12.0
 ```
 
 ## API Overview

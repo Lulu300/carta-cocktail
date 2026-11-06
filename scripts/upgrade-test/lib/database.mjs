@@ -8,7 +8,7 @@ import { runHelper } from './docker.mjs';
 export const DB_FILE_NAME = 'carta_cocktail.db';
 
 // Reads a copy of the database files, from a read-only mount: opening the live database would
-// checkpoint its WAL and change the state handed to the next version. The fingerprint and the
+// checkpoint its WAL and change the state handed to the next version. The fingerprints and the
 // backups are read from the original folder.
 const SNAPSHOT_SCRIPT = `
 set -e
@@ -17,6 +17,11 @@ cp /data/${DB_FILE_NAME}* /tmp/snapshot/
 DB=/tmp/snapshot/${DB_FILE_NAME}
 echo "fingerprint|$(sha256sum /data/${DB_FILE_NAME} | cut -d' ' -f1)"
 echo "backups|$(ls /data/backups/pre-migrate-*.db 2>/dev/null | wc -l)"
+# Backup names embed the date: a reverse name sort lists the newest first, as in the entrypoint.
+LATEST_BACKUP="$(ls /data/backups/pre-migrate-*.db 2>/dev/null | sort -r | head -n 1)"
+if [ -n "$LATEST_BACKUP" ]; then
+  echo "latestBackup|$(sha256sum "$LATEST_BACKUP" | cut -d' ' -f1)"
+fi
 echo "integrity|$(sqlite3 "$DB" 'PRAGMA integrity_check;' | tr '\\n' ' ')"
 echo "journal|$(sqlite3 "$DB" 'PRAGMA journal_mode;')"
 for table in $(sqlite3 "$DB" "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name;"); do
@@ -31,6 +36,7 @@ export function parseSnapshot(output) {
     const [kind, ...values] = line.split('|');
     if (kind === 'fingerprint') snapshot.fingerprint = values[0];
     if (kind === 'backups') snapshot.backups = Number(values[0].trim());
+    if (kind === 'latestBackup') snapshot.latestBackupFingerprint = values[0];
     if (kind === 'integrity') snapshot.integrity = values[0].trim();
     if (kind === 'journal') snapshot.journalMode = values[0].trim();
     if (kind === 'count') snapshot.counts[values[0]] = Number(values[1]);
@@ -75,6 +81,57 @@ export function createAnonymizedCopy(fixtureDir, dataDir, { email, passwordHash 
   } finally {
     fs.rmSync(sqlDir, { recursive: true, force: true });
   }
+}
+
+// Unique index created by migration 20261010173910_schema_integrity (v1.8.0).
+const UNIQUE_CATEGORY_NAME_INDEX = 'Category_name_key';
+
+// Prints two lines: the number of unique indexes on Category.name, then the number of categories.
+const FIXTURE_CATEGORIES_QUERY = `SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = '${UNIQUE_CATEGORY_NAME_INDEX}'; `
+  + 'SELECT COUNT(*) FROM Category;';
+
+export function parseFixtureCategories(output) {
+  const [indexes, categories] = output.trim().split('\n').map(Number);
+  return { hasUniqueNameIndex: indexes > 0, categories };
+}
+
+/**
+ * What --inject-duplicate needs to know of the fixture database: whether it already has the unique
+ * index on Category.name, and how many categories it holds. Opened as immutable on a read-only
+ * mount: the fixture is never written.
+ */
+export function readFixtureCategories(fixtureDir) {
+  const command = `sqlite3 'file:/fixture/${DB_FILE_NAME}?immutable=1' "${FIXTURE_CATEGORIES_QUERY}"`;
+  return parseFixtureCategories(runHelper([`${fixtureDir}:/fixture:ro`], command));
+}
+
+/**
+ * --inject-duplicate copies an existing category: the fixture needs one, and must not come from
+ * a v1.8.0 or newer instance, whose unique index refuses the copy.
+ */
+export function checkFixtureAcceptsDuplicate({ hasUniqueNameIndex, categories }) {
+  if (hasUniqueNameIndex) {
+    throw new Error(`--inject-duplicate: the fixture already has the unique index ${UNIQUE_CATEGORY_NAME_INDEX} `
+      + '(database of v1.8.0 or later), so a duplicate category name cannot be added');
+  }
+  if (categories === 0) throw new Error('--inject-duplicate: the fixture has no category to duplicate');
+}
+
+// Copies the category with the lowest id under a new id. Every column but the primary key is
+// copied, whatever the schema version of the fixture. Only the number of rows added is printed.
+const INJECT_DUPLICATE_SCRIPT = `
+set -e
+DB=/data/${DB_FILE_NAME}
+COLUMNS="$(sqlite3 "$DB" "SELECT group_concat('\\"' || name || '\\"', ', ') FROM pragma_table_info('Category') WHERE pk = 0;")"
+sqlite3 "$DB" "INSERT INTO \\"Category\\" ($COLUMNS) SELECT $COLUMNS FROM \\"Category\\" ORDER BY id LIMIT 1; SELECT changes();"
+`;
+
+/**
+ * --inject-duplicate: adds to the working copy in `dataDir` a category with the name of an
+ * existing one, which the v1.8.0 migration refuses. Returns the number of rows added.
+ */
+export function injectDuplicateCategory(dataDir) {
+  return Number(runHelper([`${dataDir}:/data`], INJECT_DUPLICATE_SCRIPT).trim());
 }
 
 /** Copies every database file (carta_cocktail.db*) from `dataMount` to the host folder `outDir`. */

@@ -57,3 +57,4 @@ Aucun : le compilateur et la suite existante suffisent.
 
 - 2026-10-08 : tâche créée à partir du rapport de dépendances. Statut : étape 2 bloquée par typescript-eslint.
 - 2026-10-08 : décisions validées par l'humain (voir « Décisions validées »).
+- 2026-10-12 : relecture de D-04 (PR #112) : le job Frontend lance maintenant `tsc -b`, mais `frontend/vitest.config.ts` n'appartient à aucun projet référencé (`tsconfig.node.json` n'inclut que `vite.config.ts`) et n'est donc pas vérifié. À ajouter à `tsconfig.node.json` lors du passage à TypeScript 6/7.

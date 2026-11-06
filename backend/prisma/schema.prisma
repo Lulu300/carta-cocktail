@@ -1,10 +1,16 @@
 generator client {
-  provider = "prisma-client-js"
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "cjs"
+  // Extensionless imports, as tsc compiles them for CommonJS. Without this, the
+  // client generated without tsconfig.json (npm ci in the Docker image) would
+  // import "./internal/class.ts", which the compiled code cannot load.
+  importFileExtension = ""
 }
 
+// The database URL is read from prisma.config.ts (CLI) and src/lib/prisma.ts (application)
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -55,6 +61,7 @@ model Bottle {
   cocktailIngredients CocktailIngredient[]
   preferredFor        CocktailPreferredBottle[]
   menuBottles         MenuBottle[]
+  menuExclusions      MenuBottleExclusion[]
 
   @@index([categoryId])
 }
@@ -155,6 +162,8 @@ model Menu {
   cocktails MenuCocktail[]
   bottles   MenuBottle[]
   sections  MenuSection[]
+
+  bottleExclusions MenuBottleExclusion[]
 }
 
 model MenuCocktail {
@@ -187,6 +196,19 @@ model MenuBottle {
   @@unique([menuId, bottleId])
   @@index([bottleId])
   @@index([menuSectionId])
+}
+
+// Bottle the admin removed from a system menu: the sync never adds it back.
+// A table rather than a MenuBottle flag, so MenuBottle only holds the bottles shown.
+model MenuBottleExclusion {
+  menuId    Int
+  menu      Menu     @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  bottleId  Int
+  bottle    Bottle   @relation(fields: [bottleId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([menuId, bottleId])
+  @@index([bottleId])
 }
 
 model MenuSection {

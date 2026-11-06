@@ -16,6 +16,7 @@ import SearchInput from '../../components/ui/SearchInput';
 import ImportBottlesWizard from '../../components/import/ImportBottlesWizard';
 import DataTable, { type Column } from '../../components/admin/DataTable';
 import { useConfirmDelete } from '../../components/admin/useConfirmDelete';
+import { useForcedDelete } from '../../components/admin/useForcedDelete';
 import { useEntityForm } from '../../components/admin/useEntityForm';
 import BottleFormModal from '../../components/admin/bottles/BottleFormModal';
 import BottleGroupRow from '../../components/admin/bottles/BottleGroupRow';
@@ -39,11 +40,16 @@ export default function BottlesPage() {
   const invalidateQueries = useInvalidateQueries();
   const bottlesQuery = useBottles();
   const categories = useCategories().data ?? [];
-  const { create, update, remove } = useCrudMutations<BottleInput>({
+  const { create, update } = useCrudMutations<BottleInput>({
     key: qk.bottles,
     api: bottlesApi,
     invalidates: BOTTLE_DEPENDENT_KEYS,
     messages: { created: 'bottles.created', updated: 'bottles.updated', deleted: 'bottles.deleted' },
+  });
+  const deleteBottle = useForcedDelete({
+    deleteItem: bottlesApi.delete,
+    invalidates: [qk.bottles, ...BOTTLE_DEPENDENT_KEYS],
+    deletedMessage: 'bottles.deleted',
   });
   const bottleForm = useEntityForm((bottle?: Bottle) => toBottleForm(categories, bottle));
   const filters = useBottleFilters(bottlesQuery.data);
@@ -65,7 +71,7 @@ export default function BottlesPage() {
   };
 
   const handleDelete = async (bottle: Bottle) => {
-    if (await confirmDelete(t('bottles.confirmDelete'))) remove.mutate(bottle.id);
+    if (await confirmDelete(t('bottles.confirmDelete'))) await deleteBottle(bottle.id);
   };
 
   const toggleGroup = (groupKey: string) => {
@@ -88,7 +94,7 @@ export default function BottlesPage() {
     { key: 'categoryName', header: t('bottles.category'), sortable: true },
     { key: 'capacityMl', header: t('bottles.capacityMl'), sortable: true },
     { key: 'remainingPercent', header: t('bottles.remainingPercent'), sortable: true },
-    { key: 'alcoholPercentage', header: 'Alcool', sortable: true },
+    { key: 'alcoholPercentage', header: t('bottles.alcoholPercentage'), sortable: true },
     { key: 'openedAt', header: t('bottles.openedAt'), sortable: true },
     { key: 'purchasePrice', header: t('bottles.purchasePrice'), sortable: true },
     { key: 'actions', header: t('common.actions'), align: 'right' },
@@ -112,12 +118,13 @@ export default function BottlesPage() {
       </div>
 
       <div className="flex flex-col lg:flex-row gap-3 mb-4">
-        <SearchInput value={filters.search} onChange={filters.setSearch} className="lg:w-64" />
+        <SearchInput value={filters.search} onChange={filters.setSearch} label={t('bottles.search')} className="lg:w-64" />
         <CategoryFilterInput
           categories={categories}
           value={filters.categoryText}
           selectedId={filters.categoryId}
           onChange={filters.setCategory}
+          label={t('bottles.filterByCategory')}
           placeholder={t('bottles.filterByCategory')}
           className="lg:w-64"
         />
@@ -125,6 +132,7 @@ export default function BottlesPage() {
           value={filters.location}
           onChange={filters.setLocation}
           locations={filters.locations}
+          label={t('bottles.filterByLocation')}
           placeholder={t('bottles.filterByLocation')}
           className="lg:w-64"
         />
@@ -144,6 +152,7 @@ export default function BottlesPage() {
         isError={bottlesQuery.isError}
         onRetry={() => bottlesQuery.refetch()}
         emptyLabel={t('common.noResults')}
+        isFiltered={filters.isFiltered}
       />
       <BottleHistoryTable bottles={filters.emptyBottles} {...rowActions} />
 
