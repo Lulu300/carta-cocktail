@@ -26,13 +26,18 @@ Avec `--inject-duplicate --mode naive` sur le layout `official`, les volumes nom
 
 1. Ajouter le refus « cannot write » de l'entrypoint aux refus connus (`lib/checks.mjs`), avec son contrôle (aucune écriture dans la base).
 2. Avec `--inject-duplicate`, quand le démarrage est refusé pour « cannot write » en mode naïf, marquer la ligne du doublon comme non applicable (le doublon n'a pas pu être testé) au lieu d'un échec.
-3. Lister ce refus dans `profile.refusals` du hook 1.12.0 si nécessaire, et documenter le cas dans `scripts/upgrade-test/README.md`.
+3. Hook `1.12.0` : lister ce refus dans `profile.refusals`, et mettre à jour ou retirer les entrées `naiveMayFail.refusal` (« … which is not a known refusal », qui ne vaut plus) et `naiveMayFail.backup` si le contrôle passe. Documenter le cas dans `scripts/upgrade-test/README.md`.
 
 ## Critères d'acceptation
 
 - [ ] `--layout official --path 1.4.0,<version ≥ 1.12.0> --mode both --inject-duplicate` passe sans échec inattendu.
 - [ ] Le layout `friend` donne le même résultat qu'avant.
 - [ ] Tests `node --test scripts/upgrade-test/test/*.test.mjs` ajoutés et verts.
+
+## Tests à ajouter ou adapter
+
+- `checks.test.mjs` : le refus « cannot write » est reconnu comme refus connu, et son contrôle de la base passe.
+- `expectations` : avec `--inject-duplicate`, la ligne du doublon est non applicable quand ce refus arrive avant la migration ; elle reste un échec pour un démarrage qui passe ou un refus inconnu.
 
 ## Points d'attention
 
