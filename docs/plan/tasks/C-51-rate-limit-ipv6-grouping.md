@@ -11,7 +11,7 @@ depends_on: [C-47]
 touches: [backend/src/middleware/rateLimit.ts, backend/src/middleware/rateLimit.test.ts, backend/src/routes/apiRateLimit.test.ts, backend/src/routes/loginRateLimit.test.ts, backend/AGENTS.md, README.md, .env.example, UPGRADING.md]
 sources: []
 branch: fix/C-51-rate-limit-ipv6-grouping
-pr: ""
+pr: "#179"
 ---
 
 ## Contexte
@@ -60,5 +60,5 @@ L'effet ne se voit que là où une vraie adresse IPv6 arrive dans `X-Forwarded-F
 ## Journal
 
 - 2026-11-12 : tâche créée d'après la relecture de la PR #174 (manque 3). Faits établis avant la décision : options d'express-rate-limit 8.7.0 sondées (clés produites pour /56, /64 et `false`, validations qui écrivent une `ValidationError` sans bloquer), et chemin de `req.ip` depuis nginx (`listen 8080` en IPv4 seulement, réseau compose sans IPv6). Décision humaine : /64.
-- 2026-11-12 : PR ouverte (branche `fix/C-51-rate-limit-ipv6-grouping`). `ipv6Subnet: 64` dans la fabrique, tests unitaires et d'intégration, README, `.env.example`, `backend/AGENTS.md`, et la ligne v1.11.0 d'`UPGRADING.md`.
+- 2026-11-12 : PR #179 ouverte (branche `fix/C-51-rate-limit-ipv6-grouping`). `ipv6Subnet: 64` dans la fabrique, tests unitaires et d'intégration, README, `.env.example`, `backend/AGENTS.md`, et la ligne v1.11.0 d'`UPGRADING.md`.
 - Notes de version : « An IPv6 client now counts for its /64 network (one LAN) in the rate limits, instead of its /56: devices on the same Wi-Fi still share a counter, but other networks of the same site, such as a guest network and a staff network, and mobile subscribers each get their own. No action required; only installs where the API sees real IPv6 client addresses (a reverse proxy or tunnel that receives IPv6) notice the change. »
