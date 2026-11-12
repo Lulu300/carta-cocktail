@@ -44,9 +44,17 @@ describe('POST /api/category-types', () => {
     expect(res.status).toBe(400);
   });
 
+  it('should answer a missing name in French', async () => {
+    const res = await request.post('/api/category-types').set(authHeader()).set('Accept-Language', 'fr').send({});
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Erreur de validation');
+  });
+
   it('should return 409 if type already exists', async () => {
-    const res = await request.post('/api/category-types').set(authHeader()).send({ name: 'SPIRIT' });
+    const res = await request.post('/api/category-types').set(authHeader()).set('Accept-Language', 'fr')
+      .send({ name: 'spirit' });
     expect(res.status).toBe(409);
+    expect(res.body).toEqual({ error: 'Cette entrée existe déjà' });
   });
 
   it('should create with uppercase name and default color', async () => {
@@ -69,6 +77,7 @@ describe('PUT /api/category-types/:name', () => {
   it('should return 404 for non-existent type', async () => {
     const res = await request.put('/api/category-types/NONEXISTENT').set(authHeader()).send({ color: 'red' });
     expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: 'Resource not found' });
   });
 
   it('should update color', async () => {
@@ -86,15 +95,18 @@ describe('PUT /api/category-types/:name', () => {
 });
 
 describe('DELETE /api/category-types/:name', () => {
-  it('should return 400 if type is in use', async () => {
+  it('should return a translated 409 if type is in use', async () => {
     await seedCategory({ type: 'SPIRIT' });
-    const res = await request.delete('/api/category-types/SPIRIT').set(authHeader());
-    expect(res.status).toBe(400);
+    const res = await request.delete('/api/category-types/SPIRIT').set(authHeader()).set('Accept-Language', 'fr');
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({ error: 'Impossible de supprimer : des catégories utilisent encore ce type' });
+    expect(await prisma.categoryType.findUnique({ where: { name: 'SPIRIT' } })).not.toBeNull();
   });
 
   it('should delete unused type', async () => {
     const res = await request.delete('/api/category-types/SOFT').set(authHeader());
     expect(res.status).toBe(200);
+    expect(res.body).toEqual({ message: 'Type deleted successfully' });
     // Verify it's gone
     const check = await prisma.categoryType.findUnique({ where: { name: 'SOFT' } });
     expect(check).toBeNull();

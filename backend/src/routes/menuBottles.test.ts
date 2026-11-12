@@ -275,6 +275,16 @@ describe('DELETE /api/menu-bottles/:id', () => {
     expect(res.status).toBe(404);
   });
 
+  it('should answer in French', async () => {
+    const aperitifs = await findSystemMenu('aperitifs');
+    const mb = await addBottleToMenu(aperitifs.id, (await seedBottle({ isApero: true })).id);
+
+    const res = await request.delete(`/api/menu-bottles/${mb.id}`).set(authHeader()).set('Accept-Language', 'fr');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ message: 'Bouteille retirée de la carte' });
+  });
+
   it('should exclude the bottle from a system menu only', async () => {
     const aperitifs = await findSystemMenu('aperitifs');
     const digestifs = await findSystemMenu('digestifs');

@@ -49,22 +49,22 @@ router.put('/sections/:id', validate(updateSchemas), async (_req: AuthRequest, r
 });
 
 // Delete section
-router.delete('/sections/:id', validate(idRequest), async (_req: AuthRequest, res: Response) => {
+router.delete('/sections/:id', validate(idRequest), async (req: AuthRequest, res: Response) => {
   // When a section is deleted, items will have their menuSectionId set to null (onDelete: SetNull)
   await prisma.menuSection.delete({
     where: { id: valid<typeof idRequest>(res).params.id },
   });
-  res.json({ message: 'Section deleted' });
+  res.json({ message: req.t('menuSections.deleted') });
 });
 
 // Reorder sections
 const reorderSchemas = { params: MenuIdParams, body: MenuSectionReorder };
 
-router.post('/menu/:menuId/sections/reorder', validate(reorderSchemas), async (_req: AuthRequest, res: Response) => {
+router.post('/menu/:menuId/sections/reorder', validate(reorderSchemas), async (req: AuthRequest, res: Response) => {
   // sectionIds lists every section of the menu, in its new order
   const { params: { menuId }, body: { sectionIds } } = valid<typeof reorderSchemas>(res);
   await prisma.$transaction((tx) => reorder(tx, 'menuSection', menuId, sectionIds));
-  res.json({ message: 'Sections reordered' });
+  res.json({ message: req.t('menuSections.reordered') });
 });
 
 export default router;

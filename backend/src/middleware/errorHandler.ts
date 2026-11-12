@@ -70,6 +70,17 @@ export function toHttpError(err: unknown, method = 'GET'): HttpError {
   return new HttpError(500, 'errors.serverError');
 }
 
+/**
+ * Values for the placeholders of the message, e.g. `{{max}}` in `errors.import.tooManyRows`.
+ * Only object details qualify: the list of validation issues has nothing to fill in.
+ * Passed under `replace` so that a detail named like an i18next option (`count`, `lng`)
+ * never changes how the message is chosen.
+ */
+function interpolationOptions(details: unknown): { replace: object } | undefined {
+  const isObject = typeof details === 'object' && details !== null && !Array.isArray(details);
+  return isObject ? { replace: details } : undefined;
+}
+
 export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
   // The response is already streaming: let Express close the connection.
   if (res.headersSent) {
@@ -81,7 +92,7 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
   // req.t is missing when the error happens before the i18n middleware ran.
   const t = typeof req.t === 'function' ? req.t : i18next.getFixedT('en');
   res.status(httpError.status).json({
-    error: t(httpError.i18nKey),
+    error: t(httpError.i18nKey, interpolationOptions(httpError.details)),
     ...(httpError.details !== undefined && { details: httpError.details }),
   });
 };

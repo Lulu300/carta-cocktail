@@ -339,9 +339,9 @@ describe('DELETE /api/menus/:id', () => {
 
   it('should return 403 when deleting aperitifs menu', async () => {
     const menu = await prisma.menu.findUnique({ where: { slug: 'aperitifs' } });
-    const res = await request.delete(`/api/menus/${menu!.id}`).set(authHeader());
+    const res = await request.delete(`/api/menus/${menu!.id}`).set(authHeader()).set('Accept-Language', 'fr');
     expect(res.status).toBe(403);
-    expect(res.body.error).not.toBe('errors.cannotDeleteDefaultMenu');
+    expect(res.body).toEqual({ error: 'Impossible de supprimer un menu système' });
   });
 
   it('should return 403 when deleting digestifs menu', async () => {

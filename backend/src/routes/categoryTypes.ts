@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middleware/auth';
+import { ConflictError, NotFoundError } from '../errors';
 import { parseNameTranslations } from '../utils/translations';
 import { valid, validate } from '../validation/validate';
 import { CategoryTypeCreate, CategoryTypeParams, CategoryTypeUpdate } from '../validation/categoryTypes';
@@ -34,10 +35,7 @@ router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Respons
   const { name, nameTranslations, color } = valid<typeof createSchemas>(res).body;
   const typeName = name.toUpperCase();
   const existing = await prisma.categoryType.findUnique({ where: { name: typeName } });
-  if (existing) {
-    res.status(409).json({ error: 'Type already exists' });
-    return;
-  }
+  if (existing) throw new ConflictError();
   const created = await prisma.categoryType.create({
     data: {
       name: typeName,
@@ -54,10 +52,7 @@ const updateSchemas = { params: CategoryTypeParams, body: CategoryTypeUpdate };
 router.put('/:name', validate(updateSchemas), async (_req: AuthRequest, res: Response) => {
   const { params: { name: typeName }, body: { nameTranslations, color } } = valid<typeof updateSchemas>(res);
   const existing = await prisma.categoryType.findUnique({ where: { name: typeName } });
-  if (!existing) {
-    res.status(404).json({ error: 'Type not found' });
-    return;
-  }
+  if (!existing) throw new NotFoundError();
   const updated = await prisma.categoryType.update({
     where: { name: typeName },
     data: {
@@ -73,15 +68,12 @@ router.put('/:name', validate(updateSchemas), async (_req: AuthRequest, res: Res
 // Delete a category type
 const deleteSchemas = { params: CategoryTypeParams };
 
-router.delete('/:name', validate(deleteSchemas), async (_req: AuthRequest, res: Response) => {
+router.delete('/:name', validate(deleteSchemas), async (req: AuthRequest, res: Response) => {
   const typeName = valid<typeof deleteSchemas>(res).params.name;
   const usageCount = await prisma.category.count({ where: { type: typeName } });
-  if (usageCount > 0) {
-    res.status(400).json({ error: 'Type is in use by categories' });
-    return;
-  }
+  if (usageCount > 0) throw new ConflictError('errors.typeInUse');
   await prisma.categoryType.delete({ where: { name: typeName } });
-  res.json({ message: 'Type deleted' });
+  res.json({ message: req.t('categoryTypes.deleted') });
 });
 
 export default router;

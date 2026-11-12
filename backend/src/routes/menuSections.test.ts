@@ -96,8 +96,18 @@ describe('DELETE /api/menu-sections/sections/:id', () => {
 
     const res = await request.delete(`/api/menu-sections/sections/${section.id}`).set(authHeader());
     expect(res.status).toBe(200);
+    expect(res.body).toEqual({ message: 'Section deleted' });
     const check = await prisma.menuSection.findUnique({ where: { id: section.id } });
     expect(check).toBeNull();
+  });
+
+  it('should answer in French', async () => {
+    const section = await seedMenuSection((await seedMenu()).id);
+
+    const res = await request.delete(`/api/menu-sections/sections/${section.id}`).set(authHeader())
+      .set('Accept-Language', 'fr');
+
+    expect(res.body).toEqual({ message: 'Section supprimée' });
   });
 });
 
@@ -127,10 +137,20 @@ describe('POST /api/menu-sections/menu/:menuId/sections/reorder', () => {
     const res = await request.post(`/api/menu-sections/menu/${menu.id}/sections/reorder`).set(authHeader())
       .send({ sectionIds: [s3.id, s1.id, s2.id] });
     expect(res.status).toBe(200);
-    expect(res.body.message).toBeDefined();
+    expect(res.body).toEqual({ message: 'Sections reordered' });
 
     const sections = await prisma.menuSection.findMany({ where: { menuId: menu.id }, orderBy: { position: 'asc' } });
     expect(sections.map((section) => [section.id, section.position])).toEqual([[s3.id, 0], [s1.id, 1], [s2.id, 2]]);
+  });
+
+  it('should answer in French', async () => {
+    const menu = await seedMenu();
+    const section = await seedMenuSection(menu.id);
+
+    const res = await request.post(`/api/menu-sections/menu/${menu.id}/sections/reorder`).set(authHeader())
+      .set('Accept-Language', 'fr').send({ sectionIds: [section.id] });
+
+    expect(res.body).toEqual({ message: 'Sections réordonnées' });
   });
 
   it('should return 400 for a partial list and leave the positions unchanged', async () => {

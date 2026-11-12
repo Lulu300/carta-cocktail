@@ -17,12 +17,12 @@ router.get('/', async (_req: AuthRequest, res: Response) => {
 
 const bulkSchemas = { body: BulkAvailability };
 
-router.post('/bulk-availability', validate(bulkSchemas), async (_req: AuthRequest, res: Response) => {
+router.post('/bulk-availability', validate(bulkSchemas), async (req: AuthRequest, res: Response) => {
   const { available } = valid<typeof bulkSchemas>(res).body;
   const result = await prisma.ingredient.updateMany({
     data: { isAvailable: available },
   });
-  res.json({ updated: result.count });
+  res.json({ message: req.t('ingredients.availabilityUpdated'), updated: result.count });
 });
 
 router.get('/:id', validate(idRequest), async (_req: AuthRequest, res: Response) => {

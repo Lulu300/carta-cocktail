@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { prisma } from '../lib/prisma';
+import { UnauthorizedError } from '../errors';
 
 export interface AuthRequest extends Request {
   userId?: number;
@@ -59,18 +60,13 @@ function extractBearerToken(req: Request): string | null {
   return authHeader.slice(BEARER_PREFIX.length);
 }
 
-export async function authMiddleware(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+/** Rejects the request with a 401, answered by errorHandler, unless it carries a valid admin token. */
+export async function authMiddleware(req: AuthRequest, _res: Response, next: NextFunction): Promise<void> {
   const token = extractBearerToken(req);
-  if (!token) {
-    res.status(401).json({ error: 'Unauthorized' });
-    return;
-  }
+  if (!token) throw new UnauthorizedError();
 
   const userId = await verifyToken(token);
-  if (userId === null) {
-    res.status(401).json({ error: 'Invalid token' });
-    return;
-  }
+  if (userId === null) throw new UnauthorizedError('errors.invalidToken');
 
   req.userId = userId;
   next();
