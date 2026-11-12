@@ -9,12 +9,14 @@ import { toast } from '../../components/ui/ToastStore';
 import type { BackupRestoreResult } from '../../services/api';
 import { mockDownload } from '../../test/download';
 import { buildSiteSettings } from '../../test/factories';
+import i18n from '../../i18n';
 import { ADMIN_USER } from '../../test/msw/handlers';
 import {
   captureRequest,
   mockApiError,
   mockApiPending,
   mockApiResponse,
+  mockProxyError,
   rejectNextFetch,
 } from '../../test/msw/utils';
 
@@ -28,6 +30,9 @@ vi.mock('react-i18next', async (importOriginal) => {
 });
 
 const admin = { ...ADMIN_USER, email: 'admin@test.local' };
+
+// Set by services/api.ts through the real i18next instance, not the mocked useTranslation
+const SERVER_UNAVAILABLE = i18n.t('common.serverUnavailable');
 
 function restoreResult(overrides: Partial<BackupRestoreResult> = {}): BackupRestoreResult {
   return { message: 'Backup restored', skippedFiles: 0, restartRecommended: false, ...overrides };
@@ -88,6 +93,23 @@ async function answerRestoreDialog(buttonName: 'settings.backup.import' | 'commo
   // userEvent waits for the restore that the answer starts: its updates stay inside act()
   await userEvent.click(within(dialog).getByRole('button', { name: buttonName }));
 }
+
+type BackupAction = 'export' | 'restore';
+
+/** Starts a backup export, or a confirmed restore of a selected file. */
+async function runBackupAction(action: BackupAction) {
+  if (action === 'export') {
+    await userEvent.click(screen.getByText('settings.backup.export'));
+    return;
+  }
+  await selectBackupFileAndClickImport();
+  await answerRestoreDialog('settings.backup.import');
+}
+
+const BACKUP_ACTIONS = [
+  { action: 'export', method: 'get', path: '/api/backup/export', timeoutMessage: 'settings.backup.exportTimeout' },
+  { action: 'restore', method: 'post', path: '/api/backup/import', timeoutMessage: 'settings.backup.restoreTimeout' },
+] as const;
 
 beforeEach(() => {
   localStorage.setItem('token', 'admin-token');
@@ -441,6 +463,29 @@ describe('SettingsPage', () => {
 
     expect(await screen.findByText('Import failed')).toBeInTheDocument();
     expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  // nginx gives up after 60 s on the export and 300 s on the restore, while the backend keeps working
+  it.each(BACKUP_ACTIONS)('explains a proxy timeout (504) on the $action instead of "try again in a moment"', async ({ action, method, path, timeoutMessage }) => {
+    mockProxyError(method, path, 504);
+    await renderLoadedPage();
+
+    await runBackupAction(action);
+
+    expect(await screen.findByText(timeoutMessage)).toBeInTheDocument();
+    expect(screen.queryByText(SERVER_UNAVAILABLE)).not.toBeInTheDocument();
+    expect(screen.queryByText('settings.backup.exportSuccess')).not.toBeInTheDocument();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it.each(BACKUP_ACTIONS)('keeps "the server is not responding" for a 502 of nginx on the $action', async ({ action, method, path, timeoutMessage }) => {
+    mockProxyError(method, path, 502);
+    await renderLoadedPage();
+
+    await runBackupAction(action);
+
+    expect(await screen.findByText(SERVER_UNAVAILABLE)).toBeInTheDocument();
+    expect(screen.queryByText(timeoutMessage)).not.toBeInTheDocument();
   });
 
   it('shows a generic error when the restore fails with something else than an Error', async () => {

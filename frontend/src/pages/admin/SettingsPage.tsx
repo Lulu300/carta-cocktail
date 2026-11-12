@@ -1,6 +1,6 @@
 import { useState, useEffect, useId, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { settings as settingsApi, backup as backupApi } from '../../services/api';
+import { ApiError, settings as settingsApi, backup as backupApi } from '../../services/api';
 import type { BackupRestoreResult } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteSettings } from '../../contexts/SiteSettingsContext';
@@ -16,6 +16,17 @@ const ICON_OPTIONS = [
   '', '🍸', '🍹', '🥃', '🍷', '🥂', '🍺', '🧉', '🫗',
   '🍾', '🥤', '🧊', '🔥', '🌿', '🍋', '🫒', '🍒',
 ];
+
+/**
+ * Status of the proxy's answer when the backend takes longer than its read timeout
+ * (frontend/nginx.conf.template: 60 s for the export, 300 s for the restore). The
+ * backend never sends it, and keeps working after the proxy has given up.
+ */
+const GATEWAY_TIMEOUT = 504;
+
+function isGatewayTimeout(err: unknown): boolean {
+  return err instanceof ApiError && err.status === GATEWAY_TIMEOUT;
+}
 
 /** A restore result the admin must read before the page reloads. */
 function needsAdminAttention(result: BackupRestoreResult): boolean {
@@ -131,6 +142,18 @@ export default function SettingsPage() {
     }
   };
 
+  /**
+   * Shows why a backup action failed. After a 504, "try again in a moment" would be wrong:
+   * an export would hit the same timeout, and a restore may still be running on the server.
+   */
+  const showBackupError = (
+    err: unknown,
+    timeoutKey: 'settings.backup.exportTimeout' | 'settings.backup.restoreTimeout',
+  ) => {
+    if (isGatewayTimeout(err)) setBackupError(t(timeoutKey));
+    else setBackupError(err instanceof Error ? err.message : t('common.error'));
+  };
+
   const handleBackupExport = async () => {
     setBackupMessage('');
     setBackupError('');
@@ -142,7 +165,7 @@ export default function SettingsPage() {
       // A failed export keeps it: the restart warning is often why it failed.
       setRestoreResult(null);
     } catch (err: unknown) {
-      setBackupError(err instanceof Error ? err.message : t('common.error'));
+      showBackupError(err, 'settings.backup.exportTimeout');
     } finally {
       setBackupExporting(false);
     }
@@ -180,7 +203,7 @@ export default function SettingsPage() {
         setTimeout(() => window.location.reload(), 1500);
       }
     } catch (err: unknown) {
-      setBackupError(err instanceof Error ? err.message : t('common.error'));
+      showBackupError(err, 'settings.backup.restoreTimeout');
     } finally {
       setBackupImporting(false);
     }
