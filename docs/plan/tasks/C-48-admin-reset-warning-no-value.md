@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [D-35]
 touches: [backend/src/bootstrap/ensureAdmin.ts, backend/src/bootstrap/ensureAdmin.test.ts]
 sources: []
-branch:
-pr:
+branch: fix/C-48-admin-reset-warning-no-value
+pr: "#168"
 ---
 
 ## Contexte
@@ -40,8 +40,8 @@ console.warn(`ADMIN_RESET_PASSWORD='${flag}' is ignored: set it to exactly 'true
 
 ## Critères d'acceptation
 
-- [ ] Avec `ADMIN_RESET_PASSWORD` à `1`, `TRUE`, `yes` ou un mot de passe, l'avertissement est écrit et ne contient pas la valeur.
-- [ ] Le comportement est inchangé : réinitialisation seulement avec `true`, aucun avertissement avec `false` ou une variable vide.
+- [x] Avec `ADMIN_RESET_PASSWORD` à `1`, `TRUE`, `yes` ou un mot de passe, l'avertissement est écrit et ne contient pas la valeur.
+- [x] Le comportement est inchangé : réinitialisation seulement avec `true`, aucun avertissement avec `false` ou une variable vide.
 
 ## Tests à ajouter ou adapter
 
@@ -55,3 +55,4 @@ console.warn(`ADMIN_RESET_PASSWORD='${flag}' is ignored: set it to exactly 'true
 ## Journal
 
 - 2026-11-12 : tâche créée par D-35 (triage CodeQL) pour l'alerte #27.
+- 2026-11-12 : avertissement réécrit sans la valeur (aide conservée : seule la valeur exacte `true` compte, `TRUE` ou `1` non), commentaire de `isResetRequested()` mis à jour. Tests : `it.each` étendu à une valeur de type mot de passe avec le message exact, nouveau test qui vérifie que ni `console.warn` ni `console.log` ne contiennent ce mot de passe ; sondes de sabotage (valeur ajoutée au message, ou écrite dans un second `console.warn`) détectées. Couverture delta 100 %. PR #168.
