@@ -34,8 +34,8 @@ Dans `backend/docker-entrypoint.sh`, `refuse_unwritable` écrit le refus par neu
 
 ## Ce qu'il faut faire
 
-1. Attendre chaque ligne attendue au lieu de la chercher dans un seul instantané : après la ligne `ERROR:`, `wait_for_log_line "chown -R $CUSTOM_ID:$CUSTOM_ID"`, en gardant un message d'échec qui dit que le refus ne donne pas la commande `chown`, par exemple en passant le message à `wait_for_log_line`. Les deux attentes partagent le délai de 60 s.
-2. Le contrôle « API running » reste une lecture unique, faite après les deux attentes : le refus est complet, et l'entrypoint s'arrête (`exit 1`) avant de lancer l'API.
+1. Attendre chaque ligne attendue au lieu de la chercher dans un seul instantané : après la ligne `ERROR:`, `wait_for_log_line "chown -R $CUSTOM_ID:$CUSTOM_ID"`, en gardant un message d'échec qui dit que le refus ne donne pas la commande `chown`, par exemple en passant le message à `wait_for_log_line`. Chacune garde son délai de 60 s (30 passages de 2 s par appel).
+2. Le contrôle « API running » reste une lecture unique, faite après les deux attentes : le refus est complet, et l'entrypoint s'arrête (`exit 1`) avant de lancer l'API. Il ne doit pas utiliser `grep -q` (voir les points d'attention) : `grep -F … >/dev/null`, ou une seule capture des logs dans une variable puis une recherche dedans.
 3. Ne pas changer l'entrypoint pour le test (un seul `printf` du bloc serait possible, mais le script ne doit pas dépendre du découpage des écritures de l'entrypoint).
 
 ## Critères d'acceptation
@@ -51,6 +51,7 @@ Le script est lui-même le test. Vérification en local, dans un projet compose 
 ## Points d'attention
 
 - `COMPOSE_PROJECT_NAME` doit valoir `carta-d-37` pour les deux scripts (ils appellent `docker compose` sans `-p`) ; jamais le projet par défaut, l'étape [2] change le propriétaire des volumes.
+- Deuxième course, sous `set -euo pipefail` : dans `backend_logs | grep -qF …`, `grep -q` s'arrête à la première ligne trouvée ; si `docker compose logs` écrit encore, il reçoit SIGPIPE et le pipeline sort en 141 alors que la ligne est là (vérifié en local : `set -o pipefail; gen | grep -qF match` → 141, `gen | grep -F match >/dev/null` → 0). Dans `wait_for_log_line`, cela ne coûte qu'un passage de plus ; dans le contrôle négatif « API running », une ligne présente pourrait passer inaperçue et le contrôle réussir à tort. Remplacer les `grep -qF` des pipelines du script par `grep -F … >/dev/null` (ou une capture unique des logs). L'échec du run 43288181424 s'explique plutôt par des logs incomplets : la ligne `ERROR:`, suivie d'autres lignes, a été trouvée au premier passage.
 - Le conteneur refusé redémarre en boucle (`restart: unless-stopped`) : les logs contiennent plusieurs refus, ce qui ne gêne pas une recherche par `grep -F`.
 - Nettoyage selon `AGENTS.md` : images `carta-d-37-*` et volumes du projet.
 

@@ -8,7 +8,7 @@ effort: S
 status: todo
 owner: agent
 depends_on: [C-12]
-touches: [backend/src/routes/auth.test.ts, backend/src/i18n/]
+touches: [backend/src/routes/auth.test.ts, backend/src/i18n/, backend/src/test/messages.ts]
 sources: []
 branch:
 pr:
@@ -32,7 +32,7 @@ C-12 (PR #166) a traduit les 401 du middleware d'authentification (`Unauthorized
    - une table qui associe chaque clé à placeholders à un cas qui fait lever l'erreur par le vrai code, par la route (`POST /api/bottles/import/preview` avec un fichier trop long, trop de bouteilles, une entrée ZIP trop grosse), et renvoie la réponse ;
    - test de complétude : toute clé de `en.json` dont le message a un placeholder est dans la table. Un nouveau message à placeholder sans cas fait échouer le test ;
    - pour chaque cas, en `en` et en `fr` : chaque placeholder du message est une clé de `details`, et le message reçu ne contient ni `NaN` ni `{{`.
-   Réutiliser `placeholders()` et `messageAt()` de `i18n.test.ts` en les déplaçant dans un module de test commun du dossier (pas de copie).
+   Réutiliser `placeholders()` et `messageAt()` de `i18n.test.ts` en les déplaçant dans `backend/src/test/messages.ts` (pas de copie). Pas dans `src/i18n/` : un `.ts` qui n'est pas un test y serait compilé, livré dans l'image (`backend/.dockerignore` n'exclut que `**/*.test.ts` et `src/test`) et compté dans la couverture ; un nom en `.test.ts` ferait de lui un fichier de test sans suite. `src/test/` est l'emplacement du code de test partagé (`helpers.ts`, `windows1252.ts`, voir `backend/AGENTS.md`).
    Pourquoi cette garde plutôt qu'une autre : une analyse statique des appels ne lit pas des `details` construits par décomposition (`...err.params`) ; un `missingInterpolationHandler` ne voit pas les placeholders formatés (voir plus haut) ; un contrôle à l'exécution dans `errorHandler` ajouterait du code de production pour un risque de développement. Passer par la route teste les `details` réellement envoyés.
 
 ## Critères d'acceptation
@@ -46,7 +46,7 @@ C-12 (PR #166) a traduit les 401 du middleware d'authentification (`Unauthorized
 
 - `routes/auth.test.ts` : 401 sans token en français (étape 1).
 - `src/i18n/placeholders.test.ts` (nouveau) : complétude de la table et placeholders fournis, en `en` et en `fr` (étape 2).
-- `src/i18n/i18n.test.ts` : importer les fonctions d'aide déplacées, sans changer ses assertions.
+- `src/i18n/i18n.test.ts` : importer les fonctions d'aide déplacées dans `src/test/messages.ts`, sans changer ses assertions.
 
 ## Points d'attention
 

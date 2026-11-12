@@ -4,7 +4,7 @@ title: "Écran d'erreur : garder la barre latérale admin, focus et annonce, err
 phase: E
 lane: frontend
 criticite: basse
-effort: S
+effort: M
 status: todo
 owner: agent
 depends_on: [E-18]
@@ -28,7 +28,7 @@ Relevé par la relecture de la PR #165 et vérifié sur `develop` (9799168) :
 
 ## Ce qu'il faut faire
 
-1. Boundary admin : envelopper l'`<Outlet />` d'`AdminLayout` (dans `<main id={MAIN_CONTENT_ID}>`) dans un boundary qui garde la barre latérale et l'en-tête. Son écran propose « Recharger » et un lien de retour vers `/admin` (libellé traduit, par exemple le tableau de bord). Réutiliser la classe `ErrorBoundary` et l'écran de `RouteErrorBoundary` en les paramétrant (lien, conteneur plein écran ou non), sans copie. Le boundary d'`App.tsx` reste pour les pages publiques, la connexion et une erreur d'`AdminLayout` lui-même ; mettre à jour le commentaire d'`App.tsx` (« one boundary is enough »).
+1. Boundary admin : envelopper l'`<Outlet />` d'`AdminLayout` (dans `<main id={MAIN_CONTENT_ID}>`) dans un boundary qui garde la barre latérale et l'en-tête. Son écran propose « Recharger » et un lien de retour vers `/admin` (libellé traduit, par exemple le tableau de bord). Réutiliser la classe `ErrorBoundary` et l'écran de `RouteErrorBoundary` en les paramétrant (lien, conteneur plein écran ou non), sans copie. Le boundary d'`App.tsx` reste pour les pages publiques, la connexion et une erreur d'`AdminLayout` lui-même ; vérifier que le commentaire d'`App.tsx` (« one boundary is enough ») reste exact : il parle de l'unique `<Suspense>` (les navigations du routeur passent par une transition), pas de l'error boundary, et il n'y a toujours qu'une `<Suspense>`.
 2. Navigation vers le chemin courant : un clic sur le lien de retour quand on est déjà sur sa cible doit effacer l'erreur. Piste : remettre à zéro sur `location.key` plutôt que sur `pathname`, en gardant la garde `prevState.hasError`. Vérifier d'abord si React Router 7 crée un nouvel emplacement (nouvelle `key`) quand on suit un lien vers l'emplacement courant. Sinon, ne pas afficher le lien quand on est déjà sur sa cible.
 3. Focus et annonce : `role="alert"` sur le titre seulement (ou un `aria-live` équivalent), pas sur les actions. `EmptyState` (`components/ui/`) pose aujourd'hui les attributs reçus sur son conteneur : lui ajouter une façon de les poser sur le titre plutôt que de dupliquer son rendu. À l'affichage de l'écran, focus sur le titre (`tabIndex={-1}`) pour que le clavier reparte de l'écran d'erreur. Appliquer la même règle d'annonce à `PublicErrorState`, qui partage le motif (sans déplacer le focus là, où l'écran remplace seulement un chargement).
 
@@ -52,6 +52,7 @@ Relevé par la relecture de la PR #165 et vérifié sur `develop` (9799168) :
 
 - Les clés du boundary d'`App.tsx` sont dans le paquet public d'E-30 (l'écran fait partie du premier chargement). Une clé utilisée seulement par `AdminLayout` (chunk admin) va dans `locales/admin/`, mais si le libellé est choisi dans `RouteErrorBoundary.tsx`, fichier du premier chargement, `bundles.test.ts` l'exigera dans le paquet public : laisser ce test trancher.
 - Le boundary admin sous la `Suspense` d'`App.tsx` : un chunk de page qui rejette pendant une navigation est attrapé par le boundary le plus proche du composant `lazy`, donc celui de l'`Outlet`. Le vérifier par un test.
+- Lien avec E-20 (page 404) : elle reprend la présentation « introuvable » de `PublicErrorState` (`EmptyState`) et touche aussi `App.tsx`, `App.test.tsx` et `pages/public/`. Celle des deux qui arrive en second suit la règle « `role="alert"` sur le titre seulement » ; ne pas les lancer en parallèle.
 - `CocktailForm` (`components/admin/cocktails/`) passe aussi `role="alert"` à un `EmptyState` avec un lien : hors périmètre, le noter dans le Journal s'il faut l'aligner.
 - Ne pas retirer le rechargement automatique d'E-01 (`utils/chunkReload.ts`).
 - Si une tâche passe à un data router (`createBrowserRouter`), ces boundaries deviennent des `errorElement` (point d'attention d'E-18).

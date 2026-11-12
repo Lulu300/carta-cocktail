@@ -50,6 +50,7 @@ Aucun si aucune ligne de code ne change : `backup.test.ts` passe par `archiver` 
 ## Points d'attention
 
 - `build.mjs --ready` la donne prête dès que B-20 est faite : la condition de départ, externe, ne se vérifie qu'à l'étape 1.
+- D-21 (réactiver Dependabot npm après la phase B) n'attend pas cette tâche : B-22 peut rester `todo` longtemps, en attente d'`archiver`, sans bloquer la fin de la phase B pour D-21 (B-22 n'est pas dans ses `depends_on`). Même situation que B-16 en son temps.
 - Une seule tâche à la fois sur `backend/package-lock.json`.
 - Ne pas passer sur une pré-version d'`archiver` pour retirer la surcharge.
 - Pas de `npm audit fix --force` (il propose de descendre `archiver` en 7.0.1) ; ne pas baisser le seuil de l'audit dans `ci.yml`.

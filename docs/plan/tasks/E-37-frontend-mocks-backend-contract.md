@@ -32,6 +32,7 @@ Relevé sur `develop` (9799168) :
 - `frontend/src/test/msw/handlers.ts:107` : le handler de `POST /api/ingredients/bulk-availability` répond `{ updated: 0 }` ;
 - `frontend/src/services/api.test.ts:385` : `mockOk({ updated: 5 })` avant `api.ingredients.bulkAvailability(…)` ;
 - `frontend/src/contexts/AuthContext.test.tsx:49` : `mockApiError('get', '/api/auth/me', 401, 'Invalid token')` ;
+- `frontend/src/services/api.test.ts:360`, `:747` et `:759` : un token est présent (`localStorage` `token` = `'expired-token'`) et le mock répond `401 { error: 'Unauthorized' }`. Pour un token présent mais invalide, le backend répond `errors.invalidToken` (et répondait « Invalid token » avant C-12). Ces tests ne vérifient que le statut 401 : la correction ne change que la donnée de test ;
 - `frontend/src/services/api.ts:215` : `bulkAvailability` typé `request<{ updated: number }>`.
 
 Un mock qui décrit une réponse que le backend ne donne plus trompe la personne qui lit ou étend le test.
@@ -41,9 +42,9 @@ Un mock qui décrit une réponse que le backend ne donne plus trompe la personne
 1. `CategoriesPage.test.tsx` : mocker un 409 avec le texte actuel (« Cannot delete: categories still use this type ») ; le test garde son intention (le message du backend s'affiche dans le toast).
 2. `test/msw/handlers.ts` : `bulk-availability` répond `{ message, updated }`.
 3. `services/api.test.ts` : même forme pour le `mockOk` de `bulkAvailability`.
-4. `AuthContext.test.tsx` : texte actuel du 401 d'un token invalide.
+4. `AuthContext.test.tsx:49` et `services/api.test.ts:360`, `:747`, `:759` : texte actuel du 401 d'un token invalide.
 5. `services/api.ts` : `bulkAvailability` typé `request<{ message: string; updated: number }>`, comme les autres actions qui renvoient un `message` et des compteurs (`menuBottles.sync`).
-6. Chercher d'autres mocks de l'ancien contrat (`grep` des textes anglais en dur du backend avant C-12, par exemple « Type », « Invalid token », « Section deleted », « Sections reordered », « Type deleted ») et les aligner. Les mocks `'Unauthorized'` d'un 401 sans token restent justes. Un fichier trouvé hors `touches` s'y ajoute, avec une ligne de Journal.
+6. Chercher d'autres mocks de l'ancien contrat (`grep` des textes anglais en dur du backend avant C-12, par exemple « Type », « Invalid token », « Section deleted », « Sections reordered », « Type deleted ») et les aligner. Un mock `'Unauthorized'` n'est juste que pour une requête sans token : avec un token présent (même expiré), le texte est celui de `errors.invalidToken`. `queryClient.test.ts:11` (`new ApiError(401, 'Unauthorized')`) n'est pas un mock du backend et reste tel quel. Un fichier trouvé hors `touches` s'y ajoute, avec une ligne de Journal.
 
 ## Critères d'acceptation
 
@@ -63,4 +64,4 @@ Pas de nouveau test : les tests listés plus haut sont adaptés et doivent reste
 
 ## Journal
 
-- 2026-11-12 : tâche créée par la PR docs de suivi du lot D-35/E-18/B-20/C-12 à partir de la relecture de la PR #166 (C-12). Les cinq emplacements sont vérifiés sur `develop` (9799168) ; `services/api.test.ts:385` s'ajoute aux quatre que citait la relecture.
+- 2026-11-12 : tâche créée par la PR docs de suivi du lot D-35/E-18/B-20/C-12 à partir de la relecture de la PR #166 (C-12). Les emplacements sont vérifiés sur `develop` (9799168) ; `services/api.test.ts:385` s'ajoute aux quatre que citait la relecture, et `services/api.test.ts:360`, `:747`, `:759` (401 avec un token présent) ont été ajoutés après la relecture de la PR #167.
