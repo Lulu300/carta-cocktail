@@ -442,6 +442,19 @@ describe('cocktails API', () => {
     expect(file.filename).toBe('cocktail-42.json');
   });
 
+  it('should export several cocktails in one request', async () => {
+    const api = await getApi();
+    const files = [{ filename: 'cocktail-mojito.json', data: { version: 1 } }];
+    mockOk(files);
+
+    expect(await api.cocktails.exportRecipes([3, 1])).toEqual(files);
+
+    const [url, init] = mockFetch.mock.calls[0];
+    expect(url).toBe('/api/cocktails/export');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual({ ids: [3, 1] });
+  });
+
   it('should upload image with FormData', async () => {
     mockOk({});
     const api = await getApi();

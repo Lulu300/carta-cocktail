@@ -246,6 +246,9 @@ export const cocktails = {
     });
   },
   exportRecipe: (id: number) => requestCocktailExport(`/cocktails/${id}/export`, id),
+  /** The exports of several cocktails in one request, in the order of `ids` (at most EXPORT_BATCH_SIZE of them). */
+  exportRecipes: (ids: number[]) =>
+    request<CocktailExportFile[]>('/cocktails/export', { method: 'POST', body: JSON.stringify({ ids }) }),
   importPreview: (data: CocktailExportFormat) =>
     request<ImportPreviewResponse>('/cocktails/import/preview', {
       method: 'POST',

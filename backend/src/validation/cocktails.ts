@@ -83,3 +83,15 @@ export const CocktailCreate = z.object({
 export const CocktailUpdate = CocktailCreate.partial().extend({
   ingredients: z.array(IngredientLineUpdate).optional(),
 });
+
+/**
+ * Most cocktails one batch export request can name. Its response holds every recipe at once:
+ * the bound keeps it to a few MB. The admin's ZIP export splits a larger selection into batches
+ * of this size (EXPORT_BATCH_SIZE in frontend/src/services/exportZip.ts).
+ */
+export const MAX_EXPORT_BATCH = 500;
+
+/** Cocktails to export, in the order of the files of the response. */
+export const CocktailExportBatch = z.object({
+  ids: z.array(Id).min(1).max(MAX_EXPORT_BATCH),
+});
