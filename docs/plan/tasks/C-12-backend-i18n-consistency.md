@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-03]
-touches: [backend/src/i18n/, backend/src/routes/categoryTypes.ts, backend/src/routes/menuSections.ts, backend/src/routes/backup.ts, backend/src/middleware/auth.ts, backend/src/middleware/errorHandler.ts]
+touches: [backend/src/i18n/, backend/src/routes/categoryTypes.ts, backend/src/routes/menuSections.ts, backend/src/routes/backup.ts, backend/src/middleware/auth.ts, backend/src/middleware/errorHandler.ts, backend/src/routes/ingredients.ts]
 sources: ["01-backend-routes.md §M1", "01-backend-routes.md §R7"]
-branch:
-pr:
+branch: feature/C-12-backend-i18n-consistency
+pr: https://github.com/Lulu300/carta-cocktail/pull/166
 ---
 
 ## Contexte
@@ -46,10 +46,10 @@ Les messages d'erreur passent par `req.t()`, mais trois clés appelées n'existe
 
 ## Critères d'acceptation
 
-- [ ] `i18n.test.ts` passe, et échoue si on ajoute `req.t('foo.bar')` sans la clé.
-- [ ] Plus aucun message d'erreur littéral dans `src/routes` ni `src/middleware`.
-- [ ] `DELETE /api/category-types/:name` d'un type utilisé → 409 traduit.
-- [ ] `Accept-Language: fr` sur `DELETE /api/menu-bottles/:id` → message français, pas la clé brute.
+- [x] `i18n.test.ts` passe, et échoue si on ajoute `req.t('foo.bar')` sans la clé.
+- [x] Plus aucun message d'erreur littéral dans `src/routes` ni `src/middleware`.
+- [x] `DELETE /api/category-types/:name` d'un type utilisé → 409 traduit.
+- [x] `Accept-Language: fr` sur `DELETE /api/menu-bottles/:id` → message français, pas la clé brute.
 
 ## Tests à ajouter ou adapter
 
@@ -72,3 +72,14 @@ Les messages d'erreur passent par `req.t()`, mais trois clés appelées n'existe
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-12 : C-13 (PR #100) a modifié `menuSections.ts` : les numéros de ligne cités (`:79`, `:107`) sont à relire ; le message `'Sections reordered'` est toujours en dur.
 - 2026-10-12 : relecture de C-10 (PR #113) : `errorHandler` (`src/middleware/errorHandler.ts`) renvoie `details` dans la réponse mais ne le passe pas à i18next comme valeurs d'interpolation. Les limites de l'import (« 2 000 » lignes ou bouteilles, « 20 Mo » par entrée ZIP) sont donc écrites en dur dans les clés `errors.import.*` en et fr. Si cette tâche ajoute l'interpolation, y passer ces limites (`MAX_IMPORT_ROWS`, `MAX_IMPORT_BOTTLES`, `MAX_ZIP_ENTRY_BYTES`) ; les `details` de l'import portent déjà `max` et `maxMb`, mais ceux de `validate()` sont un tableau : n'interpoler que des `details` objets (`errorHandler.ts` ajouté à `touches`).
+- 2026-11-12 : revérification point par point avant de commencer (PR #166) :
+  - clés absentes : `errors.cannotDeleteDefaultMenu` déjà ajoutée par A-02 (PR #27) ; `menuBottles.deleted` et `menuBottles.synced` par C-06 (PR #99) ;
+  - `categoryTypes.ts` : les `'Server error'` ont disparu avec C-03 (PR #54) ; `'Name is required'` remplacé par la validation zod de C-04 (PR #69, 400 `errors.validationError`) ; restaient `'Type already exists'`, `'Type not found'`, `'Type is in use by categories'` (400) et `'Type deleted'` : faits ici ;
+  - `menuSections.ts` : `'Section deleted'` et `'Sections reordered'` étaient toujours en dur (lignes déplacées par C-13, PR #100) : faits ici ;
+  - `menuBottles.ts` : réécrit par C-06 (PR #99), plus aucun texte en dur ;
+  - `backup.ts` : traduit par C-05 (PR #76), qui a aussi retiré `success` de la réponse d'import : rien à faire ;
+  - `bottles.ts` (message brut du parseur) : remplacé par `errors.import.<code>` avec C-10 (PR #113) ;
+  - `middleware/auth.ts` : rendu `async` par C-11 (PR #82) mais encore en anglais en dur : lève maintenant `UnauthorizedError()` / `UnauthorizedError('errors.invalidToken')` ;
+  - convention de réponse : toutes les routes la suivaient sauf `POST /ingredients/bulk-availability` (`{ updated }`), qui renvoie maintenant `{ message, updated }` (`routes/ingredients.ts` ajouté à `touches`) ;
+  - test du menu apéritifs en 403 avec message traduit : existait déjà (A-02), renforcé en français.
+- 2026-11-12 : fait dans PR #166 : 6 clés ajoutées (en, fr), suppression d'un type utilisé en 409, `src/i18n/i18n.test.ts` (clés utilisées présentes dans les deux langues, `new ImportParseError('code')` compris ; mêmes clés et mêmes variables `{{…}}` dans les deux fichiers ; aucun `error: '…'` littéral dans `routes/` et `middleware/`). Vérifié en cassant le code : `req.t('foo.bar')`, une clé dans un seul fichier (en puis fr), une variable différente, un `error: 'Oops'` font échouer le test. Interpolation des `details` objets faite dans `errorHandler` (sous `replace`, pour qu'un détail `lng` ou `count` ne change pas le message) : les limites d'import viennent du code (`{{max, number}}`, `{{maxMb, number}}`), et l'échappement HTML est coupé (réponses JSON). Côté frontend (lecture seule), rien ne dépend du 400 ni des textes des 401. Limite connue : un appel direct avec une langue sans traductions (`de`) reçoit le texte anglais avec le format de nombre de cette langue (`2.000`) ; le frontend n'envoie que `en`, `en-GB` ou `fr`.

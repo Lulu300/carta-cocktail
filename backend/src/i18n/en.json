@@ -2,6 +2,7 @@
   "errors": {
     "notFound": "Resource not found",
     "unauthorized": "Unauthorized",
+    "invalidToken": "Your session has expired or is no longer valid: sign in again",
     "invalidCredentials": "Invalid email or password",
     "invalidCurrentPassword": "Current password is incorrect",
     "serverError": "Internal server error",
@@ -10,6 +11,7 @@
     "cannotDelete": "Cannot delete: resource is in use",
     "inUseByCocktails": "Cannot delete: this item is used by cocktail recipes",
     "categoryNotEmpty": "Cannot delete: this category still contains bottles",
+    "typeInUse": "Cannot delete: categories still use this type",
     "invalidBackup": "Invalid backup file",
     "cannotDeleteDefaultMenu": "Cannot delete a system menu",
     "cannotModifySystemMenu": "System menus cannot have their slug or type changed",
@@ -39,16 +41,19 @@
       "bottlesRequired": "The JSON file has no list of bottles",
       "invalidZip": "The ZIP archive could not be read",
       "zipMissingBottles": "The ZIP archive must contain bottles.csv or bottles.json",
-      "zipEntryTooLarge": "A file of the ZIP archive is over 20 MB once uncompressed",
+      "zipEntryTooLarge": "A file of the ZIP archive is over {{maxMb, number}} MB once uncompressed",
       "unsupportedFormat": "Unsupported file format: use a .csv, .json or .zip file",
-      "tooManyRows": "The file has more than 2,000 rows: split it into several imports",
-      "tooManyBottles": "The import would create more than 2,000 bottles: split it into several imports"
+      "tooManyRows": "The file has more than {{max, number}} rows: split it into several imports",
+      "tooManyBottles": "The import would create more than {{max, number}} bottles: split it into several imports"
     }
   },
   "auth": {
     "loginSuccess": "Login successful",
     "logoutSuccess": "Logout successful",
     "loggedOutEverywhere": "Logged out on every device"
+  },
+  "categoryTypes": {
+    "deleted": "Type deleted successfully"
   },
   "categories": {
     "created": "Category created successfully",
@@ -63,7 +68,8 @@
   "ingredients": {
     "created": "Ingredient created successfully",
     "updated": "Ingredient updated successfully",
-    "deleted": "Ingredient deleted successfully"
+    "deleted": "Ingredient deleted successfully",
+    "availabilityUpdated": "Availability of every ingredient updated"
   },
   "units": {
     "created": "Unit created successfully",
@@ -87,6 +93,10 @@
     "excluded": "Bottles removed from the menu",
     "restored": "Bottle put back in the menu",
     "reordered": "Bottles reordered"
+  },
+  "menuSections": {
+    "deleted": "Section deleted",
+    "reordered": "Sections reordered"
   },
   "settings": {
     "updated": "Settings updated successfully",

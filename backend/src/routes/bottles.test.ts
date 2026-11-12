@@ -812,7 +812,8 @@ describe('POST /api/bottles/import/preview', () => {
 
     expect(res.status).toBe(400);
     expect(res.body).toEqual({
-      error: 'Le fichier a plus de 2 000 lignes : répartissez-le en plusieurs imports',
+      // The limit comes from the details, formatted for French (narrow no-break space)
+      error: 'Le fichier a plus de 2 000 lignes : répartissez-le en plusieurs imports',
       details: { code: 'tooManyRows', max: 2000 },
     });
   });

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { Request, Response } from 'express';
 import { Prisma } from '../generated/prisma/client';
 import multer from 'multer';
+import i18next from '../i18n';
 import { toHttpError, errorHandler } from './errorHandler';
 import {
   HttpError, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError,
@@ -109,6 +110,14 @@ describe('errorHandler', () => {
     return res;
   }
 
+  /** The `error` message sent for `error` to a request in `language`, translated by i18next. */
+  function sentError(error: HttpError, language: string): string {
+    const req = { method: 'POST', t: i18next.getFixedT(language) };
+    const res = mockResponse();
+    errorHandler(error, req as unknown as Request, res as unknown as Response, vi.fn());
+    return res.json.mock.calls[0][0].error;
+  }
+
   it('sends the translated message and the details', () => {
     const req = { method: 'POST', t: vi.fn((key: string) => `translated:${key}`) };
     const res = mockResponse();
@@ -123,6 +132,31 @@ describe('errorHandler', () => {
       details: { code: 'invalidZip' },
     });
     expect(next).not.toHaveBeenCalled();
+  });
+
+  it('fills the placeholders of the message with object details, in the request language', () => {
+    const tooManyRows = new BadRequestError('errors.import.tooManyRows', { code: 'tooManyRows', max: 2000 });
+    const zipEntryTooLarge = new BadRequestError('errors.import.zipEntryTooLarge', { code: 'zipEntryTooLarge', maxMb: 20 });
+
+    expect(sentError(tooManyRows, 'en')).toBe('The file has more than 2,000 rows: split it into several imports');
+    expect(sentError(tooManyRows, 'fr')).toBe('Le fichier a plus de 2 000 lignes : répartissez-le en plusieurs imports');
+    expect(sentError(zipEntryTooLarge, 'en')).toBe('A file of the ZIP archive is over 20 MB once uncompressed');
+  });
+
+  it('never lets a detail named like an i18next option change the message', () => {
+    const error = new BadRequestError('errors.import.tooManyRows', { max: 5, lng: 'fr', count: 2 });
+
+    expect(sentError(error, 'en')).toBe('The file has more than 5 rows: split it into several imports');
+  });
+
+  it('does not interpolate a list of details', () => {
+    const t = vi.fn((key: string) => key);
+    const req = { method: 'POST', t };
+
+    errorHandler(new BadRequestError('errors.validationError', [{ path: 'body.name' }]),
+      req as unknown as Request, mockResponse() as unknown as Response, vi.fn());
+
+    expect(t).toHaveBeenCalledWith('errors.validationError', undefined);
   });
 
   it('omits details when the error has none', () => {

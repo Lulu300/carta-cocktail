@@ -2,6 +2,7 @@
   "errors": {
     "notFound": "Ressource introuvable",
     "unauthorized": "Non autorisé",
+    "invalidToken": "Votre session a expiré ou n’est plus valide : reconnectez-vous",
     "invalidCredentials": "Email ou mot de passe invalide",
     "invalidCurrentPassword": "Mot de passe actuel incorrect",
     "serverError": "Erreur interne du serveur",
@@ -10,6 +11,7 @@
     "cannotDelete": "Impossible de supprimer : ressource utilisée",
     "inUseByCocktails": "Impossible de supprimer : cet élément est utilisé par des recettes de cocktails",
     "categoryNotEmpty": "Impossible de supprimer : cette catégorie contient encore des bouteilles",
+    "typeInUse": "Impossible de supprimer : des catégories utilisent encore ce type",
     "invalidBackup": "Fichier de sauvegarde invalide",
     "cannotDeleteDefaultMenu": "Impossible de supprimer un menu système",
     "cannotModifySystemMenu": "Le slug et le type d’un menu système ne peuvent pas être modifiés",
@@ -39,16 +41,19 @@
       "bottlesRequired": "Le fichier JSON ne contient pas de liste de bouteilles",
       "invalidZip": "L'archive ZIP n'a pas pu être lue",
       "zipMissingBottles": "L'archive ZIP doit contenir bottles.csv ou bottles.json",
-      "zipEntryTooLarge": "Un fichier de l'archive ZIP dépasse 20 Mo une fois décompressé",
+      "zipEntryTooLarge": "Un fichier de l'archive ZIP dépasse {{maxMb, number}} Mo une fois décompressé",
       "unsupportedFormat": "Format de fichier non pris en charge : utilisez un fichier .csv, .json ou .zip",
-      "tooManyRows": "Le fichier a plus de 2 000 lignes : répartissez-le en plusieurs imports",
-      "tooManyBottles": "L'import créerait plus de 2 000 bouteilles : répartissez-le en plusieurs imports"
+      "tooManyRows": "Le fichier a plus de {{max, number}} lignes : répartissez-le en plusieurs imports",
+      "tooManyBottles": "L'import créerait plus de {{max, number}} bouteilles : répartissez-le en plusieurs imports"
     }
   },
   "auth": {
     "loginSuccess": "Connexion réussie",
     "logoutSuccess": "Déconnexion réussie",
     "loggedOutEverywhere": "Déconnecté de tous les appareils"
+  },
+  "categoryTypes": {
+    "deleted": "Type supprimé avec succès"
   },
   "categories": {
     "created": "Catégorie créée avec succès",
@@ -63,7 +68,8 @@
   "ingredients": {
     "created": "Ingrédient créé avec succès",
     "updated": "Ingrédient mis à jour avec succès",
-    "deleted": "Ingrédient supprimé avec succès"
+    "deleted": "Ingrédient supprimé avec succès",
+    "availabilityUpdated": "Disponibilité de tous les ingrédients mise à jour"
   },
   "units": {
     "created": "Unité créée avec succès",
@@ -87,6 +93,10 @@
     "excluded": "Bouteilles retirées de la carte",
     "restored": "Bouteille remise dans la carte",
     "reordered": "Bouteilles réordonnées"
+  },
+  "menuSections": {
+    "deleted": "Section supprimée",
+    "reordered": "Sections réordonnées"
   },
   "settings": {
     "updated": "Paramètres mis à jour avec succès",
