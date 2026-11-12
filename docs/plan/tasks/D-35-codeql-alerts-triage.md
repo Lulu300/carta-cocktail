@@ -5,13 +5,13 @@ phase: D
 lane: ci
 criticite: moyenne
 effort: M
-status: todo
+status: done
 owner: mixed
 depends_on: [D-07]
 touches: [docs/plan/tasks/D-35-codeql-alerts-triage.md, docs/plan/tasks/C-47-api-rate-limiting.md, docs/plan/tasks/C-48-admin-reset-warning-no-value.md, docs/plan/tasks/D-36-codeql-required-on-main.md]
 sources: []
-branch:
-pr:
+branch: chore/D-35-codeql-alerts-triage
+pr: https://github.com/Lulu300/carta-cocktail/pull/163
 ---
 
 ## Contexte
@@ -91,3 +91,4 @@ Aucun pour le tri seul. Chaque tâche de correction créée prévoit ses propres
   - #5 : « slugify() in docs/plan/build.mjs replaces every character outside [a-z0-9] with "-" after the flagged replace, so its output never contains "<". Local script that only reads the repository's own task files. »
 - 2026-11-12 : décision humaine sur le check `CodeQL` obligatoire : « non pour l'instant ». CodeQL (default setup) ne tourne que sur `main` et les PR vers `main`, et le ruleset 24936910 couvre `main` et `develop` : l'y ajouter bloquerait toutes les PR vers `develop`. Suite confiée à D-36 (ruleset sur `main` seul, après C-47 et C-48).
 - 2026-11-12 : tâches créées : C-47, C-48, D-36. Aucune alerte fermée par cette tâche. `touches` complété avec les quatre fichiers de tâches modifiés ou créés.
+- 2026-11-12 : tâche terminée, PR #163. Après le merge, le coordinateur ferme #4, #5, #31 et #32 avec les commentaires ci-dessus.
