@@ -51,7 +51,8 @@
     "convertTo": "Convert to:"
   },
   "auth": {
-    "sessionCheckFailed": "Your session could not be checked"
+    "sessionCheckFailed": "Your session could not be checked",
+    "signInAgain": "Sign in again"
   },
   "common": {
     "cancel": "Cancel",

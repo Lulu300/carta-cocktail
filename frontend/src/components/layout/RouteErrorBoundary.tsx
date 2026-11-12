@@ -1,8 +1,9 @@
 import { Component, type ReactNode } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import Button from '../ui/Button';
 import EmptyState from '../ui/EmptyState';
+import BackHomeLink from './BackHomeLink';
 
 function RouteErrorScreen() {
   const { t } = useTranslation();
@@ -15,9 +16,7 @@ function RouteErrorScreen() {
         action={(
           <div className="flex flex-wrap items-center justify-center gap-4">
             <Button onClick={() => window.location.reload()}>{t('errors.reload')}</Button>
-            <Link to="/" className="text-accent hover:text-accent-soft underline underline-offset-4">
-              {t('public.backHome')}
-            </Link>
+            <BackHomeLink />
           </div>
         )}
       />

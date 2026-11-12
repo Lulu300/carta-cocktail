@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Outlet, useLocation } from 'react-router-dom';
@@ -114,9 +115,11 @@ describe('ProtectedRoute', () => {
 
   describe('when the session could not be checked', () => {
     const retrySession = vi.fn();
+    const logout = vi.fn();
+    const rateLimited = () => new ApiError(429, 'Too many requests: try again in a few minutes');
 
     function failSessionCheck(sessionError: Error) {
-      mockUseAuth.mockReturnValue({ user: null, isLoading: false, sessionError, retrySession });
+      mockUseAuth.mockReturnValue({ user: null, isLoading: false, sessionError, retrySession, logout });
     }
 
     it('shows the backend message of a rate limit with Retry, without sending the admin to /login', async () => {
@@ -133,6 +136,44 @@ describe('ProtectedRoute', () => {
 
       await userEvent.click(screen.getByRole('button', { name: 'common.retry' }));
       expect(retrySession).toHaveBeenCalledTimes(1);
+      expect(logout).not.toHaveBeenCalled();
+    });
+
+    it('ends the session with "Sign in again", then opens the sign-in page for the requested page', async () => {
+      // logout() of the real AuthProvider clears the token and the error: this fake does the same
+      mockUseAuth.mockImplementation(function useFailedSessionCheck() {
+        const [signedOut, setSignedOut] = useState(false);
+        return {
+          user: null,
+          isLoading: false,
+          sessionError: signedOut ? null : rateLimited(),
+          retrySession,
+          logout: () => {
+            logout();
+            setSignedOut(true);
+          },
+        };
+      });
+      renderAt('/admin/bottles');
+
+      await userEvent.click(await screen.findByRole('button', { name: 'auth.signInAgain' }));
+
+      expect(logout).toHaveBeenCalledTimes(1);
+      expect(retrySession).not.toHaveBeenCalled();
+      expect(await screen.findByTestId('login-page')).toHaveTextContent('/admin/bottles');
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('leaves for the public home page with "Back to home", still signed in', async () => {
+      failSessionCheck(rateLimited());
+      renderAt('/admin/bottles');
+
+      await userEvent.click(await screen.findByRole('link', { name: 'public.backHome' }));
+
+      expect(screen.getByTestId('home-page')).toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(logout).not.toHaveBeenCalled();
+      expect(retrySession).not.toHaveBeenCalled();
     });
 
     it('asks to check the connection after a network error', async () => {
