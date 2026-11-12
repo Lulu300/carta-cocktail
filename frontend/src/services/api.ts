@@ -285,6 +285,12 @@ export const menuBottles = {
     request<MenuBottle>('/menu-bottles', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: { position?: number; isHidden?: boolean; menuSectionId?: number | null }) =>
     request<MenuBottle>(`/menu-bottles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  /** Applies the same change to these entries (`MenuBottle.id`) of the menu, all of them or none. */
+  updateEntries: (menuId: number, ids: number[], changes: { isHidden?: boolean; menuSectionId?: number | null }) =>
+    request<{ message: string }>(`/menu-bottles/menu/${menuId}/entries`, {
+      method: 'PUT',
+      body: JSON.stringify({ ids, ...changes }),
+    }),
   delete: (id: number) =>
     request<{ message: string }>(`/menu-bottles/${id}`, { method: 'DELETE' }),
   sync: (menuId: number) =>
@@ -300,9 +306,12 @@ export const menuBottles = {
       method: 'POST',
       body: JSON.stringify({ bottleIds }),
     }),
-  /** Puts an excluded bottle back at the end of the menu. */
-  restore: (menuId: number, bottleId: number) =>
-    request<{ message: string }>(`/menu-bottles/menu/${menuId}/exclusions/${bottleId}`, { method: 'DELETE' }),
+  /** Puts these excluded bottles back at the end of the menu, all of them or none. */
+  restore: (menuId: number, bottleIds: number[]) =>
+    request<{ message: string }>(`/menu-bottles/menu/${menuId}/exclusions/restore`, {
+      method: 'POST',
+      body: JSON.stringify({ bottleIds }),
+    }),
 };
 
 // Menu Sections

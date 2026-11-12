@@ -527,9 +527,22 @@ describe('menuBottles API', () => {
     expect(JSON.parse(excludeInit.body)).toEqual({ bottleIds: [3, 4] });
 
     mockOk({ message: 'ok' });
-    await api.menuBottles.restore(5, 3);
-    expect(mockFetch.mock.calls[2][0]).toBe('/api/menu-bottles/menu/5/exclusions/3');
-    expect(mockFetch.mock.calls[2][1].method).toBe('DELETE');
+    await api.menuBottles.restore(5, [3, 4]);
+    const [restoreUrl, restoreInit] = mockFetch.mock.calls[2];
+    expect(restoreUrl).toBe('/api/menu-bottles/menu/5/exclusions/restore');
+    expect(restoreInit.method).toBe('POST');
+    expect(JSON.parse(restoreInit.body)).toEqual({ bottleIds: [3, 4] });
+  });
+
+  it('should change several entries of a menu in one request', async () => {
+    const api = await getApi();
+    mockOk({ message: 'ok' });
+    await api.menuBottles.updateEntries(5, [12, 7], { menuSectionId: null });
+
+    const [url, init] = mockFetch.mock.calls[0];
+    expect(url).toBe('/api/menu-bottles/menu/5/entries');
+    expect(init.method).toBe('PUT');
+    expect(JSON.parse(init.body)).toEqual({ ids: [12, 7], menuSectionId: null });
   });
 });
 
