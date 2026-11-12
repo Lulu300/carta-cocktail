@@ -11,7 +11,7 @@ depends_on: [C-47]
 touches: [backend/src/routes/cocktails.ts, backend/src/routes/cocktails.test.ts, backend/src/services/cocktail/cocktailExport.ts, backend/src/validation/cocktails.ts, frontend/src/services/api.ts, frontend/src/services/api.test.ts, frontend/src/services/exportZip.ts, frontend/src/services/exportZip.test.ts, frontend/src/test/msw/handlers.ts]
 sources: []
 branch: feature/C-50-batch-cocktail-export
-pr:
+pr: #177
 ---
 
 ## Contexte
