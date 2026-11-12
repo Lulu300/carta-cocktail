@@ -20,7 +20,7 @@ D-07 a activé CodeQL en « default setup », check non obligatoire. D-35 a tri�
 
 État relevé le 2026-11-12 avec `gh api` :
 
-- `code-scanning/default-setup` : `configured`, langages `actions` et `javascript-typescript`, suite `default`, analyse planifiée `weekly`. Les analyses existantes portent sur `refs/heads/main` et `refs/pull/161/head` (PR `develop` → `main`) : CodeQL ne tourne que sur `main` et les PR vers `main`, jamais sur les PR vers `develop` (la PR #162 vers `develop` n'a aucun check CodeQL).
+- `code-scanning/default-setup` : `configured`, langages `actions`, `javascript`, `javascript-typescript` et `typescript` (analyses rangées dans les catégories `/language:actions` et `/language:javascript-typescript`), suite `default`, analyse planifiée `weekly`. Les analyses existantes portent sur `refs/heads/main` et `refs/pull/161/head` (PR `develop` → `main`) : CodeQL ne tourne que sur `main` et les PR vers `main`, jamais sur les PR vers `develop` (la PR #162 vers `develop` n'a aucun check CodeQL).
 - Le check s'appelle `CodeQL`, app `github-advanced-security` (`integration_id` 57789).
 - Ruleset 24936910 « Require PR and CI on main and develop » : `active` sur `refs/heads/main` et `refs/heads/develop`, PR obligatoire (merge commit seul), checks requis `Backend`, `Frontend`, `Docker build (backend)`, `Docker build (frontend)`, `Smoke (docker compose)` (app 15368), contournement `RepositoryRole` 5 (admin) en mode `pull_request`.
 
