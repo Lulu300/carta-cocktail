@@ -5,13 +5,13 @@ phase: C
 lane: ci
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-41]
 touches: [scripts/upgrade-test/]
 sources: []
-branch:
-pr:
+branch: chore/C-46-bench-cannot-write-refusal
+pr: "#171"
 ---
 
 ## Contexte
@@ -30,9 +30,9 @@ Avec `--inject-duplicate --mode naive` sur le layout `official`, les volumes nom
 
 ## Critères d'acceptation
 
-- [ ] `--layout official --path 1.4.0,<version ≥ 1.12.0> --mode both --inject-duplicate` passe sans échec inattendu.
-- [ ] Le layout `friend` donne le même résultat qu'avant.
-- [ ] Tests `node --test scripts/upgrade-test/test/*.test.mjs` ajoutés et verts.
+- [x] `--layout official --path 1.4.0,<version ≥ 1.12.0> --mode both --inject-duplicate` passe sans échec inattendu.
+- [x] Le layout `friend` donne le même résultat qu'avant.
+- [x] Tests `node --test scripts/upgrade-test/test/*.test.mjs` ajoutés et verts.
 
 ## Tests à ajouter ou adapter
 
@@ -45,3 +45,5 @@ Avec `--inject-duplicate --mode naive` sur le layout `official`, les volumes nom
 - Banc et images à nom fixe : un verrou `mkdir` si deux agents le lancent en même temps.
 
 ## Journal
+
+- 2026-11-12 : fait (PR #171). Refus connu `UNWRITABLE_REFUSAL` (`lib/checks.mjs`, message « cannot write to », base `untouched`, `beforeMigrations: true`), listé avant `FAILED_MIGRATION_REFUSAL` dans `hooks/1.12.0.mjs` ; `naiveMayFail.refusal` retiré, `naiveMayFail.backup` gardé (aucune copie `pre-migrate` avant ce refus, vérifié au banc). Avec `--inject-duplicate`, un démarrage refusé avant les migrations passe la ligne `injected duplicate refused` en `skip` (non applicable) et n'est plus attribué au doublon : `backend starts` garde la raison des notes. Choix au-delà de la tâche, valable dans les deux modes : en conforme, `chownMounts` passe avant, donc ce refus reste un échec inattendu de `backend starts`. Banc sur une copie temporaire du jeu d'essai, `--path 1.4.0,1.12.0 --mode both --inject-duplicate`, images publiées. `official` : sur `origin/develop`, code 1 (naïf KO `injected duplicate refused`) ; sur la branche, code 0, naïf et conforme OK avec 2 échecs attendus chacun, refus « cannot write to » reconnu, base inchangée (même SHA-256), 759 lignes, aucune perte. `friend` : code 0, rapport identique à celui de `origin/develop` (hors horodatage, durées d'arrêt et nombre de redémarrages), naïf et conforme OK avec 2 échecs attendus chacun. Tests du banc : 61 OK (57 avant). Couverture des lignes ajoutées de `lib/` et `hooks/` : 21/21.
