@@ -64,7 +64,9 @@
     "clearSearch": "Effacer la recherche",
     "resultCount_one": "{{count}} résultat",
     "resultCount_other": "{{count}} résultats",
-    "serverUnavailable": "Le serveur ne répond pas, réessayez dans un instant."
+    "serverUnavailable": "Le serveur ne répond pas, réessayez dans un instant.",
+    "requestTooLarge": "Le fichier ou la requête est trop volumineux",
+    "requestFailed": "La requête n'a pas abouti (erreur {{status}})."
   },
   "deletion": {
     "usedByCocktails": "Utilisé par ces cocktails : {{names}}.",

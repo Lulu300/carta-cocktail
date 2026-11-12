@@ -84,11 +84,16 @@ function readRetryAfter(res: Response): number | undefined {
  * Without one, something in front of the backend answered: nginx sends an HTML page with a 502
  * while the backend is stopped or starting and a 504 when it does not answer in time, and Vite's
  * dev proxy an empty 502. "HTTP 502" would tell the admin nothing; the status stays in ApiError.
+ * A 4xx without one was refused before reaching the routes: mostly nginx's 413 for a body over
+ * client_max_body_size, whose limit depends on the route, so the message gives no size. Otherwise
+ * nginx's 400 or 414 (headers or URL too long), Node's 408 or 431, or a proxy's own page: the
+ * message keeps the status, the only detail the admin can report.
  */
 function errorMessage(status: number, body: { error?: unknown }): string {
   if (typeof body.error === 'string') return body.error;
   if (status >= 500) return i18n.t('common.serverUnavailable');
-  return `HTTP ${status}`;
+  if (status === 413) return i18n.t('common.requestTooLarge');
+  return i18n.t('common.requestFailed', { status });
 }
 
 /** Sends an API request and throws an ApiError carrying the server message on failure. */
