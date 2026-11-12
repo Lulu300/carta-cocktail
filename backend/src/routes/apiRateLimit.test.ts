@@ -90,6 +90,14 @@ describe(`API rate limit (API_RATE_LIMIT=${API_LIMIT})`, () => {
     expect((await getUnits('203.0.113.6')).status).toBe(200);
   });
 
+  it('counts an IPv6 client per /64 network', async () => {
+    // Devices of one LAN share the count, whatever address each one picks in it
+    await statusesOf(API_LIMIT, () => getPublicSettings('2001:db8:1:2::1'));
+    expect((await getPublicSettings('2001:db8:1:2:ffff::2')).status).toBe(429);
+
+    expect((await getPublicSettings('2001:db8:1:3::1')).status).toBe(200);
+  });
+
   it('counts each client separately behind two proxies (reverse proxy, then nginx)', async () => {
     const firstClient = () => getPublicSettings(`198.51.100.1, ${OUTER_PROXY_IP}`);
     await statusesOf(API_LIMIT, firstClient);

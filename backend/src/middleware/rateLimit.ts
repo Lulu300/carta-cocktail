@@ -14,9 +14,16 @@ export interface RateLimiterOptions {
 // tests need to reach every store to reset the counters.
 const stores: MemoryStore[] = [];
 
+// An IPv6 client counts for its /64, the network of one LAN, like the devices
+// behind one IPv4 address. Per address, a client would get around the limits by
+// picking new addresses in its /64; the library's /56 would make a guest VLAN
+// share the staff VLAN's count, or unrelated mobile subscribers share one.
+const IPV6_SUBNET = 64;
+
 /**
- * Limits requests per client address (req.ip, which follows TRUST_PROXY).
- * Counters live in memory: a restart resets them, enough for a single instance.
+ * Limits requests per client address (req.ip, which follows TRUST_PROXY), and
+ * per /64 network for IPv6. Counters live in memory: a restart resets them,
+ * enough for a single instance.
  */
 export function createRateLimiter({
   windowMs, limit, messageKey, skipSuccessfulRequests = false,
@@ -28,6 +35,7 @@ export function createRateLimiter({
     limit,
     skipSuccessfulRequests,
     store,
+    ipv6Subnet: IPV6_SUBNET,
     // RateLimit and Retry-After headers only, without the older X-RateLimit-* ones
     standardHeaders: 'draft-7',
     legacyHeaders: false,

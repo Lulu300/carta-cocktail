@@ -67,6 +67,17 @@ describe('Login rate limit (LOGIN_RATE_LIMIT=3)', () => {
     expect((await loginFrom('203.0.113.4', GOOD_PASSWORD)).status).toBe(200);
   });
 
+  it('counts an IPv6 client per /64 network', async () => {
+    // A client that picks a new address in its /64 at each attempt keeps one count
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      expect((await loginFrom(`2001:db8:5:6::${attempt}`, 'wrong')).status).toBe(401);
+    }
+    expect((await loginFrom('2001:db8:5:6::4', 'wrong')).status).toBe(429);
+
+    // Another LAN of the same /56 is not blocked
+    expect((await loginFrom('2001:db8:5:7::1', GOOD_PASSWORD)).status).toBe(200);
+  });
+
   it('counts each client separately behind two proxies (reverse proxy, then nginx)', async () => {
     for (let attempt = 0; attempt < 4; attempt++) {
       await loginWithForwardedFor(`198.51.100.1, ${OUTER_PROXY_IP}`, 'wrong');

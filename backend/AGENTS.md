@@ -138,7 +138,8 @@ export default router;
   in one minute, counted before the body parsers and `authMiddleware`; `/api/backup` also allows 10 authenticated
   requests in 15 minutes, counted after `authMiddleware`. Build a limiter with `createRateLimiter()`
   (`middleware/rateLimit.ts`), never `rateLimit()` directly; tests that send many requests to a strict limiter call
-  `resetRateLimits()` in `beforeEach`. Clients that share an address share the counters. `trust proxy`
+  `resetRateLimits()` in `beforeEach`. Clients that share an address share the counters; an IPv6 client counts
+  for its /64 network (`ipv6Subnet: 64` in the factory, C-51). `trust proxy`
   (`TRUST_PROXY`) trusts the proxies on loopback and private networks by default: the
   client IP is the last public address forwarded by nginx and any reverse proxy in front of it. A successful login
   rehashes a password hash made at another cost (`needsRehash`)
