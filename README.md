@@ -163,11 +163,11 @@ If you lose the admin password:
 2. Restart the backend: `docker compose -f docker-compose.prod.yml up -d`. The log shows `Admin credentials reset from environment (login email: …)`.
 3. Remove `ADMIN_RESET_PASSWORD` from `.env` (or set it back to `false`) and restart again, otherwise every restart resets the password.
 
-We recommend pinning a version instead of `latest`, so that an upgrade only happens after you have read `UPGRADING.md`. Edit the image tags in `docker-compose.prod.yml` (from v1.12.0, `:1.12` also exists and follows the 1.12.x patch releases):
+We recommend pinning a version instead of `latest`, so that an upgrade only happens after you have read `UPGRADING.md`. Edit the image tags in `docker-compose.prod.yml` (from v1.12.0, `:<major>.<minor>` also exists, such as `:1.13`, which follows the 1.13.x patch releases):
 
 ```yaml
-image: ghcr.io/lulu300/carta-cocktail/backend:1.12.0
-image: ghcr.io/lulu300/carta-cocktail/frontend:1.12.0
+image: ghcr.io/lulu300/carta-cocktail/backend:1.13.0
+image: ghcr.io/lulu300/carta-cocktail/frontend:1.13.0
 ```
 
 ## Database migrations
@@ -432,8 +432,8 @@ The GitHub Release contains the notes file (without its front matter), the list 
 ### Pulling release images
 
 ```bash
-docker pull ghcr.io/lulu300/carta-cocktail/backend:1.12.0
-docker pull ghcr.io/lulu300/carta-cocktail/frontend:1.12.0
+docker pull ghcr.io/lulu300/carta-cocktail/backend:1.13.0
+docker pull ghcr.io/lulu300/carta-cocktail/frontend:1.13.0
 ```
 
 ## API Overview
