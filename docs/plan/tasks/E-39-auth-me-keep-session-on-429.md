@@ -11,7 +11,7 @@ depends_on: [C-47]
 touches: [frontend/src/contexts/AuthContext.tsx, frontend/src/contexts/AuthContext.test.tsx, frontend/src/App.tsx, frontend/src/App.test.tsx, frontend/src/i18n/locales/public/, frontend/src/pages/public/MenuPublicPage.test.tsx, frontend/AGENTS.md]
 sources: []
 branch: fix/E-39-auth-me-keep-session-on-429
-pr:
+pr: #175
 ---
 
 ## Contexte
@@ -59,3 +59,4 @@ Vérifié sur `develop` (589e579) :
   - page admin (ouverture ou rechargement) : « Chargement... », puis un écran plein « ⚠️ Votre session n'a pas pu être vérifiée », le message du backend « Trop de requêtes : réessayez dans quelques minutes » (« Too many requests: try again in a few minutes » en anglais) et un bouton « Réessayer ». Pas de passage par `/login`, le token reste. « Réessayer » relance la vérification : la page admin demandée s'ouvre si la fenêtre est passée, le même écran revient sinon. Un 500 donne le même écran avec le message du serveur, une erreur réseau avec « Vérifiez votre connexion puis réessayez. ».
   - page publique : la vue invité pour ce chargement (pas de lien « Tableau de bord » dans l'en-tête, lien « Connexion » dans le pied de page, ni stock ni notes), et l'erreur de la carte avec « Réessayer » si ses propres requêtes reçoivent aussi le 429. Le token reste : un rechargement ou l'ouverture de `/admin` après la fenêtre retrouve la session sans se reconnecter.
 - 2026-11-12 : Notes de version : aucune action requise. Un 429 (ou une erreur serveur ou réseau) pendant la vérification de session au chargement ne déconnecte plus l'admin : sur une page admin, il voit « Your session could not be checked » avec le message du serveur et un bouton « Retry », et reste connecté ; seul un 401 (session expirée ou révoquée) renvoie vers la connexion. Remplace la ligne proposée par le relecteur (« opening or reloading a page signs the admin out »).
+- 2026-11-12 : PR #175 ouverte vers `develop`, `status: review`.
