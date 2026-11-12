@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: moyenne
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [D-35]
 touches: [backend/src/app.ts, backend/src/middleware/rateLimit.ts, backend/src/config.ts, backend/src/config.test.ts, backend/src/i18n/, backend/src/routes/apiRateLimit.test.ts, backend/src/routes/backup.test.ts, backend/src/test/helpers.ts, backend/AGENTS.md, README.md, .env.example]
 sources: ["03-security.md §4"]
-branch:
-pr:
+branch: feature/C-47-api-rate-limiting
+pr: #169
 ---
 
 ## Contexte
@@ -40,14 +40,14 @@ Hors login, aucune route de l'API n'est limitée. Un client peut appeler sans fi
 
 ## Critères d'acceptation
 
-- [ ] Au-delà de `API_RATE_LIMIT` requêtes par minute depuis une même IP, l'API répond 429, en JSON traduit, avec `Retry-After`.
-- [ ] `/api/health` n'est jamais limité.
-- [ ] `/api/backup` est limité plus strictement pour les requêtes authentifiées ; une requête sans token y reçoit 401 et ne compte que dans la limite globale.
-- [ ] `backup.test.ts` et les autres suites existantes passent sans limiteur désactivé.
-- [ ] Le comptage suit `TRUST_PROXY` comme le login : deux clients distincts derrière nginx ont deux compteurs.
-- [ ] `loginLimiter` garde son comportement (tests `loginRateLimit.test.ts` inchangés et verts) et utilise la fabrique commune.
-- [ ] Une valeur invalide de `API_RATE_LIMIT` empêche le démarrage avec un message qui nomme la variable.
-- [ ] `README.md`, `.env.example` et `backend/AGENTS.md` décrivent la variable.
+- [x] Au-delà de `API_RATE_LIMIT` requêtes par minute depuis une même IP, l'API répond 429, en JSON traduit, avec `Retry-After`.
+- [x] `/api/health` n'est jamais limité.
+- [x] `/api/backup` est limité plus strictement pour les requêtes authentifiées ; une requête sans token y reçoit 401 et ne compte que dans la limite globale.
+- [x] `backup.test.ts` et les autres suites existantes passent sans limiteur désactivé.
+- [x] Le comptage suit `TRUST_PROXY` comme le login : deux clients distincts derrière nginx ont deux compteurs.
+- [x] `loginLimiter` garde son comportement (tests `loginRateLimit.test.ts` inchangés et verts) et utilise la fabrique commune.
+- [x] Une valeur invalide de `API_RATE_LIMIT` empêche le démarrage avec un message qui nomme la variable.
+- [x] `README.md`, `.env.example` et `backend/AGENTS.md` décrivent la variable.
 
 ## Tests à ajouter ou adapter
 
@@ -70,3 +70,5 @@ Hors login, aucune route de l'API n'est limitée. Un client peut appeler sans fi
 
 - 2026-11-12 : tâche créée par D-35 (triage CodeQL) pour les alertes #6 à #22, #25 et #26.
 - 2026-11-12 : PR docs de suivi du lot D-35/E-18/B-20/C-12, d'après la relecture de la PR #163. Étape 6 : le décompte « 42 requêtes (21 + 21, plus les cas 401 et 400) » était faux (21 + 21 font déjà 42, et ces 21 comptaient les définitions des fonctions d'aide). Compté en exécutant `backup.test.ts` sur `develop` (9799168) : 58 requêtes à `/api/backup`, dont 2 sans token ; le texte de l'étape est corrigé. La ligne sur le recouvrement avec C-12 était périmée (C-12 faite, PR #166) : remplacée. Ajout dans les points d'attention de ce que le test de cohérence `src/i18n/i18n.test.ts` de C-12 impose à cette tâche.
+- 2026-11-12 : faite (PR #169, branche `feature/C-47-api-rate-limiting`). Fabrique `createRateLimiter()` et `resetRateLimits()` dans `middleware/rateLimit.ts`, utilisée par le login, la limite globale (`API_RATE_LIMIT`, 600 par minute) et la limite de `/api/backup` (10 requêtes authentifiées par 15 minutes, après `authMiddleware`, décision humaine du lot). `parseLoginRateLimit` devient `parsePositiveInteger(name, env)`. Charge des suites mesurée avec un middleware temporaire (non versionné) sur une exécution complète : au plus 120 requêtes `/api` en une minute pour un fichier (`bottles.test.ts`), donc aucune limite relevée pour les tests hors `apiRateLimit.test.ts`. `backup.test.ts` passe avec la vraie limite et `resetRateLimits()` en `beforeEach` : aucun test n'y dépasse 10 requêtes authentifiées. `src/test/helpers.ts` n'a pas changé (import direct depuis `middleware/rateLimit.ts`). Le titre de la section README « Login limit behind a reverse proxy » est gardé, car `UPGRADING.md` pointe sur son ancre ; son contenu couvre désormais les trois limites. Couverture globale 99,24 % / 95,2 % / 99,81 % / 99,54 %, delta 100 % (22/22 lignes).
+- Notes de version : nouvelle variable facultative `API_RATE_LIMIT` (requêtes API par minute et par adresse IP, défaut 600), aucune action obligatoire ; l'API répond 429 « Too many requests » au-delà, et l'export ou l'import de sauvegarde est limité à 10 par 15 minutes.

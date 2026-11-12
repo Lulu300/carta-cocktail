@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import path from 'path';
 import jwt from 'jsonwebtoken';
 import {
-  assertJwtSecret, parseJwtExpiresIn, parseLoginRateLimit, parseTrustProxy, resolveUploadDir,
+  assertJwtSecret, parseJwtExpiresIn, parsePositiveInteger, parseTrustProxy, resolveUploadDir,
 } from './config';
 
 describe('resolveUploadDir', () => {
@@ -54,17 +54,35 @@ describe('assertJwtSecret', () => {
   });
 });
 
-describe('parseLoginRateLimit', () => {
-  it.each([undefined, ''])('should default to 10 failed attempts for %j', (value) => {
-    expect(parseLoginRateLimit(value)).toBe(10);
+describe('parsePositiveInteger', () => {
+  describe('LOGIN_RATE_LIMIT', () => {
+    it.each([undefined, ''])('should default to 10 failed attempts for %j', (value) => {
+      expect(parsePositiveInteger('LOGIN_RATE_LIMIT', { LOGIN_RATE_LIMIT: value })).toBe(10);
+    });
+
+    it('should read a positive integer', () => {
+      expect(parsePositiveInteger('LOGIN_RATE_LIMIT', { LOGIN_RATE_LIMIT: '3' })).toBe(3);
+    });
+
+    it.each(['0', '-1', '2.5', 'ten'])('should reject %s', (value) => {
+      expect(() => parsePositiveInteger('LOGIN_RATE_LIMIT', { LOGIN_RATE_LIMIT: value }))
+        .toThrow(`LOGIN_RATE_LIMIT must be a positive integer, got '${value}'`);
+    });
   });
 
-  it('should read a positive integer', () => {
-    expect(parseLoginRateLimit('3')).toBe(3);
-  });
+  describe('API_RATE_LIMIT', () => {
+    it.each([undefined, ''])('should default to 600 requests per minute for %j', (value) => {
+      expect(parsePositiveInteger('API_RATE_LIMIT', { API_RATE_LIMIT: value })).toBe(600);
+    });
 
-  it.each(['0', '-1', '2.5', 'ten'])('should reject %s', (value) => {
-    expect(() => parseLoginRateLimit(value)).toThrow(`LOGIN_RATE_LIMIT must be a positive integer, got '${value}'`);
+    it('should read a positive integer', () => {
+      expect(parsePositiveInteger('API_RATE_LIMIT', { API_RATE_LIMIT: '1200' })).toBe(1200);
+    });
+
+    it.each(['0', '-1', 'abc', '1.5'])('should reject %s', (value) => {
+      expect(() => parsePositiveInteger('API_RATE_LIMIT', { API_RATE_LIMIT: value }))
+        .toThrow(`API_RATE_LIMIT must be a positive integer, got '${value}'`);
+    });
   });
 });
 

@@ -20,6 +20,7 @@
     "noFileUploaded": "Aucun fichier envoyé",
     "backupSchemaTooNew": "Cette sauvegarde vient d’une version plus récente de Carta Cocktail : mettez l’application à jour avant de la restaurer",
     "tooManyAttempts": "Trop de tentatives de connexion échouées : réessayez dans quelques minutes",
+    "tooManyRequests": "Trop de requêtes : réessayez dans quelques minutes",
     "passwordTooShort": "Le nouveau mot de passe doit contenir au moins 12 caractères",
     "invalidEmail": "L’adresse email n’est pas valide",
     "bottleNotAllowedInMenu": "Cette bouteille ne peut pas aller dans cette carte : seules les bouteilles cochées pour le type de la carte (apéritif ou digestif) le peuvent",
