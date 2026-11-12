@@ -5,13 +5,13 @@ phase: B
 lane: deps
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: []
 touches: [frontend/package.json, frontend/package-lock.json]
 sources: []
-branch:
-pr:
+branch: chore/B-21-deps-frontend-dev-undici
+pr: "#170"
 ---
 
 ## Contexte
@@ -33,9 +33,9 @@ Lockfile de `develop` au 2026-11-06 :
 
 ## Critères d'acceptation
 
-- [ ] `npm audit` frontend ne signale plus `undici`.
-- [ ] `minimatch` corrigé, ou la décision de garder l'avis notée dans le Journal.
-- [ ] `npm ci`, lint, `npx tsc -b`, `npm test`, build et budget du bundle passent ; CI verte.
+- [x] `npm audit` frontend ne signale plus `undici`.
+- [x] `minimatch` corrigé, ou la décision de garder l'avis notée dans le Journal.
+- [x] `npm ci`, lint, `npx tsc -b`, `npm test`, build et budget du bundle passent ; CI verte.
 - [ ] Après le merge sur `main` à la release suivante, les alertes Dependabot correspondantes sont fermées.
 
 ## Tests à ajouter ou adapter
@@ -48,3 +48,5 @@ Aucun : dépendances de dev seulement, la suite existante (Vitest sous `jsdom`, 
 - Même lockfile que toute autre tâche `deps` du frontend : une seule à la fois.
 
 ## Journal
+
+- 2026-11-12 : PR #170. Audit refait sur `develop` (a977616) : `npm audit` 11 avis (10 `moderate` dus à `minimatch` 10.2.6 et ses dépendants, 1 `high` pour `undici` 7.30.0, qui compte maintenant 8 GHSA, tous corrigés en 7.30.1) ; `npm audit --omit=dev` 0. `npm update undici` installe 7.30.2 (et non 7.30.1) : dernière 7.x de la plage `^7.25.0` de `jsdom` 29.1.1, publiée le 2026-11-05 ; seul `undici` bouge dans le lockfile. Pour `minimatch`, même choix que B-20 (décision humaine) : surcharge ciblée `"minimatch": "^11.0.1"` sous `eslint`, `@eslint/config-array` et `@typescript-eslint/typescript-estree`, les trois seuls paquets qui l'importent ; leurs dernières versions (10.14.0, 0.23.5, 8.72.2) demandent toujours `^10`. Elle installe 11.0.8 à la racine, plus `@isaacs/nonrecursive-glob-match` 1.1.0. API utilisée : classe `Minimatch` (options `dot`, `flipNegate`), `match(path, partial)` et la fonction `minimatch()` avec `dot`, inchangées en 11 ; ce que 11 retire (`makeRe`, `matchOne`, `AST`) n'est pas utilisé. Avec 10.2.6 puis 11.0.8, `eslint .` analyse les mêmes 309 fichiers et applique les mêmes `files`/`ignores`. Surcharge gardée : `npm ci`, lint, `npx tsc -b`, `npx vitest run --silent=false` (1093 tests, sortie console identique à `develop`), build (`dist/` identique octet pour octet), budget du bundle (132,60 kB) et `npm audit` (0, dev compris) passent. Retrait de la surcharge à suivre dans B-22 (extension au frontend par la PR docs de fin de lot) : sur une copie, retirer le bloc puis `npm install` laisse trois `minimatch` 10.2.6 imbriqués, qu'un `npm dedupe` ramène à la racine ; l'avis revient alors dans `npm audit`.
