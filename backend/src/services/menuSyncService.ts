@@ -191,16 +191,19 @@ export async function excludeBottles(db: Db, menuId: number, bottleIds: number[]
 }
 
 /**
- * Lifts an exclusion (404 when there is none). A bottle still available for the menu's
- * type comes back at the end of the menu, visible and outside any section.
+ * Lifts the exclusions of these bottles (404 when one of them has none). A bottle still
+ * available for the menu's type comes back at the end of the menu, visible and outside
+ * any section, in the order of `bottleIds`. Run it in a transaction: all or nothing.
  */
-export async function restoreBottle(db: Db, menuId: number, bottleId: number): Promise<void> {
-  const exclusion = await db.menuBottleExclusion.delete({
-    where: { menuId_bottleId: { menuId, bottleId } },
-    select: { menu: { select: { type: true } }, bottle: { select: BOTTLE_FLAGS_SELECT } },
-  });
-  const { type } = exclusion.menu;
-  if (isBottleMenuType(type) && isAvailableFor(exclusion.bottle, type)) {
-    await appendBottle(db, menuId, bottleId);
+export async function restoreBottles(db: Db, menuId: number, bottleIds: number[]): Promise<void> {
+  for (const bottleId of new Set(bottleIds)) {
+    const exclusion = await db.menuBottleExclusion.delete({
+      where: { menuId_bottleId: { menuId, bottleId } },
+      select: { menu: { select: { type: true } }, bottle: { select: BOTTLE_FLAGS_SELECT } },
+    });
+    const { type } = exclusion.menu;
+    if (isBottleMenuType(type) && isAvailableFor(exclusion.bottle, type)) {
+      await appendBottle(db, menuId, bottleId);
+    }
   }
 }

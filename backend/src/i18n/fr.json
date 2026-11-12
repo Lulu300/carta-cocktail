@@ -90,9 +90,11 @@
   },
   "menuBottles": {
     "deleted": "Bouteille retirée de la carte",
+    "updated": "Bouteilles mises à jour",
     "synced": "Carte synchronisée avec les bouteilles",
     "excluded": "Bouteilles retirées de la carte",
     "restored": "Bouteille remise dans la carte",
+    "restoredMany": "Bouteilles remises dans la carte",
     "reordered": "Bouteilles réordonnées"
   },
   "menuSections": {

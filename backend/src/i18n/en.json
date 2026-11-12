@@ -90,9 +90,11 @@
   },
   "menuBottles": {
     "deleted": "Bottle removed from the menu",
+    "updated": "Bottles updated",
     "synced": "Menu synchronized with the bottles",
     "excluded": "Bottles removed from the menu",
     "restored": "Bottle put back in the menu",
+    "restoredMany": "Bottles put back in the menu",
     "reordered": "Bottles reordered"
   },
   "menuSections": {
