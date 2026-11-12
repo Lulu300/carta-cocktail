@@ -105,6 +105,24 @@ describe('API request helper', () => {
     expect(onUnauthorized).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['a number of seconds', '42', 42],
+    ['an HTTP date, which the backend never sends', 'Wed, 21 Oct 2026 07:28:00 GMT', undefined],
+    ['no Retry-After header', null, undefined],
+  ])('should keep the Retry-After of a 429 with %s', async (_case, header, seconds) => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      json: () => Promise.resolve({ error: 'Too many requests' }),
+      headers: { get: (key: string) => (key.toLowerCase() === 'retry-after' ? header : null) },
+    });
+    const api = await getApi();
+
+    const error = await api.publicApi.getSettings().catch((e: unknown) => e);
+
+    expect(error).toMatchObject({ status: 429, message: 'Too many requests', retryAfterSeconds: seconds });
+  });
+
   it('should not call the unauthorized handler on a 401 from auth.login', async () => {
     mockError(401, { error: 'Invalid email or password' });
     const api = await getApi();

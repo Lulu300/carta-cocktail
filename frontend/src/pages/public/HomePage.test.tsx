@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { render, screen } from '../../test/test-utils';
 import { AppProviders } from '../../test/appProviders';
 import { buildMenu, buildSiteSettings } from '../../test/factories';
-import { mockApiPending, mockApiResponse, mockNetworkError } from '../../test/msw/utils';
+import { mockApiPending, mockApiResponse, mockNetworkError, mockRateLimited } from '../../test/msw/utils';
 import type { Menu } from '../../types';
 import { axe } from '../../test/axe';
 import HomePage from './HomePage';
@@ -75,6 +75,25 @@ describe('HomePage', () => {
     await user.click(screen.getByRole('button', { name: 'common.retry' }));
 
     expect(await screen.findByText('Summer')).toBeInTheDocument();
+  });
+
+  it("brings back the bar's name with the menus when the guest retries after a 429", async () => {
+    const user = userEvent.setup();
+    mockRateLimited('get', '/api/public/settings', 60);
+    mockRateLimited('get', '/api/public/menus', 60);
+
+    renderHome();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('home.loadError');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Carta Cocktail');
+
+    mockApiResponse('get', '/api/public/settings', buildSiteSettings({ siteName: 'Chez Lulu', siteIcon: '🍹' }));
+    mockMenus([buildMenu({ name: 'Summer' })]);
+
+    await user.click(screen.getByRole('button', { name: 'common.retry' }));
+
+    expect(await screen.findByText('Summer')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: /Chez Lulu/ })).toHaveTextContent('🍹');
   });
 
   it('shows placeholders while the menus load', () => {

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import Button from '../../components/ui/Button';
 import EmptyState from '../../components/ui/EmptyState';
+import { useSiteSettings } from '../../contexts/SiteSettingsContext';
 import { isNotFoundError } from '../../queries/public';
 
 interface NotFoundContent {
@@ -28,6 +29,7 @@ const ERROR_CLASSES = 'min-h-[60vh] justify-center';
  */
 export default function PublicErrorState({ error, loadErrorTitle, notFound, onRetry, isRetrying }: PublicErrorStateProps) {
   const { t } = useTranslation();
+  const { retryFailedLoad } = useSiteSettings();
 
   if (notFound && isNotFoundError(error)) {
     return (
@@ -45,6 +47,13 @@ export default function PublicErrorState({ error, loadErrorTitle, notFound, onRe
     );
   }
 
+  // What made the page fail (rate limit, network) often made the site settings fail too:
+  // the retry also brings back the bar's name and icon.
+  const retry = () => {
+    retryFailedLoad();
+    onRetry();
+  };
+
   return (
     <EmptyState
       icon="⚠️"
@@ -53,7 +62,7 @@ export default function PublicErrorState({ error, loadErrorTitle, notFound, onRe
       role="alert"
       className={ERROR_CLASSES}
       action={(
-        <Button variant="secondary" loading={isRetrying} onClick={onRetry}>
+        <Button variant="secondary" loading={isRetrying} onClick={retry}>
           {t('common.retry')}
         </Button>
       )}

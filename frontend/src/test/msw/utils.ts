@@ -19,6 +19,16 @@ export function mockApiError(method: ApiMethod, path: string, status: number, me
   server.use(http[method](path, () => errorResponse(status, message)));
 }
 
+/** Makes `method path` answer like the backend's rate limiter: a 429 that asks to wait `retryAfterSeconds`. */
+export function mockRateLimited(method: ApiMethod, path: string, retryAfterSeconds: number): void {
+  server.use(
+    http[method](path, () => HttpResponse.json(
+      { error: 'Too many requests: try again in a few minutes' },
+      { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } },
+    )),
+  );
+}
+
 /** Makes `method path` hang: the page stays in its loading state for the whole test. */
 export function mockApiPending(method: ApiMethod, path: string): void {
   server.use(http[method](path, pendingResponse));
