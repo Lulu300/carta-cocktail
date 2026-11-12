@@ -17,6 +17,14 @@ export function errorResponse(status: number, message: string): Response {
   return HttpResponse.json({ error: message }, { status });
 }
 
+/** The backend rate limiter's answer: a 429 that asks to wait `retryAfterSeconds`. */
+export function rateLimitedResponse(retryAfterSeconds: number): Response {
+  return HttpResponse.json(
+    { error: 'Too many requests: try again in a few minutes' },
+    { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } },
+  );
+}
+
 /** An answer that never comes: the request stays in flight for the whole test. */
 export function pendingResponse(): Promise<never> {
   return new Promise<never>(() => {});

@@ -2,11 +2,34 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { buildSiteSettings } from '../test/factories';
-import { captureRequest, mockApiResponse, mockNetworkError, mockRateLimited } from '../test/msw/utils';
+import { http, HttpResponse } from 'msw';
+import { server } from '../test/msw/server';
+import {
+  captureRequest, mockApiResponse, mockNetworkError, mockRateLimited, rateLimitedResponse,
+} from '../test/msw/utils';
 import { SiteSettingsProvider, useSiteSettings } from './SiteSettingsContext';
 
 function mockSettings(siteName: string, siteIcon = '') {
   mockApiResponse('get', '/api/public/settings', buildSiteSettings({ siteName, siteIcon }));
+}
+
+/**
+ * Holds the first settings request until `release()` and then answers `firstAnswer`;
+ * later requests get the `laterSettings` at once. `count()` counts every request.
+ */
+function holdFirstSettingsRequest(firstAnswer: () => Response, laterSettings = buildSiteSettings()) {
+  let requests = 0;
+  let release: () => void = () => {};
+  const released = new Promise<void>((resolve) => { release = resolve; });
+  server.use(
+    http.get('/api/public/settings', async () => {
+      requests += 1;
+      if (requests > 1) return HttpResponse.json(laterSettings);
+      await released;
+      return firstAnswer();
+    }),
+  );
+  return { release, count: () => requests };
 }
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -165,7 +188,7 @@ describe('SiteSettingsContext', () => {
     });
   });
 
-  describe('when the first load fails', () => {
+  describe('until the first load succeeds', () => {
     beforeEach(() => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
     });
@@ -179,18 +202,18 @@ describe('SiteSettingsContext', () => {
     }
 
     it('should load the settings again once the Retry-After of a 429 has passed', async () => {
-      mockRateLimited('get', '/api/public/settings', 5);
+      mockRateLimited('get', '/api/public/settings', 60);
       const refused = captureRequest('get', '/api/public/settings');
       const { result } = renderHook(() => useSiteSettings(), { wrapper });
       await waitFor(() => expect(refused.count()).toBe(1));
 
       mockSettings('My Bar', '🍸');
       const retried = captureRequest('get', '/api/public/settings');
-      await act(() => vi.advanceTimersByTimeAsync(4_900));
+      await act(() => vi.advanceTimersByTimeAsync(55_000));
       expect(retried.count()).toBe(0);
       expect(result.current.siteSettings.siteName).toBe('Carta Cocktail');
 
-      await act(() => vi.advanceTimersByTimeAsync(100));
+      await act(() => vi.advanceTimersByTimeAsync(5_000));
 
       await waitFor(() => expect(result.current.siteSettings.siteName).toBe('My Bar'));
       expect(result.current.siteSettings.siteIcon).toBe('🍸');
@@ -229,6 +252,35 @@ describe('SiteSettingsContext', () => {
 
       expect(request.count()).toBe(4);
       expect(result.current.siteSettings.siteName).toBe('Carta Cocktail');
+    });
+
+    it('should not retry once unmounted when a refusal arrives after the unmount', async () => {
+      const first = holdFirstSettingsRequest(() => rateLimitedResponse(1));
+      const { unmount } = renderHook(() => useSiteSettings(), { wrapper });
+      await waitFor(() => expect(first.count()).toBe(1));
+
+      unmount();
+      first.release();
+      await act(() => vi.advanceTimersByTimeAsync(5 * 60_000));
+
+      expect(first.count()).toBe(1);
+    });
+
+    it('should keep what refresh loaded when an older automatic load answers later', async () => {
+      const first = holdFirstSettingsRequest(
+        () => HttpResponse.json(buildSiteSettings({ siteName: 'Stale' })),
+        buildSiteSettings({ siteName: 'Just saved' }),
+      );
+      const { result } = renderHook(() => useSiteSettings(), { wrapper });
+      await waitFor(() => expect(first.count()).toBe(1));
+
+      await act(() => result.current.refresh());
+      expect(result.current.siteSettings.siteName).toBe('Just saved');
+
+      first.release();
+      await act(() => vi.advanceTimersByTimeAsync(1_000));
+
+      expect(result.current.siteSettings.siteName).toBe('Just saved');
     });
 
     it('should load them at once on retryFailedLoad, without the pending automatic retry', async () => {

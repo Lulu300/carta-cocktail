@@ -8,7 +8,7 @@ effort: S
 status: review
 owner: agent
 depends_on: [C-47]
-touches: [frontend/src/contexts/SiteSettingsContext.tsx, frontend/src/contexts/SiteSettingsContext.test.tsx, frontend/src/pages/public/PublicErrorState.tsx, frontend/src/pages/public/HomePage.test.tsx, frontend/src/services/api.ts, frontend/src/services/api.test.ts, frontend/src/test/msw/utils.ts]
+touches: [frontend/src/contexts/SiteSettingsContext.tsx, frontend/src/contexts/SiteSettingsContext.test.tsx, frontend/src/pages/public/PublicErrorState.tsx, frontend/src/pages/public/HomePage.test.tsx, frontend/src/services/api.ts, frontend/src/services/api.test.ts, frontend/src/test/msw/utils.ts, frontend/src/test/msw/responses.ts]
 sources: []
 branch: fix/E-41-site-settings-load-failure
 pr: "#176"
@@ -40,10 +40,10 @@ Vérifié sur `develop` : l'effet de montage ignore l'échec (`.catch(() => {})`
 
 ## Tests à ajouter ou adapter
 
-- `contexts/SiteSettingsContext.test.tsx` : 429 puis succès après le `Retry-After` (nom, icône, titre, favicon) ; 30 s après une erreur réseau ; arrêt après trois réessais ; `retryFailedLoad` charge tout de suite et annule le réessai en attente ; `retryFailedLoad` sans requête une fois les réglages arrivés.
+- `contexts/SiteSettingsContext.test.tsx` : 429 puis succès après le `Retry-After` (nom, icône, titre, favicon) ; 30 s après une erreur réseau ; arrêt après trois réessais ; `retryFailedLoad` charge tout de suite et annule le réessai en attente ; `retryFailedLoad` sans requête une fois les réglages arrivés ; aucun réessai quand un refus arrive après le démontage ; une réponse tardive du chargement automatique n'écrase pas ce que `refresh()` vient de charger.
 - `services/api.test.ts` : `retryAfterSeconds` d'un 429 (secondes, date HTTP ignorée, en-tête absent).
 - `pages/public/HomePage.test.tsx` : 429 sur les réglages et les menus, puis « Réessayer » → menus et nom du bar affichés.
-- `test/msw/utils.ts` : `mockRateLimited(method, path, retryAfterSeconds)`.
+- `test/msw/utils.ts` : `mockRateLimited(method, path, retryAfterSeconds)`, sur la réponse partagée `rateLimitedResponse` de `test/msw/responses.ts`.
 
 ## Points d'attention
 
@@ -54,4 +54,5 @@ Vérifié sur `develop` : l'effet de montage ignore l'échec (`.catch(() => {})`
 
 - 2026-11-12 : tâche créée d'après le manque 4 de la relecture de la PR #174 (décision humaine : correctif avant la rc).
 - 2026-11-12 : faite (PR #176, branche `fix/E-41-site-settings-load-failure`). Réessai automatique borné (3, `Retry-After` ou 30 s) et rechargement par le « Réessayer » des pages publiques. Bundle public mesuré avec `.github/scripts/bundle-budget.mjs` : 132,60 kB avant, 132,88 kB après (budget 140 kB).
-- Notes de version : après un refus « Too many requests » au chargement, la carte publique retrouve le nom et l'icône du bar sans recharger la page (après le délai demandé par le serveur, ou au clic sur « Réessayer »).
+- 2026-11-12 : suites de la relecture de la PR #176 (approuvée). Un test pour chacune des deux gardes `cancelled` du chargement automatique (démontage pendant un 429 en cours ; `refresh()` qui réussit pendant un chargement automatique en cours) ; chaque test échoue quand on retire sa garde. Test du `Retry-After` élargi (60 s, aucune requête à 55 s). `rateLimitedResponse` extraite dans `test/msw/responses.ts`.
+- Notes de version : après un chargement refusé (« Too many requests ») ou échoué (erreur réseau, backend qui redémarre), la carte publique et les pages admin retrouvent le nom et l'icône du bar dans l'en-tête et l'onglet sans recharger la page (après le délai demandé par le serveur ou 30 s, ou au clic sur « Réessayer »).
