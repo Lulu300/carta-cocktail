@@ -11,7 +11,7 @@ depends_on: [C-47]
 touches: [frontend/src/components/admin/menus/useMenuBottles.ts, frontend/src/pages/admin/MenuBottleEditPage.test.tsx, frontend/src/services/api.ts, frontend/src/services/api.test.ts, frontend/src/test/msw/handlers.ts, backend/src/routes/menuBottles.ts, backend/src/routes/menuBottles.test.ts, backend/src/validation/menuBottles.ts, backend/src/services/menuSyncService.ts, backend/src/services/menuSyncService.test.ts, backend/src/i18n/en.json, backend/src/i18n/fr.json]
 sources: []
 branch: fix/E-40-menu-bottle-group-requests
-pr:
+pr: #178
 ---
 
 ## Contexte
