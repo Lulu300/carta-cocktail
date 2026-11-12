@@ -24,7 +24,7 @@ Décision de l'humain : « Code fix before the rc » — « New task (author + r
 
 Vérifié sur `develop` :
 
-- **Ce que renvoie nginx** (`frontend/nginx.conf.template`, `proxy_pass $backend` résolu à chaque requête) : une page HTML d'erreur, jamais du JSON. 502 quand le conteneur du backend est arrêté (nom introuvable par le résolveur) ou démarre (connexion refusée) ; 504 quand le backend ne répond pas dans `proxy_read_timeout` (60 s, 300 s pour la restauration). nginx n'envoie pas de 503 ici ; un proxy placé devant (Traefik, Caddy, Cloudflare) peut en envoyer, avec sa propre page. En développement, le proxy de Vite répond 500 sans corps quand le backend est arrêté.
+- **Ce que renvoie nginx** (`frontend/nginx.conf.template`, `proxy_pass $backend` résolu à chaque requête) : une page HTML d'erreur, jamais du JSON. 502 quand le conteneur du backend est arrêté (nom introuvable par le résolveur) ou démarre (connexion refusée) ; 504 quand le backend ne répond pas dans `proxy_read_timeout` (60 s, 300 s pour la restauration). nginx n'envoie pas de 503 ici ; un proxy placé devant (Traefik, Caddy, Cloudflare) peut en envoyer, avec sa propre page. En développement, le proxy de Vite répond 502 sans corps (`text/plain`) quand le backend est arrêté.
 - **Le backend** envoie toujours `{ error }` traduit pour une erreur (`errorHandler`, `apiNotFoundHandler`, limiteur) ; seule la route de santé répond `{ status: 'unavailable' }` (503), qu'on n'appelle pas depuis le frontend.
 - **Où s'affiche le message d'une `ApiError`** :
   - écran de session d'E-39 (`App.tsx`, `SessionCheckError`) ;
@@ -37,7 +37,7 @@ Vérifié sur `develop` :
 
 ## Ce qu'il faut faire
 
-1. Dans `send()`, un seul endroit : garder le champ `error` du backend quand il existe, quel que soit le statut ; sans lui, un statut ≥ 500 (502, 503, 504, et le 500 vide du proxy de Vite) donne le message traduit `common.serverUnavailable`.
+1. Dans `send()`, un seul endroit : garder le champ `error` du backend quand il existe, quel que soit le statut ; sans lui, un statut ≥ 500 (502 de nginx ou du proxy de Vite, 503, 504, 500 non JSON) donne le message traduit `common.serverUnavailable`.
 2. Le statut reste dans `ApiError.status` (réessai de React Query, 401, 404, 409, `Retry-After` du 429).
 3. Clé dans les messages publics (en, fr) : `api.ts` fait partie du premier chargement.
 
@@ -50,7 +50,7 @@ Vérifié sur `develop` :
 
 ## Tests à ajouter ou adapter
 
-- `services/api.test.ts` : 502 HTML, 503 texte, 504 HTML, 500 sans corps (message traduit, statut gardé, jeton gardé) ; message en français ; 5xx JSON sans `error` ; 502 JSON avec `error` inchangé ; 413 non JSON inchangé (`HTTP 413`) ; erreur réseau inchangée. Le test de l'export de sauvegarde (503 non JSON) attend le nouveau message.
+- `services/api.test.ts` : 502 HTML de nginx, 502 vide du proxy de Vite, 503 texte, 504 HTML, 500 sans corps (message traduit, statut gardé, jeton gardé) ; message en français ; 5xx JSON sans `error` ; 502 JSON avec `error` inchangé ; 413 non JSON inchangé (`HTTP 413`) ; erreur réseau inchangée. Le test de l'export de sauvegarde (503 non JSON) attend le nouveau message.
 - `contexts/AuthContext.test.tsx` : la page HTML 502 de nginx sur `/api/auth/me` garde le jeton et donne `sessionError` avec le statut 502 et le message traduit.
 
 ## Points d'attention
@@ -61,4 +61,5 @@ Vérifié sur `develop` :
 
 - 2026-11-12 : tâche créée d'après le nit « Line 22 » de la relecture de la PR #174 (décision humaine : correctif avant la rc).
 - 2026-11-12 : faite (PR #180, branche `fix/E-45-unreachable-server-message`). Message traduit dans `send()` pour une réponse ≥ 500 sans `error` du backend. Bundle public mesuré avec `.github/scripts/bundle-budget.mjs` : 133,22 kB avant, 133,30 kB après (budget 140 kB). E-46 créée pour le 413 de nginx.
+- 2026-11-12 : suites de la relecture de la PR #180 (approuvée). Le proxy de Vite répond 502, pas 500 : commentaire de `errorMessage`, cas de test et tâche corrigés, cas du 502 vide de Vite ajouté (le 500 sans corps reste comme 500 non JSON générique). `mockProxyAnswer` reçoit le type de contenu de chaque cas (le 503 est en `text/plain`).
 - Notes de version : quand le backend ne répond pas (redémarrage, arrêt, délai dépassé), l'écran « Your session could not be checked », la page de connexion et les messages d'erreur de l'admin disent « The server is not responding, try again in a moment. » au lieu de « HTTP 502 » (ou 503, 504).

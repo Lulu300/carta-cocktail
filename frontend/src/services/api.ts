@@ -83,7 +83,7 @@ function readRetryAfter(res: Response): number | undefined {
  * Message of a failed answer. The backend always sends an `error` it has translated: keep it.
  * Without one, something in front of the backend answered: nginx sends an HTML page with a 502
  * while the backend is stopped or starting and a 504 when it does not answer in time, and Vite's
- * dev proxy an empty 500. "HTTP 502" would tell the admin nothing; the status stays in ApiError.
+ * dev proxy an empty 502. "HTTP 502" would tell the admin nothing; the status stays in ApiError.
  */
 function errorMessage(status: number, body: { error?: unknown }): string {
   if (typeof body.error === 'string') return body.error;
