@@ -43,10 +43,10 @@ export function assertJwtSecret(secret: string | undefined, nodeEnv: string | un
 }
 
 const POSITIVE_INTEGER_DEFAULTS = {
-  // Failed logins allowed per IP address in 15 minutes
+  // Failed logins allowed per IP address (per /64 network for IPv6) in 15 minutes
   LOGIN_RATE_LIMIT: 10,
-  // API requests allowed per IP address in one minute. Guests in a bar often share
-  // one public address: the limit must stay well above what a full room sends.
+  // API requests allowed per IP address (per /64 network for IPv6) in one minute.
+  // Guests in a bar often share one public address or /64: the limit must stay well above what a full room sends.
   API_RATE_LIMIT: 600,
 };
 

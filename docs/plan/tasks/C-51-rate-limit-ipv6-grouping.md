@@ -5,10 +5,10 @@ phase: C
 lane: backend
 criticite: basse
 effort: S
-status: review
+status: done
 owner: agent
 depends_on: [C-47]
-touches: [backend/src/middleware/rateLimit.ts, backend/src/middleware/rateLimit.test.ts, backend/src/routes/apiRateLimit.test.ts, backend/src/routes/loginRateLimit.test.ts, backend/AGENTS.md, README.md, .env.example, UPGRADING.md]
+touches: [backend/src/config.ts, backend/src/middleware/rateLimit.ts, backend/src/middleware/rateLimit.test.ts, backend/src/routes/apiRateLimit.test.ts, backend/src/routes/loginRateLimit.test.ts, backend/AGENTS.md, README.md, .env.example, UPGRADING.md]
 sources: []
 branch: fix/C-51-rate-limit-ipv6-grouping
 pr: "#179"
@@ -61,4 +61,5 @@ L'effet ne se voit que là où une vraie adresse IPv6 arrive dans `X-Forwarded-F
 
 - 2026-11-12 : tâche créée d'après la relecture de la PR #174 (manque 3). Faits établis avant la décision : options d'express-rate-limit 8.7.0 sondées (clés produites pour /56, /64 et `false`, validations qui écrivent une `ValidationError` sans bloquer), et chemin de `req.ip` depuis nginx (`listen 8080` en IPv4 seulement, réseau compose sans IPv6). Décision humaine : /64.
 - 2026-11-12 : PR #179 ouverte (branche `fix/C-51-rate-limit-ipv6-grouping`). `ipv6Subnet: 64` dans la fabrique, tests unitaires et d'intégration, README, `.env.example`, `backend/AGENTS.md`, et la ligne v1.11.0 d'`UPGRADING.md`.
-- Notes de version : « An IPv6 client now counts for its /64 network (one LAN) in the rate limits, instead of its /56: devices on the same Wi-Fi still share a counter, but other networks of the same site, such as a guest network and a staff network, and mobile subscribers each get their own. No action required; only installs where the API sees real IPv6 client addresses (a reverse proxy or tunnel that receives IPv6) notice the change. »
+- 2026-11-12 : relecture approuvée. Commentaires de `backend/src/config.ts` (`LOGIN_RATE_LIMIT`, `API_RATE_LIMIT`) passés à la règle /64 (nit 2), statut `done`, phrase des notes reprise du nit 1, rebase sur `origin/develop`.
+- Notes de version : « The rate limits count an IPv6 client for its /64 network (one LAN). The login limit counted per /56 in v1.11 and v1.12. Devices on the same Wi-Fi share a counter; other networks of the same site (a guest network and a staff network) and mobile subscribers each get their own. No action required; only installs where the API sees real IPv6 client addresses (a reverse proxy or tunnel that receives IPv6) notice the change. » Dans la PR #174, `docs/releases/v1.13.0.md` (l. 10, 16, 18) et la section v1.13.0 d'`UPGRADING.md` disent « per client IP address » : y ajouter « (per /64 network for IPv6) ».
