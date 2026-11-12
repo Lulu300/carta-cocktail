@@ -1,13 +1,14 @@
 // Required actions of docs/releases/v1.12.0.md (and the v1.12.0 section of UPGRADING.md).
-import { FAILED_MIGRATION_REFUSAL } from '../lib/checks.mjs';
+import { FAILED_MIGRATION_REFUSAL, UNWRITABLE_REFUSAL } from '../lib/checks.mjs';
 
 export default {
   version: '1.12.0',
   releaseNotes: 'docs/releases/v1.12.0.md',
-  // D-01: the backend runs as the node user (uid 1000), with the same startup log lines as v1.11.0.
+  // D-01: the backend runs as the node user (uid 1000), with the same startup log lines as v1.11.0,
+  // and refuses to start when it cannot write to its data folders.
   // C-18: a migration that fails (duplicates, for example) stops the backend with its own message.
   profile: {
-    refusals: [FAILED_MIGRATION_REFUSAL],
+    refusals: [UNWRITABLE_REFUSAL, FAILED_MIGRATION_REFUSAL],
   },
   before: [
     { step: 'Before 1', action: 'manual', note: 'stop the backend: the bench stopped it after the checks of the previous step' },
@@ -46,7 +47,6 @@ export default {
   naiveMayFail: {
     startup: 'the notes say the backend stops at startup until the data folders belong to uid 1000 (Before 3), '
       + 'or when a migration fails on duplicates (v1.8.0 Before 1)',
-    refusal: 'the refusal is the "cannot write" message of the entrypoint, which is not a known refusal',
     backup: 'the "cannot write" refusal stops the backend before the pre-migrate backup',
   },
 };

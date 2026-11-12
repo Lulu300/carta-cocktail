@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isStrongJwtSecret } from '../lib/actions.mjs';
 import {
   BASELINE_REFUSAL, checkImages, checkLogLines, checkRefusalMessage, checkRefusedDatabase, checkRowCounts,
-  checkUploadsPersistent, FAILED_MIGRATION_REFUSAL, findRefusal, row,
+  checkUploadsPersistent, FAILED_MIGRATION_REFUSAL, findRefusal, row, UNWRITABLE_REFUSAL,
 } from '../lib/checks.mjs';
 import { checkFixtureAcceptsDuplicate, parseFixtureCategories, parseSnapshot } from '../lib/database.mjs';
 import { parseLastExitCode } from '../lib/docker.mjs';
@@ -31,6 +31,10 @@ const FAILED_MIGRATION_LOGS = [
   'ERROR: migration 20261010173910_schema_integrity failed. The backend will not start.',
   'Newest copy made before a migration: /app/data/backups/pre-migrate-20261012-101500.db (with its -wal file when there is one).',
 ].join('\n');
+const UNWRITABLE_LOGS = [
+  'ERROR: the backend runs as uid 1000 and cannot write to /app/data.',
+  'Images before this version ran as root, so the files of an existing install belong to root.',
+].join('\n');
 // Port the frontend container listens on, per compose generation of the layouts.
 const FRONTEND_PORT_BY_GENERATION = { '1.4.0': 80, '1.5.0': 80, '1.8.0': 8080 };
 
@@ -51,7 +55,7 @@ test('the refusal messages are the ones the entrypoint prints', () => {
   // The 0_init message names the migration through a variable.
   const baselineMigration = /^BASELINE_MIGRATION=(\S+)$/m.exec(source)[1];
   const entrypoint = source.replaceAll('$BASELINE_MIGRATION', baselineMigration);
-  for (const refusal of [BASELINE_REFUSAL, FAILED_MIGRATION_REFUSAL]) {
+  for (const refusal of [BASELINE_REFUSAL, FAILED_MIGRATION_REFUSAL, UNWRITABLE_REFUSAL]) {
     assert.ok(entrypoint.includes(refusal.log), refusal.log);
   }
 });
@@ -60,8 +64,22 @@ test('findRefusal recognises each refusal, and only its own message', () => {
   const refusals = [BASELINE_REFUSAL, FAILED_MIGRATION_REFUSAL];
   assert.equal(findRefusal(refusals, BASELINE_REFUSAL_LOGS), BASELINE_REFUSAL);
   assert.equal(findRefusal(refusals, FAILED_MIGRATION_LOGS), FAILED_MIGRATION_REFUSAL);
-  assert.equal(findRefusal(refusals, 'ERROR: the backend runs as uid 1000 and cannot write to /app/data.'), null);
+  assert.equal(findRefusal(refusals, UNWRITABLE_LOGS), null);
   assert.equal(findRefusal([BASELINE_REFUSAL], FAILED_MIGRATION_LOGS), null);
+  const withUnwritable = [UNWRITABLE_REFUSAL, FAILED_MIGRATION_REFUSAL];
+  assert.equal(findRefusal(withUnwritable, UNWRITABLE_LOGS), UNWRITABLE_REFUSAL);
+  assert.equal(findRefusal(withUnwritable, FAILED_MIGRATION_LOGS), FAILED_MIGRATION_REFUSAL);
+});
+
+test('the cannot write refusal stops the backend before the migrations, and must leave the database untouched', () => {
+  assert.equal(UNWRITABLE_REFUSAL.beforeMigrations, true);
+  assert.equal(BASELINE_REFUSAL.beforeMigrations, undefined);
+  assert.equal(FAILED_MIGRATION_REFUSAL.beforeMigrations, undefined);
+  assert.equal(checkRefusalMessage([UNWRITABLE_REFUSAL, FAILED_MIGRATION_REFUSAL], UNWRITABLE_REFUSAL).detail, '"cannot write to" found');
+  const before = { fingerprint: 'aaa' };
+  const untouched = checkRefusedDatabase(UNWRITABLE_REFUSAL, before, { fingerprint: 'aaa' });
+  assert.deepEqual([untouched.label, untouched.status], ['database left untouched by the refused start', 'ok']);
+  assert.equal(checkRefusedDatabase(UNWRITABLE_REFUSAL, before, { fingerprint: 'bbb' }).status, 'ko');
 });
 
 test('checkRefusalMessage reports the message found, or every message it looked for', () => {
@@ -196,6 +214,17 @@ test('expectations: --inject-duplicate allows the refused start with its own rea
   assert.match(INJECTED_DUPLICATE_REASON, /--inject-duplicate: the schema_integrity migration refuses duplicate/);
 });
 
+test('expectations: --inject-duplicate does not explain a start refused before the migrations', () => {
+  const crossedHooks = [{ naiveMayFail: { startup: 'non-root image' } }];
+  const refuses = { knownIssues: {}, uniqueCategoryNames: true };
+  const options = { profile: refuses, crossedHooks, unmetRequirements: [], injectedDuplicate: true, refusal: UNWRITABLE_REFUSAL };
+  assert.equal(allowedFailures({ ...options, mode: 'naive' }).startup, 'non-root image');
+  assert.equal(allowedFailures({ ...options, mode: 'conformant' }).startup, undefined);
+  for (const refusal of [FAILED_MIGRATION_REFUSAL, BASELINE_REFUSAL, null]) {
+    assert.equal(allowedFailures({ ...options, mode: 'naive', refusal }).startup, INJECTED_DUPLICATE_REASON);
+  }
+});
+
 test('expectations: --inject-duplicate changes nothing before v1.8.0, nor without the option', () => {
   const crossedHooks = [{ naiveMayFail: { startup: 'weak secret' } }];
   const accepts = { knownIssues: {} };
@@ -247,7 +276,7 @@ function judgedStep({ mode, started, injectedDuplicate, refusal = started ? null
   };
   return judgeStep(step, {
     mode,
-    profile: { knownIssues: {}, uniqueCategoryNames: true, refusals: [BASELINE_REFUSAL, FAILED_MIGRATION_REFUSAL] },
+    profile: { knownIssues: {}, uniqueCategoryNames: true, refusals: [BASELINE_REFUSAL, UNWRITABLE_REFUSAL, FAILED_MIGRATION_REFUSAL] },
     crossedHooks: [{ naiveMayFail: { startup: 'weak secret' } }],
     unmetRequirements: [],
     injectedDuplicate,
@@ -282,6 +311,20 @@ test('judgeStep: --inject-duplicate requires the refusal of the failed migration
     [['duplicateRefusal', 'refused, but not by the failed migration: "does not match migration 0_init"']]);
   const unknown = judgedStep({ mode: 'naive', started: false, injectedDuplicate: true, refusal: null });
   assert.deepEqual(unexpectedOf(unknown), [['duplicateRefusal', 'refused, but not by the failed migration: no known refusal message']]);
+});
+
+test('judgeStep: --inject-duplicate, a start refused for "cannot write" leaves the duplicate untested', () => {
+  const naive = judgedStep({ mode: 'naive', started: false, injectedDuplicate: true, refusal: UNWRITABLE_REFUSAL });
+  assert.deepEqual(unexpectedOf(naive), []);
+  assert.deepEqual(naive.checks[1], {
+    group: 'duplicateRefusal', label: 'injected duplicate refused', status: 'skip',
+    detail: 'not applicable: refused before the migrations ("cannot write to"), the duplicate was not tested',
+  });
+  assert.equal(naive.checks[0].expected, 'weak secret');
+  // Conformant mode gives the folders to uid 1000 first: the refusal stays a failure of the start.
+  const conformant = judgedStep({ mode: 'conformant', started: false, injectedDuplicate: true, refusal: UNWRITABLE_REFUSAL });
+  assert.deepEqual(unexpectedOf(conformant), [['startup', 'refused: exit code 1, 1 restart(s)']]);
+  assert.equal(conformant.checks[1].status, 'skip');
 });
 
 test('judgeStep: without the option, or before v1.8.0, no refusal is required', () => {

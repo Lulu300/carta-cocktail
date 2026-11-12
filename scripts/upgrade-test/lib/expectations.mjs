@@ -5,8 +5,15 @@ import { releaseOf } from './versions.mjs';
 export const INJECTED_DUPLICATE_REASON = 'duplicate injected by --inject-duplicate: '
   + 'the schema_integrity migration refuses duplicate category names';
 
+const DUPLICATE_REFUSAL_LABEL = 'injected duplicate refused';
+
 function refusesInjectedDuplicate(profile, injectedDuplicate) {
   return injectedDuplicate && Boolean(profile.uniqueCategoryNames);
+}
+
+/** A start refused before any migration ran (`cannot write`, for example): the duplicate was not tested. */
+function refusedBeforeMigrations(refusal) {
+  return Boolean(refusal?.beforeMigrations);
 }
 
 /**
@@ -26,13 +33,14 @@ export function isRequirementMet(hook, startedReleases, previousVersion) {
  *   knows the real cause;
  * - a refused start when the path skips a version that the notes require to start first;
  * - with --inject-duplicate (`injectedDuplicate`), a refused start on a version that refuses
- *   duplicate category names: this reason replaces the one of the notes.
+ *   duplicate category names: this reason replaces the one of the notes, unless the start was
+ *   refused before the migrations (`refusal`), which the duplicate cannot explain.
  * Photos that the backend does not serve cannot reach the frontend nginx either: whenever
  * `images` may fail, `frontendImages` may fail for the same reason, unless the notes give it
  * a reason of their own.
  */
 export function allowedFailures({
-  mode, profile, crossedHooks, unmetRequirements, layoutReasons = {}, injectedDuplicate = false,
+  mode, profile, crossedHooks, unmetRequirements, layoutReasons = {}, injectedDuplicate = false, refusal = null,
 }) {
   const allowed = { ...profile.knownIssues };
   if (mode === 'naive') {
@@ -45,7 +53,9 @@ export function allowedFailures({
   if (unmetRequirements.length) {
     allowed.startup = `the path skips ${unmetRequirements.join(', ')}, which the notes require to start first`;
   }
-  if (refusesInjectedDuplicate(profile, injectedDuplicate)) allowed.startup = INJECTED_DUPLICATE_REASON;
+  if (refusesInjectedDuplicate(profile, injectedDuplicate) && !refusedBeforeMigrations(refusal)) {
+    allowed.startup = INJECTED_DUPLICATE_REASON;
+  }
   return allowed;
 }
 
@@ -59,12 +69,22 @@ function injectedDuplicateDetail(started, refusal) {
  * --inject-duplicate: a version that refuses duplicate category names must refuse the working copy,
  * and through the failed migration (`refusal`, found in the logs of a refused start, or null).
  * `allowedFailures` only allows the refused start: without this row, a start, or a refusal for
- * another reason, would go unnoticed. Returns no row when the step does not have to refuse.
+ * another reason, would go unnoticed. Returns no row when the step does not have to refuse, and a
+ * skipped row when the start was refused before the migrations: the duplicate was not tested, and
+ * the refusal is judged by its own rows (startup, refusal message, database).
  */
 export function checkInjectedDuplicateRefused({ profile, injectedDuplicate = false, started, refusal = null }) {
   if (!refusesInjectedDuplicate(profile, injectedDuplicate)) return [];
+  if (!started && refusedBeforeMigrations(refusal)) {
+    return [{
+      group: 'duplicateRefusal',
+      label: DUPLICATE_REFUSAL_LABEL,
+      status: 'skip',
+      detail: `not applicable: refused before the migrations ("${refusal.log}"), the duplicate was not tested`,
+    }];
+  }
   const refusedByMigration = !started && refusal?.log === FAILED_MIGRATION_REFUSAL.log;
-  return [row('duplicateRefusal', 'injected duplicate refused', refusedByMigration, injectedDuplicateDetail(started, refusal))];
+  return [row('duplicateRefusal', DUPLICATE_REFUSAL_LABEL, refusedByMigration, injectedDuplicateDetail(started, refusal))];
 }
 
 /**
@@ -112,7 +132,7 @@ export function judgeStep(step, {
 }) {
   const startupIndex = step.checks.findIndex((result) => result.group === 'startup');
   step.checks.splice(startupIndex + 1, 0, ...checkInjectedDuplicateRefused({ profile, injectedDuplicate, started, refusal }));
-  const allowed = allowedFailures({ mode, profile, crossedHooks, unmetRequirements, layoutReasons, injectedDuplicate });
+  const allowed = allowedFailures({ mode, profile, crossedHooks, unmetRequirements, layoutReasons, injectedDuplicate, refusal });
   markExpected(step.checks, { mode, allowed, previousFailedGroups });
   markExpectedActions(step.actions, allowedActionFailures({ profile, injectedDuplicate }));
   return step;
