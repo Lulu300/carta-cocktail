@@ -24,6 +24,14 @@ export function mockRateLimited(method: ApiMethod, path: string, retryAfterSecon
   server.use(http[method](path, () => rateLimitedResponse(retryAfterSeconds)));
 }
 
+/**
+ * Makes `method path` answer like nginx in front of the backend: an HTML error page, not the
+ * API's JSON. nginx sends a 502 while the backend is down and a 504 when it does not answer in time.
+ */
+export function mockProxyError(method: ApiMethod, path: string, status: number): void {
+  server.use(http[method](path, () => HttpResponse.html(`<html><body><h1>${status}</h1></body></html>`, { status })));
+}
+
 /** Makes `method path` hang: the page stays in its loading state for the whole test. */
 export function mockApiPending(method: ApiMethod, path: string): void {
   server.use(http[method](path, pendingResponse));
