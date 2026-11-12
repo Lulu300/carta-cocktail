@@ -4,6 +4,7 @@ import { setupTestDatabase, teardownTestDatabase, cleanDatabase, prisma } from '
 import { ensureAdmin } from './ensureAdmin';
 
 const STRONG_PASSWORD = 'correct-horse-battery';
+const PASSWORD_IN_RESET_FLAG = 'My-new-password-42';
 const PRODUCTION_ENV = { NODE_ENV: 'production', ADMIN_EMAIL: 'owner@bar.test', ADMIN_PASSWORD: STRONG_PASSWORD };
 
 async function createExistingAdmin(password = 'changed-from-the-ui'): Promise<{ id: number; passwordHash: string }> {
@@ -87,7 +88,7 @@ describe('ensureAdmin with an existing admin', () => {
     expect(String(log.mock.calls)).not.toContain(STRONG_PASSWORD);
   });
 
-  it.each(['1', 'TRUE', 'yes'])('should ignore ADMIN_RESET_PASSWORD=%s and say so', async (flag) => {
+  it.each(['1', 'TRUE', 'yes', PASSWORD_IN_RESET_FLAG])('should ignore ADMIN_RESET_PASSWORD=%s and say so', async (flag) => {
     const existing = await createExistingAdmin();
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -95,10 +96,24 @@ describe('ensureAdmin with an existing admin', () => {
 
     expect(result).toBe('unchanged');
     expect(warn).toHaveBeenCalledWith(
-      `ADMIN_RESET_PASSWORD='${flag}' is ignored: set it to exactly 'true' to reset the admin credentials`,
+      "ADMIN_RESET_PASSWORD is ignored: only the exact value 'true' resets the admin credentials " +
+      "(values such as 'TRUE' or '1' do not)",
     );
     const admin = await prisma.user.findUniqueOrThrow({ where: { id: existing.id } });
     expect(admin.passwordHash).toBe(existing.passwordHash);
+  });
+
+  // The flag's name invites operators to put the new password there
+  it('should not write a password put in ADMIN_RESET_PASSWORD to the logs', async () => {
+    await createExistingAdmin();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await ensureAdmin(prisma, { ...PRODUCTION_ENV, ADMIN_RESET_PASSWORD: PASSWORD_IN_RESET_FLAG });
+
+    expect(warn).toHaveBeenCalled();
+    expect(String(warn.mock.calls)).not.toContain(PASSWORD_IN_RESET_FLAG);
+    expect(String(log.mock.calls)).not.toContain(PASSWORD_IN_RESET_FLAG);
   });
 
   it('should not warn when ADMIN_RESET_PASSWORD is false', async () => {

@@ -9,6 +9,10 @@ const INVALID_PASSWORD_MESSAGE =
   `ADMIN_PASSWORD must be set to at least ${MIN_PASSWORD_LENGTH} characters, other than '${FORBIDDEN_ADMIN_PASSWORD}', ` +
   'to create or reset the admin user';
 
+const RESET_FLAG_IGNORED_MESSAGE =
+  "ADMIN_RESET_PASSWORD is ignored: only the exact value 'true' resets the admin credentials " +
+  "(values such as 'TRUE' or '1' do not)";
+
 export type EnsureAdminResult = 'created' | 'reset' | 'unchanged';
 
 /**
@@ -37,8 +41,10 @@ async function credentialsFromEnv(env: NodeJS.ProcessEnv): Promise<{ email: stri
 
 /**
  * Only the exact value 'true' triggers a reset. Any other non-empty value except
- * 'false' (the compose default) is logged, so a typo such as '1' or 'TRUE'
+ * 'false' (the compose default) triggers a warning, so a typo such as '1' or 'TRUE'
  * does not fail silently while someone is recovering a lost password.
+ * The warning never repeats the value: the variable's name invites operators to
+ * put the new password there, and it would end up in the container logs.
  */
 function isResetRequested(env: NodeJS.ProcessEnv): boolean {
   const flag = env.ADMIN_RESET_PASSWORD;
@@ -46,7 +52,7 @@ function isResetRequested(env: NodeJS.ProcessEnv): boolean {
     return true;
   }
   if (flag && flag !== 'false') {
-    console.warn(`ADMIN_RESET_PASSWORD='${flag}' is ignored: set it to exactly 'true' to reset the admin credentials`);
+    console.warn(RESET_FLAG_IGNORED_MESSAGE);
   }
   return false;
 }
