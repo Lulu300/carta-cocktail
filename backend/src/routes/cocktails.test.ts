@@ -10,6 +10,7 @@ import {
 } from '../test/helpers';
 import type { CocktailIngredient } from '../generated/prisma/client';
 import type { CocktailExportFile } from '../services/cocktail/cocktailExport';
+import { MAX_EXPORT_BATCH } from '../validation/cocktails';
 
 beforeAll(async () => { await setupTestDatabase(); });
 afterAll(async () => { await teardownTestDatabase(); });
@@ -556,6 +557,93 @@ describe('GET /api/cocktails/:id/export', () => {
     expect(res.body.version).toBe(1);
     expect(res.body.cocktail.name).toBe('Export Test');
     expect(res.headers['content-disposition']).toContain('cocktail-export-test.json');
+  });
+});
+
+describe('POST /api/cocktails/export', () => {
+  function exportBatch(body: unknown) {
+    return request.post('/api/cocktails/export').set(authHeader()).send(body as object);
+  }
+
+  /** The single export of a cocktail, as the batch must repeat it. */
+  async function singleExport(id: number) {
+    const res = await request.get(`/api/cocktails/${id}/export`).set(authHeader());
+    const filename = /filename="([^"]+)"/.exec(res.headers['content-disposition'])?.[1];
+    return { filename, data: res.body };
+  }
+
+  /** `exportedAt` is the time of each request: the rest of the file must match. */
+  function withoutExportTime(file: { filename?: string; data: Record<string, unknown> }) {
+    return { ...file, data: { ...file.data, exportedAt: undefined } };
+  }
+
+  it('should return 401 without auth', async () => {
+    const res = await request.post('/api/cocktails/export').send({ ids: [1] });
+    expect(res.status).toBe(401);
+  });
+
+  it('should return the files of the single export, in the order of the ids', async () => {
+    const rum = await seedCategory({ name: 'Rum', type: 'SPIRIT' });
+    const havana = await seedBottle({ name: 'Havana 3 Ans', categoryId: rum.id });
+    const daiquiri = await seedFullCocktail({
+      name: 'Daiquiri',
+      tags: 'classic,sour',
+      ingredients: [{ sourceType: 'CATEGORY', categoryId: rum.id, preferredBottleIds: [havana.id] }],
+    });
+    const mojito = await seedFullCocktail({ name: 'Mojito' });
+    const pinaColada = await seedCocktail({ name: 'Piña Colada' });
+    const ids = [pinaColada.id, daiquiri.id, mojito.id];
+
+    const res = await exportBatch({ ids });
+
+    expect(res.status).toBe(200);
+    const expected = await Promise.all(ids.map(singleExport));
+    expect(res.body.map(withoutExportTime)).toEqual(expected.map(withoutExportTime));
+    expect(res.body[0].filename).toBe('cocktail-pina-colada.json');
+    // Private fields included, as in the admin's single export
+    const daiquiriLines: CocktailExportFile['payload']['cocktail']['ingredients'] = res.body[1].data.cocktail.ingredients;
+    expect(lineOfSource(daiquiriLines, 'CATEGORY').preferredBottles)
+      .toEqual([{ name: 'Havana 3 Ans', categoryName: 'Rum' }]);
+  });
+
+  it('should give cocktails with the same name the same file name, as the single export does', async () => {
+    const first = await seedCocktail({ name: 'Mojito' });
+    const second = await seedCocktail({ name: 'Mojito' });
+
+    const res = await exportBatch({ ids: [first.id, second.id] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.map((file: { filename: string }) => file.filename))
+      .toEqual(['cocktail-mojito.json', 'cocktail-mojito.json']);
+  });
+
+  it('should return 404 when one of the cocktails does not exist', async () => {
+    const mojito = await seedCocktail({ name: 'Mojito' });
+
+    const res = await exportBatch({ ids: [mojito.id, 9999] });
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('Resource not found');
+  });
+
+  it(`should accept ${MAX_EXPORT_BATCH} ids and refuse one more`, async () => {
+    const unknownIds = Array.from({ length: MAX_EXPORT_BATCH + 1 }, (_, index) => 10_000 + index);
+
+    expect((await exportBatch({ ids: unknownIds.slice(0, MAX_EXPORT_BATCH) })).status).toBe(404);
+    const tooMany = await exportBatch({ ids: unknownIds });
+    expect(tooMany.status).toBe(400);
+    expect(tooMany.body.details[0].path).toBe('body.ids');
+  });
+
+  it.each([
+    ['no ids', {}],
+    ['an empty list', { ids: [] }],
+    ['an id that is not a positive integer', { ids: [1, 0] }],
+    ['an id sent as a string', { ids: ['1'] }],
+    ['ids that are not a list', { ids: 1 }],
+  ])('should return 400 for %s', async (_case, body) => {
+    const res = await exportBatch(body);
+    expect(res.status).toBe(400);
   });
 });
 

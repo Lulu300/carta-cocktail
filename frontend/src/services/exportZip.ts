@@ -1,4 +1,20 @@
-import { cocktails as cocktailsApi } from './api';
+import { cocktails as cocktailsApi, type CocktailExportFile } from './api';
+
+/**
+ * Most cocktails the backend exports in one request (MAX_EXPORT_BATCH in
+ * backend/src/validation/cocktails.ts). One request per cocktail would reach the
+ * API rate limit when the admin exports a few hundred of them.
+ */
+export const EXPORT_BATCH_SIZE = 500;
+
+/** The exports of every cocktail of `ids`, in their order, one batch after the other. */
+async function fetchExports(ids: number[]): Promise<CocktailExportFile[]> {
+  const files: CocktailExportFile[] = [];
+  for (let start = 0; start < ids.length; start += EXPORT_BATCH_SIZE) {
+    files.push(...(await cocktailsApi.exportRecipes(ids.slice(start, start + EXPORT_BATCH_SIZE))));
+  }
+  return files;
+}
 
 /**
  * Cocktail names are not unique, so two exports can get the same server file name,
@@ -19,7 +35,7 @@ export async function exportCocktailsAsZip(ids: number[]): Promise<void> {
   const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
 
-  const exports = await Promise.all(ids.map((id) => cocktailsApi.exportRecipe(id)));
+  const exports = await fetchExports(ids);
 
   const taken = new Set<string>();
   for (const { filename, data } of exports) {

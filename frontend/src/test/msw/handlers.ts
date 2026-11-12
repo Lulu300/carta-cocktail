@@ -37,6 +37,17 @@ function exportedRecipe(name: string): CocktailExportFormat {
   };
 }
 
+/** The export of the default cocktail `id`: its file name and its content. */
+function exportedCocktailFile(id: number): { filename: string; data: CocktailExportFormat } {
+  return { filename: `cocktail-${id}.json`, data: exportedRecipe(buildCocktail({ id }).name) };
+}
+
+/** The single export of the default cocktail `id`, named in Content-Disposition as the backend does. */
+function exportAttachment(id: number): Response {
+  const { filename, data } = exportedCocktailFile(id);
+  return HttpResponse.json(data, { headers: { 'Content-Disposition': `attachment; filename="${filename}"` } });
+}
+
 const FIRST_CREATED_ID = 1000;
 let createdId = FIRST_CREATED_ID;
 
@@ -121,11 +132,11 @@ const unitHandlers = [
 const cocktailHandlers = [
   http.get('/api/cocktails', () => HttpResponse.json([buildCocktail({ id: 1 }), buildCocktail({ id: 2 })])),
   http.get('/api/cocktails/:id', ({ params }) => HttpResponse.json(buildCocktail({ id: Number(params.id) }))),
-  http.get('/api/cocktails/:id/export', ({ params }) =>
-    HttpResponse.json(exportedRecipe(buildCocktail({ id: Number(params.id) }).name), {
-      headers: { 'Content-Disposition': `attachment; filename="cocktail-${String(params.id)}.json"` },
-    }),
-  ),
+  http.get('/api/cocktails/:id/export', ({ params }) => exportAttachment(Number(params.id))),
+  http.post('/api/cocktails/export', async ({ request }) => {
+    const { ids } = await readJsonObject(request);
+    return HttpResponse.json(Array.isArray(ids) ? ids.map((id) => exportedCocktailFile(Number(id))) : []);
+  }),
   http.post('/api/cocktails', echoCreated),
   http.put('/api/cocktails/:id', echoUpdated),
   http.delete('/api/cocktails/:id', deleted),
@@ -172,11 +183,7 @@ const publicHandlers = [
   http.get('/api/public/cocktails/:id', ({ params }) =>
     HttpResponse.json(buildCocktail({ id: Number(params.id), available: true })),
   ),
-  http.get('/api/public/cocktails/:id/export', ({ params }) =>
-    HttpResponse.json(exportedRecipe(buildCocktail({ id: Number(params.id) }).name), {
-      headers: { 'Content-Disposition': `attachment; filename="cocktail-${String(params.id)}.json"` },
-    }),
-  ),
+  http.get('/api/public/cocktails/:id/export', ({ params }) => exportAttachment(Number(params.id))),
   http.get('/api/public/settings', () => HttpResponse.json(buildSiteSettings())),
   http.get('/api/public/units', () => HttpResponse.json([buildUnit({ id: 1 }), buildUnit({ id: 2 })])),
 ];
