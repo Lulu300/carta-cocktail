@@ -146,7 +146,7 @@ Protected routes use `ProtectedRoute` wrapper in `App.tsx` which checks `AuthCon
 ### Auth Flow
 
 1. `AuthContext` loads token from `localStorage` on mount
-2. Calls `GET /api/auth/me` to validate token
+2. Calls `GET /api/auth/me` to validate token. Only a 401 ends the session; any other failure (rate limit, server or network error) keeps the token and sets `sessionError`, and `ProtectedRoute` shows a screen with the server message and "Retry" (`retrySession`)
 3. On login, stores token and user in state + localStorage
 4. `ProtectedRoute` in `App.tsx` redirects to `/login` if no user
 

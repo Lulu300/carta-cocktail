@@ -3,6 +3,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Outlet, useLocation } from 'react-router-dom';
 import App from './App';
+import { ApiError } from './services/api';
+import { axe } from './test/axe';
 import appSource from './App.tsx?raw';
 
 const mockUseAuth = vi.fn();
@@ -108,6 +110,55 @@ describe('ProtectedRoute', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('common.loading');
     expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
     expect(screen.queryByTestId('admin-layout')).not.toBeInTheDocument();
+  });
+
+  describe('when the session could not be checked', () => {
+    const retrySession = vi.fn();
+
+    function failSessionCheck(sessionError: Error) {
+      mockUseAuth.mockReturnValue({ user: null, isLoading: false, sessionError, retrySession });
+    }
+
+    it('shows the backend message of a rate limit with Retry, without sending the admin to /login', async () => {
+      failSessionCheck(new ApiError(429, 'Too many requests: try again in a few minutes'));
+
+      const { container } = renderAt('/admin/bottles');
+
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent('auth.sessionCheckFailed');
+      expect(alert).toHaveTextContent('Too many requests: try again in a few minutes');
+      expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('admin-layout')).not.toBeInTheDocument();
+      expect(await axe(container)).toHaveNoViolations();
+
+      await userEvent.click(screen.getByRole('button', { name: 'common.retry' }));
+      expect(retrySession).toHaveBeenCalledTimes(1);
+    });
+
+    it('asks to check the connection after a network error', async () => {
+      failSessionCheck(new TypeError('Failed to fetch'));
+
+      renderAt('/admin');
+
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent('auth.sessionCheckFailed');
+      expect(alert).toHaveTextContent('public.loadErrorHint');
+      expect(alert).not.toHaveTextContent('Failed to fetch');
+    });
+
+    it('renders the admin layout when the admin signed in after a failed check', async () => {
+      mockUseAuth.mockReturnValue({
+        user: { id: 1, email: 'admin@test.local' },
+        isLoading: false,
+        sessionError: new ApiError(429, 'Too many requests: try again in a few minutes'),
+        retrySession,
+      });
+
+      renderAt('/admin/bottles');
+
+      expect(await screen.findByTestId('admin-layout')).toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
   });
 });
 

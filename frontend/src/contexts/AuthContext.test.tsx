@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { auth } from '../services/api';
-import { captureRequest, mockApiError, mockApiResponse } from '../test/msw/utils';
+import { http } from 'msw';
+import { ApiError, auth } from '../services/api';
+import { server } from '../test/msw/server';
+import { captureRequest, errorResponse, mockApiError, mockApiResponse, mockNetworkError } from '../test/msw/utils';
 import { AuthProvider, useAuth } from './AuthContext';
 
 const admin = { id: 1, email: 'admin@test.local' };
@@ -56,7 +58,134 @@ describe('AuthContext', () => {
 
     expect(result.current.user).toBeNull();
     expect(result.current.token).toBeNull();
+    expect(result.current.sessionError).toBeNull();
     expect(localStorage.getItem('token')).toBeNull();
+  });
+
+  it('should keep a session signed in meanwhile when the check of the previous token gets a 401', async () => {
+    localStorage.setItem('token', 'expired-token');
+    let answer: () => void = () => {};
+    const answered = new Promise<void>((resolve) => { answer = resolve; });
+    server.use(http.get('/api/auth/me', async () => {
+      await answered;
+      return errorResponse(401, 'Token expired');
+    }));
+    mockApiResponse('post', '/api/auth/login', { token: 'new-token', user: admin });
+    const { result } = renderHook(() => useAuth(), { wrapper });
+
+    await act(async () => {
+      await result.current.login('admin@test.local', 'password');
+    });
+    // Only the 401 path of services/api.ts decides: it ignores a 401 for a replaced token
+    await act(async () => answer());
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.user).toEqual(admin);
+    expect(result.current.token).toBe('new-token');
+    expect(localStorage.getItem('token')).toBe('new-token');
+  });
+
+  describe('when the stored token cannot be checked', () => {
+    it.each([
+      { failure: 'the rate limit (429)', fail: () => mockApiError('get', '/api/auth/me', 429, 'Too many requests: try again in a few minutes'), status: 429 },
+      { failure: 'a server error (500)', fail: () => mockApiError('get', '/api/auth/me', 500, 'Internal server error'), status: 500 },
+    ])('should keep the token after $failure', async ({ fail, status }) => {
+      localStorage.setItem('token', 'stored-token');
+      fail();
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+      expect(result.current.user).toBeNull();
+      expect(result.current.token).toBe('stored-token');
+      expect(localStorage.getItem('token')).toBe('stored-token');
+      expect(result.current.sessionError).toBeInstanceOf(ApiError);
+      expect((result.current.sessionError as ApiError).status).toBe(status);
+    });
+
+    it('should keep the token after a network error', async () => {
+      localStorage.setItem('token', 'stored-token');
+      mockNetworkError('get', '/api/auth/me');
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+      expect(result.current.user).toBeNull();
+      expect(result.current.token).toBe('stored-token');
+      expect(localStorage.getItem('token')).toBe('stored-token');
+      expect(result.current.sessionError).toBeInstanceOf(TypeError);
+    });
+
+    it('should restore the session when a retry succeeds', async () => {
+      localStorage.setItem('token', 'stored-token');
+      mockApiError('get', '/api/auth/me', 429, 'Too many requests: try again in a few minutes');
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => {
+        expect(result.current.sessionError).not.toBeNull();
+      });
+
+      mockSession();
+      act(() => {
+        result.current.retrySession();
+      });
+
+      expect(result.current.isLoading).toBe(true);
+      expect(result.current.sessionError).toBeNull();
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+      expect(result.current.user).toEqual(admin);
+      expect(result.current.token).toBe('stored-token');
+    });
+
+    it('should end the session when a retry gets a 401', async () => {
+      localStorage.setItem('token', 'stored-token');
+      mockApiError('get', '/api/auth/me', 500, 'Internal server error');
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => {
+        expect(result.current.sessionError).not.toBeNull();
+      });
+
+      mockApiError('get', '/api/auth/me', 401, 'Token expired');
+      act(() => {
+        result.current.retrySession();
+      });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+      expect(result.current.user).toBeNull();
+      expect(result.current.token).toBeNull();
+      expect(result.current.sessionError).toBeNull();
+      expect(localStorage.getItem('token')).toBeNull();
+    });
+
+    it('should sign out without a request when the token was removed before the retry', async () => {
+      localStorage.setItem('token', 'stored-token');
+      mockNetworkError('get', '/api/auth/me');
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => {
+        expect(result.current.sessionError).not.toBeNull();
+      });
+      const me = captureRequest('get', '/api/auth/me');
+
+      // Another tab signed out
+      localStorage.removeItem('token');
+      act(() => {
+        result.current.retrySession();
+      });
+
+      expect(me.count()).toBe(0);
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.token).toBeNull();
+      expect(result.current.sessionError).toBeNull();
+    });
   });
 
   it('should login and set user/token without calling /auth/me', async () => {
