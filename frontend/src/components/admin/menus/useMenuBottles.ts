@@ -14,30 +14,19 @@ interface EntriesUpdate {
 }
 
 export interface MenuBottlesMutations {
-  /** Changes the visibility or the section of a group of bottles. */
+  /** Changes the visibility or the section of a group of bottles, in one request. */
   update: MenuMutation<EntriesUpdate>;
   /** Takes every entry id of the menu, in the new order. */
   reorder: MenuMutation<number[]>;
   /** Removes a group of bottles from a system menu, in one request. */
   exclude: MenuMutation<MenuBottleEntry[]>;
-  /** Puts a group of removed bottles back, one request per bottle. */
+  /** Puts a group of removed bottles back, in one request. */
   restore: MenuMutation<MenuBottleExclusion[]>;
 }
 
 /** The bottles removed from a system menu. */
 export function useMenuExclusions(menuId: number): UseQueryResult<MenuBottleExclusion[], Error> {
   return useQuery({ queryKey: qk.menuExclusions(menuId), queryFn: () => menuBottlesApi.exclusions(menuId) });
-}
-
-/**
- * Waits for every request of a group, then fails with the first error. Failing
- * as soon as one request fails would let the menu refetch, and the next change
- * start, while the others are still on their way.
- */
-async function settleAll(requests: Promise<unknown>[]): Promise<void> {
-  const results = await Promise.allSettled(requests);
-  const failure = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
-  if (failure) throw failure.reason;
 }
 
 function byBottleName(a: MenuBottleExclusion, b: MenuBottleExclusion): number {
@@ -78,7 +67,7 @@ function restoredEntries(menuId: number, exclusions: MenuBottleExclusion[], entr
 export function useMenuBottles(menuId: number): MenuBottlesMutations {
   const update = useMenuMutation<EntriesUpdate>({
     menuId,
-    mutationFn: ({ entryIds, changes }) => settleAll(entryIds.map((id) => menuBottlesApi.update(id, changes))),
+    mutationFn: ({ entryIds, changes }) => menuBottlesApi.updateEntries(menuId, entryIds, changes),
     applyOptimistic: (state, { entryIds, changes }) => updateMenu(state, (menu) => ({
       ...menu,
       bottles: menu.bottles?.map((entry) => (entryIds.includes(entry.id) ? { ...entry, ...changes } : entry)),
@@ -110,8 +99,7 @@ export function useMenuBottles(menuId: number): MenuBottlesMutations {
 
   const restore = useMenuMutation<MenuBottleExclusion[]>({
     menuId,
-    // A group is put back bottle by bottle: the backend lifts one exclusion per request.
-    mutationFn: (exclusions) => settleAll(exclusions.map(({ bottleId }) => menuBottlesApi.restore(menuId, bottleId))),
+    mutationFn: (exclusions) => menuBottlesApi.restore(menuId, exclusions.map(({ bottleId }) => bottleId)),
     applyOptimistic: (state, exclusions) => {
       const bottleIds = exclusions.map((exclusion) => exclusion.bottleId);
       const withoutExclusions = updateExclusions(state, (list) => list.filter((item) => !bottleIds.includes(item.bottleId)));

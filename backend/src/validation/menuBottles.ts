@@ -21,9 +21,14 @@ export const MenuBottleUpdate = z.object({
 /** Every entry (`MenuBottle.id`) of the menu, in its new order. */
 export const MenuBottleReorder = z.object({ ids: z.array(Id) });
 
-/** Bottles removed together from a system menu (a group of the editor). */
-export const MenuBottleExclusionCreate = z.object({
+/** Bottles removed from, or put back in, a system menu together (a group of the editor). */
+export const MenuBottleIds = z.object({
   bottleIds: z.array(Id).min(1),
+});
+
+/** One change for several entries (`MenuBottle.id`) of a menu, e.g. a group of the editor. Each keeps its position. */
+export const MenuBottleGroupUpdate = MenuBottleUpdate.omit({ position: true }).extend({
+  ids: z.array(Id).min(1),
 });
 
 export const MenuBottleExclusionParams = MenuIdParams.extend({ bottleId: PathId });
