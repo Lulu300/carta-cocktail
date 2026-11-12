@@ -257,11 +257,80 @@ describe('API request helper', () => {
       await expect(api.categories.list()).rejects.toMatchObject({ status: 502, message: 'Backup restore in progress' });
     });
 
-    it('keeps the status as the message of a 4xx that is not JSON (nginx 413 for a file over its limit)', async () => {
-      mockProxyAnswer(413, '<html><body><h1>413 Request Entity Too Large</h1></body></html>', 'text/html');
+    describe('413 of nginx for a body over client_max_body_size', () => {
+      const NGINX_413 = '<html><body><h1>413 Request Entity Too Large</h1></body></html>';
+
+      it('says the file or request is too large, without a size, and keeps the status', async () => {
+        localStorage.setItem('token', 'my-token');
+        mockProxyAnswer(413, NGINX_413, 'text/html');
+        const api = await getApi();
+
+        const photo = new File(['x'], 'photo.jpg', { type: 'image/jpeg' });
+        const error = await api.cocktails.uploadImage(1, photo).catch((e: unknown) => e);
+
+        expect(error).toBeInstanceOf(api.ApiError);
+        expect(error).toMatchObject({ status: 413, message: 'The file or request is too large' });
+        expect(localStorage.getItem('token')).toBe('my-token');
+      });
+
+      it('says it in the language chosen in the UI', async () => {
+        await i18n.changeLanguage('fr');
+        mockProxyAnswer(413, NGINX_413, 'text/html');
+        const api = await getApi();
+
+        await expect(api.categories.list()).rejects.toThrow('Le fichier ou la requête est trop volumineux');
+      });
+
+      it('keeps the message of the 413 the backend translated', async () => {
+        mockError(413, { error: 'Le fichier ou la requête est trop volumineux' });
+        const api = await getApi();
+
+        // The UI is in English: a French message can only be the one the backend sent.
+        await expect(api.categories.list()).rejects.toMatchObject({
+          status: 413,
+          message: 'Le fichier ou la requête est trop volumineux',
+        });
+      });
+    });
+
+    it.each([
+      ['400 HTML page of nginx for headers too large', 400, '<html><body><h1>400 Request Header Or Cookie Too Large</h1></body></html>', 'text/html'],
+      ['403 HTML page of a proxy in front', 403, '<html><body><h1>403 Forbidden</h1></body></html>', 'text/html'],
+      ['404 plain text page of a proxy with no route', 404, '404 page not found', 'text/plain'],
+      ['405 HTML page of a proxy in front', 405, '<html><body><h1>405 Not Allowed</h1></body></html>', 'text/html'],
+      ['empty 408 of Node when the body takes too long', 408, '', 'text/plain'],
+      ['414 HTML page of nginx for a URL too long', 414, '<html><body><h1>414 Request-URI Too Large</h1></body></html>', 'text/html'],
+      ['empty 431 of Node for headers too large', 431, '', 'text/plain'],
+    ])('says the request could not be completed after a %s, with the status', async (_case, status, body, contentType) => {
+      mockProxyAnswer(status, body, contentType);
       const api = await getApi();
 
-      await expect(api.categories.list()).rejects.toMatchObject({ status: 413, message: 'HTTP 413' });
+      await expect(api.categories.list()).rejects.toMatchObject({
+        status,
+        message: `The request could not be completed (error ${status}).`,
+      });
+    });
+
+    it('says a 4xx is incomplete in the language chosen in the UI', async () => {
+      await i18n.changeLanguage('fr');
+      mockProxyAnswer(414, '<html><body><h1>414 Request-URI Too Large</h1></body></html>', 'text/html');
+      const api = await getApi();
+
+      await expect(api.categories.list()).rejects.toThrow("La requête n'a pas abouti (erreur 414).");
+    });
+
+    it('still ends the session on a 401 that is not JSON', async () => {
+      localStorage.setItem('token', 'my-token');
+      mockProxyAnswer(401, '<html><body><h1>401 Authorization Required</h1></body></html>', 'text/html');
+      const api = await getApi();
+      const onUnauthorized = vi.fn();
+      api.setUnauthorizedHandler(onUnauthorized);
+
+      await expect(api.categories.list()).rejects.toMatchObject({
+        status: 401,
+        message: 'The request could not be completed (error 401).',
+      });
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
     });
 
     it('lets a network error through unchanged', async () => {
@@ -870,7 +939,7 @@ describe('backup API', () => {
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
   });
 
-  it('importBackup throws HTTP status when error response has no message', async () => {
+  it('importBackup gives the status in a translated message when the error response has none', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 422,
@@ -879,6 +948,9 @@ describe('backup API', () => {
 
     const api = await getApi();
     const file = new File(['x'], 'x.zip', { type: 'application/zip' });
-    await expect(api.backup.importBackup(file)).rejects.toThrow('HTTP 422');
+    await expect(api.backup.importBackup(file)).rejects.toMatchObject({
+      status: 422,
+      message: 'The request could not be completed (error 422).',
+    });
   });
 });

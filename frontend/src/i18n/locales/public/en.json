@@ -64,7 +64,9 @@
     "clearSearch": "Clear search",
     "resultCount_one": "{{count}} result",
     "resultCount_other": "{{count}} results",
-    "serverUnavailable": "The server is not responding, try again in a moment."
+    "serverUnavailable": "The server is not responding, try again in a moment.",
+    "requestTooLarge": "The file or request is too large",
+    "requestFailed": "The request could not be completed (error {{status}})."
   },
   "deletion": {
     "usedByCocktails": "Used by these cocktails: {{names}}.",
