@@ -43,4 +43,4 @@ Une photo de plus de 20 Mo ou une sauvegarde de plus de 210 Mo n'atteint pas le 
 
 ## Journal
 
-- 2026-11-12 : tâche créée pendant E-45 (PR #PR).
+- 2026-11-12 : tâche créée pendant E-45 (PR #180).
