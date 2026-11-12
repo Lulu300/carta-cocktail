@@ -78,6 +78,8 @@ function signIn(isAdmin: boolean) {
     logout: vi.fn(),
     updateSession: vi.fn(),
     isLoading: false,
+    sessionError: null,
+    retrySession: vi.fn(),
   });
 }
 

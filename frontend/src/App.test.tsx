@@ -1,8 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Outlet, useLocation } from 'react-router-dom';
 import App from './App';
+import { ApiError } from './services/api';
+import { axe } from './test/axe';
 import appSource from './App.tsx?raw';
 
 const mockUseAuth = vi.fn();
@@ -108,6 +111,95 @@ describe('ProtectedRoute', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('common.loading');
     expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
     expect(screen.queryByTestId('admin-layout')).not.toBeInTheDocument();
+  });
+
+  describe('when the session could not be checked', () => {
+    const retrySession = vi.fn();
+    const logout = vi.fn();
+    const rateLimited = () => new ApiError(429, 'Too many requests: try again in a few minutes');
+
+    function failSessionCheck(sessionError: Error) {
+      mockUseAuth.mockReturnValue({ user: null, isLoading: false, sessionError, retrySession, logout });
+    }
+
+    it('shows the backend message of a rate limit with Retry, without sending the admin to /login', async () => {
+      failSessionCheck(new ApiError(429, 'Too many requests: try again in a few minutes'));
+
+      const { container } = renderAt('/admin/bottles');
+
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent('auth.sessionCheckFailed');
+      expect(alert).toHaveTextContent('Too many requests: try again in a few minutes');
+      expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('admin-layout')).not.toBeInTheDocument();
+      expect(await axe(container)).toHaveNoViolations();
+
+      await userEvent.click(screen.getByRole('button', { name: 'common.retry' }));
+      expect(retrySession).toHaveBeenCalledTimes(1);
+      expect(logout).not.toHaveBeenCalled();
+    });
+
+    it('ends the session with "Sign in again", then opens the sign-in page for the requested page', async () => {
+      // logout() of the real AuthProvider clears the token and the error: this fake does the same
+      mockUseAuth.mockImplementation(function useFailedSessionCheck() {
+        const [signedOut, setSignedOut] = useState(false);
+        return {
+          user: null,
+          isLoading: false,
+          sessionError: signedOut ? null : rateLimited(),
+          retrySession,
+          logout: () => {
+            logout();
+            setSignedOut(true);
+          },
+        };
+      });
+      renderAt('/admin/bottles');
+
+      await userEvent.click(await screen.findByRole('button', { name: 'auth.signInAgain' }));
+
+      expect(logout).toHaveBeenCalledTimes(1);
+      expect(retrySession).not.toHaveBeenCalled();
+      expect(await screen.findByTestId('login-page')).toHaveTextContent('/admin/bottles');
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('leaves for the public home page with "Back to home", still signed in', async () => {
+      failSessionCheck(rateLimited());
+      renderAt('/admin/bottles');
+
+      await userEvent.click(await screen.findByRole('link', { name: 'public.backHome' }));
+
+      expect(screen.getByTestId('home-page')).toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(logout).not.toHaveBeenCalled();
+      expect(retrySession).not.toHaveBeenCalled();
+    });
+
+    it('asks to check the connection after a network error', async () => {
+      failSessionCheck(new TypeError('Failed to fetch'));
+
+      renderAt('/admin');
+
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent('auth.sessionCheckFailed');
+      expect(alert).toHaveTextContent('public.loadErrorHint');
+      expect(alert).not.toHaveTextContent('Failed to fetch');
+    });
+
+    it('renders the admin layout when the admin signed in after a failed check', async () => {
+      mockUseAuth.mockReturnValue({
+        user: { id: 1, email: 'admin@test.local' },
+        isLoading: false,
+        sessionError: new ApiError(429, 'Too many requests: try again in a few minutes'),
+        retrySession,
+      });
+
+      renderAt('/admin/bottles');
+
+      expect(await screen.findByTestId('admin-layout')).toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
   });
 });
 

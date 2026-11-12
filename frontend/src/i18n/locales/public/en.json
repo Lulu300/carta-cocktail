@@ -50,6 +50,10 @@
     "originalUnit": "Original unit",
     "convertTo": "Convert to:"
   },
+  "auth": {
+    "sessionCheckFailed": "Your session could not be checked",
+    "signInAgain": "Sign in again"
+  },
   "common": {
     "cancel": "Cancel",
     "confirm": "Confirm",

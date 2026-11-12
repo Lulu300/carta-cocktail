@@ -2,6 +2,10 @@ import { lazy, Suspense, type ComponentType } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from './contexts/AuthContext';
+import { ApiError } from './services/api';
+import Button from './components/ui/Button';
+import EmptyState from './components/ui/EmptyState';
+import BackHomeLink from './components/layout/BackHomeLink';
 import PublicLayout from './components/layout/PublicLayout';
 import RouteErrorBoundary from './components/layout/RouteErrorBoundary';
 import HomePage from './pages/public/HomePage';
@@ -40,13 +44,50 @@ function RouteFallback() {
   );
 }
 
+interface SessionCheckErrorProps {
+  error: Error;
+  onRetry: () => void;
+  onSignInAgain: () => void;
+}
+
+/**
+ * The stored token could not be checked, but it was not rejected either: the admin stays
+ * signed in and retries. The backend's message (translated, e.g. the rate limit's "try again
+ * in a few minutes") says why; a network failure has none. When the failure lasts (a broken
+ * server), the admin can still leave for the public site or end the session and sign in again.
+ */
+function SessionCheckError({ error, onRetry, onSignInAgain }: SessionCheckErrorProps) {
+  const { t } = useTranslation();
+  return (
+    <main className="min-h-screen bg-canvas flex items-center justify-center">
+      <EmptyState
+        icon="⚠️"
+        title={t('auth.sessionCheckFailed')}
+        description={error instanceof ApiError ? error.message : t('public.loadErrorHint')}
+        role="alert"
+        action={(
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            <Button variant="secondary" onClick={onRetry}>{t('common.retry')}</Button>
+            <Button variant="ghost" onClick={onSignInAgain}>{t('auth.signInAgain')}</Button>
+            <BackHomeLink />
+          </div>
+        )}
+      />
+    </main>
+  );
+}
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, sessionError, retrySession, logout } = useAuth();
   const location = useLocation();
   if (isLoading) return <RouteFallback />;
+  if (user) return <>{children}</>;
+  if (sessionError) {
+    // logout() also clears the error: the next render redirects to /login below.
+    return <SessionCheckError error={sessionError} onRetry={retrySession} onSignInAgain={logout} />;
+  }
   // Remember the requested page so LoginPage can return to it after sign-in
-  if (!user) return <Navigate to="/login" replace state={{ from: location }} />;
-  return <>{children}</>;
+  return <Navigate to="/login" replace state={{ from: location }} />;
 }
 
 export default function App() {
