@@ -11,7 +11,7 @@ depends_on: [C-47]
 touches: [frontend/src/contexts/SiteSettingsContext.tsx, frontend/src/contexts/SiteSettingsContext.test.tsx, frontend/src/pages/public/PublicErrorState.tsx, frontend/src/pages/public/HomePage.test.tsx, frontend/src/services/api.ts, frontend/src/services/api.test.ts, frontend/src/test/msw/utils.ts]
 sources: []
 branch: fix/E-41-site-settings-load-failure
-pr:
+pr: "#176"
 ---
 
 ## Contexte
@@ -53,5 +53,5 @@ Vérifié sur `develop` : l'effet de montage ignore l'échec (`.catch(() => {})`
 ## Journal
 
 - 2026-11-12 : tâche créée d'après le manque 4 de la relecture de la PR #174 (décision humaine : correctif avant la rc).
-- 2026-11-12 : faite (branche `fix/E-41-site-settings-load-failure`). Réessai automatique borné (3, `Retry-After` ou 30 s) et rechargement par le « Réessayer » des pages publiques. Bundle public mesuré avec `.github/scripts/bundle-budget.mjs` : 132,60 kB avant, 132,88 kB après (budget 140 kB).
+- 2026-11-12 : faite (PR #176, branche `fix/E-41-site-settings-load-failure`). Réessai automatique borné (3, `Retry-After` ou 30 s) et rechargement par le « Réessayer » des pages publiques. Bundle public mesuré avec `.github/scripts/bundle-budget.mjs` : 132,60 kB avant, 132,88 kB après (budget 140 kB).
 - Notes de version : après un refus « Too many requests » au chargement, la carte publique retrouve le nom et l'icône du bar sans recharger la page (après le délai demandé par le serveur, ou au clic sur « Réessayer »).
