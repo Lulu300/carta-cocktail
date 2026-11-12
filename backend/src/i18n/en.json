@@ -20,6 +20,7 @@
     "noFileUploaded": "No file uploaded",
     "backupSchemaTooNew": "This backup comes from a newer version of Carta Cocktail: update the application before restoring it",
     "tooManyAttempts": "Too many failed login attempts: try again in a few minutes",
+    "tooManyRequests": "Too many requests: try again in a few minutes",
     "passwordTooShort": "The new password must be at least 12 characters long",
     "invalidEmail": "The email address is not valid",
     "bottleNotAllowedInMenu": "This bottle cannot go in this menu: only bottles checked for the menu's type (aperitif or digestif) can",

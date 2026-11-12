@@ -9,6 +9,7 @@ import {
   prisma, request, authHeader, getAuthToken,
 } from '../test/helpers';
 import { configureSqlite, createPrismaClient } from '../lib/prisma';
+import { resetRateLimits } from '../middleware/rateLimit';
 import { resolveDatabasePath } from '../lib/databasePath';
 import { config } from '../config';
 import { latestAppMigration, restoreBackup } from '../services/backupService';
@@ -214,6 +215,7 @@ beforeEach(async () => {
   await cleanDatabase();
   await seedRequiredData();
   emptyUploadDir();
+  await resetRateLimits();
 });
 
 afterEach(async () => {
