@@ -206,14 +206,71 @@ describe('API request helper', () => {
     await expect(api.categories.list()).rejects.toThrow('Validation failed');
   });
 
-  it('should throw with HTTP status when no error message', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-      json: () => Promise.reject(new Error('not json')),
+  describe('when the answer carries no backend message', () => {
+    const SERVER_UNAVAILABLE = 'The server is not responding, try again in a moment.';
+
+    /** An answer of nginx or of another proxy in front of the backend: its own page, not JSON. */
+    function mockProxyAnswer(status: number, body: string, contentType: string) {
+      mockFetch.mockResolvedValueOnce(new Response(body, { status, headers: { 'Content-Type': contentType } }));
+    }
+
+    it.each([
+      ['502 HTML page of nginx while the backend is down', 502, '<html><body><h1>502 Bad Gateway</h1></body></html>', 'text/html'],
+      ['empty 502 of the Vite dev proxy while the backend is down', 502, '', 'text/plain'],
+      ['503 plain text page of a proxy', 503, 'Service Unavailable', 'text/plain'],
+      ['504 HTML page of nginx when the backend does not answer in time', 504, '<html><body><h1>504 Gateway Time-out</h1></body></html>', 'text/html'],
+      ['500 with no body, which is not JSON', 500, '', 'text/plain'],
+    ])('says the server is not responding after a %s, and keeps the status', async (_case, status, body, contentType) => {
+      localStorage.setItem('token', 'my-token');
+      mockProxyAnswer(status, body, contentType);
+      const api = await getApi();
+      const onUnauthorized = vi.fn();
+      api.setUnauthorizedHandler(onUnauthorized);
+
+      const error = await api.auth.me().catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(api.ApiError);
+      expect(error).toMatchObject({ status, message: SERVER_UNAVAILABLE });
+      expect(localStorage.getItem('token')).toBe('my-token');
+      expect(onUnauthorized).not.toHaveBeenCalled();
     });
-    const api = await getApi();
-    await expect(api.categories.list()).rejects.toThrow('HTTP 500');
+
+    it('says it in the language chosen in the UI', async () => {
+      await i18n.changeLanguage('fr');
+      mockProxyAnswer(502, '<html><body><h1>502 Bad Gateway</h1></body></html>', 'text/html');
+      const api = await getApi();
+
+      await expect(api.categories.list()).rejects.toThrow('Le serveur ne répond pas, réessayez dans un instant.');
+    });
+
+    it('says it for a JSON answer of a 5xx without an error field', async () => {
+      mockError(503, { status: 'unavailable' });
+      const api = await getApi();
+
+      await expect(api.categories.list()).rejects.toMatchObject({ status: 503, message: SERVER_UNAVAILABLE });
+    });
+
+    it('keeps the message the backend sent, whatever the status', async () => {
+      mockError(502, { error: 'Backup restore in progress' });
+      const api = await getApi();
+
+      await expect(api.categories.list()).rejects.toMatchObject({ status: 502, message: 'Backup restore in progress' });
+    });
+
+    it('keeps the status as the message of a 4xx that is not JSON (nginx 413 for a file over its limit)', async () => {
+      mockProxyAnswer(413, '<html><body><h1>413 Request Entity Too Large</h1></body></html>', 'text/html');
+      const api = await getApi();
+
+      await expect(api.categories.list()).rejects.toMatchObject({ status: 413, message: 'HTTP 413' });
+    });
+
+    it('lets a network error through unchanged', async () => {
+      const networkError = new TypeError('Failed to fetch');
+      mockFetch.mockRejectedValueOnce(networkError);
+      const api = await getApi();
+
+      await expect(api.categories.list()).rejects.toBe(networkError);
+    });
   });
 
   it('should not include auth header when no token', async () => {
@@ -743,7 +800,7 @@ describe('backup API', () => {
     await expect(api.backup.exportBackup()).rejects.toThrow('Server error');
   });
 
-  it('exportBackup throws HTTP status when error response has no message', async () => {
+  it('exportBackup says the server is not responding when the error response has no message', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 503,
@@ -751,7 +808,10 @@ describe('backup API', () => {
     });
 
     const api = await getApi();
-    await expect(api.backup.exportBackup()).rejects.toThrow('HTTP 503');
+    await expect(api.backup.exportBackup()).rejects.toMatchObject({
+      status: 503,
+      message: 'The server is not responding, try again in a moment.',
+    });
   });
 
   it('importBackup sends FormData and returns json on success', async () => {
