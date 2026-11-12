@@ -106,21 +106,23 @@ describe('ensureAdmin with an existing admin', () => {
   // The flag's name invites operators to put the new password there
   it('should not write a password put in ADMIN_RESET_PASSWORD to the logs', async () => {
     await createExistingAdmin();
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleSpies = (['warn', 'log', 'error', 'info'] as const).map(
+      (method) => vi.spyOn(console, method).mockImplementation(() => {}),
+    );
 
     await ensureAdmin(prisma, { ...PRODUCTION_ENV, ADMIN_RESET_PASSWORD: PASSWORD_IN_RESET_FLAG });
 
-    expect(warn).toHaveBeenCalled();
-    expect(String(warn.mock.calls)).not.toContain(PASSWORD_IN_RESET_FLAG);
-    expect(String(log.mock.calls)).not.toContain(PASSWORD_IN_RESET_FLAG);
+    expect(console.warn).toHaveBeenCalled();
+    for (const spy of consoleSpies) {
+      expect(String(spy.mock.calls)).not.toContain(PASSWORD_IN_RESET_FLAG);
+    }
   });
 
-  it('should not warn when ADMIN_RESET_PASSWORD is false', async () => {
+  it.each(['false', ''])('should not warn when ADMIN_RESET_PASSWORD is %j', async (flag) => {
     await createExistingAdmin();
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    await ensureAdmin(prisma, { ...PRODUCTION_ENV, ADMIN_RESET_PASSWORD: 'false' });
+    await ensureAdmin(prisma, { ...PRODUCTION_ENV, ADMIN_RESET_PASSWORD: flag });
 
     expect(warn).not.toHaveBeenCalled();
   });

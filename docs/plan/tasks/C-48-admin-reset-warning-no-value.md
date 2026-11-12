@@ -56,3 +56,4 @@ console.warn(`ADMIN_RESET_PASSWORD='${flag}' is ignored: set it to exactly 'true
 
 - 2026-11-12 : tâche créée par D-35 (triage CodeQL) pour l'alerte #27.
 - 2026-11-12 : avertissement réécrit sans la valeur (aide conservée : seule la valeur exacte `true` compte, `TRUE` ou `1` non), commentaire de `isResetRequested()` mis à jour. Tests : `it.each` étendu à une valeur de type mot de passe avec le message exact, nouveau test qui vérifie que ni `console.warn` ni `console.log` ne contiennent ce mot de passe ; sondes de sabotage (valeur ajoutée au message, ou écrite dans un second `console.warn`) détectées. Couverture delta 100 %. PR #168.
+- 2026-11-12 : points non bloquants de la relecture appliqués. Le test du mot de passe surveille aussi `console.error` et `console.info` (sonde : la valeur écrite par `console.error` ou `console.info` est détectée). Le cas « aucun avertissement » couvre aussi la valeur vide `''` (sonde : un avertissement pour `''` est détecté).
