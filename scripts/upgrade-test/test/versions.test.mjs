@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { BASELINE_REFUSAL, FAILED_MIGRATION_REFUSAL, UNWRITABLE_REFUSAL } from '../lib/checks.mjs';
 import {
   checkDuplicateInjectionPath, compareVersions, defaultLocalVersion, hooksForJump, latestHookVersion, loadHookFiles,
   parseUpgradePath, profileOf, releaseOf,
@@ -89,6 +90,13 @@ test('profileOf adds up the refusals of the releases up to the version', () => {
   assert.deepEqual(profileOf(hookFiles, '1.5.0').refusals, []);
   assert.deepEqual(profileOf(hookFiles, '1.7.0').refusals, [baseline]);
   assert.deepEqual(profileOf(hookFiles, '1.8.0-rc.1').refusals, [baseline, failedMigration]);
+});
+
+test('v1.12.0 knows the cannot write refusal of the non-root image, so naive mode needs no reason for it', async () => {
+  const hookFiles = await loadHookFiles();
+  assert.deepEqual(profileOf(hookFiles, '1.12.0').refusals, [BASELINE_REFUSAL, UNWRITABLE_REFUSAL, FAILED_MIGRATION_REFUSAL]);
+  const notes = hookFiles.find((hooks) => hooks.version === '1.12.0');
+  assert.deepEqual(Object.keys(notes.naiveMayFail).sort(), ['backup', 'startup']);
 });
 
 test('latestHookVersion picks the newest hook file', () => {
