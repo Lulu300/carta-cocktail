@@ -14,11 +14,21 @@ This guide lists the actions required to upgrade an existing instance, version b
 
 Pre-releases (`vX.Y.Z-rc.N`) are not listed: they use the section of their target version `vX.Y.Z`. The detailed changes of each version are in its [GitHub Release](https://github.com/Lulu300/carta-cocktail/releases) and in [`docs/releases/`](docs/releases/).
 
-We recommend pinning the images to a version (`:1.12.0`, or `:1.12` from v1.12.0 on to follow its patch releases) instead of `:latest`, so that an upgrade only happens when you have read this guide.
+We recommend pinning the images to a version (`:1.13.0`, or `:1.13` to follow its patch releases; these `:X.Y` tags exist from v1.12.0 on) instead of `:latest`, so that an upgrade only happens when you have read this guide.
 
 To restore a backup made by an older version, see [Restoring a backup from an older version](#restoring-a-backup-from-an-older-version), at the end of this guide.
 
 The commands below assume the default `docker-compose.prod.yml`, run from its folder. Adapt the file name and the service name `carta-cocktail-backend` if yours differ.
+
+## v1.13.0
+
+No required action. `docker-compose.prod.yml` has not changed since v1.12.0: pin both images to `:1.13.0`, or `:1.13` to follow the 1.13.x patch releases (`:1.12` does not move to 1.13.0), then pull and restart. No migration: the database does not change. The API now limits each client IP address to `API_RATE_LIMIT` requests per minute (600 by default, new optional variable) and answers `429` "Too many requests" beyond that; backup export and import together are limited to 10 per 15 minutes. Clients that share an address (a bar's Internet connection, a NAT, a proxy) share the count: raise `API_RATE_LIMIT` if guests get "Too many requests". Release notes: [`docs/releases/v1.13.0.md`](docs/releases/v1.13.0.md).
+
+Instances older than v1.12.0: upgrade to v1.12.0 first, following the [v1.12.0 section](#v1120) (and the sections before it), check that it works, then apply this one.
+
+**Testing a pre-release**: use `:1.13.0-rc.N` instead of `:1.13.0`.
+
+**If you download `docker-compose.prod.yml` again** (not needed for this release), put back the lines you added to the `environment` list of `carta-cocktail-backend`, such as `- SQLITE_WAL=false` after `- UPLOAD_DIR=/app/uploads` (database on a network share, see [README › "Database files and network shares"](README.md#database-files-and-network-shares)), `API_RATE_LIMIT`, `LOGIN_RATE_LIMIT` or `TRUST_PROXY`: the file does not have them.
 
 ## v1.12.0
 
