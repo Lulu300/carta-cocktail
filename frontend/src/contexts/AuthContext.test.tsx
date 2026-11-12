@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { http } from 'msw';
+import { http, HttpResponse } from 'msw';
 import { ApiError, auth } from '../services/api';
 import { server } from '../test/msw/server';
 import { captureRequest, errorResponse, mockApiError, mockApiResponse, mockNetworkError } from '../test/msw/utils';
@@ -89,9 +89,28 @@ describe('AuthContext', () => {
 
   describe('when the stored token cannot be checked', () => {
     it.each([
-      { failure: 'the rate limit (429)', fail: () => mockApiError('get', '/api/auth/me', 429, 'Too many requests: try again in a few minutes'), status: 429 },
-      { failure: 'a server error (500)', fail: () => mockApiError('get', '/api/auth/me', 500, 'Internal server error'), status: 500 },
-    ])('should keep the token after $failure', async ({ fail, status }) => {
+      {
+        failure: 'the rate limit (429)',
+        fail: () => mockApiError('get', '/api/auth/me', 429, 'Too many requests: try again in a few minutes'),
+        status: 429,
+        message: 'Too many requests: try again in a few minutes',
+      },
+      {
+        failure: 'a server error (500)',
+        fail: () => mockApiError('get', '/api/auth/me', 500, 'Internal server error'),
+        status: 500,
+        message: 'Internal server error',
+      },
+      {
+        failure: 'the HTML page of nginx while the backend restarts (502)',
+        fail: () => server.use(http.get('/api/auth/me', () => new HttpResponse(
+          '<html><body><h1>502 Bad Gateway</h1></body></html>',
+          { status: 502, headers: { 'Content-Type': 'text/html' } },
+        ))),
+        status: 502,
+        message: 'The server is not responding, try again in a moment.',
+      },
+    ])('should keep the token after $failure', async ({ fail, status, message }) => {
       localStorage.setItem('token', 'stored-token');
       fail();
 
@@ -104,7 +123,7 @@ describe('AuthContext', () => {
       expect(result.current.token).toBe('stored-token');
       expect(localStorage.getItem('token')).toBe('stored-token');
       expect(result.current.sessionError).toBeInstanceOf(ApiError);
-      expect((result.current.sessionError as ApiError).status).toBe(status);
+      expect(result.current.sessionError).toMatchObject({ status, message });
     });
 
     it('should keep the token after a network error', async () => {

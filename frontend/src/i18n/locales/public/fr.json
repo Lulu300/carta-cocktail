@@ -63,7 +63,8 @@
     "close": "Fermer",
     "clearSearch": "Effacer la recherche",
     "resultCount_one": "{{count}} résultat",
-    "resultCount_other": "{{count}} résultats"
+    "resultCount_other": "{{count}} résultats",
+    "serverUnavailable": "Le serveur ne répond pas, réessayez dans un instant."
   },
   "deletion": {
     "usedByCocktails": "Utilisé par ces cocktails : {{names}}.",

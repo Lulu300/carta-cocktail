@@ -79,6 +79,18 @@ function readRetryAfter(res: Response): number | undefined {
   return /^\d+$/.test(header) ? Number(header) : undefined;
 }
 
+/**
+ * Message of a failed answer. The backend always sends an `error` it has translated: keep it.
+ * Without one, something in front of the backend answered: nginx sends an HTML page with a 502
+ * while the backend is stopped or starting and a 504 when it does not answer in time, and Vite's
+ * dev proxy an empty 500. "HTTP 502" would tell the admin nothing; the status stays in ApiError.
+ */
+function errorMessage(status: number, body: { error?: unknown }): string {
+  if (typeof body.error === 'string') return body.error;
+  if (status >= 500) return i18n.t('common.serverUnavailable');
+  return `HTTP ${status}`;
+}
+
 /** Sends an API request and throws an ApiError carrying the server message on failure. */
 async function send(url: string, init: RequestInit = {}): Promise<Response> {
   const token = localStorage.getItem('token');
@@ -93,8 +105,7 @@ async function send(url: string, init: RequestInit = {}): Promise<Response> {
   if (res.status === 401) {
     handleUnauthorized(url, token);
   }
-  const message = typeof body.error === 'string' ? body.error : `HTTP ${res.status}`;
-  throw new ApiError(res.status, message, body, readRetryAfter(res));
+  throw new ApiError(res.status, errorMessage(res.status, body), body, readRetryAfter(res));
 }
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
