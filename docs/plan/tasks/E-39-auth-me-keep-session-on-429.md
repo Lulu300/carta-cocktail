@@ -5,7 +5,7 @@ phase: E
 lane: frontend
 criticite: moyenne
 effort: S
-status: review
+status: done
 owner: agent
 depends_on: [C-47]
 touches: [frontend/src/contexts/AuthContext.tsx, frontend/src/contexts/AuthContext.test.tsx, frontend/src/App.tsx, frontend/src/App.test.tsx, frontend/src/i18n/locales/public/, frontend/src/pages/public/MenuPublicPage.test.tsx, frontend/AGENTS.md, docs/plan/tasks/E-38-admin-error-boundary-focus.md, frontend/src/components/layout/BackHomeLink.tsx, frontend/src/components/layout/RouteErrorBoundary.tsx]
@@ -66,3 +66,4 @@ Vérifié sur `develop` (589e579) :
 - 2026-11-12 : PR #175 ouverte vers `develop`, `status: review`.
 - 2026-11-12 : relecture de #175 approuvée. Précisions reprises : « en-tête et pied de page d'invité » au lieu de « vue invité » (le contenu suit le token), ligne « Notes de version » complétée (message après une erreur réseau, pages publiques). Ligne ajoutée au Journal d'E-38 (ajouté à `touches`) pour qu'elle aligne `SessionCheckError`. Point « l'écran n'a pas de sortie » transmis à l'humain.
 - 2026-11-12 : décision de l'humain sur « l'écran n'a pas de sortie » : « Add links in E-39 now » — « Before the merge: 'Back to home' (and/or 'Sign in again', which clears the token) on this screen, with tests; the reviewer re-checks. » Ajouts : « Se reconnecter » (`logout`, puis la redirection de `ProtectedRoute` vers `/login` avec la page demandée) et « Retour à l'accueil » ; le lien de `RouteErrorBoundary` est extrait dans `components/layout/BackHomeLink.tsx` (ajouté à `touches` avec `RouteErrorBoundary.tsx`) ; nouvelle clé `auth.signInAgain` (en, fr) dans le paquet public. Sondes : retirer l'un ou l'autre bouton ou lien, ou brancher « Se reconnecter » sur la relance, fait échouer un test. Premier chargement public : 132,95 kB gzip sur 140. Ligne « Notes de version » mise à jour.
+- 2026-11-12 : `status: done` dans le dernier commit de la PR (cycle de vie de `docs/plan/README.md`), après rebase sur `develop` (#176, #177, #178) : 1122 tests, couverture 98,65 / 94,46 / 98,07 / 99,39 %, premier chargement public 133,22 kB gzip sur 140.
