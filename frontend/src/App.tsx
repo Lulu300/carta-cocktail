@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from './contexts/AuthContext';
 import PublicLayout from './components/layout/PublicLayout';
+import RouteErrorBoundary from './components/layout/RouteErrorBoundary';
 import HomePage from './pages/public/HomePage';
 import MenuPublicPage from './pages/public/MenuPublicPage';
 import CocktailPublicPage from './pages/public/CocktailPublicPage';
@@ -52,45 +53,47 @@ export default function App() {
   // Router navigations run in a transition, so moving between admin pages keeps
   // the current page on screen while the next chunk loads: one boundary is enough.
   return (
-    <Suspense fallback={<RouteFallback />}>
-      <Routes>
-        {/* Public routes */}
-        <Route element={<PublicLayout />}>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/menu/:slug" element={<MenuPublicPage />} />
-          <Route path="/menu/:slug/cocktail/:id" element={<CocktailPublicPage />} />
-        </Route>
+    <RouteErrorBoundary>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          {/* Public routes */}
+          <Route element={<PublicLayout />}>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/menu/:slug" element={<MenuPublicPage />} />
+            <Route path="/menu/:slug/cocktail/:id" element={<CocktailPublicPage />} />
+          </Route>
 
-        {/* Auth */}
-        <Route path="/login" element={<LoginPage />} />
+          {/* Auth */}
+          <Route path="/login" element={<LoginPage />} />
 
-        {/* Admin routes */}
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute>
-              <AdminLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<DashboardPage />} />
-          <Route path="categories" element={<CategoriesPage />} />
-          <Route path="bottles" element={<BottlesPage />} />
-          <Route path="ingredients" element={<IngredientsPage />} />
-          <Route path="units" element={<UnitsPage />} />
-          <Route path="cocktails" element={<CocktailsPage />} />
-          <Route path="cocktails/new" element={<CocktailFormPage />} />
-          <Route path="cocktails/:id" element={<CocktailFormPage />} />
-          <Route path="menus" element={<MenusPage />} />
-          <Route path="menus/:id" element={<MenuEditPage />} />
-          <Route path="menus/:id/bottles" element={<MenuBottleEditPage />} />
-          <Route path="shortages" element={<ShortagesPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-        </Route>
+          {/* Admin routes */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute>
+                <AdminLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<DashboardPage />} />
+            <Route path="categories" element={<CategoriesPage />} />
+            <Route path="bottles" element={<BottlesPage />} />
+            <Route path="ingredients" element={<IngredientsPage />} />
+            <Route path="units" element={<UnitsPage />} />
+            <Route path="cocktails" element={<CocktailsPage />} />
+            <Route path="cocktails/new" element={<CocktailFormPage />} />
+            <Route path="cocktails/:id" element={<CocktailFormPage />} />
+            <Route path="menus" element={<MenusPage />} />
+            <Route path="menus/:id" element={<MenuEditPage />} />
+            <Route path="menus/:id/bottles" element={<MenuBottleEditPage />} />
+            <Route path="shortages" element={<ShortagesPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
 
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
-    </Suspense>
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </Suspense>
+    </RouteErrorBoundary>
   );
 }

@@ -76,5 +76,9 @@
     "cocktailCount_other": "{{count}} cocktails",
     "bottleCount_one": "{{count}} bottle",
     "bottleCount_other": "{{count}} bottles"
+  },
+  "errors": {
+    "pageLoadFailed": "This page could not be displayed",
+    "reload": "Reload"
   }
 }

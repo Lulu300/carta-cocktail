@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Outlet, useLocation } from 'react-router-dom';
 import App from './App';
 import appSource from './App.tsx?raw';
@@ -50,7 +51,10 @@ vi.mock('./pages/admin/DashboardPage', () => ({
 vi.mock('./pages/admin/CategoriesPage', () => ({ default: () => null }));
 vi.mock('./pages/admin/BottlesPage', () => ({ default: () => null }));
 vi.mock('./pages/admin/IngredientsPage', () => ({ default: () => null }));
-vi.mock('./pages/admin/UnitsPage', () => ({ default: () => null }));
+// A chunk still missing after the automatic reload: its import rejects
+vi.mock('./pages/admin/UnitsPage', () => {
+  throw new Error('Failed to fetch dynamically imported module');
+});
 vi.mock('./pages/admin/CocktailsPage', () => ({ default: () => null }));
 vi.mock('./pages/admin/CocktailFormPage', () => ({ default: () => null }));
 vi.mock('./pages/admin/MenusPage', () => ({ default: () => null }));
@@ -59,7 +63,11 @@ vi.mock('./pages/admin/MenuBottleEditPage', () => ({ default: () => null }));
 vi.mock('./pages/admin/ShortagesPage', () => ({ default: () => null }));
 vi.mock('./pages/admin/SettingsPage', () => ({ default: () => null }));
 vi.mock('./pages/public/HomePage', () => ({ default: () => <div data-testid="home-page" /> }));
-vi.mock('./pages/public/MenuPublicPage', () => ({ default: () => null }));
+vi.mock('./pages/public/MenuPublicPage', () => ({
+  default: function MenuPublicPageStub() {
+    throw new Error('render failed');
+  },
+}));
 vi.mock('./pages/public/CocktailPublicPage', () => ({ default: () => null }));
 
 function renderAt(path: string) {
@@ -123,6 +131,40 @@ describe('route code splitting', () => {
     // Synchronous query: the public pages are in the entry chunk, nothing suspends
     expect(screen.getByTestId('home-page')).toBeInTheDocument();
     expect(screen.queryByText('common.loading')).not.toBeInTheDocument();
+  });
+});
+
+describe('route error boundary', () => {
+  beforeEach(() => {
+    // React reports every error a boundary catches on the console
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockUseAuth.mockReturnValue({ user: { id: 1, email: 'admin@test.local' }, isLoading: false });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('shows the error screen instead of a blank page when a chunk cannot be loaded', async () => {
+    renderAt('/admin/units');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('errors.pageLoadFailed');
+    expect(screen.getByRole('button', { name: 'errors.reload' })).toBeInTheDocument();
+  });
+
+  it('shows the error screen when a page throws while rendering', () => {
+    renderAt('/menu/house');
+
+    expect(screen.getByRole('alert')).toHaveTextContent('errors.pageLoadFailed');
+  });
+
+  it('lets the visitor reach another page after an error', async () => {
+    renderAt('/menu/house');
+
+    await userEvent.click(screen.getByRole('link', { name: 'public.backHome' }));
+
+    expect(screen.getByTestId('home-page')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });
 
