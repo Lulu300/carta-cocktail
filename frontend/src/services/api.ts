@@ -16,12 +16,15 @@ const LOGIN_URL = '/auth/login';
 export class ApiError extends Error {
   readonly status: number;
   readonly body?: unknown;
+  /** Seconds the server asks to wait before trying again (Retry-After of a 429). */
+  readonly retryAfterSeconds?: number;
 
-  constructor(status: number, message: string, body?: unknown) {
+  constructor(status: number, message: string, body?: unknown, retryAfterSeconds?: number) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.body = body;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
@@ -66,6 +69,16 @@ async function readErrorBody(res: Response): Promise<{ error?: unknown }> {
   return res.json().catch(() => ({}));
 }
 
+/**
+ * Retry-After of a rate-limited answer, in seconds. The backend's limiter sends a
+ * number of seconds, never the HTTP-date form.
+ */
+function readRetryAfter(res: Response): number | undefined {
+  if (res.status !== 429) return undefined;
+  const header = res.headers.get('Retry-After')?.trim() ?? '';
+  return /^\d+$/.test(header) ? Number(header) : undefined;
+}
+
 /** Sends an API request and throws an ApiError carrying the server message on failure. */
 async function send(url: string, init: RequestInit = {}): Promise<Response> {
   const token = localStorage.getItem('token');
@@ -81,7 +94,7 @@ async function send(url: string, init: RequestInit = {}): Promise<Response> {
     handleUnauthorized(url, token);
   }
   const message = typeof body.error === 'string' ? body.error : `HTTP ${res.status}`;
-  throw new ApiError(res.status, message, body);
+  throw new ApiError(res.status, message, body, readRetryAfter(res));
 }
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {

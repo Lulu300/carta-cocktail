@@ -1,10 +1,10 @@
 import { onTestFinished, vi } from 'vitest';
 import { http, HttpResponse, type JsonBodyType } from 'msw';
 import type { DeletionImpact } from '../../types';
-import { errorResponse, pendingResponse } from './responses';
+import { errorResponse, pendingResponse, rateLimitedResponse } from './responses';
 import { server } from './server';
 
-export { errorResponse, pendingResponse, readJsonObject } from './responses';
+export { errorResponse, pendingResponse, rateLimitedResponse, readJsonObject } from './responses';
 
 /** HTTP methods of `services/api.ts`, as named by MSW's `http` helpers. */
 export type ApiMethod = 'get' | 'post' | 'put' | 'delete';
@@ -17,6 +17,11 @@ export function mockApiResponse(method: ApiMethod, path: string, body: JsonBodyT
 /** Makes the backend reject `method path` with `status` and the `{ error }` body the real API sends. */
 export function mockApiError(method: ApiMethod, path: string, status: number, message: string): void {
   server.use(http[method](path, () => errorResponse(status, message)));
+}
+
+/** Makes `method path` answer like the backend's rate limiter: a 429 that asks to wait `retryAfterSeconds`. */
+export function mockRateLimited(method: ApiMethod, path: string, retryAfterSeconds: number): void {
+  server.use(http[method](path, () => rateLimitedResponse(retryAfterSeconds)));
 }
 
 /** Makes `method path` hang: the page stays in its loading state for the whole test. */
