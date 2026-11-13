@@ -5,13 +5,13 @@ phase: E
 lane: backend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [E-49]
 touches: [backend/src/routes/backup.ts, backend/src/routes/backup.test.ts, backend/src/services/backupService.ts, backend/src/i18n/]
 sources: []
-branch: ""
-pr: ""
+branch: fix/E-51-backup-export-during-restore
+pr: "#185"
 ---
 
 ## Contexte
@@ -38,8 +38,8 @@ Rare pendant une restauration, mais la fenêtre n'est pas instantanée : `.resto
 
 ## Critères d'acceptation
 
-- [ ] Une archive exportée ne contient jamais de dossier `.restore-*` ou `.pre-restore-*`.
-- [ ] Selon la décision : un export pendant une restauration (ou l'inverse) reçoit un 409 traduit.
+- [x] Une archive exportée ne contient jamais de dossier `.restore-*` ou `.pre-restore-*`.
+- [x] Selon la décision : un export pendant une restauration (ou l'inverse) reçoit un 409 traduit.
 
 ## Tests à ajouter ou adapter
 
@@ -52,3 +52,14 @@ Rare pendant une restauration, mais la fenêtre n'est pas instantanée : `.resto
 ## Journal
 
 - 2026-11-13 : tâche créée pendant E-49. Précisions de la relecture de #184 : durée de la fenêtre, dossier `.pre-restore-*` laissé par un nettoyage en échec.
+- 2026-11-13 : décision de l'humain (« E-51 before the rc ») : l'export répond 409 pendant une restauration (même verrou qu'E-49) et ne met pas les dossiers temporaires de restauration dans l'archive.
+- 2026-11-13 : fait (PR #185, branche `fix/E-51-backup-export-during-restore`). Le verrou d'E-49 est étendu, pas doublé : un compteur `exportsInProgress` s'ajoute à `restoreInProgress`. `beginExport()` refuse pendant une restauration (409 `errors.restoreInProgress`, message existant) et renvoie la fonction qui termine l'export, sans effet si on l'appelle deux fois. `restoreBackup()` refuse aussi tant qu'un export est en cours (409, nouveau message `errors.exportInProgress`, en et fr). Deux exports peuvent tourner ensemble. L'inverse (restauration pendant un export) est couvert. L'export prend son instantané, puis lit `uploads/` pendant l'envoi : une restauration qui bascule les photos à ce moment donne un téléchargement coupé (`ENOENT`), ou une archive avec l'ancienne base et les photos restaurées, annoncée comme réussie. L'export se termine à la fermeture de la réponse (`res` `close`), pas à la fin du handler. Quand le client part en cours de route, l'archive reste en pause et le handler ne rend jamais la main (testé). Après une erreur d'archive, `finalize()` rejette. Dans ces deux cas, une fin placée dans le handler garderait le verrou jusqu'au redémarrage. `archive.directory()` devient `archive.glob('**', { dot: true, skip: RESTORE_WORK_FOLDERS })`. `skip` ne vise que les dossiers et `*` ne traverse pas `/` : seuls les dossiers `.restore-*` et `.pre-restore-*` à la racine de `uploads/` sont exclus, et ils ne sont pas parcourus. Un dossier de même nom plus bas, ou un fichier qui commence ainsi, reste dans l'archive. En dehors de ces deux dossiers, les entrées sont les mêmes qu'avant (vérifié à la main). Aucun changement frontend : `SettingsPage` affiche le champ `error` du 409, pour l'export comme pour la restauration. Tests dans `routes/backup.test.ts` :
+  - export pendant une restauration retenue ;
+  - restauration pendant un export, retenu sur sa copie de la base puis envoyé à un client qui ne lit rien ;
+  - deux exports simultanés ;
+  - archive sans dossier de travail ;
+  - dossier `.pre-restore-*` restant, absent de l'export suivant.
+
+  Neuf sondes de sabotage, toutes détectées (détail dans la PR).
+- 2026-11-13 : relecture de #185, un point bloquant corrigé. Si le client part pendant `authMiddleware` (attente de `prisma.user.findUnique`), `close` est déjà émis quand le handler s'abonne : le compteur restait à 1 jusqu'au redémarrage, et toute restauration recevait « wait for its download to finish ». La route passe par `whenClosed(res, callback)`, qui exécute le rappel tout de suite si la réponse est déjà fermée (`res.closed`), sinon à `close`. Le même garde-fou règle le point non bloquant de la relecture, qui existait déjà sur develop : l'instantané de la base restait dans le dossier temporaire quand le client partait avant la fin de `createSnapshot()`. Pas de tâche E-52. Test : la requête est retenue dans `findUnique`, le client part, puis le handler s'exécute ; aucune copie de la base ne reste et une restauration est acceptée. Sondes : sans le garde-fou sur la fin de l'export, ce test et 25 autres échouent ; sans celui sur l'instantané, ce test échoue.
+- Notes de version : un export de sauvegarde lancé pendant une restauration est désormais refusé avec « A backup restore is already in progress… ». Une restauration lancée pendant un export est refusée avec « A backup is being exported: wait for its download to finish, then start the restore again ». Les archives exportées ne contiennent plus les dossiers temporaires de restauration (`uploads/.restore-*`, `uploads/.pre-restore-*`).

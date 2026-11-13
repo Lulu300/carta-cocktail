@@ -20,6 +20,7 @@
     "noFileUploaded": "Aucun fichier envoyé",
     "backupSchemaTooNew": "Cette sauvegarde vient d’une version plus récente de Carta Cocktail : mettez l’application à jour avant de la restaurer",
     "restoreInProgress": "Une restauration de sauvegarde est déjà en cours : attendez qu’elle se termine, puis rechargez la page et reconnectez-vous (la restauration ferme toutes les sessions)",
+    "exportInProgress": "Une sauvegarde est en cours d’export : attendez la fin de son téléchargement, puis relancez la restauration",
     "tooManyAttempts": "Trop de tentatives de connexion échouées : réessayez dans quelques minutes",
     "tooManyRequests": "Trop de requêtes : réessayez dans quelques minutes",
     "passwordTooShort": "Le nouveau mot de passe doit contenir au moins 12 caractères",
