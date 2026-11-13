@@ -5,7 +5,7 @@ phase: E
 lane: frontend
 criticite: basse
 effort: S
-status: review
+status: done
 owner: agent
 depends_on: [C-47]
 touches: [frontend/src/components/admin/menus/useMenuBottles.ts, frontend/src/pages/admin/MenuBottleEditPage.test.tsx, frontend/src/services/api.ts, frontend/src/services/api.test.ts, frontend/src/test/msw/handlers.ts, backend/src/routes/menuBottles.ts, backend/src/routes/menuBottles.test.ts, backend/src/validation/menuBottles.ts, backend/src/services/menuSyncService.ts, backend/src/services/menuSyncService.test.ts, backend/src/i18n/en.json, backend/src/i18n/fr.json]
@@ -60,3 +60,4 @@ Endpoints existants examinés : `PUT /api/menus/:id` avec `bottles` remplace tou
 
 - 2026-11-12 : tâche créée et traitée à partir de la relecture de la PR #174 (moitié « éditeur de bouteilles » du point 2 des « User-visible gaps »). Faits vérifiés sur `develop` (589e579) : `settleAll` sur `menuBottlesApi.update` et `menuBottlesApi.restore`, aucun endpoint de groupe pour ces deux actions. Ajout de `PUT …/menu/:menuId/entries` et `POST …/exclusions/restore`, transactions comprises. Un refus laisse désormais tout le groupe inchangé (avant : la partie déjà acceptée restait appliquée).
 - Notes de version : dans l'éditeur de bouteilles d'une carte, masquer, afficher, changer de section ou remettre un groupe de bouteilles envoie une seule requête, quel que soit le nombre de bouteilles : l'action n'atteint plus la limite `API_RATE_LIMIT`, et un refus laisse tout le groupe inchangé. Aucune action requise.
+- 2026-11-13 : statut passé de `review` à `done` après coup, dans la PR de suivi de la release v1.13.0 : les consignes du coordinateur demandaient `review` par erreur, alors que `docs/plan/README.md` (« Cycle de vie ») demande `done` dans le dernier commit de la PR.
