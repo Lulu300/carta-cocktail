@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, within } from '../../test/test-utils';
 import userEvent from '@testing-library/user-event';
-import { fireEvent } from '@testing-library/react';
+import { act, fireEvent } from '@testing-library/react';
 import SettingsPage from './SettingsPage';
 import { AppProviders } from '../../test/appProviders';
 import { ConfirmProvider } from '../../contexts/ConfirmContext';
@@ -9,10 +9,13 @@ import { toast } from '../../components/ui/ToastStore';
 import type { BackupRestoreResult } from '../../services/api';
 import { mockDownload } from '../../test/download';
 import { buildSiteSettings } from '../../test/factories';
+import { server } from '../../test/msw/server';
+import { http, HttpResponse } from 'msw';
 import i18n from '../../i18n';
 import { ADMIN_USER } from '../../test/msw/handlers';
 import {
   captureRequest,
+  holdApiResponse,
   mockApiError,
   mockApiPending,
   mockApiResponse,
@@ -69,7 +72,7 @@ function profileSaveButton() {
   return screen.getAllByText('common.save')[1];
 }
 
-async function selectBackupFileAndClickImport(): Promise<File> {
+async function selectBackupFile(): Promise<File> {
   await waitFor(() => {
     expect(screen.getByText('settings.backup.selectFile')).toBeInTheDocument();
   });
@@ -84,6 +87,11 @@ async function selectBackupFileAndClickImport(): Promise<File> {
   await waitFor(() => {
     expect(screen.getByText('settings.backup.import')).toBeInTheDocument();
   });
+  return file;
+}
+
+async function selectBackupFileAndClickImport(): Promise<File> {
+  const file = await selectBackupFile();
   fireEvent.click(screen.getByText('settings.backup.import'));
   return file;
 }
@@ -117,6 +125,39 @@ const BACKUP_ACTIONS = [
   { action: 'export', method: 'get', path: '/api/backup/export', timeoutMessage: 'settings.backup.exportTimeout' },
   { action: 'restore', method: 'post', path: '/api/backup/import', timeoutMessage: RESTORE_TIMEOUT },
 ] as const;
+
+const exportButton = () => screen.getByRole('button', { name: /settings\.backup\.export/ });
+const restoreButton = () => screen.getByRole('button', { name: /settings\.backup\.import/ });
+
+/**
+ * Makes the export answer at once with its headers and the start of the archive. The
+ * archive ends only when the test calls `finish()`, or is cut when it calls `fail()`:
+ * the page has the headers, but not the whole download.
+ */
+function holdExportDownload() {
+  let archive: ReadableStreamDefaultController<Uint8Array> | undefined;
+  let answered: () => void = () => {};
+  const headersSent = new Promise<void>((resolve) => { answered = resolve; });
+  server.use(
+    http.get('/api/backup/export', () => {
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          archive = controller;
+          controller.enqueue(new Uint8Array(8));
+        },
+      });
+      answered();
+      return new HttpResponse(body, {
+        headers: { 'Content-Type': 'application/zip', 'Content-Disposition': 'attachment; filename="backup.zip"' },
+      });
+    }),
+  );
+  return {
+    headersSent,
+    finish: () => archive?.close(),
+    fail: () => archive?.error(new Error('Connection lost')),
+  };
+}
 
 beforeEach(() => {
   localStorage.setItem('token', 'admin-token');
@@ -540,6 +581,88 @@ describe('SettingsPage', () => {
 
     expect(await screen.findByText('A restore is already running')).toBeInTheDocument();
     expect(screen.queryByText(NO_ANSWER_CAUSE)).not.toBeInTheDocument();
+  });
+
+  // The server refuses a restore during an export (409), after the whole archive was uploaded
+  it('keeps the restore disabled until the export download has been read in full', async () => {
+    const downloads = mockDownload();
+    const download = holdExportDownload();
+    await renderLoadedPage();
+    await selectBackupFile();
+
+    await userEvent.click(exportButton());
+    await download.headersSent;
+    // Lets the page receive the headers and the start of the archive
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+
+    expect(exportButton()).toHaveTextContent('settings.backup.exporting');
+    expect(restoreButton()).toBeDisabled();
+    expect(restoreButton()).toHaveTextContent('settings.backup.import');
+    expect(downloads).toEqual([]);
+
+    download.finish();
+
+    expect(await screen.findByText('settings.backup.exportSuccess')).toBeInTheDocument();
+    expect(downloads).toEqual(['backup.zip']);
+    expect(restoreButton()).toBeEnabled();
+    expect(exportButton()).toBeEnabled();
+  });
+
+  it('enables the restore again when the export download is cut', async () => {
+    const downloads = mockDownload();
+    const download = holdExportDownload();
+    await renderLoadedPage();
+    await selectBackupFile();
+
+    await userEvent.click(exportButton());
+    await download.headersSent;
+    expect(restoreButton()).toBeDisabled();
+
+    download.fail();
+
+    expect(await screen.findByText('Connection lost')).toBeInTheDocument();
+    expect(restoreButton()).toBeEnabled();
+    expect(exportButton()).toBeEnabled();
+    expect(downloads).toEqual([]);
+    expect(screen.queryByText('settings.backup.exportSuccess')).not.toBeInTheDocument();
+  });
+
+  it('enables the restore again when the export is refused', async () => {
+    const releaseExport = holdApiResponse('get', '/api/backup/export', { error: 'A restore is running' }, 409);
+    await renderLoadedPage();
+    await selectBackupFile();
+
+    await userEvent.click(exportButton());
+    expect(restoreButton()).toBeDisabled();
+
+    releaseExport();
+
+    expect(await screen.findByText('A restore is running')).toBeInTheDocument();
+    expect(restoreButton()).toBeEnabled();
+    expect(exportButton()).toBeEnabled();
+  });
+
+  // The server refuses an export during a restore (409)
+  it.each([
+    { outcome: 'success', body: restoreResult({ skippedFiles: 1 }), status: 200, shown: 'settings.backup.skippedFiles(1)' },
+    { outcome: 'failure', body: { error: 'Invalid backup file' }, status: 400, shown: 'Invalid backup file' },
+  ])('disables the export while a restore runs, and enables it again after its $outcome', async ({ body, status, shown }) => {
+    const releaseRestore = holdApiResponse('post', '/api/backup/import', body, status);
+    const exports = captureRequest('get', '/api/backup/export');
+    await renderLoadedPage();
+
+    await runBackupAction('restore');
+
+    expect(restoreButton()).toHaveTextContent('settings.backup.importing');
+    expect(exportButton()).toBeDisabled();
+    expect(exportButton()).toHaveTextContent('settings.backup.export');
+    fireEvent.click(exportButton());
+    expect(exports.count()).toBe(0);
+
+    releaseRestore();
+
+    expect(await screen.findByText(shown)).toBeInTheDocument();
+    expect(exportButton()).toBeEnabled();
   });
 
   it('shows a generic error when the restore fails with something else than an Error', async () => {
