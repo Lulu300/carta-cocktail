@@ -65,3 +65,4 @@ Pas de nouveau test : les tests listés plus haut sont adaptés et doivent reste
 ## Journal
 
 - 2026-11-12 : tâche créée par la PR docs de suivi du lot D-35/E-18/B-20/C-12 à partir de la relecture de la PR #166 (C-12). Les emplacements sont vérifiés sur `develop` (9799168) ; `services/api.test.ts:385` s'ajoute aux quatre que citait la relecture, et `services/api.test.ts:360`, `:747`, `:759` (401 avec un token présent) ont été ajoutés après la relecture de la PR #167.
+- 2026-11-13 : hors périmètre, relevé à la relecture de la PR #182 (E-47). `AuthContext.test.tsx` (vers les lignes 105 à 110) construit à la main la page HTML de 502 de nginx ; il pourrait utiliser `mockProxyError` (`frontend/src/test/msw/utils.ts`). À faire quand ce fichier est touché.
