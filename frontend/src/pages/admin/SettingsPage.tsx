@@ -28,6 +28,25 @@ function isGatewayTimeout(err: unknown): boolean {
   return err instanceof ApiError && err.status === GATEWAY_TIMEOUT;
 }
 
+/** What requestRestore resolves to when no HTTP answer arrived. */
+const NO_ANSWER = Symbol('no answer');
+
+/**
+ * Sends the restore, and resolves to NO_ANSWER when no HTTP answer arrives: fetch then rejects
+ * with a TypeError, which send() passes on unchanged. On a long restore, the browser may give
+ * up before nginx answers 504 (Firefox also waits 300 s), or a proxy in front may cut the
+ * connection instead of answering. Only the request is checked: a TypeError while handling
+ * an answer the server did send is a bug, not a lost connection.
+ */
+async function requestRestore(file: File): Promise<BackupRestoreResult | typeof NO_ANSWER> {
+  try {
+    return await backupApi.importBackup(file);
+  } catch (err: unknown) {
+    if (err instanceof TypeError) return NO_ANSWER;
+    throw err;
+  }
+}
+
 /** A restore result the admin must read before the page reloads. */
 function needsAdminAttention(result: BackupRestoreResult): boolean {
   return result.restartRecommended || result.skippedFiles > 0;
@@ -146,13 +165,14 @@ export default function SettingsPage() {
    * Shows why a backup action failed. After a 504, "try again in a moment" would be wrong:
    * an export would hit the same timeout, and a restore may still be running on the server.
    */
-  const showBackupError = (
-    err: unknown,
-    timeoutKey: 'settings.backup.exportTimeout' | 'settings.backup.restoreTimeout',
-  ) => {
-    if (isGatewayTimeout(err)) setBackupError(t(timeoutKey));
+  const showBackupError = (err: unknown, timeoutMessage: string) => {
+    if (isGatewayTimeout(err)) setBackupError(timeoutMessage);
     else setBackupError(err instanceof Error ? err.message : t('common.error'));
   };
+
+  /** Why a restore ended without its result, followed by the advice shared by both causes. */
+  const restoreMayStillRun = (cause: 'settings.backup.restoreTimeout' | 'settings.backup.restoreNoAnswer') =>
+    `${t(cause)} ${t('settings.backup.restoreMayStillRun')}`;
 
   const handleBackupExport = async () => {
     setBackupMessage('');
@@ -165,7 +185,7 @@ export default function SettingsPage() {
       // A failed export keeps it: the restart warning is often why it failed.
       setRestoreResult(null);
     } catch (err: unknown) {
-      showBackupError(err, 'settings.backup.exportTimeout');
+      showBackupError(err, t('settings.backup.exportTimeout'));
     } finally {
       setBackupExporting(false);
     }
@@ -186,7 +206,13 @@ export default function SettingsPage() {
     setRestoreResult(null);
     setBackupImporting(true);
     try {
-      const result = await backupApi.importBackup(backupFile);
+      const result = await requestRestore(backupFile);
+      if (result === NO_ANSWER) {
+        // Without an answer, the restore may be running as after a 504: the browser's own text
+        // ("Failed to fetch") would not stop the admin from starting a second one.
+        setBackupError(restoreMayStillRun('settings.backup.restoreNoAnswer'));
+        return;
+      }
       setBackupFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       if (needsAdminAttention(result)) {
@@ -203,7 +229,7 @@ export default function SettingsPage() {
         setTimeout(() => window.location.reload(), 1500);
       }
     } catch (err: unknown) {
-      showBackupError(err, 'settings.backup.restoreTimeout');
+      showBackupError(err, restoreMayStillRun('settings.backup.restoreTimeout'));
     } finally {
       setBackupImporting(false);
     }
