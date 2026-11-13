@@ -26,7 +26,9 @@ L'export prend un instantané de la base (`createSnapshot()`, `VACUUM INTO`), pu
 - archiver lit les dossiers cachés (`dot: true` dans `archiver/lib/core.js`) : l'archive peut contenir `uploads/.restore-<stamp>/…` et `uploads/.pre-restore-<stamp>/…`. Restaurer plus tard cette archive aplatit ces entrées par leur nom (`extractUploads()`), et ramène donc des photos de l'un ou l'autre état ;
 - une photo déplacée pendant la lecture fait échouer l'export (`ENOENT`, téléchargement coupé par `archive.on('error')`) : ce cas-là est visible, pas silencieux.
 
-Rare : il faut un export pendant les quelques instants où la restauration déplace les fichiers. Les autres écritures pendant une restauration (modifier un cocktail, envoyer une photo) sont perdues comme toutes les données remplacées par la restauration, ce qui est le comportement attendu.
+Un dossier `.pre-restore-<stamp>` laissé par un `removePreviousUploads()` en échec (la restauration réussit quand même) est aussi exporté par tout export ultérieur, même lancé seul.
+
+Rare pendant une restauration, mais la fenêtre n'est pas instantanée : `.restore-<stamp>` existe du début de l'extraction des photos (durée qui croît avec la taille de l'archive) jusqu'à la fin du basculement. Les autres écritures pendant une restauration (modifier un cocktail, envoyer une photo) sont perdues comme toutes les données remplacées par la restauration, ce qui est le comportement attendu.
 
 ## Ce qu'il faut faire
 
@@ -49,4 +51,4 @@ Rare : il faut un export pendant les quelques instants où la restauration dépl
 
 ## Journal
 
-- 2026-11-13 : tâche créée pendant E-49.
+- 2026-11-13 : tâche créée pendant E-49. Précisions de la relecture de #184 : durée de la fenêtre, dossier `.pre-restore-*` laissé par un nettoyage en échec.
