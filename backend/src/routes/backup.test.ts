@@ -48,6 +48,18 @@ async function importBackup(backup: Buffer) {
   return request.post('/api/backup/import').set(await currentSessionHeader()).attach('backup', backup, 'backup.zip');
 }
 
+/** Writes `backup` to a temporary file, as multer does, for the time `use` runs. */
+async function withZipFile<T>(backup: Buffer, use: (zipPath: string) => Promise<T>): Promise<T> {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'carta-backup-'));
+  const zipPath = path.join(dir, 'backup.zip');
+  fs.writeFileSync(zipPath, backup);
+  try {
+    return await use(zipPath);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 function zipWith(files: Record<string, string | Buffer>): Buffer {
   const zip = new AdmZip();
   for (const [name, content] of Object.entries(files)) zip.addFile(name, Buffer.from(content));
@@ -507,6 +519,115 @@ describe('backup restore', () => {
   });
 });
 
+describe('concurrent backup restores', () => {
+  const IN_PROGRESS_EN = 'A backup restore is already in progress: wait for it to finish, then reload the page';
+  const IN_PROGRESS_FR = 'Une restauration de sauvegarde est déjà en cours : attendez qu’elle se termine, puis rechargez la page';
+  // multer's default file name in its `dest` folder
+  const MULTER_FILE_NAME = /^[0-9a-f]{32}$/;
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /**
+   * Holds the next restore right before it closes the live database (after its
+   * checks and extraction, before the switch), until `release()` is called.
+   */
+  function holdNextRestore(): { held: Promise<void>; release: () => void } {
+    let markHeld!: () => void;
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { markHeld = resolve; });
+    const released = new Promise<void>((resolve) => { release = resolve; });
+    const disconnect = prisma.$disconnect.bind(prisma);
+    vi.spyOn(prisma, '$disconnect').mockImplementationOnce(async () => {
+      markHeld();
+      await released;
+      return disconnect();
+    });
+    return { held, release };
+  }
+
+  /** Every file a restore writes or moves: the uploads, the copies of the database, the files next to it. */
+  function restoreFiles() {
+    return {
+      uploads: uploadDirContent(),
+      preRestoreCopies: preRestoreCopies(),
+      nextToDatabase: fs.readdirSync(path.dirname(dbPath)).sort(),
+    };
+  }
+
+  it('should refuse a second restore with a translated 409 that touches nothing, and let the first one finish', async () => {
+    await seedCocktail({ name: 'Restored' });
+    const backup = withEntries(await exportBackup(), { 'uploads/first.jpg': 'first bytes' });
+    const secondBackup = withEntries(backup, { 'uploads/second.jpg': 'second bytes' });
+    await prisma.cocktail.deleteMany();
+    await seedCocktail({ name: 'Live' });
+    fs.writeFileSync(path.join(config.uploadDir, 'live.jpg'), 'live bytes');
+    const { held, release } = holdNextRestore();
+
+    const firstResponse = importBackup(backup);
+    let first: Awaited<typeof firstResponse>;
+    try {
+      await held;
+      const filesWhileHeld = restoreFiles();
+      const rmSync = vi.spyOn(fs, 'rmSync');
+
+      const second = await importBackup(secondBackup);
+      const secondInFrench = await request.post('/api/backup/import').set(await currentSessionHeader())
+        .set('Accept-Language', 'fr').attach('backup', secondBackup, 'backup.zip');
+
+      expect(second.status).toBe(409);
+      expect(second.body).toEqual({ error: IN_PROGRESS_EN });
+      expect(secondInFrench.status).toBe(409);
+      expect(secondInFrench.body).toEqual({ error: IN_PROGRESS_FR });
+      expect(restoreFiles()).toEqual(filesWhileHeld);
+      expect(await cocktailNames()).toEqual(['Live']);
+      // The archives of the refused requests are deleted all the same
+      const uploadedArchives = rmSync.mock.calls.map(([target]) => String(target))
+        .filter((target) => MULTER_FILE_NAME.test(path.basename(target)));
+      expect(uploadedArchives).toHaveLength(2);
+      for (const archive of uploadedArchives) expect(fs.existsSync(archive)).toBe(false);
+    } finally {
+      // Even after a failed assertion: the next test must not start while this restore runs
+      release();
+      first = await firstResponse;
+    }
+
+    expect(first.status).toBe(200);
+    expect(await cocktailNames()).toEqual(['Restored']);
+    expect(uploadDirContent()).toEqual(['first.jpg']);
+    expect(restoreLeftovers()).toEqual([]);
+  });
+
+  it('should refuse a second call made before the first one reached its first await', async () => {
+    const backup = await exportBackup();
+
+    await withZipFile(backup, async (zipPath) => {
+      const first = restoreBackup(zipPath);
+      const second = restoreBackup(zipPath);
+
+      await expect(second).rejects.toMatchObject({ status: 409, i18nKey: 'errors.restoreInProgress' });
+      await expect(first).resolves.toEqual({ skippedFiles: 0, restartRecommended: true });
+    });
+  });
+
+  it.each([
+    ['succeeded', 200, async (backup: Buffer) => backup],
+    ['was refused for an invalid archive', 400, async () => Buffer.from('not a zip archive')],
+    ['failed and was rolled back', 500, async (backup: Buffer) => {
+      vi.spyOn(prisma, '$connect').mockRejectedValueOnce(new Error('connect failed'));
+      return backup;
+    }],
+  ])('should accept a new restore after one that %s', async (_label, status, prepareFirst) => {
+    const backup = await exportBackup();
+
+    expect((await importBackup(await prepareFirst(backup))).status).toBe(status);
+    const next = await importBackup(backup);
+
+    expect(next.status).toBe(200);
+  });
+});
+
 describe('backup restore and sessions', () => {
   const TOKEN_VERSION_MIGRATION = path.resolve(
     __dirname, '../../prisma/migrations/20261011120000_user_token_version/migration.sql',
@@ -593,14 +714,7 @@ describe('backup restore and sessions', () => {
   it('should raise the version above 0 when the live database has no user', async () => {
     const backup = await exportBackup();
     await prisma.user.deleteMany();
-    const zipPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'carta-backup-')), 'backup.zip');
-    fs.writeFileSync(zipPath, backup);
-
-    try {
-      await restoreBackup(zipPath);
-    } finally {
-      fs.rmSync(path.dirname(zipPath), { recursive: true, force: true });
-    }
+    await withZipFile(backup, restoreBackup);
 
     expect(await storedTokenVersion()).toBe(1);
   });
