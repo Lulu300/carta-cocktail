@@ -1,13 +1,37 @@
+import http from 'http';
+import type { AddressInfo } from 'net';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import supertest from 'supertest';
 import { Prisma } from '../generated/prisma/client';
 import app from '../app';
 import { prisma } from '../lib/prisma';
+import { configureServerTimeouts } from '../serverTimeouts';
 
 // Tests and routes share the server's client, as in production
 export { prisma };
 export const request = supertest(app);
+
+/**
+ * Starts the app on a server of its own with the settings of index.ts, over Node's
+ * request and headers timeouts shortened to `timeoutMs` and checked every few
+ * milliseconds: a test sees in a second what takes minutes in production.
+ */
+export async function listenWithShortTimeouts(timeoutMs: number): Promise<{ port: number; close: () => void }> {
+  const server = http.createServer(
+    { requestTimeout: timeoutMs, headersTimeout: timeoutMs, connectionsCheckingInterval: 10 },
+    app,
+  );
+  configureServerTimeouts(server);
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  return {
+    port: (server.address() as AddressInfo).port,
+    close: () => {
+      server.closeAllConnections();
+      server.close();
+    },
+  };
+}
 
 /**
  * Connect to the test database, which globalSetup.ts creates once per run.

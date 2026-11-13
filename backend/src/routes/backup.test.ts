@@ -9,7 +9,7 @@ import AdmZip from 'adm-zip';
 import type { PrismaClient } from '../generated/prisma/client';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData, seedIngredient, seedCocktail,
-  prisma, request, authHeader, getAuthToken,
+  prisma, request, authHeader, getAuthToken, listenWithShortTimeouts,
 } from '../test/helpers';
 import app from '../app';
 import { configureSqlite, createPrismaClient } from '../lib/prisma';
@@ -552,6 +552,70 @@ describe('backup restore', () => {
 
       await expectPreviousStateBack(await importBackup(backup));
     });
+  });
+});
+
+describe('slow backup restore upload', () => {
+  // Stands for Node's default of 300 s, which cut a restore sent over a slow uplink
+  const OLD_REQUEST_TIMEOUT_MS = 200;
+  const BOUNDARY = 'carta-slow-upload';
+
+  /** The multipart body the frontend sends: the archive in the "backup" field. */
+  function multipartBody(backup: Buffer): Buffer {
+    return Buffer.concat([
+      Buffer.from(
+        `--${BOUNDARY}\r\n`
+        + 'Content-Disposition: form-data; name="backup"; filename="backup.zip"\r\n'
+        + 'Content-Type: application/zip\r\n\r\n',
+      ),
+      backup,
+      Buffer.from(`\r\n--${BOUNDARY}--\r\n`),
+    ]);
+  }
+
+  /** Sends `body` in pieces spread over `durationMs`, and resolves to the status of the answer. */
+  async function postSlowly(port: number, body: Buffer, durationMs: number): Promise<number | undefined> {
+    const pieces = 10;
+    const pieceSize = Math.ceil(body.length / pieces);
+    const client = http.request({
+      host: '127.0.0.1',
+      port,
+      method: 'POST',
+      path: '/api/backup/import',
+      headers: {
+        ...(await currentSessionHeader()),
+        'Content-Type': `multipart/form-data; boundary=${BOUNDARY}`,
+        'Content-Length': body.length,
+      },
+    });
+    const answer = new Promise<number | undefined>((resolve, reject) => {
+      client.on('response', (res) => {
+        res.resume();
+        res.on('end', () => resolve(res.statusCode));
+      });
+      client.on('error', reject);
+    });
+    for (let offset = 0; offset < body.length; offset += pieceSize) {
+      client.write(body.subarray(offset, offset + pieceSize));
+      await new Promise((resolve) => setTimeout(resolve, durationMs / pieces));
+    }
+    client.end();
+    return answer;
+  }
+
+  it('should restore an archive whose upload lasts longer than Node\'s default request timeout', async () => {
+    await seedCocktail({ name: 'Mojito' });
+    const backup = await exportBackup();
+    await prisma.cocktail.deleteMany();
+    const server = await listenWithShortTimeouts(OLD_REQUEST_TIMEOUT_MS);
+    try {
+      const status = await postSlowly(server.port, multipartBody(backup), 5 * OLD_REQUEST_TIMEOUT_MS);
+
+      expect(status).toBe(200);
+      expect(await cocktailNames()).toEqual(['Mojito']);
+    } finally {
+      server.close();
+    }
   });
 });
 
