@@ -602,6 +602,16 @@ describe('concurrent backup restores and exports', () => {
     return { held, release };
   }
 
+  /** Holds the next request in authMiddleware, while it reads the user: before the route handler runs. */
+  function holdNextAuthentication(): Hold {
+    const { held, release, wait } = gate();
+    const findUnique = prisma.user.findUnique.bind(prisma.user);
+    vi.spyOn(prisma.user, 'findUnique').mockImplementationOnce(
+      (args) => wait().then(() => findUnique(args)) as ReturnType<typeof findUnique>,
+    );
+    return { held, release };
+  }
+
   /**
    * Starts an export on a server of its own, through a client that reads nothing:
    * `closed` resolves when the server side of the response closes.
@@ -752,6 +762,32 @@ describe('concurrent backup restores and exports', () => {
       expect((await importBackup(backup)).status).toBe(200);
     } finally {
       snapshot.release();
+      unreadExport.stop();
+    }
+  });
+
+  it('should end an export whose client left before the handler ran, and keep no copy of the database', async () => {
+    const backup = await exportBackup();
+    const snapshotsBefore = snapshotFiles();
+    const authentication = holdNextAuthentication();
+    const unreadExport = await startUnreadExport();
+    const rmSync = vi.spyOn(fs, 'rmSync');
+
+    try {
+      await authentication.held;
+      unreadExport.leave();
+      await unreadExport.closed;
+      authentication.release();
+      // Express still runs the handler: wait until it has copied the database and deleted the copy
+      await vi.waitFor(() => {
+        const deleted = rmSync.mock.calls.map(([target]) => path.basename(String(target)));
+        expect(deleted).toContainEqual(expect.stringMatching(/^carta-snapshot-/));
+      });
+
+      expect(snapshotFiles()).toEqual(snapshotsBefore);
+      expect((await importBackup(backup)).status).toBe(200);
+    } finally {
+      authentication.release();
       unreadExport.stop();
     }
   });
