@@ -35,22 +35,24 @@ Vérifié sur `develop` :
 
 ## Critères d'acceptation
 
-- [x] Une restauration sans réponse HTTP affiche `settings.backup.restoreNoAnswer` (en, fr, bundle admin), ni le texte du navigateur ni un succès.
-- [x] Le 504 garde `settings.backup.restoreTimeout` ; un 400 ou un 409 JSON garde le message du backend ; une erreur qui n'est pas une `Error` garde `common.error`.
+- [x] Une restauration sans réponse HTTP affiche `settings.backup.restoreNoAnswer` suivi de `settings.backup.restoreMayStillRun` (en, fr, bundle admin), ni le texte du navigateur ni un succès.
+- [x] Seule la requête décide « pas de réponse » : une erreur dans le traitement d'une réponse reçue n'affiche pas `restoreNoAnswer`.
+- [x] Le 504 garde `settings.backup.restoreTimeout` (suivi du même conseil `restoreMayStillRun`) ; un 400 ou un 409 JSON garde le message du backend ; une erreur qui n'est pas une `Error` garde `common.error`.
 - [x] L'export sans réponse HTTP garde son comportement (message du navigateur).
 - [x] Pas de modification de `services/api.ts`, du backend ni de nginx.
 
 ## Tests à ajouter ou adapter
 
-- `pages/admin/SettingsPage.test.tsx` : erreur réseau sur la restauration (nouveau message, ni `restoreTimeout` ni texte du navigateur ni succès) ; erreur réseau sur l'export (inchangé) ; 409 JSON sur la restauration (message du backend). Le test du 504 vérifie en plus l'absence du nouveau message. Les tests existants (400, 502, 504, erreur qui n'est pas une `Error`) passent sans changement.
+- `pages/admin/SettingsPage.test.tsx` : erreur réseau sur la restauration (nouveau message, ni `restoreTimeout` ni texte du navigateur ni succès) ; erreur réseau sur l'export (inchangé) ; 409 JSON sur la restauration (message du backend) ; réponse 200 dont le traitement échoue (corps `null`, pas `restoreNoAnswer`). Le test du 504 vérifie en plus l'absence du nouveau message. Les tests existants (400, 502, 504, erreur qui n'est pas une `Error`) passent sans changement.
 - Sondes de sabotage sur `SettingsPage.tsx` : voir le Journal.
 
 ## Points d'attention
 
-- **Texte voisin plutôt que `restoreTimeout`** : sa première phrase, « The server did not answer in time », est fausse quand la requête échoue vite (réseau perdu, connexion coupée pendant l'envoi). La nouvelle clé dit que la connexion a été coupée avant la réponse (le navigateur ou un proxy a cessé d'attendre, ou le réseau a été perdu), garde le reste du texte de `restoreTimeout`, et ajoute « vérifiez la connexion réseau » avant de réessayer.
+- **Texte voisin plutôt que `restoreTimeout`** : sa première phrase, « The server did not answer in time », est fausse quand la requête échoue vite (réseau perdu, connexion coupée pendant l'envoi). La nouvelle clé dit que la connexion a été coupée avant la réponse (le navigateur ou un proxy a cessé d'attendre, ou le réseau a été perdu) et demande de vérifier la connexion réseau. Pour ne pas dupliquer le texte, chaque clé ne garde que sa cause, et le conseil commun (ne pas relancer, attendre, recharger, la suite) est dans `restoreMayStillRun`, affiché après.
 - Le test porte sur `TypeError`, pas sur « tout ce qui n'est pas une `ApiError` » : une erreur qui n'est pas une `Error` ne vient pas d'une requête sans réponse, et garde `common.error`.
 
 ## Journal
 
 - 2026-11-13 : tâche créée et faite (PR #183, branche `fix/E-50-restore-network-error-message`). Message `settings.backup.restoreNoAnswer` dans `SettingsPage` pour une restauration qui échoue sans réponse HTTP. Sondes de sabotage : branche réseau supprimée (1 échec), toute erreur de restauration traitée comme sans réponse (6), tout ce qui n'est pas une `ApiError` traité comme sans réponse (1), clé `restoreTimeout` réutilisée (1), même branche appliquée à l'export (1), clé fr absente (1), clé en absente (2).
+- 2026-11-13 : suites de la relecture de la PR #183 (approuvée, deux nits). `requestRestore` limite la détection « pas de réponse » à la requête elle-même, avec un test (réponse 200 de corps `null`). Les clés `restoreTimeout` et `restoreNoAnswer` ne gardent que leur cause, et le conseil commun passe dans `restoreMayStillRun`. Sondes de sabotage : détection `TypeError` supprimée (1 échec), erreurs du traitement du succès comptées comme sans réponse (1), tout ce qui n'est pas une `ApiError` (1), conseil commun retiré (2), cause du 504 utilisée sans réponse (1), même branche sur l'export (2), clé commune absente en fr (1) et en en (2).
 - Notes de version : quand une restauration de sauvegarde échoue sans réponse du serveur (le navigateur ou un proxy coupe la connexion après une longue attente), l'écran de sauvegarde dit qu'elle continue peut-être et qu'il ne faut pas la relancer, au lieu du texte brut du navigateur (« Failed to fetch »).
