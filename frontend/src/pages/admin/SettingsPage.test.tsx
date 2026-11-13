@@ -16,6 +16,7 @@ import {
   mockApiError,
   mockApiPending,
   mockApiResponse,
+  mockNetworkError,
   mockProxyError,
   rejectNextFetch,
 } from '../../test/msw/utils';
@@ -474,6 +475,7 @@ describe('SettingsPage', () => {
 
     expect(await screen.findByText(timeoutMessage)).toBeInTheDocument();
     expect(screen.queryByText(SERVER_UNAVAILABLE)).not.toBeInTheDocument();
+    expect(screen.queryByText('settings.backup.restoreNoAnswer')).not.toBeInTheDocument();
     expect(screen.queryByText('settings.backup.exportSuccess')).not.toBeInTheDocument();
     expect(toast.success).not.toHaveBeenCalled();
   });
@@ -486,6 +488,41 @@ describe('SettingsPage', () => {
 
     expect(await screen.findByText(SERVER_UNAVAILABLE)).toBeInTheDocument();
     expect(screen.queryByText(timeoutMessage)).not.toBeInTheDocument();
+  });
+
+  // The browser (Firefox after 300 s) or a proxy may drop the connection before nginx answers 504
+  it('says the restore may still be running when its request gets no HTTP answer', async () => {
+    mockNetworkError('post', '/api/backup/import');
+    await renderLoadedPage();
+
+    await runBackupAction('restore');
+
+    expect(await screen.findByText('settings.backup.restoreNoAnswer')).toBeInTheDocument();
+    expect(screen.queryByText('settings.backup.restoreTimeout')).not.toBeInTheDocument();
+    expect(screen.queryByText(/fetch/i)).not.toBeInTheDocument();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it('keeps the browser message for an export that gets no HTTP answer', async () => {
+    mockNetworkError('get', '/api/backup/export');
+    await renderLoadedPage();
+
+    await runBackupAction('export');
+
+    expect(await screen.findByText(/fetch/i)).toBeInTheDocument();
+    expect(screen.queryByText('settings.backup.restoreNoAnswer')).not.toBeInTheDocument();
+    expect(screen.queryByText('settings.backup.exportTimeout')).not.toBeInTheDocument();
+  });
+
+  // E-49's lock refuses a second restore with a translated JSON error
+  it('shows the server message when a restore is refused because another one is running', async () => {
+    mockApiError('post', '/api/backup/import', 409, 'A restore is already running');
+    await renderLoadedPage();
+
+    await runBackupAction('restore');
+
+    expect(await screen.findByText('A restore is already running')).toBeInTheDocument();
+    expect(screen.queryByText('settings.backup.restoreNoAnswer')).not.toBeInTheDocument();
   });
 
   it('shows a generic error when the restore fails with something else than an Error', async () => {

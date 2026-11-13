@@ -28,6 +28,15 @@ function isGatewayTimeout(err: unknown): boolean {
   return err instanceof ApiError && err.status === GATEWAY_TIMEOUT;
 }
 
+/**
+ * fetch rejects with a TypeError when no HTTP answer arrives, and send() passes it on
+ * unchanged. On a long restore, the browser may give up before nginx answers 504 (Firefox
+ * also waits 300 s), or a proxy in front may cut the connection instead of answering.
+ */
+function isMissingAnswer(err: unknown): boolean {
+  return err instanceof TypeError;
+}
+
 /** A restore result the admin must read before the page reloads. */
 function needsAdminAttention(result: BackupRestoreResult): boolean {
   return result.restartRecommended || result.skippedFiles > 0;
@@ -203,7 +212,10 @@ export default function SettingsPage() {
         setTimeout(() => window.location.reload(), 1500);
       }
     } catch (err: unknown) {
-      showBackupError(err, 'settings.backup.restoreTimeout');
+      // Without an answer, the restore may be running as after a 504: the browser's own text
+      // ("Failed to fetch") would not stop the admin from starting a second one.
+      if (isMissingAnswer(err)) setBackupError(t('settings.backup.restoreNoAnswer'));
+      else showBackupError(err, 'settings.backup.restoreTimeout');
     } finally {
       setBackupImporting(false);
     }
