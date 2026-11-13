@@ -3,15 +3,15 @@ id: E-49
 title: "Refuser une restauration de sauvegarde pendant qu'une autre est en cours"
 phase: E
 lane: backend
-criticite: basse
+criticite: moyenne
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: []
-touches: [backend/src/routes/backup.ts, backend/src/routes/backup.test.ts, backend/src/services/backupService.ts, backend/src/services/backupService.test.ts, backend/src/i18n/]
+touches: [backend/src/services/backupService.ts, backend/src/routes/backup.test.ts, backend/src/i18n/, docs/plan/tasks/E-51-backup-export-during-restore.md]
 sources: []
-branch: ""
-pr: ""
+branch: fix/E-49-concurrent-backup-restore
+pr: "#184"
 ---
 
 ## Contexte
@@ -30,8 +30,8 @@ Rien n'empêche deux restaurations en même temps. Le bouton « Restore Backup �
 
 ## Critères d'acceptation
 
-- [ ] Une deuxième restauration lancée pendant la première reçoit un 409 traduit, et la première se termine normalement.
-- [ ] Après une restauration réussie ou échouée, une nouvelle restauration est acceptée.
+- [x] Une deuxième restauration lancée pendant la première reçoit un 409 traduit, et la première se termine normalement.
+- [x] Après une restauration réussie ou échouée, une nouvelle restauration est acceptée.
 
 ## Tests à ajouter ou adapter
 
@@ -45,3 +45,5 @@ Rien n'empêche deux restaurations en même temps. Le bouton « Restore Backup �
 ## Journal
 
 - 2026-11-13 : tâche créée pendant E-47.
+- 2026-11-13 : `criticite` passée à `moyenne` (relecture de #182 : une restauration repliée peut remettre la base d'avant par-dessus une autre qui annonce un succès). Fait (PR #184, branche `fix/E-49-concurrent-backup-restore`). `restoreBackup()` devient une enveloppe de la restauration inchangée (`replaceLiveData()`) avec un indicateur en mémoire, vérifié et posé avant le premier `await`, libéré dans un `finally` ; une restauration lancée pendant une autre reçoit un 409 `errors.restoreInProgress` (en, fr) sans toucher aux fichiers. Le verrou est placé après multer : derrière nginx l'archive est de toute façon reçue en entier, et le `finally` de la route supprime le fichier envoyé de la requête refusée (testé). Aucun changement frontend : `SettingsPage` affiche le champ `error` du 409. Les fichiers `routes/backup.ts` et `services/backupService.test.ts` n'ont pas eu à changer ; tests dans `routes/backup.test.ts`. Tâche E-51 créée pour un export lancé pendant une restauration (hors du choix de l'humain).
+- Notes de version : lancer une restauration de sauvegarde pendant qu'une autre est en cours est désormais refusé avec « A backup restore is already in progress: wait for it to finish, then reload the page » ; avant, les deux pouvaient se mélanger et remettre en silence l'ancienne base.
