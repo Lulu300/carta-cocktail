@@ -5,13 +5,13 @@ phase: E
 lane: frontend
 criticite: basse
 effort: S
-status: in-progress
+status: done
 owner: agent
 depends_on: [E-50, E-53]
 touches: [frontend/src/pages/admin/SettingsPage.tsx, frontend/src/pages/admin/SettingsPage.test.tsx, frontend/src/i18n/locales/admin/]
 sources: []
 branch: fix/E-55-backup-export-cut-message
-pr: ""
+pr: "#187"
 ---
 
 ## Contexte
@@ -65,5 +65,5 @@ Vérifié sur `develop` :
 
 ## Journal
 
-- 2026-11-13 : tâche créée et faite (branche `fix/E-55-backup-export-cut-message`). `requestRestore` devient `orNoAnswer`, utilisé par l'export et la restauration ; nouveau message `settings.backup.exportNoAnswer`. `services/api.ts` n'est pas modifié. Sondes de sabotage, chacune annulée : export non enveloppé (2 échecs), toute `Error` comptée comme sans réponse (11), tout ce qui n'est pas une `ApiError` (2), message de la restauration sur l'export (2), pas de `return` après le message (2), texte brut affiché (2), message de l'export sur la restauration (1), clé fr absente (1), clé en absente (2).
+- 2026-11-13 : tâche créée et faite (PR #187, branche `fix/E-55-backup-export-cut-message`). `requestRestore` devient `orNoAnswer`, utilisé par l'export et la restauration ; nouveau message `settings.backup.exportNoAnswer`. `services/api.ts` n'est pas modifié. Sondes de sabotage, chacune annulée : export non enveloppé (2 échecs), toute `Error` comptée comme sans réponse (11), tout ce qui n'est pas une `ApiError` (2), message de la restauration sur l'export (2), pas de `return` après le message (2), texte brut affiché (2), message de l'export sur la restauration (1), clé fr absente (1), clé en absente (2).
 - Notes de version : quand un export de sauvegarde n'obtient pas de réponse du serveur ou que son téléchargement est coupé, l'écran de sauvegarde dit que la connexion a été coupée, que l'export ne modifie rien et qu'on peut réessayer, au lieu du texte brut du navigateur (« Failed to fetch », « network error »).
