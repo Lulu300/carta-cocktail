@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import crypto from 'crypto';
 import fs from 'fs';
+import http from 'http';
+import type { AddressInfo } from 'net';
 import os from 'os';
 import path from 'path';
 import AdmZip from 'adm-zip';
@@ -8,11 +11,12 @@ import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData, seedIngredient, seedCocktail,
   prisma, request, authHeader, getAuthToken,
 } from '../test/helpers';
+import app from '../app';
 import { configureSqlite, createPrismaClient } from '../lib/prisma';
 import { resetRateLimits } from '../middleware/rateLimit';
 import { resolveDatabasePath } from '../lib/databasePath';
 import { config } from '../config';
-import { latestAppMigration, restoreBackup } from '../services/backupService';
+import { beginExport, latestAppMigration, restoreBackup } from '../services/backupService';
 import { applySessionFloor, hasTokenVersionColumn, sessionFloorPath } from '../services/sessionFloor';
 
 const dbPath = resolveDatabasePath();
@@ -26,10 +30,10 @@ async function currentSessionHeader(): Promise<{ Authorization: string }> {
 }
 
 /** Downloads a backup, keeping the zip as a Buffer instead of letting supertest parse it. */
-async function requestExport() {
+async function requestExport(headers: Record<string, string> = {}) {
   return request
     .get('/api/backup/export')
-    .set(await currentSessionHeader())
+    .set({ ...(await currentSessionHeader()), ...headers })
     .buffer(true)
     .parse((response, callback) => {
       const chunks: Buffer[] = [];
@@ -193,6 +197,16 @@ function emptyUploadDir(): void {
   }
 }
 
+function snapshotFiles(): string[] {
+  return fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith('carta-snapshot-'));
+}
+
+/** The entries of a backup taken from uploads/, sorted. */
+function uploadEntries(backup: Buffer): string[] {
+  return new AdmZip(backup).getEntries().map((entry) => entry.entryName)
+    .filter((name) => name.startsWith('uploads/')).sort();
+}
+
 function preRestoreCopies(): string[] {
   if (!fs.existsSync(preRestoreDir)) return [];
   return fs.readdirSync(preRestoreDir).filter((name) => /^pre-restore-.*\.db$/.test(name));
@@ -288,12 +302,32 @@ describe('backup export', () => {
   });
 
   it('should delete the database snapshot once the download is over', async () => {
-    const snapshots = () => fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith('carta-snapshot-'));
-    const before = snapshots();
+    const before = snapshotFiles();
 
     await exportBackup();
 
-    expect(snapshots()).toEqual(before);
+    expect(snapshotFiles()).toEqual(before);
+  });
+
+  it('should leave out the folders a restore works in, and keep every photo', async () => {
+    const stamp = '20261011-153700123';
+    for (const folder of [`.restore-${stamp}`, `.pre-restore-${stamp}`, `cocktails/.restore-${stamp}`]) {
+      fs.mkdirSync(path.join(config.uploadDir, folder), { recursive: true });
+      fs.writeFileSync(path.join(config.uploadDir, folder, 'from-restore.jpg'), 'restore bytes');
+    }
+    fs.writeFileSync(path.join(config.uploadDir, 'photo.jpg'), 'photo bytes');
+    // A file, not a folder: only the folders a restore creates are left out
+    fs.writeFileSync(path.join(config.uploadDir, `.restore-${stamp}.jpg`), 'file bytes');
+
+    const backup = await exportBackup();
+
+    expect(uploadEntries(backup)).toEqual([
+      `uploads/.restore-${stamp}.jpg`,
+      'uploads/cocktails/',
+      `uploads/cocktails/.restore-${stamp}/`,
+      `uploads/cocktails/.restore-${stamp}/from-restore.jpg`,
+      'uploads/photo.jpg',
+    ]);
   });
 
   it.skipIf(isRoot)('should cut the download instead of sending a truncated zip when a file cannot be read', async () => {
@@ -464,6 +498,8 @@ describe('backup restore', () => {
       warn.mockRestore();
     }
 
+    // Nor does a later export send it
+    expect(uploadEntries(await exportBackup())).toEqual(['uploads/restored.jpg']);
     // The leftover folder is not served, and the next restore removes it
     expect((await request.get(`/uploads/${uploadDirContent()[0]}/old.jpg`)).status).toBe(404);
     expect((await importBackup(backup)).status).toBe(200);
@@ -519,9 +555,11 @@ describe('backup restore', () => {
   });
 });
 
-describe('concurrent backup restores', () => {
+describe('concurrent backup restores and exports', () => {
   const IN_PROGRESS_EN = 'A backup restore is already in progress: wait for it to finish, then reload the page and sign in again (the restore ends every session)';
   const IN_PROGRESS_FR = 'Une restauration de sauvegarde est déjà en cours : attendez qu’elle se termine, puis rechargez la page et reconnectez-vous (la restauration ferme toutes les sessions)';
+  const EXPORT_IN_PROGRESS_EN = 'A backup is being exported: wait for its download to finish, then start the restore again';
+  const EXPORT_IN_PROGRESS_FR = 'Une sauvegarde est en cours d’export : attendez la fin de son téléchargement, puis relancez la restauration';
   // multer's default file name in its `dest` folder
   const MULTER_FILE_NAME = /^[0-9a-f]{32}$/;
 
@@ -529,22 +567,69 @@ describe('concurrent backup restores', () => {
     vi.restoreAllMocks();
   });
 
-  /**
-   * Holds the next restore right before it closes the live database (after its
-   * checks and extraction, before the switch), until `release()` is called.
-   */
-  function holdNextRestore(): { held: Promise<void>; release: () => void } {
+  interface Hold { held: Promise<void>; release: () => void }
+
+  /** `held` resolves once `wait()` is called; `wait()` resolves once `release()` is called. */
+  function gate(): Hold & { wait: () => Promise<void> } {
     let markHeld!: () => void;
     let release!: () => void;
     const held = new Promise<void>((resolve) => { markHeld = resolve; });
     const released = new Promise<void>((resolve) => { release = resolve; });
+    return { held, release, wait: () => { markHeld(); return released; } };
+  }
+
+  /**
+   * Holds the next restore right before it closes the live database (after its
+   * checks and extraction, before the switch), until `release()` is called.
+   */
+  function holdNextRestore(): Hold {
+    const { held, release, wait } = gate();
     const disconnect = prisma.$disconnect.bind(prisma);
     vi.spyOn(prisma, '$disconnect').mockImplementationOnce(async () => {
-      markHeld();
-      await released;
+      await wait();
       return disconnect();
     });
     return { held, release };
+  }
+
+  /** Holds the next export while it copies the database, before it sends anything. */
+  function holdNextSnapshot(): Hold {
+    const { held, release, wait } = gate();
+    const executeRawUnsafe = prisma.$executeRawUnsafe.bind(prisma);
+    vi.spyOn(prisma, '$executeRawUnsafe').mockImplementationOnce(
+      (query, ...values) => wait().then(() => executeRawUnsafe(query, ...values)) as ReturnType<typeof executeRawUnsafe>,
+    );
+    return { held, release };
+  }
+
+  /**
+   * Starts an export on a server of its own, through a client that reads nothing:
+   * `closed` resolves when the server side of the response closes.
+   */
+  async function startUnreadExport() {
+    const server = http.createServer(app);
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const closed = new Promise<void>((resolve) => {
+      server.on('request', (_req, res: http.ServerResponse) => res.on('close', resolve));
+    });
+    const client = http.get({
+      host: '127.0.0.1',
+      port: (server.address() as AddressInfo).port,
+      path: '/api/backup/export',
+      headers: await currentSessionHeader(),
+    });
+    // The test destroys the request on purpose
+    client.on('error', () => {});
+    const response = new Promise<http.IncomingMessage>((resolve) => client.on('response', (res) => {
+      res.pause();
+      resolve(res);
+    }));
+    const stop = () => {
+      client.destroy();
+      server.closeAllConnections();
+      server.close();
+    };
+    return { response, closed, stop, leave: () => client.destroy() };
   }
 
   /** Every file a restore writes or moves: the uploads, the copies of the database, the files next to it. */
@@ -608,6 +693,101 @@ describe('concurrent backup restores', () => {
 
       await expect(second).rejects.toMatchObject({ status: 409, i18nKey: 'errors.restoreInProgress' });
       await expect(first).resolves.toEqual({ skippedFiles: 0, restartRecommended: true });
+    });
+  });
+
+  it('should refuse an export with a translated 409 while a restore runs, and let the restore finish', async () => {
+    const backup = withEntries(await exportBackup(), { 'uploads/restored.jpg': 'restored bytes' });
+    const { held, release } = holdNextRestore();
+
+    const restoreResponse = importBackup(backup);
+    let restored: Awaited<typeof restoreResponse>;
+    try {
+      await held;
+      const snapshotsWhileHeld = snapshotFiles();
+
+      const exported = await requestExport();
+      const exportedInFrench = await requestExport({ 'Accept-Language': 'fr' });
+
+      expect(exported.status).toBe(409);
+      expect(JSON.parse(String(exported.body))).toEqual({ error: IN_PROGRESS_EN });
+      expect(exportedInFrench.status).toBe(409);
+      expect(JSON.parse(String(exportedInFrench.body))).toEqual({ error: IN_PROGRESS_FR });
+      // Refused before it copied the database
+      expect(snapshotFiles()).toEqual(snapshotsWhileHeld);
+    } finally {
+      release();
+      restored = await restoreResponse;
+    }
+
+    expect(restored.status).toBe(200);
+    expect(uploadDirContent()).toEqual(['restored.jpg']);
+    expect(uploadEntries(await exportBackup())).toEqual(['uploads/restored.jpg']);
+  });
+
+  it('should refuse a restore with a translated 409 from the start of an export until its response closes', async () => {
+    const backup = await exportBackup();
+    // More than the socket buffers hold: the archive is still reading it while the client reads nothing
+    fs.writeFileSync(path.join(config.uploadDir, 'large.jpg'), crypto.randomBytes(32 * 1024 * 1024));
+    const snapshot = holdNextSnapshot();
+    const unreadExport = await startUnreadExport();
+
+    try {
+      await snapshot.held;
+      const whileCopyingDatabase = await importBackup(backup);
+      snapshot.release();
+      expect((await unreadExport.response).statusCode).toBe(200);
+      const whileSending = await request.post('/api/backup/import').set(await currentSessionHeader())
+        .set('Accept-Language', 'fr').attach('backup', backup, 'backup.zip');
+
+      expect(whileCopyingDatabase.status).toBe(409);
+      expect(whileCopyingDatabase.body).toEqual({ error: EXPORT_IN_PROGRESS_EN });
+      expect(whileSending.status).toBe(409);
+      expect(whileSending.body).toEqual({ error: EXPORT_IN_PROGRESS_FR });
+      expect(uploadDirContent()).toEqual(['large.jpg']);
+
+      // The archive never ends once its client has left: the response closing ends the export
+      unreadExport.leave();
+      await unreadExport.closed;
+      expect((await importBackup(backup)).status).toBe(200);
+    } finally {
+      snapshot.release();
+      unreadExport.stop();
+    }
+  });
+
+  it('should let exports run together, and accept a restore once every one of them has ended', async () => {
+    const backup = await exportBackup();
+    const endFirst = beginExport();
+    const endSecond = beginExport();
+
+    try {
+      await withZipFile(backup, async (zipPath) => {
+        const refused = { status: 409, i18nKey: 'errors.exportInProgress' };
+        await expect(restoreBackup(zipPath)).rejects.toMatchObject(refused);
+        endFirst();
+        // Ending the same export twice must not end the other one
+        endFirst();
+        await expect(restoreBackup(zipPath)).rejects.toMatchObject(refused);
+        endSecond();
+        await expect(restoreBackup(zipPath)).resolves.toEqual({ skippedFiles: 0, restartRecommended: true });
+      });
+    } finally {
+      endFirst();
+      endSecond();
+    }
+  });
+
+  it('should refuse an export as soon as a restore has started, before its first await', async () => {
+    const backup = await exportBackup();
+
+    await withZipFile(backup, async (zipPath) => {
+      const restoring = restoreBackup(zipPath);
+
+      expect(() => beginExport()).toThrow('errors.restoreInProgress');
+      await expect(restoring).resolves.toEqual({ skippedFiles: 0, restartRecommended: true });
+      const endExport = beginExport();
+      endExport();
     });
   });
 

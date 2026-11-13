@@ -7,7 +7,7 @@ import { config } from '../config';
 import { AuthRequest } from '../middleware/auth';
 import { BadRequestError } from '../errors';
 import {
-  MAX_BACKUP_UPLOAD_BYTES, buildMetadata, createSnapshot, restoreBackup,
+  MAX_BACKUP_UPLOAD_BYTES, RESTORE_WORK_FOLDERS, beginExport, buildMetadata, createSnapshot, restoreBackup,
 } from '../services/backupService';
 
 const router = Router();
@@ -20,6 +20,12 @@ const upload = multer({
 
 // Export backup as ZIP
 router.get('/export', async (_req: AuthRequest, res: Response) => {
+  // Taken before the first await. Ended when the response closes, not when this
+  // handler returns: the archive reads the photos while it is being sent, and
+  // once a client leaves halfway, the archive stays paused and this handler
+  // never returns.
+  const endExport = beginExport();
+  res.on('close', endExport);
   const metadata = await buildMetadata();
   const snapshotPath = await createSnapshot();
   res.on('close', () => fs.rmSync(snapshotPath, { force: true }));
@@ -41,7 +47,7 @@ router.get('/export', async (_req: AuthRequest, res: Response) => {
   archive.append(JSON.stringify(metadata), { name: 'metadata.json' });
   archive.file(snapshotPath, { name: 'database.db' });
   if (fs.existsSync(config.uploadDir)) {
-    archive.directory(config.uploadDir, 'uploads');
+    archive.glob('**', { cwd: config.uploadDir, dot: true, skip: RESTORE_WORK_FOLDERS }, { prefix: 'uploads' });
   }
 
   await archive.finalize();
