@@ -95,6 +95,12 @@ async function answerRestoreDialog(buttonName: 'settings.backup.import' | 'commo
   await userEvent.click(within(dialog).getByRole('button', { name: buttonName }));
 }
 
+// A restore that ends without its result shows its cause, then the advice shared by both causes
+const RESTORE_TIMEOUT = 'settings.backup.restoreTimeout settings.backup.restoreMayStillRun';
+const RESTORE_NO_ANSWER = 'settings.backup.restoreNoAnswer settings.backup.restoreMayStillRun';
+// Matches the no-answer message wherever it is, for the tests that check it is absent
+const NO_ANSWER_CAUSE = /settings\.backup\.restoreNoAnswer/;
+
 type BackupAction = 'export' | 'restore';
 
 /** Starts a backup export, or a confirmed restore of a selected file. */
@@ -109,7 +115,7 @@ async function runBackupAction(action: BackupAction) {
 
 const BACKUP_ACTIONS = [
   { action: 'export', method: 'get', path: '/api/backup/export', timeoutMessage: 'settings.backup.exportTimeout' },
-  { action: 'restore', method: 'post', path: '/api/backup/import', timeoutMessage: 'settings.backup.restoreTimeout' },
+  { action: 'restore', method: 'post', path: '/api/backup/import', timeoutMessage: RESTORE_TIMEOUT },
 ] as const;
 
 beforeEach(() => {
@@ -475,7 +481,7 @@ describe('SettingsPage', () => {
 
     expect(await screen.findByText(timeoutMessage)).toBeInTheDocument();
     expect(screen.queryByText(SERVER_UNAVAILABLE)).not.toBeInTheDocument();
-    expect(screen.queryByText('settings.backup.restoreNoAnswer')).not.toBeInTheDocument();
+    expect(screen.queryByText(NO_ANSWER_CAUSE)).not.toBeInTheDocument();
     expect(screen.queryByText('settings.backup.exportSuccess')).not.toBeInTheDocument();
     expect(toast.success).not.toHaveBeenCalled();
   });
@@ -497,8 +503,8 @@ describe('SettingsPage', () => {
 
     await runBackupAction('restore');
 
-    expect(await screen.findByText('settings.backup.restoreNoAnswer')).toBeInTheDocument();
-    expect(screen.queryByText('settings.backup.restoreTimeout')).not.toBeInTheDocument();
+    expect(await screen.findByText(RESTORE_NO_ANSWER)).toBeInTheDocument();
+    expect(screen.queryByText(/settings\.backup\.restoreTimeout/)).not.toBeInTheDocument();
     expect(screen.queryByText(/fetch/i)).not.toBeInTheDocument();
     expect(toast.success).not.toHaveBeenCalled();
   });
@@ -510,8 +516,19 @@ describe('SettingsPage', () => {
     await runBackupAction('export');
 
     expect(await screen.findByText(/fetch/i)).toBeInTheDocument();
-    expect(screen.queryByText('settings.backup.restoreNoAnswer')).not.toBeInTheDocument();
+    expect(screen.queryByText(NO_ANSWER_CAUSE)).not.toBeInTheDocument();
     expect(screen.queryByText('settings.backup.exportTimeout')).not.toBeInTheDocument();
+  });
+
+  // The server did answer: a TypeError while reading its answer is a bug, not a lost connection
+  it('does not report a lost connection for an error after the restore was answered', async () => {
+    mockApiResponse('post', '/api/backup/import', null);
+    await renderLoadedPage();
+
+    await runBackupAction('restore');
+
+    expect(await screen.findByText(/Cannot read properties of null/)).toBeInTheDocument();
+    expect(screen.queryByText(NO_ANSWER_CAUSE)).not.toBeInTheDocument();
   });
 
   // E-49's lock refuses a second restore with a translated JSON error
@@ -522,7 +539,7 @@ describe('SettingsPage', () => {
     await runBackupAction('restore');
 
     expect(await screen.findByText('A restore is already running')).toBeInTheDocument();
-    expect(screen.queryByText('settings.backup.restoreNoAnswer')).not.toBeInTheDocument();
+    expect(screen.queryByText(NO_ANSWER_CAUSE)).not.toBeInTheDocument();
   });
 
   it('shows a generic error when the restore fails with something else than an Error', async () => {
