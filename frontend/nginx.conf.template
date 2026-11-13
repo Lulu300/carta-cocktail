@@ -40,6 +40,9 @@ server {
     # Backup restore: large archive, streamed to the backend instead of buffered on disk.
     # Keep the size in line with MAX_BACKUP_UPLOAD_BYTES in backend/src/services/backupService.ts
     # (200 MB), plus a margin for the multipart envelope, so the backend answers the 413.
+    # These timeouts, and client_body_timeout (nginx's default of 60 s between two reads of the
+    # body), bound the gap between two reads or writes, not the whole upload: the backend sets
+    # no total limit either (backend/src/serverTimeouts.ts), so a slow upload may last over 300 s.
     location = /api/backup/import {
         client_max_body_size 210m;
         proxy_request_buffering off;

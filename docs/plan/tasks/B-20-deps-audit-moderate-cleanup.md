@@ -5,13 +5,13 @@ phase: B
 lane: deps
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [B-19]
 touches: [backend/package.json, backend/package-lock.json]
 sources: []
-branch:
-pr:
+branch: chore/B-20-deps-audit-moderate-cleanup
+pr: "#164"
 ---
 
 ## Contexte
@@ -34,9 +34,9 @@ Au 2026-11-05, après B-19, `npm audit --omit=dev` backend signale 5 avis `moder
 
 ## Critères d'acceptation
 
-- [ ] `npm audit --omit=dev` backend ne signale plus `fast-uri` ni `ip-address`.
-- [ ] `minimatch` corrigé, ou la décision de garder l'avis notée dans le Journal.
-- [ ] `npm ci`, `tsc`, lint, build et `npm test` passent ; jobs « Docker build (backend) » et Smoke verts.
+- [x] `npm audit --omit=dev` backend ne signale plus `fast-uri` ni `ip-address`.
+- [x] `minimatch` corrigé, ou la décision de garder l'avis notée dans le Journal.
+- [x] `npm ci`, `tsc`, lint, build et `npm test` passent ; jobs « Docker build (backend) » et Smoke verts.
 
 ## Tests à ajouter ou adapter
 
@@ -53,3 +53,6 @@ Aucun si aucune ligne de code ne change : les tests de sauvegarde couvrent `arch
 - 2026-11-05 : tâche créée par B-19 (PR #146) après l'audit complet du backend.
 - 2026-11-05 : B-16 (PR #150) monte Prisma en 7.10.1 et retire les surcharges `deepmerge-ts` / `mysql2`. Les avis listés plus haut ne changent pas. `fast-uri` reste en 3.1.8 par le même chemin : `@prisma/dev` 0.24.17 ne change pas en 7.10.1, même si les notes de version de Prisma citent `fast-uri`. `npm audit --omit=dev` reste à 5 `moderate` (14 avec le dev). Le point d'attention ne vaut plus : B-16 n'attend plus de version de Prisma. Lancer B-20 après son merge (même lockfile).
 - 2026-11-05 : PR docs de suivi du lot E-15/B-13/C-42/B-19/B-16. Points d'attention mis à jour après le merge de B-16 (PR #150) : la contrainte de lockfile partagé avec B-16 et l'attente d'une version de Prisma ne valent plus ; `fast-uri` est absent de l'image livrée (coupe D-30), relevé par la relecture de la PR #146 et vérifié sur l'image par celle de la PR #150.
+- 2026-11-06 : après le merge de v1.12.0 sur `main` (PR #161), Dependabot ouvre sur `main` les alertes `fast-uri` (2 `medium`, 2 `low`) et `minimatch` (1 `medium`) de `backend/package-lock.json` ; l'alerte `ip-address` (1 `medium`) y était déjà ouverte depuis le 2026-10-31. Toutes sont déjà listées ci-dessus. Les alertes du frontend (dev : `undici`, `minimatch`) vont à B-21.
+- 2026-11-12 : PR #164. Audit refait le jour même : mêmes 5 `moderate` en production, 14 avec le dev. `npm update fast-uri ip-address` passe `fast-uri` en 3.1.9 et `ip-address` en 10.7.6. Le lockfile ne bouge pas ailleurs. Pour `minimatch`, `archiver` 8.0.0 est toujours la dernière version et demande `readdir-glob ^3.0.0`. `readdir-glob` 4.0.0 (2026-11-09) demande `minimatch ^11.0.1`, mais son `dist/` est identique à celui de 3.0.0. Décision : surcharge ciblée `"readdir-glob": { "minimatch": "^11.0.1" }`, qui installe 11.0.8. `readdir-glob` n'utilise que la classe `Minimatch` (options `dot`, `noglobstar`, `matchBase`, `nocase`) et `match()`, inchangées en 11. `npm audit --omit=dev` : 0. Tests, lint, `tsc` et build passent. Dans l'image construite, seul `readdir-glob/node_modules/minimatch` 11.0.8 est présent, la coupe D-30 et `prisma --version` sans réseau passent, et l'export ZIP fonctionne. Restent 10 `moderate` de dev (`minimatch` 10.2.6 via `eslint` 10.14.0, `@eslint/config-array` et `typescript-eslint` 8.72.2, qui demandent tous `^10`). Ils ne sont pas surchargés : outillage de dev, hors du seuil de la CI. B-21 peut reprendre la même règle (surcharge seulement sous un paquet de production dont l'API a été vérifiée).
+- 2026-11-12 : PR docs de suivi du lot D-35/E-18/B-20/C-12, d'après la relecture de la PR #164. Retrait de la surcharge `"readdir-glob": { "minimatch": "^11.0.1" }` : quand `archiver` dépendra de `readdir-glob` ≥ 4, ou `readdir-glob` 3.x de `minimatch` ≥ 11.0.1. Il faut alors supprimer aussi l'entrée `node_modules/readdir-glob/node_modules/minimatch` du lockfile : sans elle, npm garde le `minimatch` 11 imbriqué et l'audit ne dit rien. Suivi dans B-22. Précision sur la ligne précédente : `eslint` 10.14.0 et `typescript-eslint` 8.72.2 sont les dernières versions publiées (elles demandent toujours `minimatch` `^10`) ; le lockfile a `eslint` 10.12.0 et `typescript-eslint` 8.71.1.

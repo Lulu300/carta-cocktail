@@ -51,7 +51,8 @@ backend/
 │   │   ├── serializedAdapter.ts # Queries wait for the open transaction (single connection)
 │   │   └── prisma.ts         # The only PrismaClient factory + SQLite setup (WAL)
 │   ├── middleware/
-│   │   └── auth.ts           # JWT Bearer validation, AuthRequest type
+│   │   ├── auth.ts           # JWT Bearer validation, AuthRequest type
+│   │   └── rateLimit.ts      # createRateLimiter() (429 through errorHandler), resetRateLimits() for tests
 │   ├── routes/               # One file per resource (14 route files)
 │   │   ├── auth.ts           # POST /login, GET /me, POST /logout-all
 │   │   ├── categoryTypes.ts  # CRUD /api/category-types
@@ -133,7 +134,13 @@ export default router;
   one included. A backup made before v1.11.0 has no column: the restore writes the live version to
   `<database>.session-floor`, and the next start applies it after the migrations (`services/sessionFloor.ts`, C-30)
 - `POST /api/auth/login` allows `LOGIN_RATE_LIMIT` failed attempts (default 10) per client IP in 15 minutes, then
-  answers 429. `trust proxy` (`TRUST_PROXY`) trusts the proxies on loopback and private networks by default: the
+  answers 429. Every `/api` route except `/api/health` allows `API_RATE_LIMIT` requests (default 600) per client IP
+  in one minute, counted before the body parsers and `authMiddleware`; `/api/backup` also allows 10 authenticated
+  requests in 15 minutes, counted after `authMiddleware`. Build a limiter with `createRateLimiter()`
+  (`middleware/rateLimit.ts`), never `rateLimit()` directly; tests that send many requests to a strict limiter call
+  `resetRateLimits()` in `beforeEach`. Clients that share an address share the counters; an IPv6 client counts
+  for its /64 network (`ipv6Subnet: 64` in the factory, C-51). `trust proxy`
+  (`TRUST_PROXY`) trusts the proxies on loopback and private networks by default: the
   client IP is the last public address forwarded by nginx and any reverse proxy in front of it. A successful login
   rehashes a password hash made at another cost (`needsRehash`)
 - One password rule (`src/bootstrap/password.ts`): `hashPassword()` (bcrypt cost 12) and `MIN_PASSWORD_LENGTH` (12),

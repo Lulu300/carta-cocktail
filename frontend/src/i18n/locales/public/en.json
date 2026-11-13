@@ -50,6 +50,10 @@
     "originalUnit": "Original unit",
     "convertTo": "Convert to:"
   },
+  "auth": {
+    "sessionCheckFailed": "Your session could not be checked",
+    "signInAgain": "Sign in again"
+  },
   "common": {
     "cancel": "Cancel",
     "confirm": "Confirm",
@@ -59,7 +63,10 @@
     "close": "Close",
     "clearSearch": "Clear search",
     "resultCount_one": "{{count}} result",
-    "resultCount_other": "{{count}} results"
+    "resultCount_other": "{{count}} results",
+    "serverUnavailable": "The server is not responding, try again in a moment.",
+    "requestTooLarge": "The file or request is too large",
+    "requestFailed": "The request could not be completed (error {{status}})."
   },
   "deletion": {
     "usedByCocktails": "Used by these cocktails: {{names}}.",
@@ -76,5 +83,9 @@
     "cocktailCount_other": "{{count}} cocktails",
     "bottleCount_one": "{{count}} bottle",
     "bottleCount_other": "{{count}} bottles"
+  },
+  "errors": {
+    "pageLoadFailed": "This page could not be displayed",
+    "reload": "Reload"
   }
 }

@@ -1,17 +1,22 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import crypto from 'crypto';
 import fs from 'fs';
+import http from 'http';
+import type { AddressInfo } from 'net';
 import os from 'os';
 import path from 'path';
 import AdmZip from 'adm-zip';
 import type { PrismaClient } from '../generated/prisma/client';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData, seedIngredient, seedCocktail,
-  prisma, request, authHeader, getAuthToken,
+  prisma, request, authHeader, getAuthToken, listenWithShortTimeouts,
 } from '../test/helpers';
+import app from '../app';
 import { configureSqlite, createPrismaClient } from '../lib/prisma';
+import { resetRateLimits } from '../middleware/rateLimit';
 import { resolveDatabasePath } from '../lib/databasePath';
 import { config } from '../config';
-import { latestAppMigration, restoreBackup } from '../services/backupService';
+import { beginExport, latestAppMigration, restoreBackup } from '../services/backupService';
 import { applySessionFloor, hasTokenVersionColumn, sessionFloorPath } from '../services/sessionFloor';
 
 const dbPath = resolveDatabasePath();
@@ -25,10 +30,10 @@ async function currentSessionHeader(): Promise<{ Authorization: string }> {
 }
 
 /** Downloads a backup, keeping the zip as a Buffer instead of letting supertest parse it. */
-async function requestExport() {
+async function requestExport(headers: Record<string, string> = {}) {
   return request
     .get('/api/backup/export')
-    .set(await currentSessionHeader())
+    .set({ ...(await currentSessionHeader()), ...headers })
     .buffer(true)
     .parse((response, callback) => {
       const chunks: Buffer[] = [];
@@ -45,6 +50,18 @@ async function exportBackup(): Promise<Buffer> {
 
 async function importBackup(backup: Buffer) {
   return request.post('/api/backup/import').set(await currentSessionHeader()).attach('backup', backup, 'backup.zip');
+}
+
+/** Writes `backup` to a temporary file, as multer does, for the time `use` runs. */
+async function withZipFile<T>(backup: Buffer, use: (zipPath: string) => Promise<T>): Promise<T> {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'carta-backup-'));
+  const zipPath = path.join(dir, 'backup.zip');
+  fs.writeFileSync(zipPath, backup);
+  try {
+    return await use(zipPath);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 function zipWith(files: Record<string, string | Buffer>): Buffer {
@@ -180,6 +197,16 @@ function emptyUploadDir(): void {
   }
 }
 
+function snapshotFiles(): string[] {
+  return fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith('carta-snapshot-'));
+}
+
+/** The entries of a backup taken from uploads/, sorted. */
+function uploadEntries(backup: Buffer): string[] {
+  return new AdmZip(backup).getEntries().map((entry) => entry.entryName)
+    .filter((name) => name.startsWith('uploads/')).sort();
+}
+
 function preRestoreCopies(): string[] {
   if (!fs.existsSync(preRestoreDir)) return [];
   return fs.readdirSync(preRestoreDir).filter((name) => /^pre-restore-.*\.db$/.test(name));
@@ -214,6 +241,7 @@ beforeEach(async () => {
   await cleanDatabase();
   await seedRequiredData();
   emptyUploadDir();
+  await resetRateLimits();
 });
 
 afterEach(async () => {
@@ -274,12 +302,32 @@ describe('backup export', () => {
   });
 
   it('should delete the database snapshot once the download is over', async () => {
-    const snapshots = () => fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith('carta-snapshot-'));
-    const before = snapshots();
+    const before = snapshotFiles();
 
     await exportBackup();
 
-    expect(snapshots()).toEqual(before);
+    expect(snapshotFiles()).toEqual(before);
+  });
+
+  it('should leave out the folders a restore works in, and keep every photo', async () => {
+    const stamp = '20261011-153700123';
+    for (const folder of [`.restore-${stamp}`, `.pre-restore-${stamp}`, `cocktails/.restore-${stamp}`]) {
+      fs.mkdirSync(path.join(config.uploadDir, folder), { recursive: true });
+      fs.writeFileSync(path.join(config.uploadDir, folder, 'from-restore.jpg'), 'restore bytes');
+    }
+    fs.writeFileSync(path.join(config.uploadDir, 'photo.jpg'), 'photo bytes');
+    // A file, not a folder: only the folders a restore creates are left out
+    fs.writeFileSync(path.join(config.uploadDir, `.restore-${stamp}.jpg`), 'file bytes');
+
+    const backup = await exportBackup();
+
+    expect(uploadEntries(backup)).toEqual([
+      `uploads/.restore-${stamp}.jpg`,
+      'uploads/cocktails/',
+      `uploads/cocktails/.restore-${stamp}/`,
+      `uploads/cocktails/.restore-${stamp}/from-restore.jpg`,
+      'uploads/photo.jpg',
+    ]);
   });
 
   it.skipIf(isRoot)('should cut the download instead of sending a truncated zip when a file cannot be read', async () => {
@@ -450,6 +498,8 @@ describe('backup restore', () => {
       warn.mockRestore();
     }
 
+    // Nor does a later export send it
+    expect(uploadEntries(await exportBackup())).toEqual(['uploads/restored.jpg']);
     // The leftover folder is not served, and the next restore removes it
     expect((await request.get(`/uploads/${uploadDirContent()[0]}/old.jpg`)).status).toBe(404);
     expect((await importBackup(backup)).status).toBe(200);
@@ -502,6 +552,359 @@ describe('backup restore', () => {
 
       await expectPreviousStateBack(await importBackup(backup));
     });
+  });
+});
+
+describe('slow backup restore upload', () => {
+  // Stands for Node's default of 300 s, which cut a restore sent over a slow uplink
+  const OLD_REQUEST_TIMEOUT_MS = 200;
+  const BOUNDARY = 'carta-slow-upload';
+
+  /** The multipart body the frontend sends: the archive in the "backup" field. */
+  function multipartBody(backup: Buffer): Buffer {
+    return Buffer.concat([
+      Buffer.from(
+        `--${BOUNDARY}\r\n`
+        + 'Content-Disposition: form-data; name="backup"; filename="backup.zip"\r\n'
+        + 'Content-Type: application/zip\r\n\r\n',
+      ),
+      backup,
+      Buffer.from(`\r\n--${BOUNDARY}--\r\n`),
+    ]);
+  }
+
+  /** Sends `body` in pieces spread over `durationMs`, and resolves to the status of the answer. */
+  async function postSlowly(port: number, body: Buffer, durationMs: number): Promise<number | undefined> {
+    const pieces = 10;
+    const pieceSize = Math.ceil(body.length / pieces);
+    const client = http.request({
+      host: '127.0.0.1',
+      port,
+      method: 'POST',
+      path: '/api/backup/import',
+      headers: {
+        ...(await currentSessionHeader()),
+        'Content-Type': `multipart/form-data; boundary=${BOUNDARY}`,
+        'Content-Length': body.length,
+      },
+    });
+    const answer = new Promise<number | undefined>((resolve, reject) => {
+      client.on('response', (res) => {
+        res.resume();
+        res.on('end', () => resolve(res.statusCode));
+      });
+      client.on('error', reject);
+    });
+    for (let offset = 0; offset < body.length; offset += pieceSize) {
+      client.write(body.subarray(offset, offset + pieceSize));
+      await new Promise((resolve) => setTimeout(resolve, durationMs / pieces));
+    }
+    client.end();
+    return answer;
+  }
+
+  it('should restore an archive whose upload lasts longer than Node\'s default request timeout', async () => {
+    await seedCocktail({ name: 'Mojito' });
+    const backup = await exportBackup();
+    await prisma.cocktail.deleteMany();
+    const server = await listenWithShortTimeouts(OLD_REQUEST_TIMEOUT_MS);
+    try {
+      const status = await postSlowly(server.port, multipartBody(backup), 5 * OLD_REQUEST_TIMEOUT_MS);
+
+      expect(status).toBe(200);
+      expect(await cocktailNames()).toEqual(['Mojito']);
+    } finally {
+      server.close();
+    }
+  });
+});
+
+describe('concurrent backup restores and exports', () => {
+  const IN_PROGRESS_EN = 'A backup restore is already in progress: wait for it to finish, then reload the page and sign in again (the restore ends every session)';
+  const IN_PROGRESS_FR = 'Une restauration de sauvegarde est déjà en cours : attendez qu’elle se termine, puis rechargez la page et reconnectez-vous (la restauration ferme toutes les sessions)';
+  const EXPORT_IN_PROGRESS_EN = 'A backup is being exported: wait for its download to finish, then start the restore again';
+  const EXPORT_IN_PROGRESS_FR = 'Une sauvegarde est en cours d’export : attendez la fin de son téléchargement, puis relancez la restauration';
+  // multer's default file name in its `dest` folder
+  const MULTER_FILE_NAME = /^[0-9a-f]{32}$/;
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  interface Hold { held: Promise<void>; release: () => void }
+
+  /** `held` resolves once `wait()` is called; `wait()` resolves once `release()` is called. */
+  function gate(): Hold & { wait: () => Promise<void> } {
+    let markHeld!: () => void;
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { markHeld = resolve; });
+    const released = new Promise<void>((resolve) => { release = resolve; });
+    return { held, release, wait: () => { markHeld(); return released; } };
+  }
+
+  /**
+   * Holds the next restore right before it closes the live database (after its
+   * checks and extraction, before the switch), until `release()` is called.
+   */
+  function holdNextRestore(): Hold {
+    const { held, release, wait } = gate();
+    const disconnect = prisma.$disconnect.bind(prisma);
+    vi.spyOn(prisma, '$disconnect').mockImplementationOnce(async () => {
+      await wait();
+      return disconnect();
+    });
+    return { held, release };
+  }
+
+  /** Holds the next export while it copies the database, before it sends anything. */
+  function holdNextSnapshot(): Hold {
+    const { held, release, wait } = gate();
+    const executeRawUnsafe = prisma.$executeRawUnsafe.bind(prisma);
+    vi.spyOn(prisma, '$executeRawUnsafe').mockImplementationOnce(
+      (query, ...values) => wait().then(() => executeRawUnsafe(query, ...values)) as ReturnType<typeof executeRawUnsafe>,
+    );
+    return { held, release };
+  }
+
+  /** Holds the next request in authMiddleware, while it reads the user: before the route handler runs. */
+  function holdNextAuthentication(): Hold {
+    const { held, release, wait } = gate();
+    const findUnique = prisma.user.findUnique.bind(prisma.user);
+    vi.spyOn(prisma.user, 'findUnique').mockImplementationOnce(
+      (args) => wait().then(() => findUnique(args)) as ReturnType<typeof findUnique>,
+    );
+    return { held, release };
+  }
+
+  /**
+   * Starts an export on a server of its own, through a client that reads nothing:
+   * `closed` resolves when the server side of the response closes.
+   */
+  async function startUnreadExport() {
+    const server = http.createServer(app);
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const closed = new Promise<void>((resolve) => {
+      server.on('request', (_req, res: http.ServerResponse) => res.on('close', resolve));
+    });
+    const client = http.get({
+      host: '127.0.0.1',
+      port: (server.address() as AddressInfo).port,
+      path: '/api/backup/export',
+      headers: await currentSessionHeader(),
+    });
+    // The test destroys the request on purpose
+    client.on('error', () => {});
+    const response = new Promise<http.IncomingMessage>((resolve) => client.on('response', (res) => {
+      res.pause();
+      resolve(res);
+    }));
+    const stop = () => {
+      client.destroy();
+      server.closeAllConnections();
+      server.close();
+    };
+    return { response, closed, stop, leave: () => client.destroy() };
+  }
+
+  /** Every file a restore writes or moves: the uploads, the copies of the database, the files next to it. */
+  function restoreFiles() {
+    return {
+      uploads: uploadDirContent(),
+      preRestoreCopies: preRestoreCopies(),
+      nextToDatabase: fs.readdirSync(path.dirname(dbPath)).sort(),
+    };
+  }
+
+  it('should refuse a second restore with a translated 409 that touches nothing, and let the first one finish', async () => {
+    await seedCocktail({ name: 'Restored' });
+    const backup = withEntries(await exportBackup(), { 'uploads/first.jpg': 'first bytes' });
+    const secondBackup = withEntries(backup, { 'uploads/second.jpg': 'second bytes' });
+    await prisma.cocktail.deleteMany();
+    await seedCocktail({ name: 'Live' });
+    fs.writeFileSync(path.join(config.uploadDir, 'live.jpg'), 'live bytes');
+    const { held, release } = holdNextRestore();
+
+    const firstResponse = importBackup(backup);
+    let first: Awaited<typeof firstResponse>;
+    try {
+      await held;
+      const filesWhileHeld = restoreFiles();
+      const rmSync = vi.spyOn(fs, 'rmSync');
+
+      const second = await importBackup(secondBackup);
+      const secondInFrench = await request.post('/api/backup/import').set(await currentSessionHeader())
+        .set('Accept-Language', 'fr').attach('backup', secondBackup, 'backup.zip');
+
+      expect(second.status).toBe(409);
+      expect(second.body).toEqual({ error: IN_PROGRESS_EN });
+      expect(secondInFrench.status).toBe(409);
+      expect(secondInFrench.body).toEqual({ error: IN_PROGRESS_FR });
+      expect(restoreFiles()).toEqual(filesWhileHeld);
+      expect(await cocktailNames()).toEqual(['Live']);
+      // The archives of the refused requests are deleted all the same
+      const uploadedArchives = rmSync.mock.calls.map(([target]) => String(target))
+        .filter((target) => MULTER_FILE_NAME.test(path.basename(target)));
+      expect(uploadedArchives).toHaveLength(2);
+      for (const archive of uploadedArchives) expect(fs.existsSync(archive)).toBe(false);
+    } finally {
+      // Even after a failed assertion: the next test must not start while this restore runs
+      release();
+      first = await firstResponse;
+    }
+
+    expect(first.status).toBe(200);
+    expect(await cocktailNames()).toEqual(['Restored']);
+    expect(uploadDirContent()).toEqual(['first.jpg']);
+    expect(restoreLeftovers()).toEqual([]);
+  });
+
+  it('should refuse a second call made before the first one reached its first await', async () => {
+    const backup = await exportBackup();
+
+    await withZipFile(backup, async (zipPath) => {
+      const first = restoreBackup(zipPath);
+      const second = restoreBackup(zipPath);
+
+      await expect(second).rejects.toMatchObject({ status: 409, i18nKey: 'errors.restoreInProgress' });
+      await expect(first).resolves.toEqual({ skippedFiles: 0, restartRecommended: true });
+    });
+  });
+
+  it('should refuse an export with a translated 409 while a restore runs, and let the restore finish', async () => {
+    const backup = withEntries(await exportBackup(), { 'uploads/restored.jpg': 'restored bytes' });
+    const { held, release } = holdNextRestore();
+
+    const restoreResponse = importBackup(backup);
+    let restored: Awaited<typeof restoreResponse>;
+    try {
+      await held;
+      const snapshotsWhileHeld = snapshotFiles();
+
+      const exported = await requestExport();
+      const exportedInFrench = await requestExport({ 'Accept-Language': 'fr' });
+
+      expect(exported.status).toBe(409);
+      expect(JSON.parse(String(exported.body))).toEqual({ error: IN_PROGRESS_EN });
+      expect(exportedInFrench.status).toBe(409);
+      expect(JSON.parse(String(exportedInFrench.body))).toEqual({ error: IN_PROGRESS_FR });
+      // Refused before it copied the database
+      expect(snapshotFiles()).toEqual(snapshotsWhileHeld);
+    } finally {
+      release();
+      restored = await restoreResponse;
+    }
+
+    expect(restored.status).toBe(200);
+    expect(uploadDirContent()).toEqual(['restored.jpg']);
+    expect(uploadEntries(await exportBackup())).toEqual(['uploads/restored.jpg']);
+  });
+
+  it('should refuse a restore with a translated 409 from the start of an export until its response closes', async () => {
+    const backup = await exportBackup();
+    // More than the socket buffers hold: the archive is still reading it while the client reads nothing
+    fs.writeFileSync(path.join(config.uploadDir, 'large.jpg'), crypto.randomBytes(32 * 1024 * 1024));
+    const snapshot = holdNextSnapshot();
+    const unreadExport = await startUnreadExport();
+
+    try {
+      await snapshot.held;
+      const whileCopyingDatabase = await importBackup(backup);
+      snapshot.release();
+      expect((await unreadExport.response).statusCode).toBe(200);
+      const whileSending = await request.post('/api/backup/import').set(await currentSessionHeader())
+        .set('Accept-Language', 'fr').attach('backup', backup, 'backup.zip');
+
+      expect(whileCopyingDatabase.status).toBe(409);
+      expect(whileCopyingDatabase.body).toEqual({ error: EXPORT_IN_PROGRESS_EN });
+      expect(whileSending.status).toBe(409);
+      expect(whileSending.body).toEqual({ error: EXPORT_IN_PROGRESS_FR });
+      expect(uploadDirContent()).toEqual(['large.jpg']);
+
+      // The archive never ends once its client has left: the response closing ends the export
+      unreadExport.leave();
+      await unreadExport.closed;
+      expect((await importBackup(backup)).status).toBe(200);
+    } finally {
+      snapshot.release();
+      unreadExport.stop();
+    }
+  });
+
+  it('should end an export whose client left before the handler ran, and keep no copy of the database', async () => {
+    const backup = await exportBackup();
+    const snapshotsBefore = snapshotFiles();
+    const authentication = holdNextAuthentication();
+    const unreadExport = await startUnreadExport();
+    const rmSync = vi.spyOn(fs, 'rmSync');
+
+    try {
+      await authentication.held;
+      unreadExport.leave();
+      await unreadExport.closed;
+      authentication.release();
+      // Express still runs the handler: wait until it has copied the database and deleted the copy
+      await vi.waitFor(() => {
+        const deleted = rmSync.mock.calls.map(([target]) => path.basename(String(target)));
+        expect(deleted).toContainEqual(expect.stringMatching(/^carta-snapshot-/));
+      });
+
+      expect(snapshotFiles()).toEqual(snapshotsBefore);
+      expect((await importBackup(backup)).status).toBe(200);
+    } finally {
+      authentication.release();
+      unreadExport.stop();
+    }
+  });
+
+  it('should let exports run together, and accept a restore once every one of them has ended', async () => {
+    const backup = await exportBackup();
+    const endFirst = beginExport();
+    const endSecond = beginExport();
+
+    try {
+      await withZipFile(backup, async (zipPath) => {
+        const refused = { status: 409, i18nKey: 'errors.exportInProgress' };
+        await expect(restoreBackup(zipPath)).rejects.toMatchObject(refused);
+        endFirst();
+        // Ending the same export twice must not end the other one
+        endFirst();
+        await expect(restoreBackup(zipPath)).rejects.toMatchObject(refused);
+        endSecond();
+        await expect(restoreBackup(zipPath)).resolves.toEqual({ skippedFiles: 0, restartRecommended: true });
+      });
+    } finally {
+      endFirst();
+      endSecond();
+    }
+  });
+
+  it('should refuse an export as soon as a restore has started, before its first await', async () => {
+    const backup = await exportBackup();
+
+    await withZipFile(backup, async (zipPath) => {
+      const restoring = restoreBackup(zipPath);
+
+      expect(() => beginExport()).toThrow('errors.restoreInProgress');
+      await expect(restoring).resolves.toEqual({ skippedFiles: 0, restartRecommended: true });
+      const endExport = beginExport();
+      endExport();
+    });
+  });
+
+  it.each([
+    ['succeeded', 200, async (backup: Buffer) => backup],
+    ['was refused for an invalid archive', 400, async () => Buffer.from('not a zip archive')],
+    ['failed and was rolled back', 500, async (backup: Buffer) => {
+      vi.spyOn(prisma, '$connect').mockRejectedValueOnce(new Error('connect failed'));
+      return backup;
+    }],
+  ])('should accept a new restore after one that %s', async (_label, status, prepareFirst) => {
+    const backup = await exportBackup();
+
+    expect((await importBackup(await prepareFirst(backup))).status).toBe(status);
+    const next = await importBackup(backup);
+
+    expect(next.status).toBe(200);
   });
 });
 
@@ -591,14 +994,7 @@ describe('backup restore and sessions', () => {
   it('should raise the version above 0 when the live database has no user', async () => {
     const backup = await exportBackup();
     await prisma.user.deleteMany();
-    const zipPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'carta-backup-')), 'backup.zip');
-    fs.writeFileSync(zipPath, backup);
-
-    try {
-      await restoreBackup(zipPath);
-    } finally {
-      fs.rmSync(path.dirname(zipPath), { recursive: true, force: true });
-    }
+    await withZipFile(backup, restoreBackup);
 
     expect(await storedTokenVersion()).toBe(1);
   });

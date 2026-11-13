@@ -1,10 +1,10 @@
 import { onTestFinished, vi } from 'vitest';
 import { http, HttpResponse, type JsonBodyType } from 'msw';
 import type { DeletionImpact } from '../../types';
-import { errorResponse, pendingResponse } from './responses';
+import { errorResponse, pendingResponse, rateLimitedResponse } from './responses';
 import { server } from './server';
 
-export { errorResponse, pendingResponse, readJsonObject } from './responses';
+export { errorResponse, pendingResponse, rateLimitedResponse, readJsonObject } from './responses';
 
 /** HTTP methods of `services/api.ts`, as named by MSW's `http` helpers. */
 export type ApiMethod = 'get' | 'post' | 'put' | 'delete';
@@ -19,22 +19,35 @@ export function mockApiError(method: ApiMethod, path: string, status: number, me
   server.use(http[method](path, () => errorResponse(status, message)));
 }
 
+/** Makes `method path` answer like the backend's rate limiter: a 429 that asks to wait `retryAfterSeconds`. */
+export function mockRateLimited(method: ApiMethod, path: string, retryAfterSeconds: number): void {
+  server.use(http[method](path, () => rateLimitedResponse(retryAfterSeconds)));
+}
+
+/**
+ * Makes `method path` answer like nginx in front of the backend: an HTML error page, not the
+ * API's JSON. nginx sends a 502 while the backend is down and a 504 when it does not answer in time.
+ */
+export function mockProxyError(method: ApiMethod, path: string, status: number): void {
+  server.use(http[method](path, () => HttpResponse.html(`<html><body><h1>${status}</h1></body></html>`, { status })));
+}
+
 /** Makes `method path` hang: the page stays in its loading state for the whole test. */
 export function mockApiPending(method: ApiMethod, path: string): void {
   server.use(http[method](path, pendingResponse));
 }
 
 /**
- * Makes `method path` answer `body` only once the returned function is called,
- * to check what the page shows while the request is in flight.
+ * Makes `method path` answer `body` (status 200 by default) only once the returned
+ * function is called, to check what the page shows while the request is in flight.
  */
-export function holdApiResponse(method: ApiMethod, path: string, body: JsonBodyType): () => void {
+export function holdApiResponse(method: ApiMethod, path: string, body: JsonBodyType, status = 200): () => void {
   let release: () => void = () => {};
   const released = new Promise<void>((resolve) => { release = resolve; });
   server.use(
     http[method](path, async () => {
       await released;
-      return HttpResponse.json(body);
+      return HttpResponse.json(body, { status });
     }),
   );
   return release;

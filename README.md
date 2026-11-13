@@ -163,11 +163,11 @@ If you lose the admin password:
 2. Restart the backend: `docker compose -f docker-compose.prod.yml up -d`. The log shows `Admin credentials reset from environment (login email: …)`.
 3. Remove `ADMIN_RESET_PASSWORD` from `.env` (or set it back to `false`) and restart again, otherwise every restart resets the password.
 
-We recommend pinning a version instead of `latest`, so that an upgrade only happens after you have read `UPGRADING.md`. Edit the image tags in `docker-compose.prod.yml` (from v1.12.0, `:1.12` also exists and follows the 1.12.x patch releases):
+We recommend pinning a version instead of `latest`, so that an upgrade only happens after you have read `UPGRADING.md`. Edit the image tags in `docker-compose.prod.yml` (from v1.12.0, `:<major>.<minor>` also exists, such as `:1.13`, which follows the 1.13.x patch releases):
 
 ```yaml
-image: ghcr.io/lulu300/carta-cocktail/backend:1.12.0
-image: ghcr.io/lulu300/carta-cocktail/frontend:1.12.0
+image: ghcr.io/lulu300/carta-cocktail/backend:1.13.0
+image: ghcr.io/lulu300/carta-cocktail/frontend:1.13.0
 ```
 
 ## Database migrations
@@ -349,22 +349,23 @@ carta-cocktail/
 | `CARTA_UID`, `CARTA_GID` | Docker only, read by the compose files from `.env`: uid and gid the backend runs as. Set them when the data folders must belong to another owner, such as a network share (see [Data folders and the node user](#data-folders-and-the-node-user)) | `1000` |
 | `SQLITE_WAL` | `false` keeps the rollback journal instead of WAL; required when the database is on a network share (SMB/NFS). Other values use WAL. In Docker, set it in the compose file (see [Database files and network shares](#database-files-and-network-shares)) | `true` |
 | `JWT_EXPIRES_IN` | Lifetime of the admin session token: a number of seconds (`86400`) or a timespan (`24h`, `7d`). Applies to tokens issued after the restart. The backend refuses to start with a value it cannot read | `7d` |
-| `LOGIN_RATE_LIMIT` | Failed logins allowed per client IP address in 15 minutes; beyond that, the login answers 429 (Too Many Requests). Successful logins do not count. A positive integer, otherwise the backend refuses to start | `10` |
-| `TRUST_PROXY` | Proxies whose `X-Forwarded-For` header the API believes, to find the client IP address that `LOGIN_RATE_LIMIT` counts: a number of proxies in front of the API, or a comma-separated list of addresses, subnets or names that Express understands (`loopback`, `linklocal`, `uniquelocal`). The backend refuses to start with a value it cannot read. See [Login limit behind a reverse proxy](#login-limit-behind-a-reverse-proxy) | `loopback, linklocal, uniquelocal` |
+| `LOGIN_RATE_LIMIT` | Failed logins allowed per client IP address (per /64 network for IPv6) in 15 minutes; beyond that, the login answers 429 (Too Many Requests). Successful logins do not count. A positive integer, otherwise the backend refuses to start | `10` |
+| `API_RATE_LIMIT` | API requests allowed per client IP address (per /64 network for IPv6) in one minute, public menu included; beyond that, the API answers 429 (Too Many Requests). Clients that share an address, such as guests behind a bar's Internet connection, share this count: raise it if they get "Too many requests". The Docker healthcheck does not count. Backup export and import have a fixed limit of their own: 10 requests per 15 minutes from the signed-in admin. A positive integer, otherwise the backend refuses to start | `600` |
+| `TRUST_PROXY` | Proxies whose `X-Forwarded-For` header the API believes, to find the client IP address that the rate limits count (`API_RATE_LIMIT`, `LOGIN_RATE_LIMIT` and the backup limit): a number of proxies in front of the API, or a comma-separated list of addresses, subnets or names that Express understands (`loopback`, `linklocal`, `uniquelocal`). The backend refuses to start with a value it cannot read. See [Login limit behind a reverse proxy](#login-limit-behind-a-reverse-proxy) | `loopback, linklocal, uniquelocal` |
 | `CORS_ORIGIN` | Origin allowed to call the API from another site, such as `https://example.com` (a single origin, without a trailing slash). Empty: no other origin is allowed. The app does not need one: nginx, and the Vite proxy in development, serve the frontend and the API on the same origin | empty |
 | `PORT` | Backend port | `3001` |
 | `BACKEND_HOST` | Backend hostname for nginx proxy (frontend container) | `backend` |
 
-The compose files pass only some of these variables to the backend. To set `JWT_EXPIRES_IN`, `LOGIN_RATE_LIMIT`, `TRUST_PROXY` or `CORS_ORIGIN` in Docker, add it to the `environment` list of `carta-cocktail-backend`, as for `SQLITE_WAL` (see [Database files and network shares](#database-files-and-network-shares)), and add it again each time you download a new compose file. The defaults suit a standard install.
+The compose files pass only some of these variables to the backend. To set `JWT_EXPIRES_IN`, `LOGIN_RATE_LIMIT`, `API_RATE_LIMIT`, `TRUST_PROXY` or `CORS_ORIGIN` in Docker, add it to the `environment` list of `carta-cocktail-backend`, as for `SQLITE_WAL` (see [Database files and network shares](#database-files-and-network-shares)), and add it again each time you download a new compose file. The defaults suit a standard install.
 
 ### Login limit behind a reverse proxy
 
-The login limit counts failures per client IP address. The frontend's nginx forwards requests to the API, so the API reads the client address from the `X-Forwarded-For` header, but only from the proxies that `TRUST_PROXY` trusts. The default trusts the host and private networks: nginx, and a reverse proxy in front of it on a private network (SWAG, Traefik…), work without any setting, and an address forged by a client on the Internet is ignored.
+The rate limits count requests per client IP address: every API request (`API_RATE_LIMIT`), backup exports and imports from the signed-in admin (10 per 15 minutes), and failed logins (`LOGIN_RATE_LIMIT`). Clients that share an address share these counters. An IPv6 client counts for its whole /64 network, the network of one LAN: the devices on one Wi-Fi share a counter, as behind one IPv4 address, and a client cannot get around the limits by changing its address within that network. Other networks of the same site (a guest network and a staff network, for example) and mobile phones each have their own counter, so a client that holds several /64 networks (an Internet connection often gets 256) gets one counter for each. The frontend's nginx forwards requests to the API, so the API reads the client address from the `X-Forwarded-For` header, but only from the proxies that `TRUST_PROXY` trusts. The default trusts the host and private networks: nginx, and a reverse proxy in front of it on a private network (SWAG, Traefik…), work without any setting, and an address forged by a client on the Internet is ignored.
 
 The default has limits:
 
-- A client on your local network connects from a private address, so it is trusted: it can forge its address and get around the limit.
-- In some installs, the first proxy (nginx, or SWAG) sees clients from the Internet under a **private** address: Docker rootless or Podman (through their port forwarder), Docker Desktop, or IPv6 clients on a published port when the Docker daemon has no IPv6 and `docker-proxy` relays the connection. Every client that arrives this way comes from the same address, and that address is trusted. Clients that do not forge `X-Forwarded-For` all get that address, so they already share one counter: `LOGIN_RATE_LIMIT` failures from any of them block every client that arrives this way, the admin included, for up to 15 minutes. A client that writes its own `X-Forwarded-For` gets the address it wrote, so it can change it at each attempt and get around the limit.
+- A client on your local network connects from a private address, so it is trusted: it can forge its address and get around the limits.
+- In some installs, the first proxy (nginx, or SWAG) sees clients from the Internet under a **private** address: Docker rootless or Podman (through their port forwarder), Docker Desktop, or IPv6 clients on a published port when the Docker daemon has no IPv6 and `docker-proxy` relays the connection. Every client that arrives this way comes from the same address, and that address is trusted. Clients that do not forge `X-Forwarded-For` all get that address, so they already share each counter: `LOGIN_RATE_LIMIT` failures from any of them block the login of every client that arrives this way, the admin included, for up to 15 minutes, and together they get `API_RATE_LIMIT` requests per minute. A client that writes its own `X-Forwarded-For` gets the address it wrote, so it can change it at each request and get around the limits.
 
 In these installs, set `TRUST_PROXY=1` (nginx alone) or `TRUST_PROXY=2` (SWAG or another reverse proxy in front of nginx) in the `environment` list of `carta-cocktail-backend`:
 
@@ -374,7 +375,7 @@ In these installs, set `TRUST_PROXY=1` (nginx alone) or `TRUST_PROXY=2` (SWAG or
 
 Write values without quotes in this list: compose keeps them as part of the value, and the backend refuses to start with `- TRUST_PROXY="loopback, linklocal, uniquelocal"`.
 
-The API then uses the address the first proxy sees and ignores what clients write in `X-Forwarded-For`. This removes the bypass and adds no risk of blocking the admin: clients that shared a counter still share it, and the others (IPv4 clients in the `docker-proxy` case) keep their own. Clients that share a counter can still block the admin with their failures; raise `LOGIN_RATE_LIMIT` if that happens too often. The counters are kept in memory: restarting the backend clears them.
+The API then uses the address the first proxy sees and ignores what clients write in `X-Forwarded-For`. This removes the bypass and adds no risk of blocking the admin: clients that shared a counter still share it, and the others (IPv4 clients in the `docker-proxy` case) keep their own. Clients that share a counter can still block the admin with their failures; raise `LOGIN_RATE_LIMIT` if that happens too often, and `API_RATE_LIMIT` if guests get "Too many requests". The backup limit counts only the signed-in admin's requests, so other clients cannot use it up. The counters are kept in memory: restarting the backend clears them.
 
 These settings hold only when clients cannot skip a proxy. From v1.12.0, `docker-compose.prod.yml` does not publish the backend port 3001, and `docker-compose.yml` (local build) binds it to `127.0.0.1`. If you published it again, or use a compose file from an older version, a client that connects to it directly passes for the first proxy, and the API reads the address that client wrote in `X-Forwarded-For`: with `TRUST_PROXY=1` or `2`, and also with the default when the connection arrives under a private address, as in the installs listed above (in the `docker-proxy` case, only over IPv6). Behind SWAG, the same goes for nginx's port when a client reaches it without SWAG.
 
@@ -431,8 +432,8 @@ The GitHub Release contains the notes file (without its front matter), the list 
 ### Pulling release images
 
 ```bash
-docker pull ghcr.io/lulu300/carta-cocktail/backend:1.12.0
-docker pull ghcr.io/lulu300/carta-cocktail/frontend:1.12.0
+docker pull ghcr.io/lulu300/carta-cocktail/backend:1.13.0
+docker pull ghcr.io/lulu300/carta-cocktail/frontend:1.13.0
 ```
 
 ## API Overview

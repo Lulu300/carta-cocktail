@@ -42,22 +42,32 @@ export function assertJwtSecret(secret: string | undefined, nodeEnv: string | un
   return secret;
 }
 
-const DEFAULT_LOGIN_RATE_LIMIT = 10;
+const POSITIVE_INTEGER_DEFAULTS = {
+  // Failed logins allowed per IP address (per /64 network for IPv6) in 15 minutes
+  LOGIN_RATE_LIMIT: 10,
+  // API requests allowed per IP address (per /64 network for IPv6) in one minute.
+  // Guests in a bar often share one public address or /64: the limit must stay well above what a full room sends.
+  API_RATE_LIMIT: 600,
+};
+
+export type PositiveIntegerVariable = keyof typeof POSITIVE_INTEGER_DEFAULTS;
+
+/** Reads a positive integer variable, or its default when it is not set. */
+export function parsePositiveInteger(name: PositiveIntegerVariable, env: NodeJS.ProcessEnv = process.env): number {
+  const value = env[name];
+  if (!value) {
+    return POSITIVE_INTEGER_DEFAULTS[name];
+  }
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(`${name} must be a positive integer, got '${value}'`);
+  }
+  return parsed;
+}
+
 const DEFAULT_JWT_EXPIRES_IN = '7d';
 
 export type JwtExpiresIn = NonNullable<SignOptions['expiresIn']>;
-
-/** Failed logins allowed per IP address in 15 minutes (LOGIN_RATE_LIMIT). */
-export function parseLoginRateLimit(value: string | undefined): number {
-  if (!value) {
-    return DEFAULT_LOGIN_RATE_LIMIT;
-  }
-  const limit = Number(value);
-  if (!Number.isInteger(limit) || limit < 1) {
-    throw new Error(`LOGIN_RATE_LIMIT must be a positive integer, got '${value}'`);
-  }
-  return limit;
-}
 
 /**
  * Token lifetime (JWT_EXPIRES_IN), as jsonwebtoken reads it: a number of seconds
@@ -104,7 +114,8 @@ export const config = {
   port: parseInt(process.env.PORT || '3001', 10),
   jwtSecret: assertJwtSecret(process.env.JWT_SECRET, process.env.NODE_ENV),
   jwtExpiresIn: parseJwtExpiresIn(process.env.JWT_EXPIRES_IN),
-  loginRateLimit: parseLoginRateLimit(process.env.LOGIN_RATE_LIMIT),
+  loginRateLimit: parsePositiveInteger('LOGIN_RATE_LIMIT'),
+  apiRateLimit: parsePositiveInteger('API_RATE_LIMIT'),
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   // Empty: no cross-origin access. The SPA calls the API on its own origin,
   // through nginx in production and the Vite proxy in development.

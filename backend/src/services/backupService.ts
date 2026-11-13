@@ -7,7 +7,7 @@ import type { PrismaClient } from '../generated/prisma/client';
 import { config } from '../config';
 import { PRISMA_DIR, resolveDatabasePath } from '../lib/databasePath';
 import { checkpointWal, configureSqlite, createPrismaClient, prisma } from '../lib/prisma';
-import { BadRequestError } from '../errors';
+import { BadRequestError, ConflictError } from '../errors';
 import { hasTokenVersionColumn, writeSessionFloor } from './sessionFloor';
 
 /** Format of the backup archive, written to metadata.json. Every published version wrote 1. */
@@ -251,6 +251,18 @@ function extractUploads(zip: AdmZip, targetDir: string): number {
   return skippedFiles;
 }
 
+const UPLOADS_STAGING_PREFIX = '.restore-';
+const UPLOADS_ASIDE_PREFIX = '.pre-restore-';
+
+/**
+ * Glob patterns of the folders a restore works in, inside uploads/ (see
+ * UploadsSwap). An export leaves them out: they hold the photos of one state or
+ * the other, which a later restore would flatten in with the real ones. They
+ * only match folders at the top of uploads/ (`*` stops at `/`, and the export
+ * skips folders, not files): no photo is left out.
+ */
+export const RESTORE_WORK_FOLDERS = [`${UPLOADS_STAGING_PREFIX}*`, `${UPLOADS_ASIDE_PREFIX}*`];
+
 /**
  * Folders used to swap the content of the uploads folder. Both sit inside it:
  * the folder itself is a Docker mount point (EBUSY on rename), so its entries
@@ -337,7 +349,7 @@ function fileTimestamp(date: Date): string {
  * with a raised token version (at the next start for a backup made before
  * v1.11.0): every session, the restoring one included, ends.
  */
-export async function restoreBackup(zipPath: string): Promise<RestoreResult> {
+async function replaceLiveData(zipPath: string): Promise<RestoreResult> {
   const zip = openArchive(zipPath);
   const databaseEntry = checkArchive(zip);
 
@@ -347,8 +359,8 @@ export async function restoreBackup(zipPath: string): Promise<RestoreResult> {
   const preRestorePath = path.join(path.dirname(dbPath), 'backups', `pre-restore-${stamp}.db`);
   const uploadsSwap: UploadsSwap = {
     uploadDir: config.uploadDir,
-    stagingDir: path.join(config.uploadDir, `.restore-${stamp}`),
-    asideDir: path.join(config.uploadDir, `.pre-restore-${stamp}`),
+    stagingDir: path.join(config.uploadDir, `${UPLOADS_STAGING_PREFIX}${stamp}`),
+    asideDir: path.join(config.uploadDir, `${UPLOADS_ASIDE_PREFIX}${stamp}`),
     movedIn: [],
   };
 
@@ -406,4 +418,50 @@ export async function restoreBackup(zipPath: string): Promise<RestoreResult> {
   // failure must not roll it back.
   removePreviousUploads(uploadsSwap.asideDir);
   return result;
+}
+
+/**
+ * Backup operations that must not overlap. Two restores at once replace the same
+ * database file and move the same upload entries: one could roll back over the
+ * other, which would still report success. An export next to a restore could send
+ * the database of one state with the photos of the other. Exports only read, so
+ * they may run together.
+ * A single backend process serves the API, so state in memory is enough.
+ * A restore that never settles (a hung Prisma call) keeps its flag until the
+ * backend restarts: every later restore and export gets the 409 until then.
+ */
+let restoreInProgress = false;
+let exportsInProgress = 0;
+
+/**
+ * Marks an export as running, or refuses it with a 409 while a restore runs.
+ * Returns the function that ends it, to call when the response closes: the
+ * archive reads the photos while it is being sent.
+ */
+export function beginExport(): () => void {
+  if (restoreInProgress) throw new ConflictError('errors.restoreInProgress');
+  exportsInProgress++;
+  let ended = false;
+  return () => {
+    // A second call must not count another export as ended: a restore could then start during it
+    if (ended) return;
+    ended = true;
+    exportsInProgress--;
+  };
+}
+
+/**
+ * Restores a backup archive (see replaceLiveData), or refuses with a 409 while
+ * another restore or an export is running, before touching any file.
+ */
+export async function restoreBackup(zipPath: string): Promise<RestoreResult> {
+  // Checked and set before the first await: two calls cannot both get past it
+  if (restoreInProgress) throw new ConflictError('errors.restoreInProgress');
+  if (exportsInProgress > 0) throw new ConflictError('errors.exportInProgress');
+  restoreInProgress = true;
+  try {
+    return await replaceLiveData(zipPath);
+  } finally {
+    restoreInProgress = false;
+  }
 }

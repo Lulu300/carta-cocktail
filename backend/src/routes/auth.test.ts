@@ -111,11 +111,20 @@ describe('GET /api/auth/me', () => {
   it('should return 401 without auth token', async () => {
     const res = await request.get('/api/auth/me');
     expect(res.status).toBe(401);
+    expect(res.body).toEqual({ error: 'Unauthorized' });
   });
 
   it('should return 401 with invalid token', async () => {
     const res = await request.get('/api/auth/me').set('Authorization', 'Bearer invalid-token');
     expect(res.status).toBe(401);
+    expect(res.body).toEqual({ error: 'Your session has expired or is no longer valid: sign in again' });
+  });
+
+  it('should answer the 401 of an invalid token in French', async () => {
+    const res = await request.get('/api/auth/me').set('Authorization', 'Bearer invalid-token')
+      .set('Accept-Language', 'fr');
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ error: 'Votre session a expiré ou n’est plus valide : reconnectez-vous' });
   });
 
   it('should return user data with valid token', async () => {

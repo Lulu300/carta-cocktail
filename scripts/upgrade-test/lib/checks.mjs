@@ -179,10 +179,17 @@ export function checkRowCounts(baseline, current) {
 
 // Clean refusals of the entrypoint (backend/docker-entrypoint.sh). A hook file lists the ones
 // its release adds in `profile.refusals`; `database` says what the refused start may change
-// (see checkRefusedDatabase).
+// (see checkRefusedDatabase). `beforeMigrations` marks a refusal that stops the backend before
+// any migration runs: the migrations, and what they refuse, were not tested.
 
 /** v1.6.0: a database created by `db push` that does not match the 0_init baseline. */
 export const BASELINE_REFUSAL = { log: 'does not match migration 0_init', database: 'untouched' };
+
+/**
+ * D-01 (v1.12.0): the backend runs as uid 1000 and cannot write to a data folder, for example a
+ * named volume filled by a root image. The entrypoint checks this first, before the backup.
+ */
+export const UNWRITABLE_REFUSAL = { log: 'cannot write to', database: 'untouched', beforeMigrations: true };
 
 /**
  * C-18: a migration failed (P3018), or failed at an earlier start (P3009, every restart). The
@@ -203,7 +210,7 @@ export function checkRefusalMessage(refusals, refusal) {
 
 /**
  * What a refused start may change in the database, compared with the snapshot taken before it:
- * - `untouched`: nothing (the 0_init baseline refuses before writing anything);
+ * - `untouched`: nothing (the 0_init baseline and the write check refuse before writing anything);
  * - `backupBeforeJump`: the failed migration and its history row stay in the database (SQLite
  *   migrations are not transactional), so the newest pre-migrate copy must hold the database
  *   as it was before the jump. Row counts are checked separately, for every start.

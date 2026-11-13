@@ -105,6 +105,24 @@ describe('API request helper', () => {
     expect(onUnauthorized).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['a number of seconds', '42', 42],
+    ['an HTTP date, which the backend never sends', 'Wed, 21 Oct 2026 07:28:00 GMT', undefined],
+    ['no Retry-After header', null, undefined],
+  ])('should keep the Retry-After of a 429 with %s', async (_case, header, seconds) => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      json: () => Promise.resolve({ error: 'Too many requests' }),
+      headers: { get: (key: string) => (key.toLowerCase() === 'retry-after' ? header : null) },
+    });
+    const api = await getApi();
+
+    const error = await api.publicApi.getSettings().catch((e: unknown) => e);
+
+    expect(error).toMatchObject({ status: 429, message: 'Too many requests', retryAfterSeconds: seconds });
+  });
+
   it('should not call the unauthorized handler on a 401 from auth.login', async () => {
     mockError(401, { error: 'Invalid email or password' });
     const api = await getApi();
@@ -188,14 +206,140 @@ describe('API request helper', () => {
     await expect(api.categories.list()).rejects.toThrow('Validation failed');
   });
 
-  it('should throw with HTTP status when no error message', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-      json: () => Promise.reject(new Error('not json')),
+  describe('when the answer carries no backend message', () => {
+    const SERVER_UNAVAILABLE = 'The server is not responding, try again in a moment.';
+
+    /** An answer of nginx or of another proxy in front of the backend: its own page, not JSON. */
+    function mockProxyAnswer(status: number, body: string, contentType: string) {
+      mockFetch.mockResolvedValueOnce(new Response(body, { status, headers: { 'Content-Type': contentType } }));
+    }
+
+    it.each([
+      ['502 HTML page of nginx while the backend is down', 502, '<html><body><h1>502 Bad Gateway</h1></body></html>', 'text/html'],
+      ['empty 502 of the Vite dev proxy while the backend is down', 502, '', 'text/plain'],
+      ['503 plain text page of a proxy', 503, 'Service Unavailable', 'text/plain'],
+      ['504 HTML page of nginx when the backend does not answer in time', 504, '<html><body><h1>504 Gateway Time-out</h1></body></html>', 'text/html'],
+      ['500 with no body, which is not JSON', 500, '', 'text/plain'],
+    ])('says the server is not responding after a %s, and keeps the status', async (_case, status, body, contentType) => {
+      localStorage.setItem('token', 'my-token');
+      mockProxyAnswer(status, body, contentType);
+      const api = await getApi();
+      const onUnauthorized = vi.fn();
+      api.setUnauthorizedHandler(onUnauthorized);
+
+      const error = await api.auth.me().catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(api.ApiError);
+      expect(error).toMatchObject({ status, message: SERVER_UNAVAILABLE });
+      expect(localStorage.getItem('token')).toBe('my-token');
+      expect(onUnauthorized).not.toHaveBeenCalled();
     });
-    const api = await getApi();
-    await expect(api.categories.list()).rejects.toThrow('HTTP 500');
+
+    it('says it in the language chosen in the UI', async () => {
+      await i18n.changeLanguage('fr');
+      mockProxyAnswer(502, '<html><body><h1>502 Bad Gateway</h1></body></html>', 'text/html');
+      const api = await getApi();
+
+      await expect(api.categories.list()).rejects.toThrow('Le serveur ne répond pas, réessayez dans un instant.');
+    });
+
+    it('says it for a JSON answer of a 5xx without an error field', async () => {
+      mockError(503, { status: 'unavailable' });
+      const api = await getApi();
+
+      await expect(api.categories.list()).rejects.toMatchObject({ status: 503, message: SERVER_UNAVAILABLE });
+    });
+
+    it('keeps the message the backend sent, whatever the status', async () => {
+      mockError(502, { error: 'Backup restore in progress' });
+      const api = await getApi();
+
+      await expect(api.categories.list()).rejects.toMatchObject({ status: 502, message: 'Backup restore in progress' });
+    });
+
+    describe('413 of nginx for a body over client_max_body_size', () => {
+      const NGINX_413 = '<html><body><h1>413 Request Entity Too Large</h1></body></html>';
+
+      it('says the file or request is too large, without a size, and keeps the status', async () => {
+        localStorage.setItem('token', 'my-token');
+        mockProxyAnswer(413, NGINX_413, 'text/html');
+        const api = await getApi();
+
+        const photo = new File(['x'], 'photo.jpg', { type: 'image/jpeg' });
+        const error = await api.cocktails.uploadImage(1, photo).catch((e: unknown) => e);
+
+        expect(error).toBeInstanceOf(api.ApiError);
+        expect(error).toMatchObject({ status: 413, message: 'The file or request is too large' });
+        expect(localStorage.getItem('token')).toBe('my-token');
+      });
+
+      it('says it in the language chosen in the UI', async () => {
+        await i18n.changeLanguage('fr');
+        mockProxyAnswer(413, NGINX_413, 'text/html');
+        const api = await getApi();
+
+        await expect(api.categories.list()).rejects.toThrow('Le fichier ou la requête est trop volumineux');
+      });
+
+      it('keeps the message of the 413 the backend translated', async () => {
+        mockError(413, { error: 'Le fichier ou la requête est trop volumineux' });
+        const api = await getApi();
+
+        // The UI is in English: a French message can only be the one the backend sent.
+        await expect(api.categories.list()).rejects.toMatchObject({
+          status: 413,
+          message: 'Le fichier ou la requête est trop volumineux',
+        });
+      });
+    });
+
+    it.each([
+      ['400 HTML page of nginx for headers too large', 400, '<html><body><h1>400 Request Header Or Cookie Too Large</h1></body></html>', 'text/html'],
+      ['403 HTML page of a proxy in front', 403, '<html><body><h1>403 Forbidden</h1></body></html>', 'text/html'],
+      ['404 plain text page of a proxy with no route', 404, '404 page not found', 'text/plain'],
+      ['405 HTML page of a proxy in front', 405, '<html><body><h1>405 Not Allowed</h1></body></html>', 'text/html'],
+      ['empty 408 of Node when the body takes too long', 408, '', 'text/plain'],
+      ['414 HTML page of nginx for a URL too long', 414, '<html><body><h1>414 Request-URI Too Large</h1></body></html>', 'text/html'],
+      ['empty 431 of Node for headers too large', 431, '', 'text/plain'],
+    ])('says the request could not be completed after a %s, with the status', async (_case, status, body, contentType) => {
+      mockProxyAnswer(status, body, contentType);
+      const api = await getApi();
+
+      await expect(api.categories.list()).rejects.toMatchObject({
+        status,
+        message: `The request could not be completed (error ${status}).`,
+      });
+    });
+
+    it('says a 4xx is incomplete in the language chosen in the UI', async () => {
+      await i18n.changeLanguage('fr');
+      mockProxyAnswer(414, '<html><body><h1>414 Request-URI Too Large</h1></body></html>', 'text/html');
+      const api = await getApi();
+
+      await expect(api.categories.list()).rejects.toThrow("La requête n'a pas abouti (erreur 414).");
+    });
+
+    it('still ends the session on a 401 that is not JSON', async () => {
+      localStorage.setItem('token', 'my-token');
+      mockProxyAnswer(401, '<html><body><h1>401 Authorization Required</h1></body></html>', 'text/html');
+      const api = await getApi();
+      const onUnauthorized = vi.fn();
+      api.setUnauthorizedHandler(onUnauthorized);
+
+      await expect(api.categories.list()).rejects.toMatchObject({
+        status: 401,
+        message: 'The request could not be completed (error 401).',
+      });
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    });
+
+    it('lets a network error through unchanged', async () => {
+      const networkError = new TypeError('Failed to fetch');
+      mockFetch.mockRejectedValueOnce(networkError);
+      const api = await getApi();
+
+      await expect(api.categories.list()).rejects.toBe(networkError);
+    });
   });
 
   it('should not include auth header when no token', async () => {
@@ -442,6 +586,19 @@ describe('cocktails API', () => {
     expect(file.filename).toBe('cocktail-42.json');
   });
 
+  it('should export several cocktails in one request', async () => {
+    const api = await getApi();
+    const files = [{ filename: 'cocktail-mojito.json', data: { version: 1 } }];
+    mockOk(files);
+
+    expect(await api.cocktails.exportRecipes([3, 1])).toEqual(files);
+
+    const [url, init] = mockFetch.mock.calls[0];
+    expect(url).toBe('/api/cocktails/export');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual({ ids: [3, 1] });
+  });
+
   it('should upload image with FormData', async () => {
     mockOk({});
     const api = await getApi();
@@ -527,9 +684,22 @@ describe('menuBottles API', () => {
     expect(JSON.parse(excludeInit.body)).toEqual({ bottleIds: [3, 4] });
 
     mockOk({ message: 'ok' });
-    await api.menuBottles.restore(5, 3);
-    expect(mockFetch.mock.calls[2][0]).toBe('/api/menu-bottles/menu/5/exclusions/3');
-    expect(mockFetch.mock.calls[2][1].method).toBe('DELETE');
+    await api.menuBottles.restore(5, [3, 4]);
+    const [restoreUrl, restoreInit] = mockFetch.mock.calls[2];
+    expect(restoreUrl).toBe('/api/menu-bottles/menu/5/exclusions/restore');
+    expect(restoreInit.method).toBe('POST');
+    expect(JSON.parse(restoreInit.body)).toEqual({ bottleIds: [3, 4] });
+  });
+
+  it('should change several entries of a menu in one request', async () => {
+    const api = await getApi();
+    mockOk({ message: 'ok' });
+    await api.menuBottles.updateEntries(5, [12, 7], { menuSectionId: null });
+
+    const [url, init] = mockFetch.mock.calls[0];
+    expect(url).toBe('/api/menu-bottles/menu/5/entries');
+    expect(init.method).toBe('PUT');
+    expect(JSON.parse(init.body)).toEqual({ ids: [12, 7], menuSectionId: null });
   });
 });
 
@@ -699,7 +869,7 @@ describe('backup API', () => {
     await expect(api.backup.exportBackup()).rejects.toThrow('Server error');
   });
 
-  it('exportBackup throws HTTP status when error response has no message', async () => {
+  it('exportBackup says the server is not responding when the error response has no message', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 503,
@@ -707,7 +877,10 @@ describe('backup API', () => {
     });
 
     const api = await getApi();
-    await expect(api.backup.exportBackup()).rejects.toThrow('HTTP 503');
+    await expect(api.backup.exportBackup()).rejects.toMatchObject({
+      status: 503,
+      message: 'The server is not responding, try again in a moment.',
+    });
   });
 
   it('importBackup sends FormData and returns json on success', async () => {
@@ -766,7 +939,7 @@ describe('backup API', () => {
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
   });
 
-  it('importBackup throws HTTP status when error response has no message', async () => {
+  it('importBackup gives the status in a translated message when the error response has none', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 422,
@@ -775,6 +948,9 @@ describe('backup API', () => {
 
     const api = await getApi();
     const file = new File(['x'], 'x.zip', { type: 'application/zip' });
-    await expect(api.backup.importBackup(file)).rejects.toThrow('HTTP 422');
+    await expect(api.backup.importBackup(file)).rejects.toMatchObject({
+      status: 422,
+      message: 'The request could not be completed (error 422).',
+    });
   });
 });

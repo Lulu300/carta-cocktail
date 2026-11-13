@@ -4,6 +4,7 @@ import { configureSqlite, prisma } from './lib/prisma';
 import { reportUploadsCheck } from './services/uploadsCheck';
 import { resolveDatabasePath } from './lib/databasePath';
 import { applySessionFloor } from './services/sessionFloor';
+import { configureServerTimeouts } from './serverTimeouts';
 
 // In-flight requests get this long to finish before the process is killed
 const SHUTDOWN_TIMEOUT_MS = 10_000;
@@ -24,6 +25,7 @@ async function main(): Promise<void> {
     }
     console.log(`🍸 Carta Cocktail API running on port ${config.port}`);
   });
+  configureServerTimeouts(server);
 
   let shuttingDown = false;
   const shutdown = (signal: string) => {

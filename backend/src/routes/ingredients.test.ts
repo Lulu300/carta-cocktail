@@ -109,7 +109,7 @@ describe('POST /api/ingredients/bulk-availability', () => {
     const res = await request.post('/api/ingredients/bulk-availability').set(authHeader())
       .send({ available: true });
     expect(res.status).toBe(200);
-    expect(res.body.updated).toBe(2);
+    expect(res.body).toEqual({ message: 'Availability of every ingredient updated', updated: 2 });
 
     const ings = await prisma.ingredient.findMany();
     expect(ings.every(i => i.isAvailable)).toBe(true);

@@ -5,10 +5,10 @@ import { BadRequestError, NotFoundError } from '../errors';
 import { parseNameTranslations } from '../utils/translations';
 import { valid, validate } from '../validation/validate';
 import { IdParams, idRequest } from '../validation/common';
-import { CocktailCreate, CocktailUpdate } from '../validation/cocktails';
+import { CocktailCreate, CocktailExportBatch, CocktailUpdate } from '../validation/cocktails';
 import { ImportConfirm, ImportRecipeV1 } from '../validation/cocktailImport';
 import { cocktailInclude } from '../services/cocktail/includes';
-import { exportCocktail } from '../services/cocktail/cocktailExport';
+import { exportCocktail, exportCocktails } from '../services/cocktail/cocktailExport';
 import { imageUpload, setImage } from '../services/cocktail/cocktailImage';
 import { confirmImport, previewImport } from '../services/cocktail/cocktailImport';
 import { createCocktail, removeCocktail, updateCocktail } from '../services/cocktail/cocktailService';
@@ -21,6 +21,16 @@ router.get('/:id/export', validate(idRequest), async (_req: AuthRequest, res: Re
   const exported = await exportCocktail({ id }, { includePrivate: true });
   if (!exported) throw new NotFoundError();
   res.attachment(exported.filename).json(exported.payload);
+});
+
+// Export several cocktails in one request, as the files the single export gives. The admin's
+// ZIP export uses it: one request per cocktail would reach the API rate limit with a few hundred.
+const exportBatchSchemas = { body: CocktailExportBatch };
+
+router.post('/export', validate(exportBatchSchemas), async (_req: AuthRequest, res: Response) => {
+  const files = await exportCocktails(valid<typeof exportBatchSchemas>(res).body.ids, { includePrivate: true });
+  if (!files) throw new NotFoundError();
+  res.json(files.map(({ filename, payload }) => ({ filename, data: payload })));
 });
 
 // Import preview: analyze JSON and return matched/missing entities

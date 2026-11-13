@@ -1,0 +1,49 @@
+---
+id: C-46
+title: "Banc de mise à jour : reconnaître le refus « cannot write » de D-01"
+phase: C
+lane: ci
+criticite: basse
+effort: S
+status: done
+owner: agent
+depends_on: [C-41]
+touches: [scripts/upgrade-test/]
+sources: []
+branch: chore/C-46-bench-cannot-write-refusal
+pr: "#171"
+---
+
+## Contexte
+
+Relecture des notes de v1.12.0 (PR #152, point M2). Depuis D-01 (#108), le backend tourne en uid 1000 et l'entrypoint refuse de démarrer quand il ne peut pas écrire dans `/app/data` ou `/app/uploads` (« cannot write to /app/data »). Le banc ne connaît que le refus d'une migration en échec (`FAILED_MIGRATION_REFUSAL`, C-18/C-37).
+
+## Problème constaté
+
+Avec `--inject-duplicate --mode naive` sur le layout `official`, les volumes nommés gardent leur propriétaire même sous Docker Desktop : en mode naïf, le saut vers v1.12.0 est refusé pour « cannot write » avant la migration. `checkInjectedDuplicateRefused` rapporte alors un échec inattendu (« refused, but not by the failed migration: no known refusal message »). Constat du relecteur sur `hooks/1.12.0.mjs` ; à la release v1.12.0, `--inject-duplicate` n'a été passé que sur `friend` (montages de dossiers, propriétaires ignorés par Docker Desktop), où il passe.
+
+## Ce qu'il faut faire
+
+1. Ajouter le refus « cannot write » de l'entrypoint aux refus connus (`lib/checks.mjs`), avec son contrôle (aucune écriture dans la base).
+2. Avec `--inject-duplicate`, quand le démarrage est refusé pour « cannot write » en mode naïf, marquer la ligne du doublon comme non applicable (le doublon n'a pas pu être testé) au lieu d'un échec.
+3. Hook `1.12.0` : lister ce refus dans `profile.refusals`, et mettre à jour ou retirer les entrées `naiveMayFail.refusal` (« … which is not a known refusal », qui ne vaut plus) et `naiveMayFail.backup` si le contrôle passe. Documenter le cas dans `scripts/upgrade-test/README.md`.
+
+## Critères d'acceptation
+
+- [x] `--layout official --path 1.4.0,<version ≥ 1.12.0> --mode both --inject-duplicate` passe sans échec inattendu.
+- [x] Le layout `friend` donne le même résultat qu'avant.
+- [x] Tests `node --test scripts/upgrade-test/test/*.test.mjs` ajoutés et verts.
+
+## Tests à ajouter ou adapter
+
+- `checks.test.mjs` : le refus « cannot write » est reconnu comme refus connu, et son contrôle de la base passe.
+- `expectations` : avec `--inject-duplicate`, la ligne du doublon est non applicable quand ce refus arrive avant la migration ; elle reste un échec pour un démarrage qui passe ou un refus inconnu.
+
+## Points d'attention
+
+- Le jeu d'essai reste hors du dépôt, et le rapport ne contient que des nombres.
+- Banc et images à nom fixe : un verrou `mkdir` si deux agents le lancent en même temps.
+
+## Journal
+
+- 2026-11-12 : fait (PR #171). Refus connu `UNWRITABLE_REFUSAL` (`lib/checks.mjs`, message « cannot write to », base `untouched`, `beforeMigrations: true`), listé avant `FAILED_MIGRATION_REFUSAL` dans `hooks/1.12.0.mjs` ; `naiveMayFail.refusal` retiré, `naiveMayFail.backup` gardé (aucune copie `pre-migrate` avant ce refus, vérifié au banc). Avec `--inject-duplicate`, un démarrage refusé avant les migrations passe la ligne `injected duplicate refused` en `skip` (non applicable) et n'est plus attribué au doublon : `backend starts` garde la raison des notes. Choix au-delà de la tâche, valable dans les deux modes : en conforme, `chownMounts` passe avant, donc ce refus reste un échec inattendu de `backend starts`. Banc sur une copie temporaire du jeu d'essai, `--path 1.4.0,1.12.0 --mode both --inject-duplicate`, images publiées. `official` : sur `origin/develop`, code 1 (naïf KO `injected duplicate refused`) ; sur la branche, code 0, naïf et conforme OK avec 2 échecs attendus chacun, refus « cannot write to » reconnu, base inchangée (même SHA-256), 759 lignes, aucune perte. `friend` : code 0, rapport identique à celui de `origin/develop` (hors horodatage, durées d'arrêt et nombre de redémarrages), naïf et conforme OK avec 2 échecs attendus chacun. Tests du banc : 61 OK (57 avant). Couverture des lignes ajoutées de `lib/` et `hooks/` : 21/21.

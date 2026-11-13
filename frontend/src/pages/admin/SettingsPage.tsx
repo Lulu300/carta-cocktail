@@ -1,6 +1,6 @@
 import { useState, useEffect, useId, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { settings as settingsApi, backup as backupApi } from '../../services/api';
+import { ApiError, settings as settingsApi, backup as backupApi } from '../../services/api';
 import type { BackupRestoreResult } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteSettings } from '../../contexts/SiteSettingsContext';
@@ -16,6 +16,35 @@ const ICON_OPTIONS = [
   '', '🍸', '🍹', '🥃', '🍷', '🥂', '🍺', '🧉', '🫗',
   '🍾', '🥤', '🧊', '🔥', '🌿', '🍋', '🫒', '🍒',
 ];
+
+/**
+ * Status of the proxy's answer when the backend takes longer than its read timeout
+ * (frontend/nginx.conf.template: 60 s for the export, 300 s for the restore). The
+ * backend never sends it, and keeps working after the proxy has given up.
+ */
+const GATEWAY_TIMEOUT = 504;
+
+function isGatewayTimeout(err: unknown): boolean {
+  return err instanceof ApiError && err.status === GATEWAY_TIMEOUT;
+}
+
+/** What orNoAnswer resolves to when the connection was lost. */
+const NO_ANSWER = Symbol('no answer');
+
+/**
+ * Runs a backup API call, and resolves to NO_ANSWER when the connection is lost: fetch rejects
+ * with a TypeError when no HTTP answer arrives, and so does reading a body cut mid-download.
+ * send() passes both on unchanged. Only the call is checked: a TypeError while handling what
+ * it returned is a bug, not a lost connection.
+ */
+async function orNoAnswer<T>(call: () => Promise<T>): Promise<T | typeof NO_ANSWER> {
+  try {
+    return await call();
+  } catch (err: unknown) {
+    if (err instanceof TypeError) return NO_ANSWER;
+    throw err;
+  }
+}
 
 /** A restore result the admin must read before the page reloads. */
 function needsAdminAttention(result: BackupRestoreResult): boolean {
@@ -75,6 +104,10 @@ export default function SettingsPage() {
   const [backupMessage, setBackupMessage] = useState('');
   const [backupError, setBackupError] = useState('');
   const [restoreResult, setRestoreResult] = useState<BackupRestoreResult | null>(null);
+  // The server refuses an export during a restore and a restore during an export (409). Each
+  // action is blocked while the other runs, so a restore does not upload a whole archive only
+  // to be refused. The export runs until its archive has been read in full (exportBackup).
+  const backupBusy = backupExporting || backupImporting;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const siteIconHintId = useId();
 
@@ -131,18 +164,37 @@ export default function SettingsPage() {
     }
   };
 
+  /**
+   * Shows why a backup action failed. After a 504, "try again in a moment" would be wrong:
+   * an export would hit the same timeout, and a restore may still be running on the server.
+   */
+  const showBackupError = (err: unknown, timeoutMessage: string) => {
+    if (isGatewayTimeout(err)) setBackupError(timeoutMessage);
+    else setBackupError(err instanceof Error ? err.message : t('common.error'));
+  };
+
+  /** Why a restore ended without its result, followed by the advice shared by both causes. */
+  const restoreMayStillRun = (cause: 'settings.backup.restoreTimeout' | 'settings.backup.restoreNoAnswer') =>
+    `${t(cause)} ${t('settings.backup.restoreMayStillRun')}`;
+
   const handleBackupExport = async () => {
     setBackupMessage('');
     setBackupError('');
     setBackupExporting(true);
     try {
-      await backupApi.exportBackup();
+      const result = await orNoAnswer(() => backupApi.exportBackup());
+      if (result === NO_ANSWER) {
+        // The browser's own text ("Failed to fetch", "network error") does not say that
+        // nothing changed on the server and that trying again is safe.
+        setBackupError(t('settings.backup.exportNoAnswer'));
+        return;
+      }
       setBackupMessage(t('settings.backup.exportSuccess'));
       // The report of an earlier restore no longer matches the latest message.
       // A failed export keeps it: the restart warning is often why it failed.
       setRestoreResult(null);
     } catch (err: unknown) {
-      setBackupError(err instanceof Error ? err.message : t('common.error'));
+      showBackupError(err, t('settings.backup.exportTimeout'));
     } finally {
       setBackupExporting(false);
     }
@@ -163,7 +215,15 @@ export default function SettingsPage() {
     setRestoreResult(null);
     setBackupImporting(true);
     try {
-      const result = await backupApi.importBackup(backupFile);
+      const result = await orNoAnswer(() => backupApi.importBackup(backupFile));
+      if (result === NO_ANSWER) {
+        // On a long restore, the browser may give up before nginx answers 504 (Firefox also
+        // waits 300 s), or a proxy in front may cut the connection instead of answering.
+        // The restore may then be running as after a 504: the browser's own text
+        // ("Failed to fetch") would not stop the admin from starting a second one.
+        setBackupError(restoreMayStillRun('settings.backup.restoreNoAnswer'));
+        return;
+      }
       setBackupFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       if (needsAdminAttention(result)) {
@@ -180,7 +240,7 @@ export default function SettingsPage() {
         setTimeout(() => window.location.reload(), 1500);
       }
     } catch (err: unknown) {
-      setBackupError(err instanceof Error ? err.message : t('common.error'));
+      showBackupError(err, restoreMayStillRun('settings.backup.restoreTimeout'));
     } finally {
       setBackupImporting(false);
     }
@@ -289,7 +349,7 @@ export default function SettingsPage() {
         <div className="space-y-4">
           {/* Export */}
           <div>
-            <Button onClick={handleBackupExport} disabled={backupExporting}>
+            <Button onClick={handleBackupExport} disabled={backupBusy}>
               <Icon name="download" />
               {backupExporting ? t('settings.backup.exporting') : t('settings.backup.export')}
             </Button>
@@ -326,7 +386,7 @@ export default function SettingsPage() {
             </div>
 
             {backupFile && (
-              <Button variant="danger" onClick={handleBackupImport} disabled={backupImporting}>
+              <Button variant="danger" onClick={handleBackupImport} disabled={backupBusy}>
                 {backupImporting ? t('settings.backup.importing') : t('settings.backup.import')}
               </Button>
             )}

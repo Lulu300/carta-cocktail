@@ -14,10 +14,10 @@ vi.mock('jszip', () => {
 });
 
 import { http, HttpResponse } from 'msw';
-import { exportCocktailsAsZip } from './exportZip';
+import { EXPORT_BATCH_SIZE, exportCocktailsAsZip } from './exportZip';
 import { mockDownload } from '../test/download';
 import { server } from '../test/msw/server';
-import { errorResponse } from '../test/msw/utils';
+import { errorResponse, readJsonObject } from '../test/msw/utils';
 import type { CocktailExportFormat } from '../types';
 
 let downloads: string[];
@@ -40,21 +40,20 @@ function recipe(name: string): CocktailExportFormat {
   };
 }
 
-/** Exported ids, in the order the server received them. */
-let requestedIds: number[];
+/** The ids of each batch export request, in the order the server received them. */
+let requestedBatches: number[][];
 
-/** The server names each export file, as the backend does (Content-Disposition). */
+/** The server names each export file, as the backend does, and refuses a batch with an unknown id. */
 function mockServerFiles(...files: { id: number; filename: string; name: string }[]) {
-  requestedIds = [];
+  requestedBatches = [];
   server.use(
-    http.get('/api/cocktails/:id/export', ({ params }) => {
-      const id = Number(params.id);
-      requestedIds.push(id);
-      const file = files.find((candidate) => candidate.id === id);
-      if (!file) return errorResponse(404, 'Cocktail not found');
-      return HttpResponse.json(recipe(file.name), {
-        headers: { 'Content-Disposition': `attachment; filename="${file.filename}"` },
-      });
+    http.post('/api/cocktails/export', async ({ request }) => {
+      const { ids } = await readJsonObject(request);
+      const batch = Array.isArray(ids) ? ids.map(Number) : [];
+      requestedBatches.push(batch);
+      const found = batch.map((id) => files.find((candidate) => candidate.id === id));
+      if (found.some((file) => !file)) return errorResponse(404, 'Resource not found');
+      return HttpResponse.json(found.map((file) => file && { filename: file.filename, data: recipe(file.name) }));
     }),
   );
 }
@@ -69,7 +68,7 @@ describe('exportCocktailsAsZip', () => {
 
     await exportCocktailsAsZip([1]);
 
-    expect(requestedIds).toEqual([1]);
+    expect(requestedBatches).toEqual([[1]]);
     expect(mockFile).toHaveBeenCalledWith('cocktail-mojito.json', JSON.stringify(recipe('Mojito'), null, 2));
     expect(mockGenerateAsync).toHaveBeenCalledWith({ type: 'blob' });
   });
@@ -80,10 +79,30 @@ describe('exportCocktailsAsZip', () => {
       { id: 2, filename: 'cocktail-negroni.json', name: 'Negroni' },
     );
 
-    await exportCocktailsAsZip([1, 2]);
+    await exportCocktailsAsZip([2, 1]);
 
-    expect(requestedIds).toHaveLength(2);
-    expect(zippedFilenames()).toEqual(['cocktail-mojito.json', 'cocktail-negroni.json']);
+    expect(requestedBatches).toEqual([[2, 1]]);
+    expect(zippedFilenames()).toEqual(['cocktail-negroni.json', 'cocktail-mojito.json']);
+  });
+
+  it(`should split a selection of more than ${EXPORT_BATCH_SIZE} cocktails into batches, keeping its order`, async () => {
+    const ids = Array.from({ length: EXPORT_BATCH_SIZE + 1 }, (_, index) => EXPORT_BATCH_SIZE + 1 - index);
+    mockServerFiles(...ids.map((id) => ({ id, filename: `cocktail-${id}.json`, name: `Cocktail ${id}` })));
+
+    await exportCocktailsAsZip(ids);
+
+    expect(requestedBatches.map((batch) => batch.length)).toEqual([EXPORT_BATCH_SIZE, 1]);
+    expect(requestedBatches.flat()).toEqual(ids);
+    expect(zippedFilenames()).toEqual(ids.map((id) => `cocktail-${id}.json`));
+  });
+
+  it('should fail without downloading anything when a cocktail no longer exists', async () => {
+    mockServerFiles({ id: 1, filename: 'cocktail-mojito.json', name: 'Mojito' });
+
+    await expect(exportCocktailsAsZip([1, 99])).rejects.toThrow('Resource not found');
+
+    expect(mockGenerateAsync).not.toHaveBeenCalled();
+    expect(downloads).toEqual([]);
   });
 
   it('should keep one file per cocktail when names collide', async () => {

@@ -5,7 +5,7 @@ import {
 } from '../test/helpers';
 import {
   assertBottlesAllowed, BottleMenuType, excludeBottles, isAvailableFor, isEligible, isSystemMenu,
-  restoreBottle, syncBottle, syncMenu, syncNewBottles,
+  restoreBottles, syncBottle, syncMenu, syncNewBottles,
 } from './menuSyncService';
 
 beforeAll(async () => { await setupTestDatabase(); });
@@ -268,7 +268,7 @@ describe('syncNewBottles', () => {
   });
 });
 
-describe('excludeBottles and restoreBottle', () => {
+describe('excludeBottles and restoreBottles', () => {
   it('keeps an excluded bottle out of the sync, then restores it at the end', async () => {
     const aperitifs = await findSystemMenu('aperitifs');
     const bottle = await seedBottle({ isApero: true });
@@ -281,7 +281,7 @@ describe('excludeBottles and restoreBottle', () => {
     await syncMenu(prisma, aperitifs.id);
     expect(await bottleIdsOf(aperitifs.id)).toEqual([other.id]);
 
-    await restoreBottle(prisma, aperitifs.id, bottle.id);
+    await restoreBottles(prisma, aperitifs.id, [bottle.id]);
     const restored = await prisma.menuBottle.findFirstOrThrow({ where: { menuId: aperitifs.id, bottleId: bottle.id } });
     expect(restored).toMatchObject({ position: 2, menuSectionId: null, isHidden: false });
     expect(await excludedIdsOf(aperitifs.id)).toEqual([]);
@@ -321,7 +321,7 @@ describe('excludeBottles and restoreBottle', () => {
     const bottle = await seedBottle({ isApero: false });
     await excludeBottleFromMenu(aperitifs.id, bottle.id);
 
-    await restoreBottle(prisma, aperitifs.id, bottle.id);
+    await restoreBottles(prisma, aperitifs.id, [bottle.id]);
 
     expect(await excludedIdsOf(aperitifs.id)).toEqual([]);
     expect(await bottleIdsOf(aperitifs.id)).toEqual([]);
@@ -329,6 +329,32 @@ describe('excludeBottles and restoreBottle', () => {
 
   it('fails with P2025, answered as a 404, for an unknown exclusion', async () => {
     const aperitifs = await findSystemMenu('aperitifs');
-    await expect(restoreBottle(prisma, aperitifs.id, 9999)).rejects.toMatchObject({ code: 'P2025' });
+    await expect(restoreBottles(prisma, aperitifs.id, [9999])).rejects.toMatchObject({ code: 'P2025' });
+  });
+
+  it('puts several bottles back at the end, in the order given, once each', async () => {
+    const aperitifs = await findSystemMenu('aperitifs');
+    const listed = await seedBottle({ isApero: true });
+    const [first, second] = [await seedBottle({ isApero: true }), await seedBottle({ isApero: true })];
+    await addBottleToMenu(aperitifs.id, listed.id, { position: 0 });
+    await excludeBottleFromMenu(aperitifs.id, first.id);
+    await excludeBottleFromMenu(aperitifs.id, second.id);
+
+    await restoreBottles(prisma, aperitifs.id, [second.id, first.id, second.id]);
+
+    expect(await bottleIdsOf(aperitifs.id)).toEqual([listed.id, second.id, first.id]);
+    expect(await excludedIdsOf(aperitifs.id)).toEqual([]);
+  });
+
+  it('puts nothing back when one bottle of the batch has no exclusion', async () => {
+    const aperitifs = await findSystemMenu('aperitifs');
+    const excluded = await seedBottle({ isApero: true });
+    await excludeBottleFromMenu(aperitifs.id, excluded.id);
+
+    await expect(prisma.$transaction((tx) => restoreBottles(tx, aperitifs.id, [excluded.id, 9999])))
+      .rejects.toMatchObject({ code: 'P2025' });
+
+    expect(await excludedIdsOf(aperitifs.id)).toEqual([excluded.id]);
+    expect(await bottleIdsOf(aperitifs.id)).toEqual([]);
   });
 });

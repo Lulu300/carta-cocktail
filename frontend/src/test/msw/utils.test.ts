@@ -10,6 +10,7 @@ import {
   mockApiResponse,
   mockItemInUse,
   mockNetworkError,
+  mockProxyError,
   pendingResponse,
   readJsonObject,
   rejectNextFetch,
@@ -47,6 +48,14 @@ describe('fake backend', () => {
     mockApiError('delete', '/api/units/:id', 409, 'Unit in use');
 
     await expect(units.delete(1)).rejects.toMatchObject({ status: 409, message: 'Unit in use' });
+  });
+
+  it('answers like nginx with an HTML error page and no API error message', async () => {
+    mockProxyError('get', '/api/units', 504);
+
+    const error = await units.list().catch((e: unknown) => e);
+
+    expect(error).toMatchObject({ status: 504, body: {} });
   });
 
   it('rejects like a dropped connection', async () => {

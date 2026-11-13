@@ -154,6 +154,10 @@ export interface CocktailExportFile {
   payload: ReturnType<typeof buildCocktailExport>;
 }
 
+function toExportFile(cocktail: ExportedCocktail & { id: number }, options: ExportOptions): CocktailExportFile {
+  return { filename: exportFilename(cocktail.name, cocktail.id), payload: buildCocktailExport(cocktail, options) };
+}
+
 /** Loads the first cocktail matching `where` and builds its export, or null when none matches. */
 export async function exportCocktail(
   where: Prisma.CocktailWhereInput,
@@ -161,5 +165,25 @@ export async function exportCocktail(
 ): Promise<CocktailExportFile | null> {
   const cocktail = await prisma.cocktail.findFirst({ where, select: buildPublicCocktailSelect(options.includePrivate) });
   if (!cocktail) return null;
-  return { filename: exportFilename(cocktail.name, cocktail.id), payload: buildCocktailExport(cocktail, options) };
+  return toExportFile(cocktail, options);
+}
+
+/**
+ * Builds the export of each cocktail of `ids` with one query, in the order of `ids`:
+ * the files are the ones `exportCocktail` gives one by one. Returns null when one of
+ * the cocktails does not exist, so that a batch is exported whole or not at all.
+ */
+export async function exportCocktails(ids: number[], options: ExportOptions): Promise<CocktailExportFile[] | null> {
+  const cocktails = await prisma.cocktail.findMany({
+    where: { id: { in: ids } },
+    select: buildPublicCocktailSelect(options.includePrivate),
+  });
+  const cocktailsById = new Map(cocktails.map((cocktail) => [cocktail.id, cocktail]));
+  const files: CocktailExportFile[] = [];
+  for (const id of ids) {
+    const cocktail = cocktailsById.get(id);
+    if (!cocktail) return null;
+    files.push(toExportFile(cocktail, options));
+  }
+  return files;
 }

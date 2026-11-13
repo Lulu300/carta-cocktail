@@ -16,12 +16,15 @@ const LOGIN_URL = '/auth/login';
 export class ApiError extends Error {
   readonly status: number;
   readonly body?: unknown;
+  /** Seconds the server asks to wait before trying again (Retry-After of a 429). */
+  readonly retryAfterSeconds?: number;
 
-  constructor(status: number, message: string, body?: unknown) {
+  constructor(status: number, message: string, body?: unknown, retryAfterSeconds?: number) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.body = body;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
@@ -66,6 +69,33 @@ async function readErrorBody(res: Response): Promise<{ error?: unknown }> {
   return res.json().catch(() => ({}));
 }
 
+/**
+ * Retry-After of a rate-limited answer, in seconds. The backend's limiter sends a
+ * number of seconds, never the HTTP-date form.
+ */
+function readRetryAfter(res: Response): number | undefined {
+  if (res.status !== 429) return undefined;
+  const header = res.headers.get('Retry-After')?.trim() ?? '';
+  return /^\d+$/.test(header) ? Number(header) : undefined;
+}
+
+/**
+ * Message of a failed answer. The backend always sends an `error` it has translated: keep it.
+ * Without one, something in front of the backend answered: nginx sends an HTML page with a 502
+ * while the backend is stopped or starting and a 504 when it does not answer in time, and Vite's
+ * dev proxy an empty 502. "HTTP 502" would tell the admin nothing; the status stays in ApiError.
+ * A 4xx without one was refused before reaching the routes: mostly nginx's 413 for a body over
+ * client_max_body_size, whose limit depends on the route, so the message gives no size. Otherwise
+ * nginx's 400 or 414 (headers or URL too long), Node's 408 or 431, or a proxy's own page: the
+ * message keeps the status, the only detail the admin can report.
+ */
+function errorMessage(status: number, body: { error?: unknown }): string {
+  if (typeof body.error === 'string') return body.error;
+  if (status >= 500) return i18n.t('common.serverUnavailable');
+  if (status === 413) return i18n.t('common.requestTooLarge');
+  return i18n.t('common.requestFailed', { status });
+}
+
 /** Sends an API request and throws an ApiError carrying the server message on failure. */
 async function send(url: string, init: RequestInit = {}): Promise<Response> {
   const token = localStorage.getItem('token');
@@ -80,8 +110,7 @@ async function send(url: string, init: RequestInit = {}): Promise<Response> {
   if (res.status === 401) {
     handleUnauthorized(url, token);
   }
-  const message = typeof body.error === 'string' ? body.error : `HTTP ${res.status}`;
-  throw new ApiError(res.status, message, body);
+  throw new ApiError(res.status, errorMessage(res.status, body), body, readRetryAfter(res));
 }
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
@@ -246,6 +275,9 @@ export const cocktails = {
     });
   },
   exportRecipe: (id: number) => requestCocktailExport(`/cocktails/${id}/export`, id),
+  /** The exports of several cocktails in one request, in the order of `ids` (at most EXPORT_BATCH_SIZE of them). */
+  exportRecipes: (ids: number[]) =>
+    request<CocktailExportFile[]>('/cocktails/export', { method: 'POST', body: JSON.stringify({ ids }) }),
   importPreview: (data: CocktailExportFormat) =>
     request<ImportPreviewResponse>('/cocktails/import/preview', {
       method: 'POST',
@@ -285,6 +317,12 @@ export const menuBottles = {
     request<MenuBottle>('/menu-bottles', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: { position?: number; isHidden?: boolean; menuSectionId?: number | null }) =>
     request<MenuBottle>(`/menu-bottles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  /** Applies the same change to these entries (`MenuBottle.id`) of the menu, all of them or none. */
+  updateEntries: (menuId: number, ids: number[], changes: { isHidden?: boolean; menuSectionId?: number | null }) =>
+    request<{ message: string }>(`/menu-bottles/menu/${menuId}/entries`, {
+      method: 'PUT',
+      body: JSON.stringify({ ids, ...changes }),
+    }),
   delete: (id: number) =>
     request<{ message: string }>(`/menu-bottles/${id}`, { method: 'DELETE' }),
   sync: (menuId: number) =>
@@ -300,9 +338,12 @@ export const menuBottles = {
       method: 'POST',
       body: JSON.stringify({ bottleIds }),
     }),
-  /** Puts an excluded bottle back at the end of the menu. */
-  restore: (menuId: number, bottleId: number) =>
-    request<{ message: string }>(`/menu-bottles/menu/${menuId}/exclusions/${bottleId}`, { method: 'DELETE' }),
+  /** Puts these excluded bottles back at the end of the menu, all of them or none. */
+  restore: (menuId: number, bottleIds: number[]) =>
+    request<{ message: string }>(`/menu-bottles/menu/${menuId}/exclusions/restore`, {
+      method: 'POST',
+      body: JSON.stringify({ bottleIds }),
+    }),
 };
 
 // Menu Sections

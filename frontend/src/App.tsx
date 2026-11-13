@@ -2,7 +2,12 @@ import { lazy, Suspense, type ComponentType } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from './contexts/AuthContext';
+import { ApiError } from './services/api';
+import Button from './components/ui/Button';
+import EmptyState from './components/ui/EmptyState';
+import BackHomeLink from './components/layout/BackHomeLink';
 import PublicLayout from './components/layout/PublicLayout';
+import RouteErrorBoundary from './components/layout/RouteErrorBoundary';
 import HomePage from './pages/public/HomePage';
 import MenuPublicPage from './pages/public/MenuPublicPage';
 import CocktailPublicPage from './pages/public/CocktailPublicPage';
@@ -39,58 +44,97 @@ function RouteFallback() {
   );
 }
 
+interface SessionCheckErrorProps {
+  error: Error;
+  onRetry: () => void;
+  onSignInAgain: () => void;
+}
+
+/**
+ * The stored token could not be checked, but it was not rejected either: the admin stays
+ * signed in and retries. The backend's message (translated, e.g. the rate limit's "try again
+ * in a few minutes") says why; a network failure has none. When the failure lasts (a broken
+ * server), the admin can still leave for the public site or end the session and sign in again.
+ */
+function SessionCheckError({ error, onRetry, onSignInAgain }: SessionCheckErrorProps) {
+  const { t } = useTranslation();
+  return (
+    <main className="min-h-screen bg-canvas flex items-center justify-center">
+      <EmptyState
+        icon="⚠️"
+        title={t('auth.sessionCheckFailed')}
+        description={error instanceof ApiError ? error.message : t('public.loadErrorHint')}
+        role="alert"
+        action={(
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            <Button variant="secondary" onClick={onRetry}>{t('common.retry')}</Button>
+            <Button variant="ghost" onClick={onSignInAgain}>{t('auth.signInAgain')}</Button>
+            <BackHomeLink />
+          </div>
+        )}
+      />
+    </main>
+  );
+}
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, sessionError, retrySession, logout } = useAuth();
   const location = useLocation();
   if (isLoading) return <RouteFallback />;
+  if (user) return <>{children}</>;
+  if (sessionError) {
+    // logout() also clears the error: the next render redirects to /login below.
+    return <SessionCheckError error={sessionError} onRetry={retrySession} onSignInAgain={logout} />;
+  }
   // Remember the requested page so LoginPage can return to it after sign-in
-  if (!user) return <Navigate to="/login" replace state={{ from: location }} />;
-  return <>{children}</>;
+  return <Navigate to="/login" replace state={{ from: location }} />;
 }
 
 export default function App() {
   // Router navigations run in a transition, so moving between admin pages keeps
   // the current page on screen while the next chunk loads: one boundary is enough.
   return (
-    <Suspense fallback={<RouteFallback />}>
-      <Routes>
-        {/* Public routes */}
-        <Route element={<PublicLayout />}>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/menu/:slug" element={<MenuPublicPage />} />
-          <Route path="/menu/:slug/cocktail/:id" element={<CocktailPublicPage />} />
-        </Route>
+    <RouteErrorBoundary>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          {/* Public routes */}
+          <Route element={<PublicLayout />}>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/menu/:slug" element={<MenuPublicPage />} />
+            <Route path="/menu/:slug/cocktail/:id" element={<CocktailPublicPage />} />
+          </Route>
 
-        {/* Auth */}
-        <Route path="/login" element={<LoginPage />} />
+          {/* Auth */}
+          <Route path="/login" element={<LoginPage />} />
 
-        {/* Admin routes */}
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute>
-              <AdminLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<DashboardPage />} />
-          <Route path="categories" element={<CategoriesPage />} />
-          <Route path="bottles" element={<BottlesPage />} />
-          <Route path="ingredients" element={<IngredientsPage />} />
-          <Route path="units" element={<UnitsPage />} />
-          <Route path="cocktails" element={<CocktailsPage />} />
-          <Route path="cocktails/new" element={<CocktailFormPage />} />
-          <Route path="cocktails/:id" element={<CocktailFormPage />} />
-          <Route path="menus" element={<MenusPage />} />
-          <Route path="menus/:id" element={<MenuEditPage />} />
-          <Route path="menus/:id/bottles" element={<MenuBottleEditPage />} />
-          <Route path="shortages" element={<ShortagesPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-        </Route>
+          {/* Admin routes */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute>
+                <AdminLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<DashboardPage />} />
+            <Route path="categories" element={<CategoriesPage />} />
+            <Route path="bottles" element={<BottlesPage />} />
+            <Route path="ingredients" element={<IngredientsPage />} />
+            <Route path="units" element={<UnitsPage />} />
+            <Route path="cocktails" element={<CocktailsPage />} />
+            <Route path="cocktails/new" element={<CocktailFormPage />} />
+            <Route path="cocktails/:id" element={<CocktailFormPage />} />
+            <Route path="menus" element={<MenusPage />} />
+            <Route path="menus/:id" element={<MenuEditPage />} />
+            <Route path="menus/:id/bottles" element={<MenuBottleEditPage />} />
+            <Route path="shortages" element={<ShortagesPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
 
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
-    </Suspense>
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </Suspense>
+    </RouteErrorBoundary>
   );
 }

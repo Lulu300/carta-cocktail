@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, within } from '../../test/test-utils';
 import userEvent from '@testing-library/user-event';
-import { fireEvent } from '@testing-library/react';
+import { act, fireEvent } from '@testing-library/react';
 import SettingsPage from './SettingsPage';
 import { AppProviders } from '../../test/appProviders';
 import { ConfirmProvider } from '../../contexts/ConfirmContext';
@@ -9,12 +9,18 @@ import { toast } from '../../components/ui/ToastStore';
 import type { BackupRestoreResult } from '../../services/api';
 import { mockDownload } from '../../test/download';
 import { buildSiteSettings } from '../../test/factories';
+import { server } from '../../test/msw/server';
+import { http, HttpResponse } from 'msw';
+import i18n from '../../i18n';
 import { ADMIN_USER } from '../../test/msw/handlers';
 import {
   captureRequest,
+  holdApiResponse,
   mockApiError,
   mockApiPending,
   mockApiResponse,
+  mockNetworkError,
+  mockProxyError,
   rejectNextFetch,
 } from '../../test/msw/utils';
 
@@ -28,6 +34,9 @@ vi.mock('react-i18next', async (importOriginal) => {
 });
 
 const admin = { ...ADMIN_USER, email: 'admin@test.local' };
+
+// Set by services/api.ts through the real i18next instance, not the mocked useTranslation
+const SERVER_UNAVAILABLE = i18n.t('common.serverUnavailable');
 
 function restoreResult(overrides: Partial<BackupRestoreResult> = {}): BackupRestoreResult {
   return { message: 'Backup restored', skippedFiles: 0, restartRecommended: false, ...overrides };
@@ -63,7 +72,7 @@ function profileSaveButton() {
   return screen.getAllByText('common.save')[1];
 }
 
-async function selectBackupFileAndClickImport(): Promise<File> {
+async function selectBackupFile(): Promise<File> {
   await waitFor(() => {
     expect(screen.getByText('settings.backup.selectFile')).toBeInTheDocument();
   });
@@ -78,6 +87,11 @@ async function selectBackupFileAndClickImport(): Promise<File> {
   await waitFor(() => {
     expect(screen.getByText('settings.backup.import')).toBeInTheDocument();
   });
+  return file;
+}
+
+async function selectBackupFileAndClickImport(): Promise<File> {
+  const file = await selectBackupFile();
   fireEvent.click(screen.getByText('settings.backup.import'));
   return file;
 }
@@ -87,6 +101,64 @@ async function answerRestoreDialog(buttonName: 'settings.backup.import' | 'commo
   expect(dialog).toHaveAccessibleDescription('settings.backup.confirmRestore');
   // userEvent waits for the restore that the answer starts: its updates stay inside act()
   await userEvent.click(within(dialog).getByRole('button', { name: buttonName }));
+}
+
+// A restore that ends without its result shows its cause, then the advice shared by both causes
+const RESTORE_TIMEOUT = 'settings.backup.restoreTimeout settings.backup.restoreMayStillRun';
+const RESTORE_NO_ANSWER = 'settings.backup.restoreNoAnswer settings.backup.restoreMayStillRun';
+const EXPORT_NO_ANSWER = 'settings.backup.exportNoAnswer';
+// Matches either no-answer message wherever it is, for the tests that check it is absent
+const NO_ANSWER_CAUSE = /settings\.backup\.(restore|export)NoAnswer/;
+
+type BackupAction = 'export' | 'restore';
+
+/** Starts a backup export, or a confirmed restore of a selected file. */
+async function runBackupAction(action: BackupAction) {
+  if (action === 'export') {
+    await userEvent.click(screen.getByText('settings.backup.export'));
+    return;
+  }
+  await selectBackupFileAndClickImport();
+  await answerRestoreDialog('settings.backup.import');
+}
+
+const BACKUP_ACTIONS = [
+  { action: 'export', method: 'get', path: '/api/backup/export', timeoutMessage: 'settings.backup.exportTimeout' },
+  { action: 'restore', method: 'post', path: '/api/backup/import', timeoutMessage: RESTORE_TIMEOUT },
+] as const;
+
+const exportButton = () => screen.getByRole('button', { name: /settings\.backup\.export/ });
+const restoreButton = () => screen.getByRole('button', { name: /settings\.backup\.import/ });
+
+/**
+ * Makes the export answer at once with its headers and the start of the archive. The
+ * archive ends only when the test calls `finish()`, or is cut when it calls `fail()`:
+ * the page has the headers, but not the whole download. A browser then rejects the body
+ * read with a TypeError, whose text is its own ("network error" in Chrome).
+ */
+function holdExportDownload() {
+  let archive: ReadableStreamDefaultController<Uint8Array> | undefined;
+  let answered: () => void = () => {};
+  const headersSent = new Promise<void>((resolve) => { answered = resolve; });
+  server.use(
+    http.get('/api/backup/export', () => {
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          archive = controller;
+          controller.enqueue(new Uint8Array(8));
+        },
+      });
+      answered();
+      return new HttpResponse(body, {
+        headers: { 'Content-Type': 'application/zip', 'Content-Disposition': 'attachment; filename="backup.zip"' },
+      });
+    }),
+  );
+  return {
+    headersSent,
+    finish: () => archive?.close(),
+    fail: () => archive?.error(new TypeError('network error')),
+  };
 }
 
 beforeEach(() => {
@@ -441,6 +513,167 @@ describe('SettingsPage', () => {
 
     expect(await screen.findByText('Import failed')).toBeInTheDocument();
     expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  // nginx gives up after 60 s on the export and 300 s on the restore, while the backend keeps working
+  it.each(BACKUP_ACTIONS)('explains a proxy timeout (504) on the $action instead of "try again in a moment"', async ({ action, method, path, timeoutMessage }) => {
+    mockProxyError(method, path, 504);
+    await renderLoadedPage();
+
+    await runBackupAction(action);
+
+    expect(await screen.findByText(timeoutMessage)).toBeInTheDocument();
+    expect(screen.queryByText(SERVER_UNAVAILABLE)).not.toBeInTheDocument();
+    expect(screen.queryByText(NO_ANSWER_CAUSE)).not.toBeInTheDocument();
+    expect(screen.queryByText('settings.backup.exportSuccess')).not.toBeInTheDocument();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it.each(BACKUP_ACTIONS)('keeps "the server is not responding" for a 502 of nginx on the $action', async ({ action, method, path, timeoutMessage }) => {
+    mockProxyError(method, path, 502);
+    await renderLoadedPage();
+
+    await runBackupAction(action);
+
+    expect(await screen.findByText(SERVER_UNAVAILABLE)).toBeInTheDocument();
+    expect(screen.queryByText(timeoutMessage)).not.toBeInTheDocument();
+  });
+
+  // The browser (Firefox after 300 s) or a proxy may drop the connection before nginx answers 504
+  it('says the restore may still be running when its request gets no HTTP answer', async () => {
+    mockNetworkError('post', '/api/backup/import');
+    await renderLoadedPage();
+
+    await runBackupAction('restore');
+
+    expect(await screen.findByText(RESTORE_NO_ANSWER)).toBeInTheDocument();
+    expect(screen.queryByText(/settings\.backup\.restoreTimeout/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/fetch/i)).not.toBeInTheDocument();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  // The export changes nothing: the message only has to say so, and to try again
+  it('says the export can be tried again when its request gets no HTTP answer', async () => {
+    const downloads = mockDownload();
+    mockNetworkError('get', '/api/backup/export');
+    await renderLoadedPage();
+    await selectBackupFile();
+
+    await runBackupAction('export');
+
+    expect(await screen.findByText(EXPORT_NO_ANSWER)).toBeInTheDocument();
+    expect(screen.queryByText(/fetch/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/settings\.backup\.restore/)).not.toBeInTheDocument();
+    expect(screen.queryByText('settings.backup.exportTimeout')).not.toBeInTheDocument();
+    expect(screen.queryByText('settings.backup.exportSuccess')).not.toBeInTheDocument();
+    expect(downloads).toEqual([]);
+    expect(exportButton()).toBeEnabled();
+    expect(restoreButton()).toBeEnabled();
+  });
+
+  // The server did answer: a TypeError while reading its answer is a bug, not a lost connection
+  it('does not report a lost connection for an error after the restore was answered', async () => {
+    mockApiResponse('post', '/api/backup/import', null);
+    await renderLoadedPage();
+
+    await runBackupAction('restore');
+
+    expect(await screen.findByText(/Cannot read properties of null/)).toBeInTheDocument();
+    expect(screen.queryByText(NO_ANSWER_CAUSE)).not.toBeInTheDocument();
+  });
+
+  // E-49's lock refuses a second restore with a translated JSON error
+  it('shows the server message when a restore is refused because another one is running', async () => {
+    mockApiError('post', '/api/backup/import', 409, 'A restore is already running');
+    await renderLoadedPage();
+
+    await runBackupAction('restore');
+
+    expect(await screen.findByText('A restore is already running')).toBeInTheDocument();
+    expect(screen.queryByText(NO_ANSWER_CAUSE)).not.toBeInTheDocument();
+  });
+
+  // The server refuses a restore during an export (409), after the whole archive was uploaded
+  it('keeps the restore disabled until the export download has been read in full', async () => {
+    const downloads = mockDownload();
+    const download = holdExportDownload();
+    await renderLoadedPage();
+    await selectBackupFile();
+
+    await userEvent.click(exportButton());
+    await download.headersSent;
+    // Lets the page receive the headers and the start of the archive
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+
+    expect(exportButton()).toHaveTextContent('settings.backup.exporting');
+    expect(restoreButton()).toBeDisabled();
+    expect(restoreButton()).toHaveTextContent('settings.backup.import');
+    expect(downloads).toEqual([]);
+
+    download.finish();
+
+    expect(await screen.findByText('settings.backup.exportSuccess')).toBeInTheDocument();
+    expect(downloads).toEqual(['backup.zip']);
+    expect(restoreButton()).toBeEnabled();
+    expect(exportButton()).toBeEnabled();
+  });
+
+  it('says the export can be tried again, and enables the restore again, when its download is cut', async () => {
+    const downloads = mockDownload();
+    const download = holdExportDownload();
+    await renderLoadedPage();
+    await selectBackupFile();
+
+    await userEvent.click(exportButton());
+    await download.headersSent;
+    expect(restoreButton()).toBeDisabled();
+
+    download.fail();
+
+    expect(await screen.findByText(EXPORT_NO_ANSWER)).toBeInTheDocument();
+    expect(screen.queryByText(/network error/i)).not.toBeInTheDocument();
+    expect(restoreButton()).toBeEnabled();
+    expect(exportButton()).toBeEnabled();
+    expect(downloads).toEqual([]);
+    expect(screen.queryByText('settings.backup.exportSuccess')).not.toBeInTheDocument();
+  });
+
+  it('enables the restore again when the export is refused', async () => {
+    const releaseExport = holdApiResponse('get', '/api/backup/export', { error: 'A restore is running' }, 409);
+    await renderLoadedPage();
+    await selectBackupFile();
+
+    await userEvent.click(exportButton());
+    expect(restoreButton()).toBeDisabled();
+
+    releaseExport();
+
+    expect(await screen.findByText('A restore is running')).toBeInTheDocument();
+    expect(restoreButton()).toBeEnabled();
+    expect(exportButton()).toBeEnabled();
+  });
+
+  // The server refuses an export during a restore (409)
+  it.each([
+    { outcome: 'success', body: restoreResult({ skippedFiles: 1 }), status: 200, shown: 'settings.backup.skippedFiles(1)' },
+    { outcome: 'failure', body: { error: 'Invalid backup file' }, status: 400, shown: 'Invalid backup file' },
+  ])('disables the export while a restore runs, and enables it again after its $outcome', async ({ body, status, shown }) => {
+    const releaseRestore = holdApiResponse('post', '/api/backup/import', body, status);
+    const exports = captureRequest('get', '/api/backup/export');
+    await renderLoadedPage();
+
+    await runBackupAction('restore');
+
+    expect(restoreButton()).toHaveTextContent('settings.backup.importing');
+    expect(exportButton()).toBeDisabled();
+    expect(exportButton()).toHaveTextContent('settings.backup.export');
+    fireEvent.click(exportButton());
+    expect(exports.count()).toBe(0);
+
+    releaseRestore();
+
+    expect(await screen.findByText(shown)).toBeInTheDocument();
+    expect(exportButton()).toBeEnabled();
   });
 
   it('shows a generic error when the restore fails with something else than an Error', async () => {

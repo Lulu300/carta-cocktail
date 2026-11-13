@@ -104,24 +104,22 @@ describe('authMiddleware', () => {
     expect(req.userId).toBe(ADMIN_ID);
   });
 
-  it('returns 401 without an Authorization header', async () => {
-    const res = fakeResponse();
+  it('rejects with a 401 without an Authorization header', async () => {
     const next = vi.fn();
 
-    await authMiddleware(requestWith(), res as unknown as Response, next);
+    await expect(authMiddleware(requestWith(), fakeResponse() as unknown as Response, next))
+      .rejects.toMatchObject({ status: 401, i18nKey: 'errors.unauthorized' });
 
-    expect(res.status).toHaveBeenCalledWith(401);
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('returns 401 for a token signed with HS512', async () => {
+  it('rejects with a 401 for a token signed with HS512', async () => {
     const req = requestWith(`Bearer ${getAuthToken(ADMIN_ID, { algorithm: 'HS512' })}`);
-    const res = fakeResponse();
     const next = vi.fn();
 
-    await authMiddleware(req, res as unknown as Response, next);
+    await expect(authMiddleware(req, fakeResponse() as unknown as Response, next))
+      .rejects.toMatchObject({ status: 401, i18nKey: 'errors.invalidToken' });
 
-    expect(res.status).toHaveBeenCalledWith(401);
     expect(next).not.toHaveBeenCalled();
     expect(req.userId).toBeUndefined();
   });
