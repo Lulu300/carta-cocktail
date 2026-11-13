@@ -38,16 +38,16 @@ export function mockApiPending(method: ApiMethod, path: string): void {
 }
 
 /**
- * Makes `method path` answer `body` only once the returned function is called,
- * to check what the page shows while the request is in flight.
+ * Makes `method path` answer `body` (status 200 by default) only once the returned
+ * function is called, to check what the page shows while the request is in flight.
  */
-export function holdApiResponse(method: ApiMethod, path: string, body: JsonBodyType): () => void {
+export function holdApiResponse(method: ApiMethod, path: string, body: JsonBodyType, status = 200): () => void {
   let release: () => void = () => {};
   const released = new Promise<void>((resolve) => { release = resolve; });
   server.use(
     http[method](path, async () => {
       await released;
-      return HttpResponse.json(body);
+      return HttpResponse.json(body, { status });
     }),
   );
   return release;

@@ -105,6 +105,10 @@ export default function SettingsPage() {
   const [backupMessage, setBackupMessage] = useState('');
   const [backupError, setBackupError] = useState('');
   const [restoreResult, setRestoreResult] = useState<BackupRestoreResult | null>(null);
+  // The server refuses an export during a restore and a restore during an export (409). Each
+  // action is blocked while the other runs, so a restore does not upload a whole archive only
+  // to be refused. The export runs until its archive has been read in full (exportBackup).
+  const backupBusy = backupExporting || backupImporting;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const siteIconHintId = useId();
 
@@ -338,7 +342,7 @@ export default function SettingsPage() {
         <div className="space-y-4">
           {/* Export */}
           <div>
-            <Button onClick={handleBackupExport} disabled={backupExporting}>
+            <Button onClick={handleBackupExport} disabled={backupBusy}>
               <Icon name="download" />
               {backupExporting ? t('settings.backup.exporting') : t('settings.backup.export')}
             </Button>
@@ -375,7 +379,7 @@ export default function SettingsPage() {
             </div>
 
             {backupFile && (
-              <Button variant="danger" onClick={handleBackupImport} disabled={backupImporting}>
+              <Button variant="danger" onClick={handleBackupImport} disabled={backupBusy}>
                 {backupImporting ? t('settings.backup.importing') : t('settings.backup.import')}
               </Button>
             )}
