@@ -86,3 +86,4 @@ Aucun test de code. Contrôle par `gh api .../rules/branches/<branche>` et sur l
 ## Journal
 
 - 2026-11-12 : tâche créée par D-35 ; état de CodeQL et du ruleset 24936910 relevé avec `gh api` (voir Contexte).
+- 2026-11-13 : préalables de l'étape 1 remplis. Après la release v1.13.0 (PR #189), aucune alerte CodeQL n'est ouverte sur `main` : #27 et les 19 `js/missing-rate-limiting` sont `fixed`, et les 4 faux positifs de D-35 restent fermés. La tâche peut être prise ; l'étape 2 attend toujours l'accord de l'humain sur la règle (`owner: mixed`).

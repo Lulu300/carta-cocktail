@@ -449,6 +449,7 @@ docker pull ghcr.io/lulu300/carta-cocktail/frontend:1.13.0
 | `GET/POST/PUT/DELETE /api/cocktails` | Yes | Cocktail recipes |
 | `POST /api/cocktails/import/*` | Yes | Import preview and confirm |
 | `GET /api/cocktails/:id/export` | Yes | Export cocktail as JSON |
+| `POST /api/cocktails/export` | Yes | Export up to 500 cocktails as JSON, in the order of `ids` |
 | `GET/POST/PUT/DELETE /api/menus` | Yes | Menu management |
 | `GET /api/shortages` | Yes | Stock shortage analysis |
 | `GET /api/availability/*` | Yes | Cocktail availability |

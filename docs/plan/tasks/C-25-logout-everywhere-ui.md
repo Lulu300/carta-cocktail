@@ -50,3 +50,4 @@ C-11 ajoute `POST /api/auth/logout-all` : la route incrémente `User.tokenVersio
 
 - 2026-10-11 : tâche créée pendant C-11 (PR #82).
 - 2026-10-11 : point d'attention sur les tokens ramenés par une restauration remplacé par un renvoi vers C-30 (PR #93).
+- 2026-11-13 : l'étape 3 est faite par E-39 (PR #175) : au démarrage, `AuthContext.tsx` ne termine la session que sur un 401 (`isUnauthorizedError()`), et une autre erreur garde le token et affiche `SessionCheckError` (`App.tsx`) avec « Retry », « Sign in again » et « Back to home ». Il reste les étapes 1, 2 et 4 ; les deux derniers critères d'acceptation et le test de `AuthContext.test.tsx` qui portent sur ce comportement sont déjà couverts par E-39 : ne pas le refaire.

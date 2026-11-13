@@ -5,7 +5,7 @@ phase: C
 lane: backend
 criticite: basse
 effort: S
-status: review
+status: done
 owner: agent
 depends_on: [C-47]
 touches: [backend/src/routes/cocktails.ts, backend/src/routes/cocktails.test.ts, backend/src/services/cocktail/cocktailExport.ts, backend/src/validation/cocktails.ts, frontend/src/services/api.ts, frontend/src/services/api.test.ts, frontend/src/services/exportZip.ts, frontend/src/services/exportZip.test.ts, frontend/src/test/msw/handlers.ts]
@@ -52,3 +52,5 @@ Pourquoi le ZIP reste dans le navigateur : le backend aurait dû refaire les suf
 
 - 2026-11-12 : tâche créée et traitée à partir de la relecture de la PR #174 (choix de l'humain : « Code fix before the rc »). Diagnostic vérifié sur `develop` : un `GET /:id/export` par cocktail dans `exportZip.ts`, « Tout sélectionner » dans `CocktailsPage.tsx`.
 - Notes de version : l'export ZIP de plusieurs cocktails envoie une requête par lot de 500 au lieu d'une par cocktail, et n'atteint plus la limite de débit de l'API.
+- 2026-11-13 : statut passé de `review` à `done` après coup, dans la PR de suivi de la release v1.13.0 : les consignes du coordinateur demandaient `review` par erreur, alors que `docs/plan/README.md` (« Cycle de vie ») demande `done` dans le dernier commit de la PR.
+- 2026-11-13 : README, tableau « API Overview » : ligne ajoutée pour `POST /api/cocktails/export` (point non bloquant de la relecture de la PR #177).
