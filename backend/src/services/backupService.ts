@@ -7,7 +7,7 @@ import type { PrismaClient } from '../generated/prisma/client';
 import { config } from '../config';
 import { PRISMA_DIR, resolveDatabasePath } from '../lib/databasePath';
 import { checkpointWal, configureSqlite, createPrismaClient, prisma } from '../lib/prisma';
-import { BadRequestError } from '../errors';
+import { BadRequestError, ConflictError } from '../errors';
 import { hasTokenVersionColumn, writeSessionFloor } from './sessionFloor';
 
 /** Format of the backup archive, written to metadata.json. Every published version wrote 1. */
@@ -337,7 +337,7 @@ function fileTimestamp(date: Date): string {
  * with a raised token version (at the next start for a backup made before
  * v1.11.0): every session, the restoring one included, ends.
  */
-export async function restoreBackup(zipPath: string): Promise<RestoreResult> {
+async function replaceLiveData(zipPath: string): Promise<RestoreResult> {
   const zip = openArchive(zipPath);
   const databaseEntry = checkArchive(zip);
 
@@ -406,4 +406,28 @@ export async function restoreBackup(zipPath: string): Promise<RestoreResult> {
   // failure must not roll it back.
   removePreviousUploads(uploadsSwap.asideDir);
   return result;
+}
+
+/**
+ * Two restores at once replace the same database file and move the same upload
+ * entries: one could roll back over the other, which would still report success.
+ * A single backend process serves the API, so a flag in memory is enough.
+ * A restore that never settles (a hung Prisma call) keeps the flag until the
+ * backend restarts: every later restore gets the 409 until then.
+ */
+let restoreInProgress = false;
+
+/**
+ * Restores a backup archive (see replaceLiveData), or refuses with a 409 while
+ * another restore is running, before touching any file.
+ */
+export async function restoreBackup(zipPath: string): Promise<RestoreResult> {
+  // Checked and set before the first await: two calls cannot both get past it
+  if (restoreInProgress) throw new ConflictError('errors.restoreInProgress');
+  restoreInProgress = true;
+  try {
+    return await replaceLiveData(zipPath);
+  } finally {
+    restoreInProgress = false;
+  }
 }
