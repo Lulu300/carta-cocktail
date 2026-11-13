@@ -106,8 +106,9 @@ async function answerRestoreDialog(buttonName: 'settings.backup.import' | 'commo
 // A restore that ends without its result shows its cause, then the advice shared by both causes
 const RESTORE_TIMEOUT = 'settings.backup.restoreTimeout settings.backup.restoreMayStillRun';
 const RESTORE_NO_ANSWER = 'settings.backup.restoreNoAnswer settings.backup.restoreMayStillRun';
-// Matches the no-answer message wherever it is, for the tests that check it is absent
-const NO_ANSWER_CAUSE = /settings\.backup\.restoreNoAnswer/;
+const EXPORT_NO_ANSWER = 'settings.backup.exportNoAnswer';
+// Matches either no-answer message wherever it is, for the tests that check it is absent
+const NO_ANSWER_CAUSE = /settings\.backup\.(restore|export)NoAnswer/;
 
 type BackupAction = 'export' | 'restore';
 
@@ -132,7 +133,8 @@ const restoreButton = () => screen.getByRole('button', { name: /settings\.backup
 /**
  * Makes the export answer at once with its headers and the start of the archive. The
  * archive ends only when the test calls `finish()`, or is cut when it calls `fail()`:
- * the page has the headers, but not the whole download.
+ * the page has the headers, but not the whole download. A browser then rejects the body
+ * read with a TypeError, whose text is its own ("network error" in Chrome).
  */
 function holdExportDownload() {
   let archive: ReadableStreamDefaultController<Uint8Array> | undefined;
@@ -155,7 +157,7 @@ function holdExportDownload() {
   return {
     headersSent,
     finish: () => archive?.close(),
-    fail: () => archive?.error(new Error('Connection lost')),
+    fail: () => archive?.error(new TypeError('network error')),
   };
 }
 
@@ -550,15 +552,23 @@ describe('SettingsPage', () => {
     expect(toast.success).not.toHaveBeenCalled();
   });
 
-  it('keeps the browser message for an export that gets no HTTP answer', async () => {
+  // The export changes nothing: the message only has to say so, and to try again
+  it('says the export can be tried again when its request gets no HTTP answer', async () => {
+    const downloads = mockDownload();
     mockNetworkError('get', '/api/backup/export');
     await renderLoadedPage();
+    await selectBackupFile();
 
     await runBackupAction('export');
 
-    expect(await screen.findByText(/fetch/i)).toBeInTheDocument();
-    expect(screen.queryByText(NO_ANSWER_CAUSE)).not.toBeInTheDocument();
+    expect(await screen.findByText(EXPORT_NO_ANSWER)).toBeInTheDocument();
+    expect(screen.queryByText(/fetch/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/settings\.backup\.restore/)).not.toBeInTheDocument();
     expect(screen.queryByText('settings.backup.exportTimeout')).not.toBeInTheDocument();
+    expect(screen.queryByText('settings.backup.exportSuccess')).not.toBeInTheDocument();
+    expect(downloads).toEqual([]);
+    expect(exportButton()).toBeEnabled();
+    expect(restoreButton()).toBeEnabled();
   });
 
   // The server did answer: a TypeError while reading its answer is a bug, not a lost connection
@@ -608,7 +618,7 @@ describe('SettingsPage', () => {
     expect(exportButton()).toBeEnabled();
   });
 
-  it('enables the restore again when the export download is cut', async () => {
+  it('says the export can be tried again, and enables the restore again, when its download is cut', async () => {
     const downloads = mockDownload();
     const download = holdExportDownload();
     await renderLoadedPage();
@@ -620,7 +630,8 @@ describe('SettingsPage', () => {
 
     download.fail();
 
-    expect(await screen.findByText('Connection lost')).toBeInTheDocument();
+    expect(await screen.findByText(EXPORT_NO_ANSWER)).toBeInTheDocument();
+    expect(screen.queryByText(/network error/i)).not.toBeInTheDocument();
     expect(restoreButton()).toBeEnabled();
     expect(exportButton()).toBeEnabled();
     expect(downloads).toEqual([]);

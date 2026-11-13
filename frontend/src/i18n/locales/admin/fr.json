@@ -406,6 +406,7 @@
       "confirmRestore": "Cela remplacera TOUTES les données actuelles (base de données et images). Cette action est irréversible. Continuer ?",
       "exportSuccess": "Sauvegarde exportée avec succès",
       "exportTimeout": "La préparation de la sauvegarde a pris trop de temps : le proxy placé devant le serveur a cessé d'attendre. Un nouvel essai tout de suite échouera sans doute de la même façon. Réessayez plus tard, quand le serveur est moins occupé. Si l'échec se répète, consultez les journaux du backend et le délai d'attente du proxy inverse placé devant Carta Cocktail, s'il y en a un.",
+      "exportNoAnswer": "La connexion au serveur a été coupée avant la fin du téléchargement de la sauvegarde. L'export ne modifie rien sur le serveur : vérifiez votre connexion et réessayez.",
       "importSuccess": "Sauvegarde restaurée avec succès. La page va se recharger.",
       "importDone": "Sauvegarde restaurée.",
       "restoreTimeout": "Le serveur n'a pas répondu à temps, mais la restauration est peut-être encore en cours.",
