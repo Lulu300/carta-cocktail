@@ -412,6 +412,8 @@ async function replaceLiveData(zipPath: string): Promise<RestoreResult> {
  * Two restores at once replace the same database file and move the same upload
  * entries: one could roll back over the other, which would still report success.
  * A single backend process serves the API, so a flag in memory is enough.
+ * A restore that never settles (a hung Prisma call) keeps the flag until the
+ * backend restarts: every later restore gets the 409 until then.
  */
 let restoreInProgress = false;
 

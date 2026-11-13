@@ -520,8 +520,8 @@ describe('backup restore', () => {
 });
 
 describe('concurrent backup restores', () => {
-  const IN_PROGRESS_EN = 'A backup restore is already in progress: wait for it to finish, then reload the page';
-  const IN_PROGRESS_FR = 'Une restauration de sauvegarde est déjà en cours : attendez qu’elle se termine, puis rechargez la page';
+  const IN_PROGRESS_EN = 'A backup restore is already in progress: wait for it to finish, then reload the page and sign in again (the restore ends every session)';
+  const IN_PROGRESS_FR = 'Une restauration de sauvegarde est déjà en cours : attendez qu’elle se termine, puis rechargez la page et reconnectez-vous (la restauration ferme toutes les sessions)';
   // multer's default file name in its `dest` folder
   const MULTER_FILE_NAME = /^[0-9a-f]{32}$/;
 
