@@ -406,6 +406,7 @@
       "confirmRestore": "This will replace ALL current data (database and images). This action cannot be undone. Continue?",
       "exportSuccess": "Backup exported successfully",
       "exportTimeout": "Preparing the backup took too long: the proxy in front of the server stopped waiting. Trying again right away will probably fail the same way. Try again later, when the server is less busy. If it keeps failing, check the backend logs and the timeout of any reverse proxy in front of Carta Cocktail.",
+      "exportNoAnswer": "The connection to the server was cut before the backup was fully downloaded. The export changes nothing on the server: check your connection and try again.",
       "importSuccess": "Backup restored successfully. The page will reload.",
       "importDone": "Backup restored.",
       "restoreTimeout": "The server did not answer in time, but the restore may still be running.",

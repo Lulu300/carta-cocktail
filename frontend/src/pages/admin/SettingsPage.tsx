@@ -28,19 +28,18 @@ function isGatewayTimeout(err: unknown): boolean {
   return err instanceof ApiError && err.status === GATEWAY_TIMEOUT;
 }
 
-/** What requestRestore resolves to when no HTTP answer arrived. */
+/** What orNoAnswer resolves to when the connection was lost. */
 const NO_ANSWER = Symbol('no answer');
 
 /**
- * Sends the restore, and resolves to NO_ANSWER when no HTTP answer arrives: fetch then rejects
- * with a TypeError, which send() passes on unchanged. On a long restore, the browser may give
- * up before nginx answers 504 (Firefox also waits 300 s), or a proxy in front may cut the
- * connection instead of answering. Only the request is checked: a TypeError while handling
- * an answer the server did send is a bug, not a lost connection.
+ * Runs a backup API call, and resolves to NO_ANSWER when the connection is lost: fetch rejects
+ * with a TypeError when no HTTP answer arrives, and so does reading a body cut mid-download.
+ * send() passes both on unchanged. Only the call is checked: a TypeError while handling what
+ * it returned is a bug, not a lost connection.
  */
-async function requestRestore(file: File): Promise<BackupRestoreResult | typeof NO_ANSWER> {
+async function orNoAnswer<T>(call: () => Promise<T>): Promise<T | typeof NO_ANSWER> {
   try {
-    return await backupApi.importBackup(file);
+    return await call();
   } catch (err: unknown) {
     if (err instanceof TypeError) return NO_ANSWER;
     throw err;
@@ -183,7 +182,13 @@ export default function SettingsPage() {
     setBackupError('');
     setBackupExporting(true);
     try {
-      await backupApi.exportBackup();
+      const result = await orNoAnswer(() => backupApi.exportBackup());
+      if (result === NO_ANSWER) {
+        // The browser's own text ("Failed to fetch", "network error") does not say that
+        // nothing changed on the server and that trying again is safe.
+        setBackupError(t('settings.backup.exportNoAnswer'));
+        return;
+      }
       setBackupMessage(t('settings.backup.exportSuccess'));
       // The report of an earlier restore no longer matches the latest message.
       // A failed export keeps it: the restart warning is often why it failed.
@@ -210,9 +215,11 @@ export default function SettingsPage() {
     setRestoreResult(null);
     setBackupImporting(true);
     try {
-      const result = await requestRestore(backupFile);
+      const result = await orNoAnswer(() => backupApi.importBackup(backupFile));
       if (result === NO_ANSWER) {
-        // Without an answer, the restore may be running as after a 504: the browser's own text
+        // On a long restore, the browser may give up before nginx answers 504 (Firefox also
+        // waits 300 s), or a proxy in front may cut the connection instead of answering.
+        // The restore may then be running as after a 504: the browser's own text
         // ("Failed to fetch") would not stop the admin from starting a second one.
         setBackupError(restoreMayStillRun('settings.backup.restoreNoAnswer'));
         return;
