@@ -2,18 +2,19 @@ import { Prisma } from '../generated/prisma/client';
 import { BadRequestError } from '../errors';
 import { RequiredText } from '../validation/common';
 import { toValidationIssue } from '../validation/validate';
-import { replaceInvisibleCharacters } from '../utils/invisibleCharacters';
+import { tidyName } from '../utils/invisibleCharacters';
 
 type Db = Prisma.TransactionClient;
 
 /**
  * The name a new category type is stored under: without the characters HTML draws as nothing
- * (zero-width space, soft hyphen…), without spaces around it, and with every run of whitespace
- * inside it reduced to one space. HTML shows 'X\u200BY' exactly like 'XY', and 'X  Y' like 'X Y',
- * so two types that differ only there could not be told apart.
+ * (zero-width space, soft hyphen…), without spaces around it, and with every run of spaces inside
+ * it reduced to one space, blank characters such as the braille pattern blank included. HTML shows
+ * 'X\u200BY' exactly like 'XY', and 'X  Y' like 'X Y', so two types that differ only there could not
+ * be told apart.
  */
 export function newCategoryTypeName(name: string): string {
-  return replaceInvisibleCharacters(name, () => '').trim().replace(/\s+/g, ' ');
+  return tidyName(name);
 }
 
 /**

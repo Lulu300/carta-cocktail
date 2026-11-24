@@ -32,7 +32,11 @@ describe('newCategoryTypeName', () => {
     ['\u200B X \u200B Y \u200E', 'X Y'],
     ['\u202ERUM\u202C', 'RUM'],
     ['\u200B\u00AD \uFEFF', ''],
-  ])('should remove the invisible characters of %j: %j', (name, expected) => {
+    ['\u2800SPIRIT\u3164', 'SPIRIT'],
+    ['X\u2800\u2800Y', 'X Y'],
+    ['\u2800', ''],
+    ['梅\u200D酒', '梅酒'],
+  ])('should remove the invisible characters and reduce the blank ones of %j: %j', (name, expected) => {
     expect(newCategoryTypeName(name)).toBe(expected);
   });
 

@@ -226,6 +226,27 @@ describe('CategoriesPage', () => {
       expect(await created.body).toMatchObject({ type: 'MIXER' });
     });
 
+    // A custom type is tidied as the backend stores it
+    it('does not send a custom type of invisible or blank characters, and sends a typed one tidied', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const created = captureRequest('post', '/api/categories');
+      await user.click(screen.getByRole('button', { name: 'categories.add' }));
+
+      await user.type(within(categoryDialog()).getByLabelText(/categories\.name/), 'Tonic');
+      await user.selectOptions(within(categoryDialog()).getByLabelText('categories.type'), '__OTHER__');
+      const customType = within(categoryDialog()).getByPlaceholderText('categories.customType');
+      await user.type(customType, '\u200B\u2800');
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
+
+      expect(created.count()).toBe(0);
+      expect(customType).toHaveAccessibleDescription('categories.typeRequired');
+
+      await user.type(customType, 'mi\u200Bxer');
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
+      expect(await created.body).toMatchObject({ type: 'MIXER' });
+    });
+
     it('sends a single request on a fast double click on save', async () => {
       const user = userEvent.setup();
       mockApiPending('post', '/api/categories');
@@ -540,6 +561,18 @@ describe('CategoriesPage', () => {
       const manager = await openTypesManager(user);
 
       await user.type(within(manager).getByPlaceholderText('GARNISH, MIXER...'), '  ');
+      await user.click(within(manager).getByRole('button', { name: 'common.create' }));
+
+      expect(created.count()).toBe(0);
+    });
+
+    it('does not create a type whose name is only invisible or blank characters', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const created = captureRequest('post', '/api/category-types');
+      const manager = await openTypesManager(user);
+
+      await user.type(within(manager).getByPlaceholderText('GARNISH, MIXER...'), '\u200B\u2800');
       await user.click(within(manager).getByRole('button', { name: 'common.create' }));
 
       expect(created.count()).toBe(0);

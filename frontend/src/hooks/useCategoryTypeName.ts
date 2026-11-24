@@ -1,17 +1,17 @@
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from './useLocalizedName';
-import { replaceInvisibleCharacters } from '../utils/invisibleCharacters';
+import { replaceInvisibleCharacters, SPACE_LIKE } from '../utils/invisibleCharacters';
 import type { CategoryType } from '../types';
 
 /** Shown in place of each space HTML would hide. */
 const VISIBLE_SPACE = '␣';
 
 /**
- * The whitespace HTML hides or shows as one plain space: spaces around the name, runs of two or
- * more inside it, and any whitespace other than a space (a tab, a line break).
+ * The spaces HTML hides or shows as one plain space: spaces around the name, runs of two or more
+ * inside it, and any space other than a plain one (a tab, a line break, a braille pattern blank).
  */
-const HIDDEN_SPACES = /^\s+|\s+$|\s{2,}|[^\S ]/g;
+const HIDDEN_SPACES = new RegExp(String.raw`^${SPACE_LIKE}+|${SPACE_LIKE}+$|${SPACE_LIKE}{2,}|(?! )${SPACE_LIKE}`, 'gu');
 
 /** Shown in place of a character HTML draws as nothing: its code point, which names it. */
 function codePointLabel(char: string): string {
@@ -25,8 +25,8 @@ function hasInvisibleCharacters(name: string): boolean {
 
 /**
  * Data older than v1.9.0 can hold a type named ' SPIRIT ' next to 'SPIRIT', or a type with an
- * empty name, and data older than v1.15.0 a type named 'X  Y' next to 'X Y', or 'X\u200BY' (with a
- * zero-width space) next to 'XY'. HTML shows the spaced names and the names with an invisible
+ * empty name, and data older than v1.15.0 a type named 'X  Y' or 'X\u2800Y' (braille pattern
+ * blank) next to 'X Y', or 'X\u200BY' (with a zero-width space) next to 'XY'. HTML shows the spaced names and the names with an invisible
  * character exactly like the others, and the empty one as nothing.
  */
 function isHiddenByHtml(name: string): boolean {

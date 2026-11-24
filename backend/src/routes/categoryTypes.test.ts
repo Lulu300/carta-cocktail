@@ -113,7 +113,7 @@ describe('POST /api/category-types', () => {
 
   it('should return 400 for a name of invisible characters, and create nothing', async () => {
     const typeCount = await prisma.categoryType.count();
-    const res = await request.post('/api/category-types').set(authHeader()).send({ name: '\u200B \u00AD' });
+    const res = await request.post('/api/category-types').set(authHeader()).send({ name: '\u200B \u2800\u00AD' });
     expect(res.status).toBe(400);
     expect(res.body).toMatchObject({ error: 'Validation error', details: [{ path: 'body.name', code: 'too_small' }] });
     expect(await prisma.categoryType.count()).toBe(typeCount);

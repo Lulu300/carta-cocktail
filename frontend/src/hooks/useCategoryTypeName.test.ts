@@ -43,13 +43,23 @@ describe('useCategoryTypeName', () => {
       expect(renderNames().visibleName('X\uFEFFY')).toBe(`X[U+FEFF]Y ${WITH_INVISIBLE}`);
     });
 
+    it('shows the characters fonts draw as a blank as spaces', () => {
+      const { visibleName } = renderNames();
+      expect(visibleName('X\u2800Y')).toBe(`X␣Y ${WITH_SPACES}`);
+      expect(visibleName('\u3164SPIRIT\uFFA0')).toBe(`␣SPIRIT␣ ${WITH_SPACES}`);
+    });
+
+    it('marks a joiner between letters of a script that does not join', () => {
+      expect(renderNames().visibleName('梅\u200D酒')).toBe(`梅[U+200D]酒 ${WITH_INVISIBLE}`);
+    });
+
     it('announces both hidden spaces and invisible characters', () => {
       expect(renderNames().visibleName(' X\u200BY')).toBe(`␣X[U+200B]Y ${WITH_SPACES} ${WITH_INVISIBLE}`);
     });
 
     it('keeps the joiners and variation selectors that change how a name is drawn', () => {
       const { visibleName } = renderNames();
-      const names = ['CRÈME', 'می\u200Cخواهم', 'क्\u200Dष', '👩\u200D💻', '❤\uFE0F'];
+      const names = ['CRÈME', 'می\u200Cخواهم', 'क\u094D\u200Dष', 'ന\u0D4D\u200D', '👩\u200D💻', '❤\uFE0F'];
       expect(names.map(visibleName)).toEqual(names);
     });
   });

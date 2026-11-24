@@ -1296,6 +1296,8 @@ describe('POST /api/bottles/import/confirm', () => {
 
     it.each([
       ['a blank new type', '   '],
+      ['a new type of invisible characters', '\u200B\u00AD'],
+      ['a new type of blank characters', '\u2800 \u3164'],
       // A category needs a type, even when a type has the empty name: the category form refuses it too
       ['the empty name, even when a type has it', ''],
     ])('should return 400 for %s, pointing at its resolution, and import nothing', async (_case, type) => {
