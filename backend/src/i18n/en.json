@@ -91,6 +91,8 @@
     "deleted": "Menu deleted successfully"
   },
   "menuBottles": {
+    "added": "Bottles added to the menu",
+    "removed": "Bottles removed from the menu",
     "deleted": "Bottle removed from the menu",
     "updated": "Bottles updated",
     "synced": "Menu synchronized with the bottles",

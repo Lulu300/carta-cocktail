@@ -339,6 +339,194 @@ describe('PUT /api/menu-bottles/menu/:menuId/entries', () => {
   });
 });
 
+describe('POST /api/menu-bottles/menu/:menuId/entries', () => {
+  it('should add several bottles at the end of a personal menu in one request, in the order given', async () => {
+    const menu = await seedMenu({ type: 'APEROS' });
+    const listed = await seedBottle({ isApero: true });
+    await addBottleToMenu(menu.id, listed.id, { position: 4 });
+    const [first, second] = [await seedBottle({ isApero: true }), await seedBottle({ isApero: true, remainingPercent: 0 })];
+
+    const res = await request.post(`/api/menu-bottles/menu/${menu.id}/entries`).set(authHeader())
+      .send({ bottleIds: [second.id, first.id] });
+
+    expect(res.status).toBe(201);
+    expect(res.body.message).toBe('Bottles added to the menu');
+    expect(await bottleIdsOf(menu.id)).toEqual([listed.id, second.id, first.id]);
+    const added = await prisma.menuBottle.findMany({ where: { bottleId: { in: [first.id, second.id] } } });
+    expect(added.map((entry) => entry.position).sort()).toEqual([5, 6]);
+    expect(added.every((entry) => !entry.isHidden && entry.menuSectionId === null)).toBe(true);
+  });
+
+  it('should add a bottle removed from the system menu of the same type', async () => {
+    const aperitifs = await findSystemMenu('aperitifs');
+    const menu = await seedMenu({ type: 'APEROS' });
+    const bottle = await seedBottle({ isApero: true });
+    await excludeBottleFromMenu(aperitifs.id, bottle.id);
+
+    const res = await request.post(`/api/menu-bottles/menu/${menu.id}/entries`).set(authHeader())
+      .send({ bottleIds: [bottle.id] });
+
+    expect(res.status).toBe(201);
+    expect(await bottleIdsOf(menu.id)).toEqual([bottle.id]);
+    expect(await excludedIdsOf(aperitifs.id)).toEqual([bottle.id]);
+  });
+
+  it('should answer in French', async () => {
+    const menu = await seedMenu({ type: 'DIGESTIFS' });
+    const bottle = await seedBottle({ isDigestif: true });
+    const res = await request.post(`/api/menu-bottles/menu/${menu.id}/entries`).set(authHeader())
+      .set('Accept-Language', 'fr').send({ bottleIds: [bottle.id] });
+    expect(res.body.message).toBe('Bouteilles ajoutées à la carte');
+  });
+
+  it('should accept a bottle listed twice', async () => {
+    const menu = await seedMenu({ type: 'APEROS' });
+    const bottle = await seedBottle({ isApero: true });
+    const res = await request.post(`/api/menu-bottles/menu/${menu.id}/entries`).set(authHeader())
+      .send({ bottleIds: [bottle.id, bottle.id] });
+    expect(res.status).toBe(201);
+    expect(await bottleIdsOf(menu.id)).toEqual([bottle.id]);
+  });
+
+  it('should return 400 and add nothing when one bottle is not checked for the menu type', async () => {
+    const menu = await seedMenu({ type: 'APEROS' });
+    const apero = await seedBottle({ isApero: true });
+    const digestif = await seedBottle({ isDigestif: true });
+
+    const res = await request.post(`/api/menu-bottles/menu/${menu.id}/entries`).set(authHeader())
+      .send({ bottleIds: [apero.id, digestif.id] });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/only bottles checked for the menu's type/);
+    expect(await bottleIdsOf(menu.id)).toEqual([]);
+  });
+
+  it('should return 409 and add nothing when one bottle is already in the menu', async () => {
+    const menu = await seedMenu({ type: 'APEROS' });
+    const [listed, other] = [await seedBottle({ isApero: true }), await seedBottle({ isApero: true })];
+    await addBottleToMenu(menu.id, listed.id);
+
+    const res = await request.post(`/api/menu-bottles/menu/${menu.id}/entries`).set(authHeader())
+      .send({ bottleIds: [other.id, listed.id] });
+
+    expect(res.status).toBe(409);
+    expect(await bottleIdsOf(menu.id)).toEqual([listed.id]);
+  });
+
+  it('should return 400 for a system menu, whose bottles follow their flags', async () => {
+    const aperitifs = await findSystemMenu('aperitifs');
+    const bottle = await seedBottle({ isApero: true });
+    await excludeBottleFromMenu(aperitifs.id, bottle.id);
+
+    const res = await request.post(`/api/menu-bottles/menu/${aperitifs.id}/entries`).set(authHeader())
+      .send({ bottleIds: [bottle.id] });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/follow their aperitif/);
+    expect(await bottleIdsOf(aperitifs.id)).toEqual([]);
+  });
+
+  it('should return 400 for a cocktail menu', async () => {
+    const menu = await seedMenu({ type: 'COCKTAILS' });
+    const bottle = await seedBottle({ isApero: true });
+    const res = await request.post(`/api/menu-bottles/menu/${menu.id}/entries`).set(authHeader())
+      .send({ bottleIds: [bottle.id] });
+    expect(res.status).toBe(400);
+  });
+
+  it('should return 404 for an unknown menu', async () => {
+    const bottle = await seedBottle({ isApero: true });
+    const res = await request.post('/api/menu-bottles/menu/9999/entries').set(authHeader())
+      .send({ bottleIds: [bottle.id] });
+    expect(res.status).toBe(404);
+  });
+
+  it('should return 400 for an empty list of bottles', async () => {
+    const menu = await seedMenu({ type: 'APEROS' });
+    const res = await request.post(`/api/menu-bottles/menu/${menu.id}/entries`).set(authHeader())
+      .send({ bottleIds: [] });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('body.bottleIds');
+  });
+});
+
+describe('POST /api/menu-bottles/menu/:menuId/entries/remove', () => {
+  it('should remove several entries of a personal menu in one request, without exclusion', async () => {
+    const menu = await seedMenu({ type: 'APEROS' });
+    const [a, b, c] = [await seedBottle({ isApero: true }), await seedBottle({ isApero: true }), await seedBottle({ isApero: true })];
+    const entryA = await addBottleToMenu(menu.id, a.id, { position: 0 });
+    await addBottleToMenu(menu.id, b.id, { position: 1 });
+    const entryC = await addBottleToMenu(menu.id, c.id, { position: 2 });
+
+    const res = await request.post(`/api/menu-bottles/menu/${menu.id}/entries/remove`).set(authHeader())
+      .send({ ids: [entryA.id, entryC.id] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Bottles removed from the menu');
+    expect(await bottleIdsOf(menu.id)).toEqual([b.id]);
+    expect(await prisma.menuBottleExclusion.count()).toBe(0);
+  });
+
+  it('should answer in French', async () => {
+    const menu = await seedMenu({ type: 'APEROS' });
+    const entry = await addBottleToMenu(menu.id, (await seedBottle({ isApero: true })).id);
+    const res = await request.post(`/api/menu-bottles/menu/${menu.id}/entries/remove`).set(authHeader())
+      .set('Accept-Language', 'fr').send({ ids: [entry.id] });
+    expect(res.body.message).toBe('Bouteilles retirées de la carte');
+  });
+
+  it('should exclude the bottles from a system menu, as the removal of one entry does', async () => {
+    const aperitifs = await findSystemMenu('aperitifs');
+    const [a, b] = [await seedBottle({ isApero: true }), await seedBottle({ isApero: true })];
+    const entryA = await addBottleToMenu(aperitifs.id, a.id, { position: 0 });
+    await addBottleToMenu(aperitifs.id, b.id, { position: 1 });
+
+    const res = await request.post(`/api/menu-bottles/menu/${aperitifs.id}/entries/remove`).set(authHeader())
+      .send({ ids: [entryA.id] });
+
+    expect(res.status).toBe(200);
+    expect(await bottleIdsOf(aperitifs.id)).toEqual([b.id]);
+    expect(await excludedIdsOf(aperitifs.id)).toEqual([a.id]);
+  });
+
+  it('should return 404 for an entry of another menu and remove nothing', async () => {
+    const menu = await seedMenu({ type: 'APEROS' });
+    const other = await seedMenu({ type: 'APEROS' });
+    const own = await addBottleToMenu(menu.id, (await seedBottle({ isApero: true })).id);
+    const foreign = await addBottleToMenu(other.id, (await seedBottle({ isApero: true })).id);
+
+    const res = await request.post(`/api/menu-bottles/menu/${menu.id}/entries/remove`).set(authHeader())
+      .send({ ids: [own.id, foreign.id] });
+
+    expect(res.status).toBe(404);
+    expect(await bottleIdsOf(menu.id)).toEqual([own.bottleId]);
+    expect(await bottleIdsOf(other.id)).toEqual([foreign.bottleId]);
+  });
+
+  it('should accept an id listed twice', async () => {
+    const menu = await seedMenu({ type: 'APEROS' });
+    const entry = await addBottleToMenu(menu.id, (await seedBottle({ isApero: true })).id);
+    const res = await request.post(`/api/menu-bottles/menu/${menu.id}/entries/remove`).set(authHeader())
+      .send({ ids: [entry.id, entry.id] });
+    expect(res.status).toBe(200);
+    expect(await bottleIdsOf(menu.id)).toEqual([]);
+  });
+
+  it('should return 404 for an unknown menu', async () => {
+    const res = await request.post('/api/menu-bottles/menu/9999/entries/remove').set(authHeader())
+      .send({ ids: [1] });
+    expect(res.status).toBe(404);
+  });
+
+  it('should return 400 for an empty list of entries', async () => {
+    const menu = await seedMenu({ type: 'APEROS' });
+    const res = await request.post(`/api/menu-bottles/menu/${menu.id}/entries/remove`).set(authHeader())
+      .send({ ids: [] });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('body.ids');
+  });
+});
+
 describe('POST /api/menu-bottles/menu/:menuId/reorder', () => {
   /** A personal menu with three bottles at positions 0, 1, 2. */
   async function seedMenuWithBottles() {
