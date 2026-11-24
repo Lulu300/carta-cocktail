@@ -138,17 +138,35 @@ export function replaceInvisibleCharacters(text: string, replacement: (char: str
  * text, and renderers draw them alike. Not the compatibility form (NFKC), which changes characters
  * that are drawn differently: the 'ﬁ' ligature, 'CO₂', full-width 'ＶＯＤＫＡ', half-width kana, or
  * Hangul compatibility jamo, which it joins into syllables ('ㄱㅏ' becomes '가').
+ * NFC also decomposes the characters Unicode excludes from composition, drawn the same either way:
+ * the Devanagari, Bengali and Gurmukhi nukta letters ('क़' becomes 'क\u093C'), the Hebrew
+ * presentation forms and the CJK compatibility ideographs.
  */
 export function composeName(name: string): string {
   return name.normalize('NFC');
 }
 
 /**
+ * Without invisible characters, and composed. Each step can undo the other: removing a character
+ * can bring a letter next to its accent ('E\u200B\u0300'), and composing changes the character
+ * before a joiner, which the joiner rule looks at ('E\u0308\u200D' becomes 'Ë\u200D', a joiner
+ * after a Latin letter). So both are repeated until the text stops changing; each pass that changes
+ * it removes at least one character, so the loop ends.
+ */
+function removeInvisibleAndCompose(name: string): string {
+  let current = composeName(name);
+  for (;;) {
+    const next = composeName(replaceInvisibleCharacters(current, () => ''));
+    if (next === current) return current;
+    current = next;
+  }
+}
+
+/**
  * A typed name as the admin can tell it apart from the others: without invisible characters, in
  * the composed form, without spaces around it, and with every run of spaces inside it reduced to
- * one space. Composed after the invisible characters are removed, which can bring a letter next to
- * its accent ('E\u200B\u0300').
+ * one space. Tidying a tidy name changes nothing.
  */
 export function tidyName(name: string): string {
-  return composeName(replaceInvisibleCharacters(name, () => '')).replace(SPACE_RUNS, ' ').trim();
+  return removeInvisibleAndCompose(name).replace(SPACE_RUNS, ' ').trim();
 }

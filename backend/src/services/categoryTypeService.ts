@@ -35,9 +35,9 @@ export function requireNewCategoryTypeName(name: string, path: PropertyKey[]): s
  * A category may name a type that does not exist yet: it is created, in gray,
  * before the category, which the foreign key ties to an existing type.
  * A name that matches an existing type exactly keeps that type as it is, spaces, invisible
- * characters and decomposed letters included (older data can hold 'X  Y', ' SPIRIT ', 'X\u200BY' or
- * 'E\u0300'). Any other name is
- * tidied first, so it may match a type that already has the tidy form.
+ * characters and decomposed letters included (older data can hold 'X  Y', ' SPIRIT ', 'X\u200BY'
+ * or 'E\u0300'). Any other name is tidied first, so it may match a type that already has the tidy
+ * form.
  * Returns the name of the type the category goes under.
  * `typePath` is where the request sent the name: a blank new name is refused with a 400 that
  * points there, like the other issues of the request. The default is the category routes' own.

@@ -122,24 +122,37 @@ describe('composeName', () => {
   });
 });
 
+const TIDY_CASES: [string, string][] = [
+  ['JUICE', 'JUICE'],
+  [' FRUIT \t\n JUICE ', 'FRUIT JUICE'],
+  ['\u200B X \u200B Y \u200E', 'X Y'],
+  ['X\uFEFFY', 'XY'],
+  ['X\u2800Y', 'X Y'],
+  ['\u2800SPIRIT\u3164', 'SPIRIT'],
+  ['X \u2800\uFFA0 Y', 'X Y'],
+  ['\u2800\u200B \u3164', ''],
+  ['梅\u200D酒', '梅酒'],
+  ['می\u200Cخواهم', 'می\u200Cخواهم'],
+  ['CRE\u0300ME', 'CR\u00C8ME'],
+  [' CRE\u0300ME  DE\u200B CASSIS ', 'CR\u00C8ME DE CASSIS'],
+  // The accent is composed with its letter once the invisible character between them is gone
+  ['CRE\u200B\u0300ME', 'CR\u00C8ME'],
+  ['\uFB01NO', '\uFB01NO'],
+  // Composing changes the character before a joiner: the joiner rule is applied again after it
+  ['E\u0308\u200DX', '\u00CBX'],
+  ['e\u0308\u200C\u0915', '\u00EB\u0915'],
+  ['E\u200B\u0308\u200D', '\u00CB'],
+];
+
 describe('tidyName', () => {
-  it.each([
-    ['JUICE', 'JUICE'],
-    [' FRUIT \t\n JUICE ', 'FRUIT JUICE'],
-    ['\u200B X \u200B Y \u200E', 'X Y'],
-    ['X\uFEFFY', 'XY'],
-    ['X\u2800Y', 'X Y'],
-    ['\u2800SPIRIT\u3164', 'SPIRIT'],
-    ['X \u2800\uFFA0 Y', 'X Y'],
-    ['\u2800\u200B \u3164', ''],
-    ['梅\u200D酒', '梅酒'],
-    ['می\u200Cخواهم', 'می\u200Cخواهم'],
-    ['CRE\u0300ME', 'CR\u00C8ME'],
-    [' CRE\u0300ME  DE\u200B CASSIS ', 'CR\u00C8ME DE CASSIS'],
-    // The accent is composed with its letter once the invisible character between them is gone
-    ['CRE\u200B\u0300ME', 'CR\u00C8ME'],
-    ['\uFB01NO', '\uFB01NO'],
-  ])('should tidy %j as %j', (name, expected) => {
+  it.each(TIDY_CASES)('should tidy %j as %j', (name, expected) => {
     expect(tidyName(name)).toBe(expected);
+  });
+
+  // A tidy name is stored as it is and never marked: tidying it again changes nothing
+  it.each(TIDY_CASES)('should leave nothing to tidy in the tidy form of %j', (name) => {
+    const tidy = tidyName(name);
+    expect(tidyName(tidy)).toBe(tidy);
+    expect(removeInvisible(tidy)).toBe(tidy);
   });
 });
