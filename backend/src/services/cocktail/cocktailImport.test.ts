@@ -70,6 +70,15 @@ describe('previewImport', () => {
     expect(preview.categories[0]).toMatchObject({ status: 'matched', existingMatch: { id: category.id, name: 'Rum' } });
   });
 
+  it('should send the translations of an existing match as an object', async () => {
+    await seedCategory({ name: 'Rum', nameTranslations: JSON.stringify({ fr: 'Rhum' }) });
+
+    const preview = await previewImport(recipe([
+      { sourceType: 'CATEGORY', sourceName: 'rum', quantity: 4, unit: { abbreviation: 'cl' } },
+    ]));
+    expect(preview.categories[0].existingMatch).toMatchObject({ name: 'Rum', nameTranslations: { fr: 'Rhum' } });
+  });
+
   it('should not list the preferred bottles of a line that is not a category line', async () => {
     const preview = await previewImport(recipe([
       { ...rumBottleLine, preferredBottles: [{ name: 'Diplomatico' }] },

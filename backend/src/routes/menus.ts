@@ -7,6 +7,7 @@ import { valid, validate } from '../validation/validate';
 import { IdParams, idRequest } from '../validation/common';
 import { MenuCreate, MenuUpdate } from '../validation/menus';
 import { assertBottlesAllowed, isSystemMenu } from '../services/menuSyncService';
+import { parseNameTranslations } from '../utils/translations';
 
 const router = Router();
 
@@ -82,7 +83,7 @@ router.get('/:id', validate(idRequest), async (_req: AuthRequest, res: Response)
     },
   });
   if (!menu) throw new NotFoundError();
-  res.json(menu);
+  res.json(parseNameTranslations(menu));
 });
 
 // Create menu
@@ -175,7 +176,7 @@ router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Respo
       },
     });
   });
-  res.json(menu);
+  res.json(parseNameTranslations(menu));
 });
 
 // Delete menu (prevent deletion of default apero/digestif menus)

@@ -73,6 +73,24 @@ describe('POST /api/units', () => {
     expect(res.body.nameTranslations).toEqual({ fr: 'Centilitre' });
   });
 
+  it.each([
+    ['a list', ['x']],
+    ['an unknown language', { de: 'x' }],
+  ])('should return 400 and store nothing for nameTranslations as %s', async (_label, nameTranslations) => {
+    const res = await request.post('/api/units').set(authHeader())
+      .send({ name: 'Centilitre', abbreviation: 'cl', nameTranslations });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toMatch(/^body\.nameTranslations/);
+    expect(await prisma.unit.count()).toBe(0);
+  });
+
+  it('should leave blank translations out', async () => {
+    const res = await request.post('/api/units').set(authHeader())
+      .send({ name: 'Centilitre', abbreviation: 'cl', nameTranslations: { fr: 'Centilitre', en: ' ' } });
+    expect(res.status).toBe(201);
+    expect(res.body.nameTranslations).toEqual({ fr: 'Centilitre' });
+  });
+
   it('should return 409 when the abbreviation exists, ignoring case', async () => {
     await seedUnit({ abbreviation: 'cl' });
     const res = await request.post('/api/units').set(authHeader())

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
   request, authHeader, prisma, seedCocktail, seedBottle, seedMenu, seedMenuSection, addCocktailToMenu,
-  addBottleToMenu,
+  addBottleToMenu, seedCategory,
 } from '../test/helpers';
 import type { MenuBottle, MenuCocktail } from '../generated/prisma/client';
 
@@ -38,6 +38,17 @@ describe('GET /api/menus/:id', () => {
     expect(res.body).toHaveProperty('sections');
     expect(res.body).toHaveProperty('cocktails');
     expect(res.body).toHaveProperty('bottles');
+  });
+
+  it('should return the translations of nested entities as objects', async () => {
+    const category = await seedCategory({ name: 'White rum', nameTranslations: JSON.stringify({ fr: 'Rhum blanc' }) });
+    const bottle = await seedBottle({ categoryId: category.id });
+    const menu = await seedMenu({ type: 'APEROS' });
+    await addBottleToMenu(menu.id, bottle.id);
+
+    const res = await request.get(`/api/menus/${menu.id}`).set(authHeader());
+    expect(res.status).toBe(200);
+    expect(res.body.bottles[0].bottle.category.nameTranslations).toEqual({ fr: 'Rhum blanc' });
   });
 });
 
@@ -118,6 +129,17 @@ describe('PUT /api/menus/:id', () => {
     expect(res.status).toBe(200);
     expect(res.body.cocktails).toHaveLength(1);
     expect(res.body.cocktails[0].cocktailId).toBe(cocktail.id);
+  });
+
+  it('should return the translations of nested entities as objects', async () => {
+    const category = await seedCategory({ name: 'White rum', nameTranslations: JSON.stringify({ fr: 'Rhum blanc' }) });
+    const bottle = await seedBottle({ categoryId: category.id });
+    const menu = await seedMenu({ type: 'APEROS' });
+    await addBottleToMenu(menu.id, bottle.id);
+
+    const res = await request.put(`/api/menus/${menu.id}`).set(authHeader()).send({ name: 'Renamed' });
+    expect(res.status).toBe(200);
+    expect(res.body.bottles[0].bottle.category.nameTranslations).toEqual({ fr: 'Rhum blanc' });
   });
 });
 

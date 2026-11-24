@@ -19,6 +19,14 @@ async function excludedIdsOf(menuId: number): Promise<number[]> {
   return exclusions.map((exclusion) => exclusion.bottleId);
 }
 
+/** An apero bottle whose category is translated, as the menu editors display it. */
+async function seedBottleOfTranslatedCategory() {
+  const category = await seedCategory({ name: 'White rum', nameTranslations: JSON.stringify({ fr: 'Rhum blanc' }) });
+  return seedBottle({ name: 'Havana 3', categoryId: category.id, isApero: true });
+}
+
+const TRANSLATED_CATEGORY = { fr: 'Rhum blanc' };
+
 describe('GET /api/menu-bottles/menu/:menuId', () => {
   it('should return bottles for a menu', async () => {
     const menu = await prisma.menu.findUnique({ where: { slug: 'aperitifs' } });
@@ -26,9 +34,24 @@ describe('GET /api/menu-bottles/menu/:menuId', () => {
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
   });
+
+  it('should return the category translations as an object', async () => {
+    const menu = await seedMenu({ type: 'APEROS' });
+    await addBottleToMenu(menu.id, (await seedBottleOfTranslatedCategory()).id);
+    const res = await request.get(`/api/menu-bottles/menu/${menu.id}`).set(authHeader());
+    expect(res.body[0].bottle.category.nameTranslations).toEqual(TRANSLATED_CATEGORY);
+  });
 });
 
 describe('POST /api/menu-bottles', () => {
+  it('should return the category translations as an object', async () => {
+    const menu = await seedMenu({ type: 'APEROS' });
+    const bottle = await seedBottleOfTranslatedCategory();
+    const res = await request.post('/api/menu-bottles').set(authHeader()).send({ menuId: menu.id, bottleId: bottle.id });
+    expect(res.status).toBe(201);
+    expect(res.body.bottle.category.nameTranslations).toEqual(TRANSLATED_CATEGORY);
+  });
+
   it('should return 400 if menuId is missing', async () => {
     const bottle = await seedBottle();
     const res = await request.post('/api/menu-bottles').set(authHeader())
@@ -135,6 +158,14 @@ describe('POST /api/menu-bottles', () => {
 });
 
 describe('PUT /api/menu-bottles/:id', () => {
+  it('should return the category translations as an object', async () => {
+    const menu = await seedMenu({ type: 'APEROS' });
+    const entry = await addBottleToMenu(menu.id, (await seedBottleOfTranslatedCategory()).id);
+    const res = await request.put(`/api/menu-bottles/${entry.id}`).set(authHeader()).send({ isHidden: true });
+    expect(res.status).toBe(200);
+    expect(res.body.bottle.category.nameTranslations).toEqual(TRANSLATED_CATEGORY);
+  });
+
   it('should update position and isHidden', async () => {
     const menu = await prisma.menu.findUnique({ where: { slug: 'aperitifs' } });
     const bottle = await seedBottle();
@@ -514,6 +545,14 @@ describe('GET /api/menu-bottles/menu/:menuId/exclusions', () => {
     expect(res.status).toBe(200);
     expect(res.body.map((exclusion: { bottle: { name: string } }) => exclusion.bottle.name)).toEqual(['Aperol', 'Spritz']);
     expect(res.body[0].bottle.category).toBeDefined();
+  });
+
+  it('should return the category translations as an object', async () => {
+    const aperitifs = await findSystemMenu('aperitifs');
+    await excludeBottleFromMenu(aperitifs.id, (await seedBottleOfTranslatedCategory()).id);
+    const res = await request.get(`/api/menu-bottles/menu/${aperitifs.id}/exclusions`).set(authHeader());
+    expect(res.status).toBe(200);
+    expect(res.body[0].bottle.category.nameTranslations).toEqual(TRANSLATED_CATEGORY);
   });
 
   it('should return an empty list for a personal menu', async () => {

@@ -2,19 +2,17 @@ import { Router, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { parseNameTranslations } from '../utils/translations';
+import { withCategoryType } from '../services/categoryTypeService';
 
 const router = Router();
 
 router.get('/', async (_req: AuthRequest, res: Response) => {
-  const categories = await prisma.category.findMany({
+  const categoryRows = await prisma.category.findMany({
     include: {
-      bottles: true,
+      bottles: { select: { remainingPercent: true } },
     },
   });
-
-  // Load category types for enrichment
-  const categoryTypes = await prisma.categoryType.findMany();
-  const typeMap = new Map(categoryTypes.map(ct => [ct.name, ct]));
+  const categories = await withCategoryType(categoryRows);
 
   const shortages = categories
     .map((category) => {
@@ -34,7 +32,7 @@ router.get('/', async (_req: AuthRequest, res: Response) => {
           name: category.name,
           nameTranslations: category.nameTranslations,
           type: category.type,
-          categoryType: typeMap.get(category.type) || null,
+          categoryType: category.categoryType,
           desiredStock: category.desiredStock,
           minimumPercent: category.minimumPercent,
         }),
