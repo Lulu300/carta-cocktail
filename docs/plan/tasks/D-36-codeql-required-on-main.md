@@ -5,13 +5,13 @@ phase: D
 lane: ci
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: mixed
 depends_on: [C-47, C-48]
 touches: []
 sources: []
 branch: chore/D-36-codeql-required-on-main
-pr:
+pr: "#191"
 ---
 
 ## Contexte
