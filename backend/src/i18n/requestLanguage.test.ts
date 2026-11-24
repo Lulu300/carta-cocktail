@@ -113,6 +113,15 @@ describe('request language', () => {
     expect(res.body.error).toBe(ENGLISH_MESSAGE);
   });
 
+  it('refuses a language that does not come through the detector (second guard: supportedLngs)', async () => {
+    // The instance of a request, as the middleware clones it, switched by code instead of detected
+    const requestInstance = i18next.cloneInstance({ initAsync: false });
+    await requestInstance.changeLanguage('de');
+
+    expect(requestInstance.language).toBe('en');
+    expect(requestInstance.t('errors.import.tooManyRows', { max: 5000 })).toBe(ENGLISH_MESSAGE);
+  });
+
   it('keeps no state for made-up languages, however many requests bring them', async () => {
     // Every language of the app once, so that the state below holds all it ever needs
     for (const language of ['en', 'en-GB', 'fr']) await request.get(`/?lng=${language}`);

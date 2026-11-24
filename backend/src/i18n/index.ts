@@ -32,11 +32,13 @@ i18next.use(middleware.LanguageDetector).init({
     en: { translation: en },
     fr: { translation: fr },
   },
-  // Every request is served one of these, even an unauthenticated one with a made-up language:
-  // i18next keeps state per language, and the numbers of a message are formatted in its language
-  // (`de` would get English text with `5.000`).
-  supportedLngs: [...SUPPORTED_LANGUAGES],
+  // The converter is what limits a request to SUPPORTED_LANGUAGES, even an unauthenticated one
+  // with a made-up language: i18next keeps state per language, and formats the numbers of a
+  // message in its language (`de` would get English text with `5.000`).
   detection: { convertDetectedLanguage: toSupportedLanguage },
+  // Second guard, for a language that does not come through the detector: a `changeLanguage()`
+  // or a `req.lng` set by code, or a converter changed by mistake. Also the frontend's setting.
+  supportedLngs: [...SUPPORTED_LANGUAGES],
   fallbackLng: FALLBACK_LANGUAGE,
   preload: ['en', 'fr'],
   // Messages go out as JSON and the frontend renders them as text: HTML-escaping
