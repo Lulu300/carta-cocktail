@@ -5,13 +5,13 @@ phase: E
 lane: ci
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: []
 touches: [scripts/smoke/custom-uid.sh]
 sources: []
-branch: ""
-pr: ""
+branch: fix/D-41-smoke-custom-uid-flaky
+pr: https://github.com/Lulu300/carta-cocktail/pull/197
 ---
 
 ## Contexte
@@ -34,7 +34,7 @@ FAIL: the refusal does not give the chown command for 4321:4321
 
 ## Critères d'acceptation
 
-- [ ] L'étape [1] ne dépend plus de l'ordre d'arrivée des lignes du refus dans les journaux.
+- [x] L'étape [1] ne dépend plus de l'ordre d'arrivée des lignes du refus dans les journaux.
 
 ## Tests à ajouter ou adapter
 
@@ -47,3 +47,4 @@ FAIL: the refusal does not give the chown command for 4321:4321
 ## Journal
 
 - 2026-11-13 : tâche créée pendant E-48.
+- 2026-11-24 : traitée avec D-37 et D-41 dans la PR #197 : chaque ligne attendue du refus est attendue à son tour (voir D-37). Sonde : une image du backend avec `sleep 3` après la ligne `ERROR:` de `refuse_unwritable` fait échouer l'ancien script (« does not give the chown command ») et passe avec le nouveau. Message de refus inchangé.
