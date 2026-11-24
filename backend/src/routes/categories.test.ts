@@ -41,10 +41,9 @@ describe('GET /api/categories', () => {
     expect(res.body[0].categoryType.color).toBe('blue');
   });
 
-  it('should return a null categoryType for a type without its row', async () => {
-    await seedCategory({ name: 'Vodka', type: 'MISSING' });
-    const res = await request.get('/api/categories').set(authHeader());
-    expect(res.body[0].categoryType).toBeNull();
+  it('should refuse, in the database, a category whose type does not exist', async () => {
+    await expect(seedCategory({ name: 'Vodka', type: 'MISSING' })).rejects.toMatchObject({ code: 'P2003' });
+    expect(await prisma.category.count()).toBe(0);
   });
 });
 
@@ -63,6 +62,20 @@ describe('GET /api/categories/:id', () => {
     expect(res.body.name).toBe('Rum');
     expect(res.body.bottles).toHaveLength(1);
     expect(res.body.bottles[0].name).toBe('Havana Club');
+  });
+
+  it('should include its type with parsed translations', async () => {
+    await prisma.categoryType.update({
+      where: { name: 'SPIRIT' },
+      data: { nameTranslations: JSON.stringify({ fr: 'Alcool', en: 'Spirit' }) },
+    });
+    const cat = await seedCategory({ name: 'Rum', type: 'SPIRIT' });
+
+    const res = await request.get(`/api/categories/${cat.id}`).set(authHeader());
+    expect(res.status).toBe(200);
+    expect(res.body.categoryType).toEqual({
+      name: 'SPIRIT', color: 'blue', nameTranslations: { fr: 'Alcool', en: 'Spirit' },
+    });
   });
 });
 

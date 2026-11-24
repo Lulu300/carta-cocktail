@@ -103,6 +103,20 @@ describe('PUT /api/category-types/:name', () => {
   });
 });
 
+describe('Renaming a category type', () => {
+  // The API has no rename: the name is the key. The foreign key cascades a rename
+  // made in the database to the categories of the type.
+  it('should move its categories to the new name', async () => {
+    const rum = await seedCategory({ name: 'Rum', type: 'SPIRIT' });
+    const grenadine = await seedCategory({ name: 'Grenadine', type: 'SYRUP' });
+
+    await prisma.categoryType.update({ where: { name: 'SPIRIT' }, data: { name: 'LIQUOR' } });
+
+    expect(await prisma.category.findUniqueOrThrow({ where: { id: rum.id } })).toMatchObject({ type: 'LIQUOR' });
+    expect(await prisma.category.findUniqueOrThrow({ where: { id: grenadine.id } })).toMatchObject({ type: 'SYRUP' });
+  });
+});
+
 describe('DELETE /api/category-types/:name', () => {
   it('should return a translated 409 if type is in use', async () => {
     await seedCategory({ type: 'SPIRIT' });
@@ -110,6 +124,11 @@ describe('DELETE /api/category-types/:name', () => {
     expect(res.status).toBe(409);
     expect(res.body).toEqual({ error: 'Impossible de supprimer : des catégories utilisent encore ce type' });
     expect(await prisma.categoryType.findUnique({ where: { name: 'SPIRIT' } })).not.toBeNull();
+  });
+
+  it('should be refused by the database too when the route check is bypassed', async () => {
+    await seedCategory({ type: 'SPIRIT' });
+    await expect(prisma.categoryType.delete({ where: { name: 'SPIRIT' } })).rejects.toMatchObject({ code: 'P2003' });
   });
 
   it('should delete unused type', async () => {

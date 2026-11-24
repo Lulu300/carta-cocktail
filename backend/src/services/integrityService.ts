@@ -38,7 +38,7 @@ export interface IntegrityIssues {
   duplicateCocktailNames: DuplicateGroup[];
   /** Recipe lines whose source (bottle, category or ingredient) is missing: the cocktail is never available. */
   invalidIngredientLines: InvalidIngredientLine[];
-  /** Category types that have no CategoryType row. */
+  /** Category types that have no CategoryType row. Not blocking: the category_type_relation migration creates them. */
   unknownCategoryTypes: string[];
   /** Rows pointing to a row that no longer exists (only possible if foreign keys were disabled). */
   foreignKeyViolations: ForeignKeyViolation[];
@@ -114,7 +114,7 @@ const LABELS: Record<keyof IntegrityIssues, string> = {
   duplicateUnitAbbreviations: 'Duplicate unit abbreviations, ignoring case (blocking)',
   duplicateCocktailNames: 'Duplicate cocktail names, ignoring case (allowed)',
   invalidIngredientLines: 'Recipe lines without their bottle, category or ingredient',
-  unknownCategoryTypes: 'Category types missing from CategoryType',
+  unknownCategoryTypes: 'Category types missing from CategoryType (created by the migration)',
   foreignKeyViolations: 'Rows referencing a missing row',
 };
 

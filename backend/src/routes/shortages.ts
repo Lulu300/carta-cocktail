@@ -2,17 +2,16 @@ import { Router, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { parseNameTranslations } from '../utils/translations';
-import { withCategoryType } from '../services/categoryTypeService';
 
 const router = Router();
 
 router.get('/', async (_req: AuthRequest, res: Response) => {
-  const categoryRows = await prisma.category.findMany({
+  const categories = await prisma.category.findMany({
     include: {
       bottles: { select: { remainingPercent: true } },
+      categoryType: true,
     },
   });
-  const categories = await withCategoryType(categoryRows);
 
   const shortages = categories
     .map((category) => {

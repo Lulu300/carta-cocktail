@@ -19,18 +19,6 @@ async function main() {
       create: ct,
     });
   }
-  // Sync: auto-create CategoryType for any existing custom types in categories
-  const existingCatTypes = await prisma.category.findMany({
-    select: { type: true },
-    distinct: ['type'],
-  });
-  for (const { type } of existingCatTypes) {
-    await prisma.categoryType.upsert({
-      where: { name: type },
-      update: {},
-      create: { name: type, color: 'gray' },
-    });
-  }
 
   // Ensure all default units exist (upsert each one)
   const defaultUnits = [

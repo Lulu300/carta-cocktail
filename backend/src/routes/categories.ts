@@ -5,7 +5,7 @@ import { NotFoundError } from '../errors';
 import { parseNameTranslations, serializeTranslations } from '../utils/translations';
 import { assertUniqueIgnoringCase } from '../utils/uniqueness';
 import { deleteCategory, isForceRequested } from '../services/deletionService';
-import { ensureCategoryType, withCategoryType } from '../services/categoryTypeService';
+import { ensureCategoryType } from '../services/categoryTypeService';
 import { valid, validate } from '../validation/validate';
 import { deleteRequest, IdParams, idRequest } from '../validation/common';
 import { CategoryCreate, CategoryUpdate } from '../validation/categories';
@@ -20,22 +20,20 @@ async function assertCategoryNameIsFree(name: string, ownId?: number) {
 // List all categories
 router.get('/', async (_req: AuthRequest, res: Response) => {
   const categories = await prisma.category.findMany({
-    include: { _count: { select: { bottles: true } } },
+    include: { _count: { select: { bottles: true } }, categoryType: true },
     orderBy: { name: 'asc' },
   });
-  const enriched = await withCategoryType(categories);
-  res.json(parseNameTranslations(enriched));
+  res.json(parseNameTranslations(categories));
 });
 
 // Get one category
 router.get('/:id', validate(idRequest), async (_req: AuthRequest, res: Response) => {
   const category = await prisma.category.findUnique({
     where: { id: valid<typeof idRequest>(res).params.id },
-    include: { bottles: true },
+    include: { bottles: true, categoryType: true },
   });
   if (!category) throw new NotFoundError();
-  const [enriched] = await withCategoryType([category]);
-  res.json(parseNameTranslations(enriched));
+  res.json(parseNameTranslations(category));
 });
 
 // Create category

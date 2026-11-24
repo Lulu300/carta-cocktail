@@ -26,13 +26,16 @@ model CategoryType {
   name             String  @id
   nameTranslations String?
   color            String  @default("gray")
+
+  categories Category[]
 }
 
 model Category {
   id               Int      @id @default(autoincrement())
   name             String   @unique
   nameTranslations String?  // JSON: {"fr": "...", "en": "..."}
-  type             String   // SPIRIT or SYRUP
+  type             String   // CategoryType.name: SPIRIT, SYRUP, SOFT or a custom type
+  categoryType     CategoryType @relation(fields: [type], references: [name], onDelete: Restrict, onUpdate: Cascade)
   desiredStock     Int      @default(1)
   minimumPercent   Int      @default(30)
   createdAt        DateTime @default(now())
