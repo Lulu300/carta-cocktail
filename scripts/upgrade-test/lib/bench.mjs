@@ -13,9 +13,9 @@ import { createAnonymizedCopy, fillVolume, injectDuplicateCategory, takeSnapshot
 import {
   containerLogs, containerMounts, containerState, docker, removeResources, RESOURCE_PREFIX,
 } from './docker.mjs';
-import { failedGroups, isRequirementMet, judgeStep, unexpectedFailures } from './expectations.mjs';
+import { failedGroups, isRequirementMet, judgeStep, stepMode, unexpectedFailures } from './expectations.mjs';
 import { BACKEND_SERVICE, FRONTEND_SERVICE, Instance, waitForHttp, waitForStart } from './instance.mjs';
-import { hooksForJump, profileOf, releaseOf } from './versions.mjs';
+import { hooksForJump, profileOf, releaseOf, stepOrigin } from './versions.mjs';
 
 export const ADMIN_EMAIL = 'admin@example.test';
 const TEST_PASSWORD_LENGTH = 20;
@@ -147,20 +147,22 @@ export class BenchRun {
 
   // ───────────── One step: start a version, or jump to it ─────────────
 
+  /** `previous` is the step before, or the fixture for the first step (see stepOrigin). */
   stepContext(index) {
     const target = { ...this.steps[index], images: this.images[this.steps[index].label] };
-    const previous = this.steps[index - 1];
+    const previous = stepOrigin(this.steps, index, this.hookFiles);
+    const previousProfile = profileOf(this.hookFiles, previous.version);
     const profile = profileOf(this.hookFiles, target.version);
-    const fromDbPush = !previous || !profileOf(this.hookFiles, previous.version).migrations;
+    const fromDbPush = !previousProfile.migrations;
     const expectedStartLogs = [...(fromDbPush && profile.migrations ? profile.baselineLogs : []), ...profile.startupLogs];
     return {
       target,
       previous,
       profile,
-      previousProfile: previous ? profileOf(this.hookFiles, previous.version) : null,
+      previousProfile,
       fromDbPush,
       expectedStartLogs,
-      crossedHooks: previous ? hooksForJump(this.hookFiles, previous.version, target.version) : [],
+      crossedHooks: hooksForJump(this.hookFiles, previous.version, target.version),
       instance: this.instance,
       workDir: this.workDir,
       startedReleases: this.startedReleases,
@@ -192,10 +194,12 @@ export class BenchRun {
 
   async runStep(index) {
     const ctx = this.stepContext(index);
-    const title = ctx.previous ? `${ctx.previous.label} -> ${ctx.target.label}` : `start ${ctx.target.label}`;
+    const firstStep = index === 0;
+    const title = firstStep ? `start ${ctx.target.label}` : `${ctx.previous.label} -> ${ctx.target.label}`;
     this.log(`${title}: running`);
-    const step = { from: ctx.previous?.label ?? null, to: ctx.target.label, actions: [], checks: [] };
-    const conformant = this.mode === 'conformant' && ctx.previous;
+    const step = { from: firstStep ? null : ctx.previous.label, to: ctx.target.label, actions: [], checks: [] };
+    const mode = stepMode(this.mode, firstStep);
+    const conformant = mode === 'conformant';
     const unmet = this.unmetRequirements(ctx);
 
     if (conformant) step.actions.push(...await this.runHooks(ctx, 'before'));
@@ -226,7 +230,7 @@ export class BenchRun {
     step.checks.push(...this.databaseChecks(ctx, outcome, refusal));
 
     judgeStep(step, {
-      mode: this.mode,
+      mode,
       profile: ctx.profile,
       crossedHooks: ctx.crossedHooks,
       unmetRequirements: unmet,

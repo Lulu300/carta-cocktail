@@ -13,11 +13,14 @@ import { checkFixtureAcceptsDuplicate, parseFixtureCategories, parseSnapshot } f
 import { parseLastExitCode } from '../lib/docker.mjs';
 import {
   allowedActionFailures, allowedFailures, checkInjectedDuplicateRefused, INJECTED_DUPLICATE_REASON, isRequirementMet,
-  judgeStep, markExpected, markExpectedActions, unexpectedFailures,
+  judgeStep, markExpected, markExpectedActions, stepMode, unexpectedFailures,
 } from '../lib/expectations.mjs';
 import {
   BACKEND_SERVICE, FRONTEND_SERVICE, Instance, publishedContainerPort, readEnvVariable, renderTemplate, writeEnvVariable,
 } from '../lib/instance.mjs';
+import {
+  fixtureVersion, hooksForJump, loadHookFiles, parseUpgradePath, profileOf, stepOrigin,
+} from '../lib/versions.mjs';
 
 const LAYOUTS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'layouts');
 const ENTRYPOINT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'backend', 'docker-entrypoint.sh');
@@ -364,6 +367,62 @@ test('expectations: frontendImages may fail whenever images may, unless the note
   const knownBug = { knownIssues: { images: 'known bug' } };
   assert.equal(allowedFailures({ mode: 'conformant', profile: knownBug, crossedHooks: [], unmetRequirements: [] }).frontendImages, 'known bug');
   assert.equal(allowedFailures({ mode: 'conformant', profile, crossedHooks: photosLost, unmetRequirements: [] }).frontendImages, undefined);
+});
+
+test('stepMode: the first step follows the notes in both modes, the jumps keep the mode of the run', () => {
+  assert.equal(stepMode('naive', true), 'conformant');
+  assert.equal(stepMode('conformant', true), 'conformant');
+  assert.equal(stepMode('naive', false), 'naive');
+  assert.equal(stepMode('conformant', false), 'conformant');
+});
+
+/** Compose generation the notes crossed by a jump end on (last `updateCompose`), or the one the instance has. */
+function composeGenerationAfter(crossedHooks, generation) {
+  const updates = crossedHooks.flatMap((hooks) => hooks.before).filter((hook) => hook.action === 'updateCompose');
+  return updates.at(-1)?.generation ?? generation;
+}
+
+test('first start of the friend layout from v1.5.0: reached through the notes, its failures stay unexpected', async () => {
+  const hookFiles = await loadHookFiles();
+  const steps = parseUpgradePath('1.5.0,local', { hookFiles });
+  const crossedHooks = hooksForJump(hookFiles, stepOrigin(steps, 0, hookFiles).version, steps[0].version);
+  assert.deepEqual(crossedHooks.map((hooks) => hooks.version), ['1.5.0']);
+  // The v1.5.0 notes (Before 3) move the photo mount to the folder v1.5.0 reads.
+  const profile = profileOf(hookFiles, steps[0].version);
+  const compose = fs.readFileSync(path.join(LAYOUTS_DIR, 'friend', `compose-${composeGenerationAfter(crossedHooks, '1.4.0')}.yml`), 'utf8');
+  assert.match(compose, new RegExp(`^ {6}- \\./uploads:${profile.uploadDir}$`, 'm'));
+
+  const photoMount = { images: 'custom photo mount', uploadsPersistent: 'custom photo mount' };
+  const failedChecks = () => ['startup', 'images', 'frontendImages', 'uploadsPersistent', 'rowCounts']
+    .map((group) => row(group, group, false, 'failed'));
+  const judge = (mode, isFirstStep) => judgeStep({ actions: [], checks: failedChecks() }, {
+    mode: stepMode(mode, isFirstStep), profile, crossedHooks, unmetRequirements: [], layoutReasons: photoMount,
+    started: false, previousFailedGroups: new Set(),
+  });
+  for (const mode of ['naive', 'conformant']) {
+    assert.deepEqual(unexpectedFailures(judge(mode, true).checks).map((result) => result.group),
+      ['startup', 'images', 'frontendImages', 'uploadsPersistent', 'rowCounts'], mode);
+  }
+  // The same notes crossed by a naive jump of the path still expect what they say breaks.
+  const naiveJump = judge('naive', false);
+  assert.deepEqual(unexpectedFailures(naiveJump.checks).map((result) => result.group), ['rowCounts']);
+  assert.equal(naiveJump.checks.find((result) => result.group === 'images').expected, 'custom photo mount');
+});
+
+test('first start after the fixture version: the notes crossed mount the photos where the version reads them', async () => {
+  const hookFiles = await loadHookFiles();
+  // v1.4.0 itself writes the photos outside the uploads volume (known v1.4.0 bug, fixed by v1.5.0).
+  const laterVersions = hookFiles.map((hooks) => hooks.version).filter((version) => version !== fixtureVersion(hookFiles));
+  for (const layout of fs.readdirSync(LAYOUTS_DIR)) {
+    const { initialGeneration } = (await import(pathToFileURL(path.join(LAYOUTS_DIR, layout, 'layout.mjs')))).default;
+    for (const version of laterVersions) {
+      const steps = [{ label: version, version }];
+      const crossedHooks = hooksForJump(hookFiles, stepOrigin(steps, 0, hookFiles).version, version);
+      const generation = composeGenerationAfter(crossedHooks, initialGeneration);
+      const compose = fs.readFileSync(path.join(LAYOUTS_DIR, layout, `compose-${generation}.yml`), 'utf8');
+      assert.match(compose, new RegExp(`^ {6}- \\S+:${profileOf(hookFiles, version).uploadDir}$`, 'm'), `${layout} from ${version}`);
+    }
+  }
 });
 
 test('checkImages reports in the group it is given', async () => {

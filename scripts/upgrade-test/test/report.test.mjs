@@ -37,6 +37,7 @@ test('renderReport writes a summary column per mode and escapes table cells', ()
     generatedAt: '2026-10-10T00:00:00.000Z',
     layout: { name: 'friend', description: 'bind mounts', envSecrets: { JWT_SECRET: 46 } },
     pathLabels: ['1.4.0', '1.5.0'],
+    fixtureVersion: '1.4.0',
     images: { '1.4.0': { backend: 'b', frontend: 'f', platform: 'linux/amd64' } },
     runs: [
       { mode: 'naive', setup: { tables: 15, rows: 758, users: 1 }, steps: [okStep] },
@@ -72,4 +73,17 @@ test('renderReport shows an expected action failure and the injected duplicate, 
   assert.equal(stepVerdict(step), 'OK, 1 expected failure(s)');
   const plain = renderReport({ ...base, runs: [{ mode: 'naive', setup: { tables: 15, rows: 758 }, steps: [okStep] }] });
   assert.doesNotMatch(plain, /inject-duplicate/);
+});
+
+test('renderReport says how the first step reaches its version from the fixture', () => {
+  const report = renderReport({
+    generatedAt: '2026-11-24T00:00:00.000Z',
+    layout: { name: 'friend', description: 'bind mounts', envSecrets: {} },
+    pathLabels: ['1.8.0', '1.14.0'],
+    fixtureVersion: '1.4.0',
+    images: {},
+    runs: [{ mode: 'naive', setup: { tables: 15, rows: 758 }, steps: [okStep] }],
+  });
+  assert.match(report, /- First step: the fixture comes from a v1\.4\.0 instance\. In both modes, the start of 1\.8\.0 brings it /);
+  assert.match(report, /- Modes, on the jumps of the path: \*\*naive\*\* changes the image tags only/);
 });

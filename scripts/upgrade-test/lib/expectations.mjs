@@ -17,6 +17,18 @@ function refusedBeforeMigrations(refusal) {
 }
 
 /**
+ * Mode a step is run and judged in. The first step is the starting point of the path, not an
+ * upgrade under test: in both modes, it reaches its version from the fixture with the required
+ * actions of the notes it crosses, and its failures are judged as in conformant mode. Naive mode
+ * only skips the actions on the jumps of the path. Without this, a path that starts after the
+ * fixture version would start naive mode on an instance already broken (photos on a folder the
+ * version no longer reads, frontend port), and hide what the next jumps break.
+ */
+export function stepMode(mode, isFirstStep) {
+  return isFirstStep ? 'conformant' : mode;
+}
+
+/**
  * `requireStarted` hooks: the version must have started earlier on the path, unless the jump
  * comes from a release line the notes allow to skip it (`directFrom: '1.4'` for v1.6.0).
  */

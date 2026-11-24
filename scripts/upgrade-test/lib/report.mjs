@@ -77,7 +77,15 @@ function injectedDuplicateLines(setup) {
     + 'name of an existing one, before the row counts of reference; the schema_integrity migration refuses them.'];
 }
 
-export function renderReport({ generatedAt, layout, pathLabels, images, runs }) {
+/** The first start of a path that begins after the fixture version is reached through the notes. */
+function firstStepLine(fixtureVersion, firstLabel) {
+  return `- First step: the fixture comes from a v${fixtureVersion} instance. In both modes, the start of `
+    + `${firstLabel} brings it to that version with the required actions of the notes crossed since v${fixtureVersion} `
+    + '(none when the path starts at the fixture version), and is judged as in conformant mode: the path starts '
+    + 'from an instance set up as the notes say.';
+}
+
+export function renderReport({ generatedAt, layout, pathLabels, images, runs, fixtureVersion }) {
   const setup = runs.find((run) => run.setup?.tables)?.setup ?? {};
   const sections = [
     `# Upgrade test: ${layout.name} layout, ${pathLabels.join(' → ')}`,
@@ -87,12 +95,13 @@ export function renderReport({ generatedAt, layout, pathLabels, images, runs }) 
       `- Layout \`${layout.name}\`: ${layout.description}.`,
       `- Fixture: ${setup.tables} tables, ${setup.rows} rows, journal mode \`${setup.journalMode}\`; `
         + `${setup.photosInArchive} photos in the archive, ${setup.photosReferenced} referenced by cocktails.`,
+      firstStepLine(fixtureVersion, pathLabels[0]),
       ...injectedDuplicateLines(setup),
       `- Credentials: in the working copy, the admin email was replaced by a placeholder and the password hash `
         + `(${setup.users} user(s)) by a bcrypt hash of a random test password. The env file holds random values `
         + `of the lengths given by the layout (${Object.entries(layout.envSecrets).map(([name, length]) => `${name}: ${length}`).join(', ')}).`,
-      '- Modes: **naive** changes the image tags only; **conformant** applies the required actions of the release '
-        + 'notes of every version crossed by the jump (hook files in scripts/upgrade-test/hooks/).',
+      '- Modes, on the jumps of the path: **naive** changes the image tags only; **conformant** applies the required '
+        + 'actions of the release notes of every version crossed by the jump (hook files in scripts/upgrade-test/hooks/).',
     ].join('\n'),
     renderImages(images),
     '## Summary',
