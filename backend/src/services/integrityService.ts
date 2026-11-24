@@ -114,7 +114,7 @@ const LABELS: Record<keyof IntegrityIssues, string> = {
   duplicateUnitAbbreviations: 'Duplicate unit abbreviations, ignoring case (blocking)',
   duplicateCocktailNames: 'Duplicate cocktail names, ignoring case (allowed)',
   invalidIngredientLines: 'Recipe lines without their bottle, category or ingredient',
-  unknownCategoryTypes: 'Category types missing from CategoryType',
+  unknownCategoryTypes: 'Category types missing from CategoryType (created by the migration)',
   foreignKeyViolations: 'Rows referencing a missing row',
 };
 

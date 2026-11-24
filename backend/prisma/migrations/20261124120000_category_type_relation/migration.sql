@@ -1,9 +1,10 @@
 -- Category.type becomes a foreign key to CategoryType.name. A category whose type
 -- has no CategoryType row (database edited by hand, old backup) would break the
 -- new constraint: its type is created first, in gray and without translations, as
--- the seed has always done at startup. No category is refused or changed. The
--- INSERT can run twice, so the migration can be retried after
--- `prisma migrate resolve --rolled-back`.
+-- the seed has always done at startup. No category is refused or changed.
+-- The INSERT can run twice. A failure after CREATE TABLE "new_Category" leaves
+-- that table behind: restore the pre-migrate copy, as README.md says
+-- ("Recovering from a failed migration").
 INSERT INTO "CategoryType" ("name", "color")
 SELECT DISTINCT "type", 'gray' FROM "Category"
 WHERE "type" NOT IN (SELECT "name" FROM "CategoryType");
