@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-03]
-touches: [backend/src/utils/translations.ts, backend/src/routes/settings.ts, backend/src/routes/categoryTypes.ts, backend/src/routes/shortages.ts, backend/src/routes/categories.ts, backend/src/routes/units.ts, backend/src/routes/ingredients.ts, backend/src/routes/bottles.ts, backend/src/routes/cocktails.ts, backend/src/services/cocktail/, backend/src/routes/public.ts, backend/src/routes/menus.ts, backend/src/services/settingsService.ts, backend/src/services/categoryTypeService.ts, backend/src/i18n/]
+touches: [backend/src/utils/translations.ts, backend/src/routes/settings.ts, backend/src/routes/categoryTypes.ts, backend/src/routes/shortages.ts, backend/src/routes/categories.ts, backend/src/routes/units.ts, backend/src/routes/ingredients.ts, backend/src/routes/bottles.ts, backend/src/routes/cocktails.ts, backend/src/services/cocktail/, backend/src/routes/public.ts, backend/src/routes/menus.ts, backend/src/services/settingsService.ts, backend/src/services/categoryTypeService.ts, backend/src/i18n/, backend/src/utils/bottlesExport.ts, backend/src/validation/common.ts, backend/AGENTS.md]
 sources: ["01-backend-routes.md §M3", "01-backend-routes.md §M5", "01-backend-routes.md §R6", "02-backend-data-perf.md §2.1"]
-branch:
-pr:
+branch: feature/C-14-translations-settings-cleanup
+pr: "#193"
 ---
 
 ## Contexte
@@ -54,12 +54,12 @@ Les traductions des noms (`nameTranslations`) sont stockées en chaîne JSON. L'
 
 ## Critères d'acceptation
 
-- [ ] `grep -rn "JSON.stringify(nameTranslations" backend/src` ne renvoie rien ; plus de `parseNT`.
-- [ ] `POST /api/units` avec `nameTranslations: ['x']` ou `{ de: 'x' }` → 400.
-- [ ] `/api/public/units` et `GET /api/menus/:id` renvoient des objets de traduction, jamais des chaînes.
-- [ ] Deux `GET /api/public/settings` simultanés sur une base sans réglages → deux 200.
-- [ ] Une seule implémentation de `ensureCategoryType` et de l'enrichissement par type.
-- [ ] Réponses de `/category-types` et `/shortages` inchangées (mêmes champs).
+- [x] `grep -rn "JSON.stringify(nameTranslations" backend/src` ne renvoie rien ; plus de `parseNT`.
+- [x] `POST /api/units` avec `nameTranslations: ['x']` ou `{ de: 'x' }` → 400 (déjà vrai depuis C-04, par le schéma zod).
+- [x] `/api/public/units` et `GET /api/menus/:id` renvoient des objets de traduction, jamais des chaînes.
+- [x] Deux `GET /api/public/settings` simultanés sur une base sans réglages → deux 200.
+- [x] Une seule implémentation de `ensureCategoryType` et de l'enrichissement par type.
+- [x] Réponses de `/category-types` et `/shortages` inchangées (mêmes champs).
 
 ## Tests à ajouter ou adapter
 
@@ -82,3 +82,5 @@ Les traductions des noms (`nameTranslations`) sont stockées en chaîne JSON. L'
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-12 : C-33 (PR #127) déplace l'import de cocktails de `routes/cocktails.ts` vers `services/cocktail/cocktailImport.ts` : la copie d'`ensureCategoryType` et les 3 `JSON.stringify(nameTranslations)` (regroupés dans un `stringifyTranslations` local) y sont désormais ; `backend/src/services/cocktail/` ajouté à `touches`.
 - 2026-10-13 : relecture d'E-10 (PR #134). Le problème de `GET /menus/:id` (`menus.ts:54-86`, cité `:23-63` plus haut) se voit maintenant dans l'interface : la route renvoie `bottle.category.nameTranslations` en chaîne JSON, `useLocalizedName` retombe donc sur `name`, et l'éditeur de carte de bouteilles affiche « Rhum blanc » en anglais.
+- 2026-11-24 : PR #193. Déjà réglé avant la PR : la validation des traductions (schéma zod `Translations` de C-04, qui refuse tableau, nombre et langue inconnue) et les deux `parseNT` (disparus avec C-33 et C-50). `serializeTranslations` prend donc le type de sortie du schéma et ne lève rien : la clé `errors.invalidTranslations` serait du code mort, elle n'est pas ajoutée (`backend/src/i18n/` non modifié). Fait : `serializeTranslations` remplace les 12 écritures (dont `stringifyTranslations` de l'import de cocktail) et retire les langues vides ; `parseTranslations` (avec `console.warn`) remplace aussi `parseStoredTranslations` de l'export de cocktail et le `JSON.parse` de `utils/bottlesExport.ts` (ajouté à `touches`) ; `parseNameTranslations` renvoie une copie ; `/public/units` et `GET`/`PUT /menus/:id` passent par `parseNameTranslations` ; `getOrCreateSettings()` sans paramètre `db` (aucun appelant n'en passe) ; `ensureCategoryType` et `withCategoryType` dans `categoryTypeService.ts` ; `groupBy` et `select` dans `/category-types` et `/shortages`. Le conflit P2002 au premier démarrage est réel : un test avec l'ancien code (lecture puis création, deux appels simultanés) échoue ; deux requêtes HTTP simultanées ne le reproduisent pas dans les tests, le test de service le couvre. Les langues autres que `fr`/`en` déjà en base restent lisibles (`parseTranslations` les garde) ; l'écriture les refuse depuis C-04, rien ne change ici. Commentaire de `validation/common.ts` et section Translations de `backend/AGENTS.md` mis à jour (ajoutés à `touches`).
+- Notes de version : `GET /api/public/units`, `GET /api/menus/:id` et `PUT /api/menus/:id` renvoient `nameTranslations` en objet JSON au lieu d'une chaîne, comme les autres routes (seuls les scripts qui appellent l'API directement sont concernés) ; l'éditeur de carte de bouteilles affiche les noms traduits des catégories ; les traductions vides envoyées à l'API ne sont plus enregistrées. Aucune action requise.
