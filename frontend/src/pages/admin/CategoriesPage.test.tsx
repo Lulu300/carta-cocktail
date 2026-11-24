@@ -17,6 +17,11 @@ const grenadine = buildCategory({ id: 2, name: 'Grenadine', type: 'SYRUP', categ
 const spacedSpirit = buildCategoryType({ name: ' SPIRIT ', color: 'gray', _count: { categories: 1 } });
 const unnamed = buildCategoryType({ name: '', color: 'gray', _count: { categories: 0 } });
 const SPACED_SPIRIT_LABEL = '␣SPIRIT␣ categoryTypes.withSpaces';
+// Data older than v1.15.0 can hold these: HTML shows each of them as 'X Y'.
+const doubleSpaced = buildCategoryType({ name: 'X  Y', color: 'gray', _count: { categories: 1 } });
+const singleSpaced = buildCategoryType({ name: 'X Y', color: 'gray', _count: { categories: 0 } });
+const tabbed = buildCategoryType({ name: 'X\tY', color: 'gray', _count: { categories: 0 } });
+const DOUBLE_SPACED_LABEL = 'X␣␣Y categoryTypes.withSpaces';
 
 type User = ReturnType<typeof userEvent.setup>;
 
@@ -245,6 +250,26 @@ describe('CategoriesPage', () => {
         expect(await openTypeOptions(user)).toEqual([
           'Spirits – categoryTypes.emptyName', `Spirits – ${SPACED_SPIRIT_LABEL}`, 'Spirits', 'categories.otherType',
         ]);
+      });
+
+      it('tells a type with inner spaces or a tab from the type with one space', async () => {
+        const user = userEvent.setup();
+        mockApiResponse('get', '/api/category-types', [doubleSpaced, singleSpaced, tabbed]);
+
+        expect(await openTypeOptions(user)).toEqual([
+          DOUBLE_SPACED_LABEL, 'X Y', 'X␣Y categoryTypes.withSpaces', 'categories.otherType',
+        ]);
+        expect(within(categoryDialog()).getByRole('option', { name: DOUBLE_SPACED_LABEL })).toBeInTheDocument();
+      });
+
+      it('adds the stored name with inner spaces to a translation that would hide it', async () => {
+        const user = userEvent.setup();
+        const nameTranslations = { en: 'Mixers' };
+        mockApiResponse('get', '/api/category-types', [
+          { ...doubleSpaced, nameTranslations }, { ...singleSpaced, nameTranslations },
+        ]);
+
+        expect(await openTypeOptions(user)).toEqual([`Mixers – ${DOUBLE_SPACED_LABEL}`, 'Mixers', 'categories.otherType']);
       });
     });
 
@@ -543,6 +568,18 @@ describe('CategoriesPage', () => {
       const manager = await openTypesManager(user);
 
       expect(within(manager).getByRole('listitem')).toHaveTextContent(`Spirits${SPACED_SPIRIT_LABEL}(1)`);
+    });
+
+    it('tells a type with inner spaces from the type with one space', async () => {
+      const user = userEvent.setup();
+      mockApiResponse('get', '/api/category-types', [doubleSpaced, singleSpaced]);
+      await renderLoadedPage();
+
+      const manager = await openTypesManager(user);
+
+      const rows = within(manager).getAllByRole('listitem').map((row) => row.textContent);
+      expect(rows[0]).toContain(`${DOUBLE_SPACED_LABEL}${DOUBLE_SPACED_LABEL}(1)`);
+      expect(rows[1]).toContain('X YX Y(0)');
     });
 
     // Data older than v1.9.0 can hold a type with an empty name: it is named in the query.
