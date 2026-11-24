@@ -115,11 +115,12 @@ Tu travailles sur le projet Carta Cocktail. Prends en charge la tâche <ID> — 
 Modèle fixé par D-11, appliqué par `.github/workflows/release.yml` (détails dans `README.md`, section « Release ») :
 
 - **Pré-version** `vX.Y.Z-rc.N`, taguée sur `develop` : images `:X.Y.Z-rc.N` sans toucher `latest`, GitHub Release marquée pre-release.
-- **Version finale** `vX.Y.Z`, taguée sur `main` après le merge `develop` → `main` : images `:X.Y.Z` et `latest`, release normale.
+- **Version finale** `vX.Y.Z`, taguée sur `main` après le merge `develop` → `main` : images `:X.Y.Z`, `:X.Y`, `:X` et `latest`, release normale.
+- **CI avant les images** : le job `ci` relance tout `ci.yml` sur le commit tagué ; aucune image n'est poussée s'il échoue. Les images sont construites pour `linux/amd64` et `linux/arm64` (la CI ne construit que l'amd64 : l'arm64 n'est testé qu'à la release), avec SBOM et provenance, et reçoivent la version (`APP_VERSION`, `dev` hors release).
 - **Notes d'abord** : `docs/releases/vX.Y.Z.md` (copie de `docs/releases/TEMPLATE.md`) et la section de `UPGRADING.md` sont mergées sur `develop` avant le premier tag. Une pré-version utilise le fichier de sa version cible, sauf si `docs/releases/vX.Y.Z-rc.N.md` existe. Le coordinateur les rédige à partir des sections « Required actions » des PR et des lignes « Notes de version » des Journaux (règle 9).
 - **Banc de mise à jour avant la version finale** : avant de taguer `vX.Y.Z`, passer le banc `scripts/upgrade-test/` sur la dernière pré-version, depuis la plus ancienne version encore en production, avec les layouts `friend` et `official`, en mode naïf et conforme (`--path 1.4.0,…,X.Y.Z-rc.N`). Chaque échec inattendu est corrigé (nouvelle pré-version) ou ajouté aux notes de version avant le tag. Le jeu d'essai est fourni par l'humain et ne va jamais dans le dépôt (voir `scripts/upgrade-test/README.md`).
 - **Pousser la branche avant le tag** : le job `verify` vérifie que le commit du tag est atteignable depuis `origin/main` (version finale) ou `origin/develop` (pré-version), et que le fichier de notes existe et a un front matter valide. Sinon il échoue avant tout push d'image.
-- Un tag refusé par `verify` n'a rien publié : le supprimer (local et distant), corriger, puis le reposer.
+- Un tag refusé par `verify`, ou dont le job `ci` a échoué, n'a rien publié : le supprimer (local et distant), corriger, puis le reposer. Pour un échec ponctuel du job `ci`, « Re-run failed jobs » dans le run Release suffit.
 - Un tag qui a publié une image n'est jamais déplacé ni repoussé : en cas d'échec après le push d'une image, corriger puis taguer la pré-version suivante (`-rc.N+1`) pour une pré-version, ou la version suivante (ex. `v1.5.1`) pour une version finale.
 - Chaque tag demande l'accord de l'humain. Première release avec ce modèle : D-12 (`v1.5.0-rc.1` puis `v1.5.0`).
 

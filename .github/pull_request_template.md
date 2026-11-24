@@ -21,7 +21,7 @@ before / after upgrade, `breaking: true`, recommended pinning, and a matching "N
 - [ ] Tests added or updated for the new or changed behavior
 - [ ] `npm test` passes in every changed package (`backend/`, `frontend/`)
 - [ ] `npm run lint` passes in every changed package that has a lint script
-- [ ] `npx tsc --noEmit` passes in every changed package
+- [ ] Types check in every changed package: `npx tsc --noEmit` in `backend/`, `npx tsc -b` in `frontend/`
 - [ ] Coverage: global >= 60% on every metric, changed lines >= 80% (delta)
 - [ ] Task file: acceptance criteria checked, `status: done`, `branch` and `pr` filled in, Journal line added
 - [ ] Out-of-scope findings recorded as new tasks in `docs/plan/tasks/`, not fixed here

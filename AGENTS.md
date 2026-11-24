@@ -76,16 +76,16 @@ The machine is shared with other projects and its disk fills up. Before its fina
 **Branching model**: feature branches → `develop` → `main`
 
 For every change:
-1. Create a branch from `develop` (`feature/xxx`, `fix/xxx`)
+1. Create a branch from `develop`: `<type>/<task id>-<slug>` for a plan task (`fix/`, `feature/`, `chore/`, `docs/`, see `docs/plan/README.md`), `feature/xxx` or `fix/xxx` otherwise
 2. Make changes
 3. **Add or update tests** for any new or modified feature (see Testing section below)
 4. Ensure lint and tests pass: `cd frontend && npm run lint && npm test` / `cd backend && npm run lint && npm test`. Formatting follows the root `.editorconfig` and `.prettierrc`; `npm run format:check` exists in both packages but still fails until the one-off repository reformat is done, so do not reformat files outside your change
-5. Ensure TypeScript compiles: `cd frontend && npx tsc --noEmit` / `cd backend && npx tsc --noEmit`
+5. Ensure TypeScript compiles: `cd frontend && npx tsc -b` / `cd backend && npx tsc --noEmit`. In `frontend/`, `tsc --noEmit` checks nothing: `tsconfig.json` only holds project references
 6. **Verify coverage thresholds are met** (see Testing section below)
 7. Commit (Conventional Commits, in English) and push the branch
-8. Open a PR to `develop` — CI runs automatically
-9. Once `develop` is stable, merge to `main`
-10. Tag `main` for release: `git tag v1.0.0 && git push --tags`
+8. Open a PR to `develop`. `gh pr create --body-file` ignores `.github/pull_request_template.md`: start the body from that file. Add the label that files the PR in the release notes: `breaking`, `feature`, `fix`, `dependencies`, `ci` or `docs`, or `skip-changelog` for a PR that brings nothing new to a release, such as the `develop` → `main` merge (`.github/release.yml`). CI runs automatically
+9. Merge with a merge commit, the only method allowed (squash and rebase are disabled), once the required checks pass. Rulesets refuse direct pushes to `main` and `develop`, and require a PR with the checks `Backend`, `Frontend`, `Docker build (backend)`, `Docker build (frontend)` and `Smoke (docker compose)`; a PR to `main` also needs CodeQL results, with no new security alert of high severity or above and no new alert of level error. An admin can bypass them on a PR, but **agents never use `gh pr merge --admin`**: only the human bypasses, in an emergency
+10. Release: pre-releases `vX.Y.Z-rc.N` are tagged on `develop`, final releases `vX.Y.Z` on `main` after the `develop` → `main` merge. The notes `docs/releases/vX.Y.Z.md` and the `UPGRADING.md` section are merged before the tag, and the branch is pushed before the tag. Every tag needs the human's agreement. Details: `README.md` ("Release") and `docs/plan/README.md` ("Releases")
 
 ## Testing Requirements
 
@@ -104,32 +104,48 @@ Coverage is enforced automatically by CI. Run `npm test -- --coverage` in either
 
 ## CI/CD (GitHub Actions)
 
-**CI** (`.github/workflows/ci.yml`) — runs on PRs and pushes to `main`/`develop`:
-- **Backend job**: `npm ci` (postinstall: `prisma generate`) → `tsc --noEmit` → `npm run build` → `npm test`
-- **Frontend job**: `npm ci` → `tsc --noEmit` → `npm run lint` → `npm run build` → `npm test`
-- Both jobs run in parallel on Node 24, the version used by the Docker images (`.nvmrc`); `engines` in both `package.json` require Node >= 24
+**CI** (`.github/workflows/ci.yml`) — runs on PRs and pushes to `main`/`develop`, and is called by the release workflow (`workflow_call`). Four jobs run in parallel:
+- **Backend**: `npm ci` (postinstall: `prisma generate`) → `npm audit --omit=dev --audit-level=high` → `npm run db:check` (migrations match `schema.prisma`) → `tsc --noEmit` → `npm run lint` → `npm run build` → tests of `.github/scripts` → `npm run test:coverage` → delta coverage (80%, PRs only)
+- **Frontend**: `npm ci` → `npm audit --omit=dev --audit-level=high` → `tsc -b` → `npm run lint` → `npm run build` → bundle budget of the public menu (`.github/scripts/bundle-budget.mjs`, 140 kB gzip) → CSS media queries readable by Safari 16 → `npm run test:coverage` → delta coverage (80%, PRs only)
+- **Docker build (backend)** and **Docker build (frontend)**: build each image for `linux/amd64`, without pushing it. The `linux/arm64` build only runs at release
+- The Node jobs run on Node 24, the version used by the Docker images (`.nvmrc`); `engines` in both `package.json` require Node >= 24
 
 **Smoke** (`.github/workflows/smoke.yml`) — runs on PRs to `main`/`develop` and on demand:
 - Builds and starts `docker-compose.yml`, then runs `scripts/smoke/smoke.sh` through nginx: login, 2.4 MB photo upload, photo still served after the backend container is recreated, backup export. Then `scripts/smoke/custom-uid.sh` recreates the backend with `CARTA_UID`/`CARTA_GID`: refused on volumes of uid 1000, then started after a `chown`, and `smoke.sh` again
 - Locally, always in a dedicated compose project: `export COMPOSE_PROJECT_NAME=carta-smoke JWT_SECRET=$(openssl rand -hex 32) ADMIN_PASSWORD=$(openssl rand -hex 16)`, then `docker compose -p carta-smoke up -d --build --wait && ./scripts/smoke/smoke.sh`, then `docker compose -p carta-smoke down -v --remove-orphans --rmi local`, all in the same shell call (`smoke.sh` reads `COMPOSE_PROJECT_NAME` to recreate the backend). The default project is your local stack: `down -v` would delete its data (see the header of `smoke.sh`)
 
+**CodeQL**: GitHub's default setup analyses `main` and the PRs to `main` only, so its check is required on `main` alone.
+
 **Release** (`.github/workflows/release.yml`) — runs on tag push `v*`:
-- Builds backend and frontend Docker images
-- Pushes to `ghcr.io/<repo>/backend:<version>` and `ghcr.io/<repo>/frontend:<version>` (+ `latest`)
-- Creates a GitHub Release with auto-generated changelog
+- `verify` refuses, before anything is built, a tag that is not `vX.Y.Z` or `vX.Y.Z-rc.N`, a final tag not reachable from `origin/main` or a pre-release not reachable from `origin/develop`, and a missing or invalid notes file (`docs/releases/`)
+- `ci` runs the whole CI above on the tagged commit: no image is pushed unless it passes
+- Builds the backend and frontend images for `linux/amd64` and `linux/arm64`, with SBOM and provenance attestations, and `APP_VERSION` set to the version (`dev` in any other build). A final release pushes `:X.Y.Z`, `:X.Y`, `:X` and `latest` to `ghcr.io/lulu300/carta-cocktail/{backend,frontend}`; a pre-release pushes `:X.Y.Z-rc.N` only
+- Creates the GitHub Release: the notes file, the merged PRs since the previous tag, grouped by label, and the `docker pull` commands. A pre-release is marked as such
+- A tag that published nothing (refused by `verify`, or failed in `ci`) can be deleted and pushed again once fixed; a failed `ci` caused by a flaky step can also be re-run with "Re-run failed jobs" in the Release run. A tag that pushed an image is never moved: tag the next version instead (`README.md`, "Release")
 
 ## Directory Structure
 
 ```
 /
-├── backend/           # Express API server (see backend/AGENTS.md)
-├── frontend/          # React SPA (see frontend/AGENTS.md)
-├── uploads/           # Cocktail images (Docker volume)
-├── docker-compose.yml # 2 services: backend (port 3001) + frontend/nginx (port 80)
-└── .env.example       # Environment template
+├── backend/                # Express API server (see backend/AGENTS.md)
+├── frontend/               # React SPA served by nginx (see frontend/AGENTS.md)
+├── docs/
+│   ├── operations.md       # Operations guide (French): install, backups, upgrades, HTTPS
+│   ├── plan/               # Action plan: tasks and tracking script
+│   ├── releases/           # Release notes, one file per version
+│   └── review/             # Review reports behind the plan
+├── scripts/
+│   ├── smoke/              # Smoke test of the compose stack (CI "Smoke" job)
+│   └── upgrade-test/       # Upgrade bench across released versions
+├── uploads/                # Cocktail photos in development (UPLOAD_DIR default)
+├── .github/                # Workflows, CI scripts, PR template, release notes categories
+├── docker-compose.yml      # Local build: backend (127.0.0.1:3001) + frontend/nginx (host port 80 -> 8080)
+├── docker-compose.prod.yml # Released images from ghcr.io, backend port not published
+├── UPGRADING.md            # Required actions, version by version
+└── .env.example            # Environment template
 ```
 
-## Database Schema (14 models)
+## Database Schema
 
 ```
 User                    # Single admin (email + password hash)
@@ -145,6 +161,7 @@ CocktailInstruction     # Recipe steps
 Menu                    # Collections (type: COCKTAILS | APEROS | DIGESTIFS)
 MenuCocktail            # Cocktails in menus (position, visibility)
 MenuBottle              # Bottles in menus (position, visibility)
+MenuBottleExclusion     # Bottles the admin removed from a system menu (never synced back)
 MenuSection             # Menu groupings
 SiteSettings            # Site name + favicon emoji
 ```
@@ -161,7 +178,9 @@ SiteSettings            # Site name + favicon emoji
 
 ```bash
 # Backend (terminal 1)
-cd backend && npm install && npx prisma db push && npm run db:seed && npm run dev
+cd backend && cp ../.env.example .env
+# Edit backend/.env: JWT_SECRET (openssl rand -hex 32) and ADMIN_PASSWORD (at least 12 characters)
+npm install && npm run db:deploy && npm run db:seed && npm run dev
 
 # Frontend (terminal 2)
 cd frontend && npm install && npm run dev
@@ -169,12 +188,12 @@ cd frontend && npm install && npm run dev
 
 - Backend: http://localhost:3001
 - Frontend: http://localhost:5173 (proxies /api to backend)
-- Admin: admin@carta.local / admin123
+- Admin: the `ADMIN_EMAIL` / `ADMIN_PASSWORD` credentials of `backend/.env`. The backend refuses to start without a valid `JWT_SECRET`, and the seed refuses to create the admin without a valid `ADMIN_PASSWORD`
 
 ## API Structure
 
-- **Public** (no auth): `/api/auth/*`, `/api/public/*`
-- **Protected** (JWT Bearer): All other `/api/*` routes
+- **Public** (no auth): `/api/auth/login`, `/api/public/*`, `/api/health` (Docker healthcheck: status and version), `/uploads/*` (photos)
+- **Protected** (JWT Bearer): All other `/api/*` routes, `/api/auth/me` and `/api/auth/logout-all` included
 - Auth middleware validates JWT and sets `req.userId`
 
 ## Languages
@@ -186,7 +205,8 @@ cd frontend && npm install && npm run dev
 ## Docker
 
 ```bash
-docker-compose up --build
+# .env next to the compose file: JWT_SECRET and ADMIN_PASSWORD (see README.md)
+docker compose up --build
 ```
 
-Backend on port 3001, frontend/nginx on port 80. Volumes: `db-data` (SQLite), `uploads` (images).
+The frontend (nginx, non-root, uid 101) listens on 8080 in its container, published on host port 80. The backend runs as uid 1000 (`CARTA_UID`/`CARTA_GID`), on port 3001, bound to `127.0.0.1` by `docker-compose.yml` and not published by `docker-compose.prod.yml`. Volumes: `db-data` (SQLite, `/app/data`), `uploads` (photos, `/app/uploads`). Operations (install, backups, upgrades, HTTPS): `docs/operations.md`.
