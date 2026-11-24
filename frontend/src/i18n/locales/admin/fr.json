@@ -120,6 +120,7 @@
       "pickCategory": "— Choisir une catégorie —",
       "willCreate": "à créer",
       "categoryRequired": "Catégorie obligatoire pour cette bouteille",
+      "categoriesWithoutType": "{{count}} catégorie(s) à créer sans type qui a un nom : choisissez un autre type.",
       "duplicateFlag": "{{count}} doublon(s) existant(s)",
       "confirmTitle": "Résumé de l'import",
       "categoriesToCreate": "Catégories à créer",
