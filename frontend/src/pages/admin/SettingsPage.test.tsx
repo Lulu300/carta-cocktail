@@ -72,16 +72,26 @@ function profileSaveButton() {
   return screen.getAllByText('common.save')[1];
 }
 
-async function selectBackupFile(): Promise<File> {
+// MAX_BACKUP_UPLOAD_BYTES of backend/src/services/backupService.ts
+const BACKEND_UPLOAD_LIMIT = 200 * 1024 * 1024;
+
+/** Chooses an archive in the hidden file input, of `size` bytes when given. */
+function chooseBackupFile(size?: number): File {
+  const fileInput = document.querySelector('input[type="file"]');
+  if (!(fileInput instanceof HTMLInputElement)) throw new Error('No file input');
+  const file = new File(['content'], 'backup.zip', { type: 'application/zip' });
+  // A real archive of 200 MB would weigh on the test's memory: only its size is read
+  if (size !== undefined) Object.defineProperty(file, 'size', { value: size });
+  fireEvent.change(fileInput, { target: { files: [file] } });
+  return file;
+}
+
+async function selectBackupFile(size?: number): Promise<File> {
   await waitFor(() => {
     expect(screen.getByText('settings.backup.selectFile')).toBeInTheDocument();
   });
 
-  // Select a file via the hidden input
-  const fileInput = document.querySelector('input[type="file"]');
-  if (!(fileInput instanceof HTMLInputElement)) throw new Error('No file input');
-  const file = new File(['content'], 'backup.zip', { type: 'application/zip' });
-  fireEvent.change(fileInput, { target: { files: [file] } });
+  const file = chooseBackupFile(size);
 
   // Import button appears after file selection
   await waitFor(() => {
@@ -90,8 +100,8 @@ async function selectBackupFile(): Promise<File> {
   return file;
 }
 
-async function selectBackupFileAndClickImport(): Promise<File> {
-  const file = await selectBackupFile();
+async function selectBackupFileAndClickImport(size?: number): Promise<File> {
+  const file = await selectBackupFile(size);
   fireEvent.click(screen.getByText('settings.backup.import'));
   return file;
 }
@@ -373,11 +383,65 @@ describe('SettingsPage', () => {
   it('shows the file name after selecting a backup file', async () => {
     await renderLoadedPage();
 
-    const fileInput = document.querySelector('input[type="file"]');
-    if (!(fileInput instanceof HTMLInputElement)) throw new Error('No file input');
-    fireEvent.change(fileInput, { target: { files: [new File(['content'], 'backup.zip', { type: 'application/zip' })] } });
+    chooseBackupFile();
 
     expect(await screen.findByText('settings.backup.fileSelected(backup.zip)')).toBeInTheDocument();
+  });
+
+  // Past nginx's limit, Firefox does not read the 413 that nginx sends during the upload
+  it('refuses an archive over the backend limit as soon as it is chosen, without sending it', async () => {
+    await renderLoadedPage();
+    const restore = captureRequest('post', '/api/backup/import');
+
+    chooseBackupFile(BACKEND_UPLOAD_LIMIT + 1);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('common.requestTooLarge');
+    expect(screen.queryByText(/settings\.backup\.fileSelected/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /settings\.backup\.import/ })).not.toBeInTheDocument();
+    expect(restore.count()).toBe(0);
+  });
+
+  it('sends an archive of exactly the backend limit, as before', async () => {
+    await renderLoadedPage();
+    const restore = captureRequest('post', '/api/backup/import');
+    await selectBackupFileAndClickImport(BACKEND_UPLOAD_LIMIT);
+    await answerRestoreDialog('settings.backup.import');
+
+    expect(await screen.findByText('settings.backup.importSuccess')).toBeInTheDocument();
+    expect(restore.count()).toBe(1);
+    expect(screen.queryByText('common.requestTooLarge')).not.toBeInTheDocument();
+  });
+
+  it('forgets the refusal when a smaller archive is chosen next', async () => {
+    await renderLoadedPage();
+    chooseBackupFile(BACKEND_UPLOAD_LIMIT + 1);
+    await screen.findByText('common.requestTooLarge');
+
+    await selectBackupFile(BACKEND_UPLOAD_LIMIT - 1);
+
+    expect(screen.getByText('settings.backup.fileSelected(backup.zip)')).toBeInTheDocument();
+    expect(screen.queryByText('common.requestTooLarge')).not.toBeInTheDocument();
+  });
+
+  it('drops the archive chosen before when a too large one replaces it', async () => {
+    await renderLoadedPage();
+    await selectBackupFile();
+
+    chooseBackupFile(BACKEND_UPLOAD_LIMIT + 1);
+
+    expect(await screen.findByText('common.requestTooLarge')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /settings\.backup\.import/ })).not.toBeInTheDocument();
+  });
+
+  // The backend refuses an archive of exactly its limit, and a proxy in front may have a lower one
+  it('keeps the translated message of a 413 for an archive sent to the server', async () => {
+    mockProxyError('post', '/api/backup/import', 413);
+    await renderLoadedPage();
+    await selectBackupFileAndClickImport(BACKEND_UPLOAD_LIMIT);
+    await answerRestoreDialog('settings.backup.import');
+
+    expect(await screen.findByText(i18n.t('common.requestTooLarge'))).toBeInTheDocument();
+    expect(screen.queryByText(NO_ANSWER_CAUSE)).not.toBeInTheDocument();
   });
 
   it('uploads the backup after confirming in the dialog and shows a success message', async () => {

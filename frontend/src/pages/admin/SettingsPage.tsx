@@ -28,6 +28,15 @@ function isGatewayTimeout(err: unknown): boolean {
   return err instanceof ApiError && err.status === GATEWAY_TIMEOUT;
 }
 
+/**
+ * Largest backup archive the backend accepts: MAX_BACKUP_UPLOAD_BYTES in
+ * backend/src/services/backupService.ts, keep both in line. A larger archive is refused before
+ * it is sent, so that every browser shows the same message: past its own limit (210 MB), nginx
+ * answers 413 while the archive is still being sent, and Firefox does not read that answer. It
+ * sends the archive again until it gives up, then shows the "may still be running" message.
+ */
+const MAX_BACKUP_UPLOAD_BYTES = 200 * 1024 * 1024;
+
 /** What orNoAnswer resolves to when the connection was lost. */
 const NO_ANSWER = Symbol('no answer');
 
@@ -99,6 +108,7 @@ export default function SettingsPage() {
 
   // Backup settings
   const [backupFile, setBackupFile] = useState<File | null>(null);
+  const [backupFileTooLarge, setBackupFileTooLarge] = useState(false);
   const [backupExporting, setBackupExporting] = useState(false);
   const [backupImporting, setBackupImporting] = useState(false);
   const [backupMessage, setBackupMessage] = useState('');
@@ -176,6 +186,18 @@ export default function SettingsPage() {
   /** Why a restore ended without its result, followed by the advice shared by both causes. */
   const restoreMayStillRun = (cause: 'settings.backup.restoreTimeout' | 'settings.backup.restoreNoAnswer') =>
     `${t(cause)} ${t('settings.backup.restoreMayStillRun')}`;
+
+  /**
+   * Keeps the chosen archive only when the backend can accept it. Refused here rather than when
+   * the restore starts: the admin learns it before the confirmation, and the message stays apart
+   * from the outcome of the last backup action, such as a restore that may still be running.
+   */
+  const handleBackupFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    const tooLarge = file !== null && file.size > MAX_BACKUP_UPLOAD_BYTES;
+    setBackupFileTooLarge(tooLarge);
+    setBackupFile(tooLarge ? null : file);
+  };
 
   const handleBackupExport = async () => {
     setBackupMessage('');
@@ -375,7 +397,7 @@ export default function SettingsPage() {
                 ref={fileInputRef}
                 type="file"
                 accept=".zip"
-                onChange={(e) => setBackupFile(e.target.files?.[0] || null)}
+                onChange={handleBackupFileChange}
                 className="hidden"
               />
               {backupFile && (
@@ -384,6 +406,10 @@ export default function SettingsPage() {
                 </span>
               )}
             </div>
+
+            {backupFileTooLarge && (
+              <p role="alert" className="text-sm text-red-400">{t('common.requestTooLarge')}</p>
+            )}
 
             {backupFile && (
               <Button variant="danger" onClick={handleBackupImport} disabled={backupBusy}>
