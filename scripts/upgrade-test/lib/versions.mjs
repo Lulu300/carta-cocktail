@@ -122,6 +122,25 @@ export function hooksForJump(hookFiles, from, to) {
 }
 
 /**
+ * Version of the instance the fixture comes from: the oldest hook file, starting point of the
+ * bench (v1.4.0, no release notes). The layouts start from its compose file (`initialGeneration`).
+ */
+export function fixtureVersion(hookFiles) {
+  return sortedByRelease(hookFiles)[0].version;
+}
+
+/**
+ * Where a step comes from: the step before it, or the fixture for the first step. A path that
+ * starts after the fixture version first brings the fixture to that version, crossing the hook
+ * files in between (1.4.0 -> 1.8.0 crosses 1.5.0 to 1.8.0).
+ */
+export function stepOrigin(steps, index, hookFiles) {
+  if (index > 0) return steps[index - 1];
+  const version = fixtureVersion(hookFiles);
+  return { label: `fixture (v${version})`, version };
+}
+
+/**
  * Behaviour of a version (upload folder, migrations…): merged profiles of all releases up to it.
  * A newer profile replaces a field, except `refusals`, which add up: a release that adds a
  * refusal keeps the ones of the releases before it.

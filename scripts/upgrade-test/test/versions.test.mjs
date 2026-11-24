@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { BASELINE_REFUSAL, FAILED_MIGRATION_REFUSAL, UNWRITABLE_REFUSAL } from '../lib/checks.mjs';
 import {
-  checkDuplicateInjectionPath, compareVersions, defaultLocalVersion, hooksForJump, latestHookVersion, loadHookFiles,
-  parseUpgradePath, profileOf, releaseOf,
+  checkDuplicateInjectionPath, compareVersions, defaultLocalVersion, fixtureVersion, hooksForJump, latestHookVersion,
+  loadHookFiles, parseUpgradePath, profileOf, releaseOf, stepOrigin,
 } from '../lib/versions.mjs';
 
 const HOOKS = [
@@ -72,6 +72,18 @@ test('hooksForJump returns every crossed release, oldest first', () => {
   assert.deepEqual(hooksForJump(HOOKS, '1.4.0', '1.6.0-rc.1').map((hooks) => hooks.version), ['1.5.0', '1.6.0']);
   assert.deepEqual(hooksForJump(HOOKS, '1.5.0', '1.6.0').map((hooks) => hooks.version), ['1.6.0']);
   assert.deepEqual(hooksForJump(HOOKS, '1.6.0-rc.1', '1.6.0'), []);
+});
+
+test('the first step comes from the fixture version, the oldest hook file; the others from the step before', () => {
+  assert.equal(fixtureVersion(HOOKS), '1.4.0');
+  const steps = parseUpgradePath('1.5.0,1.6.0', { hookFiles: HOOKS });
+  const origin = stepOrigin(steps, 0, HOOKS);
+  assert.deepEqual(origin, { label: 'fixture (v1.4.0)', version: '1.4.0' });
+  assert.deepEqual(hooksForJump(HOOKS, origin.version, steps[0].version).map((hooks) => hooks.version), ['1.5.0']);
+  assert.equal(stepOrigin(steps, 1, HOOKS), steps[0]);
+
+  const fromFixture = parseUpgradePath('1.4.0,1.6.0', { hookFiles: HOOKS });
+  assert.deepEqual(hooksForJump(HOOKS, stepOrigin(fromFixture, 0, HOOKS).version, fromFixture[0].version), []);
 });
 
 test('profileOf merges the profiles of all releases up to the version', () => {

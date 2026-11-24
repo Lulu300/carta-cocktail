@@ -1,6 +1,6 @@
 // Decides which failures a step may have without failing the bench.
 import { FAILED_MIGRATION_REFUSAL, row } from './checks.mjs';
-import { releaseOf } from './versions.mjs';
+import { hooksForJump, releaseOf, stepOrigin } from './versions.mjs';
 
 export const INJECTED_DUPLICATE_REASON = 'duplicate injected by --inject-duplicate: '
   + 'the schema_integrity migration refuses duplicate category names';
@@ -14,6 +14,31 @@ function refusesInjectedDuplicate(profile, injectedDuplicate) {
 /** A start refused before any migration ran (`cannot write`, for example): the duplicate was not tested. */
 function refusedBeforeMigrations(refusal) {
   return Boolean(refusal?.beforeMigrations);
+}
+
+/**
+ * Mode a step is run and judged in. The first step is the starting point of the path, not an
+ * upgrade under test: in both modes, it reaches its version from the fixture with the required
+ * actions of the notes it crosses, and its failures are judged as in conformant mode. Naive mode
+ * only skips the actions on the jumps of the path. Without this, a path that starts after the
+ * fixture version would start naive mode on an instance already broken (photos on a folder the
+ * version no longer reads, frontend port), and hide what the next jumps break.
+ */
+export function stepMode(mode, isFirstStep) {
+  return isFirstStep ? 'conformant' : mode;
+}
+
+/**
+ * How step `index` of a path is run in a run of mode `mode`: where it comes from (`previous`, the
+ * step before or the fixture), the mode it is run and judged in, and the hook files it crosses.
+ */
+export function stepPlan(steps, index, hookFiles, mode) {
+  const previous = stepOrigin(steps, index, hookFiles);
+  return {
+    previous,
+    mode: stepMode(mode, index === 0),
+    crossedHooks: hooksForJump(hookFiles, previous.version, steps[index].version),
+  };
 }
 
 /**
