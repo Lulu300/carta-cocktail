@@ -38,7 +38,7 @@ Le frontend envoie déjà le nom tel qu'il est stocké (`useCategoryTypeForm` pa
 
 1. `CategoryTypeParams` : `z.string().min(1)`, sans trim.
 2. Forme `?name=` : `PUT /api/category-types?name=` et `DELETE /api/category-types?name=`, schéma `CategoryTypeQuery` (`z.string()`, nom vide accepté seulement là). Les routes `/:name` restent. `services/api.ts` passe par la query pour le nom vide seulement.
-3. `CategoryUpdate.type` : `z.string().min(1)`, sans trim. `CategoryCreate` garde le trim.
+3. `CategoryUpdate.type` : `z.string().min(1)`, sans trim. `CategoryCreate` garde le trim (remplacé par C-57 : la création garde aussi un type existant tel quel).
 
 ## Critères d'acceptation
 
@@ -46,12 +46,12 @@ Le frontend envoie déjà le nom tel qu'il est stocké (`useCategoryTypeForm` pa
 - [x] `SPIRIT` s'édite et se supprime comme avant.
 - [x] Le type au nom vide s'édite et se supprime depuis Manage Types (`?name=`), avec le 409 habituel s'il est utilisé.
 - [x] Sans `name` ou avec deux `name`, la forme query répond 400 et ne touche rien.
-- [x] Enregistrer une catégorie de type ` SPIRIT ` la laisse sur ` SPIRIT ` ; la création d'une catégorie trime toujours le type.
+- [x] Enregistrer une catégorie de type ` SPIRIT ` la laisse sur ` SPIRIT ` ; la création d'une catégorie trime toujours le type (remplacé par C-57, PR #209).
 
 ## Tests à ajouter ou adapter
 
 - `backend/src/routes/categoryTypes.test.ts` : ` SPIRIT ` à côté de `SPIRIT` (édition, suppression, 409, 404), forme `?name=` (nom vide édité et supprimé, 409, nom non trimé, 404, 400 sans nom ou avec deux noms).
-- `backend/src/routes/categories.test.ts` : édition qui garde ` SPIRIT `, 400 pour un type vide, création qui trime.
+- `backend/src/routes/categories.test.ts` : édition qui garde ` SPIRIT `, 400 pour un type vide, création qui trime (remplacé par C-57).
 - `frontend/src/services/api.test.ts` : nom à espaces encodé dans le chemin, nom vide dans la query.
 - `frontend/src/pages/admin/CategoriesPage.test.tsx` : édition et suppression du type au nom vide depuis Manage Types, enregistrement d'une catégorie de type ` SPIRIT `.
 
