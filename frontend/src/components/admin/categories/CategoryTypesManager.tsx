@@ -11,6 +11,7 @@ import { cx } from '../../ui/classNames';
 import TranslationFields from '../TranslationFields';
 import { useConfirmDelete } from '../useConfirmDelete';
 import { useCategoryTypeForm } from './useCategoryTypeForm';
+import { useCategoryTypeName } from './useCategoryTypeName';
 
 interface CategoryTypesManagerProps {
   open: boolean;
@@ -37,6 +38,7 @@ export default function CategoryTypesManager({ open, onClose, categoryTypes }: C
 function CategoryTypesPanel({ categoryTypes }: { categoryTypes: CategoryType[] }) {
   const { t } = useTranslation();
   const localize = useLocalizedName();
+  const { visibleName } = useCategoryTypeName();
   const confirmDelete = useConfirmDelete();
   const typeForm = useCategoryTypeForm();
   const { form, setField, editing } = typeForm;
@@ -54,8 +56,8 @@ function CategoryTypesPanel({ categoryTypes }: { categoryTypes: CategoryType[] }
             <li key={categoryType.name} className="flex items-center justify-between bg-canvas rounded-lg px-4 py-2">
               <div className="flex items-center gap-3">
                 <div className={cx('w-4 h-4 rounded-full', getDotClasses(categoryType.color))} />
-                <span className="font-medium">{localize(categoryType)}</span>
-                <span className="text-xs text-fg-muted">{categoryType.name}</span>
+                <span className="font-medium">{visibleName(localize(categoryType))}</span>
+                <span className="text-xs text-fg-muted">{visibleName(categoryType.name)}</span>
                 <span className="text-xs text-fg-muted">({categoryCount(categoryType)})</span>
               </div>
               <div className="flex items-center gap-1">

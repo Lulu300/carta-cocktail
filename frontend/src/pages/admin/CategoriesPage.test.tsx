@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { createTestQueryClient, fireEvent, screen, waitFor, within } from '../../test/test-utils';
 import { clearToasts, renderWithFeedback } from '../../test/feedback';
 import { qk } from '../../queries/keys';
+import { axe } from '../../test/axe';
 import { buildCategory, buildCategoryType } from '../../test/factories';
 import { captureRequest, mockApiError, mockApiPending, mockApiResponse, mockItemInUse } from '../../test/msw/utils';
 import CategoriesPage from './CategoriesPage';
@@ -12,6 +13,10 @@ const syrup = buildCategoryType({ name: 'SYRUP', color: 'red', _count: { categor
 const garnish = buildCategoryType({ name: 'GARNISH', color: 'green', _count: { categories: 0 } });
 const vodka = buildCategory({ id: 1, name: 'Vodka', type: 'SPIRIT', categoryType: spirit, desiredStock: 2, _count: { bottles: 3 } });
 const grenadine = buildCategory({ id: 2, name: 'Grenadine', type: 'SYRUP', categoryType: syrup, _count: { bottles: 1 } });
+// Data older than v1.9.0 can hold these names: HTML would show ' SPIRIT ' as 'SPIRIT', and '' as nothing.
+const spacedSpirit = buildCategoryType({ name: ' SPIRIT ', color: 'gray', _count: { categories: 1 } });
+const unnamed = buildCategoryType({ name: '', color: 'gray', _count: { categories: 0 } });
+const SPACED_SPIRIT_LABEL = '␣SPIRIT␣ categoryTypes.withSpaces';
 
 type User = ReturnType<typeof userEvent.setup>;
 
@@ -130,7 +135,15 @@ describe('CategoriesPage', () => {
       await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
 
       expect(created.count()).toBe(0);
-      expect(categoryDialog()).toBeInTheDocument();
+      const customType = within(categoryDialog()).getByPlaceholderText('categories.customType');
+      expect(customType).toHaveFocus();
+      expect(customType).toHaveAccessibleDescription('categories.typeRequired');
+      expect(within(categoryDialog()).getByLabelText('categories.type')).not.toHaveAttribute('aria-invalid');
+
+      await user.type(customType, 'mixer');
+      expect(within(categoryDialog()).queryByText('categories.typeRequired')).not.toBeInTheDocument();
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
+      expect(await created.body).toMatchObject({ type: 'MIXER' });
     });
 
     it('sends a single request on a fast double click on save', async () => {
@@ -201,6 +214,97 @@ describe('CategoriesPage', () => {
 
       expect(within(categoryDialog()).getByLabelText('categories.type')).toHaveValue('__OTHER__');
       expect(within(categoryDialog()).getByPlaceholderText('categories.customType')).toHaveValue('UNKNOWN');
+    });
+
+    describe('types whose names HTML would hide', () => {
+      async function openTypeOptions(user: User) {
+        await renderLoadedPage();
+        await user.click(screen.getByRole('button', { name: 'categories.add' }));
+        const options = within(within(categoryDialog()).getByLabelText('categories.type')).getAllByRole('option');
+        return options.map((option) => option.textContent);
+      }
+
+      it('tells a type with surrounding spaces from the type without them, and labels the empty name', async () => {
+        const user = userEvent.setup();
+        mockApiResponse('get', '/api/category-types', [unnamed, spacedSpirit, spirit]);
+
+        expect(await openTypeOptions(user)).toEqual([
+          'categoryTypes.emptyName', SPACED_SPIRIT_LABEL, 'SPIRIT', 'categories.otherType',
+        ]);
+      });
+
+      it('adds the stored name to a translation that would hide it', async () => {
+        const user = userEvent.setup();
+        const nameTranslations = { en: 'Spirits' };
+        mockApiResponse('get', '/api/category-types', [
+          { ...unnamed, nameTranslations },
+          { ...spacedSpirit, nameTranslations },
+          { ...spirit, nameTranslations },
+        ]);
+
+        expect(await openTypeOptions(user)).toEqual([
+          'Spirits – categoryTypes.emptyName', `Spirits – ${SPACED_SPIRIT_LABEL}`, 'Spirits', 'categories.otherType',
+        ]);
+      });
+    });
+
+    describe('a category whose type has an empty name', () => {
+      const water = buildCategory({ id: 4, name: 'Water', type: '', categoryType: unnamed, _count: { bottles: 0 } });
+
+      beforeEach(() => {
+        mockApiResponse('get', '/api/category-types', [unnamed, spirit]);
+        mockApiResponse('get', '/api/categories', [water]);
+      });
+
+      async function saveWater(user: User) {
+        renderPage();
+        await screen.findByText('Water');
+        await user.click(screen.getByRole('button', { name: 'common.edit' }));
+        await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
+      }
+
+      it('is not saved: a message asks for a type with a name', async () => {
+        const user = userEvent.setup();
+        const updated = captureRequest('put', '/api/categories/:id');
+
+        await saveWater(user);
+
+        expect(updated.count()).toBe(0);
+        const type = within(categoryDialog()).getByLabelText('categories.type');
+        expect(type).toHaveValue('');
+        expect(type).toHaveFocus();
+        expect(type).toHaveAttribute('aria-invalid', 'true');
+        expect(type).toHaveAccessibleDescription('categories.typeRequired');
+      });
+
+      it('is saved once another type is chosen', async () => {
+        const user = userEvent.setup();
+        const updated = captureRequest('put', '/api/categories/:id');
+        await saveWater(user);
+
+        await user.selectOptions(within(categoryDialog()).getByLabelText('categories.type'), 'SPIRIT');
+        expect(within(categoryDialog()).queryByText('categories.typeRequired')).not.toBeInTheDocument();
+        await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
+
+        expect(await updated.body).toMatchObject({ type: 'SPIRIT' });
+      });
+
+      it('opens again without the message', async () => {
+        const user = userEvent.setup();
+        await saveWater(user);
+
+        await user.click(within(categoryDialog()).getByRole('button', { name: 'common.cancel' }));
+        await user.click(screen.getByRole('button', { name: 'common.edit' }));
+
+        expect(within(categoryDialog()).queryByText('categories.typeRequired')).not.toBeInTheDocument();
+      });
+
+      it('has no accessibility violation with the message', async () => {
+        const user = userEvent.setup();
+        await saveWater(user);
+
+        expect(await axe(categoryDialog())).toHaveNoViolations();
+      });
     });
 
     it('collapses the translations block again when another category is opened', async () => {
@@ -418,10 +522,31 @@ describe('CategoriesPage', () => {
       expect(within(manager).getByDisplayValue('SPIRIT')).toBeDisabled();
     });
 
+    it('tells a type with surrounding spaces from the type without them, and labels the empty name', async () => {
+      const user = userEvent.setup();
+      mockApiResponse('get', '/api/category-types', [unnamed, spacedSpirit, spirit]);
+      await renderLoadedPage();
+
+      const manager = await openTypesManager(user);
+
+      const rows = within(manager).getAllByRole('listitem').map((row) => row.textContent);
+      expect(rows[0]).toContain('categoryTypes.emptyNamecategoryTypes.emptyName(0)');
+      expect(rows[1]).toContain(`${SPACED_SPIRIT_LABEL}${SPACED_SPIRIT_LABEL}(1)`);
+      expect(rows[2]).toContain('SPIRITSPIRIT(1)');
+    });
+
+    it('keeps the translation of a type with surrounding spaces next to its stored name', async () => {
+      const user = userEvent.setup();
+      mockApiResponse('get', '/api/category-types', [{ ...spacedSpirit, nameTranslations: { en: 'Spirits' } }]);
+      await renderLoadedPage();
+
+      const manager = await openTypesManager(user);
+
+      expect(within(manager).getByRole('listitem')).toHaveTextContent(`Spirits${SPACED_SPIRIT_LABEL}(1)`);
+    });
+
     // Data older than v1.9.0 can hold a type with an empty name: it is named in the query.
     describe('the type with an empty name', () => {
-      const unnamed = buildCategoryType({ name: '', color: 'gray', _count: { categories: 0 } });
-
       beforeEach(() => {
         mockApiResponse('get', '/api/category-types', [unnamed, spirit]);
       });

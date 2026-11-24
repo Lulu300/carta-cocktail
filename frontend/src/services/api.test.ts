@@ -885,6 +885,25 @@ describe('categoryTypes API', () => {
     expect(mockFetch.mock.calls[1][0]).toBe('/api/category-types?name=');
     expect(mockFetch.mock.calls[1][1].method).toBe('DELETE');
   });
+
+  // The browser resolves the dot segments: '/category-types/..' would become '/'.
+  it.each(['.', '..'])('should send the name %s in the query', async (name) => {
+    const api = await getApi();
+    mockOk({});
+    await api.categoryTypes.update(name, { color: 'blue' });
+    expect(mockFetch.mock.calls[0][0]).toBe(`/api/category-types?name=${name}`);
+
+    mockOk({ message: 'ok' });
+    await api.categoryTypes.delete(name);
+    expect(mockFetch.mock.calls[1][0]).toBe(`/api/category-types?name=${name}`);
+  });
+
+  it('should keep in the path a name that only contains dots', async () => {
+    const api = await getApi();
+    mockOk({});
+    await api.categoryTypes.update('...', { color: 'blue' });
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/category-types/...');
+  });
 });
 
 describe('backup API', () => {
