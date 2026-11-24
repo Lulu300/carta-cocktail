@@ -6,6 +6,7 @@ import type { CategoryType, EntityResolutionAction, ImportEntityResolution } fro
 import ImportEntityRow from './ImportEntityRow';
 import { defaultCreateData, type ImportEntityType } from './importResolutions';
 import type { ExistingOption } from './useImportReferenceLists';
+import { buildCategoryType } from '../../test/factories';
 
 interface HarnessProps {
   entity: ImportEntityResolution;
@@ -163,6 +164,31 @@ describe('ImportEntityRow', () => {
 
     await user.selectOptions(screen.getByLabelText(/categories\.type/), 'Spirits');
     expect(onChange).toHaveBeenLastCalledWith({ action: 'create', data: expect.objectContaining({ type: 'SPIRIT' }) });
+  });
+
+  it('flags the type with an empty name until another type is chosen', async () => {
+    const user = userEvent.setup();
+    const category: ImportEntityResolution = { ref: { name: 'Sirop', type: 'SYRUP', desiredStock: 1 }, existingMatch: null, status: 'missing' };
+    const categoryTypes = [buildCategoryType({ name: 'SYRUP' }), buildCategoryType({ name: '' }), buildCategoryType({ name: ' SPIRIT ' })];
+    render(<Harness entity={category} type="categories" initial={createResolution('categories', category)} categoryTypes={categoryTypes} />);
+    const typeSelect = screen.getByLabelText(/categories\.type/);
+
+    await user.selectOptions(typeSelect, 'categoryTypes.emptyName');
+    expect(typeSelect).toHaveValue('');
+    expect(typeSelect).toHaveAttribute('aria-invalid', 'true');
+    expect(typeSelect).toHaveAccessibleDescription('categories.typeRequired');
+
+    // A type whose name only has spaces around it can be picked
+    await user.selectOptions(typeSelect, ' SPIRIT ');
+    expect(typeSelect).not.toHaveAttribute('aria-invalid');
+    expect(screen.queryByText('categories.typeRequired')).not.toBeInTheDocument();
+  });
+
+  it('flags a file type made only of invisible characters, which the backend would refuse to create', () => {
+    const category: ImportEntityResolution = { ref: { name: 'Sirop', type: '\u200B', desiredStock: 1 }, existingMatch: null, status: 'missing' };
+    render(<Harness entity={category} type="categories" initial={createResolution('categories', category)} categoryTypes={[buildCategoryType({ name: 'SYRUP' })]} />);
+
+    expect(screen.getByText('categories.typeRequired')).toBeInTheDocument();
   });
 
   it('keeps the file type selectable before the types are loaded', () => {

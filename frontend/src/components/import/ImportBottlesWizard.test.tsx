@@ -291,6 +291,37 @@ describe('ImportBottlesWizard', () => {
     expect(screen.getByLabelText('categories.type')).toHaveValue('LIQUEUR');
   });
 
+  it('blocks the import while a category to create has the type with an empty name', async () => {
+    mockApiResponse('get', '/api/category-types', [
+      buildCategoryType({ name: 'SPIRIT' }),
+      buildCategoryType({ name: '' }),
+      buildCategoryType({ name: '   ' }),
+    ]);
+    const confirmed = captureRequest('post', '/api/bottles/import/confirm');
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    const user = await previewWith(samplePreview);
+    const next = screen.getAllByText('bottles.importWizard.next').at(-1)!.closest('button')!;
+    const typeSelect = screen.getByLabelText('categories.type');
+    await screen.findByRole('option', { name: 'categoryTypes.emptyName' });
+
+    await user.selectOptions(typeSelect, '');
+    expect(typeSelect).toHaveAttribute('aria-invalid', 'true');
+    expect(typeSelect).toHaveAccessibleDescription('categories.typeRequired');
+    expect(next).toBeDisabled();
+
+    // An existing type made only of spaces is kept as picked, as the backend does
+    await user.selectOptions(typeSelect, '   ');
+    expect(typeSelect).not.toHaveAttribute('aria-invalid');
+    expect(screen.queryByText('categories.typeRequired')).not.toBeInTheDocument();
+    await user.click(next);
+    await user.click(screen.getByText('bottles.importWizard.confirmImport'));
+
+    await screen.findByText('bottles.importWizard.successCount');
+    expect(await confirmed.body).toMatchObject({
+      resolutions: { categories: { rhum: { action: 'create', data: { type: '   ' } } } },
+    });
+  });
+
   it('maps a category to the existing match and offers the existing categories for each row', async () => {
     mockApiResponse('get', '/api/categories', [buildCategory({ id: 5, name: 'Rhum ambré' })]);
     mockApiResponse('post', '/api/bottles/import/confirm', { created: { bottles: 2 }, duplicatesCreated: 1, skippedNoCategory: 1 });

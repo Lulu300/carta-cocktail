@@ -19,7 +19,12 @@ import BottleImportRowErrors from './BottleImportRowErrors';
 import BottleImportCategoryStep from './BottleImportCategoryStep';
 import BottleImportRowsStep from './BottleImportRowsStep';
 import BottleImportConfirmStep from './BottleImportConfirmStep';
-import { buildAutoBottleImportResolutions, categoryOptions, countRowsWithoutCategory } from './bottleImportResolutions';
+import {
+  buildAutoBottleImportResolutions,
+  categoryOptions,
+  countCategoriesWithoutType,
+  countRowsWithoutCategory,
+} from './bottleImportResolutions';
 
 type Step = 'upload' | 'resolve' | 'confirm' | 'success' | 'error';
 
@@ -89,6 +94,7 @@ export default function ImportBottlesWizard({ onClose, onImported }: ImportBottl
   };
 
   const rowsWithoutCategory = preview ? countRowsWithoutCategory(preview, resolutions) : 0;
+  const isIncomplete = rowsWithoutCategory > 0 || countCategoriesWithoutType(resolutions, categoryTypes) > 0;
 
   const footer = (step === 'resolve' || step === 'confirm') && (
     <>
@@ -96,11 +102,11 @@ export default function ImportBottlesWizard({ onClose, onImported }: ImportBottl
         {t('bottles.importWizard.back')}
       </Button>
       {step === 'resolve' ? (
-        <Button onClick={() => setStep('confirm')} disabled={rowsWithoutCategory > 0}>
+        <Button onClick={() => setStep('confirm')} disabled={isIncomplete}>
           {t('bottles.importWizard.next')}
         </Button>
       ) : (
-        <Button onClick={onConfirm} loading={isLoading} disabled={rowsWithoutCategory > 0}>
+        <Button onClick={onConfirm} loading={isLoading} disabled={isIncomplete}>
           {isLoading ? t('bottles.importWizard.importing') : t('bottles.importWizard.confirmImport')}
         </Button>
       )}

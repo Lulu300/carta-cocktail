@@ -5,8 +5,9 @@ import type {
   BottleImportResolutions,
   BottleRowResolution,
   Category,
+  CategoryType,
 } from '../../types';
-import { DEFAULT_CATEGORY_TYPE, DEFAULT_DESIRED_STOCK, resolutionKey } from './importResolutions';
+import { DEFAULT_CATEGORY_TYPE, DEFAULT_DESIRED_STOCK, isMissingCategoryType, resolutionKey } from './importResolutions';
 
 // The backend gives this default to a category file that leaves it out
 const DEFAULT_MINIMUM_PERCENT = 30;
@@ -62,6 +63,13 @@ export function countRowsWithoutCategory(preview: BottleImportPreviewResponse, r
     const resolution = resolutions.bottles[String(index)];
     return resolution?.action !== 'skip' && !rowCategory(entry.ref.categoryName, resolution);
   }).length;
+}
+
+/** Categories to create under a type the backend refuses: the confirmation would answer 400. */
+export function countCategoriesWithoutType(resolutions: BottleImportResolutions, categoryTypes: CategoryType[]): number {
+  return Object.values(resolutions.categories).filter(
+    (resolution) => resolution.action === 'create' && isMissingCategoryType(resolution.data.type, categoryTypes),
+  ).length;
 }
 
 export function countDuplicateRows(preview: BottleImportPreviewResponse, resolutions: BottleImportResolutions): number {
