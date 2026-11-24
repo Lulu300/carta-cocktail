@@ -5,13 +5,13 @@ phase: D
 lane: ci
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [D-34]
 touches: [scripts/smoke/custom-uid.sh]
 sources: []
-branch:
-pr:
+branch: fix/D-41-smoke-custom-uid-flaky
+pr: https://github.com/Lulu300/carta-cocktail/pull/197
 ---
 
 ## Contexte
@@ -40,9 +40,9 @@ Dans `backend/docker-entrypoint.sh`, `refuse_unwritable` écrit le refus par neu
 
 ## Critères d'acceptation
 
-- [ ] Le script attend la ligne `chown` au lieu de la lire une seule fois après la ligne `ERROR:`.
-- [ ] Un refus sans la commande `chown` fait toujours échouer l'étape [1], avec un message qui le dit (vérifié en local en retirant la ligne de l'entrypoint sur une copie, puis annulé).
-- [ ] Job « Smoke (docker compose) » vert sur la PR ; `shellcheck scripts/smoke/custom-uid.sh` sans nouvel avertissement s'il est disponible.
+- [x] Le script attend la ligne `chown` au lieu de la lire une seule fois après la ligne `ERROR:`.
+- [x] Un refus sans la commande `chown` fait toujours échouer l'étape [1], avec un message qui le dit (vérifié en local en retirant la ligne de l'entrypoint sur une copie, puis annulé).
+- [x] Job « Smoke (docker compose) » vert sur la PR ; `shellcheck scripts/smoke/custom-uid.sh` sans nouvel avertissement s'il est disponible.
 
 ## Tests à ajouter ou adapter
 
@@ -58,3 +58,4 @@ Le script est lui-même le test. Vérification en local, dans un projet compose 
 ## Journal
 
 - 2026-11-12 : tâche créée par la PR docs de suivi du lot D-35/E-18/B-20/C-12 à partir de la relecture de la PR #166 (C-12). Script, entrypoint et journal du run 43288181424 (tentative 1 en échec, tentative 2 verte) vérifiés sur `develop` (9799168).
+- 2026-11-24 : traitée avec D-41 et E-57 dans la PR #197, projet `carta-d-41` au lieu de `carta-d-37`. `wait_for_log_line` prend le message d'échec et attend la ligne `ERROR:` puis la ligne `chown`, 60 s chacune (lecture toutes les secondes) ; « API running » reste une lecture unique faite après. La recherche `chown -R 4321:4321` trouve aussi la ligne `sudo chown -R …` du refus : la sonde retire donc les deux lignes, sur une image construite depuis celle du projet (supprimée ensuite) ; le script échoue avec `FAIL: the refusal does not give the chown command for 4321:4321: no "chown -R 4321:4321" in the backend logs after 60 s`. Mesures : en local (projet compose `carta-d-41`, à chaque passage pile neuve, `smoke.sh`, `custom-uid.sh`, `down -v`) : avant, 1 passage réussi sur 5 (2 échecs « does not give the chown command », 2 échecs « no "ERROR: …" after 60 s » avec la ligne présente dans le dump) ; après, 12 passages consécutifs réussis, `custom-uid.sh` en 13 à 14 s chacun (environ 33 s par passage avec la pile et `smoke.sh`). `shellcheck` sans avertissement.
