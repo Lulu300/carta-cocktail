@@ -39,9 +39,9 @@ const app = express();
 app.set('trust proxy', config.trustProxy);
 
 // Middleware
-// No HSTS here: whether the site is HTTPS-only is decided where TLS ends (the reverse proxy,
-// or nginx in frontend/security-headers.conf), for every response at once. Sent from here, it
-// would cover only the API and the photos, and helmet adds includeSubDomains.
+// No HSTS here: the backend cannot tell whether TLS ends in front of it, and HSTS applies to
+// the whole host (helmet's default even adds includeSubDomains). It is set where TLS ends: the
+// reverse proxy, or nginx in frontend/security-headers.conf.
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   strictTransportSecurity: false,
