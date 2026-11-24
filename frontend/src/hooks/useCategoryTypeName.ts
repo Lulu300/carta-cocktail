@@ -24,6 +24,7 @@ function isHiddenByHtml(name: string): boolean {
 /**
  * Category type names as the admin can tell them apart: an empty name gets a label, the spaces
  * HTML would hide are made visible and announced in words, for screen readers too.
+ * Admin screens only: its messages are in the admin bundle, so a public page would show their keys.
  */
 export function useCategoryTypeName() {
   const { t } = useTranslation();

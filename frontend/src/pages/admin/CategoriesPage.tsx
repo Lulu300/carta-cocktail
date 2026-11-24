@@ -55,10 +55,6 @@ export default function CategoriesPage() {
   const sort = useSort<Category>(filteredCategories);
   const pagination = usePagination(sort.sortedItems);
 
-  const typeLabel = (type: string) => {
-    return categoryTypeLabel(type, categoryTypes.find((candidate) => candidate.name === type));
-  };
-
   const handleSubmit = (data: CategoryInput) => {
     const options = { onSuccess: categoryForm.close };
     if (categoryForm.editing) update.mutate({ id: categoryForm.editing.id, data }, options);
@@ -77,7 +73,7 @@ export default function CategoriesPage() {
       sortable: true,
       render: (category) => (
         <span className={cx('px-2 py-1 rounded text-xs font-medium', getBadgeClasses(category.categoryType?.color))}>
-          {typeLabel(category.type)}
+          {categoryTypeLabel(category.type, category.categoryType)}
         </span>
       ),
     },
