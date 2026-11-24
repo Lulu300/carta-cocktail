@@ -484,6 +484,7 @@
     "blank": "required",
     "issue": "{{field}}: {{rule}}",
     "issueInRow": "Row {{row}}, {{field}}: {{rule}}",
+    "issueInCategoryRow": "Category {{row}}, {{field}}: {{rule}}",
     "fields": {
       "name": "Name",
       "slug": "URL slug",

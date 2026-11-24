@@ -42,6 +42,11 @@ describe('describeValidationIssue', () => {
       .toBe('Row 4, Remaining (%): value too large');
   });
 
+  it('names a row of the imported categories as a category', () => {
+    expect(describeValidationIssue({ path: 'body.payload.categories.1.name', code: 'too_small' }))
+      .toBe('Category 2, Name: required');
+  });
+
   it('says a blank required text is required', () => {
     expect(describeValidationIssue({ path: 'body.name', code: 'too_small' })).toBe('Name: required');
   });
@@ -55,11 +60,15 @@ describe('describeValidationIssue', () => {
     expect(describeValidationIssue({ path: 'body.ingredients.0.bottleId', code: 'custom' }))
       .toBe('Ligne 1, Bouteille : valeur invalide');
     expect(describeValidationIssue({ path: 'body.name', code: 'too_small' })).toBe('Nom : obligatoire');
+    expect(describeValidationIssue({ path: 'body.payload.categories.0.type', code: 'too_small' }))
+      .toBe('Catégorie 1, Type : obligatoire');
   });
 
   it.each([
     ['an unknown field', { path: 'body.secretField', code: 'too_small' }],
     ['an id in the URL', { path: 'params.id', code: 'too_small' }],
+    ['a known field of the query string', { path: 'query.categoryId', code: 'invalid_type' }],
+    ['a known field of the path', { path: 'params.name', code: 'too_small' }],
     ['an unknown code', { path: 'body.name', code: 'not_a_zod_code' }],
     ['a field the backend names after an object method', { path: 'body.constructor', code: 'custom' }],
     ['the whole body', { path: 'body', code: 'invalid_type' }],
