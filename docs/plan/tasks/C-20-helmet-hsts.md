@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [D-02]
-touches: [backend/src/app.ts, backend/src/app.test.ts, backend/src/config.ts, backend/src/config.test.ts, .env.example]
+touches: [backend/src/app.ts, backend/src/app.test.ts]
 sources: ["03-security.md §8"]
-branch:
-pr:
+branch: fix/C-20-helmet-hsts
+pr: https://github.com/Lulu300/carta-cocktail/pull/211
 ---
 
 ## Contexte
@@ -34,10 +34,10 @@ Relevé par la revue de la PR #61 (D-02), remarque 3 ; l'humain a demandé une t
 
 ## Critères d'acceptation
 
-- [ ] Par défaut, aucune réponse du backend (`/api/public/settings`, `/uploads/<image>`) ne porte `Strict-Transport-Security`, ni en direct sur le port 3001, ni à travers nginx.
-- [ ] Les autres en-têtes helmet sont inchangés.
-- [ ] Si l'option du point 2 est retenue : avec la variable définie, l'en-tête est présent avec la valeur attendue.
-- [ ] `npm test`, `npx tsc --noEmit` et la couverture passent dans `backend/`.
+- [x] Par défaut, aucune réponse du backend (`/api/public/settings`, `/uploads/<image>`) ne porte `Strict-Transport-Security`, ni en direct sur le port 3001, ni à travers nginx.
+- [x] Les autres en-têtes helmet sont inchangés.
+- [x] Sans objet (option du point 2 non retenue) : avec la variable définie, l'en-tête est présent avec la valeur attendue.
+- [x] `npm test`, `npx tsc --noEmit` et la couverture passent dans `backend/`.
 
 ## Tests à ajouter ou adapter
 
@@ -53,3 +53,5 @@ Relevé par la revue de la PR #61 (D-02), remarque 3 ; l'humain a demandé une t
 ## Journal
 
 - 2026-10-10 : tâche créée à la demande de l'humain, à partir de la remarque 3 de la revue de la PR #61 (D-02). Numéro C-20 : C-17 à C-19 sont pris par la PR #60, non mergée.
+- 2026-11-24 : réalisée (PR #211). `strictTransportSecurity: false` dans `helmet()`, autres en-têtes inchangés. Mesuré sur un projet compose `carta-c-20` construit depuis `develop` : avant, `/api/*` (200, 401, 404) et `/uploads/*` portaient `max-age=31536000; includeSubDomains` à travers nginx comme en direct sur 3001, `/`, routes SPA et `/assets/*` aucun HSTS ; après, aucune réponse n'en porte, et l'ensemble des en-têtes de `/api/public/settings` ne diffère que de cette ligne. Avec la ligne commentée de `security-headers.conf` activée dans le conteneur, chaque réponse (SPA, API, photos) porte un seul `max-age=31536000` (avant, `/api/*` et `/uploads/*` en auraient porté deux). Option `HSTS_MAX_AGE` non retenue : le backend ne sait pas si TLS se termine devant lui, et HSTS s'applique à tout l'hôte (et à ses sous-domaines avec `includeSubDomains`) dès qu'une réponse HTTPS le porte ; une variable ferait décider cette politique par un second réglage. Le reverse proxy ou la ligne de `security-headers.conf` la fixent déjà, d'une seule valeur, là où se termine TLS (`docs/operations.md` › HTTPS, juste désormais sans modification). `touches` réduit à `app.ts` et `app.test.ts` (`config.ts`, `config.test.ts` et `.env.example` servaient à l'option). Tests : pas de HSTS sur une route API, une photo et une photo absente (échouent sans le correctif), en-têtes helmet témoins inchangés sur l'API et les photos.
+- Notes de version : les réponses de l'API et des photos (`/api/*`, `/uploads/*`) ne portent plus `Strict-Transport-Security` (helmet l'envoyait : un an, sous-domaines compris). Un site servi en HTTPS avait donc HSTS sur tout l'hôte et ses sous-domaines par ces réponses. Aucune action obligatoire ; pour garder HSTS, l'activer dans le reverse proxy (exemple Caddy dans `docs/operations.md` › HTTPS) ou avec la ligne commentée de `frontend/security-headers.conf`. Les navigateurs qui ont enregistré l'ancien en-tête le gardent jusqu'à son expiration (un an) : un sous-domaine servi en HTTP y reste forcé en HTTPS jusque-là.

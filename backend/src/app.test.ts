@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import type { Express } from 'express';
+import fs from 'fs';
+import path from 'path';
 import supertest from 'supertest';
 import app from './app';
+import { config } from './config';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
   request, authHeader, seedUnit, seedCategory, seedBottle, seedIngredient, seedCocktailUsing, prisma,
@@ -162,6 +165,47 @@ describe('CORS', () => {
       .set('Origin', 'https://evil.example')
       .set('Access-Control-Request-Method', 'POST');
     expect(res.headers['access-control-allow-origin']).toBeUndefined();
+  });
+});
+
+describe('Security headers', () => {
+  const PHOTO_NAME = 'security-headers-test.png';
+  const photoPath = path.join(config.uploadDir, PHOTO_NAME);
+
+  beforeAll(() => {
+    fs.mkdirSync(config.uploadDir, { recursive: true });
+    fs.writeFileSync(photoPath, Buffer.from('not really a png'));
+  });
+  afterAll(() => { fs.rmSync(photoPath, { force: true }); });
+
+  // The helmet headers that HSTS must not take down with it
+  const HELMET_HEADERS = {
+    'cross-origin-resource-policy': 'cross-origin',
+    'cross-origin-opener-policy': 'same-origin',
+    'origin-agent-cluster': '?1',
+    'referrer-policy': 'no-referrer',
+    'x-content-type-options': 'nosniff',
+    'x-dns-prefetch-control': 'off',
+    'x-download-options': 'noopen',
+    'x-frame-options': 'SAMEORIGIN',
+    'x-permitted-cross-domain-policies': 'none',
+    'x-xss-protection': '0',
+  };
+
+  it.each([
+    ['an API route', '/api/public/settings', 200],
+    ['an uploaded photo', `/uploads/${PHOTO_NAME}`, 200],
+    ['a missing photo', '/uploads/missing.png', 404],
+  ])('%s does not carry Strict-Transport-Security', async (_label, url, status) => {
+    const res = await request.get(url);
+    expect(res.status).toBe(status);
+    expect(res.headers['strict-transport-security']).toBeUndefined();
+  });
+
+  it.each(['/api/public/settings', `/uploads/${PHOTO_NAME}`])('%s keeps the other helmet headers', async (url) => {
+    const res = await request.get(url);
+    expect(res.headers).toEqual(expect.objectContaining(HELMET_HEADERS));
+    expect(res.headers['content-security-policy']).toContain("default-src 'self'");
   });
 });
 
