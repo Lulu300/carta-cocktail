@@ -50,3 +50,4 @@ Aucun nouveau test. `frontend/src/i18n/index.test.ts` (A-08) protège la détect
 
 - 2026-10-08 : tâche créée à partir du rapport de dépendances.
 - 2026-10-08 : suivi des revues de la phase A. Options réelles posées par A-08 (`supportedLngs`, `detection.order`, `detection.convertDetectedLanguage`, pas de `load`) et rôle de `frontend/src/i18n/index.test.ts` comme garde-fou de la montée.
+- 2026-11-24 : après la release v1.14.0, Dependabot garde deux alertes modérées sur `i18next` < 26.3.4 (GHSA-6jcc-5g8w-32mx), #22 (backend) et #23 (frontend), sous le seuil `high` de l'audit de la CI. Cette tâche les ferme.
