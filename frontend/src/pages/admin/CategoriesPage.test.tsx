@@ -23,6 +23,10 @@ const doubleSpaced = buildCategoryType({ name: 'X  Y', color: 'gray', _count: { 
 const singleSpaced = buildCategoryType({ name: 'X Y', color: 'gray', _count: { categories: 0 } });
 const tabbed = buildCategoryType({ name: 'X\tY', color: 'gray', _count: { categories: 0 } });
 const DOUBLE_SPACED_LABEL = 'X␣␣Y categoryTypes.withSpaces';
+// HTML shows a zero-width space as nothing: 'X\u200BY' looks exactly like 'XY'.
+const zeroWidth = buildCategoryType({ name: 'X\u200BY', color: 'gray', _count: { categories: 1 } });
+const joined = buildCategoryType({ name: 'XY', color: 'gray', _count: { categories: 0 } });
+const ZERO_WIDTH_LABEL = 'X[U+200B]Y categoryTypes.withInvisibleCharacters';
 
 type User = ReturnType<typeof userEvent.setup>;
 
@@ -342,6 +346,19 @@ describe('CategoriesPage', () => {
 
         expect(await openTypeOptions(user)).toEqual([`Mixers – ${DOUBLE_SPACED_LABEL}`, 'Mixers', 'categories.otherType']);
       });
+
+      it('tells a type with an invisible character from the type without it, also with the same translation', async () => {
+        const user = userEvent.setup();
+        const nameTranslations = { en: 'Mixers' };
+        mockApiResponse('get', '/api/category-types', [
+          zeroWidth, joined, { ...zeroWidth, name: 'Z\u200BW', nameTranslations }, { ...joined, name: 'ZW', nameTranslations },
+        ]);
+
+        expect(await openTypeOptions(user)).toEqual([
+          ZERO_WIDTH_LABEL, 'XY', 'Mixers – Z[U+200B]W categoryTypes.withInvisibleCharacters', 'Mixers', 'categories.otherType',
+        ]);
+        expect(within(categoryDialog()).getByRole('option', { name: ZERO_WIDTH_LABEL })).toBeInTheDocument();
+      });
     });
 
     describe('a category whose type has an empty name', () => {
@@ -651,6 +668,18 @@ describe('CategoriesPage', () => {
       const rows = within(manager).getAllByRole('listitem').map((row) => row.textContent);
       expect(rows[0]).toContain(`${DOUBLE_SPACED_LABEL}${DOUBLE_SPACED_LABEL}(1)`);
       expect(rows[1]).toContain('X YX Y(0)');
+    });
+
+    it('tells a type with an invisible character from the type without it', async () => {
+      const user = userEvent.setup();
+      mockApiResponse('get', '/api/category-types', [zeroWidth, joined]);
+      await renderLoadedPage();
+
+      const manager = await openTypesManager(user);
+
+      const rows = within(manager).getAllByRole('listitem').map((row) => row.textContent);
+      expect(rows[0]).toContain(`${ZERO_WIDTH_LABEL}${ZERO_WIDTH_LABEL}(1)`);
+      expect(rows[1]).toContain('XYXY(0)');
     });
 
     // The decision is about names: a translation is shown as the admin typed it
