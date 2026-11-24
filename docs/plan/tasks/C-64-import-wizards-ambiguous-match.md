@@ -46,6 +46,7 @@ Sur la branche de C-19 :
 
 - C-62 touche les mêmes fichiers : la faire après.
 - Le type `ImportMatchStatus` et les champs `ambiguousMatches` sont déjà dans `frontend/src/types/index.ts` (C-19).
+- Depuis C-19, une résolution « Créer » dont le nom existe déjà à la casse près (sans ambiguïté) est rattachée à la ligne existante, telle quelle : le type, le stock et les traductions saisis dans l'assistant sont ignorés. Le signaler à côté du nom saisi est possible dans la même tâche, mais pas exigé.
 
 ## Journal
 
