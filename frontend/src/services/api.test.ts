@@ -860,6 +860,31 @@ describe('categoryTypes API', () => {
     await api.categoryTypes.delete('SPIRIT');
     expect(mockFetch.mock.calls[3][1].method).toBe('DELETE');
   });
+
+  it('should send a name with surrounding spaces as it is, encoded in the path', async () => {
+    const api = await getApi();
+    mockOk({});
+    await api.categoryTypes.update(' SPIRIT ', { color: 'blue' });
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/category-types/%20SPIRIT%20');
+
+    mockOk({ message: 'ok' });
+    await api.categoryTypes.delete(' SPIRIT ');
+    expect(mockFetch.mock.calls[1][0]).toBe('/api/category-types/%20SPIRIT%20');
+  });
+
+  // An empty path segment cannot be addressed: the empty name goes in the query.
+  it('should send the empty name in the query', async () => {
+    const api = await getApi();
+    mockOk({});
+    await api.categoryTypes.update('', { color: 'blue' });
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/category-types?name=');
+    expect(mockFetch.mock.calls[0][1].method).toBe('PUT');
+
+    mockOk({ message: 'ok' });
+    await api.categoryTypes.delete('');
+    expect(mockFetch.mock.calls[1][0]).toBe('/api/category-types?name=');
+    expect(mockFetch.mock.calls[1][1].method).toBe('DELETE');
+  });
 });
 
 describe('backup API', () => {

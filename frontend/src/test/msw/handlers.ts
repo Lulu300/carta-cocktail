@@ -89,6 +89,11 @@ const categoryTypeHandlers = [
     HttpResponse.json({ ...(await readJsonObject(request)), name: params.name }),
   ),
   http.delete('/api/category-types/:name', deleted),
+  // The empty name of old data goes in the query (`?name=`), see categoryTypeUrl in services/api.ts.
+  http.put('/api/category-types', async ({ request }) =>
+    HttpResponse.json({ ...(await readJsonObject(request)), name: new URL(request.url).searchParams.get('name') }),
+  ),
+  http.delete('/api/category-types', deleted),
 ];
 
 const categoryHandlers = [
