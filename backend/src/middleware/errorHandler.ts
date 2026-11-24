@@ -76,9 +76,9 @@ export function toHttpError(err: unknown, method = 'GET'): HttpError {
  * Passed under `replace` so that a detail named like an i18next option (`count`, `lng`)
  * never changes how the message is chosen.
  */
-function interpolationOptions(details: unknown): { replace: object } | undefined {
+function interpolationOptions(details: unknown): { replace?: object } {
   const isObject = typeof details === 'object' && details !== null && !Array.isArray(details);
-  return isObject ? { replace: details } : undefined;
+  return isObject ? { replace: details } : {};
 }
 
 export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
