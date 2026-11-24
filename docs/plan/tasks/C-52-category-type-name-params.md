@@ -51,7 +51,7 @@ Le frontend envoie déjà le nom tel qu'il est stocké (`useCategoryTypeForm` pa
 ## Tests à ajouter ou adapter
 
 - `backend/src/routes/categoryTypes.test.ts` : ` SPIRIT ` à côté de `SPIRIT` (édition, suppression, 409, 404), forme `?name=` (nom vide édité et supprimé, 409, nom non trimé, 404, 400 sans nom ou avec deux noms).
-- `backend/src/routes/categories.test.ts` : édition qui garde ` SPIRIT `, 400 pour un type vide, création qui trime.
+- `backend/src/routes/categories.test.ts` : édition qui garde ` SPIRIT `, 400 pour un type vide, création qui trime (remplacé par C-57).
 - `frontend/src/services/api.test.ts` : nom à espaces encodé dans le chemin, nom vide dans la query.
 - `frontend/src/pages/admin/CategoriesPage.test.tsx` : édition et suppression du type au nom vide depuis Manage Types, enregistrement d'une catégorie de type ` SPIRIT `.
 
