@@ -33,8 +33,8 @@ export async function ensureCategoryType(db: Db, name: string): Promise<string> 
 
 /**
  * The 400 of the `validate` middleware for a blank type, which would create a type with no name.
- * Only the category edit sends the type untrimmed (the other callers' schemas refuse a blank
- * one), so the issue names its `body.type`.
+ * Only the category creation and edit send the type untrimmed (the imports' schemas refuse a
+ * blank one), so the issue names its `body.type`.
  */
 function blankTypeError(name: string): BadRequestError {
   const issues = RequiredText.safeParse(name).error?.issues ?? [];

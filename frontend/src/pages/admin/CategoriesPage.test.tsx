@@ -108,7 +108,7 @@ describe('CategoriesPage', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
-    it('creates a category of a custom type, upper-cased', async () => {
+    it('creates a category of a custom type, trimmed and upper-cased', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
       const created = captureRequest('post', '/api/categories');
@@ -116,7 +116,7 @@ describe('CategoriesPage', () => {
 
       await user.type(within(categoryDialog()).getByLabelText(/categories\.name/), 'Tonic');
       await user.selectOptions(within(categoryDialog()).getByLabelText('categories.type'), '__OTHER__');
-      await user.type(within(categoryDialog()).getByPlaceholderText('categories.customType'), 'mixer');
+      await user.type(within(categoryDialog()).getByPlaceholderText('categories.customType'), '  mixer ');
       await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
 
       expect(await created.body).toEqual({
@@ -126,6 +126,21 @@ describe('CategoriesPage', () => {
         minimumPercent: 30,
         nameTranslations: null,
       });
+    });
+
+    // Data older than v1.9.0 can hold ' SPIRIT ' next to 'SPIRIT': the creation sends the type picked as stored.
+    it('creates a category with a type picked from the list as it is stored', async () => {
+      const user = userEvent.setup();
+      mockApiResponse('get', '/api/category-types', [spirit, spacedSpirit]);
+      await renderLoadedPage();
+      const created = captureRequest('post', '/api/categories');
+      await user.click(screen.getByRole('button', { name: 'categories.add' }));
+
+      await user.type(within(categoryDialog()).getByLabelText(/categories\.name/), 'Rum');
+      await user.selectOptions(within(categoryDialog()).getByLabelText('categories.type'), ' SPIRIT ');
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
+
+      expect(await created.body).toMatchObject({ name: 'Rum', type: ' SPIRIT ' });
     });
 
     it('does not send a blank custom type', async () => {
