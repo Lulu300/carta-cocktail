@@ -209,6 +209,8 @@ describe('translation keys used in the code', () => {
     'cocktails.importWizard.${type}',
     '${type}.name',
     'bottles.importWizard.rowErrors.source.${source}',
+    'validation.fields.${field}',
+    'validation.codes.${code}',
   ];
 
   /** "colors.${color}" matches "colors.blue": each placeholder stands for one key segment. */

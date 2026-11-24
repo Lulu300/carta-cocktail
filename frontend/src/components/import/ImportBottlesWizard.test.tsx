@@ -3,7 +3,9 @@ import { render, screen, waitFor, fireEvent } from '../../test/test-utils';
 import userEvent from '@testing-library/user-event';
 import ImportBottlesWizard from './ImportBottlesWizard';
 import { buildCategory, buildCategoryType } from '../../test/factories';
-import { captureRequest, mockApiError, mockApiResponse } from '../../test/msw/utils';
+import { captureRequest, mockApiError, mockApiResponse, mockValidationError } from '../../test/msw/utils';
+// The validation messages of a refused import are admin messages, as in the app
+import '../../i18n/admin';
 import type { BottleImportConfirmResponse, BottleImportPreviewResponse } from '../../types';
 
 const samplePreview: BottleImportPreviewResponse = {
@@ -359,5 +361,19 @@ describe('ImportBottlesWizard', () => {
     expect(screen.getByText('bottles.importWizard.error')).toBeInTheDocument();
     await user.click(screen.getByText('bottles.importWizard.close'));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('names the row and the field when the confirmation is refused by the validation', async () => {
+    mockValidationError('post', '/api/bottles/import/confirm', [
+      { path: 'body.payload.bottles.1.capacityMl', code: 'too_small' },
+    ]);
+    render(<ImportBottlesWizard onClose={vi.fn()} />);
+    const user = await previewWith(samplePreview);
+
+    await user.click(screen.getAllByText('bottles.importWizard.next').at(-1)!);
+    await user.click(screen.getByText('bottles.importWizard.confirmImport'));
+
+    expect(await screen.findByText('Row 2, Capacity (ml): value too small')).toBeInTheDocument();
+    expect(screen.queryByText('Validation error')).not.toBeInTheDocument();
   });
 });

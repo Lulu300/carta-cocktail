@@ -4,7 +4,11 @@ import { fireEvent, screen, waitFor, within } from '../../test/test-utils';
 import { clearToasts, renderWithFeedback } from '../../test/feedback';
 import { axe } from '../../test/axe';
 import { buildUnit } from '../../test/factories';
-import { captureRequest, mockApiError, mockApiPending, mockApiResponse, mockNetworkError } from '../../test/msw/utils';
+import {
+  captureRequest, mockApiError, mockApiPending, mockApiResponse, mockNetworkError, mockValidationError,
+} from '../../test/msw/utils';
+// Registers the admin messages, and with them the names of the fields a validation 400 refuses
+import '../../i18n/admin';
 import UnitsPage from './UnitsPage';
 
 vi.mock('react-i18next', async (importOriginal) => {
@@ -142,6 +146,20 @@ describe('UnitsPage', () => {
     await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('This unit already exists'));
+    expect(dialog()).toBeInTheDocument();
+  });
+
+  // A name of spaces passes the `required` of the form, then the backend refuses it.
+  it('names the refused field when the backend refuses a name of spaces', async () => {
+    const user = userEvent.setup();
+    mockValidationError('post', '/api/units', [{ path: 'body.name', code: 'too_small' }]);
+    await renderLoadedPage();
+    await fillCreateForm(user, '   ', 'cl');
+
+    await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Name: required'));
+    expect(screen.getByRole('alert')).not.toHaveTextContent('Validation error');
     expect(dialog()).toBeInTheDocument();
   });
 

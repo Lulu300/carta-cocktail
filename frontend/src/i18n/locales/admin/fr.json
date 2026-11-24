@@ -480,7 +480,44 @@
   "validation": {
     "required": "Obligatoire",
     "positive": "Doit être supérieur à 0",
-    "sourceRequired": "Choisissez un élément"
+    "sourceRequired": "Choisissez un élément",
+    "blank": "obligatoire",
+    "issue": "{{field}} : {{rule}}",
+    "issueInRow": "Ligne {{row}}, {{field}} : {{rule}}",
+    "issueInCategoryRow": "Catégorie {{row}}, {{field}} : {{rule}}",
+    "fields": {
+      "name": "Nom",
+      "slug": "Slug URL",
+      "abbreviation": "Abréviation",
+      "type": "Type",
+      "description": "Description",
+      "color": "Couleur",
+      "instructions": "Étape",
+      "capacityMl": "Contenance (ml)",
+      "remainingPercent": "Restant (%)",
+      "alcoholPercentage": "Alcool (% vol.)",
+      "purchasePrice": "Prix d'achat",
+      "openedAt": "Ouverte le",
+      "location": "Localisation",
+      "quantity": "Quantité",
+      "categoryName": "Catégorie",
+      "categoryId": "Catégorie",
+      "bottleId": "Bouteille",
+      "ingredientId": "Ingrédient",
+      "unitId": "Unité",
+      "preferredBottleIds": "Bouteilles préférées",
+      "desiredStock": "Stock souhaité",
+      "minimumPercent": "Seuil d'alerte (%)",
+      "conversionFactorToMl": "Facteur de conversion (ml)"
+    },
+    "codes": {
+      "invalid_type": "valeur manquante ou invalide",
+      "too_small": "valeur trop petite",
+      "too_big": "valeur trop grande",
+      "invalid_value": "valeur non autorisée",
+      "invalid_format": "format invalide",
+      "custom": "valeur invalide"
+    }
   },
   "dates": {
     "day": "jj",
