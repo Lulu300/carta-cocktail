@@ -18,6 +18,15 @@ services:
       # Only needed to create the admin on first start, or with ADMIN_RESET_PASSWORD=true
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - ADMIN_RESET_PASSWORD=${ADMIN_RESET_PASSWORD:-false}
+      # Optional settings, read from .env (see README, "Environment Variables").
+      # Unset or empty: the backend uses its default. They stay above PORT so that a
+      # line added by hand at the end of this list, as older READMEs said, still wins.
+      - SQLITE_WAL=${SQLITE_WAL:-}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-}
+      - LOGIN_RATE_LIMIT=${LOGIN_RATE_LIMIT:-}
+      - API_RATE_LIMIT=${API_RATE_LIMIT:-}
+      - TRUST_PROXY=${TRUST_PROXY:-}
+      - CORS_ORIGIN=${CORS_ORIGIN:-}
       - PORT=3001
       - UPLOAD_DIR=/app/uploads
     volumes:
