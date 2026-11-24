@@ -6,7 +6,7 @@ import {
   seedMenu, seedMenuSection, addBottleToMenu, excludeBottleFromMenu, findSystemMenu,
 } from '../test/helpers';
 import type { BottlesExportPayload } from '../utils/bottlesExport';
-import type { ImportCategoryRecord } from '../utils/bottlesImport';
+import { MAX_BOTTLE_IMPORT_BYTES, type ImportCategoryRecord } from '../utils/bottlesImport';
 import { windows1252Bytes } from '../test/windows1252';
 
 beforeAll(async () => { await setupTestDatabase(); });
@@ -739,10 +739,31 @@ describe('POST /api/bottles/import/preview', () => {
     expect(res.body.details).toEqual({ code: 'missingColumn', column: 'capacityMl' });
   });
 
-  it('should answer 413 JSON for a file over 10 MB', async () => {
+  // JSON ignores the trailing spaces that bring the file to the size under test
+  function importFileOf(size: number): Buffer {
+    const payload = { version: 1, bottles: [{ name: 'Havana', categoryName: 'Rhum', capacityMl: 700, quantity: 1 }] };
+    return Buffer.from(JSON.stringify(payload).padEnd(size, ' '));
+  }
+
+  it.each([
+    ['one byte under the limit', MAX_BOTTLE_IMPORT_BYTES - 1],
+    ['exactly the limit', MAX_BOTTLE_IMPORT_BYTES],
+  ])('should read a file of %s', async (_case, size) => {
+    const file = importFileOf(size);
+    expect(file.length).toBe(size);
+
     const res = await request.post('/api/bottles/import/preview')
       .set(authHeader())
-      .attach('file', Buffer.alloc(11 * 1024 * 1024), 'bottles.csv');
+      .attach('file', file, 'bottles.json');
+
+    expect(res.status).toBe(200);
+    expect(res.body.payload.bottles).toHaveLength(1);
+  });
+
+  it('should answer 413 JSON for a file one byte over the limit', async () => {
+    const res = await request.post('/api/bottles/import/preview')
+      .set(authHeader())
+      .attach('file', importFileOf(MAX_BOTTLE_IMPORT_BYTES + 1), 'bottles.json');
     expect(res.status).toBe(413);
     expect(res.body.error).toBe('The file or request is too large');
   });

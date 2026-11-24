@@ -10,6 +10,7 @@ import {
 } from '../test/helpers';
 import type { CocktailIngredient } from '../generated/prisma/client';
 import type { CocktailExportFile } from '../services/cocktail/cocktailExport';
+import { MAX_IMAGE_BYTES } from '../services/cocktail/cocktailImage';
 import { MAX_EXPORT_BATCH } from '../validation/cocktails';
 
 beforeAll(async () => { await setupTestDatabase(); });
@@ -1196,11 +1197,11 @@ function uploadedFiles(): string[] {
   return fs.existsSync(config.uploadDir) ? fs.readdirSync(config.uploadDir) : [];
 }
 
-function uploadImage(id: number, filename: string, contentType: string) {
+function uploadImage(id: number, filename: string, contentType: string, content = Buffer.from('image-data')) {
   return request
     .post(`/api/cocktails/${id}/image`)
     .set(authHeader())
-    .attach('image', Buffer.from('image-data'), { filename, contentType });
+    .attach('image', content, { filename, contentType });
 }
 
 describe('POST /api/cocktails/:id/image - file checks', () => {
@@ -1226,6 +1227,29 @@ describe('POST /api/cocktails/:id/image - file checks', () => {
 
     expect(res.status).toBe(400);
     expect(uploadedFiles()).toEqual(before);
+  });
+
+  it.each([
+    ['one byte under the limit', MAX_IMAGE_BYTES - 1],
+    ['exactly the limit', MAX_IMAGE_BYTES],
+  ])('should store a photo of %s, whole', async (_case, size) => {
+    const cocktail = await seedCocktail();
+
+    const res = await uploadImage(cocktail.id, 'photo.jpg', 'image/jpeg', Buffer.alloc(size));
+
+    expect(res.status).toBe(200);
+    expect(fs.statSync(path.join(config.uploadDir, res.body.imagePath)).size).toBe(size);
+  });
+
+  it('should answer 413 and keep no file for a photo one byte over the limit', async () => {
+    const cocktail = await seedCocktail();
+    const before = uploadedFiles();
+
+    const res = await uploadImage(cocktail.id, 'photo.jpg', 'image/jpeg', Buffer.alloc(MAX_IMAGE_BYTES + 1));
+
+    expect(res.status).toBe(413);
+    expect(uploadedFiles()).toEqual(before);
+    expect((await prisma.cocktail.findUniqueOrThrow({ where: { id: cocktail.id } })).imagePath).toBeNull();
   });
 
   it('should store the image under a random name with the lowercased extension', async () => {

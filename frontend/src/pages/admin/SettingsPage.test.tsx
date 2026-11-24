@@ -72,7 +72,7 @@ function profileSaveButton() {
   return screen.getAllByText('common.save')[1];
 }
 
-// MAX_BACKUP_UPLOAD_BYTES of backend/src/services/backupService.ts
+// MAX_BACKUP_UPLOAD_BYTES of backend/src/services/backupService.ts, the largest archive it accepts
 const BACKEND_UPLOAD_LIMIT = 200 * 1024 * 1024;
 
 /** Chooses an archive in the hidden file input, of `size` bytes when given. */
@@ -401,10 +401,13 @@ describe('SettingsPage', () => {
     expect(restore.count()).toBe(0);
   });
 
-  it('sends an archive of exactly the backend limit, as before', async () => {
+  it.each([
+    ['one byte under the backend limit', BACKEND_UPLOAD_LIMIT - 1],
+    ['exactly the backend limit', BACKEND_UPLOAD_LIMIT],
+  ])('sends an archive of %s', async (_case, size) => {
     await renderLoadedPage();
     const restore = captureRequest('post', '/api/backup/import');
-    await selectBackupFileAndClickImport(BACKEND_UPLOAD_LIMIT);
+    await selectBackupFileAndClickImport(size);
     await answerRestoreDialog('settings.backup.import');
 
     expect(await screen.findByText('settings.backup.importSuccess')).toBeInTheDocument();
@@ -433,7 +436,7 @@ describe('SettingsPage', () => {
     expect(screen.queryByRole('button', { name: /settings\.backup\.import/ })).not.toBeInTheDocument();
   });
 
-  // The backend refuses an archive of exactly its limit, and a proxy in front may have a lower one
+  // A proxy in front of the app may have a lower limit than the backend
   it('keeps the translated message of a 413 for an archive sent to the server', async () => {
     mockProxyError('post', '/api/backup/import', 413);
     await renderLoadedPage();
