@@ -5,13 +5,13 @@ phase: C
 lane: frontend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-30, C-22]
-touches: [frontend/src/i18n/locales/, frontend/src/pages/admin/SettingsPage.tsx]
+touches: [frontend/src/i18n/locales/, frontend/src/pages/admin/SettingsPage.tsx, frontend/src/pages/auth/LoginPage.tsx, frontend/src/utils/signInAfterRestore.ts]
 sources: []
-branch:
-pr:
+branch: fix/C-31-restore-sign-out-warning
+pr: "#223"
 ---
 
 ## Contexte
@@ -32,8 +32,8 @@ Depuis C-30, une restauration révoque toutes les sessions, celle qui l'a lancé
 
 ## Critères d'acceptation
 
-- [ ] Avant et après la restauration, l'admin sait qu'il devra se reconnecter et avec quel mot de passe.
-- [ ] Aucun texte en dur.
+- [x] Avant et après la restauration, l'admin sait qu'il devra se reconnecter et avec quel mot de passe.
+- [x] Aucun texte en dur.
 
 ## Tests à ajouter ou adapter
 
@@ -48,3 +48,5 @@ Depuis C-30, une restauration révoque toutes les sessions, celle qui l'a lancé
 
 - 2026-10-11 : tâche créée pendant C-30.
 - 2026-10-11 : revue de la PR #93 : ajout du commentaire de `SettingsPage.tsx` à mettre à jour ; la sauvegarde antérieure à v1.11.0 déconnecte aussi l'admin (au démarrage suivant).
+- 2026-11-25 : PR #223. Faits revérifiés : les messages de 504 et de non-réponse (E-47, E-50) parlaient déjà de déconnexion, la confirmation non. La confirmation dit maintenant que le compte admin est remplacé lui aussi, et qu'il faudra se reconnecter avec l'email et le mot de passe en vigueur à la date de la sauvegarde. Après la restauration, la page ouvre `/login?reason=backup-restored` par un chargement complet : la page de connexion répète le message (`auth.backupRestored`). Sans rapport, elle s'ouvre tout de suite : plus de rechargement après 1,5 s, et `importSuccess` disparaît. Avec rapport, le bouton devient « Se reconnecter » ou « Se reconnecter une fois le backend redémarré » (`signIn`/`signInAfterRestart` remplacent `reload`/`reloadAfterRestart`). Commentaire de `handleBackupImport` corrigé. URL partagée par `utils/signInAfterRestore.ts`. Sondes de sabotage : 5, toutes détectées.
+- Notes de version : avant une restauration, la confirmation prévient qu'il faudra se reconnecter avec l'email et le mot de passe de la sauvegarde. Après la restauration, la page de connexion s'ouvre et le rappelle. Le bouton du rapport de restauration s'appelle désormais « Sign in again once the backend has restarted » (« Se reconnecter une fois le backend redémarré ») : mettre à jour la citation de l'ancien libellé (« Reload the page once the backend has restarted ») dans `UPGRADING.md`, section « Restoring a backup from an older version ».
