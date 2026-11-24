@@ -3,14 +3,15 @@
 # Version update PRs target `develop`, like any other change. Security update
 # PRs ignore this file's per-ecosystem options and always target the default
 # branch (`main`); they only exist once "Dependabot security updates" is
-# enabled in the repository settings.
+# enabled in the repository settings. GitHub reads this file from the default
+# branch only: a change takes effect after the next `develop` -> `main` merge.
 #
-# Ignored majors:
-# - those handled by a plan task: Prisma and better-sqlite3 (D-47; the three
-#   Prisma packages move together and better-sqlite3 stays in the range of
-#   @prisma/adapter-better-sqlite3), TypeScript (F-07);
-# - Node and @types/node, which follow the Node major of the images and CI
-#   (an LTS switch is done by hand).
+# Ignored majors, each followed by a plan task:
+# - Prisma and better-sqlite3 (D-47): the three Prisma packages move together,
+#   and better-sqlite3 stays in the range of @prisma/adapter-better-sqlite3;
+# - Node and @types/node (D-47), which follow the Node major of the images and
+#   CI (an LTS switch is done by hand);
+# - TypeScript (F-07).
 # Pre-releases are never proposed while the current version is a stable one,
 # even when the `latest` dist-tag points to one (as `prisma` 8.0.0-rc does).
 version: 2
