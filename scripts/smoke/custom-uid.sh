@@ -31,27 +31,42 @@ backend_logs() {
   docker compose logs --no-color "$BACKEND_SERVICE" 2>&1
 }
 
-# The refused container restarts in a loop (restart: unless-stopped): wait for its first log.
+# Reads the logs whole before searching them. Piped into `grep -q` under pipefail, a line
+# that is there can be missed: grep exits at the first match, and docker compose logs, still
+# writing, dies of SIGPIPE (status 141), which fails the pipeline.
+logs_contain() {
+  local logs
+  logs="$(backend_logs)"
+  grep -qF -- "$1" <<<"$logs"
+}
+
+# Waits up to 60 s for a line, then fails with the given message. Docker copies each write of
+# the entrypoint into the logs on its own, so one line of the refusal can be there before the
+# next one: wait for each line, never search a single read made after the first one.
+# The refused container restarts in a loop (restart: unless-stopped): the logs hold several
+# refusals, which does not matter to a fixed-string search.
 wait_for_log_line() {
-  local line="$1"
-  for _ in {1..30}; do
-    if backend_logs | grep -qF -- "$line"; then
-      return 0
+  local line="$1" failure="$2"
+  local deadline=$((SECONDS + 60))
+  until logs_contain "$line"; do
+    if ((SECONDS >= deadline)); then
+      backend_logs >&2
+      fail "$failure: no \"$line\" in the backend logs after 60 s"
     fi
-    sleep 2
+    sleep 1
   done
-  backend_logs >&2
-  fail "no \"$line\" in the backend logs after 60 s"
 }
 
 export CARTA_UID="$CUSTOM_ID" CARTA_GID="$CUSTOM_ID"
 
 echo "[1] As uid $CUSTOM_ID on volumes owned by uid 1000, the backend refuses to start"
 docker compose up -d --no-deps "$BACKEND_SERVICE"
-wait_for_log_line "ERROR: the backend runs as uid $CUSTOM_ID and cannot write to /app/data."
-backend_logs | grep -qF -- "chown -R $CUSTOM_ID:$CUSTOM_ID" \
-  || fail "the refusal does not give the chown command for $CUSTOM_ID:$CUSTOM_ID"
-if backend_logs | grep -qF -- "API running"; then
+wait_for_log_line "ERROR: the backend runs as uid $CUSTOM_ID and cannot write to /app/data." \
+  "the backend did not refuse to start as uid $CUSTOM_ID"
+wait_for_log_line "chown -R $CUSTOM_ID:$CUSTOM_ID" \
+  "the refusal does not give the chown command for $CUSTOM_ID:$CUSTOM_ID"
+# A single read is enough once the refusal is there: the entrypoint exits before it starts the API
+if logs_contain "API running"; then
   fail "the API started although the volumes belong to uid 1000"
 fi
 docker compose stop "$BACKEND_SERVICE"
