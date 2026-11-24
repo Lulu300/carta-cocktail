@@ -38,7 +38,7 @@ Le frontend envoie déjà le nom tel qu'il est stocké (`useCategoryTypeForm` pa
 
 1. `CategoryTypeParams` : `z.string().min(1)`, sans trim.
 2. Forme `?name=` : `PUT /api/category-types?name=` et `DELETE /api/category-types?name=`, schéma `CategoryTypeQuery` (`z.string()`, nom vide accepté seulement là). Les routes `/:name` restent. `services/api.ts` passe par la query pour le nom vide seulement.
-3. `CategoryUpdate.type` : `z.string().min(1)`, sans trim. `CategoryCreate` garde le trim.
+3. `CategoryUpdate.type` : `z.string().min(1)`, sans trim. `CategoryCreate` garde le trim (remplacé par C-57 : la création garde aussi un type existant tel quel).
 
 ## Critères d'acceptation
 
@@ -46,7 +46,7 @@ Le frontend envoie déjà le nom tel qu'il est stocké (`useCategoryTypeForm` pa
 - [x] `SPIRIT` s'édite et se supprime comme avant.
 - [x] Le type au nom vide s'édite et se supprime depuis Manage Types (`?name=`), avec le 409 habituel s'il est utilisé.
 - [x] Sans `name` ou avec deux `name`, la forme query répond 400 et ne touche rien.
-- [x] Enregistrer une catégorie de type ` SPIRIT ` la laisse sur ` SPIRIT ` ; la création d'une catégorie trime toujours le type.
+- [x] Enregistrer une catégorie de type ` SPIRIT ` la laisse sur ` SPIRIT ` ; la création d'une catégorie trime toujours le type (remplacé par C-57, PR #209).
 
 ## Tests à ajouter ou adapter
 

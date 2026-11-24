@@ -35,7 +35,7 @@ Décision de l'humain (2026-11-24), mot pour mot : « Code fix, next batch » �
 - [x] Une archive de plus de 200 Mo est refusée avant tout envoi (aucune requête vers `/api/backup/import`), avec le message `requestTooLarge` en/fr.
 - [x] Une archive de 200 Mo ou moins part comme avant.
 - [x] Le 413 du backend ou de nginx garde son message (E-46).
-- [ ] Vérifié dans Firefox avec un envoi bridé (le coordinateur sait le faire : proxy local qui limite le débit montant).
+- [x] Vérifié dans Firefox avec un envoi bridé (le coordinateur sait le faire : proxy local qui limite le débit montant).
 
 ## Tests à ajouter ou adapter
 
@@ -51,3 +51,4 @@ Décision de l'humain (2026-11-24), mot pour mot : « Code fix, next batch » �
 - 2026-11-24 : tâche créée par le coordinateur après le test bridé de la relecture de la PR #200 (voir le Journal d'E-46).
 - 2026-11-24 : fait (PR #201). Archive refusée dès son choix, sous le sélecteur de fichier, avec `common.requestTooLarge` et sans requête : l'admin l'apprend avant la confirmation, et le message a son propre état, si bien que choisir un fichier n'efface pas l'avertissement d'E-50. Limite du frontend `MAX_BACKUP_UPLOAD_BYTES` dans `SettingsPage.tsx`, commentée vers celle du backend. Une archive d'exactement 200 Mo part toujours, mais busboy refuse un fichier qui atteint la limite (413 du backend, bon message, lu par tous les navigateurs) : tâche E-59 créée. Critère Firefox bridé laissé au coordinateur, après le merge.
 - Notes de version : sur l'écran de sauvegarde, une archive de plus de 200 Mo est refusée dès qu'on la choisit, avant tout envoi (avant : envoi complet puis refus, ou, au-delà de 210 Mo dans Firefox, dix renvois puis un faux message « la restauration est peut-être encore en cours »). Aucune action requise.
+- 2026-11-24 : critère 4 vérifié par le coordinateur sur `v1.15.0-rc.1` (stack locale, proxy qui bride l'envoi à 4 Mo/s, Firefox 160 en instance séparée par WebDriver BiDi) : une archive de 250 Mo est refusée dès sa sélection avec « The file or request is too large », le bouton « Restore Backup » n'apparaît pas, et le journal de nginx ne montre aucune requête vers `/api/backup/import`.
