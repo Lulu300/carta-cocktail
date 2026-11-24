@@ -6,7 +6,9 @@ import { AuthRequest } from '../middleware/auth';
 import { BadRequestError, NotFoundError } from '../errors';
 import { parseNameTranslations, serializeTranslations } from '../utils/translations';
 import { buildExportPayload, buildCsvPayload } from '../utils/bottlesExport';
-import { ImportParseError, parseImportFile, NormalizedImportPayload } from '../utils/bottlesImport';
+import {
+  ImportParseError, MAX_BOTTLE_IMPORT_BYTES, parseImportFile, NormalizedImportPayload,
+} from '../utils/bottlesImport';
 import { deleteBottle, isForceRequested } from '../services/deletionService';
 import { syncBottle, syncNewBottles } from '../services/menuSyncService';
 import { ensureCategoryType } from '../services/categoryTypeService';
@@ -19,7 +21,7 @@ const router = Router();
 
 const importUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: MAX_BOTTLE_IMPORT_BYTES },
 });
 
 const listSchemas = { query: BottleListQuery };

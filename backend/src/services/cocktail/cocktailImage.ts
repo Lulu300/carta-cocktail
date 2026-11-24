@@ -15,7 +15,8 @@ const IMAGE_MIME_TYPES = new Map([
   ['.webp', 'image/webp'],
 ]);
 
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+/** Largest cocktail photo accepted, this size included (multer's fileSize, see backend/AGENTS.md). */
+export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 function extensionOf(file: Express.Multer.File): string {
   return path.extname(file.originalname).toLowerCase();

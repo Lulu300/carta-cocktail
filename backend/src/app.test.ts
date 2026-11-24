@@ -9,6 +9,7 @@ import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
   request, authHeader, seedUnit, seedCategory, seedBottle, seedIngredient, seedCocktailUsing, prisma,
 } from './test/helpers';
+import { MAX_IMAGE_BYTES } from './services/cocktail/cocktailImage';
 
 beforeAll(async () => { await setupTestDatabase(); });
 afterAll(async () => { await teardownTestDatabase(); });
@@ -110,12 +111,12 @@ describe('Request body errors', () => {
     expectJsonError(res);
   });
 
-  it('answers 413 JSON for a cocktail image over 5 MB', async () => {
+  it('answers 413 JSON for a cocktail image over its limit', async () => {
     const cocktail = await prisma.cocktail.create({ data: { name: 'Big Picture' } });
-    const sixMegabytes = Buffer.alloc(6 * 1024 * 1024);
+    const tooLarge = Buffer.alloc(MAX_IMAGE_BYTES + 1);
 
     const res = await request.post(`/api/cocktails/${cocktail.id}/image`).set(authHeader())
-      .attach('image', sixMegabytes, { filename: 'big.jpg', contentType: 'image/jpeg' });
+      .attach('image', tooLarge, { filename: 'big.jpg', contentType: 'image/jpeg' });
 
     expect(res.status).toBe(413);
     expectJsonError(res);

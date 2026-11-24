@@ -206,9 +206,21 @@ Never `JSON.stringify` or `JSON.parse` them by hand: use the helpers of `src/uti
   before `res.json()`: every response sends objects, never strings;
 - `parseTranslations(raw)` reads one column (exports).
 
+### File Uploads
+
+Every upload goes through multer, whose `limits.fileSize` is the largest file accepted, that size included: multer (2.5.0) passes `fileSize + 1` to busboy, which stops as soon as a file reaches the limit it is given. A file of exactly the limit is therefore accepted, one byte more gives `LIMIT_FILE_SIZE` and a 413. One exported constant per limit, used by multer and by the tests at the boundary (limit - 1, limit, limit + 1):
+
+| Upload | Constant |
+|--------|----------|
+| Cocktail photo | `MAX_IMAGE_BYTES` (`services/cocktail/cocktailImage.ts`) |
+| Bottle import | `MAX_BOTTLE_IMPORT_BYTES` (`utils/bottlesImport.ts`) |
+| Backup restore | `MAX_BACKUP_UPLOAD_BYTES` (`services/backupService.ts`) |
+
+nginx (`frontend/nginx.conf.template`) limits the whole multipart body, so its `client_max_body_size` keeps a margin above each limit for the multipart envelope. `src/uploadLimits.test.ts` reads the template and fails when a file of exactly a backend limit, with its envelope, would no longer fit under the limit of its nginx location. The admin page checks the backup size before sending it (`frontend/src/pages/admin/SettingsPage.tsx`).
+
 ### Image Upload
 
-- Uses multer with 5MB limit (`services/cocktail/cocktailImage.ts`)
+- Limit: `MAX_IMAGE_BYTES` (see File Uploads)
 - Accepted: jpg, jpeg, png, webp
 - Stored at the root of `config.uploadDir`: `UPLOAD_DIR`, or `<repo>/uploads` when it is not set. The Docker image and both compose files set `UPLOAD_DIR=/app/uploads` (the `uploads` volume)
 - Served statically at `/uploads/*`

@@ -13,7 +13,11 @@ import { hasTokenVersionColumn, writeSessionFloor } from './sessionFloor';
 /** Format of the backup archive, written to metadata.json. Every published version wrote 1. */
 export const BACKUP_FORMAT_VERSION = 1;
 
-/** Largest backup archive the import accepts (keep in line with frontend/nginx.conf.template). */
+/**
+ * Largest backup archive the import accepts, this size included (multer's fileSize, see
+ * backend/AGENTS.md). Keep in line with frontend/nginx.conf.template and
+ * frontend/src/pages/admin/SettingsPage.tsx.
+ */
 export const MAX_BACKUP_UPLOAD_BYTES = 200 * 1024 * 1024;
 
 // adm-zip extracts each entry in memory: these bounds keep a crafted archive

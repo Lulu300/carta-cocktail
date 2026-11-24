@@ -10,6 +10,9 @@ import { isRecord } from './records';
 
 export const BOTTLE_IMPORT_VERSION = 1;
 
+/** Largest bottle import file accepted, this size included (multer's fileSize, see backend/AGENTS.md). */
+export const MAX_BOTTLE_IMPORT_BYTES = 10 * 1024 * 1024;
+
 /** Largest file the parser reads from a ZIP once uncompressed. */
 export const MAX_ZIP_ENTRY_BYTES = 20 * 1024 * 1024;
 

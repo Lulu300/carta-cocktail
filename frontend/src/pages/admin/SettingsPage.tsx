@@ -29,7 +29,7 @@ function isGatewayTimeout(err: unknown): boolean {
 }
 
 /**
- * Largest backup archive the backend accepts: MAX_BACKUP_UPLOAD_BYTES in
+ * Largest backup archive the backend accepts, this size included: MAX_BACKUP_UPLOAD_BYTES in
  * backend/src/services/backupService.ts, keep both in line. A larger archive is refused before
  * it is sent, so that every browser shows the same message: past its own limit (210 MB), nginx
  * answers 413 while the archive is still being sent, and Firefox does not read that answer. It
