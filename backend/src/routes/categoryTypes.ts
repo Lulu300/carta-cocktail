@@ -26,7 +26,8 @@ const createSchemas = { body: CategoryTypeCreate };
 
 router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Response) => {
   const { name, nameTranslations, color } = valid<typeof createSchemas>(res).body;
-  const typeName = requireNewCategoryTypeName(name, ['body', 'name']).toUpperCase();
+  // Upper case first: it can decompose a composed letter ('ΐ' becomes 'Ι\u0308\u0301')
+  const typeName = requireNewCategoryTypeName(name.toUpperCase(), ['body', 'name']);
   const existing = await prisma.categoryType.findUnique({ where: { name: typeName } });
   if (existing) throw new ConflictError();
   const created = await prisma.categoryType.create({

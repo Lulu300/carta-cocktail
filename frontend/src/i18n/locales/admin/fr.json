@@ -67,7 +67,8 @@
     "deleted": "Type supprimé",
     "emptyName": "(sans nom)",
     "withSpaces": "(avec espaces)",
-    "withInvisibleCharacters": "(avec caractères invisibles)"
+    "withInvisibleCharacters": "(avec caractères invisibles)",
+    "nonStandardForm": "(forme Unicode non standard)"
   },
   "bottles": {
     "title": "Bouteilles",
