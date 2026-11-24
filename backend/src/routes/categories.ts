@@ -2,32 +2,15 @@ import { Router, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { NotFoundError } from '../errors';
-import { parseNameTranslations } from '../utils/translations';
+import { parseNameTranslations, serializeTranslations } from '../utils/translations';
 import { assertUniqueIgnoringCase } from '../utils/uniqueness';
 import { deleteCategory, isForceRequested } from '../services/deletionService';
+import { ensureCategoryType, withCategoryType } from '../services/categoryTypeService';
 import { valid, validate } from '../validation/validate';
 import { deleteRequest, IdParams, idRequest } from '../validation/common';
 import { CategoryCreate, CategoryUpdate } from '../validation/categories';
 
 const router = Router();
-
-// Helper: enrich categories with their CategoryType metadata
-async function enrichWithCategoryType<C extends { type: string }>(categories: C[]) {
-  const categoryTypes = await prisma.categoryType.findMany();
-  const typeMap = new Map(categoryTypes.map(ct => [ct.name, ct]));
-  return categories.map(c => ({
-    ...c,
-    categoryType: typeMap.get(c.type) || null,
-  }));
-}
-
-// Helper: auto-create CategoryType if it doesn't exist
-async function ensureCategoryType(type: string) {
-  const existing = await prisma.categoryType.findUnique({ where: { name: type } });
-  if (!existing) {
-    await prisma.categoryType.create({ data: { name: type, color: 'gray' } });
-  }
-}
 
 async function assertCategoryNameIsFree(name: string, ownId?: number) {
   const categories = await prisma.category.findMany({ select: { id: true, name: true } });
@@ -40,7 +23,7 @@ router.get('/', async (_req: AuthRequest, res: Response) => {
     include: { _count: { select: { bottles: true } } },
     orderBy: { name: 'asc' },
   });
-  const enriched = await enrichWithCategoryType(categories);
+  const enriched = await withCategoryType(categories);
   res.json(parseNameTranslations(enriched));
 });
 
@@ -51,7 +34,7 @@ router.get('/:id', validate(idRequest), async (_req: AuthRequest, res: Response)
     include: { bottles: true },
   });
   if (!category) throw new NotFoundError();
-  const [enriched] = await enrichWithCategoryType([category]);
+  const [enriched] = await withCategoryType([category]);
   res.json(parseNameTranslations(enriched));
 });
 
@@ -61,7 +44,7 @@ const createSchemas = { body: CategoryCreate };
 router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Response) => {
   const { name, type, desiredStock, minimumPercent, nameTranslations } = valid<typeof createSchemas>(res).body;
   await assertCategoryNameIsFree(name);
-  await ensureCategoryType(type);
+  await ensureCategoryType(prisma, type);
   const category = await prisma.category.create({
     data: {
       name,
@@ -69,7 +52,7 @@ router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Respons
       // ?? and not ||: a desired stock of 0 is kept
       desiredStock: desiredStock ?? 1,
       minimumPercent: minimumPercent ?? 30,
-      nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null,
+      nameTranslations: serializeTranslations(nameTranslations),
     },
   });
   res.status(201).json(parseNameTranslations(category));
@@ -85,7 +68,7 @@ router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Respo
     await assertCategoryNameIsFree(name, id);
   }
   if (type !== undefined) {
-    await ensureCategoryType(type);
+    await ensureCategoryType(prisma, type);
   }
   // Absent fields are undefined, which Prisma leaves untouched
   const category = await prisma.category.update({
@@ -95,7 +78,7 @@ router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Respo
       type,
       desiredStock,
       minimumPercent,
-      ...(nameTranslations !== undefined && { nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null }),
+      nameTranslations: serializeTranslations(nameTranslations),
     },
   });
   res.json(parseNameTranslations(category));

@@ -7,6 +7,7 @@ import { NotFoundError } from '../errors';
 import { calculateAvailabilities } from '../services/availabilityService';
 import { buildPublicCocktailSelect, CATEGORY_PUBLIC_SELECT } from '../services/cocktail/includes';
 import { exportCocktail } from '../services/cocktail/cocktailExport';
+import { getOrCreateSettings } from '../services/settingsService';
 
 const router = Router();
 
@@ -114,12 +115,7 @@ router.get('/menus/:slug', async (req: AuthRequest, res: Response) => {
 
 // Get site settings (public)
 router.get('/settings', async (_req: Request, res: Response) => {
-  let settings = await prisma.siteSettings.findUnique({ where: { id: 1 } });
-  if (!settings) {
-    settings = await prisma.siteSettings.create({
-      data: { id: 1, siteName: 'Carta Cocktail', siteIcon: '' },
-    });
-  }
+  const settings = await getOrCreateSettings();
   res.json({ siteName: settings.siteName, siteIcon: settings.siteIcon });
 });
 
@@ -137,7 +133,7 @@ router.get('/cocktails/:id/export', async (req: AuthRequest, res: Response) => {
 // List all units (public, needed for unit conversion on public pages)
 router.get('/units', async (_req: Request, res: Response) => {
   const units = await prisma.unit.findMany({ orderBy: { name: 'asc' } });
-  res.json(units);
+  res.json(parseNameTranslations(units));
 });
 
 // Get public cocktail detail

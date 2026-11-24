@@ -135,4 +135,27 @@ describe('GET /api/shortages', () => {
     expect(res.body[0].category.categoryType).toBeDefined();
     expect(res.body[0].category.categoryType.name).toBe('SPIRIT');
   });
+
+  it('should keep the fields of a shortage, translations as objects', async () => {
+    await prisma.categoryType.update({ where: { name: 'SPIRIT' }, data: { nameTranslations: JSON.stringify({ fr: 'Alcool' }) } });
+    const cat = await seedCategory({ name: 'Rum', desiredStock: 2, nameTranslations: JSON.stringify({ fr: 'Rhum' }) });
+    await seedBottle({ name: 'Rum 1', categoryId: cat.id, remainingPercent: 60 });
+
+    const res = await request.get('/api/shortages').set(authHeader());
+    expect(res.body).toEqual([{
+      category: {
+        id: cat.id,
+        name: 'Rum',
+        nameTranslations: { fr: 'Rhum' },
+        type: 'SPIRIT',
+        categoryType: { name: 'SPIRIT', nameTranslations: { fr: 'Alcool' }, color: 'blue' },
+        desiredStock: 2,
+        minimumPercent: 30,
+      },
+      totalPercent: 60,
+      requiredPercent: 130,
+      totalUsable: 1,
+      isShortage: true,
+    }]);
+  });
 });

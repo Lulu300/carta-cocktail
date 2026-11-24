@@ -1,5 +1,6 @@
 import { Prisma } from '../../generated/prisma/client';
 import { prisma } from '../../lib/prisma';
+import { parseTranslations } from '../../utils/translations';
 import { buildPublicCocktailSelect } from './includes';
 
 /**
@@ -52,16 +53,6 @@ export interface ExportedCocktail {
   instructions: { stepNumber: number; text: string }[];
 }
 
-/** Stored translations are a JSON string; an unreadable one is exported as null. */
-function parseStoredTranslations(value: Translations): Record<string, string> | null {
-  if (!value) return null;
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
-}
-
 function splitTags(tags: string): string[] {
   return tags.split(',').map((tag) => tag.trim()).filter(Boolean);
 }
@@ -75,14 +66,14 @@ function describeSource(line: ExportedLine): { sourceName: string; sourceDetail:
       sourceDetail: {
         categoryName: category.name,
         categoryType: category.type,
-        categoryNameTranslations: parseStoredTranslations(category.nameTranslations),
+        categoryNameTranslations: parseTranslations(category.nameTranslations),
       },
     };
   }
   if (line.sourceType === 'CATEGORY' && line.category) {
     return {
       sourceName: line.category.name,
-      sourceDetail: { type: line.category.type, nameTranslations: parseStoredTranslations(line.category.nameTranslations) },
+      sourceDetail: { type: line.category.type, nameTranslations: parseTranslations(line.category.nameTranslations) },
     };
   }
   if (line.sourceType === 'INGREDIENT' && line.ingredient) {
@@ -90,7 +81,7 @@ function describeSource(line: ExportedLine): { sourceName: string; sourceDetail:
       sourceName: line.ingredient.name,
       sourceDetail: {
         icon: line.ingredient.icon || null,
-        nameTranslations: parseStoredTranslations(line.ingredient.nameTranslations),
+        nameTranslations: parseTranslations(line.ingredient.nameTranslations),
       },
     };
   }
@@ -107,7 +98,7 @@ function exportLine(line: ExportedLine, { includePrivate }: ExportOptions) {
       name: line.unit.name,
       abbreviation: line.unit.abbreviation,
       conversionFactorToMl: line.unit.conversionFactorToMl,
-      nameTranslations: parseStoredTranslations(line.unit.nameTranslations),
+      nameTranslations: parseTranslations(line.unit.nameTranslations),
     },
     position: line.position,
     ...(includePrivate && {

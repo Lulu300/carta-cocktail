@@ -4,11 +4,12 @@ import { prisma } from '../lib/prisma';
 import multer from 'multer';
 import { AuthRequest } from '../middleware/auth';
 import { BadRequestError, NotFoundError } from '../errors';
-import { parseNameTranslations } from '../utils/translations';
+import { parseNameTranslations, serializeTranslations } from '../utils/translations';
 import { buildExportPayload, buildCsvPayload } from '../utils/bottlesExport';
 import { ImportParseError, parseImportFile, NormalizedImportPayload } from '../utils/bottlesImport';
 import { deleteBottle, isForceRequested } from '../services/deletionService';
 import { syncBottle, syncNewBottles } from '../services/menuSyncService';
+import { ensureCategoryType } from '../services/categoryTypeService';
 import { valid, validate } from '../validation/validate';
 import { deleteRequest, IdParams, idRequest } from '../validation/common';
 import { BottleCreate, BottleExportQuery, BottleListQuery, BottleUpdate } from '../validation/bottles';
@@ -130,17 +131,14 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
       } else if (resolution.action === 'create' && resolution.data) {
         // The schema fills the type, desired stock and minimum percent defaults
         const { nameTranslations, name, type, desiredStock, minimumPercent } = resolution.data;
-        const existingType = await tx.categoryType.findUnique({ where: { name: type } });
-        if (!existingType) {
-          await tx.categoryType.create({ data: { name: type, color: 'gray' } });
-        }
+        await ensureCategoryType(tx, type);
         const createdCat = await tx.category.create({
           data: {
             name: name || key,
             type,
             desiredStock,
             minimumPercent,
-            nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null,
+            nameTranslations: serializeTranslations(nameTranslations),
           },
         });
         categoryMap.set((name || key).toLowerCase(), createdCat.id);

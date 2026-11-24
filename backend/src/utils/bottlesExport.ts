@@ -1,3 +1,5 @@
+import { parseTranslations } from './translations';
+
 /**
  * Serialization helpers for bottle export (JSON + CSV).
  * Identical bottles (same attributes) are aggregated under a single entry
@@ -90,17 +92,12 @@ function collectCategories(bottles: BottleWithCategory[]): CategoryExportRecord[
   const seen = new Map<string, CategoryExportRecord>();
   for (const b of bottles) {
     if (seen.has(b.category.name)) continue;
-    let translations: Record<string, string> | null = null;
-    if (b.category.nameTranslations) {
-      try { translations = JSON.parse(b.category.nameTranslations); }
-      catch { translations = null; }
-    }
     seen.set(b.category.name, {
       name: b.category.name,
       type: b.category.type,
       desiredStock: b.category.desiredStock,
       minimumPercent: b.category.minimumPercent,
-      nameTranslations: translations,
+      nameTranslations: parseTranslations(b.category.nameTranslations),
     });
   }
   return Array.from(seen.values());

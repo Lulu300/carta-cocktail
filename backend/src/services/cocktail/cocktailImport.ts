@@ -4,6 +4,8 @@ import { prisma } from '../../lib/prisma';
 import { BadRequestError } from '../../errors';
 import { ImportRecipeV1, ImportResolutions } from '../../validation/cocktailImport';
 import { SOURCE_KEYS, SourceType } from '../../validation/cocktails';
+import { ensureCategoryType } from '../categoryTypeService';
+import { serializeTranslations } from '../../utils/translations';
 import { createCocktailIn, IngredientLineValue } from './cocktailService';
 import { collectImportReferences, ImportReferences, ImportedLine, lowercase } from './importReferences';
 
@@ -44,10 +46,6 @@ const SOURCE_KIND: Record<z.output<typeof SourceType>, EntityKind> = {
   CATEGORY: 'category',
   INGREDIENT: 'ingredient',
 };
-
-function stringifyTranslations(translations: Record<string, unknown> | null | undefined): string | null {
-  return translations ? JSON.stringify(translations) : null;
-}
 
 // --- Preview ---------------------------------------------------------------
 
@@ -140,11 +138,6 @@ function firstLineUsingBottle(recipe: ImportedRecipe, key: string): number {
   });
 }
 
-async function ensureCategoryType(db: Db, name: string): Promise<void> {
-  const existing = await db.categoryType.findUnique({ where: { name } });
-  if (!existing) await db.categoryType.create({ data: { name, color: 'gray' } });
-}
-
 // A name the admin cleared in the wizard falls back on the one in the file
 async function resolveAll(db: Db, recipe: ImportedRecipe, refs: ImportReferences, resolutions: Resolutions | undefined) {
   const unit = await resolveEntities(refs.units, resolutions?.units, async (data, ref, key) => {
@@ -155,7 +148,7 @@ async function resolveAll(db: Db, recipe: ImportedRecipe, refs: ImportReferences
         name: data.name || ref.name || abbreviation,
         abbreviation,
         conversionFactorToMl: data.conversionFactorToMl ?? null,
-        nameTranslations: stringifyTranslations(data.nameTranslations),
+        nameTranslations: serializeTranslations(data.nameTranslations),
       },
     });
     return created.id;
@@ -170,7 +163,7 @@ async function resolveAll(db: Db, recipe: ImportedRecipe, refs: ImportReferences
         type: data.type,
         desiredStock: data.desiredStock,
         minimumPercent: data.minimumPercent,
-        nameTranslations: stringifyTranslations(data.nameTranslations),
+        nameTranslations: serializeTranslations(data.nameTranslations),
       },
     });
     return created.id;
@@ -193,7 +186,7 @@ async function resolveAll(db: Db, recipe: ImportedRecipe, refs: ImportReferences
       data: {
         name: data.name || ref.name || key,
         icon: data.icon ?? null,
-        nameTranslations: stringifyTranslations(data.nameTranslations),
+        nameTranslations: serializeTranslations(data.nameTranslations),
       },
     });
     return created.id;

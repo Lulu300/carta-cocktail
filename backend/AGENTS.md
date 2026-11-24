@@ -174,11 +174,13 @@ router.put('/:id', validate(updateSchemas), async (_req, res) => {
 
 ### Translations
 
-Entity names support multi-language via JSON strings stored in SQLite:
-```typescript
-// Stored as: '{"fr": "Rhum", "en": "Rum"}'
-// Parsed with: JSON.parse(entity.nameTranslations || '{}')
-```
+Entity names support multi-language via JSON strings stored in SQLite (`'{"fr": "Rhum", "en": "Rum"}'`).
+Never `JSON.stringify` or `JSON.parse` them by hand: use the helpers of `src/utils/translations.ts`:
+- `serializeTranslations(body.nameTranslations)` writes the value the `Translations` schema checked
+  (`undefined` leaves the column untouched, blank languages are left out, nothing left clears it);
+- `parseNameTranslations(entity)` turns the strings of an entity and of its relations into objects
+  before `res.json()`: every response sends objects, never strings;
+- `parseTranslations(raw)` reads one column (exports).
 
 ### Image Upload
 

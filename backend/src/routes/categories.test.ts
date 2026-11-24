@@ -40,6 +40,12 @@ describe('GET /api/categories', () => {
     expect(res.body[0].categoryType.name).toBe('SPIRIT');
     expect(res.body[0].categoryType.color).toBe('blue');
   });
+
+  it('should return a null categoryType for a type without its row', async () => {
+    await seedCategory({ name: 'Vodka', type: 'MISSING' });
+    const res = await request.get('/api/categories').set(authHeader());
+    expect(res.body[0].categoryType).toBeNull();
+  });
 });
 
 describe('GET /api/categories/:id', () => {
@@ -115,6 +121,15 @@ describe('POST /api/categories', () => {
     expect(ct).not.toBeNull();
   });
 
+  it('should create an unknown CategoryType once, in gray', async () => {
+    await request.post('/api/categories').set(authHeader()).send({ name: 'OJ', type: 'JUICE' });
+    const res = await request.post('/api/categories').set(authHeader()).send({ name: 'Apple juice', type: 'JUICE' });
+    expect(res.status).toBe(201);
+    expect(await prisma.categoryType.findMany({ where: { name: 'JUICE' } })).toEqual([
+      { name: 'JUICE', nameTranslations: null, color: 'gray' },
+    ]);
+  });
+
   it('should store nameTranslations', async () => {
     const res = await request.post('/api/categories').set(authHeader())
       .send({ name: 'Whisky', type: 'SPIRIT', nameTranslations: { fr: 'Whisky' } });
@@ -132,6 +147,16 @@ describe('POST /api/categories', () => {
 });
 
 describe('PUT /api/categories/:id', () => {
+  it('should auto-create the CategoryType of a new type', async () => {
+    const cat = await seedCategory({ name: 'OJ' });
+    const res = await request.put(`/api/categories/${cat.id}`).set(authHeader()).send({ type: 'JUICE' });
+    expect(res.status).toBe(200);
+    expect(res.body.type).toBe('JUICE');
+    expect(await prisma.categoryType.findUnique({ where: { name: 'JUICE' } })).toEqual(
+      { name: 'JUICE', nameTranslations: null, color: 'gray' },
+    );
+  });
+
   it('should update category name', async () => {
     const cat = await seedCategory({ name: 'Old Name' });
     const res = await request.put(`/api/categories/${cat.id}`).set(authHeader())

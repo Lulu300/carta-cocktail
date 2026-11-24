@@ -247,6 +247,17 @@ describe('GET /api/public/settings', () => {
     expect(res.body).toHaveProperty('siteName');
     expect(res.body).toHaveProperty('siteIcon');
   });
+
+  it('should create the default settings once when two first requests arrive together', async () => {
+    await prisma.siteSettings.deleteMany();
+    const responses = await Promise.all([
+      request.get('/api/public/settings'),
+      request.get('/api/public/settings'),
+    ]);
+    expect(responses.map((res) => res.status)).toEqual([200, 200]);
+    expect(responses[0].body).toEqual({ siteName: 'Carta Cocktail', siteIcon: '' });
+    expect(await prisma.siteSettings.count()).toBe(1);
+  });
 });
 
 describe('GET /api/public/units', () => {
@@ -258,6 +269,13 @@ describe('GET /api/public/units', () => {
     expect(res.body).toHaveLength(2);
     expect(res.body[0].name).toBe('Centilitre');
     expect(res.body[1].name).toBe('Millilitre');
+  });
+
+  it('should return nameTranslations as an object', async () => {
+    await seedUnit({ name: 'Centilitre', abbreviation: 'cl', nameTranslations: JSON.stringify({ fr: 'Centilitre', en: 'Centiliter' }) });
+    const res = await request.get('/api/public/units');
+    expect(res.status).toBe(200);
+    expect(res.body[0].nameTranslations).toEqual({ fr: 'Centilitre', en: 'Centiliter' });
   });
 
   it('should return empty array when no units exist', async () => {

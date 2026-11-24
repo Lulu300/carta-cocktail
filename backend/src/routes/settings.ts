@@ -5,16 +5,13 @@ import { AuthRequest, signToken } from '../middleware/auth';
 import { BadRequestError, NotFoundError } from '../errors';
 import { valid, validate } from '../validation/validate';
 import { EmailAddress, ProfileUpdate, SiteSettingsUpdate } from '../validation/settings';
+import { getOrCreateSettings } from '../services/settingsService';
 
 const router = Router();
 
 // Get site settings
 router.get('/', async (_req: AuthRequest, res: Response) => {
-  let settings = await prisma.siteSettings.findUnique({ where: { id: 1 } });
-  if (!settings) {
-    settings = await prisma.siteSettings.create({ data: { id: 1 } });
-  }
-  res.json(settings);
+  res.json(await getOrCreateSettings());
 });
 
 // Update site settings

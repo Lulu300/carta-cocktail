@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { ConflictError, NotFoundError } from '../errors';
-import { parseNameTranslations } from '../utils/translations';
+import { parseNameTranslations, serializeTranslations } from '../utils/translations';
 import { valid, validate } from '../validation/validate';
 import { CategoryTypeCreate, CategoryTypeParams, CategoryTypeUpdate } from '../validation/categoryTypes';
 
@@ -13,17 +13,12 @@ router.get('/', async (_req: AuthRequest, res: Response) => {
   const types = await prisma.categoryType.findMany({
     orderBy: { name: 'asc' },
   });
-  // Count categories per type
-  const categories = await prisma.category.findMany({
-    select: { type: true },
-  });
-  const countMap = new Map<string, number>();
-  for (const c of categories) {
-    countMap.set(c.type, (countMap.get(c.type) || 0) + 1);
-  }
+  // Category.type is a plain string, not a relation: Prisma's _count cannot follow it
+  const counts = await prisma.category.groupBy({ by: ['type'], _count: { _all: true } });
+  const countByType = new Map(counts.map((count) => [count.type, count._count._all]));
   const enriched = types.map(t => ({
     ...t,
-    _count: { categories: countMap.get(t.name) || 0 },
+    _count: { categories: countByType.get(t.name) ?? 0 },
   }));
   res.json(parseNameTranslations(enriched));
 });
@@ -39,7 +34,7 @@ router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Respons
   const created = await prisma.categoryType.create({
     data: {
       name: typeName,
-      nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null,
+      nameTranslations: serializeTranslations(nameTranslations),
       color: color || 'gray',
     },
   });
@@ -56,9 +51,7 @@ router.put('/:name', validate(updateSchemas), async (_req: AuthRequest, res: Res
   const updated = await prisma.categoryType.update({
     where: { name: typeName },
     data: {
-      ...(nameTranslations !== undefined && {
-        nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null,
-      }),
+      nameTranslations: serializeTranslations(nameTranslations),
       ...(color !== undefined && { color }),
     },
   });

@@ -33,7 +33,7 @@ export const SUPPORTED_LANGUAGES = ['fr', 'en'] as const;
 /**
  * Translated names, e.g. { fr: 'Rhum', en: 'Rum' }. Every language is optional:
  * the forms only send the languages the admin filled in. A partial record also
- * rejects unknown languages. `serializeTranslations` (task C-14) must apply the same rule.
+ * rejects unknown languages. `serializeTranslations` (utils/translations.ts) stores its output.
  */
 export const Translations = z.partialRecord(z.enum(SUPPORTED_LANGUAGES), z.string().trim()).nullable();
 
