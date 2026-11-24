@@ -5,7 +5,7 @@ import { BadRequestError } from '../../errors';
 import { ImportRecipeV1, ImportResolutions } from '../../validation/cocktailImport';
 import { SOURCE_KEYS, SourceType } from '../../validation/cocktails';
 import { ensureCategoryType } from '../categoryTypeService';
-import { serializeTranslations } from '../../utils/translations';
+import { parseNameTranslations, serializeTranslations } from '../../utils/translations';
 import { createCocktailIn, IngredientLineValue } from './cocktailService';
 import { collectImportReferences, ImportReferences, ImportedLine, lowercase } from './importReferences';
 
@@ -66,7 +66,7 @@ function matchReferences<Ref, Row extends { id: number }>(
     return {
       ref,
       // `name` is the compared field: the abbreviation for a unit
-      existingMatch: match ? { ...match, id: match.id, name: keyOf(match) } : null,
+      existingMatch: match ? parseNameTranslations({ ...match, id: match.id, name: keyOf(match) }) : null,
       status: match ? ('matched' as const) : ('missing' as const),
     };
   });

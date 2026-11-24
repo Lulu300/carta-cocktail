@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { BadRequestError, NotFoundError } from '../errors';
+import { parseNameTranslations } from '../utils/translations';
 import { valid, validate } from '../validation/validate';
 import { IdParams, idRequest, MenuIdParams } from '../validation/common';
 import {
@@ -34,7 +35,7 @@ router.get('/menu/:menuId', validate(menuSchemas), async (_req: AuthRequest, res
     include: BOTTLE_WITH_CATEGORY,
     orderBy: { position: 'asc' },
   });
-  res.json(menuBottles);
+  res.json(parseNameTranslations(menuBottles));
 });
 
 // Add bottle to a personal menu: the system menus follow the bottles' flags
@@ -61,7 +62,7 @@ router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Respons
       include: BOTTLE_WITH_CATEGORY,
     });
   });
-  res.status(201).json(menuBottle);
+  res.status(201).json(parseNameTranslations(menuBottle));
 });
 
 // Update menu bottle (position or visibility)
@@ -80,7 +81,7 @@ router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Respo
       include: BOTTLE_WITH_CATEGORY,
     });
   });
-  res.json(menuBottle);
+  res.json(parseNameTranslations(menuBottle));
 });
 
 // Apply one change (visibility or section) to several entries of a menu at once: all of them or none
@@ -138,7 +139,7 @@ router.get('/menu/:menuId/exclusions', validate(menuSchemas), async (_req: AuthR
     include: BOTTLE_WITH_CATEGORY,
     orderBy: { bottle: { name: 'asc' } },
   });
-  res.json(exclusions);
+  res.json(parseNameTranslations(exclusions));
 });
 
 // Remove several bottles from a system menu at once: all of them or none
