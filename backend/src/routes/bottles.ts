@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { Prisma } from '../generated/prisma/client';
+import type { Category } from '../generated/prisma/client';
 import { prisma } from '../lib/prisma';
 import multer from 'multer';
 import { AuthRequest } from '../middleware/auth';
@@ -17,6 +18,7 @@ import { deleteRequest, IdParams, idRequest } from '../validation/common';
 import { BottleCreate, BottleExportQuery, BottleListQuery, BottleUpdate } from '../validation/bottles';
 import { BottleImportConfirm } from '../validation/bottleImport';
 import { importedCategoryTypePath } from '../validation/categories';
+import { CaseInsensitiveIndex, previewMatch } from '../utils/uniqueness';
 
 const router = Router();
 
@@ -51,6 +53,10 @@ function duplicateKey(name: string, capacityMl: number, categoryName: string): s
   return `${name.toLowerCase()}|${capacityMl}|${categoryName.toLowerCase()}`;
 }
 
+function previewCategory(category: Category) {
+  return { id: category.id, name: category.name, type: category.type, desiredStock: category.desiredStock };
+}
+
 function parseUploadedFile(file: Express.Multer.File, language: string): NormalizedImportPayload {
   try {
     return parseImportFile(file.originalname || '', file.buffer, language);
@@ -67,16 +73,10 @@ router.post('/import/preview', importUpload.single('file'), async (req: AuthRequ
   // A date typed in a spreadsheet is read in the order of the app's language (Accept-Language)
   const { errors, ...payload } = parseUploadedFile(req.file, req.language);
 
-  const allCategories = await prisma.category.findMany();
   const allBottles = await prisma.bottle.findMany({ include: { category: true } });
 
   // Indexes instead of a scan per imported row: an import has up to 2,000 rows
-  const categoriesByName = new Map<string, (typeof allCategories)[number]>();
-  for (const category of allCategories) {
-    const key = category.name.toLowerCase();
-    // The first match wins, as before
-    if (!categoriesByName.has(key)) categoriesByName.set(key, category);
-  }
+  const categoriesByName = new CaseInsensitiveIndex(await prisma.category.findMany(), (category) => category.name);
   const bottlesByKey = new Map<string, typeof allBottles>();
   for (const bottle of allBottles) {
     const key = duplicateKey(bottle.name, bottle.capacityMl, bottle.category.name);
@@ -85,16 +85,10 @@ router.post('/import/preview', importUpload.single('file'), async (req: AuthRequ
     else bottlesByKey.set(key, [bottle]);
   }
 
-  const categories = payload.categories.map((c) => {
-    const match = categoriesByName.get(c.name.toLowerCase());
-    return {
-      ref: c,
-      existingMatch: match
-        ? { id: match.id, name: match.name, type: match.type, desiredStock: match.desiredStock }
-        : null,
-      status: match ? ('matched' as const) : ('missing' as const),
-    };
-  });
+  const categories = payload.categories.map((c) => ({
+    ref: c,
+    ...previewMatch(categoriesByName.match(c.name), previewCategory),
+  }));
 
   const bottles = payload.bottles.map((b) => {
     const duplicates = (bottlesByKey.get(duplicateKey(b.name, b.capacityMl, b.categoryName)) ?? [])
@@ -121,31 +115,35 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
   const { payload, resolutions } = valid<typeof importConfirmSchemas>(res).body;
 
   const created = await prisma.$transaction(async (tx) => {
-    const categoryMap = new Map<string, number>(); // lowercased name -> id
-
-    // Seed map with already-existing categories matching any reference
-    const allCats = await tx.category.findMany();
-    for (const c of allCats) categoryMap.set(c.name.toLowerCase(), c.id);
+    const resolvedCategories = new Map<string, number>(); // lowercased name -> id
+    const existingCategories = new CaseInsensitiveIndex(await tx.category.findMany(), (category) => category.name);
 
     // Apply explicit category resolutions
     for (const [key, resolution] of Object.entries(resolutions?.categories || {})) {
       if (resolution.action === 'use_existing' && resolution.existingId) {
-        categoryMap.set(key.toLowerCase(), resolution.existingId);
+        resolvedCategories.set(key.toLowerCase(), resolution.existingId);
       } else if (resolution.action === 'create' && resolution.data) {
         // The schema fills the type, desired stock and minimum percent defaults
         const { nameTranslations, name, type, desiredStock, minimumPercent } = resolution.data;
-        const createdCat = await tx.category.create({
-          data: {
-            name: name || key,
-            type: await ensureCategoryType(tx, type, importedCategoryTypePath(key)),
-            desiredStock,
-            minimumPercent,
-            nameTranslations: serializeTranslations(nameTranslations),
-          },
-        });
-        categoryMap.set((name || key).toLowerCase(), createdCat.id);
+        const categoryName = name || key;
+        // A category that exists ignoring case is used as it is, its type included
+        const category = await existingCategories.findOrCreate(categoryName, 'errors.ambiguousCategoryName', async () =>
+          tx.category.create({
+            data: {
+              name: categoryName,
+              type: await ensureCategoryType(tx, type, importedCategoryTypePath(key)),
+              desiredStock,
+              minimumPercent,
+              nameTranslations: serializeTranslations(nameTranslations),
+            },
+          }));
+        resolvedCategories.set(categoryName.toLowerCase(), category.id);
       }
     }
+
+    // A row goes in the category resolved for its name, else in the existing one of that name
+    const categoryIdOf = (categoryName: string) => resolvedCategories.get(categoryName.toLowerCase())
+      ?? existingCategories.findUnambiguous(categoryName, 'errors.ambiguousCategoryName')?.id;
 
     let skippedNoCategory = 0;
     let duplicatesCreated = 0;
@@ -169,7 +167,7 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
         skippedNoCategory++;
         continue;
       }
-      const categoryId = categoryMap.get(finalCategoryName.toLowerCase());
+      const categoryId = categoryIdOf(finalCategoryName);
       if (!categoryId) {
         skippedNoCategory++;
         continue;

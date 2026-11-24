@@ -37,6 +37,8 @@
     "sectionNotInMenu": "Cette section n'appartient pas à cette carte",
     "unknownReference": "Une ligne de la recette désigne une unité, une bouteille, une catégorie ou un ingrédient qui n'existe pas (peut-être supprimé entre-temps) : rechargez la page et vérifiez la recette",
     "importUnresolved": "La recette ne peut pas être importée : certaines unités, bouteilles, catégories ou certains ingrédients ne sont ni associés à un élément existant ni créés (une nouvelle bouteille a aussi besoin de sa catégorie)",
+    "ambiguousCategoryName": "Plusieurs catégories correspondent à « {{name}} » sans tenir compte de la casse, et aucune exactement : {{matches}}. Utilisez l’une d’elles, ou renommez-les pour que leurs noms diffèrent autrement que par la casse",
+    "ambiguousUnitAbbreviation": "Plusieurs unités correspondent à l’abréviation « {{name}} » sans tenir compte de la casse, et aucune exactement : {{matches}}. Utilisez l’une d’elles, ou changez leurs abréviations pour qu’elles diffèrent autrement que par la casse",
     "import": {
       "missingColumn": "Le fichier CSV doit avoir une colonne name et une colonne capacityMl",
       "invalidJson": "Le fichier n'est pas un JSON valide",
