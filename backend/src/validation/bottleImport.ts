@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { Id, NullableDate, Percent, RequiredText, Translations } from './common';
 import { AlcoholPercentage, BottleQuantity, CapacityMl, PurchasePrice } from './bottles';
-import { DesiredStock } from './categories';
+import { CategoryTypeName, DesiredStock } from './categories';
 
 // The payload is the one returned by POST /bottles/import/preview, sent back with
 // the admin's choices. It goes through the same bounds as a bottle created by hand.
@@ -58,7 +58,7 @@ const CategoryResolution = z.discriminatedUnion('action', [
       .object({
         // Blank or absent: the route uses the category name of the file
         name: z.string().trim().optional(),
-        type: RequiredText.default('SPIRIT'),
+        type: CategoryTypeName.default('SPIRIT'),
         desiredStock: DesiredStock.default(1),
         minimumPercent: Percent.default(30),
         nameTranslations: Translations.optional(),

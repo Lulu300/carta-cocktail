@@ -1045,6 +1045,23 @@ describe('POST /api/cocktails/import/confirm', () => {
     expect(res.body.ingredients[0].sourceType).toBe('INGREDIENT');
     expect(res.body.ingredients[0].ingredient.name).toBe('Fresh Mint');
   });
+  // A category needs a type, even when a type has the empty name: the category form refuses it too
+  it('should return 400 for a category to create under the empty name, and create nothing', async () => {
+    await prisma.categoryType.create({ data: { name: '', color: 'red' } });
+
+    const res = await request.post('/api/cocktails/import/confirm').set(authHeader()).send({
+      recipe: {
+        version: 1,
+        cocktail: { name: 'Mezcal Sour', ingredients: [{ sourceType: 'CATEGORY', sourceName: 'Mezcal', quantity: 2 }] },
+      },
+      resolutions: { categories: { mezcal: { action: 'create', data: { name: 'Mezcal', type: '' } } } },
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.details).toMatchObject([{ path: 'body.resolutions.categories.mezcal.data.type', code: 'too_small' }]);
+    expect(await prisma.category.count()).toBe(0);
+    expect(await prisma.cocktail.count()).toBe(0);
+  });
 });
 
 describe('POST /api/cocktails - with preferredBottleIds', () => {

@@ -3,6 +3,7 @@ import { Prisma } from '../../generated/prisma/client';
 import { prisma } from '../../lib/prisma';
 import { BadRequestError } from '../../errors';
 import { ImportRecipeV1, ImportResolutions } from '../../validation/cocktailImport';
+import { importedCategoryTypePath } from '../../validation/categories';
 import { SOURCE_KEYS, SourceType } from '../../validation/cocktails';
 import { ensureCategoryType } from '../categoryTypeService';
 import { parseNameTranslations, serializeTranslations } from '../../utils/translations';
@@ -158,8 +159,8 @@ async function resolveAll(db: Db, recipe: ImportedRecipe, refs: ImportReferences
     const created = await db.category.create({
       data: {
         name: data.name || ref.name || key,
-        // The schema defaults the type to SPIRIT
-        type: await ensureCategoryType(db, data.type),
+        // The schema defaults the type to SPIRIT. The wizard keys resolutions by lowercased name, like `key`
+        type: await ensureCategoryType(db, data.type, importedCategoryTypePath(key)),
         desiredStock: data.desiredStock,
         minimumPercent: data.minimumPercent,
         nameTranslations: serializeTranslations(data.nameTranslations),

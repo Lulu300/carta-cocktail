@@ -1241,6 +1241,77 @@ describe('POST /api/bottles/import/confirm', () => {
     expect(category.type).toBe('AROMATIC BITTER');
     expect(await prisma.categoryType.findUnique({ where: { name: 'AROMATIC   BITTER' } })).toBeNull();
   });
+
+  // Data older than v1.9.0 can hold ' SPIRIT ' next to 'SPIRIT': the wizard lists both, and the
+  // category goes under the one picked, as when it is created by hand (C-57)
+  describe('type picked for a category to create', () => {
+    /** Imports one bottle per category, each category created under the type given. */
+    function importUnderTypes(typesByCategory: Record<string, string>) {
+      const names = Object.keys(typesByCategory);
+      const payload = {
+        version: 1,
+        bottles: names.map((categoryName) => importRow({ name: `${categoryName} bottle`, categoryName })),
+      };
+      const categories = Object.fromEntries(names.map((name) => [
+        name.toLowerCase(), { action: 'create', data: { name, type: typesByCategory[name] } },
+      ]));
+      return request.post('/api/bottles/import/confirm').set(authHeader()).send({ payload, resolutions: { categories } });
+    }
+
+    async function typeOf(categoryName: string) {
+      return (await prisma.category.findUniqueOrThrow({ where: { name: categoryName } })).type;
+    }
+
+    it('should keep an existing type with surrounding spaces, and create no type', async () => {
+      await prisma.categoryType.create({ data: { name: ' RUM ', color: 'red' } });
+      const typeCount = await prisma.categoryType.count();
+
+      const res = await importUnderTypes({ Rhum: ' RUM ' });
+
+      expect(res.status).toBe(201);
+      expect(await typeOf('Rhum')).toBe(' RUM ');
+      expect(await prisma.categoryType.count()).toBe(typeCount);
+    });
+
+    it("should file each category under the type picked when ' SPIRIT ' and 'SPIRIT' both exist", async () => {
+      await prisma.categoryType.create({ data: { name: ' SPIRIT ', color: 'red' } });
+      const typesBefore = await prisma.categoryType.findMany({ orderBy: { name: 'asc' } });
+
+      const res = await importUnderTypes({ Rhum: ' SPIRIT ', Gin: 'SPIRIT' });
+
+      expect(res.status).toBe(201);
+      expect(await typeOf('Rhum')).toBe(' SPIRIT ');
+      expect(await typeOf('Gin')).toBe('SPIRIT');
+      expect(await prisma.categoryType.findMany({ orderBy: { name: 'asc' } })).toEqual(typesBefore);
+    });
+
+    it('should trim and collapse a new type, created in gray', async () => {
+      const res = await importUnderTypes({ Rhum: ' rum  x ' });
+
+      expect(res.status).toBe(201);
+      expect(await typeOf('Rhum')).toBe('rum x');
+      expect(await prisma.categoryType.findUnique({ where: { name: 'rum x' } }))
+        .toEqual({ name: 'rum x', nameTranslations: null, color: 'gray' });
+    });
+
+    it.each([
+      ['a blank new type', '   '],
+      // A category needs a type, even when a type has the empty name: the category form refuses it too
+      ['the empty name, even when a type has it', ''],
+    ])('should return 400 for %s, pointing at its resolution, and import nothing', async (_case, type) => {
+      // A blank new type is refused, and the empty name even when a type has it
+      await prisma.categoryType.create({ data: { name: '', color: 'red' } });
+      const typeCount = await prisma.categoryType.count();
+
+      const res = await importUnderTypes({ Rhum: type });
+
+      expect(res.status).toBe(400);
+      expect(res.body.details).toMatchObject([{ path: 'body.resolutions.categories.rhum.data.type', code: 'too_small' }]);
+      expect(await prisma.category.count()).toBe(0);
+      expect(await prisma.bottle.count()).toBe(0);
+      expect(await prisma.categoryType.count()).toBe(typeCount);
+    });
+  });
 });
 
 describe('bottle menus', () => {
