@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-07, C-09, C-10, C-33]
-touches: [backend/src/scripts/seed.ts, backend/src/routes/cocktails.ts, backend/src/routes/bottles.ts, backend/src/services/cocktail/, backend/src/i18n/]
+touches: [backend/src/scripts/seed.ts, backend/src/bootstrap/defaultUnits.ts, backend/src/bootstrap/defaultUnits.test.ts, backend/src/utils/uniqueness.ts, backend/src/utils/uniqueness.test.ts, backend/src/routes/cocktails.test.ts, backend/src/routes/bottles.ts, backend/src/routes/bottles.test.ts, backend/src/services/cocktail/, backend/src/i18n/, frontend/src/types/index.ts, docs/plan/tasks/C-64-import-wizards-ambiguous-match.md]
 sources: ["02-backend-data-perf.md §2.4"]
-branch:
-pr:
+branch: fix/C-19-imports-case-insensitive-names
+pr: https://github.com/Lulu300/carta-cocktail/pull/226
 ---
 
 ## Contexte
@@ -33,9 +33,9 @@ C-07 a rendu `Category.name` et `Unit.abbreviation` uniques en base, et les rout
 
 ## Critères d'acceptation
 
-- [ ] Un import qui demande à créer « rhum » quand « Rhum » existe ne crée pas de doublon.
-- [ ] Après le renommage de `cl` en `CL`, le seed ne recrée pas `cl`.
-- [ ] Le message d'erreur éventuel nomme la catégorie ou l'unité en cause (i18n en et fr).
+- [x] Un import qui demande à créer « rhum » quand « Rhum » existe ne crée pas de doublon.
+- [x] Après le renommage de `cl` en `CL`, le seed ne recrée pas `cl`.
+- [x] Le message d'erreur éventuel nomme la catégorie ou l'unité en cause (i18n en et fr).
 
 ## Tests à ajouter ou adapter
 
@@ -52,3 +52,5 @@ C-07 a rendu `Category.name` et `Unit.abbreviation` uniques en base, et les rout
 - 2026-10-10 : seed ajouté (revue de la PR #60).
 - 2026-10-12 : dépend aussi de C-33 (découpage de C-09 : l'import cocktail est réécrit par C-33).
 - 2026-10-12 : D-01 (PR #108) déplace le seed de `backend/prisma/seed.ts` vers `backend/src/scripts/seed.ts` (compilé dans `dist/`, l'image n'a plus `tsx`) : `touches` mis à jour, la ligne citée plus haut (`prisma/seed.ts:80`) est dans ce fichier.
+- 2026-11-25 : PR #226 (branche `fix/C-19-imports-case-insensitive-names`). Faits vérifiés sur `origin/develop` (b36d8f6) : les deux confirmations créaient sans contrôle (doublon à la casse près, ou 409 générique pour un nom exact) ; les aperçus prenaient la première ligne égale à la casse près, la confirmation des bouteilles la dernière ; le seed cherchait l'abréviation exacte. Règle unique dans `utils/uniqueness.ts` (`CaseInsensitiveIndex`), utilisée par les deux aperçus, les deux confirmations, le seed et `assertUniqueIgnoringCase` (routes) : la ligne exacte d'abord, sinon la seule ligne égale à la casse près ; plusieurs lignes égales à la casse près et aucune exactement (données antérieures à C-07) : ambiguïté. Aperçus : statut `ambiguous`, `existingMatch: null`, `ambiguousMatches` (`previewMatch`, partagé) ; bouteilles et ingrédients gardent la première correspondance (rien ne les rend uniques à la casse près). Confirmations : une catégorie ou une unité à créer qui existe à la casse près est reprise telle quelle (son type, son stock et ses traductions ; aucun type de catégorie créé) ; une ligne créée par l'import rejoint l'index (deux références de même nom à la casse près donnent une ligne) ; une ambiguïté répond 409 `errors.ambiguousCategoryName` / `errors.ambiguousUnitAbbreviation`, qui nomme la valeur et les lignes (en, fr), sans rien écrire ; la catégorie de chaque ligne de bouteilles suit la même règle. Seed : unités par défaut déplacées dans `bootstrap/defaultUnits.ts` (`ensureDefaultUnits`, testable comme `ensureAdmin`), rien n'est créé pour une unité trouvée ou ambiguë. Pas de correspondance par les traductions : la règle d'unicité des routes et de `check-integrity` porte sur le nom, et les traductions ne sont pas uniques. Règles des types de catégorie (C-52 à C-59) inchangées : `ensureCategoryType` n'est appelé que pour une catégorie vraiment créée. `frontend/src/types/index.ts` : `ImportMatchStatus` et `ambiguousMatches`, sans changement d'écran. Sondes de sabotage (correspondance exacte retirée, ambiguïté résolue par la première ligne, ligne créée hors de l'index, création directe dans chacun des trois chemins, aperçus des catégories et des unités revenus à la première correspondance, ingrédients passés à la règle ambiguë, catégorie de ligne sans contrôle d'ambiguïté, ambiguïté masquée dans l'aperçu des bouteilles, seed par abréviation exacte, seed qui crée sur ambiguïté) : chacune fait échouer au moins un test. Hors périmètre : C-64 (afficher l'ambiguïté dans les deux assistants et faire choisir une ligne, après C-62, qui touche les mêmes fichiers). Relevé sans ID de réserve : l'import de cocktail qui crée un ingrédient dont le nom exact existe échoue encore avec le 409 générique (`Ingredient.name` unique, sensible à la casse).
+- Notes de version : « An import that creates a category or a unit which already exists, ignoring case, now uses the existing one instead of creating a duplicate or failing with "This entry already exists". When older data holds several categories or units that differ only by case and the file matches none of them exactly, the import is refused with a message that names them. The startup seed no longer recreates a default unit (`cl`) renamed in another case (`CL`). »
