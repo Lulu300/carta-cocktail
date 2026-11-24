@@ -65,7 +65,8 @@
     "updated": "Type modifié",
     "deleted": "Type supprimé",
     "emptyName": "(sans nom)",
-    "withSpaces": "(avec espaces)"
+    "withSpaces": "(avec espaces)",
+    "withInvisibleCharacters": "(avec caractères invisibles)"
   },
   "bottles": {
     "title": "Bouteilles",

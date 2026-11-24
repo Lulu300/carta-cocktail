@@ -1,29 +1,41 @@
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from './useLocalizedName';
+import { replaceInvisibleCharacters, SPACE_LIKE } from '../utils/invisibleCharacters';
 import type { CategoryType } from '../types';
 
 /** Shown in place of each space HTML would hide. */
 const VISIBLE_SPACE = '␣';
 
 /**
- * The whitespace HTML hides or shows as one plain space: spaces around the name, runs of two or
- * more inside it, and any whitespace other than a space (a tab, a line break).
+ * The spaces HTML hides or shows as one plain space: spaces around the name, runs of two or more
+ * inside it, and any space other than a plain one (a tab, a line break, a braille pattern blank).
  */
-const HIDDEN_SPACES = /^\s+|\s+$|\s{2,}|[^\S ]/g;
+const HIDDEN_SPACES = new RegExp(String.raw`^${SPACE_LIKE}+|${SPACE_LIKE}+$|${SPACE_LIKE}{2,}|(?! )${SPACE_LIKE}`, 'gu');
 
-/**
- * Data older than v1.9.0 can hold a type named ' SPIRIT ' next to 'SPIRIT', or a type with an
- * empty name, and data older than v1.15.0 a type named 'X  Y' next to 'X Y'. HTML shows the
- * spaced names exactly like the others, and the empty one as nothing.
- */
-function isHiddenByHtml(name: string): boolean {
-  return name === '' || name.match(HIDDEN_SPACES) !== null;
+/** Shown in place of a character HTML draws as nothing: its code point, which names it. */
+function codePointLabel(char: string): string {
+  const hex = (char.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, '0');
+  return `[U+${hex}]`;
+}
+
+function hasInvisibleCharacters(name: string): boolean {
+  return replaceInvisibleCharacters(name, () => '') !== name;
 }
 
 /**
- * Category type names as the admin can tell them apart: an empty name gets a label, the spaces
- * HTML would hide are made visible and announced in words, for screen readers too.
+ * Data older than v1.9.0 can hold a type named ' SPIRIT ' next to 'SPIRIT', or a type with an
+ * empty name, and data older than v1.15.0 a type named 'X  Y' or 'X\u2800Y' (braille pattern
+ * blank) next to 'X Y', or 'X\u200BY' (with a zero-width space) next to 'XY'. HTML shows the spaced names and the names with an invisible
+ * character exactly like the others, and the empty one as nothing.
+ */
+function isHiddenByHtml(name: string): boolean {
+  return name === '' || name.match(HIDDEN_SPACES) !== null || hasInvisibleCharacters(name);
+}
+
+/**
+ * Category type names as the admin can tell them apart: an empty name gets a label, the spaces and
+ * the characters HTML would hide are made visible and announced in words, for screen readers too.
  * Admin screens only: its messages are in the admin bundle, so a public page would show their keys.
  */
 export function useCategoryTypeName() {
@@ -32,10 +44,14 @@ export function useCategoryTypeName() {
 
   /** The text as it is, unless HTML would hide part of it. */
   const visibleName = useCallback((text: string) => {
-    if (!isHiddenByHtml(text)) return text;
     if (text === '') return t('categoryTypes.emptyName');
-    const spacesShown = text.replace(HIDDEN_SPACES, (spaces) => VISIBLE_SPACE.repeat(spaces.length));
-    return `${spacesShown} ${t('categoryTypes.withSpaces')}`;
+    // Characters first: a byte order mark is white space for JS, but it is shown by its code point
+    const charactersShown = replaceInvisibleCharacters(text, codePointLabel);
+    const spacesShown = charactersShown.replace(HIDDEN_SPACES, (spaces) => VISIBLE_SPACE.repeat(spaces.length));
+    const notes: string[] = [];
+    if (spacesShown !== charactersShown) notes.push(t('categoryTypes.withSpaces'));
+    if (charactersShown !== text) notes.push(t('categoryTypes.withInvisibleCharacters'));
+    return notes.length === 0 ? text : `${spacesShown} ${notes.join(' ')}`;
   }, [t]);
 
   /**

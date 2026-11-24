@@ -23,6 +23,10 @@ const doubleSpaced = buildCategoryType({ name: 'X  Y', color: 'gray', _count: { 
 const singleSpaced = buildCategoryType({ name: 'X Y', color: 'gray', _count: { categories: 0 } });
 const tabbed = buildCategoryType({ name: 'X\tY', color: 'gray', _count: { categories: 0 } });
 const DOUBLE_SPACED_LABEL = 'X␣␣Y categoryTypes.withSpaces';
+// HTML shows a zero-width space as nothing: 'X\u200BY' looks exactly like 'XY'.
+const zeroWidth = buildCategoryType({ name: 'X\u200BY', color: 'gray', _count: { categories: 1 } });
+const joined = buildCategoryType({ name: 'XY', color: 'gray', _count: { categories: 0 } });
+const ZERO_WIDTH_LABEL = 'X[U+200B]Y categoryTypes.withInvisibleCharacters';
 
 type User = ReturnType<typeof userEvent.setup>;
 
@@ -222,6 +226,27 @@ describe('CategoriesPage', () => {
       expect(await created.body).toMatchObject({ type: 'MIXER' });
     });
 
+    // A custom type is tidied as the backend stores it
+    it('does not send a custom type of invisible or blank characters, and sends a typed one tidied', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const created = captureRequest('post', '/api/categories');
+      await user.click(screen.getByRole('button', { name: 'categories.add' }));
+
+      await user.type(within(categoryDialog()).getByLabelText(/categories\.name/), 'Tonic');
+      await user.selectOptions(within(categoryDialog()).getByLabelText('categories.type'), '__OTHER__');
+      const customType = within(categoryDialog()).getByPlaceholderText('categories.customType');
+      await user.type(customType, '\u200B\u2800');
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
+
+      expect(created.count()).toBe(0);
+      expect(customType).toHaveAccessibleDescription('categories.typeRequired');
+
+      await user.type(customType, 'mi\u200Bxer');
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
+      expect(await created.body).toMatchObject({ type: 'MIXER' });
+    });
+
     it('sends a single request on a fast double click on save', async () => {
       const user = userEvent.setup();
       mockApiPending('post', '/api/categories');
@@ -341,6 +366,19 @@ describe('CategoriesPage', () => {
         ]);
 
         expect(await openTypeOptions(user)).toEqual([`Mixers – ${DOUBLE_SPACED_LABEL}`, 'Mixers', 'categories.otherType']);
+      });
+
+      it('tells a type with an invisible character from the type without it, also with the same translation', async () => {
+        const user = userEvent.setup();
+        const nameTranslations = { en: 'Mixers' };
+        mockApiResponse('get', '/api/category-types', [
+          zeroWidth, joined, { ...zeroWidth, name: 'Z\u200BW', nameTranslations }, { ...joined, name: 'ZW', nameTranslations },
+        ]);
+
+        expect(await openTypeOptions(user)).toEqual([
+          ZERO_WIDTH_LABEL, 'XY', 'Mixers – Z[U+200B]W categoryTypes.withInvisibleCharacters', 'Mixers', 'categories.otherType',
+        ]);
+        expect(within(categoryDialog()).getByRole('option', { name: ZERO_WIDTH_LABEL })).toBeInTheDocument();
       });
     });
 
@@ -528,6 +566,18 @@ describe('CategoriesPage', () => {
       expect(created.count()).toBe(0);
     });
 
+    it('does not create a type whose name is only invisible or blank characters', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const created = captureRequest('post', '/api/category-types');
+      const manager = await openTypesManager(user);
+
+      await user.type(within(manager).getByPlaceholderText('GARNISH, MIXER...'), '\u200B\u2800');
+      await user.click(within(manager).getByRole('button', { name: 'common.create' }));
+
+      expect(created.count()).toBe(0);
+    });
+
     it('edits a type: name locked, translations open, color and translations sent', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
@@ -651,6 +701,18 @@ describe('CategoriesPage', () => {
       const rows = within(manager).getAllByRole('listitem').map((row) => row.textContent);
       expect(rows[0]).toContain(`${DOUBLE_SPACED_LABEL}${DOUBLE_SPACED_LABEL}(1)`);
       expect(rows[1]).toContain('X YX Y(0)');
+    });
+
+    it('tells a type with an invisible character from the type without it', async () => {
+      const user = userEvent.setup();
+      mockApiResponse('get', '/api/category-types', [zeroWidth, joined]);
+      await renderLoadedPage();
+
+      const manager = await openTypesManager(user);
+
+      const rows = within(manager).getAllByRole('listitem').map((row) => row.textContent);
+      expect(rows[0]).toContain(`${ZERO_WIDTH_LABEL}${ZERO_WIDTH_LABEL}(1)`);
+      expect(rows[1]).toContain('XYXY(0)');
     });
 
     // The decision is about names: a translation is shown as the admin typed it

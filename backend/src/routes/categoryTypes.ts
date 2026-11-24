@@ -8,7 +8,7 @@ import { valid, validate } from '../validation/validate';
 import {
   CategoryTypeCreate, CategoryTypeParams, CategoryTypeQuery, CategoryTypeUpdate,
 } from '../validation/categoryTypes';
-import { newCategoryTypeName } from '../services/categoryTypeService';
+import { requireNewCategoryTypeName } from '../services/categoryTypeService';
 
 const router = Router();
 
@@ -26,7 +26,7 @@ const createSchemas = { body: CategoryTypeCreate };
 
 router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Response) => {
   const { name, nameTranslations, color } = valid<typeof createSchemas>(res).body;
-  const typeName = newCategoryTypeName(name).toUpperCase();
+  const typeName = requireNewCategoryTypeName(name, ['body', 'name']).toUpperCase();
   const existing = await prisma.categoryType.findUnique({ where: { name: typeName } });
   if (existing) throw new ConflictError();
   const created = await prisma.categoryType.create({

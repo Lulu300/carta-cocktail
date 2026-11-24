@@ -370,11 +370,15 @@ describe('confirmImport - recipe lines', () => {
         .toEqual({ name: 'agave x', nameTranslations: null, color: 'gray' });
     });
 
-    it('should refuse a blank new type, pointing at its resolution, and write nothing', async () => {
+    it.each([
+      ['a blank new type', '   '],
+      ['a new type of invisible characters', '\u200B\u2060'],
+      ['a new type of blank characters', '\u2800'],
+    ])('should refuse %s, pointing at its resolution, and write nothing', async (_case, type) => {
       const before = await rowCounts();
       const typeCount = await prisma.categoryType.count();
 
-      await expect(importUnderTypes({ Mezcal: '   ' })).rejects.toMatchObject({
+      await expect(importUnderTypes({ Mezcal: type })).rejects.toMatchObject({
         status: 400, details: [{ path: 'body.resolutions.categories.mezcal.data.type', code: 'too_small' }],
       });
       expect(await rowCounts()).toEqual(before);

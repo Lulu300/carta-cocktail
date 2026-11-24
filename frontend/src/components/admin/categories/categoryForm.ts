@@ -1,5 +1,6 @@
 import type { Category, CategoryType } from '../../../types';
 import { buildNameTranslations, toTranslationForm, type TranslationForm } from '../../../utils/translations';
+import { tidyName } from '../../../utils/invisibleCharacters';
 
 /** Value of the type select meaning "a type that is not in the list yet", typed by hand. */
 export const OTHER_TYPE = '__OTHER__';
@@ -49,9 +50,13 @@ export function toCategoryForm(categoryTypes: CategoryType[], category?: Categor
   };
 }
 
-/** Null when the type is blank (a blank custom type, or the empty name data older than v1.9.0 can hold): the category needs a type. */
+/**
+ * Null when the type is blank (a custom type of spaces or invisible characters, or the empty name
+ * data older than v1.9.0 can hold): the category needs a type. A custom type is tidied as the
+ * backend stores it, so a blank one gets the field message rather than the backend's 400.
+ */
 export function toCategoryInput(form: CategoryForm): CategoryInput | null {
-  const type = form.type === OTHER_TYPE ? form.customType.trim().toUpperCase() : form.type;
+  const type = form.type === OTHER_TYPE ? tidyName(form.customType).toUpperCase() : form.type;
   if (!type) return null;
   return {
     name: form.name,
