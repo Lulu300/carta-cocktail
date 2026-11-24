@@ -112,7 +112,7 @@ ADMIN_PASSWORD=<at least 12 characters>        # required on first start
 
 `ADMIN_PASSWORD` is only used to create the admin on first start. After that, change the password from Settings > Profile: it survives restarts and image updates. Changing `JWT_SECRET` logs out existing sessions; it does not touch data.
 
-Behind a reverse proxy that reaches the frontend container directly, target port **8080**: nginx runs as a non-root user and listens there. The image also declares port 80, inherited from the official nginx image, but nothing listens on it. A proxy that picks the container port by itself then chooses 80 and answers 502: set the port, `traefik.http.services.<name>.loadbalancer.server.port=8080` with Traefik, `VIRTUAL_PORT=8080` with nginx-proxy.
+Behind a reverse proxy that reaches the frontend container directly, target port **8080**: nginx runs as a non-root user and listens there. It is the only port the image declares, so a proxy that picks the container port by itself finds it.
 
 #### Upgrading
 
