@@ -44,4 +44,10 @@ describe('Field', () => {
     expect(input).toHaveAttribute('aria-invalid', 'false');
     expect(input.getAttribute('aria-describedby')).toMatch(/-error extra$/);
   });
+
+  it('hides the label from sight only', () => {
+    render(<Field label="Type" hideLabel error="Required"><Input /></Field>);
+    expect(screen.getByText('Type')).toHaveClass('sr-only');
+    expect(screen.getByLabelText('Type')).toHaveAccessibleDescription('Required');
+  });
 });

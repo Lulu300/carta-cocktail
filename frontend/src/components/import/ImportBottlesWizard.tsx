@@ -19,7 +19,12 @@ import BottleImportRowErrors from './BottleImportRowErrors';
 import BottleImportCategoryStep from './BottleImportCategoryStep';
 import BottleImportRowsStep from './BottleImportRowsStep';
 import BottleImportConfirmStep from './BottleImportConfirmStep';
-import { buildAutoBottleImportResolutions, categoryOptions, countRowsWithoutCategory } from './bottleImportResolutions';
+import {
+  buildAutoBottleImportResolutions,
+  categoryOptions,
+  countCategoriesWithoutType,
+  countRowsWithoutCategory,
+} from './bottleImportResolutions';
 
 type Step = 'upload' | 'resolve' | 'confirm' | 'success' | 'error';
 
@@ -89,6 +94,15 @@ export default function ImportBottlesWizard({ onClose, onImported }: ImportBottl
   };
 
   const rowsWithoutCategory = preview ? countRowsWithoutCategory(preview, resolutions) : 0;
+  const categoriesWithoutType = countCategoriesWithoutType(resolutions, categoryTypes);
+  const isIncomplete = rowsWithoutCategory > 0 || categoriesWithoutType > 0;
+
+  // Says why "Next" or "Import" is disabled: the flagged type field can be out of sight
+  const typeWarning = categoriesWithoutType > 0 && (
+    <div className="bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-lg p-3 text-sm">
+      {t('bottles.importWizard.categoriesWithoutType', { count: categoriesWithoutType })}
+    </div>
+  );
 
   const footer = (step === 'resolve' || step === 'confirm') && (
     <>
@@ -96,11 +110,11 @@ export default function ImportBottlesWizard({ onClose, onImported }: ImportBottl
         {t('bottles.importWizard.back')}
       </Button>
       {step === 'resolve' ? (
-        <Button onClick={() => setStep('confirm')} disabled={rowsWithoutCategory > 0}>
+        <Button onClick={() => setStep('confirm')} disabled={isIncomplete}>
           {t('bottles.importWizard.next')}
         </Button>
       ) : (
-        <Button onClick={onConfirm} loading={isLoading} disabled={rowsWithoutCategory > 0}>
+        <Button onClick={onConfirm} loading={isLoading} disabled={isIncomplete}>
           {isLoading ? t('bottles.importWizard.importing') : t('bottles.importWizard.confirmImport')}
         </Button>
       )}
@@ -144,28 +158,37 @@ export default function ImportBottlesWizard({ onClose, onImported }: ImportBottl
       )}
 
       {step === 'resolve' && preview && (
-        <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-1">
-          <div className="bg-canvas border border-gray-700 rounded-lg p-3 text-sm flex gap-6 text-fg-muted">
-            <span>{t('bottles.importWizard.summaryCategories', { count: preview.categories.length })}</span>
-            <span>{t('bottles.importWizard.summaryBottles', { count: preview.bottles.length })}</span>
+        <div className="space-y-4">
+          {/* Above the scrolled list, so that it stays in sight */}
+          {typeWarning}
+          <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-1">
+            <div className="bg-canvas border border-gray-700 rounded-lg p-3 text-sm flex gap-6 text-fg-muted">
+              <span>{t('bottles.importWizard.summaryCategories', { count: preview.categories.length })}</span>
+              <span>{t('bottles.importWizard.summaryBottles', { count: preview.bottles.length })}</span>
+            </div>
+            <BottleImportRowErrors errors={preview.errors} />
+            <BottleImportCategoryStep
+              categories={preview.categories}
+              resolutions={resolutions.categories}
+              categoryTypes={categoryTypes}
+              onChange={updateCategory}
+            />
+            <BottleImportRowsStep
+              rows={preview.bottles}
+              resolutions={resolutions.bottles}
+              categoryOptions={categoryOptions(existingCategories, preview, resolutions)}
+              onChange={updateRow}
+            />
           </div>
-          <BottleImportRowErrors errors={preview.errors} />
-          <BottleImportCategoryStep
-            categories={preview.categories}
-            resolutions={resolutions.categories}
-            categoryTypes={categoryTypes}
-            onChange={updateCategory}
-          />
-          <BottleImportRowsStep
-            rows={preview.bottles}
-            resolutions={resolutions.bottles}
-            categoryOptions={categoryOptions(existingCategories, preview, resolutions)}
-            onChange={updateRow}
-          />
         </div>
       )}
 
-      {step === 'confirm' && preview && <BottleImportConfirmStep preview={preview} resolutions={resolutions} />}
+      {step === 'confirm' && preview && (
+        <div className="space-y-4">
+          {typeWarning}
+          <BottleImportConfirmStep preview={preview} resolutions={resolutions} />
+        </div>
+      )}
 
       {step === 'success' && result && (
         <WizardResult variant="success" title={t('bottles.importWizard.successCount', { count: result.created.bottles })} actions={closeButton}>

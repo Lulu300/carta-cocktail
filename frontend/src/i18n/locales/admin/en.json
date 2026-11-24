@@ -120,6 +120,7 @@
       "pickCategory": "— Pick a category —",
       "willCreate": "will be created",
       "categoryRequired": "Category required for this bottle",
+      "categoriesWithoutType": "{{count}} category(ies) to create have no type with a name: choose another type.",
       "duplicateFlag": "{{count}} existing duplicate(s)",
       "confirmTitle": "Import summary",
       "categoriesToCreate": "Categories to create",

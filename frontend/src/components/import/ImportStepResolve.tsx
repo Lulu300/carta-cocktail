@@ -29,7 +29,7 @@ export default function ImportStepResolve({ preview, resolutions, onChange, list
     onChange({ ...resolutions, [type]: { ...resolutions[type], [key]: resolution } });
   };
 
-  const incompleteCount = countIncompleteResolutions(preview, resolutions);
+  const incompleteCount = countIncompleteResolutions(preview, resolutions, lists.categoryTypes);
   const totalEntities = IMPORT_ENTITY_TYPES.reduce((total, type) => total + preview[type].length, 0);
 
   const renderSection = (type: ImportEntityType) => {

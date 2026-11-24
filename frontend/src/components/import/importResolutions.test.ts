@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { buildCategoryType } from '../../test/factories';
 import type { ImportPreviewResponse } from '../../types';
 import {
   buildAutoResolutions,
@@ -8,6 +9,7 @@ import {
   emptyResolutions,
   referenceLabel,
   invalidCreateFields,
+  isMissingCategoryType,
   isResolutionComplete,
   parseNumberInput,
   resolutionKey,
@@ -67,7 +69,7 @@ describe('defaultCreateData', () => {
   it('names a unit without a name after its abbreviation, as the backend does', () => {
     expect(defaultCreateData('units', { abbreviation: 'cl' })).toMatchObject({ name: 'cl', abbreviation: 'cl' });
     expect(defaultCreateData('units', {})).toMatchObject({ name: '', abbreviation: '' });
-    expect(invalidCreateFields('units', defaultCreateData('units', { abbreviation: 'cl' }))).toEqual([]);
+    expect(invalidCreateFields('units', defaultCreateData('units', { abbreviation: 'cl' }), [])).toEqual([]);
   });
 
   it('gives a category the backend defaults and keeps a desired stock of 0', () => {
@@ -117,35 +119,69 @@ describe('buildAutoResolutions', () => {
   });
 });
 
+// Data older than v1.9.0 can hold a type with an empty name, or made only of spaces.
+const unnamedType = buildCategoryType({ name: '' });
+const spacesType = buildCategoryType({ name: '   ' });
+const spacedSpirit = buildCategoryType({ name: ' SPIRIT ' });
+
+describe('isMissingCategoryType', () => {
+  it('refuses the empty name, even when a type has it', () => {
+    expect(isMissingCategoryType('', [])).toBe(true);
+    expect(isMissingCategoryType('', [unnamedType])).toBe(true);
+  });
+
+  it('refuses a new type made only of blanks or invisible characters', () => {
+    for (const blank of ['   ', '\t', '\u200B', '\u2800', ' \u2060 ']) {
+      expect(isMissingCategoryType(blank, [unnamedType, spacedSpirit])).toBe(true);
+    }
+  });
+
+  it('keeps an existing type exactly as picked, spaces included', () => {
+    expect(isMissingCategoryType('   ', [spacesType])).toBe(false);
+    expect(isMissingCategoryType(' SPIRIT ', [spacedSpirit])).toBe(false);
+    expect(isMissingCategoryType(' SPIRIT ', [])).toBe(false);
+    expect(isMissingCategoryType('SPIRIT', [])).toBe(false);
+  });
+});
+
 describe('invalidCreateFields', () => {
   it('flags blank names and abbreviations', () => {
-    expect(invalidCreateFields('units', { name: ' ', abbreviation: '' })).toEqual(['name', 'abbreviation']);
-    expect(invalidCreateFields('ingredients', { name: 'Mint' })).toEqual([]);
+    expect(invalidCreateFields('units', { name: ' ', abbreviation: '' }, [])).toEqual(['name', 'abbreviation']);
+    expect(invalidCreateFields('ingredients', { name: 'Mint' }, [])).toEqual([]);
   });
 
   it('flags a missing or invalid bottle capacity', () => {
-    expect(invalidCreateFields('bottles', { name: 'Havana', capacityMl: null })).toEqual(['capacityMl']);
-    expect(invalidCreateFields('bottles', { name: 'Havana', capacityMl: 0 })).toEqual(['capacityMl']);
-    expect(invalidCreateFields('bottles', { name: 'Havana', capacityMl: 70.5 })).toEqual(['capacityMl']);
-    expect(invalidCreateFields('bottles', { name: 'Havana', capacityMl: 700 })).toEqual([]);
+    expect(invalidCreateFields('bottles', { name: 'Havana', capacityMl: null }, [])).toEqual(['capacityMl']);
+    expect(invalidCreateFields('bottles', { name: 'Havana', capacityMl: 0 }, [])).toEqual(['capacityMl']);
+    expect(invalidCreateFields('bottles', { name: 'Havana', capacityMl: 70.5 }, [])).toEqual(['capacityMl']);
+    expect(invalidCreateFields('bottles', { name: 'Havana', capacityMl: 700 }, [])).toEqual([]);
   });
 
   it('flags a missing or negative desired stock', () => {
-    expect(invalidCreateFields('categories', { name: 'Rhum', desiredStock: null })).toEqual(['desiredStock']);
-    expect(invalidCreateFields('categories', { name: 'Rhum', desiredStock: -1 })).toEqual(['desiredStock']);
-    expect(invalidCreateFields('categories', { name: 'Rhum', desiredStock: 0 })).toEqual([]);
+    expect(invalidCreateFields('categories', { name: 'Rhum', desiredStock: null }, [])).toEqual(['desiredStock']);
+    expect(invalidCreateFields('categories', { name: 'Rhum', desiredStock: -1 }, [])).toEqual(['desiredStock']);
+    expect(invalidCreateFields('categories', { name: 'Rhum', desiredStock: 0 }, [])).toEqual([]);
+  });
+
+  it('flags a category type the backend refuses, and no other', () => {
+    expect(invalidCreateFields('categories', { name: 'Rhum', type: '', desiredStock: 1 }, [unnamedType])).toEqual(['type']);
+    expect(invalidCreateFields('categories', { name: 'Rhum', type: '\u200B', desiredStock: 1 }, [])).toEqual(['type']);
+    expect(invalidCreateFields('categories', { name: 'Rhum', type: ' SPIRIT ', desiredStock: 1 }, [spacedSpirit])).toEqual([]);
+    expect(invalidCreateFields('categories', { name: 'Rhum', type: '   ', desiredStock: 1 }, [spacesType])).toEqual([]);
+    // Sent without a type, a category gets the backend's default
+    expect(invalidCreateFields('categories', { name: 'Rhum', desiredStock: 1 }, [])).toEqual([]);
   });
 });
 
 describe('isResolutionComplete', () => {
   it('needs an entity to use, valid data to create, nothing to skip', () => {
-    expect(isResolutionComplete('units', undefined)).toBe(false);
-    expect(isResolutionComplete('units', { action: 'use_existing' })).toBe(false);
-    expect(isResolutionComplete('units', { action: 'use_existing', existingId: 1 })).toBe(true);
-    expect(isResolutionComplete('ingredients', { action: 'create' })).toBe(false);
-    expect(isResolutionComplete('ingredients', { action: 'create', data: { name: '' } })).toBe(false);
-    expect(isResolutionComplete('ingredients', { action: 'create', data: { name: 'Mint' } })).toBe(true);
-    expect(isResolutionComplete('bottles', { action: 'skip' })).toBe(true);
+    expect(isResolutionComplete('units', undefined, [])).toBe(false);
+    expect(isResolutionComplete('units', { action: 'use_existing' }, [])).toBe(false);
+    expect(isResolutionComplete('units', { action: 'use_existing', existingId: 1 }, [])).toBe(true);
+    expect(isResolutionComplete('ingredients', { action: 'create' }, [])).toBe(false);
+    expect(isResolutionComplete('ingredients', { action: 'create', data: { name: '' } }, [])).toBe(false);
+    expect(isResolutionComplete('ingredients', { action: 'create', data: { name: 'Mint' } }, [])).toBe(true);
+    expect(isResolutionComplete('bottles', { action: 'skip' }, [])).toBe(true);
   });
 });
 
@@ -158,10 +194,19 @@ describe('countIncompleteResolutions', () => {
       ],
     });
     const resolutions = buildAutoResolutions(recipePreview);
-    expect(countIncompleteResolutions(recipePreview, resolutions)).toBe(0);
+    expect(countIncompleteResolutions(recipePreview, resolutions, [])).toBe(0);
 
     resolutions.ingredients.mint = { action: 'create', data: { name: '' } };
-    expect(countIncompleteResolutions(recipePreview, resolutions)).toBe(1);
+    expect(countIncompleteResolutions(recipePreview, resolutions, [])).toBe(1);
+  });
+
+  it('counts a category to create under the type with an empty name', () => {
+    const recipePreview = preview({ categories: [{ ref: { name: 'Rhum', type: 'SPIRIT' }, existingMatch: null, status: 'missing' }] });
+    const resolutions = buildAutoResolutions(recipePreview);
+    expect(countIncompleteResolutions(recipePreview, resolutions, [unnamedType])).toBe(0);
+
+    resolutions.categories.rhum = { action: 'create', data: { name: 'Rhum', type: '', desiredStock: 1 } };
+    expect(countIncompleteResolutions(recipePreview, resolutions, [unnamedType])).toBe(1);
   });
 });
 

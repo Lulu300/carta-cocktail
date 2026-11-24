@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { render, screen, fireEvent, waitFor, within } from '../../test/test-utils';
 import userEvent from '@testing-library/user-event';
 import { createQueryClient } from '../../queries/queryClient';
-import { buildCategory, buildCocktail } from '../../test/factories';
+import { buildCategory, buildCategoryType, buildCocktail } from '../../test/factories';
 import { server } from '../../test/msw/server';
 import {
   captureRequest,
@@ -194,6 +194,40 @@ describe('ImportCocktailWizard', () => {
 
     expect(name).toHaveValue('');
     expect(screen.getByRole('button', { name: 'cocktails.importWizard.next' })).toBeDisabled();
+  });
+
+  it('blocks the import while a category to create has the type with an empty name', async () => {
+    answerPreview = (name) => HttpResponse.json({
+      ...matchedPreview(name),
+      categories: [{ ref: { name: 'Sirop', type: 'SYRUP', desiredStock: 1 }, existingMatch: null, status: 'missing' }],
+    });
+    mockApiResponse('get', '/api/category-types', [
+      buildCategoryType({ name: 'SYRUP' }),
+      buildCategoryType({ name: '' }),
+      buildCategoryType({ name: '   ' }),
+    ]);
+    render(<ImportCocktailWizard onClose={vi.fn()} />);
+
+    uploadJson(recipe('Grenadine'));
+    await user.click(await screen.findByRole('button', { name: 'cocktails.importWizard.next' }));
+    await screen.findByRole('option', { name: 'categoryTypes.emptyName' });
+    const typeSelect = screen.getByLabelText(/categories\.type/);
+
+    await user.selectOptions(typeSelect, '');
+    expect(screen.getByText('categories.typeRequired')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'cocktails.importWizard.next' })).toBeDisabled();
+    expect(screen.getByText('cocktails.importWizard.unresolvedCount')).toBeInTheDocument();
+
+    // An existing type made only of spaces is kept as picked, as the backend does
+    await user.selectOptions(typeSelect, '   ');
+    expect(screen.queryByText('categories.typeRequired')).not.toBeInTheDocument();
+    await goToConfirmationFromResolve();
+    await confirmImport();
+
+    expect(await screen.findByText('cocktails.importWizard.success')).toBeInTheDocument();
+    expect(confirmations[0].resolutions.categories).toEqual({
+      sirop: { action: 'create', data: { name: 'Sirop', type: '   ', desiredStock: 1, nameTranslations: null } },
+    });
   });
 
   it('refreshes the lists after a confirmation that created an entity', async () => {

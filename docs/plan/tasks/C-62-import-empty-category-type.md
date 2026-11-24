@@ -5,13 +5,13 @@ phase: C
 lane: frontend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-59]
-touches: [frontend/src/components/import/importResolutions.ts, frontend/src/components/import/importResolutions.test.ts, frontend/src/components/import/ImportEntityRow.tsx, frontend/src/components/import/ImportEntityRow.test.tsx, frontend/src/components/import/BottleImportCategoryStep.tsx, frontend/src/components/import/ImportBottlesWizard.tsx, frontend/src/components/import/ImportBottlesWizard.test.tsx]
+touches: [frontend/src/components/import/importResolutions.ts, frontend/src/components/import/importResolutions.test.ts, frontend/src/components/import/ImportEntityRow.tsx, frontend/src/components/import/ImportEntityRow.test.tsx, frontend/src/components/import/BottleImportCategoryStep.tsx, frontend/src/components/import/ImportBottlesWizard.tsx, frontend/src/components/import/ImportBottlesWizard.test.tsx, frontend/src/components/import/ImportStepResolve.tsx, frontend/src/components/import/ImportCocktailWizard.test.tsx, frontend/src/components/import/bottleImportResolutions.ts, frontend/src/components/import/CategoryTypeSelect.tsx, frontend/src/components/import/CategoryTypeSelect.test.tsx, frontend/src/components/ui/Field.tsx, frontend/src/components/ui/Field.test.tsx, frontend/src/i18n/locales/admin/en.json, frontend/src/i18n/locales/admin/fr.json]
 sources: []
-branch:
-pr:
+branch: fix/C-62-import-empty-type-warning
+pr: https://github.com/Lulu300/carta-cocktail/pull/221
 ---
 
 ## Contexte
@@ -34,9 +34,9 @@ Sur `fix/C-59-imports-keep-chosen-type` :
 
 ## Critères d'acceptation
 
-- [ ] Dans les deux assistants, choisir le type au nom vide pour une catégorie à créer affiche un message traduit sur le champ et bloque la confirmation.
-- [ ] Choisir un autre type retire le message et débloque la confirmation.
-- [ ] Les autres types, ` SPIRIT ` compris, ne sont pas signalés.
+- [x] Dans les deux assistants, choisir le type au nom vide pour une catégorie à créer affiche un message traduit sur le champ et bloque la confirmation.
+- [x] Choisir un autre type retire le message et débloque la confirmation.
+- [x] Les autres types, ` SPIRIT ` compris, ne sont pas signalés.
 
 ## Tests à ajouter ou adapter
 
@@ -50,3 +50,6 @@ Sur `fix/C-59-imports-keep-chosen-type` :
 ## Journal
 
 - 2026-11-24 : tâche créée pendant C-59 (hors périmètre).
+- 2026-11-25 : PR #221 (branche `fix/C-62-import-empty-type-warning`). Règle unique `isMissingCategoryType(type, categoryTypes)` (`importResolutions.ts`), celle du backend depuis C-59 et C-56 : le nom vide est refusé même s'il existe ; un type nouveau fait seulement de blancs ou de caractères invisibles (`tidyName`, le helper de C-56 déjà utilisé par le formulaire de catégorie) est refusé ; un type existant est gardé tel quel (` SPIRIT `, et un ancien type `'   '`, accepté par le backend depuis C-59). Faits vérifiés avant de coder : un type de fichier de cocktail n'est pas trimé à l'aperçu, donc `'   '` ou `U+200B` inexistant arrivait aussi au 400 ; le fichier de bouteilles est trimé à la lecture, un type vide y devient `SPIRIT`. Message : `categories.typeRequired`, celui du formulaire de catégorie (consigne du coordinateur, aucune clé nouvelle), au lieu de `fieldRequired` proposé par la tâche. Assistant de cocktail : `invalidCreateFields` signale `type`, le champ de `ImportEntityRow` l'affiche, `countIncompleteResolutions` bloque « Next » ; les trois fonctions reçoivent la liste des types (`lists.categoryTypes`, `ImportStepResolve.tsx` ajouté à `touches`). Assistant de bouteilles : `countCategoriesWithoutType` (`bottleImportResolutions.ts`) désactive « Next » et « Import » ; le select de type passe dans un `Field` à libellé masqué (`hideLabel`, nouveau, `sr-only`) pour avoir le message, `aria-invalid` et `aria-describedby` comme ailleurs ; la prop `aria-label` de `CategoryTypeSelect`, devenue inutile, est retirée. Le type au nom vide reste dans la liste, nommé « (no name) » (point 3). Limite : si la liste des types ne se charge pas, un ancien type `'   '` venu du fichier est signalé alors que le backend l'accepterait (aucun type connu) ; l'assistant de cocktail affiche déjà `listsLoadError`. Sondes de sabotage (nom vide accepté s'il existe, pas de contrôle des blancs, types existants non exemptés, `trim` au lieu de `tidyName`, `type` absent de `invalidCreateFields`, champ sans message, étape de résolution sans la liste, assistant de bouteilles sans le décompte ou sans la liste, décompte qui ignore `create`, étape des catégories sans message ou sans la liste, `hideLabel` ignoré) : chacune fait échouer au moins un test. Bundle public : 135,72 kB.
+- 2026-11-25 : relecture de #221 (approuvée, sans bloquant). Les deux nits, demandés par le coordinateur dans la même PR : (1) test de l'assistant de bouteilles pour le chemin par défaut : un type de fichier `U+200B` (gardé par le trim de `toText`) est signalé dès l'ouverture de l'étape, « Next » désactivé, puis débloqué par un autre type ; « Import » est couvert par un type existant `U+200B` choisi, supprimé ailleurs avant la confirmation (liste rechargée) : « Import » se désactive. (2) Résumé visible dans l'assistant de bouteilles : nouvelle clé `bottles.importWizard.categoriesWithoutType` (en/fr, bundle admin ; aucune clé existante ne disait ce cas), même encadré que `unresolvedCount` de l'assistant de cocktail, au-dessus de la liste défilante de l'étape de résolution et sur l'étape de confirmation, tant qu'une catégorie à créer a un type refusé. `rowsWithoutCategory` inchangé (avertissement sur la ligne et à la confirmation, comme avant). Sondes de sabotage (résumé absent de la résolution ou de la confirmation, « Import » ou « Next » sans les types, résumé sans le décompte) : chacune fait échouer au moins un test. Locales admin ajoutées à `touches`.
+- Notes de version : « The import wizards flag a category to create under the type with an empty name (data older than v1.9.0), or under a new type made only of spaces or invisible characters, with the category form's message, and keep the import disabled until another type is chosen, instead of failing at the confirmation; the bottle wizard also says above its list how many categories need another type. »
