@@ -150,6 +150,13 @@ describe('POST /api/categories', () => {
     expect(res.body.nameTranslations).toEqual({ fr: 'Whisky' });
   });
 
+  it('should trim the type on creation, even when a type with surrounding spaces exists', async () => {
+    await prisma.categoryType.create({ data: { name: ' SPIRIT ', color: 'gray' } });
+    const res = await request.post('/api/categories').set(authHeader()).send({ name: 'Rum', type: ' SPIRIT ' });
+    expect(res.status).toBe(201);
+    expect(res.body.type).toBe('SPIRIT');
+  });
+
   it('should return 409 when the name exists with another case', async () => {
     await seedCategory({ name: 'Rhum' });
     const res = await request.post('/api/categories').set(authHeader())
@@ -208,6 +215,25 @@ describe('PUT /api/categories/:id', () => {
       .send({ name: '  ' });
     expect(res.status).toBe(400);
     expect(res.body.details[0].path).toBe('body.name');
+  });
+
+  // Data older than v1.9.0 can hold ' SPIRIT ' next to 'SPIRIT': an edit keeps the type as sent.
+  it('should keep a type with surrounding spaces when the category is saved', async () => {
+    await prisma.categoryType.create({ data: { name: ' SPIRIT ', color: 'gray' } });
+    const cat = await seedCategory({ name: 'Rum', type: ' SPIRIT ' });
+    const res = await request.put(`/api/categories/${cat.id}`).set(authHeader())
+      .send({ name: 'Rum', type: ' SPIRIT ', desiredStock: 3 });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ type: ' SPIRIT ', desiredStock: 3 });
+    expect(await prisma.category.findUniqueOrThrow({ where: { id: cat.id } })).toMatchObject({ type: ' SPIRIT ' });
+    expect(await prisma.categoryType.count()).toBe(4);
+  });
+
+  it('should return 400 for an empty type', async () => {
+    const cat = await seedCategory({ name: 'Rum' });
+    const res = await request.put(`/api/categories/${cat.id}`).set(authHeader()).send({ type: '' });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('body.type');
   });
 
   it('should update minimumPercent', async () => {
