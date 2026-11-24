@@ -19,7 +19,7 @@ RUN npm run build
 # Official nginx image, mainline branch (the newest nginx), pinned on a minor version: a
 # rebuild picks up its patch releases. It replaces nginxinc/nginx-unprivileged, which was
 # still on a vulnerable nginx a week after the security releases of 2026-11-18.
-FROM nginx:1.31-alpine
+FROM nginx:1.31-alpine AS nginx
 
 # Same changes as nginxinc/nginx-unprivileged makes to the official image: nginx runs as the
 # nginx user (uid 101) on port 8080, so it also works under rootless Docker and Podman. The
@@ -36,6 +36,17 @@ RUN sed -i 's,listen       80;,listen       8080;,' /etc/nginx/conf.d/default.co
     && ! grep -q '^user' /etc/nginx/nginx.conf \
     && chown -R 101:0 /var/cache/nginx /etc/nginx \
     && chmod -R g+w /var/cache/nginx /etc/nginx
+
+# Flattened into an empty image: the official image declares EXPOSE 80, which no later
+# instruction can remove. With 80 and 8080 exposed, a reverse proxy that picks the container
+# port by itself (Traefik, nginx-proxy, SWAG auto-proxy) takes 80, where nothing listens, and
+# answers 502. FROM scratch drops the base image's settings: the start-up ones are declared
+# again. Its NGINX_VERSION-style variables are left out: only its own build used them.
+FROM scratch
+COPY --from=nginx / /
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["nginx", "-g", "daemon off;"]
+STOPSIGNAL SIGQUIT
 
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
