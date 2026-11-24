@@ -8,7 +8,7 @@ React 19 SPA with Vite 8, TailwindCSS 4, React Router 7, and react-i18next. Dark
 
 Before committing any change:
 
-1. Create a branch from `develop` (`feature/xxx` or `fix/xxx`)
+1. Create a branch from `develop`: `<type>/<task id>-<slug>` for a plan task (`fix/`, `feature/`, `chore/`, `docs/`, see `docs/plan/README.md`), `feature/xxx` or `fix/xxx` otherwise
 2. **Add or update tests** for any new or modified feature (see Testing section below)
 3. Ensure TypeScript compiles: `npx tsc -b` (`tsc --noEmit` checks nothing: `tsconfig.json` only holds project references)
 4. Ensure lint passes: `npm run lint`
@@ -94,6 +94,7 @@ frontend/
 │       └── locales/
 │           ├── public/           # en.json, fr.json: keys used by the first load (public pages, shared components)
 │           └── admin/            # en.json, fr.json: every other key (login page and admin)
+├── index.html                    # Vite entry page
 ├── package.json
 ├── tsconfig.json                 # Project references only: check types with `tsc -b`
 ├── tsconfig.app.json             # src/

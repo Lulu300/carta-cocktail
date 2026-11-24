@@ -44,7 +44,7 @@ Références :
    ADMIN_PASSWORD=<au moins 12 caractères>
    ```
 
-   `.env` contient les secrets : `chmod 600 .env`. `ADMIN_PASSWORD` ne sert qu'à créer l'admin au premier démarrage ; changez ensuite le mot de passe dans Paramètres > Profil administrateur (Settings > Admin Profile).
+   `.env` contient les secrets : il est prudent de le réserver à son propriétaire (`chmod 600 .env`). `ADMIN_PASSWORD` ne sert qu'à créer l'admin au premier démarrage ; changez ensuite le mot de passe dans Paramètres > Profil administrateur (Settings > Admin Profile).
 
 4. Démarrer et attendre que les deux conteneurs soient sains :
 
@@ -102,9 +102,11 @@ Les archives `db-<date>.tgz` et `uploads-<date>.tgz` sont écrites dans le dossi
 
 ```bash
 docker compose -f docker-compose.prod.yml stop carta-cocktail-backend
-docker run --rm -v <projet>_db-data:/data -v "$PWD":/backup alpine sh -c 'find /data -mindepth 1 -delete && tar xzf /backup/db-<date>.tgz -C /data'
-docker run --rm -v <projet>_uploads:/data -v "$PWD":/backup alpine sh -c 'find /data -mindepth 1 -delete && tar xzf /backup/uploads-<date>.tgz -C /data'
+docker run --rm -v <projet>_db-data:/data -v "$PWD":/backup alpine sh -c 'tar tzf /backup/db-<date>.tgz >/dev/null && find /data -mindepth 1 -delete && tar xzf /backup/db-<date>.tgz -C /data'
+docker run --rm -v <projet>_uploads:/data -v "$PWD":/backup alpine sh -c 'tar tzf /backup/uploads-<date>.tgz >/dev/null && find /data -mindepth 1 -delete && tar xzf /backup/uploads-<date>.tgz -C /data'
 ```
+
+Chaque commande lit d'abord toute l'archive (`tar tzf`) : si le nom est mal tapé ou l'archive abîmée, elle s'arrête sans rien effacer.
 
 La base revient avec le mot de passe admin et les sessions de la sauvegarde, y compris les sessions révoquées depuis : changez `JWT_SECRET` (voir [Rotation de `JWT_SECRET`](#rotation-de-jwt_secret)) avant de redémarrer avec `docker compose -f docker-compose.prod.yml up -d --wait`.
 
@@ -120,7 +122,7 @@ Dans Paramètres > Sauvegarde & Restauration (Settings > Backup & Restore) :
 > **Attention : destructif.** La restauration remplace **toutes** les données actuelles. Le backend garde une copie de la base remplacée dans `/app/data/backups/pre-restore-<date>.db`, mais pas des photos : exportez d'abord une sauvegarde.
 
 - Une restauration termine toutes les sessions, y compris celle qui l'a lancée : reconnectez-vous avec l'email et le mot de passe enregistrés dans la sauvegarde.
-- Une sauvegarde dont la base vient d'une version plus récente (migration inconnue de la version installée) est refusée : mettez d'abord l'application à jour. Une sauvegarde d'une version plus ancienne demande un redémarrage du backend : voir [UPGRADING › "Restoring a backup from an older version"](../UPGRADING.md#restoring-a-backup-from-an-older-version).
+- Une sauvegarde dont la base vient d'une version plus récente (migration inconnue de la version installée) est refusée : mettez d'abord l'application à jour. Une sauvegarde d'une version plus ancienne peut demander un redémarrage du backend (quand son schéma est plus ancien ; l'interface l'indique) : voir [UPGRADING › "Restoring a backup from an older version"](../UPGRADING.md#restoring-a-backup-from-an-older-version).
 - Le ZIP à restaurer ne doit pas dépasser 200 Mo (limite de nginx). L'export et la restauration sont limités à 10 requêtes en 15 minutes.
 
 Les mêmes opérations passent par l'API, avec le jeton de `POST /api/auth/login` : `GET /api/backup/export` et `POST /api/backup/import` (champ multipart `backup`).
@@ -141,7 +143,7 @@ curl -fsS -H "Authorization: Bearer $TOKEN" -o "$CARTA_BACKUP_DIR/carta-$(date +
 find "$CARTA_BACKUP_DIR" -name 'carta-*.zip' -mtime +30 -delete
 ```
 
-Le fichier `/root/.carta-backup.env` (droits `600`) contient les identifiants de l'admin :
+Le fichier `/root/.carta-backup.env` contient les identifiants de l'admin (mieux vaut le réserver à root, `chmod 600`) :
 
 ```sh
 CARTA_URL=http://localhost
@@ -174,7 +176,7 @@ Pensez à mettre à jour `CARTA_PASSWORD` quand vous changez le mot de passe adm
 
 5. Vérifier la version : `curl -s http://localhost/api/health`. Puis faire les actions « After upgrading » d'`UPGRADING.md`.
 
-**Copie avant migration.** Au démarrage, quand la nouvelle image apporte une migration de la base, le backend copie d'abord la base dans `/app/data/backups/pre-migrate-<date>.db` (le journal affiche `Database backed up to …`), puis applique la migration. Il garde les 10 copies les plus récentes. Cette copie ne contient pas les photos : elle sert au [retour arrière](#retour-arrière). Si une migration échoue, le backend refuse de démarrer et nomme la copie à restaurer : suivez [README › "Recovering from a failed migration"](../README.md#recovering-from-a-failed-migration).
+**Copie avant migration.** Au démarrage, quand la nouvelle image apporte une migration de la base, le backend copie d'abord la base dans `/app/data/backups/pre-migrate-<date>.db` (le journal affiche `Database backed up to …`, ou `Database unchanged since backup …` quand la base n'a pas changé depuis la copie précédente, qui sert alors), puis applique la migration (`Applying migration …`). Il garde les 10 copies les plus récentes. Cette copie ne contient pas les photos : elle sert au [retour arrière](#retour-arrière). Si une migration échoue, le backend refuse de démarrer et nomme la copie à restaurer : suivez [README › "Recovering from a failed migration"](../README.md#recovering-from-a-failed-migration).
 
 Pour lister les copies (la plus récente en dernier ; le dossier n'existe pas tant qu'aucune copie n'a été faite) :
 
@@ -184,15 +186,18 @@ docker compose -f docker-compose.prod.yml run --rm --no-deps --entrypoint ls car
 
 ## Retour arrière
 
-1. Remettre le tag précédent sur les deux lignes `image:`, puis :
+1. **Avant de changer d'image**, regarder dans le journal du backend si la mise à jour a appliqué une migration. Ce journal disparaît quand le conteneur est recréé, donc par le changement de tag :
 
    ```bash
-   docker compose -f docker-compose.prod.yml up -d --wait
+   docker compose -f docker-compose.prod.yml logs carta-cocktail-backend | grep -E 'Applying migration|Database backed up|Database unchanged'
    ```
 
-   Si aucune migration n'a tourné pendant la mise à jour (pas de nouvelle copie `pre-migrate-<date>.db` à la date de la mise à jour), c'est terminé : la base sert telle quelle à la version précédente.
+   - Aucune ligne (le journal affiche `No pending migrations to apply.`) : la base n'a pas changé, passer à l'étape 3.
+   - `Applying migration …` : une migration a tourné. La copie à restaurer est celle que nomme `Database backed up to …`, ou `Database unchanged since backup …` quand la base n'avait pas changé depuis la copie précédente. La liste des copies (commande de [Mise à jour](#mise-à-jour)) permet de vérifier son nom.
 
-2. Si une migration a tourné, restaurer la copie faite juste avant.
+   Le journal ne couvre que le conteneur actuel : si le backend a été recréé depuis la mise à jour (changement de `.env`, par exemple), il ne le dit plus. Comparez alors le dossier `backend/prisma/migrations/` des deux versions sur GitHub (`https://github.com/Lulu300/carta-cocktail/tree/v<version>/backend/prisma/migrations`) : un dossier présent seulement dans la nouvelle version est une migration qui a tourné.
+
+2. Si une migration a tourné, restaurer la copie avec la nouvelle image encore en place.
 
    > **Attention : destructif.** La copie remplace la base actuelle : tout ce qui a été saisi depuis la mise à jour est perdu.
 
@@ -205,7 +210,13 @@ docker compose -f docker-compose.prod.yml run --rm --no-deps --entrypoint ls car
      if [ -f "$B-wal" ]; then cp "$B-wal" /app/data/carta_cocktail.db-wal; fi'
    ```
 
-   La copie revient avec ses sessions : changez `JWT_SECRET` (voir [Rotation de `JWT_SECRET`](#rotation-de-jwt_secret)), puis `docker compose -f docker-compose.prod.yml up -d --wait`.
+   La copie revient avec ses sessions : changez `JWT_SECRET` (voir [Rotation de `JWT_SECRET`](#rotation-de-jwt_secret)) avant l'étape 3.
+
+3. Remettre le tag précédent sur les deux lignes `image:`, puis :
+
+   ```bash
+   docker compose -f docker-compose.prod.yml up -d --wait
+   ```
 
 Revenir à une version v1.11.x ou plus ancienne demande aussi son propre fichier compose (pas de `/api/health`, démarrage en root, port 80 jusqu'à v1.7.0) : voir [README › "Running a previous version"](../README.md#running-a-previous-version).
 
@@ -246,7 +257,7 @@ carte.monbar.fr {
 ```
 
 - **En-têtes `X-Forwarded-*`** : le proxy doit transmettre `X-Forwarded-For` (Caddy, Traefik et SWAG le font par défaut). L'API s'en sert pour compter les limites de débit par client. Un proxy sur l'hôte ou sur un réseau privé n'a besoin d'aucun réglage ; dans les autres cas (Docker rootless, Podman, Docker Desktop…), voir `TRUST_PROXY` dans [README › "Login limit behind a reverse proxy"](../README.md#login-limit-behind-a-reverse-proxy).
-- **HSTS** se règle sur le proxy, jamais dans le conteneur, qui sert du HTTP. Une fois activé, les navigateurs refusent le HTTP pour ce domaine pendant toute la durée de `max-age` : activez-le quand HTTPS fonctionne.
+- **HSTS** s'active sur le proxy, ou dans le conteneur (ligne `Strict-Transport-Security` en commentaire de `frontend/security-headers.conf`) une fois HTTPS en place devant lui, jamais quand le site est servi en HTTP. Une fois activé, les navigateurs refusent le HTTP pour ce domaine pendant toute la durée de `max-age` : activez-le quand HTTPS fonctionne.
 - Ne publiez pas le port 3001 du backend : nginx l'atteint par le réseau compose (`docker-compose.prod.yml` ne le publie pas).
 
 ## Mise à jour depuis une ancienne version

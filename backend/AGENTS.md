@@ -8,7 +8,7 @@ Express 5 REST API with Prisma 7 ORM, SQLite database, JWT authentication, and i
 
 Before committing any change:
 
-1. Create a branch from `develop` (`feature/xxx` or `fix/xxx`)
+1. Create a branch from `develop`: `<type>/<task id>-<slug>` for a plan task (`fix/`, `feature/`, `chore/`, `docs/`, see `docs/plan/README.md`), `feature/xxx` or `fix/xxx` otherwise
 2. **Add or update tests** for any new or modified feature (see Testing section below)
 3. Ensure TypeScript compiles: `npx tsc --noEmit`
 4. Ensure lint and build pass: `npm run lint` (config in `eslint.config.js`), `npm run build`
