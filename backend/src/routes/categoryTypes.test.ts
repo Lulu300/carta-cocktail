@@ -73,6 +73,29 @@ describe('POST /api/category-types', () => {
     expect(res.body.color).toBe('gray');
   });
 
+  // HTML shows 'X  Y' exactly like 'X Y': a new type never keeps a run of spaces
+  it('should collapse the inner spaces of a new type', async () => {
+    const res = await request.post('/api/category-types').set(authHeader()).send({ name: ' fruit \t  juice ' });
+    expect(res.status).toBe(201);
+    expect(res.body.name).toBe('FRUIT JUICE');
+    expect(await prisma.categoryType.findUnique({ where: { name: 'FRUIT JUICE' } })).not.toBeNull();
+  });
+
+  it('should return 409 for a name that only differs from an existing type by inner spaces', async () => {
+    await request.post('/api/category-types').set(authHeader()).send({ name: 'x y' });
+    const res = await request.post('/api/category-types').set(authHeader()).send({ name: 'x  y' });
+    expect(res.status).toBe(409);
+    expect(await prisma.categoryType.count({ where: { name: { startsWith: 'X' } } })).toBe(1);
+  });
+
+  it('should create the tidy name next to an older type with inner spaces, which stays as it is', async () => {
+    await prisma.categoryType.create({ data: { name: 'X  Y', color: 'red' } });
+    const res = await request.post('/api/category-types').set(authHeader()).send({ name: 'x  y' });
+    expect(res.status).toBe(201);
+    expect(res.body.name).toBe('X Y');
+    expect(await prisma.categoryType.findUnique({ where: { name: 'X  Y' } })).toMatchObject({ color: 'red' });
+  });
+
   it('should store nameTranslations', async () => {
     const res = await request.post('/api/category-types').set(authHeader())
       .send({ name: 'BITTERS', nameTranslations: { fr: 'Amers' }, color: 'red' });
