@@ -243,11 +243,14 @@ describe('parseCsvBottles', () => {
       expect(payload.bottles.map((b) => [b.name, b.capacityMl])).toEqual([['Gin', 700], ['Rum', 700]]);
     });
 
-    it('names a malformed cell past the last column by its number', () => {
-      const payload = parseCsvBottles('name,capacityMl\nGin,700,"note\nRum,700', 'en');
+    it('locates a malformed cell past the last named column by its number', () => {
+      const payload = parseCsvBottles('name,capacityMl,\nGin,700,"note\nRum,700,,"x\nVodka,700', 'en');
 
-      expect(payload.bottles.map((b) => b.name)).toEqual(['Rum']);
-      expect(payload.errors).toEqual([malformed(2, '3')]);
+      expect(payload.bottles.map((b) => b.name)).toEqual(['Vodka']);
+      expect(payload.errors).toEqual([
+        { ...malformed(2, ''), column: 3 },
+        { ...malformed(3, ''), column: 4 },
+      ]);
     });
 
     it('lists the errors in the order of the file lines', () => {
@@ -271,7 +274,9 @@ describe('parseCsvBottles', () => {
     });
 
     it('refuses a file whose header has a misplaced quote', () => {
-      expect(parseError(() => parseCsvBottles('\n"name,capacityMl\nGin,700', 'en')).code).toBe('malformedHeader');
+      expect(parseError(() => parseCsvBottles('\n"name,capacityMl\nGin,700', 'en'))).toMatchObject({
+        code: 'malformedHeader', params: { file: 'bottles.csv' },
+      });
     });
   });
 
@@ -507,6 +512,13 @@ describe('parseZipBottles', () => {
       { name: 'Rhum', type: 'SPIRIT', desiredStock: 3, minimumPercent: 25, nameTranslations: { fr: 'Rhum' } },
     ]);
     expect(payload.errors).toEqual([{ source: 'categories', line: 3, field: 'desiredStock', code: 'outOfRange' }]);
+  });
+
+  it('refuses an archive whose categories.csv header has a misplaced quote, naming that file', () => {
+    const zip = zipOf({ 'bottles.csv': 'name,capacityMl\nGin,700', 'categories.csv': 'name,"type\nRhum,SPIRIT' });
+    expect(parseError(() => parseZipBottles(zip, 'en'))).toMatchObject({
+      code: 'malformedHeader', params: { file: 'categories.csv' },
+    });
   });
 
   it('reports the misplaced quotes of categories.csv after the rows of bottles.csv, each in line order', () => {

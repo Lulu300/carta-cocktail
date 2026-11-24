@@ -39,7 +39,7 @@
     "importUnresolved": "La recette ne peut pas être importée : certaines unités, bouteilles, catégories ou certains ingrédients ne sont ni associés à un élément existant ni créés (une nouvelle bouteille a aussi besoin de sa catégorie)",
     "import": {
       "missingColumn": "Le fichier CSV doit avoir une colonne name et une colonne capacityMl",
-      "malformedHeader": "Les noms de colonnes du fichier CSV (sa première ligne) contiennent un guillemet mal placé",
+      "malformedHeader": "Les noms de colonnes de {{file}} (sa première ligne) contiennent un guillemet mal placé",
       "invalidJson": "Le fichier n'est pas un JSON valide",
       "unsupportedVersion": "Ce fichier n'est pas un export de bouteilles de Carta Cocktail, ou sa version n'est pas prise en charge",
       "bottlesRequired": "Le fichier JSON ne contient pas de liste de bouteilles",

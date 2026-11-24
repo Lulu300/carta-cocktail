@@ -39,7 +39,7 @@
     "importUnresolved": "The recipe cannot be imported: some of its units, bottles, categories or ingredients are neither matched with an existing one nor created (a new bottle also needs its category)",
     "import": {
       "missingColumn": "The CSV file must have a name column and a capacityMl column",
-      "malformedHeader": "The column names of the CSV file (its first line) have a misplaced quotation mark",
+      "malformedHeader": "The column names of {{file}} (its first line) have a misplaced quotation mark",
       "invalidJson": "The file is not valid JSON",
       "unsupportedVersion": "This file is not a bottle export of Carta Cocktail, or its version is not supported",
       "bottlesRequired": "The JSON file has no list of bottles",

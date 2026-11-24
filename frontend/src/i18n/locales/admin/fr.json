@@ -143,6 +143,7 @@
       "rowErrors": {
         "title": "{{count}} ligne(s) écartée(s) de l'import",
         "position": "{{source}}, ligne {{line}} :",
+        "column": "colonne {{number}}",
         "source": {
           "bottles": "Bouteilles",
           "categories": "Catégories"

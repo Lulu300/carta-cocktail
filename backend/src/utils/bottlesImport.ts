@@ -48,12 +48,14 @@ export type ImportRowSource = 'bottles' | 'categories';
 
 /**
  * A row left out of the import. `line` is the line of the CSV file (header = 1),
- * or the position in the JSON array (first = 1), within `source`.
+ * or the position in the JSON array (first = 1), within `source`. `field` is the column name;
+ * a CSV cell past the last named column has none, and `column` (first = 1) locates it instead.
  */
 export interface ImportRowError {
   source: ImportRowSource;
   line: number;
   field: string;
+  column?: number;
   code: ImportRowErrorCode;
 }
 
@@ -293,8 +295,9 @@ function detectSeparator(headerLine: string): string {
 }
 
 function malformedRowError(line: number, cell: number, headers: string[], source: ImportRowSource): ImportRowError {
-  // A cell past the last column has no name: its column number stands for it
-  return { source, line, field: headers[cell] || String(cell + 1), code: 'malformedQuotes' };
+  const field = headers[cell] ?? '';
+  const error: ImportRowError = { source, line, field, code: 'malformedQuotes' };
+  return field ? error : { ...error, column: cell + 1 };
 }
 
 /**
@@ -305,7 +308,7 @@ function readCsvRows(csv: string, source: ImportRowSource): { headers: string[];
   const text = stripBom(csv);
   const [header, ...records] = new CsvReader(text, detectSeparator(firstNonBlankLine(text))).readAll();
   if (header === undefined) return { headers: [], rows: [], errors: [] };
-  if (header.malformedCell !== undefined) throw new ImportParseError('malformedHeader');
+  if (header.malformedCell !== undefined) throw new ImportParseError('malformedHeader', { file: `${source}.csv` });
 
   const headers = header.cells.map((cell) => cell.trim());
   const rows: NumberedRow[] = [];

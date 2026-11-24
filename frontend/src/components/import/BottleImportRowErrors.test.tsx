@@ -29,6 +29,15 @@ describe('BottleImportRowErrors', () => {
     expect(screen.getByText(/^bottles\.importWizard\.rowErrors\.code\.malformedQuotes \{"field":"name"/)).toBeInTheDocument();
   });
 
+  it('names a cell past the last named column by its number', () => {
+    render(<BottleImportRowErrors errors={[rowError({ field: '', column: 13, code: 'malformedQuotes' })]} />);
+
+    expect(screen.getByText(
+      'bottles.importWizard.rowErrors.code.malformedQuotes {"field":"bottles.importWizard.rowErrors.column {\\"number\\":13}"',
+      { exact: false },
+    )).toBeInTheDocument();
+  });
+
   it('falls back on a generic reason and the raw source when the backend sends unknown values', () => {
     render(<BottleImportRowErrors errors={[rowError({ source: 'menus', code: 'tooLong', field: 'name' })]} />);
 
