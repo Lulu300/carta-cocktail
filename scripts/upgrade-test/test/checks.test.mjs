@@ -13,13 +13,13 @@ import { checkFixtureAcceptsDuplicate, parseFixtureCategories, parseSnapshot } f
 import { parseLastExitCode } from '../lib/docker.mjs';
 import {
   allowedActionFailures, allowedFailures, checkInjectedDuplicateRefused, INJECTED_DUPLICATE_REASON, isRequirementMet,
-  judgeStep, markExpected, markExpectedActions, stepMode, unexpectedFailures,
+  judgeStep, markExpected, markExpectedActions, stepMode, stepPlan, unexpectedFailures,
 } from '../lib/expectations.mjs';
 import {
   BACKEND_SERVICE, FRONTEND_SERVICE, Instance, publishedContainerPort, readEnvVariable, renderTemplate, writeEnvVariable,
 } from '../lib/instance.mjs';
 import {
-  fixtureVersion, hooksForJump, loadHookFiles, parseUpgradePath, profileOf, stepOrigin,
+  fixtureVersion, loadHookFiles, parseUpgradePath, profileOf,
 } from '../lib/versions.mjs';
 
 const LAYOUTS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'layouts');
@@ -376,37 +376,57 @@ test('stepMode: the first step follows the notes in both modes, the jumps keep t
   assert.equal(stepMode('conformant', false), 'conformant');
 });
 
+test('stepPlan: the first step comes from the fixture through the notes, the jumps from the step before in the run mode', async () => {
+  const hookFiles = await loadHookFiles();
+  const steps = parseUpgradePath('1.8.0,1.12.0', { hookFiles });
+  const versions = (plan) => plan.crossedHooks.map((hooks) => hooks.version);
+  for (const mode of ['naive', 'conformant']) {
+    const start = stepPlan(steps, 0, hookFiles, mode);
+    assert.deepEqual(start.previous, { label: 'fixture (v1.4.0)', version: '1.4.0' }, mode);
+    assert.equal(start.mode, 'conformant', mode);
+    assert.deepEqual(versions(start), ['1.5.0', '1.6.0', '1.7.0', '1.8.0'], mode);
+    const jump = stepPlan(steps, 1, hookFiles, mode);
+    assert.equal(jump.previous, steps[0], mode);
+    assert.equal(jump.mode, mode);
+    assert.deepEqual(versions(jump), ['1.9.0', '1.10.0', '1.11.0', '1.12.0'], mode);
+  }
+  // A path that starts at the fixture version crosses nothing at its first start, as before.
+  assert.deepEqual(versions(stepPlan(parseUpgradePath('1.4.0,1.8.0', { hookFiles }), 0, hookFiles, 'naive')), []);
+});
+
 /** Compose generation the notes crossed by a jump end on (last `updateCompose`), or the one the instance has. */
 function composeGenerationAfter(crossedHooks, generation) {
   const updates = crossedHooks.flatMap((hooks) => hooks.before).filter((hook) => hook.action === 'updateCompose');
   return updates.at(-1)?.generation ?? generation;
 }
 
+/** Judges a step run as `plan` says, on which these checks all failed. */
+function judgeFailedChecks(plan, profile, layoutReasons) {
+  const checks = ['startup', 'images', 'frontendImages', 'uploadsPersistent', 'rowCounts'].map((group) => row(group, group, false, 'failed'));
+  return judgeStep({ actions: [], checks }, {
+    mode: plan.mode, profile, crossedHooks: plan.crossedHooks, unmetRequirements: [], layoutReasons,
+    started: false, previousFailedGroups: new Set(),
+  }).checks;
+}
+
 test('first start of the friend layout from v1.5.0: reached through the notes, its failures stay unexpected', async () => {
   const hookFiles = await loadHookFiles();
   const steps = parseUpgradePath('1.5.0,local', { hookFiles });
-  const crossedHooks = hooksForJump(hookFiles, stepOrigin(steps, 0, hookFiles).version, steps[0].version);
-  assert.deepEqual(crossedHooks.map((hooks) => hooks.version), ['1.5.0']);
-  // The v1.5.0 notes (Before 3) move the photo mount to the folder v1.5.0 reads.
   const profile = profileOf(hookFiles, steps[0].version);
-  const compose = fs.readFileSync(path.join(LAYOUTS_DIR, 'friend', `compose-${composeGenerationAfter(crossedHooks, '1.4.0')}.yml`), 'utf8');
-  assert.match(compose, new RegExp(`^ {6}- \\./uploads:${profile.uploadDir}$`, 'm'));
-
   const photoMount = { images: 'custom photo mount', uploadsPersistent: 'custom photo mount' };
-  const failedChecks = () => ['startup', 'images', 'frontendImages', 'uploadsPersistent', 'rowCounts']
-    .map((group) => row(group, group, false, 'failed'));
-  const judge = (mode, isFirstStep) => judgeStep({ actions: [], checks: failedChecks() }, {
-    mode: stepMode(mode, isFirstStep), profile, crossedHooks, unmetRequirements: [], layoutReasons: photoMount,
-    started: false, previousFailedGroups: new Set(),
-  });
   for (const mode of ['naive', 'conformant']) {
-    assert.deepEqual(unexpectedFailures(judge(mode, true).checks).map((result) => result.group),
+    const plan = stepPlan(steps, 0, hookFiles, mode);
+    assert.deepEqual(plan.crossedHooks.map((hooks) => hooks.version), ['1.5.0'], mode);
+    // The v1.5.0 notes (Before 3) move the photo mount to the folder v1.5.0 reads.
+    const compose = fs.readFileSync(path.join(LAYOUTS_DIR, 'friend', `compose-${composeGenerationAfter(plan.crossedHooks, '1.4.0')}.yml`), 'utf8');
+    assert.match(compose, new RegExp(`^ {6}- \\./uploads:${profile.uploadDir}$`, 'm'), mode);
+    assert.deepEqual(unexpectedFailures(judgeFailedChecks(plan, profile, photoMount)).map((result) => result.group),
       ['startup', 'images', 'frontendImages', 'uploadsPersistent', 'rowCounts'], mode);
   }
-  // The same notes crossed by a naive jump of the path still expect what they say breaks.
-  const naiveJump = judge('naive', false);
-  assert.deepEqual(unexpectedFailures(naiveJump.checks).map((result) => result.group), ['rowCounts']);
-  assert.equal(naiveJump.checks.find((result) => result.group === 'images').expected, 'custom photo mount');
+  // The same notes crossed by a naive jump of a path (1.4.0 -> 1.5.0) still expect what they say breaks.
+  const naiveJump = judgeFailedChecks(stepPlan(parseUpgradePath('1.4.0,1.5.0', { hookFiles }), 1, hookFiles, 'naive'), profile, photoMount);
+  assert.deepEqual(unexpectedFailures(naiveJump).map((result) => result.group), ['rowCounts']);
+  assert.equal(naiveJump.find((result) => result.group === 'images').expected, 'custom photo mount');
 });
 
 test('first start after the fixture version: the notes crossed mount the photos where the version reads them', async () => {
@@ -416,8 +436,7 @@ test('first start after the fixture version: the notes crossed mount the photos 
   for (const layout of fs.readdirSync(LAYOUTS_DIR)) {
     const { initialGeneration } = (await import(pathToFileURL(path.join(LAYOUTS_DIR, layout, 'layout.mjs')))).default;
     for (const version of laterVersions) {
-      const steps = [{ label: version, version }];
-      const crossedHooks = hooksForJump(hookFiles, stepOrigin(steps, 0, hookFiles).version, version);
+      const { crossedHooks } = stepPlan([{ label: version, version }], 0, hookFiles, 'naive');
       const generation = composeGenerationAfter(crossedHooks, initialGeneration);
       const compose = fs.readFileSync(path.join(LAYOUTS_DIR, layout, `compose-${generation}.yml`), 'utf8');
       assert.match(compose, new RegExp(`^ {6}- \\S+:${profileOf(hookFiles, version).uploadDir}$`, 'm'), `${layout} from ${version}`);

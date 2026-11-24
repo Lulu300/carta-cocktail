@@ -13,9 +13,9 @@ import { createAnonymizedCopy, fillVolume, injectDuplicateCategory, takeSnapshot
 import {
   containerLogs, containerMounts, containerState, docker, removeResources, RESOURCE_PREFIX,
 } from './docker.mjs';
-import { failedGroups, isRequirementMet, judgeStep, stepMode, unexpectedFailures } from './expectations.mjs';
+import { failedGroups, isRequirementMet, judgeStep, stepPlan, unexpectedFailures } from './expectations.mjs';
 import { BACKEND_SERVICE, FRONTEND_SERVICE, Instance, waitForHttp, waitForStart } from './instance.mjs';
-import { hooksForJump, profileOf, releaseOf, stepOrigin } from './versions.mjs';
+import { profileOf, releaseOf } from './versions.mjs';
 
 export const ADMIN_EMAIL = 'admin@example.test';
 const TEST_PASSWORD_LENGTH = 20;
@@ -147,10 +147,10 @@ export class BenchRun {
 
   // ───────────── One step: start a version, or jump to it ─────────────
 
-  /** `previous` is the step before, or the fixture for the first step (see stepOrigin). */
+  /** `previous` is the step before, or the fixture for the first step (see stepPlan). */
   stepContext(index) {
     const target = { ...this.steps[index], images: this.images[this.steps[index].label] };
-    const previous = stepOrigin(this.steps, index, this.hookFiles);
+    const { previous, mode, crossedHooks } = stepPlan(this.steps, index, this.hookFiles, this.mode);
     const previousProfile = profileOf(this.hookFiles, previous.version);
     const profile = profileOf(this.hookFiles, target.version);
     const fromDbPush = !previousProfile.migrations;
@@ -158,11 +158,12 @@ export class BenchRun {
     return {
       target,
       previous,
+      mode,
       profile,
       previousProfile,
       fromDbPush,
       expectedStartLogs,
-      crossedHooks: hooksForJump(this.hookFiles, previous.version, target.version),
+      crossedHooks,
       instance: this.instance,
       workDir: this.workDir,
       startedReleases: this.startedReleases,
@@ -198,8 +199,7 @@ export class BenchRun {
     const title = firstStep ? `start ${ctx.target.label}` : `${ctx.previous.label} -> ${ctx.target.label}`;
     this.log(`${title}: running`);
     const step = { from: firstStep ? null : ctx.previous.label, to: ctx.target.label, actions: [], checks: [] };
-    const mode = stepMode(this.mode, firstStep);
-    const conformant = mode === 'conformant';
+    const conformant = ctx.mode === 'conformant';
     const unmet = this.unmetRequirements(ctx);
 
     if (conformant) step.actions.push(...await this.runHooks(ctx, 'before'));
@@ -230,7 +230,7 @@ export class BenchRun {
     step.checks.push(...this.databaseChecks(ctx, outcome, refusal));
 
     judgeStep(step, {
-      mode,
+      mode: ctx.mode,
       profile: ctx.profile,
       crossedHooks: ctx.crossedHooks,
       unmetRequirements: unmet,

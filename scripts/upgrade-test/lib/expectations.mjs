@@ -1,6 +1,6 @@
 // Decides which failures a step may have without failing the bench.
 import { FAILED_MIGRATION_REFUSAL, row } from './checks.mjs';
-import { releaseOf } from './versions.mjs';
+import { hooksForJump, releaseOf, stepOrigin } from './versions.mjs';
 
 export const INJECTED_DUPLICATE_REASON = 'duplicate injected by --inject-duplicate: '
   + 'the schema_integrity migration refuses duplicate category names';
@@ -26,6 +26,19 @@ function refusedBeforeMigrations(refusal) {
  */
 export function stepMode(mode, isFirstStep) {
   return isFirstStep ? 'conformant' : mode;
+}
+
+/**
+ * How step `index` of a path is run in a run of mode `mode`: where it comes from (`previous`, the
+ * step before or the fixture), the mode it is run and judged in, and the hook files it crosses.
+ */
+export function stepPlan(steps, index, hookFiles, mode) {
+  const previous = stepOrigin(steps, index, hookFiles);
+  return {
+    previous,
+    mode: stepMode(mode, index === 0),
+    crossedHooks: hooksForJump(hookFiles, previous.version, steps[index].version),
+  };
 }
 
 /**
