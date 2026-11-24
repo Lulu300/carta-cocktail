@@ -38,15 +38,24 @@ export function useCategoryTypeName() {
   }, [t]);
 
   /**
+   * The translation as the admin typed it, or the stored name made visible when there is none:
+   * only stored names have to be told apart.
+   */
+  const localizedName = useCallback((categoryType: CategoryType) => {
+    const label = localize(categoryType);
+    return label === categoryType.name ? visibleName(label) : label;
+  }, [localize, visibleName]);
+
+  /**
    * The localized name. A translation would hide which of ' SPIRIT ' and 'SPIRIT' it belongs
    * to, so such a type also shows its stored name.
    */
   const typeLabel = useCallback((categoryType: CategoryType) => {
-    const label = localize(categoryType);
-    if (label === categoryType.name) return visibleName(label);
-    if (!isHiddenByHtml(categoryType.name)) return label;
+    const label = localizedName(categoryType);
+    const isTranslated = localize(categoryType) !== categoryType.name;
+    if (!isTranslated || !isHiddenByHtml(categoryType.name)) return label;
     return `${label} – ${visibleName(categoryType.name)}`;
-  }, [localize, visibleName]);
+  }, [localize, localizedName, visibleName]);
 
-  return { visibleName, typeLabel };
+  return { visibleName, localizedName, typeLabel };
 }

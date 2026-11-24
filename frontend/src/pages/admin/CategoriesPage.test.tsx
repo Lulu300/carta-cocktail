@@ -582,6 +582,22 @@ describe('CategoriesPage', () => {
       expect(rows[1]).toContain('X YX Y(0)');
     });
 
+    // The decision is about names: a translation is shown as the admin typed it
+    it('marks a stored name with inner spaces but not a translation with inner spaces', async () => {
+      const user = userEvent.setup();
+      mockApiResponse('get', '/api/category-types', [
+        { ...doubleSpaced, nameTranslations: { en: 'Mixers' } },
+        { ...singleSpaced, nameTranslations: { en: 'Fruit  juice' } },
+      ]);
+      await renderLoadedPage();
+
+      const manager = await openTypesManager(user);
+
+      const rows = within(manager).getAllByRole('listitem').map((row) => row.textContent);
+      expect(rows[0]).toContain(`Mixers${DOUBLE_SPACED_LABEL}(1)`);
+      expect(rows[1]).toContain('Fruit  juiceX Y(0)');
+    });
+
     // Data older than v1.9.0 can hold a type with an empty name: it is named in the query.
     describe('the type with an empty name', () => {
       beforeEach(() => {
