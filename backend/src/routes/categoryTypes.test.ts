@@ -103,6 +103,76 @@ describe('PUT /api/category-types/:name', () => {
   });
 });
 
+// Data older than v1.9.0 can hold a type whose name has spaces around it, next to the
+// same name without them. The name in the path is the stored key: it is not trimmed.
+describe('A category type whose name has surrounding spaces', () => {
+  const SPACED = ' SPIRIT ';
+  const SPACED_PATH = '/api/category-types/%20SPIRIT%20';
+
+  beforeEach(async () => {
+    await prisma.categoryType.update({
+      where: { name: 'SPIRIT' },
+      data: { nameTranslations: JSON.stringify({ fr: 'Spiritueux', en: 'Spirits' }) },
+    });
+    await prisma.categoryType.create({ data: { name: SPACED, color: 'gray' } });
+  });
+
+  async function findType(name: string) {
+    return prisma.categoryType.findUniqueOrThrow({ where: { name } });
+  }
+
+  it('should be edited without touching the type without spaces', async () => {
+    const res = await request.put(SPACED_PATH).set(authHeader())
+      .send({ color: 'red', nameTranslations: { fr: 'Alcool' } });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ name: SPACED, color: 'red', nameTranslations: { fr: 'Alcool' } });
+    expect(await findType(SPACED)).toMatchObject({ color: 'red', nameTranslations: JSON.stringify({ fr: 'Alcool' }) });
+    expect(await findType('SPIRIT')).toMatchObject({
+      color: 'blue',
+      nameTranslations: JSON.stringify({ fr: 'Spiritueux', en: 'Spirits' }),
+    });
+  });
+
+  it('should be deleted without touching the type without spaces or its categories', async () => {
+    const rum = await seedCategory({ name: 'Rum', type: 'SPIRIT' });
+
+    const res = await request.delete(SPACED_PATH).set(authHeader());
+
+    expect(res.status).toBe(200);
+    expect(await prisma.categoryType.findUnique({ where: { name: SPACED } })).toBeNull();
+    expect(await findType('SPIRIT')).toMatchObject({ color: 'blue' });
+    expect(await prisma.category.findUniqueOrThrow({ where: { id: rum.id } })).toMatchObject({ type: 'SPIRIT' });
+  });
+
+  it('should delete the unused type without spaces and keep the spaced one', async () => {
+    const res = await request.delete('/api/category-types/SPIRIT').set(authHeader());
+
+    expect(res.status).toBe(200);
+    expect(await prisma.categoryType.findUnique({ where: { name: 'SPIRIT' } })).toBeNull();
+    expect(await findType(SPACED)).toMatchObject({ color: 'gray' });
+  });
+
+  it('should refuse to delete it while its own categories use it, even if the type without spaces is unused', async () => {
+    await seedCategory({ name: 'Rum', type: SPACED });
+
+    const res = await request.delete(SPACED_PATH).set(authHeader());
+
+    expect(res.status).toBe(409);
+    expect(await findType(SPACED)).toMatchObject({ color: 'gray' });
+    expect(await findType('SPIRIT')).toMatchObject({ color: 'blue' });
+  });
+
+  it('should answer 404 to an edit of the spaced name when only the name without spaces exists', async () => {
+    await prisma.categoryType.delete({ where: { name: SPACED } });
+
+    const res = await request.put(SPACED_PATH).set(authHeader()).send({ color: 'red' });
+
+    expect(res.status).toBe(404);
+    expect(await findType('SPIRIT')).toMatchObject({ color: 'blue' });
+  });
+});
+
 describe('Renaming a category type', () => {
   // The API has no rename: the name is the key. The foreign key cascades a rename
   // made in the database to the categories of the type.
