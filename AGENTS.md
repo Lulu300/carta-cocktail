@@ -68,7 +68,7 @@ The machine is shared with other projects and its disk fills up. Before its fina
 | Frontend | React + Vite | 19.x / 8.x |
 | Styling | TailwindCSS | 4.x |
 | Routing | React Router | 7.x |
-| i18n | i18next | 25.x |
+| i18n | i18next | 27.x |
 | Containers | Docker Compose | - |
 
 ## Git Workflow

@@ -156,7 +156,7 @@ describe('errorHandler', () => {
     errorHandler(new BadRequestError('errors.validationError', [{ path: 'body.name' }]),
       req as unknown as Request, mockResponse() as unknown as Response, vi.fn());
 
-    expect(t).toHaveBeenCalledWith('errors.validationError', undefined);
+    expect(t).toHaveBeenCalledWith('errors.validationError', {});
   });
 
   it('omits details when the error has none', () => {

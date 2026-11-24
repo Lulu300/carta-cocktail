@@ -200,7 +200,7 @@ Safari and iOS 16.0+, Chrome and Edge 107+, Firefox 104+ (`build.target` in `vit
 
 ## Dependencies
 
-**Runtime**: react 19, react-dom 19, react-router-dom 7, i18next 25, react-i18next 16, i18next-browser-languagedetector 8, jszip 3
+**Runtime**: react 19, react-dom 19, react-router-dom 7, i18next 27, react-i18next 18, i18next-browser-languagedetector 8, jszip 3
 **Dev**: vite 8, @vitejs/plugin-react 6, tailwindcss 4, @tailwindcss/vite, typescript 5.9, eslint 10, prettier 3
 
 ## Styling Conventions
