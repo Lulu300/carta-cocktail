@@ -21,6 +21,7 @@
     "password": "Mot de passe",
     "loginButton": "Se connecter",
     "loginError": "Email ou mot de passe invalide",
+    "backupRestored": "Sauvegarde restaurée. Connectez-vous avec l'email et le mot de passe en vigueur à la date de la sauvegarde.",
     "welcome": "Bienvenue sur Carta Cocktail"
   },
   "dashboard": {
@@ -408,11 +409,10 @@
       "import": "Restaurer une sauvegarde",
       "importing": "Restauration en cours...",
       "selectFile": "Sélectionner un fichier ZIP",
-      "confirmRestore": "Cela remplacera TOUTES les données actuelles (base de données et images). Cette action est irréversible. Continuer ?",
+      "confirmRestore": "Cela remplacera TOUTES les données actuelles (base de données, images et compte administrateur). Cette action est irréversible. Vous devrez ensuite vous reconnecter avec l'email et le mot de passe en vigueur à la date de la sauvegarde. Continuer ?",
       "exportSuccess": "Sauvegarde exportée avec succès",
       "exportTimeout": "La préparation de la sauvegarde a pris trop de temps : le proxy placé devant le serveur a cessé d'attendre. Un nouvel essai tout de suite échouera sans doute de la même façon. Réessayez plus tard, quand le serveur est moins occupé. Si l'échec se répète, consultez les journaux du backend et le délai d'attente du proxy inverse placé devant Carta Cocktail, s'il y en a un.",
       "exportNoAnswer": "La connexion au serveur a été coupée avant la fin du téléchargement de la sauvegarde. L'export ne modifie rien sur le serveur : vérifiez votre connexion et réessayez.",
-      "importSuccess": "Sauvegarde restaurée avec succès. La page va se recharger.",
       "importDone": "Sauvegarde restaurée.",
       "restoreTimeout": "Le serveur n'a pas répondu à temps, mais la restauration est peut-être encore en cours.",
       "restoreNoAnswer": "La connexion au serveur a été coupée avant sa réponse (le navigateur ou un proxy a cessé d'attendre, ou le réseau a été perdu), mais la restauration est peut-être encore en cours. Vérifiez la connexion réseau.",
@@ -423,8 +423,7 @@
       "restartMayFail": "Cela peut ne pas suffire : pour une sauvegarde de la v1.0.x, ou d'avant la v1.8.0 avec des noms de catégories ou des abréviations d'unités en double, ou, sans Docker, de la v1.5.0 ou plus ancienne, la mise à jour de la base échoue. Lisez « Restoring a backup from an older version » dans UPGRADING.md avant de redémarrer.",
       "skippedFiles_one": "{{count}} fichier du dossier uploads n'a pas été restauré : seules les images JPG, PNG et WebP sont restaurées, une fois par nom de fichier.",
       "skippedFiles_other": "{{count}} fichiers du dossier uploads n'ont pas été restaurés : seules les images JPG, PNG et WebP sont restaurées, une fois par nom de fichier.",
-      "reload": "Recharger la page",
-      "reloadAfterRestart": "Recharger la page une fois le backend redémarré",
+      "signInAfterRestart": "Se reconnecter une fois le backend redémarré",
       "fileSelected": "Fichier : {{name}}"
     },
     "noIcon": "Aucune icône"

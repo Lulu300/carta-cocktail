@@ -41,6 +41,15 @@ function renderRedirectedFrom(from: { pathname: string; search?: string; hash?: 
   );
 }
 
+/** Renders the login page opened at `url` by a full page load, without router state. */
+function renderAtUrl(url: string) {
+  return renderWithoutRouter(
+    <MemoryRouter initialEntries={[url]}>
+      <LoginPage />
+    </MemoryRouter>,
+  );
+}
+
 async function submitValidCredentials() {
   const user = userEvent.setup();
   await user.type(screen.getByLabelText('auth.email'), 'admin@test.local');
@@ -111,6 +120,33 @@ describe('LoginPage', () => {
     await submitValidCredentials();
 
     expect(await screen.findByText(expectedMessage)).toBeInTheDocument();
+  });
+
+  it('says which account to use when opened after a backup restore', async () => {
+    const { container } = renderAtUrl('/login?reason=backup-restored');
+
+    expect(screen.getByText('auth.backupRestored')).toBeInTheDocument();
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it.each([
+    ['without a reason', '/login'],
+    ['with another reason', '/login?reason=expired'],
+  ])('says nothing about a restore when opened %s', (_label, url) => {
+    renderAtUrl(url);
+
+    expect(screen.queryByText('auth.backupRestored')).not.toBeInTheDocument();
+  });
+
+  it('opens the admin home after signing in from the restore notice', async () => {
+    mockLogin.mockResolvedValueOnce(undefined);
+    renderAtUrl('/login?reason=backup-restored');
+
+    await submitValidCredentials();
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/admin', { replace: true });
+    });
   });
 
   it('should show loading state during submission', async () => {
