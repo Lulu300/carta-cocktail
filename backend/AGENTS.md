@@ -216,7 +216,7 @@ Every upload goes through multer, whose `limits.fileSize` is the largest file ac
 | Bottle import | `MAX_BOTTLE_IMPORT_BYTES` (`utils/bottlesImport.ts`) |
 | Backup restore | `MAX_BACKUP_UPLOAD_BYTES` (`services/backupService.ts`) |
 
-nginx (`frontend/nginx.conf.template`) limits the whole multipart body, so its `client_max_body_size` keeps a margin above each limit for the multipart envelope. The admin page checks the backup size before sending it (`frontend/src/pages/admin/SettingsPage.tsx`).
+nginx (`frontend/nginx.conf.template`) limits the whole multipart body, so its `client_max_body_size` keeps a margin above each limit for the multipart envelope. `src/uploadLimits.test.ts` reads the template and fails when a file of exactly a backend limit, with its envelope, would no longer fit under the limit of its nginx location. The admin page checks the backup size before sending it (`frontend/src/pages/admin/SettingsPage.tsx`).
 
 ### Image Upload
 

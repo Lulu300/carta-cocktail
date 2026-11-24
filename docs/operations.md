@@ -123,7 +123,7 @@ Dans Paramètres > Sauvegarde & Restauration (Settings > Backup & Restore) :
 
 - Une restauration termine toutes les sessions, y compris celle qui l'a lancée : reconnectez-vous avec l'email et le mot de passe enregistrés dans la sauvegarde.
 - Une sauvegarde dont la base vient d'une version plus récente (migration inconnue de la version installée) est refusée : mettez d'abord l'application à jour. Une sauvegarde d'une version plus ancienne peut demander un redémarrage du backend (quand son schéma est plus ancien ; l'interface l'indique) : voir [UPGRADING › "Restoring a backup from an older version"](../UPGRADING.md#restoring-a-backup-from-an-older-version).
-- Le ZIP à restaurer ne doit pas dépasser 200 Mo (limite de nginx). L'export et la restauration sont limités à 10 requêtes en 15 minutes.
+- Le ZIP à restaurer ne doit pas dépasser 200 Mo, cette taille comprise (limite du backend, `MAX_BACKUP_UPLOAD_BYTES` ; nginx accepte jusqu'à 210 Mo pour laisser passer l'enveloppe multipart). L'export et la restauration sont limités à 10 requêtes en 15 minutes.
 
 Les mêmes opérations passent par l'API, avec le jeton de `POST /api/auth/login` : `GET /api/backup/export` et `POST /api/backup/import` (champ multipart `backup`).
 
