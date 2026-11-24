@@ -1578,13 +1578,30 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
   it('should create a category once when two file categories create it under names equal ignoring case', async () => {
     const res = await confirm([{ categoryName: 'Mezcal' }, { categoryName: 'MEZCAL' }], {
       mezcal: { action: 'create', data: { name: 'Mezcal' } },
-      'mezcal ': { action: 'create', data: { name: 'MEZCAL' } },
+      // The admin typed 'MEZCAL' for the file's 'Mescal'
+      mescal: { action: 'create', data: { name: 'MEZCAL' } },
     });
 
     expect(res.status).toBe(201);
     const mezcal = await prisma.category.findUniqueOrThrow({ where: { name: 'Mezcal' } });
     expect(await bottleCategoryIds()).toEqual([mezcal.id, mezcal.id]);
     expect(await prisma.category.count()).toBe(1);
+  });
+
+  it.each([
+    ['a blank', '   '],
+    ['an invisible', '\u200B'],
+  ])('should refuse %s new type even when the category exists ignoring case, and write nothing', async (_case, type) => {
+    await seedCategory({ name: 'Rhum' });
+    const typeCount = await prisma.categoryType.count();
+
+    const res = await confirm([{ categoryName: 'rhum' }], { rhum: { action: 'create', data: { name: 'rhum', type } } });
+
+    expect(res.status).toBe(400);
+    expect(res.body.details).toEqual([expect.objectContaining({ path: 'body.resolutions.categories.rhum.data.type' })]);
+    expect(await prisma.bottle.count()).toBe(0);
+    expect(await prisma.category.count()).toBe(1);
+    expect(await prisma.categoryType.count()).toBe(typeCount);
   });
 
   it('should put a row in the exact category when others are equal to it ignoring case', async () => {

@@ -451,13 +451,28 @@ describe('units and categories that exist ignoring case', () => {
       });
     });
 
-    it('should keep proposing the first ingredient equal ignoring case', async () => {
+    // Bottles and ingredients need not be unique ignoring case: the exact row first, else the first one
+    it('should propose the exact bottle or ingredient first, else the first one equal ignoring case', async () => {
+      const rum = await seedCategory({ name: 'Rum' });
+      const havana = await seedBottle({ name: 'Havana', categoryId: rum.id });
+      const lowerHavana = await seedBottle({ name: 'havana', categoryId: rum.id });
       const lime = await seedIngredient({ name: 'Lime' });
-      await seedIngredient({ name: 'LIME' });
+      const lowerLime = await seedIngredient({ name: 'lime' });
 
-      const preview = await previewImport(recipe([{ sourceType: 'INGREDIENT', sourceName: 'lime', quantity: 1, unit: CL }]));
+      const preview = await previewImport(recipe([
+        { ...rumBottleLine, sourceName: 'havana' },
+        { sourceType: 'INGREDIENT', sourceName: 'lime', quantity: 1, unit: CL },
+      ]));
 
-      expect(preview.ingredients[0]).toMatchObject({ status: 'matched', existingMatch: { id: lime.id } });
+      expect(preview.bottles).toEqual([expect.objectContaining({ status: 'matched', existingMatch: expect.objectContaining({ id: lowerHavana.id }) })]);
+      expect(preview.ingredients).toEqual([expect.objectContaining({ status: 'matched', existingMatch: expect.objectContaining({ id: lowerLime.id }) })]);
+
+      const upperPreview = await previewImport(recipe([
+        { ...rumBottleLine, sourceName: 'HAVANA' },
+        { sourceType: 'INGREDIENT', sourceName: 'LIME', quantity: 1, unit: CL },
+      ]));
+      expect(upperPreview.bottles[0]).toMatchObject({ status: 'matched', existingMatch: { id: havana.id } });
+      expect(upperPreview.ingredients[0]).toMatchObject({ status: 'matched', existingMatch: { id: lime.id } });
     });
   });
 
@@ -526,6 +541,23 @@ describe('units and categories that exist ignoring case', () => {
       await expect(confirmImport(recipe([rumLine]), resolutions(chosen)))
         .rejects.toMatchObject({ status: 409, i18nKey, details: { name, matches } });
       expect(await rowCounts()).toEqual(before);
+    });
+
+    it.each([
+      ['a blank', '   '],
+      ['an invisible', '\u200B'],
+    ])('should refuse %s new type even when the category exists ignoring case, and write nothing', async (_case, type) => {
+      await seedCategory({ name: 'Rum' });
+      const unit = await seedUnit();
+      const before = await rowCounts();
+      const typeCount = await prisma.categoryType.count();
+
+      await expect(confirmImport(recipe([rumLine]), resolutions({
+        units: { cl: { action: 'use_existing', existingId: unit.id } },
+        categories: { rum: { action: 'create', data: { name: 'rum', type } } },
+      }))).rejects.toMatchObject({ status: 400, details: [{ path: 'body.resolutions.categories.rum.data.type' }] });
+      expect(await rowCounts()).toEqual(before);
+      expect(await prisma.categoryType.count()).toBe(typeCount);
     });
 
     it('should put a category to create under the exact row when others are equal to it ignoring case', async () => {

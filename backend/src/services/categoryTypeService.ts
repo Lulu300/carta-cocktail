@@ -42,9 +42,25 @@ export function requireNewCategoryTypeName(name: string, path: PropertyKey[]): s
  * points there, like the other issues of the request. The default is the category routes' own.
  */
 export async function ensureCategoryType(db: Db, name: string, typePath: PropertyKey[] = ['body', 'type']): Promise<string> {
+  const typeName = await categoryTypeNameFor(db, name, typePath);
+  await createMissingCategoryType(db, typeName);
+  return typeName;
+}
+
+/**
+ * The read-only half of `ensureCategoryType`: the name of the type a category given `name` goes
+ * under, by the same rule (an existing type matched exactly, else the tidied new name), with the
+ * same 400 at `typePath` when nothing is left. It writes nothing, so an import can check the type of
+ * a category to create before it knows whether it reuses an existing category instead (C-19): the
+ * request is valid or not whatever the database holds, and a reused category creates no type.
+ */
+export async function categoryTypeNameFor(db: Db, name: string, typePath: PropertyKey[]): Promise<string> {
   const existing = await db.categoryType.findUnique({ where: { name } });
   if (existing) return existing.name;
-  const typeName = requireNewCategoryTypeName(name, typePath);
+  return requireNewCategoryTypeName(name, typePath);
+}
+
+/** The write half of `ensureCategoryType`: creates, in gray, the type `categoryTypeNameFor` named if it is new. */
+export async function createMissingCategoryType(db: Db, typeName: string): Promise<void> {
   await db.categoryType.upsert({ where: { name: typeName }, update: {}, create: { name: typeName, color: 'gray' } });
-  return typeName;
 }

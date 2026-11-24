@@ -12,7 +12,7 @@ import {
 } from '../utils/bottlesImport';
 import { deleteBottle, isForceRequested } from '../services/deletionService';
 import { syncBottle, syncNewBottles } from '../services/menuSyncService';
-import { ensureCategoryType } from '../services/categoryTypeService';
+import { categoryTypeNameFor, createMissingCategoryType } from '../services/categoryTypeService';
 import { valid, validate } from '../validation/validate';
 import { deleteRequest, IdParams, idRequest } from '../validation/common';
 import { BottleCreate, BottleExportQuery, BottleListQuery, BottleUpdate } from '../validation/bottles';
@@ -126,17 +126,21 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
         // The schema fills the type, desired stock and minimum percent defaults
         const { nameTranslations, name, type, desiredStock, minimumPercent } = resolution.data;
         const categoryName = name || key;
+        // Checked before the lookup, so the request is refused or not whatever the database holds
+        const typeName = await categoryTypeNameFor(tx, type, importedCategoryTypePath(key));
         // A category that exists ignoring case is used as it is, its type included
-        const category = await existingCategories.findOrCreate(categoryName, 'errors.ambiguousCategoryName', async () =>
-          tx.category.create({
+        const category = await existingCategories.findOrCreate(categoryName, 'errors.ambiguousCategoryName', async () => {
+          await createMissingCategoryType(tx, typeName);
+          return tx.category.create({
             data: {
               name: categoryName,
-              type: await ensureCategoryType(tx, type, importedCategoryTypePath(key)),
+              type: typeName,
               desiredStock,
               minimumPercent,
               nameTranslations: serializeTranslations(nameTranslations),
             },
-          }));
+          });
+        });
         resolvedCategories.set(categoryName.toLowerCase(), category.id);
       }
     }

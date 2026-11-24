@@ -5,7 +5,7 @@ import { BadRequestError } from '../../errors';
 import { ImportRecipeV1, ImportResolutions } from '../../validation/cocktailImport';
 import { importedCategoryTypePath } from '../../validation/categories';
 import { SOURCE_KEYS, SourceType } from '../../validation/cocktails';
-import { ensureCategoryType } from '../categoryTypeService';
+import { categoryTypeNameFor, createMissingCategoryType } from '../categoryTypeService';
 import { parseNameTranslations, serializeTranslations } from '../../utils/translations';
 import { CaseInsensitiveIndex, CaseInsensitiveMatch, previewMatch } from '../../utils/uniqueness';
 import { createCocktailIn, IngredientLineValue } from './cocktailService';
@@ -81,17 +81,13 @@ function matchReferences<Ref, Row extends { id: number }>(
 }
 
 /**
- * Bottle names repeat, and ingredient names may differ only by case: unlike categories and
- * units, nothing makes them unique ignoring case, and the first row equal ignoring case is
- * proposed.
+ * Bottle names repeat, and ingredient names may differ only by case: unlike categories and units,
+ * nothing makes them unique ignoring case. The exact row is proposed first, else the first row
+ * equal ignoring case, never an ambiguity (`matchFirst`).
  */
-function firstIgnoringCase<Row>(rows: Row[], keyOf: (row: Row) => string): RowMatcher<Row> {
-  return {
-    match(value) {
-      const row = rows.find((candidate) => lowercase(keyOf(candidate)) === lowercase(value));
-      return row ? { status: 'found', row } : { status: 'none' };
-    },
-  };
+function exactOrFirst<Row>(rows: Row[], keyOf: (row: Row) => string): RowMatcher<Row> {
+  const index = new CaseInsensitiveIndex(rows, keyOf);
+  return { match: (value) => index.matchFirst(value) };
 }
 
 const byName = (row: { name: string }) => row.name;
@@ -101,8 +97,8 @@ export async function previewImport(recipe: ImportedRecipe) {
   const refs = collectImportReferences(recipe);
   const units = new CaseInsensitiveIndex(await prisma.unit.findMany(), byAbbreviation);
   const categories = new CaseInsensitiveIndex(await prisma.category.findMany(), byName);
-  const bottles = firstIgnoringCase(await prisma.bottle.findMany({ include: { category: true } }), byName);
-  const ingredients = firstIgnoringCase(await prisma.ingredient.findMany(), byName);
+  const bottles = exactOrFirst(await prisma.bottle.findMany({ include: { category: true } }), byName);
+  const ingredients = exactOrFirst(await prisma.ingredient.findMany(), byName);
   return {
     cocktail: {
       name: recipe.name,
@@ -186,16 +182,21 @@ async function resolveAll(db: Db, recipe: ImportedRecipe, refs: ImportReferences
   const categories = new CaseInsensitiveIndex(await db.category.findMany(), byName);
   const category = await resolveEntities(refs.categories, resolutions?.categories, async (data, ref, key) => {
     const name = data.name || ref.name || key;
-    const row = await categories.findOrCreate(name, 'errors.ambiguousCategoryName', async () => db.category.create({
-      data: {
-        name,
-        // The schema defaults the type to SPIRIT. The wizard keys resolutions by lowercased name, like `key`
-        type: await ensureCategoryType(db, data.type, importedCategoryTypePath(key)),
-        desiredStock: data.desiredStock,
-        minimumPercent: data.minimumPercent,
-        nameTranslations: serializeTranslations(data.nameTranslations),
-      },
-    }));
+    // The schema defaults the type to SPIRIT. The wizard keys resolutions by lowercased name, like `key`.
+    // Checked before the lookup, so the request is refused or not whatever the database holds
+    const typeName = await categoryTypeNameFor(db, data.type, importedCategoryTypePath(key));
+    const row = await categories.findOrCreate(name, 'errors.ambiguousCategoryName', async () => {
+      await createMissingCategoryType(db, typeName);
+      return db.category.create({
+        data: {
+          name,
+          type: typeName,
+          desiredStock: data.desiredStock,
+          minimumPercent: data.minimumPercent,
+          nameTranslations: serializeTranslations(data.nameTranslations),
+        },
+      });
+    });
     return row.id;
   });
 

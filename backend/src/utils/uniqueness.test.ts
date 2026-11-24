@@ -37,6 +37,16 @@ describe('CaseInsensitiveIndex.match', () => {
   });
 });
 
+describe('CaseInsensitiveIndex.matchFirst', () => {
+  it('should prefer the exact row, else take the first one equal ignoring case, never ambiguous', () => {
+    const index = indexOf('Lime', 'lime', 'LIME');
+
+    expect(index.matchFirst('lime')).toEqual({ status: 'found', row: { id: 2, name: 'lime' } });
+    expect(index.matchFirst('lIME')).toEqual({ status: 'found', row: { id: 1, name: 'Lime' } });
+    expect(index.matchFirst('Mint')).toEqual({ status: 'none' });
+  });
+});
+
 describe('CaseInsensitiveIndex.findUnambiguous', () => {
   it('should refuse an ambiguous name with a 409 naming it and its matches', () => {
     expect(() => indexOf('Rum', 'RUM').findUnambiguous('rum', 'errors.ambiguousCategoryName')).toThrow(

@@ -47,6 +47,17 @@ export class CaseInsensitiveIndex<Row> {
   }
 
   /**
+   * For values nothing makes unique ignoring case (bottle names repeat, ingredient names may differ
+   * only by case): the exact row first, as `match`, else the first row equal ignoring case. Never
+   * ambiguous: the preview proposes a row, and the admin may pick another.
+   */
+  matchFirst(value: string): CaseInsensitiveMatch<Row> {
+    const candidates = this.rowsByKey.get(value.toLowerCase()) ?? [];
+    const row = candidates.find((candidate) => this.valueOf(candidate) === value) ?? candidates[0];
+    return row ? { status: 'found', row } : { status: 'none' };
+  }
+
+  /**
    * `match`, with an ambiguous value refused: a 409 under `conflictKey` that names the value
    * and the rows it could mean, so the admin knows which ones to tell apart.
    */
