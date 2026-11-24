@@ -16,6 +16,7 @@ import { valid, validate } from '../validation/validate';
 import { deleteRequest, IdParams, idRequest } from '../validation/common';
 import { BottleCreate, BottleExportQuery, BottleListQuery, BottleUpdate } from '../validation/bottles';
 import { BottleImportConfirm } from '../validation/bottleImport';
+import { importedCategoryTypePath } from '../validation/categories';
 
 const router = Router();
 
@@ -136,7 +137,7 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
         const createdCat = await tx.category.create({
           data: {
             name: name || key,
-            type: await ensureCategoryType(tx, type, ['body', 'resolutions', 'categories', key, 'data', 'type']),
+            type: await ensureCategoryType(tx, type, importedCategoryTypePath(key)),
             desiredStock,
             minimumPercent,
             nameTranslations: serializeTranslations(nameTranslations),

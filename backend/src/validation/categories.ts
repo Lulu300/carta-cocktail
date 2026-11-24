@@ -10,6 +10,14 @@ export const DesiredStock = z.number().int().min(0);
 // needs a type, as the category form says.
 export const CategoryTypeName = z.string().min(1);
 
+/**
+ * Where the bottle and cocktail imports send the type of a category to create: both key their
+ * category resolutions by name. The 400 of a blank new type points there.
+ */
+export function importedCategoryTypePath(key: string): PropertyKey[] {
+  return ['body', 'resolutions', 'categories', key, 'data', 'type'];
+}
+
 export const CategoryCreate = z.object({
   name: RequiredText,
   type: CategoryTypeName,

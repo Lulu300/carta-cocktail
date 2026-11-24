@@ -1299,7 +1299,7 @@ describe('POST /api/bottles/import/confirm', () => {
       // A category needs a type, even when a type has the empty name: the category form refuses it too
       ['the empty name, even when a type has it', ''],
     ])('should return 400 for %s, pointing at its resolution, and import nothing', async (_case, type) => {
-      // Neither blank name may be used, whatever the types that exist
+      // A blank new type is refused, and the empty name even when a type has it
       await prisma.categoryType.create({ data: { name: '', color: 'red' } });
       const typeCount = await prisma.categoryType.count();
 
