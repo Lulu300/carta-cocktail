@@ -39,7 +39,13 @@ const app = express();
 app.set('trust proxy', config.trustProxy);
 
 // Middleware
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+// No HSTS here: whether the site is HTTPS-only is decided where TLS ends (the reverse proxy,
+// or nginx in frontend/security-headers.conf), for every response at once. Sent from here, it
+// would cover only the API and the photos, and helmet adds includeSubDomains.
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  strictTransportSecurity: false,
+}));
 app.use(cors({ origin: config.corsOrigin || false }));
 // Before the request logger: the Docker healthcheck calls it every 30 s and would fill the logs.
 // Public, like /api/auth and /api/public: Docker calls it without a token.
