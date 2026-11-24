@@ -96,11 +96,11 @@ docker compose up --build
 
 Use `docker-compose.prod.yml` to deploy with pre-built images from GitHub Container Registry. The operations guide, [`docs/operations.md`](docs/operations.md) (in French), covers installation, backups, upgrades, rollback, secret rotation and HTTPS step by step.
 
-1. **Pin a version.** In `docker-compose.prod.yml`, replace `:latest` with a version, so that an upgrade only happens after you have read [`UPGRADING.md`](UPGRADING.md). `:<major>.<minor>` (from v1.12.0, such as `:1.14`) follows the patch releases of that minor version; `:<major>.<minor>.<patch>` never moves:
+1. **Pin a version.** In `docker-compose.prod.yml`, replace `:latest` with a version, so that an upgrade only happens after you have read [`UPGRADING.md`](UPGRADING.md). `:<major>.<minor>` (from v1.12.0, such as `:1.15`) follows the patch releases of that minor version; `:<major>.<minor>.<patch>` never moves:
 
    ```yaml
-   image: ghcr.io/lulu300/carta-cocktail/backend:1.14
-   image: ghcr.io/lulu300/carta-cocktail/frontend:1.14
+   image: ghcr.io/lulu300/carta-cocktail/backend:1.15
+   image: ghcr.io/lulu300/carta-cocktail/frontend:1.15
    ```
 
 2. **Create a `.env` file** alongside the compose file, before the first start:
@@ -448,8 +448,8 @@ The GitHub Release contains the notes file (without its front matter), the list 
 Prefer `:<major>.<minor>`, which follows the patch releases (see [Docker (production with pre-built images)](#docker-production-with-pre-built-images)):
 
 ```bash
-docker pull ghcr.io/lulu300/carta-cocktail/backend:1.14
-docker pull ghcr.io/lulu300/carta-cocktail/frontend:1.14
+docker pull ghcr.io/lulu300/carta-cocktail/backend:1.15
+docker pull ghcr.io/lulu300/carta-cocktail/frontend:1.15
 ```
 
 ## API Overview
