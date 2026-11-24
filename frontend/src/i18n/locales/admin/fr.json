@@ -350,20 +350,37 @@
       "noExcluded": "Aucune bouteille retirée de cette carte.",
       "restore": "Remettre",
       "restoreLabel": "Remettre {{name}} dans la carte",
+      "add": "Ajouter",
+      "addTitle": "Ajouter des bouteilles",
+      "addLabel": "Ajouter {{name}} à la carte",
+      "searchChoices": "Rechercher les bouteilles à ajouter",
       "cocktailMenu": "Cette carte est une carte de cocktails : elle ne contient pas de bouteilles.",
       "aperos": {
         "title": "Gérer la carte des apéritifs",
         "hint": "Les bouteilles cochées comme apéritif apparaissent automatiquement ici. Utilisez « Synchroniser » pour mettre à jour la liste.",
-        "empty": "Aucune bouteille. Cochez des bouteilles comme apéritif, puis synchronisez."
+        "empty": "Aucune bouteille. Cochez des bouteilles comme apéritif, puis synchronisez.",
+        "personalTitle": "Gérer une carte d’apéritifs",
+        "personalHint": "Choisissez les bouteilles de cette carte parmi les bouteilles cochées comme apéritif. Décocher une bouteille la retire de cette carte.",
+        "personalEmpty": "Aucune bouteille pour l’instant. Ajoutez des bouteilles cochées comme apéritif depuis la liste ci-dessous.",
+        "choices": "Bouteilles cochées comme apéritif qui ne sont pas encore dans cette carte. Une bouteille vide reste cachée aux invités jusqu’à son remplacement.",
+        "noChoice": "Toutes les bouteilles cochées comme apéritif sont déjà dans cette carte. Cochez d’autres bouteilles comme apéritif pour les ajouter ici.",
+        "unchecked": "N’est plus cochée comme apéritif : « Remettre » la retire seulement de cette liste. La carte la reprend dès qu’elle est de nouveau cochée comme apéritif."
       },
       "digestifs": {
         "title": "Gérer la carte des digestifs",
         "hint": "Les bouteilles cochées comme digestif apparaissent automatiquement ici. Utilisez « Synchroniser » pour mettre à jour la liste.",
-        "empty": "Aucune bouteille. Cochez des bouteilles comme digestif, puis synchronisez."
+        "empty": "Aucune bouteille. Cochez des bouteilles comme digestif, puis synchronisez.",
+        "personalTitle": "Gérer une carte de digestifs",
+        "personalHint": "Choisissez les bouteilles de cette carte parmi les bouteilles cochées comme digestif. Décocher une bouteille la retire de cette carte.",
+        "personalEmpty": "Aucune bouteille pour l’instant. Ajoutez des bouteilles cochées comme digestif depuis la liste ci-dessous.",
+        "choices": "Bouteilles cochées comme digestif qui ne sont pas encore dans cette carte. Une bouteille vide reste cachée aux invités jusqu’à son remplacement.",
+        "noChoice": "Toutes les bouteilles cochées comme digestif sont déjà dans cette carte. Cochez d’autres bouteilles comme digestif pour les ajouter ici.",
+        "unchecked": "N’est plus cochée comme digestif : « Remettre » la retire seulement de cette liste. La carte la reprend dès qu’elle est de nouveau cochée comme digestif."
       }
     },
     "search": "Rechercher une carte",
     "type": "Type",
+    "typeHint": "Non modifiable ensuite. Les cartes d’apéritifs et de digestifs contiennent des bouteilles, choisies parmi les bouteilles cochées pour leur type.",
     "types": {
       "cocktails": "Cocktails",
       "aperos": "Apéritifs",

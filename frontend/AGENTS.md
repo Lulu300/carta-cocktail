@@ -65,7 +65,7 @@ frontend/
 │   │   │   ├── bottles/        # Bottle form modal, rows, history, export menu, filters
 │   │   │   ├── categories/     # Category form modal, category types manager
 │   │   │   ├── cocktails/      # Cocktail editor (react-hook-form + zod), list items, filters, selection
-│   │   │   └── menus/          # Menu editors: composition, sections, excluded bottles, mutations
+│   │   │   └── menus/          # Menu editors: composition, sections, excluded bottles, bottles to add, mutations
 │   │   ├── import/             # Cocktail import wizard (upload, resolve, confirm) and bottle import wizard
 │   │   ├── layout/             # AdminLayout, PublicLayout, RouteErrorBoundary, SkipLink, AppVersion, BackHomeLink
 │   │   └── ui/                 # Design system: Button, Field, Input, Select, Modal, ConfirmDialog, Toaster,

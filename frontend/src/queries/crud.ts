@@ -69,8 +69,8 @@ export function useEntityMutation<Variables, Result = unknown>({
   return { ...mutation, mutate };
 }
 
-interface CrudApi<Input> {
-  create(data: Input): Promise<unknown>;
+interface CrudApi<Input, Entity> {
+  create(data: Input): Promise<Entity>;
   update(id: number, data: Partial<Input>): Promise<unknown>;
   delete(id: number): Promise<unknown>;
 }
@@ -80,31 +80,32 @@ export interface UpdateVariables<Input> {
   data: Partial<Input>;
 }
 
-interface CrudMutationsOptions<Input> {
+interface CrudMutationsOptions<Input, Entity> {
   key: QueryKey;
-  api: CrudApi<Input>;
+  api: CrudApi<Input, Entity>;
   /** Other queries that show this entity, e.g. the cocktail availability. */
   invalidates?: QueryKey[];
   /** i18n keys of the success toasts, and of the hint shown when a deletion is refused because the item is in use. */
   messages: { created: string; updated: string; deleted: string; inUse?: string };
 }
 
-export interface CrudMutations<Input> {
-  create: EntityMutation<Input>;
+/** `Entity` is what a creation returns, e.g. to open the new item. */
+export interface CrudMutations<Input, Entity = unknown> {
+  create: EntityMutation<Input, Entity>;
   update: EntityMutation<UpdateVariables<Input>>;
   remove: EntityMutation<number>;
 }
 
 /** Create, update and delete mutations of an admin list page. */
-export function useCrudMutations<Input>({
+export function useCrudMutations<Input, Entity = unknown>({
   key,
   api,
   invalidates = [],
   messages,
-}: CrudMutationsOptions<Input>): CrudMutations<Input> {
+}: CrudMutationsOptions<Input, Entity>): CrudMutations<Input, Entity> {
   const refreshed = [key, ...invalidates];
 
-  const create = useEntityMutation<Input>({
+  const create = useEntityMutation<Input, Entity>({
     mutationFn: (data) => api.create(data),
     invalidates: refreshed,
     successMessage: messages.created,

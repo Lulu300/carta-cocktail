@@ -757,6 +757,23 @@ describe('menuBottles API', () => {
     expect(init.method).toBe('PUT');
     expect(JSON.parse(init.body)).toEqual({ ids: [12, 7], menuSectionId: null });
   });
+
+  it('should add bottles to, and remove entries from, a personal menu in one request each', async () => {
+    const api = await getApi();
+    mockOk({ message: 'ok' });
+    await api.menuBottles.addBottles(5, [3, 4]);
+    const [addUrl, addInit] = mockFetch.mock.calls[0];
+    expect(addUrl).toBe('/api/menu-bottles/menu/5/entries');
+    expect(addInit.method).toBe('POST');
+    expect(JSON.parse(addInit.body)).toEqual({ bottleIds: [3, 4] });
+
+    mockOk({ message: 'ok' });
+    await api.menuBottles.removeEntries(5, [12, 7]);
+    const [removeUrl, removeInit] = mockFetch.mock.calls[1];
+    expect(removeUrl).toBe('/api/menu-bottles/menu/5/entries/remove');
+    expect(removeInit.method).toBe('POST');
+    expect(JSON.parse(removeInit.body)).toEqual({ ids: [12, 7] });
+  });
 });
 
 describe('menuSections API', () => {

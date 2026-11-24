@@ -28,6 +28,14 @@ export interface ExcludedBottleGroup {
   isEmpty: boolean;
 }
 
+/** Identical bottles that are not in a personal menu yet, shown and added as one row. */
+export interface BottleChoiceGroup {
+  key: string;
+  bottle: Bottle;
+  bottles: Bottle[];
+  isEmpty: boolean;
+}
+
 export function hasBottle(entry: MenuBottle): entry is MenuBottleEntry {
   return entry.bottle !== undefined;
 }
@@ -73,5 +81,15 @@ export function groupExcludedBottles(exclusions: MenuBottleExclusion[]): Exclude
     bottle: groupExclusions[0].bottle,
     exclusions: groupExclusions,
     isEmpty: groupExclusions.every((exclusion) => isEmptyBottle(exclusion.bottle)),
+  }));
+}
+
+/** Groups identical bottles to add to a menu. */
+export function groupBottleChoices(bottles: Bottle[]): BottleChoiceGroup[] {
+  return groupByKey(bottles, bottleGroupKey).map(([key, groupBottles]) => ({
+    key,
+    bottle: groupBottles[0],
+    bottles: groupBottles,
+    isEmpty: groupBottles.every(isEmptyBottle),
   }));
 }

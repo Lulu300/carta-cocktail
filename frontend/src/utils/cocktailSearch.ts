@@ -1,4 +1,4 @@
-import type { Cocktail, CocktailIngredient } from '../types';
+import type { Bottle, Cocktail, CocktailIngredient } from '../types';
 
 type NamedEntity = { name: string; nameTranslations?: Record<string, string> | null };
 
@@ -43,6 +43,11 @@ function getIngredientNames(ingredient: CocktailIngredient, localize: LocalizeNa
 interface CocktailSearchOptions {
   /** Notes are private: only the admin cocktail list may search them. */
   includeNotes?: boolean;
+}
+
+/** Searchable text of a bottle: its name and the names of its category. */
+export function getBottleSearchText(bottle: Pick<Bottle, 'name' | 'category'> | undefined, localize: LocalizeName): string {
+  return buildSearchText([bottle?.name, ...getEntityNames(bottle?.category, localize)]);
 }
 
 /** Searchable text of a cocktail; compute it once per cocktail when filtering on every keystroke. */

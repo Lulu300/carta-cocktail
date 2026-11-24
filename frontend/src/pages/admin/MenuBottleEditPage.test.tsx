@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '../../test/test-utils';
 import { clearToasts, renderWithFeedback } from '../../test/feedback';
 import { buildBottle, buildCategory, buildMenu, buildMenuBottle, buildMenuSection } from '../../test/factories';
+import { axe } from '../../test/axe';
 import { server } from '../../test/msw/server';
 import { errorResponse, pendingResponse, readJsonObject } from '../../test/msw/utils';
 import MenuBottleEditPage from './MenuBottleEditPage';
@@ -23,6 +24,12 @@ const sameHendricks = makeBottle(2, 'Hendricks', { alcoholPercentage: 41.4 });
 const lillet = makeBottle(3, 'Lillet');
 const campari = makeBottle(6, 'Campari');
 const sameCampari = makeBottle(7, 'Campari');
+const emptyAperol = makeBottle(8, 'Aperol', { remainingPercent: 0 });
+const chartreuse = makeBottle(9, 'Chartreuse', { isApero: false, isDigestif: true });
+const notChecked = makeBottle(13, 'Vodka', { isApero: false });
+
+/** Every bottle of the inventory, as `GET /api/bottles` returns them. */
+const INVENTORY = [hendricks, sameHendricks, lillet, campari, sameCampari, emptyAperol, chartreuse, notChecked];
 
 function exclusionOf(bottle: Bottle): MenuBottleExclusion {
   return { menuId: 5, bottleId: bottle.id, bottle, createdAt: '2026-10-12' };
@@ -39,7 +46,7 @@ function makeEntry(id: number, bottle: Bottle, menuSectionId: number | null = nu
 // --- Fake backend of the editor: it stores the menu and records each request ---
 
 /** What the server stores: a refetch after a change returns the saved state. */
-let stored: { menu: Menu; exclusions: MenuBottleExclusion[] };
+let stored: { menu: Menu; exclusions: MenuBottleExclusion[]; bottles: Bottle[] };
 
 /** Requests received, in order. */
 let received: {
@@ -50,6 +57,8 @@ let received: {
   reorders: number[][];
   excludes: number[][];
   restores: number[][];
+  adds: number[][];
+  removes: number[][];
   syncs: number[];
   sectionDeletes: number[];
 };
@@ -61,6 +70,8 @@ let answer: {
   entryUpdate: (ids: number[], changes: Partial<MenuBottle>) => Promise<Response>;
   exclude: (bottleIds: number[]) => Promise<Response>;
   restore: (bottleIds: number[]) => Promise<Response>;
+  add: (bottleIds: number[]) => Promise<Response>;
+  remove: (entryIds: number[]) => Promise<Response>;
   sync: () => Promise<Response>;
 };
 
@@ -86,7 +97,13 @@ function storeMenu(overrides: Partial<Menu> = {}, exclusions: MenuBottleExclusio
       ...overrides,
     }),
     exclusions,
+    bottles: INVENTORY,
   };
+}
+
+/** A personal menu of the given type, with Hendricks twice and Lillet unless told otherwise. */
+function storePersonalMenu(overrides: Partial<Menu> = {}) {
+  storeMenu({ slug: 'summer-aperos', name: 'Summer', ...overrides });
 }
 
 function updateEntries(ids: number[], changes: Partial<MenuBottle>) {
@@ -102,14 +119,24 @@ function excludeBottles(bottleIds: number[]) {
   ];
 }
 
+/** As the server: a bottle no longer checked as aperitif leaves the list without coming back in the menu. */
 function restoreBottles(bottleIds: number[]) {
-  const restored = bottleIds.map((bottleId) => {
+  const restored = bottleIds.flatMap((bottleId) => {
     const exclusion = stored.exclusions.find((item) => item.bottleId === bottleId);
     if (!exclusion) throw new Error(`Bottle ${bottleId} is not removed`);
-    return makeEntry(50 + bottleId, exclusion.bottle);
+    return exclusion.bottle.isApero ? [makeEntry(50 + bottleId, exclusion.bottle)] : [];
   });
   stored.exclusions = stored.exclusions.filter((item) => !bottleIds.includes(item.bottleId));
   setEntries([...storedEntries(), ...restored]);
+}
+
+function addBottles(bottleIds: number[]) {
+  const added = bottleIds.map((bottleId) => {
+    const bottle = stored.bottles.find((item) => item.id === bottleId);
+    if (!bottle) throw new Error(`No bottle ${bottleId}`);
+    return makeEntry(70 + bottleId, bottle);
+  });
+  setEntries([...storedEntries(), ...added]);
 }
 
 function numbers(value: unknown): number[] {
@@ -127,7 +154,7 @@ function entryChanges(body: Record<string, unknown>): Partial<MenuBottle> {
 function installFakeBackend() {
   received = {
     menuReads: [], exclusionReads: [], menuUpdates: [], entryUpdates: [], reorders: [], excludes: [], restores: [],
-    syncs: [], sectionDeletes: [],
+    adds: [], removes: [], syncs: [], sectionDeletes: [],
   };
   answer = {
     menuRead: async () => HttpResponse.json(stored.menu),
@@ -142,6 +169,14 @@ function installFakeBackend() {
     },
     restore: async (bottleIds) => {
       restoreBottles(bottleIds);
+      return ok();
+    },
+    add: async (bottleIds) => {
+      addBottles(bottleIds);
+      return ok();
+    },
+    remove: async (entryIds) => {
+      setEntries(storedEntries().filter((entry) => !entryIds.includes(entry.id)));
       return ok();
     },
     sync: async () => HttpResponse.json({ message: 'ok', added: 0, removed: 0 }),
@@ -163,6 +198,17 @@ function installFakeBackend() {
       received.entryUpdates.push(update);
       return answer.entryUpdate(update.ids, update.changes);
     }),
+    http.post('/api/menu-bottles/menu/:menuId/entries', async ({ request }) => {
+      const bottleIds = numbers((await readJsonObject(request)).bottleIds);
+      received.adds.push(bottleIds);
+      return answer.add(bottleIds);
+    }),
+    http.post('/api/menu-bottles/menu/:menuId/entries/remove', async ({ request }) => {
+      const ids = numbers((await readJsonObject(request)).ids);
+      received.removes.push(ids);
+      return answer.remove(ids);
+    }),
+    http.get('/api/bottles', () => HttpResponse.json(stored.bottles)),
     http.post('/api/menu-bottles/menu/:menuId/reorder', async ({ request }) => {
       const ids = numbers((await readJsonObject(request)).ids);
       received.reorders.push(ids);
@@ -246,6 +292,23 @@ function excludedCard(): HTMLElement {
   return sectionAround(screen.getByText(/menus.bottles.excludedTitle/));
 }
 
+function choicesCard(): HTMLElement {
+  return sectionAround(screen.getByRole('heading', { name: 'menus.bottles.addTitle' }));
+}
+
+/** The list of bottles to add, once the menu has loaded. */
+async function findChoicesCard(): Promise<HTMLElement> {
+  return sectionAround(await screen.findByRole('heading', { name: 'menus.bottles.addTitle' }));
+}
+
+function choiceNames(): string[] {
+  return within(choicesCard()).queryAllByRole('listitem').map((row) => row.querySelector('.font-medium')?.textContent ?? '');
+}
+
+async function addGroup(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(within(rowOf(name, choicesCard())).getByRole('button', { name: 'menus.bottles.addLabel' }));
+}
+
 function compositionNames(): string[] {
   return within(compositionCard()).getAllByRole('listitem').map((row) => row.querySelector('.font-medium')?.textContent ?? '');
 }
@@ -272,6 +335,17 @@ describe('MenuBottleEditPage', () => {
     expect(within(rowOf('Hendricks')).getByText('menus.bottles.count')).toBeInTheDocument();
     expect(within(rowOf('Hendricks')).getByText('units.abv')).toBeInTheDocument();
     expect(within(rowOf('Lillet')).queryByText('units.abv')).not.toBeInTheDocument();
+  });
+
+  it('keeps a system menu automatic: sync, removed bottles, and no bottle to add by hand', async () => {
+    const { container } = renderPage();
+    await screen.findByText('Hendricks');
+
+    expect(screen.getByText('menus.bottles.aperos.hint')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'menus.bottles.sync' })).toBeInTheDocument();
+    await waitFor(() => expect(within(excludedCard()).getByText('menus.bottles.noExcluded')).toBeInTheDocument());
+    expect(screen.queryByRole('heading', { name: 'menus.bottles.addTitle' })).not.toBeInTheDocument();
+    expect(await axe(container)).toHaveNoViolations();
   });
 
   it('marks a bottle at 0 % as empty', async () => {
@@ -389,6 +463,7 @@ describe('MenuBottleEditPage', () => {
     await removeGroup(user, 'Hendricks');
 
     await waitFor(() => expect(received.excludes).toEqual([[1, 2]]));
+    expect(received.removes).toEqual([]);
     expect(within(compositionCard()).queryByText('Hendricks')).not.toBeInTheDocument();
     // One row for the two identical bottles, as in the menu.
     await waitFor(() => expect(within(excludedCard()).getAllByText('Hendricks')).toHaveLength(1));
@@ -469,6 +544,24 @@ describe('MenuBottleEditPage', () => {
     await waitFor(() => expect(within(rowOf('Campari', excludedCard())).getByText('menus.bottles.count')).toBeInTheDocument());
   });
 
+  it('tells which removed bottle is no longer checked, and only takes it off the list', async () => {
+    const user = userEvent.setup();
+    storeMenu({}, [exclusionOf(makeBottle(6, 'Campari', { isApero: false })), exclusionOf(emptyAperol)]);
+    // The answer never comes: the screen shows what the editor expects from the server.
+    answer.restore = async () => pendingResponse();
+    renderPage();
+    await within(await screen.findByRole('group')).findByText('Campari');
+    const row = rowOf('Campari', excludedCard());
+    expect(within(row).getByText('menus.bottles.aperos.unchecked')).toBeInTheDocument();
+    expect(within(rowOf('Aperol', excludedCard())).queryByText('menus.bottles.aperos.unchecked')).not.toBeInTheDocument();
+
+    await user.click(within(row).getByRole('button', { name: 'menus.bottles.restoreLabel' }));
+
+    await waitFor(() => expect(received.restores).toEqual([[6]]));
+    expect(within(excludedCard()).queryByText('Campari')).not.toBeInTheDocument();
+    expect(compositionNames()).toEqual(['Hendricks', 'Lillet']);
+  });
+
   it('renames a system menu but keeps its slug read-only', async () => {
     const user = userEvent.setup();
     renderPage();
@@ -542,15 +635,160 @@ describe('MenuBottleEditPage', () => {
     await waitFor(() => expect(compositionNames()).toEqual(['Lillet', 'Hendricks', 'Campari']));
   });
 
-  it('offers neither removal nor removed bottles on a personal menu', async () => {
-    storeMenu({ slug: 'summer-aperos', name: 'Summer' });
-    renderPage();
-    await screen.findByText('Hendricks');
+  describe('personal menu', () => {
+    it('offers the bottles checked for its type that are not in it yet, without sync nor removed bottles', async () => {
+      storePersonalMenu();
+      const { container } = renderPage();
+      await screen.findByText('Hendricks');
 
-    expect(screen.queryByRole('button', { name: 'menus.removeItem' })).not.toBeInTheDocument();
-    expect(screen.queryByText(/menus.bottles.excludedTitle/)).not.toBeInTheDocument();
-    expect(screen.getByDisplayValue('summer-aperos')).not.toHaveAttribute('readonly');
-    expect(received.exclusionReads).toEqual([]);
+      expect(screen.getByRole('heading', { name: 'menus.bottles.aperos.personalTitle' })).toBeInTheDocument();
+      expect(screen.getByText('menus.bottles.aperos.personalHint')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'menus.bottles.sync' })).not.toBeInTheDocument();
+      expect(screen.queryByText(/menus.bottles.excludedTitle/)).not.toBeInTheDocument();
+      expect(received.exclusionReads).toEqual([]);
+      expect(screen.getByDisplayValue('summer-aperos')).not.toHaveAttribute('readonly');
+      expect(within(choicesCard()).getByText('menus.bottles.aperos.choices')).toBeInTheDocument();
+      // Hendricks and Lillet are in the menu, Chartreuse is a digestif, the vodka is not checked.
+      expect(await within(await findChoicesCard()).findByText('Campari')).toBeInTheDocument();
+      expect(choiceNames()).toEqual(['Campari', 'Aperol']);
+      expect(within(rowOf('Campari', choicesCard())).getByText('menus.bottles.count')).toBeInTheDocument();
+      // An empty bottle can be added: it stays hidden from guests until refilled.
+      expect(within(rowOf('Aperol', choicesCard())).getByText('menus.bottles.empty')).toBeInTheDocument();
+      expect(await axe(container)).toHaveNoViolations();
+    });
+
+    it('offers the digestifs only on a digestifs menu', async () => {
+      storePersonalMenu({ type: 'DIGESTIFS', slug: 'after-dinner', bottles: [] });
+      renderPage();
+
+      expect(await screen.findByRole('heading', { name: 'menus.bottles.digestifs.personalTitle' })).toBeInTheDocument();
+      expect(screen.getByText('menus.bottles.digestifs.personalEmpty')).toBeInTheDocument();
+      expect(await within(await findChoicesCard()).findByText('Chartreuse')).toBeInTheDocument();
+      expect(choiceNames()).toEqual(['Chartreuse']);
+    });
+
+    it('says so when every bottle checked for its type is already in it', async () => {
+      storePersonalMenu();
+      stored.bottles = [hendricks, sameHendricks, lillet, chartreuse];
+      renderPage();
+
+      expect(await within(await findChoicesCard()).findByText('menus.bottles.aperos.noChoice')).toBeInTheDocument();
+      expect(within(choicesCard()).queryByRole('searchbox')).not.toBeInTheDocument();
+    });
+
+    it('filters the bottles to add by name or category', async () => {
+      const user = userEvent.setup();
+      storePersonalMenu();
+      renderPage();
+      await within(await findChoicesCard()).findByText('Campari');
+      const search = within(choicesCard()).getByRole('searchbox', { name: 'menus.bottles.searchChoices' });
+
+      await user.type(search, 'camp');
+      expect(choiceNames()).toEqual(['Campari']);
+
+      await user.clear(search);
+      await user.type(search, 'gin');
+      expect(choiceNames()).toEqual(['Campari', 'Aperol']);
+
+      await user.type(search, ' tonic');
+      expect(choiceNames()).toEqual([]);
+      expect(within(choicesCard()).getByText('common.noResults')).toBeInTheDocument();
+    });
+
+    it('adds a group of identical bottles in one request and shows it at once', async () => {
+      const user = userEvent.setup();
+      storePersonalMenu();
+      serveOnlyFirstLoad();
+      renderPage();
+      await within(await findChoicesCard()).findByText('Campari');
+
+      await addGroup(user, 'Campari');
+
+      // The refetches never answer: the editor shows the new group by itself.
+      expect(compositionNames()).toEqual(['Hendricks', 'Lillet', 'Campari']);
+      expect(within(rowOf('Campari', compositionCard())).getByText('menus.bottles.count')).toBeInTheDocument();
+      expect(choiceNames()).toEqual(['Aperol']);
+      await waitFor(() => expect(received.adds).toEqual([[6, 7]]));
+      expect(storedEntries().map((entry) => entry.bottleId)).toEqual([1, 2, 3, 6, 7]);
+    });
+
+    it('keeps an added group after the refetch, once the server gave its ids', async () => {
+      const user = userEvent.setup();
+      storePersonalMenu({ bottles: [] });
+      renderPage();
+      await within(await findChoicesCard()).findByText('Aperol');
+
+      await addGroup(user, 'Aperol');
+
+      await waitFor(() => expect(received.menuReads).toHaveLength(2));
+      await waitFor(() => expect(within(rowOf('Aperol', compositionCard())).getByRole('button', { name: 'menus.hideItem' })).toBeEnabled());
+      expect(within(rowOf('Aperol', compositionCard())).getByText('menus.bottles.empty')).toBeInTheDocument();
+      expect(received.adds).toEqual([[8]]);
+    });
+
+    it('takes an added group back with a toast when the server refuses it', async () => {
+      const user = userEvent.setup();
+      storePersonalMenu();
+      answer.add = async () => errorResponse(400, 'This bottle cannot go in this menu');
+      serveOnlyFirstLoad();
+      renderPage();
+      await within(await findChoicesCard()).findByText('Campari');
+
+      await addGroup(user, 'Campari');
+
+      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('This bottle cannot go in this menu'));
+      // The refetches never answer: the editor took the group back by itself.
+      expect(compositionNames()).toEqual(['Hendricks', 'Lillet']);
+      expect(choiceNames()).toEqual(['Campari', 'Aperol']);
+    });
+
+    it('removes a group in one request, without confirmation nor exclusion, and offers it again', async () => {
+      const user = userEvent.setup();
+      storePersonalMenu();
+      renderPage();
+      await within(await findChoicesCard()).findByText('Campari');
+
+      await user.click(within(rowOf('Hendricks')).getByRole('button', { name: 'menus.removeItem' }));
+
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      expect(compositionNames()).toEqual(['Lillet']);
+      await waitFor(() => expect(received.removes).toEqual([[10, 11]]));
+      expect(received.excludes).toEqual([]);
+      await waitFor(() => expect(received.menuReads).toHaveLength(2));
+      expect(choiceNames()).toEqual(['Hendricks', 'Campari', 'Aperol']);
+      expect(compositionNames()).toEqual(['Lillet']);
+    });
+
+    it('shows a group again with a toast when its removal is refused', async () => {
+      const user = userEvent.setup();
+      storePersonalMenu();
+      answer.remove = async () => errorResponse(404, 'Resource not found');
+      serveOnlyFirstLoad();
+      renderPage();
+      await within(await findChoicesCard()).findByText('Campari');
+
+      await user.click(within(rowOf('Hendricks')).getByRole('button', { name: 'menus.removeItem' }));
+
+      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Resource not found'));
+      expect(compositionNames()).toEqual(['Hendricks', 'Lillet']);
+      expect(choiceNames()).toEqual(['Campari', 'Aperol']);
+    });
+
+    it('shows an error with a retry when the bottles cannot be loaded', async () => {
+      const user = userEvent.setup();
+      storePersonalMenu();
+      let bottleReads = 0;
+      server.use(http.get('/api/bottles', () => {
+        bottleReads += 1;
+        return bottleReads === 1 ? errorResponse(500, 'Server error') : HttpResponse.json(stored.bottles);
+      }));
+      renderPage();
+      await screen.findByText('Hendricks');
+
+      await user.click(await within(choicesCard()).findByRole('button', { name: 'common.retry' }));
+
+      expect(await within(await findChoicesCard()).findByText('Campari')).toBeInTheDocument();
+    });
   });
 
   it('titles a digestifs menu as such and shows its empty state', async () => {

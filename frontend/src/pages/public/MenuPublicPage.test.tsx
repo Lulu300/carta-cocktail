@@ -166,6 +166,18 @@ describe('MenuPublicPage', () => {
       expect(screen.getByText('×2')).toBeInTheDocument();
     });
 
+    it('shows a personal digestifs menu as a bottle menu, like the system ones', async () => {
+      mockMenu(buildMenu({
+        id: 3, name: 'After dinner', slug: 'after-dinner', type: 'DIGESTIFS',
+        bottles: [menuBottle(1, { name: 'Chartreuse', isApero: false, isDigestif: true })],
+      }));
+      renderMenu('after-dinner');
+
+      expect(await screen.findByRole('heading', { level: 3, name: 'Chartreuse' })).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('public.bottleSearchPlaceholder')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'cocktails.viewList' })).not.toBeInTheDocument();
+    });
+
     it('keeps the order of the bottles set in the admin', async () => {
       mockMenu(bottleMenu([
         menuBottle(1, { name: 'Zubrowka' }),
