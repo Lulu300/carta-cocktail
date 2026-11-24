@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-55]
 touches: [backend/src/validation/categories.ts, backend/src/services/categoryTypeService.ts, backend/src/routes/categories.test.ts, frontend/src/pages/admin/CategoriesPage.test.tsx, docs/plan/tasks/C-52-category-type-name-params.md]
 sources: []
 branch: fix/C-57-category-create-existing-type
-pr:
+pr: https://github.com/Lulu300/carta-cocktail/pull/209
 ---
 
 ## Contexte
@@ -38,11 +38,11 @@ Sur `origin/develop` (18d90ca) :
 
 ## Critères d'acceptation
 
-- [ ] Créer une catégorie avec ` RUM ` existant seul la range sous ` RUM `, sans créer de type.
-- [ ] Avec ` RUM ` et `RUM` existants, chaque catégorie va sous le type choisi ; aucun des deux ne change.
-- [ ] Un type nouveau ` rum  x ` crée `rum x`, en gris.
-- [ ] Un type blanc répond 400 (détail `body.type`) et ne crée ni catégorie ni type ; un type vide répond 400.
-- [ ] L'édition, les imports et `POST /api/category-types` ne changent pas.
+- [x] Créer une catégorie avec ` RUM ` existant seul la range sous ` RUM `, sans créer de type.
+- [x] Avec ` RUM ` et `RUM` existants, chaque catégorie va sous le type choisi ; aucun des deux ne change.
+- [x] Un type nouveau ` rum  x ` crée `rum x`, en gris.
+- [x] Un type blanc répond 400 (détail `body.type`) et ne crée ni catégorie ni type ; un type vide répond 400.
+- [x] L'édition, les imports et `POST /api/category-types` ne changent pas.
 
 ## Tests à ajouter ou adapter
 
@@ -56,3 +56,4 @@ Sur `origin/develop` (18d90ca) :
 ## Journal
 
 - 2026-11-24 : tâche créée d'après la relecture de la PR #205 et la décision de l'humain ci-dessus.
+- 2026-11-24 : PR #209 (branche `fix/C-57-category-create-existing-type`). `CategoryCreate.type` non trimé ; `CategoryUpdate = CategoryCreate.partial()`, un seul schéma pour la création et l'édition ; aucune nouvelle logique, `ensureCategoryType` (C-55) applique la règle. Frontend inchangé (le type choisi part tel qu'il est stocké, un type saisi est trimé par `toCategoryInput`), verrouillé par deux tests. Journal de C-52 complété : règle « Creation keeps trimming » remplacée. Sondes de sabotage (création trimée, garde du nom blanc, réduction, correspondance exacte, type choisi trimé côté frontend, type saisi non trimé) : chacune fait échouer au moins un test. Pas de ligne « Notes de version » : un type existant est gardé à la création comme à l'édition, rien ne reste à signaler ; la ligne « Notes de version » de C-52 ne s'applique plus.
