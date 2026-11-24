@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-56]
-touches: [backend/src/services/categoryTypeService.ts, backend/src/services/categoryTypeService.test.ts, frontend/src/hooks/useCategoryTypeName.ts, frontend/src/hooks/useCategoryTypeName.test.ts]
+touches: [backend/src/utils/invisibleCharacters.ts, backend/src/utils/invisibleCharacters.test.ts, backend/src/services/categoryTypeService.ts, backend/src/services/categoryTypeService.test.ts, backend/src/routes/categoryTypes.ts, backend/src/routes/categoryTypes.test.ts, backend/src/routes/categories.test.ts, frontend/src/utils/invisibleCharacters.ts, frontend/src/utils/invisibleCharacters.test.ts, frontend/src/hooks/useCategoryTypeName.ts, frontend/src/hooks/useCategoryTypeName.test.ts, frontend/src/components/admin/categories/categoryForm.ts, frontend/src/components/admin/categories/useCategoryTypeForm.ts, frontend/src/i18n/locales/admin/en.json, frontend/src/i18n/locales/admin/fr.json, frontend/src/pages/admin/CategoriesPage.test.tsx]
 sources: []
-branch:
-pr:
+branch: fix/C-61-category-type-unicode-normalization
+pr: https://github.com/Lulu300/carta-cocktail/pull/222
 ---
 
 ## Contexte
@@ -30,9 +30,9 @@ Trouvé pendant C-56. C-55 et C-56 rangent un nouveau type sous une forme que l'
 
 ## Critères d'acceptation
 
-- [ ] Un nouveau type saisi en NFD est créé en NFC, ou rattaché au type NFC existant.
-- [ ] Un type existant en NFD se distingue du type NFC dans Manage Types et dans la liste des types du formulaire.
-- [ ] Les noms déjà en NFC s'affichent comme avant.
+- [x] Un nouveau type saisi en NFD est créé en NFC, ou rattaché au type NFC existant.
+- [x] Un type existant en NFD se distingue du type NFC dans Manage Types et dans la liste des types du formulaire.
+- [x] Les noms déjà en NFC s'affichent comme avant.
 
 ## Tests à ajouter ou adapter
 
@@ -46,3 +46,9 @@ Trouvé pendant C-56. C-55 et C-56 rangent un nouveau type sous une forme que l'
 ## Journal
 
 - 2026-11-24 : tâche créée pendant C-56 (hors périmètre).
+- 2026-11-25 : PR #222 (branche `fix/C-61-category-type-unicode-normalization`). Nouveau `composeName` (NFC) dans `utils/invisibleCharacters.ts`, mêmes code et cas de test dans les deux paquets. `tidyName` retire les caractères invisibles, compose, puis réduit les espaces : composer après le retrait rapproche une lettre de son accent (`E` + U+200B + U+0300 donne `È`). Tous les chemins de création passent par `newCategoryTypeName` (création d'un type, création et édition d'une catégorie, les deux imports par `ensureCategoryType`, routes d'import inchangées) ; la correspondance exacte d'abord garde tel quel un type existant décomposé choisi ; un nom décomposé saisi va sous le type composé s'il existe (409 pour `POST /api/category-types`). Majuscules avant le nettoyage dans `POST /api/category-types`, le type personnalisé du formulaire de catégorie et le nom de Manage Types : la mise en majuscules peut décomposer une lettre (`ΐ` devient `Ι` + U+0308 + U+0301). Faits établis et choix :
+  - NFC plutôt que NFKC : NFC ne fusionne que les suites qu'Unicode déclare canoniquement équivalentes, dessinées pareil. NFKC changerait des caractères dessinés autrement, qu'un admin peut saisir exprès : ligature `ﬁ`, `CO₂`, `№`, lettres pleine largeur (`ＶＯＤＫＡ`), kana demi-largeur (`ｶﾞ` deviendrait `ガ`), jamo hangul de compatibilité joints en syllabe (`ㄱㅏ` deviendrait `가`), et le remplisseur hangul U+3164 (un blanc pour C-56) deviendrait U+1160. Des tests verrouillent chacun de ces cas.
+  - Limite assumée : NFC remplace les idéogrammes de compatibilité CJK (U+F900–U+FAFF, U+2F800–U+2FA1F) par l'idéogramme unifié, que quelques polices dessinent un peu autrement. C'est le comportement normal de NFC ; une séquence de variante idéographique (gardée par C-56) garde un glyphe précis.
+  - Marquage : toujours, pas seulement quand un type composé équivalent existe. Même règle que C-55 et C-56, qui marquent un nom à espaces ou à caractère invisible sans regarder la liste ; un nom stocké non composé ne peut plus être ressaisi tel quel. Rien ne change dans le texte, les deux formes se dessinant pareil : le nom est suivi de « (non-standard Unicode form) » / « (forme Unicode non standard) », plutôt que « forme décomposée », faux pour le signe angström U+212B ou des marques combinantes dans le désordre. Seul le nom stocké est marqué, jamais une traduction ; `typeLabel` ajoute le nom stocké marqué à une traduction ; tous les écrans de C-54 en profitent (même hook).
+  - Bundle public inchangé (135,72 kB). Sondes de sabotage (`tidyName` sans NFC dans chaque paquet, NFKC au lieu de NFC dans chaque paquet, composition avant le retrait des caractères invisibles dans chaque paquet, majuscules après le nettoyage dans la route, le formulaire de catégorie et Manage Types, `visibleName` sans la mention, `isHiddenByHtml` sans le test de forme, `ensureCategoryType` sans la correspondance exacte) : chacune fait échouer au moins un test.
+- Notes de version : « A new category type name is stored in its composed Unicode form (NFC): a name pasted with decomposed accents (often copied from macOS file names) joins the type with composed accents instead of creating a second one that looks the same. An existing type picked as it is stays unchanged, and a stored name that is not in that form is shown with "(non-standard Unicode form)" / "(forme Unicode non standard)" on the admin screens. »
