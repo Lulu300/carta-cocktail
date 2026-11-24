@@ -11,7 +11,7 @@ depends_on: [D-02]
 touches: [frontend/Dockerfile, README.md, docs/plan/README.md, docs/plan/tasks/D-02-frontend-image-security-headers.md]
 sources: []
 branch: chore/D-40-nginx-1.31.9
-pr:
+pr: https://github.com/Lulu300/carta-cocktail/pull/194
 ---
 
 ## Décisions validées (2026-11-24)
@@ -62,5 +62,5 @@ Aucun test automatisé : le job Smoke de la CI construit l'image et vérifie l'e
 
 - 2026-11-24 : tâche créée par le coordinateur après la demande de l'humain (« la mise à jour de Nginx dans notre image. Parce que celle qu'on a a une faille, il faut qu'on prenne la toute dernière version disponible »).
 - 2026-11-24 : question de l'agent (port 80 hérité, 1.31.10 sorti la veille, épinglage), décisions de l'humain ci-dessus.
-- 2026-11-24 : réalisée. Vérifications : versions (`nginx -v`, `id`), `nginx -t`, uid arbitraire du groupe 0, smoke complet dans le projet `carta-d-40` (ports de test sur 127.0.0.1 par un fichier d'override, le port 80 étant libre mais d'autres sessions tournant en parallèle), comparaison des réponses entre l'ancienne image (Dockerfile de `develop`) et la nouvelle : aucune différence hors `Date`/`ETag`. `README.md` et `docs/plan/README.md` ajoutés à `touches`.
+- 2026-11-24 : réalisée (PR #194). Vérifications : versions (`nginx -v`, `id`), `nginx -t`, uid arbitraire du groupe 0, smoke complet dans le projet `carta-d-40` (ports de test sur 127.0.0.1 par un fichier d'override, le port 80 étant libre mais d'autres sessions tournant en parallèle), comparaison des réponses entre l'ancienne image (Dockerfile de `develop`) et la nouvelle : aucune différence hors `Date`/`ETag`. `README.md` et `docs/plan/README.md` ajoutés à `touches`.
 - Notes de version : nginx 1.31.x (mainline, 1.31.10 au 2026-11-24) au lieu de 1.30.6, correctifs de sécurité du 2026-11-18 (CVE-2026-123007, -123633, -123634, -121810, -118899, -113425, -120993, -125283, -120967, -123640) et du 2026-11-23 (CVE-2026-132779) ; seule CVE-2026-123634 (resolver) touche notre configuration. Image de base : `nginx` officielle au lieu de `nginxinc/nginx-unprivileged`, toujours uid 101 et port 8080, mêmes en-têtes. L'image expose aussi le port 80 (rien n'y écoute). Aucune action avec les compose du dépôt, SWAG ou un proxy qui vise 8080. Avant : un reverse proxy qui détecte seul le port du conteneur doit indiquer 8080 (Traefik : `traefik.http.services.<name>.loadbalancer.server.port=8080` ; nginx-proxy : `VIRTUAL_PORT=8080`), sinon 502. Épinglage recommandé inchangé (`:<majeure>.<mineure>`).
