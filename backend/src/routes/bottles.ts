@@ -136,7 +136,7 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
         const createdCat = await tx.category.create({
           data: {
             name: name || key,
-            type: await ensureCategoryType(tx, type),
+            type: await ensureCategoryType(tx, type, ['body', 'resolutions', 'categories', key, 'data', 'type']),
             desiredStock,
             minimumPercent,
             nameTranslations: serializeTranslations(nameTranslations),

@@ -158,8 +158,8 @@ async function resolveAll(db: Db, recipe: ImportedRecipe, refs: ImportReferences
     const created = await db.category.create({
       data: {
         name: data.name || ref.name || key,
-        // The schema defaults the type to SPIRIT
-        type: await ensureCategoryType(db, data.type),
+        // The schema defaults the type to SPIRIT. The wizard keys resolutions by lowercased name, like `key`
+        type: await ensureCategoryType(db, data.type, ['body', 'resolutions', 'categories', key, 'data', 'type']),
         desiredStock: data.desiredStock,
         minimumPercent: data.minimumPercent,
         nameTranslations: serializeTranslations(data.nameTranslations),

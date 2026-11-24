@@ -324,6 +324,64 @@ describe('confirmImport - recipe lines', () => {
     expect(await prisma.categoryType.findUnique({ where: { name: 'AGAVE   SPIRIT' } })).toBeNull();
   });
 
+  // Data older than v1.9.0 can hold ' SPIRIT ' next to 'SPIRIT': the wizard lists both, and the
+  // category goes under the one picked, as when it is created by hand (C-57)
+  describe('type picked for a category to create', () => {
+    /** Imports one category line per category, each category created under the type given. */
+    function importUnderTypes(typesByCategory: Record<string, string>) {
+      const names = Object.keys(typesByCategory);
+      const lines = names.map((name) => ({ sourceType: 'CATEGORY', sourceName: name, quantity: 2, unit: CL }));
+      const categories = Object.fromEntries(names.map((name) => [
+        name.toLowerCase(), { action: 'create', data: { name, type: typesByCategory[name] } },
+      ]));
+      return confirmImport(recipe(lines), resolutions({ units: { cl: { action: 'create', data: CL } }, categories }));
+    }
+
+    async function typeOf(categoryName: string) {
+      return (await prisma.category.findUniqueOrThrow({ where: { name: categoryName } })).type;
+    }
+
+    it('should keep an existing type with surrounding spaces, and create no type', async () => {
+      await prisma.categoryType.create({ data: { name: ' AGAVE ', color: 'red' } });
+      const typeCount = await prisma.categoryType.count();
+
+      await importUnderTypes({ Mezcal: ' AGAVE ' });
+
+      expect(await typeOf('Mezcal')).toBe(' AGAVE ');
+      expect(await prisma.categoryType.count()).toBe(typeCount);
+    });
+
+    it("should file each category under the type picked when ' SPIRIT ' and 'SPIRIT' both exist", async () => {
+      await prisma.categoryType.create({ data: { name: ' SPIRIT ', color: 'red' } });
+      const typesBefore = await prisma.categoryType.findMany({ orderBy: { name: 'asc' } });
+
+      await importUnderTypes({ Mezcal: ' SPIRIT ', Gin: 'SPIRIT' });
+
+      expect(await typeOf('Mezcal')).toBe(' SPIRIT ');
+      expect(await typeOf('Gin')).toBe('SPIRIT');
+      expect(await prisma.categoryType.findMany({ orderBy: { name: 'asc' } })).toEqual(typesBefore);
+    });
+
+    it('should trim and collapse a new type, created in gray', async () => {
+      await importUnderTypes({ Mezcal: ' agave  x ' });
+
+      expect(await typeOf('Mezcal')).toBe('agave x');
+      expect(await prisma.categoryType.findUnique({ where: { name: 'agave x' } }))
+        .toEqual({ name: 'agave x', nameTranslations: null, color: 'gray' });
+    });
+
+    it('should refuse a blank new type, pointing at its resolution, and write nothing', async () => {
+      const before = await rowCounts();
+      const typeCount = await prisma.categoryType.count();
+
+      await expect(importUnderTypes({ Mezcal: '   ' })).rejects.toMatchObject({
+        status: 400, details: [{ path: 'body.resolutions.categories.mezcal.data.type', code: 'too_small' }],
+      });
+      expect(await rowCounts()).toEqual(before);
+      expect(await prisma.categoryType.count()).toBe(typeCount);
+    });
+  });
+
   it('should read resolution keys whatever their case', async () => {
     const unit = await seedUnit();
     const lime = await seedIngredient({ name: 'Lime' });

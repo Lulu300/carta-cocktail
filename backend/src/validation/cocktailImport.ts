@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { Id, Percent, RequiredText, Translations } from './common';
 import { AlcoholPercentage, CapacityMl } from './bottles';
-import { DesiredStock } from './categories';
+import { CategoryTypeName, DesiredStock } from './categories';
 import { SourceType, Tags } from './cocktails';
 import { ConversionFactorToMl } from './units';
 
@@ -70,7 +70,7 @@ const UnitData = z.object({
 
 const CategoryData = z.object({
   name: NameOrFileName,
-  type: RequiredText.default('SPIRIT'),
+  type: CategoryTypeName.default('SPIRIT'),
   desiredStock: DesiredStock.optional(),
   minimumPercent: Percent.optional(),
   nameTranslations: Translations.optional(),
