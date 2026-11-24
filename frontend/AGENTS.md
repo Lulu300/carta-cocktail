@@ -10,14 +10,14 @@ Before committing any change:
 
 1. Create a branch from `develop` (`feature/xxx` or `fix/xxx`)
 2. **Add or update tests** for any new or modified feature (see Testing section below)
-3. Ensure TypeScript compiles: `npx tsc --noEmit`
+3. Ensure TypeScript compiles: `npx tsc -b` (`tsc --noEmit` checks nothing: `tsconfig.json` only holds project references)
 4. Ensure lint passes: `npm run lint`
 5. Ensure build passes: `npm run build`
 6. Run tests: `npm test`
 7. **Verify coverage thresholds are met**: `npm test -- --coverage`
 8. Commit, push, open PR to `develop`
 
-CI runs automatically on PRs: tsc → lint → build → test → coverage check.
+CI runs automatically on PRs (`Frontend` job of `.github/workflows/ci.yml`): `npm audit --omit=dev --audit-level=high` → `tsc -b` → lint → build → bundle budget (140 kB gzip for the first load of the public menu, `.github/scripts/bundle-budget.mjs`) → CSS media queries readable by Safari 16 → tests with coverage → delta coverage (80%). The `Docker build (frontend)` job builds the nginx image, and the `Smoke` workflow starts it with the backend (see the root `AGENTS.md`).
 
 ## Testing Requirements
 
@@ -48,58 +48,46 @@ CI runs automatically on PRs: tsc → lint → build → test → coverage check
 ```
 frontend/
 ├── src/
-│   ├── main.tsx                # Entry point (BrowserRouter, AuthProvider, SiteSettingsProvider, i18n)
-│   ├── App.tsx                 # Route definitions (public, auth, admin)
-│   ├── index.css               # TailwindCSS imports (@import "tailwindcss")
+│   ├── main.tsx                # Entry point (QueryClientProvider, BrowserRouter, SiteSettingsProvider, AuthProvider, ConfirmProvider)
+│   ├── App.tsx                 # Route definitions (public, auth, admin), lazy admin chunks
+│   ├── index.css               # TailwindCSS imports (@import "tailwindcss") and theme
+│   ├── vite-env.d.ts           # Vite env types (VITE_APP_VERSION)
 │   ├── pages/
-│   │   ├── admin/
-│   │   │   ├── DashboardPage.tsx       # Stats + shortage alerts
-│   │   │   ├── CategoriesPage.tsx      # Category CRUD + type management
-│   │   │   ├── BottlesPage.tsx         # Bottle inventory management
-│   │   │   ├── IngredientsPage.tsx     # Free ingredient management
-│   │   │   ├── UnitsPage.tsx           # Measurement unit CRUD
-│   │   │   ├── CocktailsPage.tsx       # Cocktail list + batch export
-│   │   │   ├── CocktailFormPage.tsx    # Create/edit cocktail (ingredients, instructions, image)
-│   │   │   ├── MenusPage.tsx           # Menu management
-│   │   │   ├── MenuEditPage.tsx        # Add/reorder cocktails in menu
-│   │   │   ├── MenuBottleEditPage.tsx  # Add/reorder bottles in menu
-│   │   │   ├── ShortagesPage.tsx       # Stock shortage analysis
-│   │   │   └── SettingsPage.tsx        # Site config + admin profile
+│   │   ├── admin/              # One page per admin route (Dashboard, Categories, Bottles, Ingredients, Units,
+│   │   │                       # Cocktails, CocktailForm, Menus, MenuEdit, MenuBottleEdit, Shortages, Settings)
 │   │   ├── auth/
-│   │   │   └── LoginPage.tsx           # Admin login
-│   │   └── public/
-│   │       ├── HomePage.tsx            # Menu listing
-│   │       ├── MenuPublicPage.tsx      # Public menu display
-│   │       └── CocktailPublicPage.tsx  # Cocktail detail + print/export
+│   │   │   └── LoginPage.tsx   # Admin login
+│   │   └── public/             # HomePage, MenuPublicPage, CocktailPublicPage and their parts
+│   │                           # (sections, search bar, skeletons, error state, useMenuFilter, useScrollRestoration)
 │   ├── components/
-│   │   ├── layout/
-│   │   │   ├── AdminLayout.tsx    # Sidebar nav, ProtectedRoute wrapper
-│   │   │   └── PublicLayout.tsx   # Public header/footer
-│   │   ├── ui/
-│   │   │   ├── ExportCocktailButton.tsx  # Export cocktail as JSON
-│   │   │   ├── IconPicker.tsx            # Emoji selector for category types
-│   │   │   ├── LanguageSelector.tsx      # Language menu (FR, EN, UK)
-│   │   │   └── UnitConverter.tsx         # ml conversion display
-│   │   └── import/
-│   │       ├── ImportCocktailWizard.tsx  # Main import orchestrator
-│   │       ├── ImportStepUpload.tsx      # File drop/select (JSON or ZIP)
-│   │       ├── ImportStepResolve.tsx     # Dependency resolution UI
-│   │       ├── ImportStepConfirm.tsx     # Preview + confirmation
-│   │       └── ImportEntityRow.tsx       # Entity row renderer
+│   │   ├── admin/              # Shared admin parts: DataTable, TranslationFields, DeletionImpactList,
+│   │   │   │                   # LoadError, useConfirmDelete, useEntityForm, useForcedDelete
+│   │   │   ├── bottles/        # Bottle form modal, rows, history, export menu, filters
+│   │   │   ├── categories/     # Category form modal, category types manager
+│   │   │   ├── cocktails/      # Cocktail editor (react-hook-form + zod), list items, filters, selection
+│   │   │   └── menus/          # Menu editors: composition, sections, excluded bottles, mutations
+│   │   ├── import/             # Cocktail import wizard (upload, resolve, confirm) and bottle import wizard
+│   │   ├── layout/             # AdminLayout, PublicLayout, RouteErrorBoundary, SkipLink, AppVersion, BackHomeLink
+│   │   └── ui/                 # Design system: Button, Field, Input, Select, Modal, ConfirmDialog, Toaster,
+│   │                           # Pagination, SearchInput, SortableHeader, DateInput, LanguageSelector, IconButton…
 │   ├── contexts/
 │   │   ├── AuthContext.tsx         # Login/logout, token management, auth state
+│   │   ├── ConfirmContext.tsx      # Confirmation dialog opened from any component
 │   │   └── SiteSettingsContext.tsx # Site name + favicon from API
 │   ├── hooks/
-│   │   └── useLocalizedName.ts    # Get localized name from translation object
+│   │   ├── useClickOutside.ts
+│   │   ├── useLocalizedName.ts    # Get localized name from translation object
+│   │   ├── usePagination.ts
+│   │   └── useSort.ts
+│   ├── queries/                # TanStack Query: query keys (keys.ts), query client, one file per resource
 │   ├── services/
 │   │   ├── api.ts                 # Centralized API client with typed endpoints
 │   │   └── exportZip.ts          # Batch export cocktails to ZIP
 │   ├── types/
 │   │   └── index.ts              # TypeScript interfaces for all entities
-│   ├── utils/
-│   │   ├── colors.ts             # Color utilities for category types
-│   │   ├── localization.ts       # Localization helpers
-│   │   └── unitConverter.ts      # Unit conversion logic
+│   ├── utils/                  # Pure helpers: colors, dates, localization, translations, unitConverter,
+│   │                           # cocktailSearch, uploads (photo URLs), chunkReload, bottleGrouping…
+│   ├── test/                   # Test setup, MSW fake backend (msw/), factories, providers, axe
 │   └── i18n/
 │       ├── index.ts              # i18next + browser language detector, public messages
 │       ├── admin.ts              # Registers the admin messages (loaded by App.tsx with each /login and /admin chunk)
@@ -107,10 +95,15 @@ frontend/
 │           ├── public/           # en.json, fr.json: keys used by the first load (public pages, shared components)
 │           └── admin/            # en.json, fr.json: every other key (login page and admin)
 ├── package.json
-├── tsconfig.json
+├── tsconfig.json                 # Project references only: check types with `tsc -b`
+├── tsconfig.app.json             # src/
+├── tsconfig.node.json            # vite.config.ts
 ├── vite.config.ts
-├── nginx.conf                    # Production: proxy /api to backend
-└── Dockerfile
+├── vitest.config.ts
+├── eslint.config.js
+├── nginx.conf.template           # Production: nginx server, proxies /api and /uploads to the backend (BACKEND_HOST)
+├── security-headers.conf         # Security headers included by nginx.conf.template
+└── Dockerfile                    # Vite build, then nginx (non-root, uid 101, port 8080)
 ```
 
 ## Routing
@@ -161,10 +154,10 @@ const name = getLocalizedName(entity.name, entity.nameTranslations);
 ### Page Pattern
 
 Admin pages are self-contained with inline forms and modals. Each page:
-1. Fetches data on mount via `api.ts`
-2. Manages local state with `useState`
+1. Reads server data through the TanStack Query hooks of `src/queries/`, which call `services/api.ts`; query keys come from `queries/keys.ts` only
+2. Manages local UI state with `useState`
 3. Uses `useTranslation()` for all UI text
-4. Handles CRUD operations with optimistic or refetch patterns
+4. Writes through mutations that invalidate the queries showing the changed data (`queries/crud.ts`)
 
 ### Locale bundles
 
@@ -197,11 +190,14 @@ Safari and iOS 16.0+, Chrome and Edge 107+, Firefox 104+ (`build.target` in `vit
 | `npm run lint` | ESLint |
 | `npm run format:check` | Prettier check (fails until the repository reformat) |
 | `npm run preview` | Preview production build |
+| `npm test` | Tests (Vitest) |
+| `npm run test:watch` | Tests in watch mode |
+| `npm run test:coverage` | Tests with coverage |
 
 ## Dependencies
 
-**Runtime**: react 19, react-dom 19, react-router-dom 7, i18next 27, react-i18next 18, i18next-browser-languagedetector 8, jszip 3
-**Dev**: vite 8, @vitejs/plugin-react 6, tailwindcss 4, @tailwindcss/vite, typescript 5.9, eslint 10, prettier 3
+**Runtime**: react 19, react-dom 19, react-router-dom 7, @tanstack/react-query 5, react-hook-form 7, @hookform/resolvers, zod 4, i18next 27, react-i18next 18, i18next-browser-languagedetector 8, jszip 3
+**Dev**: vite 8, @vitejs/plugin-react 6, tailwindcss 4, @tailwindcss/vite, typescript 5.9, eslint 10, eslint-plugin-i18next, prettier 3, vitest, jsdom, @testing-library/*, msw, vitest-axe
 
 ## Styling Conventions
 
