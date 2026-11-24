@@ -22,22 +22,13 @@ The commands below assume the default `docker-compose.prod.yml`, run from its fo
 
 ## v1.14.0
 
-No required action with the repository's compose files, SWAG, or a reverse proxy that already targets port 8080. `docker-compose.prod.yml` has not changed since v1.12.0: pin both images to `:1.14.0`, or `:1.14` to follow the 1.14.x patch releases (`:1.13` does not move to 1.14.0), then pull and restart. No migration: the database does not change. The frontend image now uses the official nginx image (nginx 1.31.x, still uid 101 on port 8080), which also declares port 80, where nothing listens: a reverse proxy that picks the frontend port by itself must be told to use 8080 (step 1). Validation errors in the admin now name the field to fix. A few API answers now send `nameTranslations` as an object instead of a string, which only concerns scripts that call the API directly. Release notes: [`docs/releases/v1.14.0.md`](docs/releases/v1.14.0.md).
+No required action. `docker-compose.prod.yml` has not changed since v1.12.0: pin both images to `:1.14.0`, or `:1.14` to follow the 1.14.x patch releases (`:1.13` does not move to 1.14.0), then pull and restart. No migration: the database does not change. The frontend image now uses the official nginx image (nginx 1.31.x), still as uid 101 and on port 8080 only: reverse proxies need no change. Validation errors in the admin now name the field to fix. A few API answers now send `nameTranslations` as an object instead of a string, which only concerns scripts that call the API directly. Release notes: [`docs/releases/v1.14.0.md`](docs/releases/v1.14.0.md).
 
 Instances older than v1.12.0: upgrade to v1.12.0 first, following the [v1.12.0 section](#v1120) (and the sections before it), check that it works, then apply this one.
 
 **Testing a pre-release**: use `:1.14.0-rc.N` instead of `:1.14.0`.
 
-### Before upgrading
-
-1. **Only if a reverse proxy picks the frontend container's port by itself.** This concerns Traefik when the frontend service has no `traefik.http.services.<name>.loadbalancer.server.port` label, and nginx-proxy when the frontend has no `VIRTUAL_PORT`. The new image declares ports 80 and 8080; such a proxy picks 80, where nothing listens, and answers `502`. Set the port to 8080:
-
-   - Traefik: add the label `traefik.http.services.<name>.loadbalancer.server.port=8080` to the frontend service;
-   - nginx-proxy: add `VIRTUAL_PORT=8080` to the `environment` of the frontend service.
-
-   nginx already listens on 8080 in v1.13.x (since v1.8.0), so you can make this change before the upgrade. See [README › "Docker (production with pre-built images)"](README.md#docker-production-with-pre-built-images).
-
-**If you download `docker-compose.prod.yml` again** (not needed for this release), put back the lines you added to the `environment` list of `carta-cocktail-backend`, such as `- SQLITE_WAL=false` after `- UPLOAD_DIR=/app/uploads` (database on a network share, see [README › "Database files and network shares"](README.md#database-files-and-network-shares)), `API_RATE_LIMIT`, `LOGIN_RATE_LIMIT` or `TRUST_PROXY`: the file does not have them. The same goes for the reverse proxy labels or `VIRTUAL_PORT` of the frontend service.
+**If you download `docker-compose.prod.yml` again** (not needed for this release), put back the lines you added to the `environment` list of `carta-cocktail-backend`, such as `- SQLITE_WAL=false` after `- UPLOAD_DIR=/app/uploads` (database on a network share, see [README › "Database files and network shares"](README.md#database-files-and-network-shares)), `API_RATE_LIMIT`, `LOGIN_RATE_LIMIT` or `TRUST_PROXY`: the file does not have them.
 
 ## v1.13.0
 
