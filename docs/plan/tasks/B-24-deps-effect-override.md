@@ -5,13 +5,13 @@ phase: B
 lane: deps
 criticite: haute
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: []
 touches: [backend/package.json, backend/package-lock.json, docs/plan/tasks/B-22-deps-minimatch-overrides-removal.md]
 sources: []
 branch: chore/B-24-deps-effect-override
-pr:
+pr: "#192"
 ---
 
 ## Décisions validées
@@ -40,12 +40,12 @@ Constat du coordinateur (2026-11-24), vérifié sur `develop` (9bc7f3d) : l'audi
 
 ## Critères d'acceptation
 
-- [ ] `npm audit --omit=dev --audit-level=high` backend sort en 0, seuil de `ci.yml` inchangé.
-- [ ] Le lockfile ne change que l'entrée `node_modules/effect` (3.20.0 → 3.22.x) ; `npm ls effect` sans `invalid`.
-- [ ] CLI Prisma : `validate`, `generate`, `migrate deploy`, `migrate status` et `db:check` passent ; les erreurs de configuration restent lisibles.
-- [ ] Image backend : `effect` 3.22.x, démarrage et migrations sur une base vide et sur une base ancienne.
-- [ ] `npm ci`, lint, `npx tsc --noEmit`, `npm run build` et `npm test` passent.
-- [ ] Condition et commande de retrait de la surcharge notées ici et dans B-22.
+- [x] `npm audit --omit=dev --audit-level=high` backend sort en 0, seuil de `ci.yml` inchangé.
+- [x] Le lockfile ne change que l'entrée `node_modules/effect` (3.20.0 → 3.22.x) ; `npm ls effect` sans `invalid`.
+- [x] CLI Prisma : `validate`, `generate`, `migrate deploy`, `migrate status` et `db:check` passent ; les erreurs de configuration restent lisibles.
+- [x] Image backend : `effect` 3.22.x, démarrage et migrations sur une base vide et sur une base ancienne.
+- [x] `npm ci`, lint, `npx tsc --noEmit`, `npm run build` et `npm test` passent.
+- [x] Condition et commande de retrait de la surcharge notées ici et dans B-22.
 - [ ] Après le merge sur `main` à la release suivante, l'alerte Dependabot #21 est fermée.
 
 ## Tests à ajouter ou adapter
@@ -62,3 +62,5 @@ Aucun : aucune ligne de code ne change. La CLI Prisma n'est pas appelée par la 
 ## Journal
 
 - 2026-11-24 : tâche créée sur décision humaine (voir « Décisions validées »), à passer en premier dans le lot B-24 / D-40 / E-23 / C-14 / D-36 : les autres PR attendent qu'elle débloque l'audit.
+- 2026-11-24 : PR #192. Constat refait sur `develop` (9bc7f3d), Node 24.14.0, npm 11.9.0 : 3 `high` (`effect`, `@prisma/config`, `prisma`) et 1 `moderate` (`i18next`). Surcharge `"@prisma/config": { "effect": "^3.22.1" }` ajoutée après les entrées `minimatch` ; `npm install` installe 3.22.5, seule l'entrée `node_modules/effect` change dans le lockfile. `npm audit --omit=dev --audit-level=high` : 0 ; reste `i18next` (`moderate`, B-09). `npm ls effect` : un seul `effect@3.22.5`, sous `@prisma/config`, aucun `invalid`. `effect` n'est chargé que par `@prisma/config` (`Schema.Struct`, `String`, `optional`, `decodeUnknownEither`, `Either`), pas par l'application. CLI en local : `prisma --version`, `validate`, `generate`, `migrate deploy` puis `migrate status` sur une base temporaire (4 migrations), `db:check` sans différence ; un fichier de configuration avec un mauvais type ou une clé inconnue donne toujours une erreur lisible. `npm ci`, lint, `npx tsc --noEmit`, build et `npm test -- --coverage` passent (58 fichiers, 1319 tests ; 99,27 % des instructions, 95,26 % des branches). Image `carta-b-24-backend` : `/app/node_modules/effect` en 3.22.5, contrôle `prisma --version` sans réseau du `Dockerfile` passé ; sur une base vide, 4 migrations appliquées au démarrage, seed, API démarrée, `migrate status` à jour dans le conteneur, login 200. Banc `--layout friend --path 1.4.0,local --mode conformant` sur le jeu d'essai : OK (base `db push` v1.4.0 sauvegardée, baseline `0_init`, migrations appliquées, `migrate status` à jour, aucune ligne perdue, photos et API publique servies). Trouvé en vérifiant : la CLI embarque sa propre copie d'`effect` 3.20.0 dans `build/cli.js`, hors de portée de la surcharge (voir « Points d'attention »).
+- 2026-11-24 : Notes de version (Security, comme B-20 dans v1.13.0) : la CLI Prisma de l'image backend, qui applique les migrations au démarrage, charge `effect` 3.22.5 au lieu de 3.20.0 (GHSA-7589-6fvf-x4pw) ; aucune entrée non fiable n'atteignait le code concerné. Aucune action demandée.
