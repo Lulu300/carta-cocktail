@@ -11,16 +11,10 @@ const router = Router();
 // List all category types with usage count
 router.get('/', async (_req: AuthRequest, res: Response) => {
   const types = await prisma.categoryType.findMany({
+    include: { _count: { select: { categories: true } } },
     orderBy: { name: 'asc' },
   });
-  // Category.type is a plain string, not a relation: Prisma's _count cannot follow it
-  const counts = await prisma.category.groupBy({ by: ['type'], _count: { _all: true } });
-  const countByType = new Map(counts.map((count) => [count.type, count._count._all]));
-  const enriched = types.map(t => ({
-    ...t,
-    _count: { categories: countByType.get(t.name) ?? 0 },
-  }));
-  res.json(parseNameTranslations(enriched));
+  res.json(parseNameTranslations(types));
 });
 
 // Create a category type

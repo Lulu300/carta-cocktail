@@ -90,12 +90,21 @@ describe('findIntegrityIssues', () => {
     ]);
   });
 
+  // Since the category_type_relation migration, the foreign key refuses such a
+  // category: the audit still finds it in a database that is not migrated yet,
+  // reproduced here with the foreign keys switched off.
   it('reports category types missing from CategoryType', async () => {
-    await seedCategory({ name: 'Orange juice', type: 'JUICE' });
+    await prisma.$executeRawUnsafe('PRAGMA foreign_keys = OFF');
+    try {
+      await seedCategory({ name: 'Orange juice', type: 'JUICE' });
+    } finally {
+      await prisma.$executeRawUnsafe('PRAGMA foreign_keys = ON');
+    }
 
     const issues = await findIntegrityIssues(prisma);
 
     expect(issues.unknownCategoryTypes).toEqual(['JUICE']);
+    expect(issues.foreignKeyViolations).toEqual([{ table: 'Category', rowid: expect.any(Number), parent: 'CategoryType' }]);
   });
 });
 

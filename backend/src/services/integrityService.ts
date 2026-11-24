@@ -38,7 +38,7 @@ export interface IntegrityIssues {
   duplicateCocktailNames: DuplicateGroup[];
   /** Recipe lines whose source (bottle, category or ingredient) is missing: the cocktail is never available. */
   invalidIngredientLines: InvalidIngredientLine[];
-  /** Category types that have no CategoryType row. */
+  /** Category types that have no CategoryType row. Not blocking: the category_type_relation migration creates them. */
   unknownCategoryTypes: string[];
   /** Rows pointing to a row that no longer exists (only possible if foreign keys were disabled). */
   foreignKeyViolations: ForeignKeyViolation[];
