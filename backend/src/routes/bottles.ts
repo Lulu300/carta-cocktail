@@ -131,11 +131,10 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
       } else if (resolution.action === 'create' && resolution.data) {
         // The schema fills the type, desired stock and minimum percent defaults
         const { nameTranslations, name, type, desiredStock, minimumPercent } = resolution.data;
-        await ensureCategoryType(tx, type);
         const createdCat = await tx.category.create({
           data: {
             name: name || key,
-            type,
+            type: await ensureCategoryType(tx, type),
             desiredStock,
             minimumPercent,
             nameTranslations: serializeTranslations(nameTranslations),

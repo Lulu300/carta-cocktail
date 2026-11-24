@@ -314,6 +314,16 @@ describe('confirmImport - recipe lines', () => {
     expect(cocktail.ingredients[0]).toMatchObject({ sourceType: 'BOTTLE', bottleId: havana.id, preferredBottles: [] });
   });
 
+  it('should collapse the inner spaces of a category type it creates', async () => {
+    const cocktail = await confirmImport(recipe([{ sourceType: 'CATEGORY', sourceName: 'Mezcal', quantity: 2, unit: CL }]), resolutions({
+      units: { cl: { action: 'create', data: CL } },
+      categories: { mezcal: { action: 'create', data: { name: 'Mezcal', type: 'AGAVE   SPIRIT' } } },
+    }));
+
+    expect(cocktail.ingredients[0].category).toMatchObject({ name: 'Mezcal', type: 'AGAVE SPIRIT' });
+    expect(await prisma.categoryType.findUnique({ where: { name: 'AGAVE   SPIRIT' } })).toBeNull();
+  });
+
   it('should read resolution keys whatever their case', async () => {
     const unit = await seedUnit();
     const lime = await seedIngredient({ name: 'Lime' });

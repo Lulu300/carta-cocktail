@@ -42,11 +42,10 @@ const createSchemas = { body: CategoryCreate };
 router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Response) => {
   const { name, type, desiredStock, minimumPercent, nameTranslations } = valid<typeof createSchemas>(res).body;
   await assertCategoryNameIsFree(name);
-  await ensureCategoryType(prisma, type);
   const category = await prisma.category.create({
     data: {
       name,
-      type,
+      type: await ensureCategoryType(prisma, type),
       // ?? and not ||: a desired stock of 0 is kept
       desiredStock: desiredStock ?? 1,
       minimumPercent: minimumPercent ?? 30,
@@ -65,15 +64,13 @@ router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Respo
   if (name !== undefined) {
     await assertCategoryNameIsFree(name, id);
   }
-  if (type !== undefined) {
-    await ensureCategoryType(prisma, type);
-  }
+  const typeName = type === undefined ? undefined : await ensureCategoryType(prisma, type);
   // Absent fields are undefined, which Prisma leaves untouched
   const category = await prisma.category.update({
     where: { id },
     data: {
       name,
-      type,
+      type: typeName,
       desiredStock,
       minimumPercent,
       nameTranslations: serializeTranslations(nameTranslations),

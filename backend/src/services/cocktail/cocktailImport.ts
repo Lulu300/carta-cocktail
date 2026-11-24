@@ -155,12 +155,11 @@ async function resolveAll(db: Db, recipe: ImportedRecipe, refs: ImportReferences
   });
 
   const category = await resolveEntities(refs.categories, resolutions?.categories, async (data, ref, key) => {
-    // The schema defaults the type to SPIRIT
-    await ensureCategoryType(db, data.type);
     const created = await db.category.create({
       data: {
         name: data.name || ref.name || key,
-        type: data.type,
+        // The schema defaults the type to SPIRIT
+        type: await ensureCategoryType(db, data.type),
         desiredStock: data.desiredStock,
         minimumPercent: data.minimumPercent,
         nameTranslations: serializeTranslations(data.nameTranslations),
