@@ -10,7 +10,7 @@ import { cx } from '../../ui/classNames';
 import TranslationFields from '../TranslationFields';
 import { useConfirmDelete } from '../useConfirmDelete';
 import { useCategoryTypeForm } from './useCategoryTypeForm';
-import { useCategoryTypeName } from './useCategoryTypeName';
+import { useCategoryTypeName } from '../../../hooks/useCategoryTypeName';
 
 interface CategoryTypesManagerProps {
   open: boolean;

@@ -75,6 +75,7 @@ frontend/
 │   │   ├── ConfirmContext.tsx      # Confirmation dialog opened from any component
 │   │   └── SiteSettingsContext.tsx # Site name + favicon from API
 │   ├── hooks/
+│   │   ├── useCategoryTypeName.ts # Category type names admin screens can tell apart (admin messages only)
 │   │   ├── useClickOutside.ts
 │   │   ├── useLocalizedName.ts    # Get localized name from translation object
 │   │   ├── usePagination.ts

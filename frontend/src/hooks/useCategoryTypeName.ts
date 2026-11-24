@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLocalizedName } from '../../../hooks/useLocalizedName';
-import type { CategoryType } from '../../../types';
+import { useLocalizedName } from './useLocalizedName';
+import type { CategoryType } from '../types';
 
 /** Shown in place of each space HTML would hide. */
 const VISIBLE_SPACE = '␣';
@@ -24,6 +24,7 @@ function isHiddenByHtml(name: string): boolean {
 /**
  * Category type names as the admin can tell them apart: an empty name gets a label, the spaces
  * HTML would hide are made visible and announced in words, for screen readers too.
+ * Admin screens only: its messages are in the admin bundle, so a public page would show their keys.
  */
 export function useCategoryTypeName() {
   const { t } = useTranslation();
@@ -57,5 +58,13 @@ export function useCategoryTypeName() {
     return `${label} – ${visibleName(categoryType.name)}`;
   }, [localize, localizedName, visibleName]);
 
-  return { visibleName, localizedName, typeLabel };
+  /**
+   * The label of a category's type: `typeLabel` of its type, or its stored type name made
+   * visible when the type is not known (types still loading, or missing from the list).
+   */
+  const categoryTypeLabel = useCallback((name: string, categoryType: CategoryType | null | undefined) => {
+    return categoryType ? typeLabel(categoryType) : visibleName(name);
+  }, [typeLabel, visibleName]);
+
+  return { visibleName, localizedName, typeLabel, categoryTypeLabel };
 }

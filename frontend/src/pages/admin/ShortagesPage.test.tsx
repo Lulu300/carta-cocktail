@@ -45,6 +45,41 @@ describe('ShortagesPage', () => {
     expect(within(getCard('Vodka')).getByText('SPIRIT')).toHaveClass('bg-blue-500/20');
   });
 
+  describe('type badge of a category whose type name HTML would hide', () => {
+    // Data older than v1.9.0 can hold ' SPIRIT ' next to 'SPIRIT', and a type with an empty name.
+    const shortageOfType = (name: string, type: string, nameTranslations?: Record<string, string>) => buildShortage({
+      category: { name, type, categoryType: { name: type, nameTranslations, color: 'gray' } },
+    });
+
+    it('tells the stored names apart, and labels the empty name', async () => {
+      mockShortages([shortageOfType('Rum', ' SPIRIT '), shortageOfType('Gin', 'SPIRIT'), shortageOfType('Water', '')]);
+      render(<ShortagesPage />);
+
+      await screen.findByRole('heading', { name: 'Rum' });
+      expect(within(getCard('Rum')).getByText('␣SPIRIT␣ categoryTypes.withSpaces')).toBeInTheDocument();
+      expect(within(getCard('Gin')).getByText('SPIRIT')).toBeInTheDocument();
+      expect(within(getCard('Water')).getByText('categoryTypes.emptyName')).toBeInTheDocument();
+    });
+
+    it('adds the stored name to a translation that would hide it', async () => {
+      const nameTranslations = { en: 'Spirits' };
+      mockShortages([shortageOfType('Rum', ' SPIRIT ', nameTranslations), shortageOfType('Gin', 'SPIRIT', nameTranslations)]);
+      render(<ShortagesPage />);
+
+      await screen.findByRole('heading', { name: 'Rum' });
+      expect(within(getCard('Rum')).getByText('Spirits – ␣SPIRIT␣ categoryTypes.withSpaces')).toBeInTheDocument();
+      expect(within(getCard('Gin')).getByText('Spirits')).toBeInTheDocument();
+    });
+
+    it('marks the stored name of a category sent without its type', async () => {
+      mockShortages([buildShortage({ category: { name: 'Rum', type: 'X  Y', categoryType: null } })]);
+      render(<ShortagesPage />);
+
+      await screen.findByRole('heading', { name: 'Rum' });
+      expect(within(getCard('Rum')).getByText('X␣␣Y categoryTypes.withSpaces')).toBeInTheDocument();
+    });
+  });
+
   it('shows the stock, the requirement, the deficit and the threshold of each category', async () => {
     mockShortages();
     render(<ShortagesPage />);

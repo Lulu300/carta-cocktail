@@ -1,11 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
+import { useCategoryTypeName } from '../../hooks/useCategoryTypeName';
 import { useShortages } from '../../queries/shortages';
 import { getBadgeClasses } from '../../utils/colors';
 
 export default function ShortagesPage() {
   const { t } = useTranslation();
   const localize = useLocalizedName();
+  const { categoryTypeLabel } = useCategoryTypeName();
   const { data: items, isPending, isError, refetch } = useShortages();
 
   // Never show the green "no shortages" banner unless the list really loaded.
@@ -45,7 +47,7 @@ export default function ShortagesPage() {
               <div className="flex items-center justify-between mb-3">
                 <h2 className="font-semibold text-lg">{localize(item.category)}</h2>
                 <span className={`px-2 py-1 rounded text-xs font-medium ${getBadgeClasses(item.category.categoryType?.color)}`}>
-                  {item.category.categoryType ? localize(item.category.categoryType) : item.category.type}
+                  {categoryTypeLabel(item.category.type, item.category.categoryType)}
                 </span>
               </div>
               <div className="space-y-2 text-sm">

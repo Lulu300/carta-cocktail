@@ -8,7 +8,7 @@ effort: S
 status: todo
 owner: agent
 depends_on: [C-55]
-touches: [backend/src/services/categoryTypeService.ts, backend/src/services/categoryTypeService.test.ts, frontend/src/components/admin/categories/useCategoryTypeName.ts, frontend/src/pages/admin/CategoriesPage.test.tsx]
+touches: [backend/src/services/categoryTypeService.ts, backend/src/services/categoryTypeService.test.ts, frontend/src/hooks/useCategoryTypeName.ts, frontend/src/pages/admin/CategoriesPage.test.tsx]
 sources: []
 branch:
 pr:
