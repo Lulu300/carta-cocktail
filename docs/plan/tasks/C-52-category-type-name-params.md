@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-17]
 touches: [backend/src/validation/categoryTypes.ts, backend/src/validation/categories.ts, backend/src/routes/categoryTypes.ts, backend/src/routes/categoryTypes.test.ts, backend/src/routes/categories.test.ts, frontend/src/services/api.ts, frontend/src/services/api.test.ts, frontend/src/test/msw/handlers.ts, frontend/src/pages/admin/CategoriesPage.test.tsx]
 sources: []
 branch: fix/C-52-category-type-name-params
-pr:
+pr: https://github.com/Lulu300/carta-cocktail/pull/206
 ---
 
 ## Contexte
@@ -64,3 +64,5 @@ Le frontend envoie déjà le nom tel qu'il est stocké (`useCategoryTypeForm` pa
 ## Journal
 
 - 2026-11-24 : tâche créée d'après la relecture de la PR #205. Faits sondés avant correctif ; décisions humaines ci-dessus.
+- 2026-11-24 : PR #206 (branche `fix/C-52-category-type-name-params`). Paramètre `:name` non trimé, forme `?name=` pour `PUT` et `DELETE` (choisie plutôt qu'une route sans segment : un `DELETE /api/category-types` nu ressemblerait à « tout supprimer », et l'absence de `name` répond 400), `categoryTypeUrl()` dans `services/api.ts` (query pour le nom vide seulement), `CategoryUpdate.type` non trimé. `useCategoryTypeForm` et `CategoryTypesManager` inchangés : ils passent déjà le nom stocké. Sondes de sabotage : chaque retour en arrière fait échouer au moins un test. Hors périmètre : C-53 (affichage des noms à espaces et du nom vide).
+- Notes de version (seul effet qui reste visible) : « Creating a category and picking a type whose name has spaces around it (left by data older than v1.9.0) files the category under the name without spaces. »
