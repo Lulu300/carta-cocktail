@@ -8,7 +8,7 @@ effort: S
 status: done
 owner: agent
 depends_on: [C-53]
-touches: [backend/src/services/categoryTypeService.ts, backend/src/services/categoryTypeService.test.ts, backend/src/routes/categoryTypes.ts, backend/src/routes/categoryTypes.test.ts, backend/src/routes/categories.ts, backend/src/routes/categories.test.ts, backend/src/routes/bottles.ts, backend/src/routes/bottles.test.ts, backend/src/services/cocktail/cocktailImport.ts, backend/src/services/cocktail/cocktailImport.test.ts, backend/src/validation/categories.ts, frontend/src/components/admin/categories/useCategoryTypeName.ts, frontend/src/pages/admin/CategoriesPage.test.tsx]
+touches: [backend/src/services/categoryTypeService.ts, backend/src/services/categoryTypeService.test.ts, backend/src/routes/categoryTypes.ts, backend/src/routes/categoryTypes.test.ts, backend/src/routes/categories.ts, backend/src/routes/categories.test.ts, backend/src/routes/bottles.ts, backend/src/routes/bottles.test.ts, backend/src/services/cocktail/cocktailImport.ts, backend/src/services/cocktail/cocktailImport.test.ts, backend/src/validation/categories.ts, frontend/src/components/admin/categories/useCategoryTypeName.ts, frontend/src/components/admin/categories/CategoryTypesManager.tsx, frontend/src/pages/admin/CategoriesPage.test.tsx]
 sources: []
 branch: fix/C-55-category-type-inner-spaces
 pr: 208
@@ -34,9 +34,9 @@ Chemins qui créent un type, sur `origin/develop` (038ee31) :
 
 ## Ce qu'il faut faire
 
-1. `categoryTypeService.ts` : `newCategoryTypeName(name)` (trim, puis chaque suite d'espaces internes réduite à un espace) et `ensureCategoryType` qui renvoie le nom du type retenu : un nom qui correspond exactement à un type existant garde ce type tel quel ; sinon le nom est réduit, puis rattaché au type de ce nom ou créé. Un nom vide après réduction répond 400.
+1. `categoryTypeService.ts` : `newCategoryTypeName(name)` (trim, puis chaque suite d'espaces internes réduite à un espace) et `ensureCategoryType` qui renvoie le nom du type retenu : un nom qui correspond exactement à un type existant garde ce type tel quel ; sinon le nom est réduit, puis rattaché au type de ce nom ou créé. Un nom vide après réduction répond 400, avec le détail `body.type` des autres 400 de validation.
 2. Les routes et services qui créent une catégorie (création, édition, import de bouteilles, import de cocktails) enregistrent le nom renvoyé par `ensureCategoryType`. `POST /api/category-types` passe par `newCategoryTypeName`.
-3. `useCategoryTypeName` (C-53) : `isHiddenByHtml` et `visibleName` marquent aussi les suites de 2 espaces ou plus et tout blanc autre qu'un espace (tabulation, saut de ligne), avec `␣` et « (with spaces) » / « (avec espaces) ».
+3. `useCategoryTypeName` (C-53) : `isHiddenByHtml` et `visibleName` marquent aussi les suites de 2 espaces ou plus et tout blanc autre qu'un espace (tabulation, saut de ligne), avec `␣` et « (with spaces) » / « (avec espaces) ». La décision porte sur les noms : Manage Types n'applique `visibleName` qu'au nom stocké (`localizedName`), une traduction s'affiche telle quelle, comme dans la liste des types du formulaire (`typeLabel`).
 
 ## Critères d'acceptation
 
@@ -44,15 +44,15 @@ Chemins qui créent un type, sur `origin/develop` (038ee31) :
 - [x] Un type nouveau donné à la création ou à l'édition d'une catégorie, ou par un import, est trimé et ses espaces internes réduits.
 - [x] Un type existant choisi tel quel (`X  Y`, ` SPIRIT `) n'est jamais modifié ni dédoublé.
 - [x] `X  Y` et `X Y` se distinguent dans Manage Types et dans la liste des types du formulaire, lecteur d'écran compris, aussi avec la même traduction.
-- [x] Les noms normaux s'affichent comme avant.
+- [x] Les noms normaux s'affichent comme avant. Une traduction n'est pas marquée.
 
 ## Tests à ajouter ou adapter
 
 - `backend/src/services/categoryTypeService.test.ts` (nouveau) : réduction du nom, type existant gardé tel quel (espaces internes ou autour), création réduite en gris, rattachement à `X Y` existant, nom blanc refusé.
 - `backend/src/routes/categoryTypes.test.ts` : création réduite, 409 face à `X Y`, création de `X Y` à côté d'un `X  Y` ancien.
-- `backend/src/routes/categories.test.ts` : création réduite, `X  Y` existant gardé à la création et à l'édition, type nouveau trimé et réduit à l'édition, type blanc refusé à l'édition.
+- `backend/src/routes/categories.test.ts` : création réduite, `X  Y` existant gardé à la création et à l'édition, type nouveau trimé et réduit à l'édition, type blanc refusé à l'édition (détail `body.type`).
 - `backend/src/routes/bottles.test.ts`, `backend/src/services/cocktail/cocktailImport.test.ts` : type créé par l'import, réduit.
-- `frontend/src/pages/admin/CategoriesPage.test.tsx` : liste des types (espaces internes, tabulation, traduction identique, nom accessible) et lignes de Manage Types.
+- `frontend/src/pages/admin/CategoriesPage.test.tsx` : liste des types (espaces internes, tabulation, traduction identique, nom accessible) et lignes de Manage Types (nom stocké marqué, traduction à double espace non marquée).
 
 ## Points d'attention
 
@@ -64,3 +64,4 @@ Chemins qui créent un type, sur `origin/develop` (038ee31) :
 
 - 2026-11-24 : tâche créée d'après la relecture de #207 et la décision de l'humain.
 - 2026-11-24 : PR #208 (branche `fix/C-55-category-type-inner-spaces`). `newCategoryTypeName` et `ensureCategoryType` partagés par les cinq chemins de création ; `visibleName` marque les espaces internes. Sondes de sabotage (réduction, correspondance exacte, garde du nom blanc, route de création de type, chacun des quatre appelants, les deux motifs d'affichage) : chacune fait échouer au moins un test. Pas de changement d'`api.ts` ni des libellés. Pas de ligne « Notes de version » : la création range un nom saisi avec des espaces répétés sous sa forme à un espace, et les noms anciens sont marqués comme ceux de C-53, sans action de l'utilisateur.
+- 2026-11-24 : relecture de #208 (approuvée). Manage Types ne marque plus une traduction, seulement le nom stocké (`localizedName` dans `useCategoryTypeName`, `touches` complété par `CategoryTypesManager.tsx`) ; le 400 d'un type blanc nouveau à l'édition donne le détail `body.type`. Sondes : traduction marquée de nouveau (1 échec), 400 sans détail (2 échecs). Caractères invisibles hors `\s` (espace sans chasse…) : C-56.
