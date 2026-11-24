@@ -152,6 +152,7 @@
           "outOfRange": "{{field}} is out of range",
           "invalidDate": "{{field}} is not a valid date (expected {{pattern}} or {{isoPattern}})",
           "invalidNumber": "{{field}} is not a valid number",
+          "malformedQuotes": "{{field}} has a misplaced quotation mark",
           "unknown": "{{field}} is invalid"
         }
       }

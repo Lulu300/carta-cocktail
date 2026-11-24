@@ -152,6 +152,7 @@
           "outOfRange": "{{field}} hors limites",
           "invalidDate": "{{field}} n'est pas une date valide (attendu : {{pattern}} ou {{isoPattern}})",
           "invalidNumber": "{{field}} n'est pas un nombre valide",
+          "malformedQuotes": "{{field}} contient un guillemet mal placé",
           "unknown": "{{field}} invalide"
         }
       }

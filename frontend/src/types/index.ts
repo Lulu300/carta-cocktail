@@ -345,7 +345,7 @@ export interface BottleRowPreview {
   potentialDuplicates: BottleDuplicateEntry[];
 }
 
-export type BottleImportRowErrorCode = 'required' | 'outOfRange' | 'invalidDate' | 'invalidNumber';
+export type BottleImportRowErrorCode = 'required' | 'outOfRange' | 'invalidDate' | 'invalidNumber' | 'malformedQuotes';
 
 /**
  * A row of the file left out of the import. `line` is the CSV line (header = 1)

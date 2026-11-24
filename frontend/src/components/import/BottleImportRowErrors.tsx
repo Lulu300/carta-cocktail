@@ -4,7 +4,7 @@ import { datePattern, isoDatePattern } from '../../utils/dates';
 
 // Codes and sources this version can name. A newer backend may send others:
 // they get a generic reason, or the raw source, rather than an i18n key.
-const KNOWN_CODES: readonly string[] = ['required', 'outOfRange', 'invalidDate', 'invalidNumber'];
+const KNOWN_CODES: readonly string[] = ['required', 'outOfRange', 'invalidDate', 'invalidNumber', 'malformedQuotes'];
 const KNOWN_SOURCES: readonly string[] = ['bottles', 'categories'];
 
 /** Rows of the file the backend left out, with the line and the reason. */
