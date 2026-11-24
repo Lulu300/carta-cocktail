@@ -5,13 +5,13 @@ phase: B
 lane: deps
 criticite: moyenne
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [B-09]
 touches: [backend/package.json, backend/package-lock.json, backend/src/i18n/]
 sources: []
-branch:
-pr:
+branch: chore/B-25-deps-i18next-http-middleware
+pr: 213
 ---
 
 ## Contexte
@@ -36,10 +36,10 @@ Trouvé pendant B-09 (montée d'i18next en 27), hors de son périmètre.
 
 ## Critères d'acceptation
 
-- [ ] `i18next-http-middleware` ≥ 3.10.1 dans le lockfile.
-- [ ] Un test montre que des requêtes avec des langues inventées ne font pas grandir `i18next.options.preload`.
-- [ ] Messages d'erreur toujours dans la langue de la requête (`fr`, `fr-FR`, `en`, langue inconnue → anglais).
-- [ ] `npm ci`, lint, `npx tsc --noEmit`, build et `npm test` passent.
+- [x] `i18next-http-middleware` ≥ 3.10.1 dans le lockfile.
+- [x] Un test montre que des requêtes avec des langues inventées ne font pas grandir `i18next.options.preload`.
+- [x] Messages d'erreur toujours dans la langue de la requête (`fr`, `fr-FR`, `en`, langue inconnue → anglais).
+- [x] `npm ci`, lint, `npx tsc --noEmit`, build et `npm test` passent.
 
 ## Tests à ajouter ou adapter
 
@@ -53,3 +53,6 @@ Test de non-régression dans `backend/src/i18n/i18n.test.ts` (ou un test d'inté
 ## Journal
 
 - 2026-11-24 : tâche créée par B-09 (PR de la montée d'i18next 27), d'après la mesure ci-dessus.
+- 2026-11-24 : PR #213, sur `develop` (570193e), Node 24, i18next 27.2.7. `i18next-http-middleware` 3.9.9 → 3.11.1, plage relevée à `^3.11.1` ; seule cette entrée change dans le lockfile. Avis : GHSA-mjcw-gfh6-3cxm (CVE-2026-132267, `< 3.10.1`), GHSA-xxvx-vcj6-rjq5 (`< 3.10.2`) et GHSA-ccfc-2jr7-wr97 (`< 3.11.0`) sont publiés au niveau du dépôt (`high`), toujours absents de la base globale (`gh api /advisories/<id>` : 404), donc invisibles pour `npm audit` et Dependabot ; seul le premier nous touche (`handle()` monté sur toutes les requêtes), les deux autres visent `missingKeyHandler` et `getResourcesHandler`, non montés. Étape 3 retenue : `supportedLngs: ['en', 'en-GB', 'fr']` (la liste du frontend) et un `convertDetectedLanguage` qui ramène chaque code détecté à l'une d'elles (`fr-FR` → `fr`, `en-gb` → `en-GB`, inconnu → chaîne vide, ignorée par le middleware), comme `toSupportedLanguage` du frontend. Sans conversion, la première passe d'i18next prend toute correspondance exacte (`fr-CA, en;q=0.5` → anglais, `en-US, fr;q=0.8` → français) et les codes inventés font encore tourner le cache `formattedCodes`. Effets côté API seulement (le SPA envoie `fr`, `en` ou `en-GB`) : `Content-Language` vaut toujours `en`, `en-GB` ou `fr` ; `de` reçoit l'anglais avec `5,000` (et non plus `5.000`) ; une langue non prise en charge dans `?lng=` ou en tête d'`Accept-Language` passe à la suivante (`?lng=de` + `Accept-Language: fr` → français) ; `?lng=cimode` ne renvoie plus les clés. Dates de l'import inchangées (`en-GB` jour d'abord, tests de `bottles.test.ts` inchangés). Test `backend/src/i18n/requestLanguage.test.ts` : langues et replis (message et format exacts) et 2 000 requêtes à langues inventées (requête, cookie, en-tête : 6 000 codes) sans changement de `options.preload`, des langues du store, de `resolveHierarchyCache`, `formattedCodes` et `pluralRulesCache`. Sabotages : config de `develop` avec 3.11.1 → 10 échecs sur 18, caches remplis de `xx…` ; avec 3.9.9 → `preload` + 2 000 ; nouvelle config avec 3.9.9 → `preload` borné (`en-GB` en plus, une fois) ; sans conversion → 4 échecs. `npm ci`, lint, `tsc --noEmit`, build, `npm test -- --coverage` (1420 tests, 99,48 % des instructions) ; `npm audit --omit=dev` à 0. Aucune tâche hors périmètre.
+- 2026-11-24 : relecture de #213 (approuvée, 0 bloquant) prise en compte, après rebase sur `develop` (c59fe82, C-20). `supportedLngs` gardé comme seconde garde (langue posée par du code : `changeLanguage()`, `req.lng`), son commentaire dit maintenant que c'est le convertisseur qui impose la liste ; nouveau test qui bascule l'instance d'une requête sur `de` par du code. Sondes : sans `supportedLngs` → ce test échoue (1 sur 19) ; sans convertisseur → 4 échecs. `bottles.test.ts` gagne `de-DE, fr;q=0.5` → `2024-03-12` (échoue avec la configuration de `develop`, qui donne `2024-12-03`). Ligne « Notes de version » reformulée d'après la relecture : sur Carta (ressources en ligne), une requête ordinaire ne ralentit presque pas (0,08 → 0,10 ms après 60 000 langues inventées) ; ce qui grandit, c'est la liste (57 334 entrées, environ 5 Mo) et le coût de chaque nouvelle langue inventée. Lint, `tsc --noEmit`, build, `npm test -- --coverage` (1427 tests, 99,48 % des instructions), `npm audit --omit=dev` à 0.
+- 2026-11-24 : Notes de version (Security) : `i18next-http-middleware` 3.11.1 corrige GHSA-mjcw-gfh6-3cxm (CVE-2026-132267) : des requêtes non authentifiées avec des langues inventées (`?lng=`, cookie, `Accept-Language`) faisaient grandir sans limite une liste en mémoire, jusqu'au redémarrage, et chaque nouvelle langue inventée coûtait plus cher que la précédente. L'API ne sert plus que `en`, `en-GB` et `fr` ; une autre langue reçoit l'anglais, nombres compris. Pour un client d'API dont la première langue n'est pas prise en charge, les dates de l'import suivent désormais la langue des messages : avec `Accept-Language: de-DE, fr;q=0.5`, `12/03/2024` est lu comme le 12 mars (français, jour d'abord) et non plus comme le 3 décembre (`de-DE` retombait sur l'ordre de `en`). Le SPA envoie toujours `fr`, `en` ou `en-GB` : aucun changement pour lui. Aucune action demandée.
