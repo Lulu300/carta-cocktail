@@ -25,11 +25,15 @@ FROM nginx:1.31-alpine
 # nginx user (uid 101) on port 8080, so it also works under rootless Docker and Podman. The
 # pid file and temporary files go to /tmp, and the entrypoint writes the configuration from
 # the templates into /etc/nginx/conf.d. Group 0 with write access, as in that image, lets
-# nginx run under another uid of group 0 too.
+# nginx run under another uid of group 0 too. The grep lines stop the build if a future
+# nginx.conf no longer matches these edits, instead of leaving root paths or the user line.
 RUN sed -i 's,listen       80;,listen       8080;,' /etc/nginx/conf.d/default.conf \
     && sed -i '/user  nginx;/d' /etc/nginx/nginx.conf \
     && sed -i 's,\(/var\)\{0\,1\}/run/nginx.pid,/tmp/nginx.pid,' /etc/nginx/nginx.conf \
     && sed -i "/^http {/a \    proxy_temp_path /tmp/proxy_temp;\n    client_body_temp_path /tmp/client_temp;\n    fastcgi_temp_path /tmp/fastcgi_temp;\n    uwsgi_temp_path /tmp/uwsgi_temp;\n    scgi_temp_path /tmp/scgi_temp;\n" /etc/nginx/nginx.conf \
+    && grep -q '^pid  */tmp/nginx.pid;' /etc/nginx/nginx.conf \
+    && grep -q '^    proxy_temp_path /tmp/proxy_temp;' /etc/nginx/nginx.conf \
+    && ! grep -q '^user' /etc/nginx/nginx.conf \
     && chown -R 101:0 /var/cache/nginx /etc/nginx \
     && chmod -R g+w /var/cache/nginx /etc/nginx
 
