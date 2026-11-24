@@ -112,6 +112,8 @@ ADMIN_PASSWORD=<at least 12 characters>        # required on first start
 
 `ADMIN_PASSWORD` is only used to create the admin on first start. After that, change the password from Settings > Profile: it survives restarts and image updates. Changing `JWT_SECRET` logs out existing sessions; it does not touch data.
 
+Behind a reverse proxy that reaches the frontend container directly, target port **8080**: nginx runs as a non-root user and listens there. The image also declares port 80, inherited from the official nginx image, but nothing listens on it. A proxy that picks the container port by itself then chooses 80 and answers 502: set the port, `traefik.http.services.<name>.loadbalancer.server.port=8080` with Traefik, `VIRTUAL_PORT=8080` with nginx-proxy.
+
 #### Upgrading
 
 Some versions require actions before or after the upgrade (new variables in `.env`, files to copy out of the old container…). **Read [`UPGRADING.md`](UPGRADING.md) before pulling a new version**, and apply the sections of every version newer than yours, in order. Upgrading from v1.4.0 or older to v1.5.0 requires a `JWT_SECRET` and a copy of the existing cocktail photos. Upgrading to v1.12.0 requires giving the data folders to uid 1000 first (see below).
