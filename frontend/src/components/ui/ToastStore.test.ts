@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import i18n from '../../i18n';
 import { ApiError } from '../../services/api';
-import { toast, toastStore } from './ToastStore';
+import { setErrorDescriber, toast, toastStore } from './ToastStore';
 
 function messages() {
   return toastStore.getSnapshot().map((item) => item.message);
@@ -92,6 +92,22 @@ describe('ToastStore', () => {
     toast.error('boom');
     toast.error(new Error(''));
     expect(messages()).toEqual([i18n.t('common.error'), i18n.t('common.error')]);
+  });
+
+  describe('with a registered error describer', () => {
+    afterEach(() => {
+      setErrorDescriber(() => null);
+    });
+
+    it('shows the description of the errors it knows, the error message of the others', () => {
+      setErrorDescriber((error) => (error instanceof ApiError && error.status === 400 ? 'Name: required' : null));
+
+      toast.error(new ApiError(400, 'Validation error'));
+      toast.error(new ApiError(409, 'Already exists'));
+      toast.error('boom');
+
+      expect(messages()).toEqual(['Name: required', 'Already exists', i18n.t('common.error')]);
+    });
   });
 
   it('keeps the action of a toast', () => {

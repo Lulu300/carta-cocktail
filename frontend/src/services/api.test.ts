@@ -159,6 +159,62 @@ describe('API request helper', () => {
     expect(onUnauthorized).not.toHaveBeenCalled();
   });
 
+  describe('validation issues of a 400', () => {
+    async function failedRequest(status: number, body: unknown) {
+      mockError(status, body);
+      const api = await getApi();
+      return (await api.units.list().catch((e: unknown) => e)) as InstanceType<typeof api.ApiError>;
+    }
+
+    it('lists the path and code of each issue, without the English message of zod', async () => {
+      const error = await failedRequest(400, {
+        error: 'Validation error',
+        details: [
+          { path: 'body.ingredients.1.quantity', code: 'too_small', message: 'Too small: expected number to be >0' },
+          { path: 'body.name', code: 'too_small', message: 'Too small' },
+        ],
+      });
+
+      expect(error.message).toBe('Validation error');
+      expect(error.validationIssues()).toEqual([
+        { path: 'body.ingredients.1.quantity', code: 'too_small' },
+        { path: 'body.name', code: 'too_small' },
+      ]);
+    });
+
+    it('is empty for a 400 without details', async () => {
+      const error = await failedRequest(400, { error: 'Validation error' });
+      expect(error.validationIssues()).toEqual([]);
+    });
+
+    it('leaves out details of another shape, such as the unresolved references of an import', async () => {
+      const error = await failedRequest(400, {
+        error: 'Unknown references',
+        details: [{ line: 2, kind: 'bottle', name: 'Rum' }, 'body.name', null, { path: 'body.name', code: 3 }],
+      });
+      expect(error.validationIssues()).toEqual([]);
+    });
+
+    it('is empty when details is not a list, such as the code of an import parse error', async () => {
+      const error = await failedRequest(400, { error: 'Too many rows', details: { code: 'tooManyRows', max: 2000 } });
+      expect(error.validationIssues()).toEqual([]);
+    });
+
+    it('is empty for a 400 whose body is not JSON', async () => {
+      mockFetch.mockResolvedValueOnce(new Response('<html>400 Bad Request</html>', { status: 400 }));
+      const api = await getApi();
+      const error = (await api.units.list().catch((e: unknown) => e)) as InstanceType<typeof api.ApiError>;
+
+      expect(error.status).toBe(400);
+      expect(error.validationIssues()).toEqual([]);
+    });
+
+    it('is empty for another status, even with details', async () => {
+      const error = await failedRequest(409, { error: 'In use', details: [{ path: 'body.name', code: 'custom' }] });
+      expect(error.validationIssues()).toEqual([]);
+    });
+  });
+
   it('should send the UI language in Accept-Language', async () => {
     mockOk([]);
     mockOk([]);

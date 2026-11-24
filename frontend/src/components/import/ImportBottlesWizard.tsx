@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { bottles as bottlesApi } from '../../services/api';
 import { useCategories } from '../../queries/categories';
 import { useCategoryTypes } from '../../queries/categoryTypes';
+import { validationErrorMessage } from '../../utils/validationMessage';
 import type {
   BottleCategoryResolution,
   BottleImportConfirmResponse,
@@ -71,7 +72,8 @@ export default function ImportBottlesWizard({ onClose, onImported }: ImportBottl
       setStep('success');
       onImported?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('bottles.importWizard.error'));
+      // A row refused by the validation is named, with its field, rather than the generic message
+      setError(validationErrorMessage(err) ?? (err instanceof Error ? err.message : t('bottles.importWizard.error')));
       setStep('error');
     } finally {
       setIsLoading(false);

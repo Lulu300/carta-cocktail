@@ -71,11 +71,28 @@ function show(tone: ToastTone, message: string, options: ToastOptions = {}): str
   return id;
 }
 
+/** A more precise message for some errors, or null to keep the error's own. */
+export type ErrorDescriber = (error: unknown) => string | null;
+
+let describeError: ErrorDescriber = () => null;
+
 /**
- * The message of a caught value: an Error (ApiError included) carries a text the
- * backend has already translated; anything else gets the generic error message.
+ * Registers how to name the errors the admin can fix, such as the field refused by a
+ * validation 400. The admin chunk registers it with its messages: the first load of the
+ * public menu never shows such an error and stays without them.
+ */
+export function setErrorDescriber(describer: ErrorDescriber): void {
+  describeError = describer;
+}
+
+/**
+ * The message of a caught value: the registered description when there is one, otherwise
+ * the text of an Error (an ApiError carries the one the backend has already translated);
+ * anything else gets the generic error message.
  */
 function errorMessage(error: unknown): string {
+  const described = describeError(error);
+  if (described) return described;
   if (error instanceof Error && error.message) return error.message;
   return i18n.t('common.error');
 }

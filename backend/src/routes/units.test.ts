@@ -52,6 +52,14 @@ describe('POST /api/units', () => {
     expect(res.status).toBe(400);
   });
 
+  // A name of spaces passes the form's `required`: the frontend names the field from these details (E-23).
+  it('should return 400 naming the field when the name is only spaces', async () => {
+    const res = await request.post('/api/units').set(authHeader()).send({ name: '   ', abbreviation: 'x' });
+    expect(res.status).toBe(400);
+    expect(res.body.details).toEqual([expect.objectContaining({ path: 'body.name', code: 'too_small' })]);
+    expect(await prisma.unit.count({ where: { abbreviation: 'x' } })).toBe(0);
+  });
+
   it('should create unit with conversionFactorToMl', async () => {
     const res = await request.post('/api/units').set(authHeader())
       .send({ name: 'Centilitre', abbreviation: 'cl', conversionFactorToMl: 10 });
