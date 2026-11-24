@@ -217,6 +217,19 @@ describe('A category type named in the query', () => {
     expect(await prisma.categoryType.findUniqueOrThrow({ where: { name: 'SPIRIT' } })).toMatchObject({ color: 'blue' });
   });
 
+  // The browser resolves '/category-types/..' to '/': the frontend names these types in the query.
+  it.each(['.', '..'])('should edit and then delete the type named %s, and only it', async (name) => {
+    await prisma.categoryType.create({ data: { name, color: 'gray' } });
+
+    const updated = await request.put(`/api/category-types?name=${name}`).set(authHeader()).send({ color: 'red' });
+    expect(updated.status).toBe(200);
+    expect(updated.body).toEqual({ name, color: 'red', nameTranslations: null });
+
+    const deleted = await request.delete(`/api/category-types?name=${name}`).set(authHeader());
+    expect(deleted.status).toBe(200);
+    expect((await prisma.categoryType.findMany()).map((type) => type.name).sort()).toEqual(['SOFT', 'SPIRIT', 'SYRUP']);
+  });
+
   it('should answer 404 for a name that does not exist', async () => {
     const res = await request.put('/api/category-types?name=').set(authHeader()).send({ color: 'red' });
     expect(res.status).toBe(404);

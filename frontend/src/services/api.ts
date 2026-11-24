@@ -181,11 +181,16 @@ export const auth = {
 };
 
 /**
- * URL of one category type. The name is a path segment, except the empty name that data
- * older than v1.9.0 can hold: an empty segment cannot be addressed, so it goes in the query.
+ * Category type names a path segment cannot carry: the empty name, which data older than
+ * v1.9.0 can hold, cannot be addressed, and the browser resolves `.` and `..` away.
  */
+const NAMES_OUTSIDE_THE_PATH = new Set(['', '.', '..']);
+
+/** URL of one category type: its name is a path segment, or the `name` query when it cannot be one. */
 function categoryTypeUrl(name: string): string {
-  return name ? `/category-types/${encodeURIComponent(name)}` : '/category-types?name=';
+  return NAMES_OUTSIDE_THE_PATH.has(name)
+    ? `/category-types?name=${encodeURIComponent(name)}`
+    : `/category-types/${encodeURIComponent(name)}`;
 }
 
 // Category Types
