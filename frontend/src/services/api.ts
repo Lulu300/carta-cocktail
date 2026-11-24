@@ -180,15 +180,23 @@ export const auth = {
   me: () => request<{ id: number; email: string }>('/auth/me'),
 };
 
+/**
+ * URL of one category type. The name is a path segment, except the empty name that data
+ * older than v1.9.0 can hold: an empty segment cannot be addressed, so it goes in the query.
+ */
+function categoryTypeUrl(name: string): string {
+  return name ? `/category-types/${encodeURIComponent(name)}` : '/category-types?name=';
+}
+
 // Category Types
 export const categoryTypes = {
   list: () => request<CategoryType[]>('/category-types'),
   create: (data: { name: string; nameTranslations?: Record<string, string> | null; color?: string }) =>
     request<CategoryType>('/category-types', { method: 'POST', body: JSON.stringify(data) }),
   update: (name: string, data: { nameTranslations?: Record<string, string> | null; color?: string }) =>
-    request<CategoryType>(`/category-types/${encodeURIComponent(name)}`, { method: 'PUT', body: JSON.stringify(data) }),
+    request<CategoryType>(categoryTypeUrl(name), { method: 'PUT', body: JSON.stringify(data) }),
   delete: (name: string) =>
-    request<{ message: string }>(`/category-types/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+    request<{ message: string }>(categoryTypeUrl(name), { method: 'DELETE' }),
 };
 
 // Categories

@@ -103,6 +103,143 @@ describe('PUT /api/category-types/:name', () => {
   });
 });
 
+// Data older than v1.9.0 can hold a type whose name has spaces around it, next to the
+// same name without them. The name in the path is the stored key: it is not trimmed.
+describe('A category type whose name has surrounding spaces', () => {
+  const SPACED = ' SPIRIT ';
+  const SPACED_PATH = '/api/category-types/%20SPIRIT%20';
+
+  beforeEach(async () => {
+    await prisma.categoryType.update({
+      where: { name: 'SPIRIT' },
+      data: { nameTranslations: JSON.stringify({ fr: 'Spiritueux', en: 'Spirits' }) },
+    });
+    await prisma.categoryType.create({ data: { name: SPACED, color: 'gray' } });
+  });
+
+  async function findType(name: string) {
+    return prisma.categoryType.findUniqueOrThrow({ where: { name } });
+  }
+
+  it('should be edited without touching the type without spaces', async () => {
+    const res = await request.put(SPACED_PATH).set(authHeader())
+      .send({ color: 'red', nameTranslations: { fr: 'Alcool' } });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ name: SPACED, color: 'red', nameTranslations: { fr: 'Alcool' } });
+    expect(await findType(SPACED)).toMatchObject({ color: 'red', nameTranslations: JSON.stringify({ fr: 'Alcool' }) });
+    expect(await findType('SPIRIT')).toMatchObject({
+      color: 'blue',
+      nameTranslations: JSON.stringify({ fr: 'Spiritueux', en: 'Spirits' }),
+    });
+  });
+
+  it('should be deleted without touching the type without spaces or its categories', async () => {
+    const rum = await seedCategory({ name: 'Rum', type: 'SPIRIT' });
+
+    const res = await request.delete(SPACED_PATH).set(authHeader());
+
+    expect(res.status).toBe(200);
+    expect(await prisma.categoryType.findUnique({ where: { name: SPACED } })).toBeNull();
+    expect(await findType('SPIRIT')).toMatchObject({ color: 'blue' });
+    expect(await prisma.category.findUniqueOrThrow({ where: { id: rum.id } })).toMatchObject({ type: 'SPIRIT' });
+  });
+
+  it('should delete the unused type without spaces and keep the spaced one', async () => {
+    const res = await request.delete('/api/category-types/SPIRIT').set(authHeader());
+
+    expect(res.status).toBe(200);
+    expect(await prisma.categoryType.findUnique({ where: { name: 'SPIRIT' } })).toBeNull();
+    expect(await findType(SPACED)).toMatchObject({ color: 'gray' });
+  });
+
+  it('should refuse to delete it while its own categories use it, even if the type without spaces is unused', async () => {
+    await seedCategory({ name: 'Rum', type: SPACED });
+
+    const res = await request.delete(SPACED_PATH).set(authHeader());
+
+    expect(res.status).toBe(409);
+    expect(await findType(SPACED)).toMatchObject({ color: 'gray' });
+    expect(await findType('SPIRIT')).toMatchObject({ color: 'blue' });
+  });
+
+  it('should answer 404 to an edit of the spaced name when only the name without spaces exists', async () => {
+    await prisma.categoryType.delete({ where: { name: SPACED } });
+
+    const res = await request.put(SPACED_PATH).set(authHeader()).send({ color: 'red' });
+
+    expect(res.status).toBe(404);
+    expect(await findType('SPIRIT')).toMatchObject({ color: 'blue' });
+  });
+});
+
+// Data older than v1.9.0 can also hold a type with an empty name. A path segment cannot
+// carry it: the type can be named in the query instead.
+describe('A category type named in the query', () => {
+  it('should edit the type with an empty name', async () => {
+    await prisma.categoryType.create({ data: { name: '', color: 'gray' } });
+
+    const res = await request.put('/api/category-types?name=').set(authHeader())
+      .send({ color: 'red', nameTranslations: { fr: 'Autre' } });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ name: '', color: 'red', nameTranslations: { fr: 'Autre' } });
+    expect(await prisma.categoryType.findUniqueOrThrow({ where: { name: 'SPIRIT' } })).toMatchObject({ color: 'blue' });
+  });
+
+  it('should delete the unused type with an empty name, and only it', async () => {
+    await prisma.categoryType.create({ data: { name: '', color: 'gray' } });
+
+    const res = await request.delete('/api/category-types?name=').set(authHeader());
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ message: 'Type deleted successfully' });
+    expect((await prisma.categoryType.findMany()).map((type) => type.name).sort()).toEqual(['SOFT', 'SPIRIT', 'SYRUP']);
+  });
+
+  it('should refuse to delete the type with an empty name while categories use it', async () => {
+    await prisma.categoryType.create({ data: { name: '', color: 'gray' } });
+    await seedCategory({ name: 'Rum', type: '' });
+
+    const res = await request.delete('/api/category-types?name=').set(authHeader());
+
+    expect(res.status).toBe(409);
+    expect(await prisma.categoryType.findUnique({ where: { name: '' } })).not.toBeNull();
+  });
+
+  it('should keep the name as sent, without trimming it', async () => {
+    await prisma.categoryType.create({ data: { name: ' SPIRIT ', color: 'gray' } });
+
+    const res = await request.put('/api/category-types?name=%20SPIRIT%20').set(authHeader()).send({ color: 'red' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe(' SPIRIT ');
+    expect(await prisma.categoryType.findUniqueOrThrow({ where: { name: 'SPIRIT' } })).toMatchObject({ color: 'blue' });
+  });
+
+  it('should answer 404 for a name that does not exist', async () => {
+    const res = await request.put('/api/category-types?name=').set(authHeader()).send({ color: 'red' });
+    expect(res.status).toBe(404);
+  });
+
+  it.each([
+    ['without a name', ''],
+    ['with the name twice', '?name=SOFT&name=SYRUP'],
+  ])('should refuse a deletion %s and delete nothing', async (_label, query) => {
+    const res = await request.delete(`/api/category-types${query}`).set(authHeader());
+
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('query.name');
+    expect(await prisma.categoryType.count()).toBe(3);
+  });
+
+  it('should refuse an edit without a name', async () => {
+    const res = await request.put('/api/category-types').set(authHeader()).send({ color: 'red' });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('query.name');
+  });
+});
+
 describe('Renaming a category type', () => {
   // The API has no rename: the name is the key. The foreign key cascades a rename
   // made in the database to the categories of the type.

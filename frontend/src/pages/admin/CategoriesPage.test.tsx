@@ -171,6 +171,24 @@ describe('CategoriesPage', () => {
       expect(await screen.findByText('categories.updated')).toBeInTheDocument();
     });
 
+    // Data older than v1.9.0 can hold ' SPIRIT ' next to 'SPIRIT': the edit sends the type as stored.
+    it('keeps a type with surrounding spaces when a category is saved', async () => {
+      const user = userEvent.setup();
+      const spacedSpirit = buildCategoryType({ name: ' SPIRIT ', color: 'gray', _count: { categories: 1 } });
+      mockApiResponse('get', '/api/category-types', [spirit, spacedSpirit]);
+      mockApiResponse('get', '/api/categories', [
+        buildCategory({ id: 3, name: 'Rum', type: ' SPIRIT ', categoryType: spacedSpirit, _count: { bottles: 0 } }),
+      ]);
+      renderPage();
+      await screen.findByText('Rum');
+      const updated = captureRequest('put', '/api/categories/:id');
+
+      await user.click(screen.getByRole('button', { name: 'common.edit' }));
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
+
+      expect(await updated.body).toMatchObject({ type: ' SPIRIT ' });
+    });
+
     it('shows a type missing from the list as a custom type', async () => {
       const user = userEvent.setup();
       mockApiResponse('get', '/api/categories', [
@@ -398,6 +416,47 @@ describe('CategoriesPage', () => {
 
       expect(await screen.findByText('categoryTypes.deleted')).toBeInTheDocument();
       expect(within(manager).getByDisplayValue('SPIRIT')).toBeDisabled();
+    });
+
+    // Data older than v1.9.0 can hold a type with an empty name: it is named in the query.
+    describe('the type with an empty name', () => {
+      const unnamed = buildCategoryType({ name: '', color: 'gray', _count: { categories: 0 } });
+
+      beforeEach(() => {
+        mockApiResponse('get', '/api/category-types', [unnamed, spirit]);
+      });
+
+      it('is edited through the query', async () => {
+        const user = userEvent.setup();
+        await renderLoadedPage();
+        const updated = captureRequest('put', '/api/category-types');
+        const manager = await openTypesManager(user);
+
+        await user.click(within(manager).getAllByRole('button', { name: 'common.edit' })[0]);
+        await user.click(within(manager).getByRole('button', { name: 'colors.red' }));
+        await user.click(within(manager).getByRole('button', { name: 'common.save' }));
+
+        const url = await updated.url;
+        expect(url.pathname).toBe('/api/category-types');
+        expect(url.searchParams.get('name')).toBe('');
+        expect(await updated.body).toEqual({ nameTranslations: null, color: 'red' });
+        expect(await screen.findByText('categoryTypes.updated')).toBeInTheDocument();
+      });
+
+      it('is deleted through the query', async () => {
+        const user = userEvent.setup();
+        await renderLoadedPage();
+        const deleted = captureRequest('delete', '/api/category-types');
+        const manager = await openTypesManager(user);
+
+        await user.click(within(manager).getByRole('button', { name: 'common.delete' }));
+        await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.delete' }));
+
+        expect(await screen.findByText('categoryTypes.deleted')).toBeInTheDocument();
+        const url = await deleted.url;
+        expect(url.pathname).toBe('/api/category-types');
+        expect(url.searchParams.get('name')).toBe('');
+      });
     });
 
     it('shows the backend message in a toast when a type cannot be deleted', async () => {
