@@ -5,13 +5,13 @@ phase: D
 lane: docs
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [A-01, A-04, C-01, C-05, D-01, D-03, D-05]
-touches: [AGENTS.md, backend/AGENTS.md, frontend/AGENTS.md, README.md, docs/operations.md, backend/src/bootstrap/ensureAdmin.ts, .gitignore, .github/workflows/ci.yml]
+touches: [AGENTS.md, backend/AGENTS.md, frontend/AGENTS.md, README.md, docs/operations.md, backend/src/bootstrap/ensureAdmin.ts, .gitignore, .github/workflows/ci.yml, docs/plan/README.md, .env.example, .github/pull_request_template.md]
 sources: ["07-devops-history.md §5"]
-branch:
-pr:
+branch: docs/D-09-docs-sync-ops-guide
+pr: https://github.com/Lulu300/carta-cocktail/pull/204
 ---
 
 ## Décisions validées (2026-10-10)
@@ -62,13 +62,13 @@ Les `AGENTS.md` sont lus par chaque agent avant une tâche : une affirmation fau
 
 ## Critères d'acceptation
 
-- [ ] Chaque écart listé ci-dessus est corrigé ou n'a plus d'objet.
-- [ ] `grep -rnE '14 (models|route)|Node 20|ts-node|uploads/cocktails' AGENTS.md backend/AGENTS.md frontend/AGENTS.md README.md` ne renvoie rien.
-- [ ] `grep -n admin123 AGENTS.md backend/AGENTS.md frontend/AGENTS.md` ne renvoie rien ; les commandes de « Running Locally » fonctionnent sur un clone neuf.
-- [ ] `UPLOAD_DIR` figure dans le tableau des variables du README.
-- [ ] Toutes les commandes de `docs/operations.md` ont été exécutées au moins une fois sur une pile locale (`docker compose up`), noté dans la PR.
-- [ ] Le README renvoie vers `docs/operations.md`.
-- [ ] Les arborescences des `AGENTS.md` correspondent à `ls` des dossiers concernés.
+- [x] Chaque écart listé ci-dessus est corrigé ou n'a plus d'objet.
+- [x] `grep -rnE '14 (models|route)|Node 20|ts-node|uploads/cocktails' AGENTS.md backend/AGENTS.md frontend/AGENTS.md README.md` ne renvoie rien.
+- [x] `grep -n admin123 AGENTS.md backend/AGENTS.md frontend/AGENTS.md` ne renvoie rien ; les commandes de « Running Locally » fonctionnent sur un clone neuf.
+- [x] `UPLOAD_DIR` figure dans le tableau des variables du README.
+- [x] Toutes les commandes de `docs/operations.md` ont été exécutées au moins une fois sur une pile locale (`docker compose up`), noté dans la PR.
+- [x] Le README renvoie vers `docs/operations.md`.
+- [x] Les arborescences des `AGENTS.md` correspondent à `ls` des dossiers concernés.
 
 ## Tests à ajouter ou adapter
 
@@ -109,3 +109,6 @@ Les `AGENTS.md` sont lus par chaque agent avant une tâche : une affirmation fau
 - 2026-10-12 : relecture de D-04 (PR #112, seconde passe) : l'étape d'audit est bien dans `ci.yml`, Points d'attention mis à jour.
 - 2026-10-12 : D-05 (PR #118) transmet la description du nouveau pipeline de release (Points d'attention).
 - 2026-10-12 : relectures de D-03 (PR #117) et D-05 (PR #118), à reprendre ici : section « API Structure » d'`AGENTS.md` (`/api/health` est public, sans auth) ; sections « Auth Pattern » et « Structure » de `backend/AGENTS.md` (`/api/health`, `routes/health.ts`) ; dans le modèle de release, un tag dont le job `ci` échoue ne publie rien (supprimer puis reposer le tag, ou « Re-run failed jobs » dans le run Release) ; le build arm64 n'est testé qu'à la release (le job `docker` de `ci.yml` construit l'amd64 seul) ; corriger le commentaire « Same cache scopes as the release workflow » du job `docker` de `ci.yml` (exact en lecture seulement : la release écrit dans `<service>-release`), fichier ajouté à `touches`.
+- 2026-11-24 : PR #204. Chaque point revérifié sur `develop` (v1.14.0). Déjà réglés : Node 24 dans `AGENTS.md` et le README, défaut de `JWT_SECRET`, `@prisma/client`/`ts-node` (B-08), étape `.env` et `migrate deploy` du README, `prisma/migrations/` dans l'arborescence backend, `test.db` du README (vrai depuis B-03). Corrigés : le reste de « Problème constaté » et des Points d'attention (D-11, C-01, D-07, D-04, B-08, D-05, D-03), plus les changements arrivés depuis : rulesets (dont `Smoke (docker compose)` requis et CodeQL sur `main`, D-36), image nginx 8080/uid 101 (D-40, D-43), 16 modèles (`MenuBottleExclusion`), TanStack Query côté frontend, `BACKEND_HOST` et `DATABASE_URL` du tableau des variables. `touches` complété : `docs/plan/README.md` (section « Releases »), `.env.example` (« Settings > Admin Profile »), `.github/pull_request_template.md` (ligne `tsc --noEmit`, sans effet côté frontend). Les arborescences des gros dossiers frontend décrivent leur rôle plutôt que chaque fichier. `docs/operations.md` exécuté sur une pile locale (projet `carta-d-09`, images `:1.13` puis `:1.14`), sauf `crontab -e` et le `Caddyfile`. Hors périmètre : D-44 (fichiers de configuration jamais typés).
+- 2026-11-24 : Notes de version : aucune action. Nouveau guide d'exploitation `docs/operations.md` (en français) ; le README place l'épinglage `:X.Y` en tête de l'installation de production ; l'avertissement du mot de passe par défaut renvoie vers « Settings > Admin Profile ».
+- 2026-11-24 : revue de la PR #204 (approve, 7 remarques non bloquantes traitées). Retour arrière : journal du backend lu avant de changer d'image (`Applying migration`, `Database backed up to`, `Database unchanged since backup`, textes vérifiés dans `docker-entrypoint.sh` et sur une mise à jour réelle 1.11.0 → 1.14 du projet `carta-d-09`), restauration puis image précédente. Restauration à froid gardée par `tar tzf` (nom mal tapé et archive tronquée : rien n'est effacé). HSTS aligné sur `frontend/security-headers.conf`. Restauration d'une sauvegarde ancienne : « peut demander » un redémarrage. `index.html` dans l'arbre de `frontend/AGENTS.md`, `skip-changelog` dans les labels, convention de branche alignée dans les deux `AGENTS.md` de paquet, `chmod 600` présenté comme un conseil. Rebasée sur `develop` (E-58).

@@ -63,7 +63,7 @@ async function warnIfDefaultPassword(passwordHash: string): Promise<void> {
   if (await bcrypt.compare(FORBIDDEN_ADMIN_PASSWORD, passwordHash)) {
     console.warn(
       `WARNING: the admin password is still the old default '${FORBIDDEN_ADMIN_PASSWORD}'. ` +
-      'Change it in Settings > Profile, or set ADMIN_RESET_PASSWORD=true with a new ADMIN_PASSWORD ' +
+      'Change it in Settings > Admin Profile, or set ADMIN_RESET_PASSWORD=true with a new ADMIN_PASSWORD ' +
       'for one restart, then remove the flag.',
     );
   }

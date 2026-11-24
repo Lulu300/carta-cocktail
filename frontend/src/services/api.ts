@@ -180,15 +180,28 @@ export const auth = {
   me: () => request<{ id: number; email: string }>('/auth/me'),
 };
 
+/**
+ * Category type names a path segment cannot carry: the empty name, which data older than
+ * v1.9.0 can hold, cannot be addressed, and the browser resolves `.` and `..` away.
+ */
+const NAMES_OUTSIDE_THE_PATH = new Set(['', '.', '..']);
+
+/** URL of one category type: its name is a path segment, or the `name` query when it cannot be one. */
+function categoryTypeUrl(name: string): string {
+  return NAMES_OUTSIDE_THE_PATH.has(name)
+    ? `/category-types?name=${encodeURIComponent(name)}`
+    : `/category-types/${encodeURIComponent(name)}`;
+}
+
 // Category Types
 export const categoryTypes = {
   list: () => request<CategoryType[]>('/category-types'),
   create: (data: { name: string; nameTranslations?: Record<string, string> | null; color?: string }) =>
     request<CategoryType>('/category-types', { method: 'POST', body: JSON.stringify(data) }),
   update: (name: string, data: { nameTranslations?: Record<string, string> | null; color?: string }) =>
-    request<CategoryType>(`/category-types/${encodeURIComponent(name)}`, { method: 'PUT', body: JSON.stringify(data) }),
+    request<CategoryType>(categoryTypeUrl(name), { method: 'PUT', body: JSON.stringify(data) }),
   delete: (name: string) =>
-    request<{ message: string }>(`/category-types/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+    request<{ message: string }>(categoryTypeUrl(name), { method: 'DELETE' }),
 };
 
 // Categories

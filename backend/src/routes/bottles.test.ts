@@ -1201,6 +1201,23 @@ describe('POST /api/bottles/import/confirm', () => {
     const types = await prisma.categoryType.findMany({ where: { name: 'BITTER' } });
     expect(types).toHaveLength(1);
   });
+
+  it('should collapse the inner spaces of a type it creates', async () => {
+    const payload = {
+      version: 1,
+      categories: [],
+      bottles: [{ name: 'Angostura', categoryName: 'CustomCat', capacityMl: 200 }],
+    };
+    const resolutions = {
+      categories: { customcat: { action: 'create', data: { name: 'CustomCat', type: 'AROMATIC   BITTER' } } },
+    };
+    const res = await request.post('/api/bottles/import/confirm').set(authHeader()).send({ payload, resolutions });
+
+    expect(res.status).toBe(201);
+    const category = await prisma.category.findUniqueOrThrow({ where: { name: 'CustomCat' } });
+    expect(category.type).toBe('AROMATIC BITTER');
+    expect(await prisma.categoryType.findUnique({ where: { name: 'AROMATIC   BITTER' } })).toBeNull();
+  });
 });
 
 describe('bottle menus', () => {

@@ -5,7 +5,7 @@ import { NotFoundError } from '../errors';
 import { parseNameTranslations, serializeTranslations } from '../utils/translations';
 import { assertUniqueIgnoringCase } from '../utils/uniqueness';
 import { deleteCategory, isForceRequested } from '../services/deletionService';
-import { ensureCategoryType, withCategoryType } from '../services/categoryTypeService';
+import { ensureCategoryType } from '../services/categoryTypeService';
 import { valid, validate } from '../validation/validate';
 import { deleteRequest, IdParams, idRequest } from '../validation/common';
 import { CategoryCreate, CategoryUpdate } from '../validation/categories';
@@ -20,22 +20,20 @@ async function assertCategoryNameIsFree(name: string, ownId?: number) {
 // List all categories
 router.get('/', async (_req: AuthRequest, res: Response) => {
   const categories = await prisma.category.findMany({
-    include: { _count: { select: { bottles: true } } },
+    include: { _count: { select: { bottles: true } }, categoryType: true },
     orderBy: { name: 'asc' },
   });
-  const enriched = await withCategoryType(categories);
-  res.json(parseNameTranslations(enriched));
+  res.json(parseNameTranslations(categories));
 });
 
 // Get one category
 router.get('/:id', validate(idRequest), async (_req: AuthRequest, res: Response) => {
   const category = await prisma.category.findUnique({
     where: { id: valid<typeof idRequest>(res).params.id },
-    include: { bottles: true },
+    include: { bottles: true, categoryType: true },
   });
   if (!category) throw new NotFoundError();
-  const [enriched] = await withCategoryType([category]);
-  res.json(parseNameTranslations(enriched));
+  res.json(parseNameTranslations(category));
 });
 
 // Create category
@@ -44,11 +42,10 @@ const createSchemas = { body: CategoryCreate };
 router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Response) => {
   const { name, type, desiredStock, minimumPercent, nameTranslations } = valid<typeof createSchemas>(res).body;
   await assertCategoryNameIsFree(name);
-  await ensureCategoryType(prisma, type);
   const category = await prisma.category.create({
     data: {
       name,
-      type,
+      type: await ensureCategoryType(prisma, type),
       // ?? and not ||: a desired stock of 0 is kept
       desiredStock: desiredStock ?? 1,
       minimumPercent: minimumPercent ?? 30,
@@ -67,15 +64,13 @@ router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Respo
   if (name !== undefined) {
     await assertCategoryNameIsFree(name, id);
   }
-  if (type !== undefined) {
-    await ensureCategoryType(prisma, type);
-  }
+  const typeName = type === undefined ? undefined : await ensureCategoryType(prisma, type);
   // Absent fields are undefined, which Prisma leaves untouched
   const category = await prisma.category.update({
     where: { id },
     data: {
       name,
-      type,
+      type: typeName,
       desiredStock,
       minimumPercent,
       nameTranslations: serializeTranslations(nameTranslations),

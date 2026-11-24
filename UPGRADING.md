@@ -14,11 +14,27 @@ This guide lists the actions required to upgrade an existing instance, version b
 
 Pre-releases (`vX.Y.Z-rc.N`) are not listed: they use the section of their target version `vX.Y.Z`. The detailed changes of each version are in its [GitHub Release](https://github.com/Lulu300/carta-cocktail/releases) and in [`docs/releases/`](docs/releases/).
 
-We recommend pinning the images to a version (`:1.14.0`, or `:1.14` to follow its patch releases; these `:X.Y` tags exist from v1.12.0 on) instead of `:latest`, so that an upgrade only happens when you have read this guide.
+We recommend pinning the images to a version (`:1.15.0`, or `:1.15` to follow its patch releases; these `:X.Y` tags exist from v1.12.0 on) instead of `:latest`, so that an upgrade only happens when you have read this guide.
 
 To restore a backup made by an older version, see [Restoring a backup from an older version](#restoring-a-backup-from-an-older-version), at the end of this guide.
 
 The commands below assume the default `docker-compose.prod.yml`, run from its folder. Adapt the file name and the service name `carta-cocktail-backend` if yours differ.
+
+## v1.15.0
+
+No required action. `docker-compose.prod.yml` has not changed since v1.12.0: pin both images to `:1.15.0`, or `:1.15` to follow the 1.15.x patch releases (`:1.14` does not move to 1.15.0), then pull and restart. At the first start, the backend copies the database to `backups/pre-migrate-<date>.db` and applies one migration, `20261124120000_category_type_relation`: the type of a category becomes a foreign key to the list of category types. No category is refused, changed or lost. A type used by a category but missing from the list is created in gray, without translations; the backend already did this at every start, so on an instance in service the migration normally creates none. Category types whose name has spaces around it, or no name, can now be edited and deleted correctly from Categories > Manage Types. The backup screen now refuses an archive larger than 200 MB before sending it. Release notes: [`docs/releases/v1.15.0.md`](docs/releases/v1.15.0.md).
+
+Instances older than v1.12.0: upgrade to v1.12.0 first, following the [v1.12.0 section](#v1120) (and the sections before it), check that it works, then apply this one.
+
+**Testing a pre-release**: use `:1.15.0-rc.N` instead of `:1.15.0`.
+
+Worth checking after the upgrade:
+
+- **If the backend does not start**, its log names the failed migration and the `pre-migrate` copy to restore: follow [README › "Recovering from a failed migration"](README.md#recovering-from-a-failed-migration) and restore that copy. Do not run this migration again without restoring it.
+- **Restoring a backup made before v1.15.0.** The restore screen asks to restart the backend: the migration runs at that restart, after a new `pre-migrate` copy. See [Restoring a backup from an older version](#restoring-a-backup-from-an-older-version).
+- **Rolling back to v1.14.x.** Restore the `pre-migrate` copy made at the upgrade, then pin the images back to `:1.14`: [`docs/operations.md`](docs/operations.md#retour-arrière) ("Retour arrière") or [README › "Restoring a pre-migration backup"](README.md#restoring-a-pre-migration-backup). What was entered since the upgrade is lost, and the copy brings back its sessions: set a new `JWT_SECRET` afterwards, as in [Signing in after a restore](#signing-in-after-a-restore).
+
+**If you download `docker-compose.prod.yml` again** (not needed for this release), put back the lines you added to the `environment` list of `carta-cocktail-backend`, such as `- SQLITE_WAL=false` after `- UPLOAD_DIR=/app/uploads` (database on a network share, see [README › "Database files and network shares"](README.md#database-files-and-network-shares)), `API_RATE_LIMIT`, `LOGIN_RATE_LIMIT` or `TRUST_PROXY`: the file does not have them.
 
 ## v1.14.0
 

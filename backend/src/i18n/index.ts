@@ -16,8 +16,6 @@ i18next.use(middleware.LanguageDetector).init({
   // Messages go out as JSON and the frontend renders them as text: HTML-escaping
   // the interpolated values would show `&amp;` instead of `&`.
   interpolation: { escapeValue: false },
-  // No promotional banner in the server logs
-  showSupportNotice: false,
 });
 
 export default i18next;

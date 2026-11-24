@@ -49,7 +49,7 @@ export function toCategoryForm(categoryTypes: CategoryType[], category?: Categor
   };
 }
 
-/** Null when the custom type is blank: the category needs a type. */
+/** Null when the type is blank (a blank custom type, or the empty name data older than v1.9.0 can hold): the category needs a type. */
 export function toCategoryInput(form: CategoryForm): CategoryInput | null {
   const type = form.type === OTHER_TYPE ? form.customType.trim().toUpperCase() : form.type;
   if (!type) return null;

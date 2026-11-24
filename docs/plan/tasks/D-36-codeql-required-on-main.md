@@ -70,7 +70,7 @@ Ajouter `CodeQL` aux checks requis du ruleset 24936910 bloquerait toutes les PR 
 
 - [x] Préalables vérifiés : C-47 et C-48 sur `main`, alertes ouvertes réglées ou acceptées par l'humain.
 - [x] Nouveau ruleset actif sur `main` seulement, avec CodeQL exigé ; ruleset 24936910 inchangé.
-- [ ] Une PR vers `develop` se merge sans CodeQL ; la PR `develop` → `main` suivante attend CodeQL. Contrôlé par l'API (`rules/branches/<branche>`) le 2026-11-24 ; reste à observer sur la prochaine PR de release, sans PR de test vers `main`.
+- [x] Une PR vers `develop` se merge sans CodeQL ; la PR `develop` → `main` suivante attend CodeQL. Observé sur la PR de release #199 (v1.14.0).
 - [x] Id du ruleset et réglage retenu notés dans le Journal.
 
 ## Tests à ajouter ou adapter
@@ -82,6 +82,8 @@ Aucun test de code. Contrôle par `gh api .../rules/branches/<branche>` et sur l
 - Changement de réglage GitHub : action humaine, ou faite par un agent après l'accord explicite de l'humain sur le JSON final.
 - Un faux positif sur une PR de release bloquera le merge : le fermer avec un motif validé par l'humain (comme dans D-35) et relancer l'analyse, plutôt que contourner la règle avec les droits admin.
 - L'analyse hebdomadaire de `main` peut ouvrir des alertes avec une nouvelle version des requêtes CodeQL ; la règle ne juge que les alertes apportées par la PR.
+- Si CodeQL ne produit pas de résultat (configuration par défaut désactivée ou cassée, analyse en échec), la PR de release ne peut pas être mergée : réparer l'analyse, jamais `--admin` (relecture de la PR #191).
+- CodeQL ne tourne pas sur les PR vers `develop` : une alerte de sécurité `high` ou plus, ou une alerte `error`, ajoutée pendant le cycle n'apparaît que sur la PR de release et la bloque. Corriger par une PR vers `develop` (qui met à jour la PR de release) ou par une fermeture validée par l'humain (relecture de la PR #191).
 - Ne jamais utiliser `gh pr merge --admin` (D-07).
 
 ## Journal
@@ -90,3 +92,4 @@ Aucun test de code. Contrôle par `gh api .../rules/branches/<branche>` et sur l
 - 2026-11-13 : préalables de l'étape 1 remplis. Après la release v1.13.0 (PR #189), aucune alerte CodeQL n'est ouverte sur `main` : #27 et les 19 `js/missing-rate-limiting` sont `fixed`, et les 4 faux positifs de D-35 restent fermés. La tâche peut être prise ; l'étape 2 attend toujours l'accord de l'humain sur la règle (`owner: mixed`).
 - 2026-11-24 : préalables revérifiés. Aucune alerte CodeQL ouverte (la commande de l'étape 1 ne renvoie rien) ; C-47 (#169) et C-48 (#168) sont sur `main` ; dernière analyse de `main` le 2026-11-21 (catégories `/language:actions` et `/language:javascript-typescript`). Le ruleset 24936910 a toujours le contournement `RepositoryRole` 5 en mode `pull_request`, identique au JSON de l'étape 2 ; seuls les rulesets 13123732 et 24936910 existaient.
 - 2026-11-24 : ruleset **27973452** « Require CodeQL on main » créé avec le JSON de l'étape 2, sans changement (décision de l'humain du même jour) : `active`, `refs/heads/main` seul, règle `code_scanning` pour `CodeQL` avec `security_alerts_threshold: high_or_higher` et `alerts_threshold: errors`, contournement `RepositoryRole` 5 en `pull_request`. Contrôles : `rules/branches/main` renvoie `deletion` et `non_fast_forward` (13123732), `code_scanning` (27973452), `pull_request` et `required_status_checks` (24936910) ; `rules/branches/develop` renvoie les mêmes règles sans `code_scanning`. Le ruleset 24936910 n'a pas changé (`updated_at` toujours 2026-11-05T21:30:01). Aucune PR de test vers `main` : le blocage effectif se verra à la prochaine PR de release `develop` → `main`.
+- 2026-11-24 : troisième critère observé sur la PR de release #199 (v1.14.0). `rules/branches/main` y appliquait bien la règle `code_scanning`, et le check `CodeQL` a été exigé : la PR est restée `BLOCKED` pendant que CodeQL (et le Smoke) tournaient, puis est passée à `CLEAN` une fois CodeQL terminé (« No new alerts in code changed by this pull request ») ; mergée sans `--admin`. Les PR du lot vers `develop` (#191 à #198) se sont mergées sans attendre CodeQL.

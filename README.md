@@ -92,27 +92,37 @@ docker compose up --build
 
 ### Docker (production with pre-built images)
 
-Use `docker-compose.prod.yml` to deploy with pre-built images from GitHub Container Registry:
-
-```bash
-# Pull and start
-docker compose -f docker-compose.prod.yml pull
-docker compose -f docker-compose.prod.yml up -d
-```
-
-Create a `.env` file alongside the compose file **before the first start**:
-
-```bash
-JWT_SECRET=<output of: openssl rand -hex 32>   # required, at least 32 characters
-ADMIN_EMAIL=admin@yourbar.com
-ADMIN_PASSWORD=<at least 12 characters>        # required on first start
-```
-
 > **Warning:** set `JWT_SECRET` and `ADMIN_PASSWORD` before exposing the app to the Internet. `docker compose` refuses to start without `JWT_SECRET`, and the backend refuses a secret shorter than 32 characters or a known default.
 
-`ADMIN_PASSWORD` is only used to create the admin on first start. After that, change the password from Settings > Profile: it survives restarts and image updates. Changing `JWT_SECRET` logs out existing sessions; it does not touch data.
+Use `docker-compose.prod.yml` to deploy with pre-built images from GitHub Container Registry. The operations guide, [`docs/operations.md`](docs/operations.md) (in French), covers installation, backups, upgrades, rollback, secret rotation and HTTPS step by step.
+
+1. **Pin a version.** In `docker-compose.prod.yml`, replace `:latest` with a version, so that an upgrade only happens after you have read [`UPGRADING.md`](UPGRADING.md). `:<major>.<minor>` (from v1.12.0, such as `:1.15`) follows the patch releases of that minor version; `:<major>.<minor>.<patch>` never moves:
+
+   ```yaml
+   image: ghcr.io/lulu300/carta-cocktail/backend:1.15
+   image: ghcr.io/lulu300/carta-cocktail/frontend:1.15
+   ```
+
+2. **Create a `.env` file** alongside the compose file, before the first start:
+
+   ```bash
+   JWT_SECRET=<output of: openssl rand -hex 32>   # required, at least 32 characters
+   ADMIN_EMAIL=admin@yourbar.com
+   ADMIN_PASSWORD=<at least 12 characters>        # required on first start
+   ```
+
+3. **Pull and start:**
+
+   ```bash
+   docker compose -f docker-compose.prod.yml pull
+   docker compose -f docker-compose.prod.yml up -d --wait
+   ```
+
+`ADMIN_PASSWORD` is only used to create the admin on first start. After that, change the password from Settings > Admin Profile: it survives restarts and image updates. Changing `JWT_SECRET` logs out existing sessions; it does not touch data.
 
 Behind a reverse proxy that reaches the frontend container directly, target port **8080**: nginx runs as a non-root user and listens there. It is the only port the image declares, so a proxy that picks the container port by itself finds it.
+
+The changes of each version are in the [GitHub Releases](https://github.com/Lulu300/carta-cocktail/releases) and in [`docs/releases/`](docs/releases/).
 
 #### Upgrading
 
@@ -164,13 +174,6 @@ If you lose the admin password:
 1. Set `ADMIN_RESET_PASSWORD=true` (exactly `true`: other values are ignored, with a warning in the log) and the new `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `.env`. `ADMIN_EMAIL` defaults to `admin@carta.local`, so set it if your login email is different.
 2. Restart the backend: `docker compose -f docker-compose.prod.yml up -d`. The log shows `Admin credentials reset from environment (login email: …)`.
 3. Remove `ADMIN_RESET_PASSWORD` from `.env` (or set it back to `false`) and restart again, otherwise every restart resets the password.
-
-We recommend pinning a version instead of `latest`, so that an upgrade only happens after you have read `UPGRADING.md`. Edit the image tags in `docker-compose.prod.yml` (from v1.12.0, `:<major>.<minor>` also exists, such as `:1.14`, which follows the 1.14.x patch releases):
-
-```yaml
-image: ghcr.io/lulu300/carta-cocktail/backend:1.14.0
-image: ghcr.io/lulu300/carta-cocktail/frontend:1.14.0
-```
 
 ## Database migrations
 
@@ -312,27 +315,32 @@ A restored copy brings back its sessions: afterwards, set a new `JWT_SECRET`, as
 carta-cocktail/
 ├── backend/                # Express API
 │   ├── src/
-│   │   ├── routes/         # REST endpoints (14 route files)
-│   │   ├── services/       # Business logic (availability)
-│   │   ├── middleware/      # JWT auth
+│   │   ├── routes/         # REST endpoints, one file per resource
+│   │   ├── services/       # Business logic (availability, backups, menus, cocktails…)
+│   │   ├── validation/     # zod schemas of every request
+│   │   ├── middleware/     # JWT auth, rate limits, error handler
+│   │   ├── bootstrap/      # Startup: admin account, password rule, migration state
 │   │   ├── i18n/           # Backend translations
-│   │   ├── scripts/        # Seed (default data), integrity check
+│   │   ├── scripts/        # Seed (default data), integrity check, migration state
 │   │   └── utils/          # Helpers
 │   └── prisma/
-│       ├── schema.prisma   # Database schema (15 models)
+│       ├── schema.prisma   # Database schema
 │       └── migrations/     # Versioned migrations
 ├── frontend/               # React SPA
 │   ├── src/
-│   │   ├── pages/          # Admin (12) + Public (3) pages
-│   │   ├── components/     # Layouts, UI, import wizard
-│   │   ├── contexts/       # Auth, site settings
+│   │   ├── pages/          # Admin, login and public pages
+│   │   ├── components/     # Layouts, UI, admin forms, import wizards
+│   │   ├── queries/        # TanStack Query hooks
+│   │   ├── contexts/       # Auth, site settings, confirmation dialog
 │   │   ├── services/       # API client, ZIP export
-│   │   ├── hooks/          # useLocalizedName
+│   │   ├── hooks/          # Shared hooks
 │   │   ├── i18n/           # EN/FR translations
 │   │   └── types/          # TypeScript interfaces
-│   └── nginx.conf          # Production reverse proxy
-├── .github/workflows/      # CI + Release pipelines
+│   └── nginx.conf.template # Production nginx: serves the SPA, proxies /api and /uploads
+├── .github/workflows/      # CI, Smoke and Release pipelines
+├── docs/operations.md      # Operations guide (French)
 ├── docs/releases/          # Release notes, one file per version
+├── scripts/                # Smoke test and upgrade test bench
 ├── docker-compose.yml          # Local build
 ├── docker-compose.prod.yml     # Production (ghcr.io images)
 ├── UPGRADING.md                # Required actions, version by version
@@ -343,7 +351,7 @@ carta-cocktail/
 
 | Variable | Description | Default |
 | --- | --- | --- |
-| `DATABASE_URL` | SQLite database path | `file:./carta_cocktail.db` |
+| `DATABASE_URL` | SQLite database file, `file:<path>`; a relative path starts from `backend/prisma/`. The compose files set `file:/app/data/carta_cocktail.db` | **required** (`.env.example`: `file:./carta_cocktail.db`) |
 | `JWT_SECRET` | Secret for JWT signing, at least 32 characters (`openssl rand -hex 32`) | **required**, no default |
 | `ADMIN_EMAIL` | Admin login email, used when the admin is created or reset | `admin@carta.local` |
 | `ADMIN_PASSWORD` | Admin password, at least 12 characters, used when the admin is created or reset | **required** on first start, no default |
@@ -356,7 +364,8 @@ carta-cocktail/
 | `TRUST_PROXY` | Proxies whose `X-Forwarded-For` header the API believes, to find the client IP address that the rate limits count (`API_RATE_LIMIT`, `LOGIN_RATE_LIMIT` and the backup limit): a number of proxies in front of the API, or a comma-separated list of addresses, subnets or names that Express understands (`loopback`, `linklocal`, `uniquelocal`). The backend refuses to start with a value it cannot read. See [Login limit behind a reverse proxy](#login-limit-behind-a-reverse-proxy) | `loopback, linklocal, uniquelocal` |
 | `CORS_ORIGIN` | Origin allowed to call the API from another site, such as `https://example.com` (a single origin, without a trailing slash). Empty: no other origin is allowed. The app does not need one: nginx, and the Vite proxy in development, serve the frontend and the API on the same origin | empty |
 | `PORT` | Backend port | `3001` |
-| `BACKEND_HOST` | Backend hostname for nginx proxy (frontend container) | `backend` |
+| `UPLOAD_DIR` | Folder of the cocktail photos | `<repo>/uploads` outside Docker; `/app/uploads` in the image and the compose files (`uploads` volume) |
+| `BACKEND_HOST` | Backend hostname for nginx proxy (frontend container) | `carta-cocktail-backend` |
 
 The compose files pass only some of these variables to the backend. To set `JWT_EXPIRES_IN`, `LOGIN_RATE_LIMIT`, `API_RATE_LIMIT`, `TRUST_PROXY` or `CORS_ORIGIN` in Docker, add it to the `environment` list of `carta-cocktail-backend`, as for `SQLITE_WAL` (see [Database files and network shares](#database-files-and-network-shares)), and add it again each time you download a new compose file. The defaults suit a standard install.
 
@@ -403,13 +412,14 @@ This project uses a **feature branch** workflow:
 
 ## CI/CD
 
-**CI** runs on every PR and push to `main`/`develop`:
-- TypeScript type checking
-- Prisma migrations in sync with `schema.prisma` (backend, `npm run db:check`)
-- ESLint (frontend)
-- Build verification
-- Tests (must pass to merge)
-- Coverage report (uploaded as artifact)
+**CI** (`.github/workflows/ci.yml`) runs on every PR and push to `main`/`develop`, in four jobs:
+- **Backend**: audit of the production dependencies, Prisma migrations in sync with `schema.prisma` (`npm run db:check`), TypeScript, ESLint, build, tests with coverage, delta coverage on PRs (80% of the changed lines)
+- **Frontend**: audit of the production dependencies, TypeScript (`tsc -b`), ESLint, build, size budget of the public menu, CSS readable by Safari 16, tests with coverage, delta coverage on PRs
+- **Docker build (backend)** and **Docker build (frontend)**: both images are built (`linux/amd64`, not pushed)
+
+**Smoke** (`.github/workflows/smoke.yml`) runs on every PR to `main`/`develop`: it starts `docker-compose.yml` and checks login, photo upload, persistence after a backend recreation and backup export, then runs the backend under another uid.
+
+These checks are required to merge into `main` and `develop`; a PR to `main` also needs CodeQL results.
 
 ### Release
 
@@ -420,42 +430,56 @@ The **Release** workflow (`.github/workflows/release.yml`) runs on version tags 
 | `vX.Y.Z-rc.N` (pre-release) | a commit of `develop` | `:X.Y.Z-rc.N` only, `latest` does not move | marked as pre-release |
 | `vX.Y.Z` (final) | a commit of `main` | `:X.Y.Z`, `:X.Y`, `:X` and `latest` | normal release, marked as latest |
 
+Before pushing any image, the workflow runs the whole CI on the tagged commit (`ci.yml`). Images are built for `linux/amd64` and `linux/arm64` (the CI builds `amd64` only, so the `arm64` build is first tested here), with SBOM and provenance attestations, and carry their version (`APP_VERSION`, shown in the admin and by `/api/health`; `dev` in any other build).
+
 1. **Notes first.** On `develop`, copy `docs/releases/TEMPLATE.md` to `docs/releases/vX.Y.Z.md` (summary, detailed changes, required actions before and after the upgrade, `breaking`), and add the version's section to `UPGRADING.md`. A pre-release uses the notes of its target version, unless `docs/releases/vX.Y.Z-rc.N.md` exists.
 2. **Pre-release.** Push `develop`, then tag it: `git tag vX.Y.Z-rc.N origin/develop && git push origin vX.Y.Z-rc.N`.
 3. **Final release.** Merge `develop` into `main` (pull request), then tag `main`: `git fetch origin && git tag vX.Y.Z origin/main && git push origin vX.Y.Z`.
 
 **Push the branch before the tag.** The workflow checks that a final tag is reachable from `origin/main` and a pre-release from `origin/develop`. A tag on another commit, or a tag without its notes file, fails before any image is pushed.
 
-- A tag refused by the `verify` job published nothing: delete it (locally and on GitHub), fix the problem, then push it again.
+- A tag refused by the `verify` job, or whose `ci` job failed, published nothing: delete it (locally and on GitHub), fix the problem, then push it again. When the `ci` job failed on a flaky step, "Re-run failed jobs" in the Release run is enough.
 - A tag that published an image is never moved or pushed again. If the release fails after an image push, fix the problem and tag the next pre-release (`-rc.N+1`) for a pre-release, or the next version (for example `v1.5.1`) for a final release.
 
 The GitHub Release contains the notes file (without its front matter), the list of merged pull requests since the previous tag (previous final release for a final tag, previous tag of any kind for a pre-release) and the `docker pull` commands.
 
 ### Pulling release images
 
+Prefer `:<major>.<minor>`, which follows the patch releases (see [Docker (production with pre-built images)](#docker-production-with-pre-built-images)):
+
 ```bash
-docker pull ghcr.io/lulu300/carta-cocktail/backend:1.14.0
-docker pull ghcr.io/lulu300/carta-cocktail/frontend:1.14.0
+docker pull ghcr.io/lulu300/carta-cocktail/backend:1.15
+docker pull ghcr.io/lulu300/carta-cocktail/frontend:1.15
 ```
 
 ## API Overview
 
 | Endpoint | Auth | Description |
 | --- | --- | --- |
+| `GET /api/health` | No | Status and version (Docker healthcheck) |
 | `POST /api/auth/login` | No | Admin login |
+| `GET /api/auth/me` | Yes | Signed-in admin |
+| `POST /api/auth/logout-all` | Yes | Revoke every session |
 | `GET /api/public/*` | No | Public menus and cocktails |
+| `GET/POST/PUT/DELETE /api/category-types` | Yes | Category types |
 | `GET/POST/PUT/DELETE /api/categories` | Yes | Category management |
 | `GET/POST/PUT/DELETE /api/bottles` | Yes | Bottle inventory |
+| `POST /api/bottles/import/*` | Yes | Bottle import preview and confirm (JSON, CSV) |
+| `GET /api/bottles/export` | Yes | Bottle export (JSON, CSV) |
 | `GET/POST/PUT/DELETE /api/ingredients` | Yes | Free ingredients |
 | `GET/POST/PUT/DELETE /api/units` | Yes | Measurement units |
 | `GET/POST/PUT/DELETE /api/cocktails` | Yes | Cocktail recipes |
+| `POST /api/cocktails/:id/image` | Yes | Cocktail photo upload |
 | `POST /api/cocktails/import/*` | Yes | Import preview and confirm |
 | `GET /api/cocktails/:id/export` | Yes | Export cocktail as JSON |
 | `POST /api/cocktails/export` | Yes | Export up to 500 cocktails as JSON, in the order of `ids` |
 | `GET/POST/PUT/DELETE /api/menus` | Yes | Menu management |
+| `/api/menu-bottles/*` | Yes | Bottles of a menu, their order, sync and exclusions of the system menus |
+| `/api/menu-sections/*` | Yes | Menu sections and their order |
 | `GET /api/shortages` | Yes | Stock shortage analysis |
 | `GET /api/availability/*` | Yes | Cocktail availability |
 | `GET/PUT /api/settings` | Yes | Site settings and profile |
+| `GET /api/backup/export`, `POST /api/backup/import` | Yes | Backup (database and photos as a ZIP) and restore |
 
 ## License
 

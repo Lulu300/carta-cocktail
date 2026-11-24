@@ -42,6 +42,7 @@
     "type": "Type",
     "otherType": "Other...",
     "customType": "Custom type",
+    "typeRequired": "Choose or enter a type with a name.",
     "desiredStock": "Desired Stock",
     "minimumPercent": "Alert threshold (%)",
     "bottleCount": "Bottles",
@@ -62,7 +63,9 @@
     "cannotDelete": "This type is used by categories and cannot be deleted.",
     "created": "Type created",
     "updated": "Type updated",
-    "deleted": "Type deleted"
+    "deleted": "Type deleted",
+    "emptyName": "(no name)",
+    "withSpaces": "(with spaces)"
   },
   "bottles": {
     "title": "Bottles",

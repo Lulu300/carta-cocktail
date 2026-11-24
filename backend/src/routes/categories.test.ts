@@ -41,10 +41,9 @@ describe('GET /api/categories', () => {
     expect(res.body[0].categoryType.color).toBe('blue');
   });
 
-  it('should return a null categoryType for a type without its row', async () => {
-    await seedCategory({ name: 'Vodka', type: 'MISSING' });
-    const res = await request.get('/api/categories').set(authHeader());
-    expect(res.body[0].categoryType).toBeNull();
+  it('should refuse, in the database, a category whose type does not exist', async () => {
+    await expect(seedCategory({ name: 'Vodka', type: 'MISSING' })).rejects.toMatchObject({ code: 'P2003' });
+    expect(await prisma.category.count()).toBe(0);
   });
 });
 
@@ -63,6 +62,20 @@ describe('GET /api/categories/:id', () => {
     expect(res.body.name).toBe('Rum');
     expect(res.body.bottles).toHaveLength(1);
     expect(res.body.bottles[0].name).toBe('Havana Club');
+  });
+
+  it('should include its type with parsed translations', async () => {
+    await prisma.categoryType.update({
+      where: { name: 'SPIRIT' },
+      data: { nameTranslations: JSON.stringify({ fr: 'Alcool', en: 'Spirit' }) },
+    });
+    const cat = await seedCategory({ name: 'Rum', type: 'SPIRIT' });
+
+    const res = await request.get(`/api/categories/${cat.id}`).set(authHeader());
+    expect(res.status).toBe(200);
+    expect(res.body.categoryType).toEqual({
+      name: 'SPIRIT', color: 'blue', nameTranslations: { fr: 'Alcool', en: 'Spirit' },
+    });
   });
 });
 
@@ -137,6 +150,72 @@ describe('POST /api/categories', () => {
     expect(res.body.nameTranslations).toEqual({ fr: 'Whisky' });
   });
 
+  // Data older than v1.9.0 can hold ' RUM ': picking it keeps it, as the edit does.
+  it('should keep an existing type with surrounding spaces chosen as it is, and create no type', async () => {
+    await prisma.categoryType.create({ data: { name: ' RUM ', color: 'gray' } });
+    const typeCount = await prisma.categoryType.count();
+    const res = await request.post('/api/categories').set(authHeader()).send({ name: 'Rum', type: ' RUM ' });
+    expect(res.status).toBe(201);
+    expect(res.body.type).toBe(' RUM ');
+    expect(await prisma.category.findUniqueOrThrow({ where: { id: res.body.id } })).toMatchObject({ type: ' RUM ' });
+    expect(await prisma.categoryType.count()).toBe(typeCount);
+  });
+
+  it('should file the category under the type chosen when one has spaces around it and the other not', async () => {
+    await prisma.categoryType.create({ data: { name: ' RUM ', color: 'gray' } });
+    await prisma.categoryType.create({ data: { name: 'RUM', color: 'blue' } });
+    const spaced = await request.post('/api/categories').set(authHeader()).send({ name: 'Dark rum', type: ' RUM ' });
+    const plain = await request.post('/api/categories').set(authHeader()).send({ name: 'White rum', type: 'RUM' });
+    expect(spaced.body.type).toBe(' RUM ');
+    expect(plain.body.type).toBe('RUM');
+    expect(await prisma.categoryType.findMany({ where: { name: { contains: 'RUM' } }, orderBy: { name: 'asc' } }))
+      .toEqual([
+        { name: ' RUM ', nameTranslations: null, color: 'gray' },
+        { name: 'RUM', nameTranslations: null, color: 'blue' },
+      ]);
+  });
+
+  it('should trim and collapse a new type', async () => {
+    const res = await request.post('/api/categories').set(authHeader()).send({ name: 'Rum', type: ' rum  x ' });
+    expect(res.status).toBe(201);
+    expect(res.body.type).toBe('rum x');
+    expect(await prisma.categoryType.findUnique({ where: { name: 'rum x' } }))
+      .toEqual({ name: 'rum x', nameTranslations: null, color: 'gray' });
+    expect(await prisma.categoryType.findUnique({ where: { name: ' rum  x ' } })).toBeNull();
+  });
+
+  it('should return 400 for a blank type that names no type, and create nothing', async () => {
+    const typeCount = await prisma.categoryType.count();
+    const res = await request.post('/api/categories').set(authHeader()).send({ name: 'Rum', type: '   ' });
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({ error: 'Validation error', details: [{ path: 'body.type', code: 'too_small' }] });
+    expect(await prisma.category.count()).toBe(0);
+    expect(await prisma.categoryType.count()).toBe(typeCount);
+  });
+
+  it('should return 400 for an empty type', async () => {
+    const res = await request.post('/api/categories').set(authHeader()).send({ name: 'Rum', type: '' });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('body.type');
+    expect(await prisma.category.count()).toBe(0);
+  });
+
+  it('should collapse the inner spaces of a new type', async () => {
+    const res = await request.post('/api/categories').set(authHeader()).send({ name: 'OJ', type: 'FRUIT   JUICE' });
+    expect(res.status).toBe(201);
+    expect(res.body.type).toBe('FRUIT JUICE');
+    expect(await prisma.categoryType.findUnique({ where: { name: 'FRUIT JUICE' } })).not.toBeNull();
+    expect(await prisma.categoryType.findUnique({ where: { name: 'FRUIT   JUICE' } })).toBeNull();
+  });
+
+  it('should keep an existing type with inner spaces chosen as it is', async () => {
+    await prisma.categoryType.create({ data: { name: 'X  Y', color: 'gray' } });
+    const res = await request.post('/api/categories').set(authHeader()).send({ name: 'Rum', type: 'X  Y' });
+    expect(res.status).toBe(201);
+    expect(res.body.type).toBe('X  Y');
+    expect(await prisma.categoryType.findUnique({ where: { name: 'X Y' } })).toBeNull();
+  });
+
   it('should return 409 when the name exists with another case', async () => {
     await seedCategory({ name: 'Rhum' });
     const res = await request.post('/api/categories').set(authHeader())
@@ -195,6 +274,52 @@ describe('PUT /api/categories/:id', () => {
       .send({ name: '  ' });
     expect(res.status).toBe(400);
     expect(res.body.details[0].path).toBe('body.name');
+  });
+
+  // Data older than v1.9.0 can hold ' SPIRIT ' next to 'SPIRIT': an edit keeps the type as sent.
+  it('should keep a type with surrounding spaces when the category is saved', async () => {
+    await prisma.categoryType.create({ data: { name: ' SPIRIT ', color: 'gray' } });
+    const cat = await seedCategory({ name: 'Rum', type: ' SPIRIT ' });
+    const res = await request.put(`/api/categories/${cat.id}`).set(authHeader())
+      .send({ name: 'Rum', type: ' SPIRIT ', desiredStock: 3 });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ type: ' SPIRIT ', desiredStock: 3 });
+    expect(await prisma.category.findUniqueOrThrow({ where: { id: cat.id } })).toMatchObject({ type: ' SPIRIT ' });
+    expect(await prisma.categoryType.count()).toBe(4);
+  });
+
+  it('should keep an existing type with inner spaces when the category is saved', async () => {
+    await prisma.categoryType.create({ data: { name: 'X  Y', color: 'gray' } });
+    await prisma.categoryType.create({ data: { name: 'X Y', color: 'gray' } });
+    const cat = await seedCategory({ name: 'Rum', type: 'X  Y' });
+    const res = await request.put(`/api/categories/${cat.id}`).set(authHeader()).send({ name: 'Rum', type: 'X  Y' });
+    expect(res.status).toBe(200);
+    expect(await prisma.category.findUniqueOrThrow({ where: { id: cat.id } })).toMatchObject({ type: 'X  Y' });
+  });
+
+  // The edit does not trim, so the new type is tidied when it is created
+  it('should trim and collapse a new type given on edit', async () => {
+    const cat = await seedCategory({ name: 'OJ' });
+    const res = await request.put(`/api/categories/${cat.id}`).set(authHeader()).send({ type: ' FRUIT   JUICE ' });
+    expect(res.status).toBe(200);
+    expect(res.body.type).toBe('FRUIT JUICE');
+    expect(await prisma.categoryType.findUnique({ where: { name: ' FRUIT   JUICE ' } })).toBeNull();
+  });
+
+  it('should return 400 for a blank type that names no type, and change nothing', async () => {
+    const cat = await seedCategory({ name: 'Rum' });
+    const res = await request.put(`/api/categories/${cat.id}`).set(authHeader()).send({ type: '   ' });
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({ error: 'Validation error', details: [{ path: 'body.type', code: 'too_small' }] });
+    expect(await prisma.category.findUniqueOrThrow({ where: { id: cat.id } })).toMatchObject({ type: 'SPIRIT' });
+    expect(await prisma.categoryType.count()).toBe(3);
+  });
+
+  it('should return 400 for an empty type', async () => {
+    const cat = await seedCategory({ name: 'Rum' });
+    const res = await request.put(`/api/categories/${cat.id}`).set(authHeader()).send({ type: '' });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('body.type');
   });
 
   it('should update minimumPercent', async () => {

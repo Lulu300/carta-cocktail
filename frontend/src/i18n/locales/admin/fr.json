@@ -42,6 +42,7 @@
     "type": "Type",
     "otherType": "Autre...",
     "customType": "Type personnalisé",
+    "typeRequired": "Choisissez ou saisissez un type qui a un nom.",
     "desiredStock": "Stock souhaité",
     "minimumPercent": "Seuil d'alerte (%)",
     "bottleCount": "Bouteilles",
@@ -62,7 +63,9 @@
     "cannotDelete": "Ce type est utilisé par des catégories et ne peut pas être supprimé.",
     "created": "Type créé",
     "updated": "Type modifié",
-    "deleted": "Type supprimé"
+    "deleted": "Type supprimé",
+    "emptyName": "(sans nom)",
+    "withSpaces": "(avec espaces)"
   },
   "bottles": {
     "title": "Bouteilles",
