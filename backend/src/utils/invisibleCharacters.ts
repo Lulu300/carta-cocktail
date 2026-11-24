@@ -1,6 +1,7 @@
 /**
  * Characters HTML draws as nothing or as a blank, which make two names look the same: 'X\u200BY'
  * (with a zero-width space) shows exactly like 'XY', and 'X\u2800Y' (braille pattern blank) like 'X Y'.
+ * So does a name and its decomposed form: 'E\u0300' (E and a combining grave accent) shows like 'È'.
  *
  * A new category type name is stored tidied; the admin screens mark these characters in a stored
  * name, with the same rule in `frontend/src/utils/invisibleCharacters.ts`: change both together.
@@ -133,9 +134,21 @@ export function replaceInvisibleCharacters(text: string, replacement: (char: str
 }
 
 /**
- * A typed name as the admin can tell it apart from the others: without invisible characters,
- * without spaces around it, and with every run of spaces inside it reduced to one space.
+ * A typed name in the canonical composed form (NFC): Unicode declares 'E\u0300' and 'È' the same
+ * text, and renderers draw them alike. Not the compatibility form (NFKC), which changes characters
+ * that are drawn differently: the 'ﬁ' ligature, 'CO₂', full-width 'ＶＯＤＫＡ', half-width kana, or
+ * Hangul compatibility jamo, which it joins into syllables ('ㄱㅏ' becomes '가').
+ */
+export function composeName(name: string): string {
+  return name.normalize('NFC');
+}
+
+/**
+ * A typed name as the admin can tell it apart from the others: without invisible characters, in
+ * the composed form, without spaces around it, and with every run of spaces inside it reduced to
+ * one space. Composed after the invisible characters are removed, which can bring a letter next to
+ * its accent ('E\u200B\u0300').
  */
 export function tidyName(name: string): string {
-  return replaceInvisibleCharacters(name, () => '').replace(SPACE_RUNS, ' ').trim();
+  return composeName(replaceInvisibleCharacters(name, () => '')).replace(SPACE_RUNS, ' ').trim();
 }

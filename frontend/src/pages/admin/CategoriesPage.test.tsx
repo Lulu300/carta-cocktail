@@ -27,6 +27,10 @@ const DOUBLE_SPACED_LABEL = 'X␣␣Y categoryTypes.withSpaces';
 const zeroWidth = buildCategoryType({ name: 'X\u200BY', color: 'gray', _count: { categories: 1 } });
 const joined = buildCategoryType({ name: 'XY', color: 'gray', _count: { categories: 0 } });
 const ZERO_WIDTH_LABEL = 'X[U+200B]Y categoryTypes.withInvisibleCharacters';
+// HTML shows 'E' and a combining grave accent (U+0300) exactly like the composed 'È' (U+00C8).
+const decomposed = buildCategoryType({ name: 'CRE\u0300ME', color: 'gray', _count: { categories: 1 } });
+const composed = buildCategoryType({ name: 'CR\u00C8ME', color: 'gray', _count: { categories: 0 } });
+const DECOMPOSED_LABEL = 'CRE\u0300ME categoryTypes.nonStandardForm';
 
 type User = ReturnType<typeof userEvent.setup>;
 
@@ -247,6 +251,24 @@ describe('CategoriesPage', () => {
       expect(await created.body).toMatchObject({ type: 'MIXER' });
     });
 
+    // Upper case decomposes 'ΐ' into 'Ι\u0308\u0301': the type is composed after it
+    it.each([
+      ['cre\u0300me', 'CR\u00C8ME'],
+      ['\u0390', '\u03AA\u0301'],
+    ])('sends the custom type %j composed, as %j', async (typed, sent) => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const created = captureRequest('post', '/api/categories');
+      await user.click(screen.getByRole('button', { name: 'categories.add' }));
+
+      await user.type(within(categoryDialog()).getByLabelText(/categories\.name/), 'Cassis');
+      await user.selectOptions(within(categoryDialog()).getByLabelText('categories.type'), '__OTHER__');
+      await user.type(within(categoryDialog()).getByPlaceholderText('categories.customType'), typed);
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
+
+      expect(await created.body).toMatchObject({ type: sent });
+    });
+
     it('sends a single request on a fast double click on save', async () => {
       const user = userEvent.setup();
       mockApiPending('post', '/api/categories');
@@ -379,6 +401,19 @@ describe('CategoriesPage', () => {
           ZERO_WIDTH_LABEL, 'XY', 'Mixers – Z[U+200B]W categoryTypes.withInvisibleCharacters', 'Mixers', 'categories.otherType',
         ]);
         expect(within(categoryDialog()).getByRole('option', { name: ZERO_WIDTH_LABEL })).toBeInTheDocument();
+      });
+
+      it('tells a decomposed type from the composed one, also with the same translation', async () => {
+        const user = userEvent.setup();
+        const nameTranslations = { en: 'Creams' };
+        mockApiResponse('get', '/api/category-types', [
+          decomposed, composed, { ...decomposed, name: 'CRE\u0301ME', nameTranslations }, { ...composed, name: 'CR\u00C9ME', nameTranslations },
+        ]);
+
+        expect(await openTypeOptions(user)).toEqual([
+          DECOMPOSED_LABEL, 'CR\u00C8ME', 'Creams – CRE\u0301ME categoryTypes.nonStandardForm', 'Creams', 'categories.otherType',
+        ]);
+        expect(within(categoryDialog()).getByRole('option', { name: DECOMPOSED_LABEL })).toBeInTheDocument();
       });
     });
 
@@ -566,6 +601,21 @@ describe('CategoriesPage', () => {
       expect(created.count()).toBe(0);
     });
 
+    it.each([
+      ['cre\u0300me', 'CR\u00C8ME'],
+      ['\u0390', '\u03AA\u0301'],
+    ])('creates the type %j composed after its upper case, as %j', async (typed, sent) => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const created = captureRequest('post', '/api/category-types');
+      const manager = await openTypesManager(user);
+
+      await user.type(within(manager).getByPlaceholderText('GARNISH, MIXER...'), typed);
+      await user.click(within(manager).getByRole('button', { name: 'common.create' }));
+
+      expect(await created.body).toMatchObject({ name: sent });
+    });
+
     it('does not create a type whose name is only invisible or blank characters', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
@@ -713,6 +763,18 @@ describe('CategoriesPage', () => {
       const rows = within(manager).getAllByRole('listitem').map((row) => row.textContent);
       expect(rows[0]).toContain(`${ZERO_WIDTH_LABEL}${ZERO_WIDTH_LABEL}(1)`);
       expect(rows[1]).toContain('XYXY(0)');
+    });
+
+    it('tells a decomposed type from the composed one', async () => {
+      const user = userEvent.setup();
+      mockApiResponse('get', '/api/category-types', [decomposed, composed]);
+      await renderLoadedPage();
+
+      const manager = await openTypesManager(user);
+
+      const rows = within(manager).getAllByRole('listitem').map((row) => row.textContent);
+      expect(rows[0]).toContain(`${DECOMPOSED_LABEL}${DECOMPOSED_LABEL}(1)`);
+      expect(rows[1]).toContain('CR\u00C8MECR\u00C8ME(0)');
     });
 
     // The decision is about names: a translation is shown as the admin typed it
