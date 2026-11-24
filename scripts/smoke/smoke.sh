@@ -187,4 +187,14 @@ if [[ "$frontend_uids" != $'101\n101' ]]; then
   fail "expected uid 101 for the container user and the nginx master, got: ${frontend_uids//$'\n'/, }"
 fi
 
+step "The frontend container exposes port 8080 only"
+# The official nginx image declares port 80, where nothing listens: a reverse proxy that picks
+# the container port by itself would take it and answer 502. frontend/Dockerfile flattens the
+# image to drop it, and only this step notices if that stops working.
+frontend_id="$(cd "$REPO_ROOT" && docker compose ps -q "$FRONTEND_SERVICE")" \
+  || fail "cannot find the frontend container"
+exposed_ports="$(docker inspect --format '{{json .Config.ExposedPorts}}' "$frontend_id")" \
+  || fail "cannot inspect the frontend container"
+[[ "$exposed_ports" == '{"8080/tcp":{}}' ]] || fail "expected 8080/tcp only, got: $exposed_ports"
+
 echo "Smoke test passed"
