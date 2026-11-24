@@ -9,7 +9,7 @@ import Select from '../../ui/Select';
 import TranslationFields from '../TranslationFields';
 import type { EntityForm } from '../useEntityForm';
 import { OTHER_TYPE, toCategoryInput, type CategoryForm, type CategoryInput } from './categoryForm';
-import { useCategoryTypeName } from './useCategoryTypeName';
+import { useCategoryTypeName } from '../../../hooks/useCategoryTypeName';
 
 interface CategoryFormModalProps {
   entityForm: EntityForm<Category, CategoryForm>;

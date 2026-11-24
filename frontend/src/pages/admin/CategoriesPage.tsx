@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
+import { useCategoryTypeName } from '../../hooks/useCategoryTypeName';
 import { useSort } from '../../hooks/useSort';
 import { usePagination } from '../../hooks/usePagination';
 import { categories as categoriesApi } from '../../services/api';
@@ -25,6 +26,7 @@ import { toCategoryForm, type CategoryInput } from '../../components/admin/categ
 export default function CategoriesPage() {
   const { t } = useTranslation();
   const localize = useLocalizedName();
+  const { categoryTypeLabel } = useCategoryTypeName();
   const confirmDelete = useConfirmDelete();
   const categoriesQuery = useCategories();
   const categoryTypes = useCategoryTypes().data ?? [];
@@ -54,8 +56,7 @@ export default function CategoriesPage() {
   const pagination = usePagination(sort.sortedItems);
 
   const typeLabel = (type: string) => {
-    const categoryType = categoryTypes.find((candidate) => candidate.name === type);
-    return categoryType ? localize(categoryType) : type;
+    return categoryTypeLabel(type, categoryTypes.find((candidate) => candidate.name === type));
   };
 
   const handleSubmit = (data: CategoryInput) => {

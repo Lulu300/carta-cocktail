@@ -1,6 +1,7 @@
 import { useId, useRef, type FormEvent, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../../hooks/useLocalizedName';
+import { useCategoryTypeName } from '../../../hooks/useCategoryTypeName';
 import type { Bottle, Category } from '../../../types';
 import Button from '../../ui/Button';
 import DateInput from '../../ui/DateInput';
@@ -22,6 +23,7 @@ interface BottleFormModalProps {
 export default function BottleFormModal({ entityForm, categories, isSaving, onSubmit }: BottleFormModalProps) {
   const { t } = useTranslation();
   const localize = useLocalizedName();
+  const { categoryTypeLabel } = useCategoryTypeName();
   const { form, setField, editing } = entityForm;
   const remainingId = useId();
   // Lets "save and duplicate" reuse the form submission (and its native validation)
@@ -42,8 +44,7 @@ export default function BottleFormModal({ entityForm, categories, isSaving, onSu
   };
 
   const categoryLabel = (category: Category) => {
-    const typeLabel = category.categoryType ? localize(category.categoryType) : category.type;
-    return `${localize(category)} (${typeLabel})`;
+    return `${localize(category)} (${categoryTypeLabel(category.type, category.categoryType)})`;
   };
 
   return (

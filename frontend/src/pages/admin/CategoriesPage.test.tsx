@@ -84,6 +84,57 @@ describe('CategoriesPage', () => {
     expect(screen.queryByText('Grenadine')).not.toBeInTheDocument();
   });
 
+  describe('type badge of a category whose type name HTML would hide', () => {
+    /** The type cell of a category's row: its accessible name is what a screen reader reads. */
+    async function typeCell(categoryName: string) {
+      const row = (await screen.findByText(categoryName)).closest('tr');
+      if (!row) throw new Error(`No row for ${categoryName}`);
+      return within(row).getAllByRole('cell')[1];
+    }
+
+    const categories = [
+      buildCategory({ name: 'Rum', type: ' SPIRIT ', categoryType: spacedSpirit }),
+      buildCategory({ name: 'Gin', type: 'SPIRIT', categoryType: spirit }),
+      buildCategory({ name: 'Water', type: '', categoryType: unnamed }),
+      buildCategory({ name: 'Tonic', type: 'X  Y', categoryType: doubleSpaced }),
+    ];
+
+    it('tells the stored names apart, and labels the empty name', async () => {
+      mockApiResponse('get', '/api/categories', categories);
+      mockApiResponse('get', '/api/category-types', [spacedSpirit, spirit, unnamed, doubleSpaced]);
+      renderPage();
+
+      expect(await typeCell('Rum')).toHaveAccessibleName(SPACED_SPIRIT_LABEL);
+      expect(await typeCell('Gin')).toHaveAccessibleName('SPIRIT');
+      expect(await typeCell('Water')).toHaveAccessibleName('categoryTypes.emptyName');
+      expect(await typeCell('Tonic')).toHaveAccessibleName(DOUBLE_SPACED_LABEL);
+    });
+
+    it('adds the stored name to a translation that would hide it', async () => {
+      const nameTranslations = { en: 'Spirits' };
+      mockApiResponse('get', '/api/categories', categories.slice(0, 3));
+      mockApiResponse('get', '/api/category-types', [
+        { ...spacedSpirit, nameTranslations }, { ...spirit, nameTranslations }, { ...unnamed, nameTranslations },
+      ]);
+      renderPage();
+
+      await screen.findByText(`Spirits – ${SPACED_SPIRIT_LABEL}`);
+      expect(await typeCell('Rum')).toHaveAccessibleName(`Spirits – ${SPACED_SPIRIT_LABEL}`);
+      expect(await typeCell('Gin')).toHaveAccessibleName('Spirits');
+      expect(await typeCell('Water')).toHaveAccessibleName('Spirits – categoryTypes.emptyName');
+    });
+
+    it('marks the stored name of a type missing from the list of types', async () => {
+      mockApiResponse('get', '/api/categories', categories);
+      mockApiResponse('get', '/api/category-types', []);
+      renderPage();
+
+      expect(await typeCell('Rum')).toHaveAccessibleName(SPACED_SPIRIT_LABEL);
+      expect(await typeCell('Gin')).toHaveAccessibleName('SPIRIT');
+      expect(await typeCell('Water')).toHaveAccessibleName('categoryTypes.emptyName');
+    });
+  });
+
   describe('category form', () => {
     it('creates a category with the first type by default and confirms with a toast', async () => {
       const user = userEvent.setup();
