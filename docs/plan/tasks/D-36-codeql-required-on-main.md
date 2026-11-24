@@ -70,7 +70,7 @@ Ajouter `CodeQL` aux checks requis du ruleset 24936910 bloquerait toutes les PR 
 
 - [x] Préalables vérifiés : C-47 et C-48 sur `main`, alertes ouvertes réglées ou acceptées par l'humain.
 - [x] Nouveau ruleset actif sur `main` seulement, avec CodeQL exigé ; ruleset 24936910 inchangé.
-- [x] Une PR vers `develop` se merge sans CodeQL ; la PR `develop` → `main` suivante attend CodeQL. Contrôlé par l'API (`rules/branches/<branche>`) le 2026-11-24 ; reste à observer sur la prochaine PR de release, sans PR de test vers `main`.
+- [x] Une PR vers `develop` se merge sans CodeQL ; la PR `develop` → `main` suivante attend CodeQL. Observé sur la PR de release #199 (v1.14.0).
 - [x] Id du ruleset et réglage retenu notés dans le Journal.
 
 ## Tests à ajouter ou adapter
@@ -82,6 +82,8 @@ Aucun test de code. Contrôle par `gh api .../rules/branches/<branche>` et sur l
 - Changement de réglage GitHub : action humaine, ou faite par un agent après l'accord explicite de l'humain sur le JSON final.
 - Un faux positif sur une PR de release bloquera le merge : le fermer avec un motif validé par l'humain (comme dans D-35) et relancer l'analyse, plutôt que contourner la règle avec les droits admin.
 - L'analyse hebdomadaire de `main` peut ouvrir des alertes avec une nouvelle version des requêtes CodeQL ; la règle ne juge que les alertes apportées par la PR.
+- Si CodeQL ne produit pas de résultat (configuration par défaut désactivée ou cassée, analyse en échec), la PR de release ne peut pas être mergée : réparer l'analyse, jamais `--admin` (relecture de la PR #191).
+- CodeQL ne tourne pas sur les PR vers `develop` : une alerte de sécurité `high` ou plus, ou une alerte `error`, ajoutée pendant le cycle n'apparaît que sur la PR de release et la bloque. Corriger par une PR vers `develop` (qui met à jour la PR de release) ou par une fermeture validée par l'humain (relecture de la PR #191).
 - Ne jamais utiliser `gh pr merge --admin` (D-07).
 
 ## Journal
