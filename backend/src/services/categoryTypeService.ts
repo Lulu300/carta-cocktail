@@ -1,5 +1,7 @@
 import { Prisma } from '../generated/prisma/client';
 import { BadRequestError } from '../errors';
+import { RequiredText } from '../validation/common';
+import { toValidationIssue } from '../validation/validate';
 
 type Db = Prisma.TransactionClient;
 
@@ -24,8 +26,17 @@ export async function ensureCategoryType(db: Db, name: string): Promise<string> 
   const existing = await db.categoryType.findUnique({ where: { name } });
   if (existing) return existing.name;
   const typeName = newCategoryTypeName(name);
-  // Only an edit sends the type untrimmed: a blank one would create a type with no name
-  if (!typeName) throw new BadRequestError();
+  if (!typeName) throw blankTypeError(name);
   await db.categoryType.upsert({ where: { name: typeName }, update: {}, create: { name: typeName, color: 'gray' } });
   return typeName;
+}
+
+/**
+ * The 400 of the `validate` middleware for a blank type, which would create a type with no name.
+ * Only the category edit sends the type untrimmed (the other callers' schemas refuse a blank
+ * one), so the issue names its `body.type`.
+ */
+function blankTypeError(name: string): BadRequestError {
+  const issues = RequiredText.safeParse(name).error?.issues ?? [];
+  return new BadRequestError('errors.validationError', issues.map((issue) => toValidationIssue(['body', 'type'], issue)));
 }

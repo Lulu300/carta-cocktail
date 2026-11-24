@@ -58,7 +58,9 @@ describe('ensureCategoryType', () => {
   });
 
   it('should refuse a blank name that names no type, and create nothing', async () => {
-    await expect(ensureCategoryType(prisma, '   ')).rejects.toMatchObject({ status: 400 });
+    await expect(ensureCategoryType(prisma, '   ')).rejects.toMatchObject({
+      status: 400, i18nKey: 'errors.validationError', details: [{ path: 'body.type', code: 'too_small' }],
+    });
     expect(await typeNames()).toEqual(['SOFT', 'SPIRIT', 'SYRUP']);
   });
 });

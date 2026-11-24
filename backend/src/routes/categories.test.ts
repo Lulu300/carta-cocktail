@@ -267,6 +267,7 @@ describe('PUT /api/categories/:id', () => {
     const cat = await seedCategory({ name: 'Rum' });
     const res = await request.put(`/api/categories/${cat.id}`).set(authHeader()).send({ type: '   ' });
     expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({ error: 'Validation error', details: [{ path: 'body.type', code: 'too_small' }] });
     expect(await prisma.category.findUniqueOrThrow({ where: { id: cat.id } })).toMatchObject({ type: 'SPIRIT' });
     expect(await prisma.categoryType.count()).toBe(3);
   });
