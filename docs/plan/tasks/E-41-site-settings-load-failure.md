@@ -5,7 +5,7 @@ phase: E
 lane: frontend
 criticite: basse
 effort: S
-status: review
+status: done
 owner: agent
 depends_on: [C-47]
 touches: [frontend/src/contexts/SiteSettingsContext.tsx, frontend/src/contexts/SiteSettingsContext.test.tsx, frontend/src/pages/public/PublicErrorState.tsx, frontend/src/pages/public/HomePage.test.tsx, frontend/src/services/api.ts, frontend/src/services/api.test.ts, frontend/src/test/msw/utils.ts, frontend/src/test/msw/responses.ts]
@@ -56,3 +56,4 @@ Vérifié sur `develop` : l'effet de montage ignore l'échec (`.catch(() => {})`
 - 2026-11-12 : faite (PR #176, branche `fix/E-41-site-settings-load-failure`). Réessai automatique borné (3, `Retry-After` ou 30 s) et rechargement par le « Réessayer » des pages publiques. Bundle public mesuré avec `.github/scripts/bundle-budget.mjs` : 132,60 kB avant, 132,88 kB après (budget 140 kB).
 - 2026-11-12 : suites de la relecture de la PR #176 (approuvée). Un test pour chacune des deux gardes `cancelled` du chargement automatique (démontage pendant un 429 en cours ; `refresh()` qui réussit pendant un chargement automatique en cours) ; chaque test échoue quand on retire sa garde. Test du `Retry-After` élargi (60 s, aucune requête à 55 s). `rateLimitedResponse` extraite dans `test/msw/responses.ts`.
 - Notes de version : après un chargement refusé (« Too many requests ») ou échoué (erreur réseau, backend qui redémarre), la carte publique et les pages admin retrouvent le nom et l'icône du bar dans l'en-tête et l'onglet sans recharger la page (après le délai demandé par le serveur ou 30 s, ou au clic sur « Réessayer »).
+- 2026-11-13 : statut passé de `review` à `done` après coup, dans la PR de suivi de la release v1.13.0 : les consignes du coordinateur demandaient `review` par erreur, alors que `docs/plan/README.md` (« Cycle de vie ») demande `done` dans le dernier commit de la PR.

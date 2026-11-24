@@ -36,6 +36,15 @@ describe('GET /api/category-types', () => {
     const soft = types.find((t) => t.name === 'SOFT');
     expect(soft?._count.categories).toBe(0);
   });
+
+  it('should count the categories of each type', async () => {
+    await seedCategory({ name: 'Rum', type: 'SPIRIT' });
+    await seedCategory({ name: 'Gin', type: 'SPIRIT' });
+    await seedCategory({ name: 'Grenadine', type: 'SYRUP' });
+    const res = await request.get('/api/category-types').set(authHeader());
+    const counts = Object.fromEntries((res.body as CategoryTypeUsage[]).map((t) => [t.name, t._count.categories]));
+    expect(counts).toEqual({ SOFT: 0, SPIRIT: 2, SYRUP: 1 });
+  });
 });
 
 describe('POST /api/category-types', () => {

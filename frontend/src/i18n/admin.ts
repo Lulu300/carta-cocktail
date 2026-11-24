@@ -1,6 +1,8 @@
 import i18n, { type TranslatedLanguage } from './index';
 import en from './locales/admin/en.json';
 import fr from './locales/admin/fr.json';
+import { setErrorDescriber } from '../components/ui/ToastStore';
+import { validationErrorMessage } from '../utils/validationMessage';
 
 // Messages of the login page and the admin, kept out of the public first load.
 // App.tsx loads this module with every chunk behind /login and /admin and waits for it,
@@ -11,3 +13,7 @@ for (const [language, messages] of Object.entries(ADMIN_MESSAGES)) {
   // Deep merge: namespaces such as "common" are split between the public and admin bundles.
   i18n.addResourceBundle(language, 'translation', messages, true, false);
 }
+
+// The names of the fields and rules a validation 400 refers to are admin messages: error
+// toasts can name the refused field from now on.
+setErrorDescriber(validationErrorMessage);

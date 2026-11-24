@@ -26,6 +26,7 @@ ADMIN_EMAIL="${ADMIN_EMAIL:-admin@carta.local}"
 : "${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set (the admin password given to the backend on first start)}"
 
 BACKEND_SERVICE=carta-cocktail-backend
+FRONTEND_SERVICE=carta-cocktail-frontend
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 TMP="$(mktemp -d)"
@@ -174,5 +175,26 @@ request GET /api/backup/export "${auth[@]}"
 expect_status 200
 expect_content_type 'application/zip*'
 [[ -s "$BODY" ]] || fail "the archive is empty"
+
+step "nginx runs as uid 101, not as root"
+# USER 101 in frontend/Dockerfile is the only thing that keeps nginx non-root (rootless Docker,
+# Podman): without it, the master process runs as root and every request above still works.
+# The master is PID 1, started by the entrypoint with exec.
+frontend_uids="$(cd "$REPO_ROOT" && docker compose exec -T "$FRONTEND_SERVICE" \
+  sh -c 'id -u; awk "/^Uid:/ { print \$2 }" /proc/1/status')" \
+  || fail "cannot run a command in the frontend container"
+if [[ "$frontend_uids" != $'101\n101' ]]; then
+  fail "expected uid 101 for the container user and the nginx master, got: ${frontend_uids//$'\n'/, }"
+fi
+
+step "The frontend container exposes port 8080 only"
+# The official nginx image declares port 80, where nothing listens: a reverse proxy that picks
+# the container port by itself would take it and answer 502. frontend/Dockerfile flattens the
+# image to drop it, and only this step notices if that stops working.
+frontend_id="$(cd "$REPO_ROOT" && docker compose ps -q "$FRONTEND_SERVICE")" \
+  || fail "cannot find the frontend container"
+exposed_ports="$(docker inspect --format '{{json .Config.ExposedPorts}}' "$frontend_id")" \
+  || fail "cannot inspect the frontend container"
+[[ "$exposed_ports" == '{"8080/tcp":{}}' ]] || fail "expected 8080/tcp only, got: $exposed_ports"
 
 echo "Smoke test passed"

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { buildCocktailExport, exportFilename, ExportedCocktail } from './cocktailExport';
 
 const rum = { name: 'Rum', type: 'SPIRIT', nameTranslations: '{"fr":"Rhum","en":"Rum"}' };
@@ -30,8 +30,13 @@ const daiquiri: ExportedCocktail = {
 };
 
 describe('buildCocktailExport', () => {
+  // The lime's stored translations are unreadable on purpose
+  beforeEach(() => { vi.spyOn(console, 'warn').mockImplementation(() => {}); });
+  afterEach(() => { vi.restoreAllMocks(); });
+
   it('should write the version 1 format with every private field for the admin', () => {
     const payload = buildCocktailExport(daiquiri, { includePrivate: true });
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('not json'));
 
     expect(payload.version).toBe(1);
     expect(Number.isNaN(Date.parse(payload.exportedAt))).toBe(false);

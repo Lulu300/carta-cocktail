@@ -52,6 +52,14 @@ describe('POST /api/units', () => {
     expect(res.status).toBe(400);
   });
 
+  // A name of spaces passes the form's `required`: the frontend names the field from these details (E-23).
+  it('should return 400 naming the field when the name is only spaces', async () => {
+    const res = await request.post('/api/units').set(authHeader()).send({ name: '   ', abbreviation: 'x' });
+    expect(res.status).toBe(400);
+    expect(res.body.details).toEqual([expect.objectContaining({ path: 'body.name', code: 'too_small' })]);
+    expect(await prisma.unit.count({ where: { abbreviation: 'x' } })).toBe(0);
+  });
+
   it('should create unit with conversionFactorToMl', async () => {
     const res = await request.post('/api/units').set(authHeader())
       .send({ name: 'Centilitre', abbreviation: 'cl', conversionFactorToMl: 10 });
@@ -69,6 +77,24 @@ describe('POST /api/units', () => {
   it('should store nameTranslations', async () => {
     const res = await request.post('/api/units').set(authHeader())
       .send({ name: 'Centilitre', abbreviation: 'cl', nameTranslations: { fr: 'Centilitre' } });
+    expect(res.status).toBe(201);
+    expect(res.body.nameTranslations).toEqual({ fr: 'Centilitre' });
+  });
+
+  it.each([
+    ['a list', ['x']],
+    ['an unknown language', { de: 'x' }],
+  ])('should return 400 and store nothing for nameTranslations as %s', async (_label, nameTranslations) => {
+    const res = await request.post('/api/units').set(authHeader())
+      .send({ name: 'Centilitre', abbreviation: 'cl', nameTranslations });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toMatch(/^body\.nameTranslations/);
+    expect(await prisma.unit.count()).toBe(0);
+  });
+
+  it('should leave blank translations out', async () => {
+    const res = await request.post('/api/units').set(authHeader())
+      .send({ name: 'Centilitre', abbreviation: 'cl', nameTranslations: { fr: 'Centilitre', en: ' ' } });
     expect(res.status).toBe(201);
     expect(res.body.nameTranslations).toEqual({ fr: 'Centilitre' });
   });

@@ -19,6 +19,15 @@ export function mockApiError(method: ApiMethod, path: string, status: number, me
   server.use(http[method](path, () => errorResponse(status, message)));
 }
 
+/**
+ * Makes `method path` fail like the backend's `validate()` middleware: a 400 whose `details`
+ * lists the refused inputs, e.g. `{ path: 'body.name', code: 'too_small' }`.
+ */
+export function mockValidationError(method: ApiMethod, path: string, issues: { path: string; code: string }[]): void {
+  const details = issues.map((issue) => ({ ...issue, message: 'English message of zod, never shown' }));
+  server.use(http[method](path, () => HttpResponse.json({ error: 'Validation error', details }, { status: 400 })));
+}
+
 /** Makes `method path` answer like the backend's rate limiter: a 429 that asks to wait `retryAfterSeconds`. */
 export function mockRateLimited(method: ApiMethod, path: string, retryAfterSeconds: number): void {
   server.use(http[method](path, () => rateLimitedResponse(retryAfterSeconds)));

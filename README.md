@@ -112,6 +112,8 @@ ADMIN_PASSWORD=<at least 12 characters>        # required on first start
 
 `ADMIN_PASSWORD` is only used to create the admin on first start. After that, change the password from Settings > Profile: it survives restarts and image updates. Changing `JWT_SECRET` logs out existing sessions; it does not touch data.
 
+Behind a reverse proxy that reaches the frontend container directly, target port **8080**: nginx runs as a non-root user and listens there. It is the only port the image declares, so a proxy that picks the container port by itself finds it.
+
 #### Upgrading
 
 Some versions require actions before or after the upgrade (new variables in `.env`, files to copy out of the old container…). **Read [`UPGRADING.md`](UPGRADING.md) before pulling a new version**, and apply the sections of every version newer than yours, in order. Upgrading from v1.4.0 or older to v1.5.0 requires a `JWT_SECRET` and a copy of the existing cocktail photos. Upgrading to v1.12.0 requires giving the data folders to uid 1000 first (see below).
@@ -163,11 +165,11 @@ If you lose the admin password:
 2. Restart the backend: `docker compose -f docker-compose.prod.yml up -d`. The log shows `Admin credentials reset from environment (login email: …)`.
 3. Remove `ADMIN_RESET_PASSWORD` from `.env` (or set it back to `false`) and restart again, otherwise every restart resets the password.
 
-We recommend pinning a version instead of `latest`, so that an upgrade only happens after you have read `UPGRADING.md`. Edit the image tags in `docker-compose.prod.yml` (from v1.12.0, `:<major>.<minor>` also exists, such as `:1.13`, which follows the 1.13.x patch releases):
+We recommend pinning a version instead of `latest`, so that an upgrade only happens after you have read `UPGRADING.md`. Edit the image tags in `docker-compose.prod.yml` (from v1.12.0, `:<major>.<minor>` also exists, such as `:1.14`, which follows the 1.14.x patch releases):
 
 ```yaml
-image: ghcr.io/lulu300/carta-cocktail/backend:1.13.0
-image: ghcr.io/lulu300/carta-cocktail/frontend:1.13.0
+image: ghcr.io/lulu300/carta-cocktail/backend:1.14.0
+image: ghcr.io/lulu300/carta-cocktail/frontend:1.14.0
 ```
 
 ## Database migrations
@@ -432,8 +434,8 @@ The GitHub Release contains the notes file (without its front matter), the list 
 ### Pulling release images
 
 ```bash
-docker pull ghcr.io/lulu300/carta-cocktail/backend:1.13.0
-docker pull ghcr.io/lulu300/carta-cocktail/frontend:1.13.0
+docker pull ghcr.io/lulu300/carta-cocktail/backend:1.14.0
+docker pull ghcr.io/lulu300/carta-cocktail/frontend:1.14.0
 ```
 
 ## API Overview
@@ -449,6 +451,7 @@ docker pull ghcr.io/lulu300/carta-cocktail/frontend:1.13.0
 | `GET/POST/PUT/DELETE /api/cocktails` | Yes | Cocktail recipes |
 | `POST /api/cocktails/import/*` | Yes | Import preview and confirm |
 | `GET /api/cocktails/:id/export` | Yes | Export cocktail as JSON |
+| `POST /api/cocktails/export` | Yes | Export up to 500 cocktails as JSON, in the order of `ids` |
 | `GET/POST/PUT/DELETE /api/menus` | Yes | Menu management |
 | `GET /api/shortages` | Yes | Stock shortage analysis |
 | `GET /api/availability/*` | Yes | Cocktail availability |

@@ -20,7 +20,10 @@ import {
   mockApiError,
   mockApiPending,
   mockApiResponse,
+  mockValidationError,
 } from '../../test/msw/utils';
+// Registers the admin messages, and with them the names of the fields a validation 400 refuses
+import '../../i18n/admin';
 import type { Cocktail, CocktailInput } from '../../types';
 import CocktailFormPage from './CocktailFormPage';
 
@@ -523,6 +526,21 @@ describe('CocktailFormPage, lines stored with a defect (C-21)', () => {
     await user.clear(nameInput);
     await user.type(nameInput, name);
   }
+
+  // The form lets a stored defect through; the backend refuses it if the stored recipe changed
+  // meanwhile, in another tab for instance.
+  it('names the line in the error toast when the backend refuses a defect the form let through', async () => {
+    const user = userEvent.setup();
+    mockValidationError('put', '/api/cocktails/:id', [{ path: 'body.ingredients.1.quantity', code: 'too_small' }]);
+    renderAt('/admin/cocktails/42');
+    await renameTo(user, 'Old mojito');
+
+    await user.click(screen.getByRole('button', { name: 'common.save' }));
+
+    expect(await screen.findByText('Row 2, Quantity: value too small')).toBeInTheDocument();
+    expect(screen.queryByText('Validation error')).not.toBeInTheDocument();
+    expect(screen.queryByText('cocktail list')).not.toBeInTheDocument();
+  });
 
   it('saves a rename with the defective lines sent as they were, and warns on each of them', async () => {
     const user = userEvent.setup();

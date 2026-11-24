@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { NotFoundError } from '../errors';
-import { parseNameTranslations } from '../utils/translations';
+import { parseNameTranslations, serializeTranslations } from '../utils/translations';
 import { deleteIngredient, isForceRequested } from '../services/deletionService';
 import { valid, validate } from '../validation/validate';
 import { deleteRequest, IdParams, idRequest } from '../validation/common';
@@ -41,7 +41,7 @@ router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Respons
     data: {
       name,
       icon: icon || null,
-      nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null,
+      nameTranslations: serializeTranslations(nameTranslations),
     },
   });
   res.status(201).json(parseNameTranslations(ingredient));
@@ -59,9 +59,7 @@ router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Respo
       name,
       icon,
       isAvailable,
-      ...(nameTranslations !== undefined && {
-        nameTranslations: nameTranslations ? JSON.stringify(nameTranslations) : null,
-      }),
+      nameTranslations: serializeTranslations(nameTranslations),
     },
   });
   res.json(parseNameTranslations(ingredient));

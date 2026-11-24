@@ -12,6 +12,17 @@ import { FALLBACK_LANGUAGE } from '../utils/localization';
 const API_BASE = '/api';
 const LOGIN_URL = '/auth/login';
 
+/** A rule an input broke, from the `details` of a validation 400: `path` is `body.ingredients.1.quantity`. */
+export interface ValidationIssue {
+  path: string;
+  code: string;
+}
+
+function isValidationIssue(value: unknown): value is ValidationIssue {
+  const issue = value as Partial<ValidationIssue> | null;
+  return typeof issue?.path === 'string' && typeof issue.code === 'string';
+}
+
 /** HTTP error that keeps the server message and status code. */
 export class ApiError extends Error {
   readonly status: number;
@@ -25,6 +36,18 @@ export class ApiError extends Error {
     this.status = status;
     this.body = body;
     this.retryAfterSeconds = retryAfterSeconds;
+  }
+
+  /**
+   * The issues of a 400 refused by the backend's validation, empty for any other error.
+   * Other 400s send `details` of another shape (an import's unresolved references): their
+   * entries are left out, `body` keeps them as sent.
+   */
+  validationIssues(): ValidationIssue[] {
+    if (this.status !== 400) return [];
+    const details = (this.body as { details?: unknown } | undefined)?.details;
+    if (!Array.isArray(details)) return [];
+    return details.filter(isValidationIssue).map(({ path, code }) => ({ path, code }));
   }
 }
 
