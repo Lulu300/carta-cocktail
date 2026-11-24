@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import { render, screen, waitFor, within } from '../../test/test-utils';
 import userEvent from '@testing-library/user-event';
 import { act, fireEvent } from '@testing-library/react';
@@ -137,6 +137,12 @@ const BACKUP_ACTIONS = [
   { action: 'restore', method: 'post', path: '/api/backup/import', timeoutMessage: RESTORE_TIMEOUT },
 ] as const;
 
+// The sign-in page that openSignInAfterRestore loads, which explains why the admin was signed out
+const SIGN_IN_AFTER_RESTORE = '/login?reason=backup-restored';
+
+// Page loads, which jsdom does not implement: every successful restore ends with one
+let assignLocation: Mock<(url: string) => void>;
+
 const exportButton = () => screen.getByRole('button', { name: /settings\.backup\.export/ });
 const restoreButton = () => screen.getByRole('button', { name: /settings\.backup\.import/ });
 
@@ -172,6 +178,8 @@ function holdExportDownload() {
 }
 
 beforeEach(() => {
+  assignLocation = vi.fn();
+  vi.stubGlobal('location', { ...window.location, assign: assignLocation });
   localStorage.setItem('token', 'admin-token');
   mockApiResponse('get', '/api/auth/me', admin);
   mockApiResponse('get', '/api/settings', buildSiteSettings({ siteName: 'My Bar', siteIcon: '🍸' }));
@@ -182,6 +190,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   document.title = '';
 });
 
@@ -410,7 +419,7 @@ describe('SettingsPage', () => {
     await selectBackupFileAndClickImport(size);
     await answerRestoreDialog('settings.backup.import');
 
-    expect(await screen.findByText('settings.backup.importSuccess')).toBeInTheDocument();
+    await waitFor(() => expect(assignLocation).toHaveBeenCalledWith(SIGN_IN_AFTER_RESTORE));
     expect(restore.count()).toBe(1);
     expect(screen.queryByText('common.requestTooLarge')).not.toBeInTheDocument();
   });
@@ -447,7 +456,7 @@ describe('SettingsPage', () => {
     expect(screen.queryByText(NO_ANSWER_CAUSE)).not.toBeInTheDocument();
   });
 
-  it('uploads the backup after confirming in the dialog and shows a success message', async () => {
+  it('uploads the backup after confirming in the dialog, then opens the sign-in page', async () => {
     await renderLoadedPage();
     const restore = captureRequest('post', '/api/backup/import');
     await selectBackupFileAndClickImport();
@@ -455,32 +464,31 @@ describe('SettingsPage', () => {
     expect(restore.count()).toBe(0);
     await answerRestoreDialog('settings.backup.import');
 
-    expect(await screen.findByText('settings.backup.importSuccess')).toBeInTheDocument();
+    await waitFor(() => expect(assignLocation).toHaveBeenCalledWith(SIGN_IN_AFTER_RESTORE));
     // The file goes in the "backup" field of a multipart body. Node's fetch drops the
     // name and bytes of a jsdom File, so only the field and its type can be checked.
     const body = await restore.body;
     expect(body).toContain('name="backup"');
     expect(body).toContain('Content-Type: application/zip');
-    expect(toast.success).toHaveBeenCalledWith('settings.backup.importSuccess');
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   });
 
-  it('reloads the page by itself when the restore has nothing to report', async () => {
-    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+  it('opens the sign-in page at once, without a report, when the restore has nothing to report', async () => {
     await renderLoadedPage();
     await selectBackupFileAndClickImport();
     await answerRestoreDialog('settings.backup.import');
 
-    await screen.findByText('settings.backup.importSuccess');
-    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 1500);
+    // The sign-in page says that the backup was restored: nothing else is shown here
+    await waitFor(() => expect(assignLocation).toHaveBeenCalledOnce());
+    expect(assignLocation).toHaveBeenCalledWith(SIGN_IN_AFTER_RESTORE);
+    expect(toast.success).not.toHaveBeenCalled();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.queryByText(/settings\.backup\.skippedFiles/)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /settings\.backup\.reload/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /settings\.backup\.signIn/ })).not.toBeInTheDocument();
   });
 
   it('keeps the restart warning and the skipped files on screen after restoring an older backup', async () => {
     mockRestore(restoreResult({ skippedFiles: 2, restartRecommended: true }));
-    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
     await renderLoadedPage();
     await selectBackupFileAndClickImport();
     await answerRestoreDialog('settings.backup.import');
@@ -495,14 +503,15 @@ describe('SettingsPage', () => {
     // Not a plain success while the backend still has to update the database
     expect(toast.info).toHaveBeenCalledWith('settings.backup.importDone');
     expect(toast.success).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'settings.backup.reloadAfterRestart' })).toBeInTheDocument();
-    // Reloading would log the admin out before the warning is read
-    expect(setTimeoutSpy).not.toHaveBeenCalledWith(expect.any(Function), 1500);
+    // Opening the sign-in page by itself would hide the warning before it is read
+    expect(assignLocation).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'settings.backup.signInAfterRestart' }));
+    expect(assignLocation).toHaveBeenCalledWith(SIGN_IN_AFTER_RESTORE);
   });
 
   it('shows the skipped files without the restart warning when the schema is current', async () => {
     mockRestore(restoreResult({ skippedFiles: 1 }));
-    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
     await renderLoadedPage();
     await selectBackupFileAndClickImport();
     await answerRestoreDialog('settings.backup.import');
@@ -510,8 +519,10 @@ describe('SettingsPage', () => {
     expect(await screen.findByText('settings.backup.skippedFiles(1)')).toBeInTheDocument();
     expect(toast.success).toHaveBeenCalledWith('settings.backup.importDone');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'settings.backup.reload' })).toBeInTheDocument();
-    expect(setTimeoutSpy).not.toHaveBeenCalledWith(expect.any(Function), 1500);
+    expect(assignLocation).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'settings.backup.signIn' }));
+    expect(assignLocation).toHaveBeenCalledWith(SIGN_IN_AFTER_RESTORE);
   });
 
   it('clears the restore report after a successful export', async () => {
