@@ -216,6 +216,21 @@ describe('POST /api/categories', () => {
     expect(await prisma.categoryType.findUnique({ where: { name: 'X Y' } })).toBeNull();
   });
 
+  it('should remove the invisible characters of a new type', async () => {
+    const res = await request.post('/api/categories').set(authHeader()).send({ name: 'OJ', type: 'FRUIT\u200B JUICE\u00AD' });
+    expect(res.status).toBe(201);
+    expect(res.body.type).toBe('FRUIT JUICE');
+    expect(await prisma.categoryType.findUnique({ where: { name: 'FRUIT JUICE' } })).not.toBeNull();
+  });
+
+  it('should keep an existing type with an invisible character chosen as it is', async () => {
+    await prisma.categoryType.create({ data: { name: 'X\u200BY', color: 'gray' } });
+    const res = await request.post('/api/categories').set(authHeader()).send({ name: 'Rum', type: 'X\u200BY' });
+    expect(res.status).toBe(201);
+    expect(res.body.type).toBe('X\u200BY');
+    expect(await prisma.categoryType.findUnique({ where: { name: 'XY' } })).toBeNull();
+  });
+
   it('should return 409 when the name exists with another case', async () => {
     await seedCategory({ name: 'Rhum' });
     const res = await request.post('/api/categories').set(authHeader())

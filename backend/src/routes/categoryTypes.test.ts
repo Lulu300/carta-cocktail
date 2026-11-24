@@ -96,6 +96,29 @@ describe('POST /api/category-types', () => {
     expect(await prisma.categoryType.findUnique({ where: { name: 'X  Y' } })).toMatchObject({ color: 'red' });
   });
 
+  // HTML shows 'X\u200BY' exactly like 'XY': a new type never keeps a character drawn as nothing
+  it('should remove the invisible characters of a new type', async () => {
+    const res = await request.post('/api/category-types').set(authHeader()).send({ name: '\u200Bfruit\u00AD juice\u2060' });
+    expect(res.status).toBe(201);
+    expect(res.body.name).toBe('FRUIT JUICE');
+    expect(await prisma.categoryType.findUnique({ where: { name: 'FRUIT JUICE' } })).not.toBeNull();
+  });
+
+  it('should return 409 for a name that only differs from an existing type by invisible characters', async () => {
+    await request.post('/api/category-types').set(authHeader()).send({ name: 'xy' });
+    const res = await request.post('/api/category-types').set(authHeader()).send({ name: 'x\u200By' });
+    expect(res.status).toBe(409);
+    expect(await prisma.categoryType.count({ where: { name: { startsWith: 'X' } } })).toBe(1);
+  });
+
+  it('should return 400 for a name of invisible characters, and create nothing', async () => {
+    const typeCount = await prisma.categoryType.count();
+    const res = await request.post('/api/category-types').set(authHeader()).send({ name: '\u200B \u00AD' });
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({ error: 'Validation error', details: [{ path: 'body.name', code: 'too_small' }] });
+    expect(await prisma.categoryType.count()).toBe(typeCount);
+  });
+
   it('should store nameTranslations', async () => {
     const res = await request.post('/api/category-types').set(authHeader())
       .send({ name: 'BITTERS', nameTranslations: { fr: 'Amers' }, color: 'red' });
