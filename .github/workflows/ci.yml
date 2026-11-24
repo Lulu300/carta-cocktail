@@ -174,9 +174,11 @@ jobs:
           retention-days: 7
 
   # Builds both images without pushing them, so a broken Dockerfile fails the
-  # pull request instead of the release. Same cache scopes as the release
-  # workflow. Only pushes write the cache: pull requests read the cache of
-  # their base branch, and writing their own layers would evict it (10 GB quota).
+  # pull request instead of the release. The release workflow reads the cache
+  # scope written here, and writes its own (<service>-release). Builds amd64
+  # only: the arm64 image is first built by the release. Only pushes write the
+  # cache: pull requests read the cache of their base branch, and writing
+  # their own layers would evict it (10 GB quota).
   docker:
     name: Docker build (${{ matrix.service }})
     runs-on: ubuntu-latest
