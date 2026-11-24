@@ -5,13 +5,13 @@ phase: F
 lane: frontend
 criticite: moyenne
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [C-06, E-07]
-touches: [frontend/src/pages/admin/MenusPage.tsx, frontend/src/pages/admin/MenuBottleEditPage.tsx, frontend/src/components/admin/menus/, frontend/src/services/api.ts, frontend/src/i18n/locales/]
+touches: [frontend/src/pages/admin/MenusPage.tsx, frontend/src/pages/admin/MenuBottleEditPage.tsx, frontend/src/components/admin/menus/, frontend/src/services/api.ts, frontend/src/i18n/locales/, frontend/src/pages/admin/MenusPage.test.tsx, frontend/src/pages/admin/MenuBottleEditPage.test.tsx, frontend/src/services/api.test.ts, frontend/src/test/msw/handlers.ts, frontend/src/queries/crud.ts, frontend/src/utils/cocktailSearch.ts, frontend/src/pages/public/useMenuFilter.ts, frontend/src/pages/public/MenuPublicPage.test.tsx, frontend/AGENTS.md, backend/src/routes/menuBottles.ts, backend/src/routes/menuBottles.test.ts, backend/src/validation/menuBottles.ts, backend/src/services/menuSyncService.ts, backend/src/i18n/en.json, backend/src/i18n/fr.json]
 sources: ["01-backend-routes.md §H3"]
-branch:
-pr:
+branch: feature/F-08-personal-bottle-menus
+pr: "#227"
 ---
 
 ## Décisions validées (2026-10-09)
@@ -43,15 +43,15 @@ L'application sert à la fois de carte de cocktails et de carte de boissons serv
 
 ## Critères d'acceptation
 
-- [ ] L'admin crée une carte « Apéro d'été » de type Apéritifs ; elle apparaît vide dans la liste.
-- [ ] Le sélecteur de cette carte ne propose que les bouteilles `isApero`, y compris les vides (marquées « vide »).
-- [ ] Ajouter puis retirer une bouteille fonctionne sans recharger la page, et survit à un rechargement.
-- [ ] Une carte personnelle peut être supprimée ; les cartes « Apéritifs » et « Digestifs » ne le peuvent toujours pas.
-- [ ] Les cartes système gardent le comportement d'E-07 : composition automatique, bouton « Synchroniser », retrait par exclusion et « Remettre », pas d'ajout manuel.
-- [ ] Une bouteille retirée de la carte système « Apéritifs » reste proposée dans le sélecteur d'une carte personnelle `APEROS`.
-- [ ] Décocher `isApero` sur une bouteille la fait disparaître de la carte personnelle (vérifié après rechargement).
-- [ ] Aucun texte en dur ; clés présentes en `en` et `fr`.
-- [ ] Couverture ≥ 80 % sur les lignes modifiées.
+- [x] L'admin crée une carte « Apéro d'été » de type Apéritifs ; elle apparaît vide dans la liste.
+- [x] Le sélecteur de cette carte ne propose que les bouteilles `isApero`, y compris les vides (marquées « vide »).
+- [x] Ajouter puis retirer une bouteille fonctionne sans recharger la page, et survit à un rechargement.
+- [x] Une carte personnelle peut être supprimée ; les cartes « Apéritifs » et « Digestifs » ne le peuvent toujours pas.
+- [x] Les cartes système gardent le comportement d'E-07 : composition automatique, bouton « Synchroniser », retrait par exclusion et « Remettre », pas d'ajout manuel.
+- [x] Une bouteille retirée de la carte système « Apéritifs » reste proposée dans le sélecteur d'une carte personnelle `APEROS`.
+- [x] Décocher `isApero` sur une bouteille la fait disparaître de la carte personnelle (vérifié après rechargement).
+- [x] Aucun texte en dur ; clés présentes en `en` et `fr`.
+- [x] Couverture ≥ 80 % sur les lignes modifiées.
 
 ## Tests à ajouter ou adapter
 
@@ -77,3 +77,5 @@ L'application sert à la fois de carte de cocktails et de carte de boissons serv
 - 2026-10-09 : cartes système alignées sur la liste d'exclusions (retrait et « Remettre » faits par E-07) ; type figé repris dans les décisions.
 - 2026-10-09 : deuxième revue de la PR #38. Bouton « Retirer » d'E-07 réutilisé avec un handler par type de carte (exclusion sur une carte système, suppression simple sur une carte personnelle) ; test « carte personnelle → aucun appel à `exclude` ».
 - 2026-10-12 : revue de la PR #107 (E-07) : « Remettre » une bouteille qui n'est plus cochée pour ce type : `restoreBottle` (`backend/src/services/menuSyncService.ts:194-203`) supprime l'exclusion sans remettre la bouteille ; l'éditeur l'affiche en fin de carte puis elle disparaît des deux listes au rechargement, sans message. Signaler « n'est plus cochée pour ce type » dans la liste des bouteilles retirées, ou l'expliquer dans un toast.
+- 2026-11-25 : PR #227 (branche `feature/F-08-personal-bottle-menus`). Faits vérifiés sur `develop` (b36d8f6) : libellés de type déjà traduits (`TYPE_BADGES`), badge « vide » déjà fait par E-07, suppression d'une carte non système déjà offerte par `MenusPage`, carte publique déjà rendue selon `menu.type` (cartes personnelles comprises, bouteilles vides écartées par le serveur). Fait : type au choix dans la modale de création (Cocktails par défaut, aide « non modifiable ensuite ») et ouverture de l'éditeur de la nouvelle carte (`menuEditorPath`, partagé avec les liens « Modifier ») ; sur une carte personnelle, titre, aide et carte vide propres, ni « Synchroniser » ni « Bouteilles retirées », carte « Ajouter des bouteilles » (`BottlesToAdd`) : bouteilles cochées pour le type et absentes de la carte, vides comprises et marquées, regroupées comme dans la carte, filtre texte sur le nom et la catégorie ; « Retirer » sans confirmation ni exclusion. Écart avec l'étape 3 et l'étape 4 : pas un `menuBottles.create` / `delete` par bouteille, mais deux routes de groupe en une transaction, comme celles d'E-40 (une action de groupe = une requête, rien d'appliqué en cas de refus) : `POST /api/menu-bottles/menu/:menuId/entries` (`{ bottleIds }`, carte personnelle seulement) et `POST …/entries/remove` (`{ ids }`, mêmes règles que `DELETE /:id`, exclusion sur une carte système). « Ajouter » ajoute tout le groupe de bouteilles identiques, comme « Retirer » le retire. Point du Journal du 2026-10-12 traité : une bouteille retirée d'une carte système et décochée est signalée dans « Bouteilles retirées », et « Remettre » ne l'affiche plus un instant dans la carte. `getBottleSearchText` déplacé de la carte publique vers `utils/cocktailSearch.ts`, `useCrudMutations` typé par l'entité créée, `BottleGroupActionRow` partagé par les deux listes ; `touches` complété. Rendu réel (build servi par `vite preview`, backend sur une base neuve, Chrome sans interface) : cartes personnelles apéritifs et digestifs côté admin (ajout et retrait conservés après rechargement) et côté public (bouteille vide masquée) ; décocher l'apéritif retire la bouteille de la carte personnelle. Premier chargement public : 135,80 kB (les deux méthodes ajoutées à `services/api.ts`). Sonde : afficher dans la carte une bouteille décochée après « Remettre » fait échouer un test.
+- Notes de version : l'admin peut créer ses propres cartes d'apéritifs ou de digestifs (type choisi à la création, non modifiable ensuite) et les composer à la main parmi les bouteilles cochées pour ce type ; les cartes système « Apéritifs » et « Digestifs » ne changent pas. Deux routes de groupe s'ajoutent à l'API (`POST /api/menu-bottles/menu/:menuId/entries` et `…/entries/remove`). Aucune action requise.
