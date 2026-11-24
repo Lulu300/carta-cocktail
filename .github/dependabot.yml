@@ -3,22 +3,24 @@
 # Version update PRs target `develop`, like any other change. Security update
 # PRs ignore this file's per-ecosystem options and always target the default
 # branch (`main`); they only exist once "Dependabot security updates" is
-# enabled in the repository settings.
+# enabled in the repository settings. GitHub reads this file from the default
+# branch only: a change takes effect after the next `develop` -> `main` merge.
 #
-# Majors handled by dedicated plan tasks are ignored: Prisma (C-15),
-# TypeScript (F-07) and Node (an LTS switch is done by hand).
+# Ignored majors, each followed by a plan task:
+# - Prisma and better-sqlite3 (D-47): the three Prisma packages move together,
+#   and better-sqlite3 stays in the range of @prisma/adapter-better-sqlite3;
+# - Node and @types/node (D-47), which follow the Node major of the images and
+#   CI (an LTS switch is done by hand);
+# - TypeScript (F-07).
+# Pre-releases are never proposed while the current version is a stable one,
+# even when the `latest` dist-tag points to one (as `prisma` 8.0.0-rc does).
 version: 2
 updates:
-  # npm: `open-pull-requests-limit: 0` disables version updates while phase B
-  # of the plan is in progress. Phase B upgrades the dependencies in planned
-  # batches and allows only one task at a time on a package's lockfile, so
-  # Dependabot PRs would conflict with those tasks. Security updates are not
-  # subject to this limit. Task D-21 raises it to 5 once phase B is done.
   - package-ecosystem: npm
     directory: /backend
     target-branch: develop
     schedule: { interval: weekly, day: monday, timezone: Europe/Paris }
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 5
     commit-message: { prefix: "chore(deps)" }
     labels: [dependencies, backend]
     groups:
@@ -29,14 +31,20 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "@prisma/client"
         update-types: ["version-update:semver-major"]
+      - dependency-name: "@prisma/adapter-better-sqlite3"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "better-sqlite3"
+        update-types: ["version-update:semver-major"]
       - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: /frontend
     target-branch: develop
     schedule: { interval: weekly, day: monday, timezone: Europe/Paris }
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 5
     commit-message: { prefix: "chore(deps)" }
     labels: [dependencies, frontend]
     groups:
@@ -44,6 +52,8 @@ updates:
         update-types: [minor, patch]
     ignore:
       - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
 
   # Dependabot only updates a `FROM` with a literal tag, not one built from an
