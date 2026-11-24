@@ -484,7 +484,7 @@ describe('SettingsPage', () => {
     expect(toast.success).not.toHaveBeenCalled();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.queryByText(/settings\.backup\.skippedFiles/)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /settings\.backup\.signIn/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /settings\.backup\.signInAfterRestart|auth\.signInAgain/ })).not.toBeInTheDocument();
   });
 
   it('keeps the restart warning and the skipped files on screen after restoring an older backup', async () => {
@@ -521,7 +521,7 @@ describe('SettingsPage', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(assignLocation).not.toHaveBeenCalled();
 
-    await userEvent.click(screen.getByRole('button', { name: 'settings.backup.signIn' }));
+    await userEvent.click(screen.getByRole('button', { name: 'auth.signInAgain' }));
     expect(assignLocation).toHaveBeenCalledWith(SIGN_IN_AFTER_RESTORE);
   });
 

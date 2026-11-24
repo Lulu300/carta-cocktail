@@ -569,7 +569,7 @@ A backup whose database schema is older than the one of the installed version re
 
 - **Without Docker**, from `backend/`, run `npm run db:deploy`, then restart the backend. For a backup from v1.5.0 or older, see below first.
 
-Then reload the page (the "Reload the page once the backend has restarted" button of the restore screen).
+Then open the sign-in page with the "Sign in again once the backend has restarted" button of the restore screen ("Reload the page once the backend has restarted" in older versions), and sign in with the email and password stored in the backup (see [Signing in after a restore](#signing-in-after-a-restore)).
 
 Until the database is updated, the app may answer with server errors. From v1.11.0 on, restoring a backup made before v1.11.0 breaks the admin pages and, in a browser where the admin is signed in, the public menu. Reloading the page shows "Your session could not be checked" with "Internal server error" (before v1.13.0: it signed you out), and signing in fails with the same error, even with the right password. These failures count for the login limit: after 10 attempts the login answers "Too many failed login attempts" until the restart, which clears the counters. Guests can still see the public menu.
 

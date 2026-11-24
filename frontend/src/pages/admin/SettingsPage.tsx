@@ -56,7 +56,7 @@ async function orNoAnswer<T>(call: () => Promise<T>): Promise<T | typeof NO_ANSW
   }
 }
 
-/** A restore result the admin must read before the page reloads. */
+/** A restore result the admin must read before the sign-in page opens. */
 function needsAdminAttention(result: BackupRestoreResult): boolean {
   return result.restartRecommended || result.skippedFiles > 0;
 }
@@ -77,7 +77,7 @@ function RestoreReport({ result }: { result: BackupRestoreResult }) {
         <p className="text-sm text-fg-muted">{t('settings.backup.skippedFiles', { count: result.skippedFiles })}</p>
       )}
       <Button variant="secondary" size="sm" onClick={openSignInAfterRestore}>
-        {result.restartRecommended ? t('settings.backup.signInAfterRestart') : t('settings.backup.signIn')}
+        {result.restartRecommended ? t('settings.backup.signInAfterRestart') : t('auth.signInAgain')}
       </Button>
     </div>
   );

@@ -422,7 +422,6 @@
       "restartMayFail": "This may not be enough: for a backup from v1.0.x, or from before v1.8.0 with duplicate category names or unit abbreviations, or, without Docker, from v1.5.0 or older, the database update fails. Read \"Restoring a backup from an older version\" in UPGRADING.md before restarting.",
       "skippedFiles_one": "{{count}} file of the uploads folder was not restored: only JPG, PNG and WebP images are restored, once per file name.",
       "skippedFiles_other": "{{count}} files of the uploads folder were not restored: only JPG, PNG and WebP images are restored, once per file name.",
-      "signIn": "Sign in again",
       "signInAfterRestart": "Sign in again once the backend has restarted",
       "fileSelected": "File: {{name}}"
     },
