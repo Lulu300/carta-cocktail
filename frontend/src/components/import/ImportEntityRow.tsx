@@ -6,6 +6,7 @@ import Field from '../ui/Field';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
 import { cx } from '../ui/classNames';
+import { caseInsensitiveKey } from '../../utils/invisibleCharacters';
 import {
   UNIQUE_FIELD,
   defaultCreateData,
@@ -53,13 +54,14 @@ const FIELD_ERROR_KEYS: Record<CreateDataField, string> = {
 };
 
 /**
- * The entities the admin can pick. A bottle only maps to a bottle of the same
- * category. The backend's matches stay listed while the lists are loading.
+ * The entities the admin can pick. A bottle only maps to a bottle of the same category, compared
+ * like the backend compares category names (`caseInsensitiveKey`). The backend's matches stay
+ * listed while the lists are loading.
  */
 function pickableOptions(entity: ImportEntityResolution, type: ImportEntityType, options: ExistingOption[]): ExistingOption[] {
-  const categoryName = entity.ref.categoryName?.toLowerCase();
-  const sameCategory = type === 'bottles' && categoryName
-    ? options.filter((option) => option.category?.name?.toLowerCase() === categoryName)
+  const categoryKey = entity.ref.categoryName ? caseInsensitiveKey(entity.ref.categoryName) : undefined;
+  const sameCategory = type === 'bottles' && categoryKey
+    ? options.filter((option) => option.category?.name !== undefined && caseInsensitiveKey(option.category.name) === categoryKey)
     : options;
   const matches = entity.existingMatch ? [entity.existingMatch] : entity.ambiguousMatches ?? [];
   const unlisted = matches.filter((match) => !sameCategory.some((option) => option.id === match.id));

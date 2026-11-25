@@ -464,15 +464,15 @@ describe('DELETE /api/categories/:id', () => {
   });
 });
 
-// 'Crème' and its decomposed form look the same: a new name is stored composed (C-65)
-const COMPOSED = 'Crème';
-const DECOMPOSED = 'Crème';
+// 'Cr\u00E8me' and its decomposed form look the same: a new name is stored composed (C-65)
+const COMPOSED = 'Cr\u00E8me';
+const DECOMPOSED = 'Cre\u0300me';
 
 describe('Category names in another Unicode form', () => {
   it('should return 409 for a decomposed name next to the composed one, or the composed name in upper case', async () => {
     await seedCategory({ name: COMPOSED });
     const decomposed = await request.post('/api/categories').set(authHeader()).send({ name: DECOMPOSED, type: 'SPIRIT' });
-    const upperCase = await request.post('/api/categories').set(authHeader()).send({ name: 'CRÈME', type: 'SPIRIT' });
+    const upperCase = await request.post('/api/categories').set(authHeader()).send({ name: 'CR\u00C8ME', type: 'SPIRIT' });
     expect(decomposed.status).toBe(409);
     expect(upperCase.status).toBe(409);
     expect(await prisma.category.count()).toBe(1);
@@ -498,13 +498,13 @@ describe('Category names in another Unicode form', () => {
   it('should keep a stored decomposed name and translation sent back as they are', async () => {
     const cat = await seedCategory({ name: DECOMPOSED, nameTranslations: JSON.stringify({ fr: DECOMPOSED }) });
     const res = await request.put(`/api/categories/${cat.id}`).set(authHeader())
-      .send({ name: DECOMPOSED, desiredStock: 3, nameTranslations: { fr: DECOMPOSED, en: 'Crèam' } });
+      .send({ name: DECOMPOSED, desiredStock: 3, nameTranslations: { fr: DECOMPOSED, en: 'Cre\u0300am' } });
     expect(res.status).toBe(200);
     expect(await prisma.category.findUniqueOrThrow({ where: { id: cat.id } })).toMatchObject({
       name: DECOMPOSED,
       desiredStock: 3,
       // The new English translation is composed, the French one sent back as it is stays as it is
-      nameTranslations: JSON.stringify({ fr: DECOMPOSED, en: 'Crèam' }),
+      nameTranslations: JSON.stringify({ fr: DECOMPOSED, en: 'Cr\u00E8am' }),
     });
   });
 

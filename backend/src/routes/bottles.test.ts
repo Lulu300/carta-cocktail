@@ -919,6 +919,21 @@ describe('POST /api/bottles/import/preview', () => {
     expect(res.body.bottles[0].potentialDuplicates.map((d: { name: string }) => d.name)).toEqual(['HAVANA', 'havana']);
     expect(res.body.bottles[1].potentialDuplicates).toEqual([]);
   });
+
+  // Category names are compared ignoring case and Unicode form (C-65)
+  it.each([
+    ['decomposed, the existing one composed', 'CRÈME', 'Crème'],
+    ['composed, the existing one decomposed', 'CRÈME', 'Crème'],
+  ])('should list a duplicate whose category is written %s', async (_case, fileCategory, existingCategory) => {
+    const cream = await seedCategory({ name: existingCategory });
+    await seedBottle({ name: 'Lejay', categoryId: cream.id, capacityMl: 700 });
+    const payload = { version: 1, bottles: [importRow({ name: 'Lejay', categoryName: fileCategory })] };
+
+    const res = await request.post('/api/bottles/import/preview').set(authHeader())
+      .attach('file', Buffer.from(JSON.stringify(payload)), 'bottles.json');
+
+    expect(res.body.bottles[0].potentialDuplicates.map((d: { name: string }) => d.name)).toEqual(['Lejay']);
+  });
 });
 
 describe('POST /api/bottles/import/confirm', () => {
@@ -1604,17 +1619,17 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
 
   // A name pasted from a macOS file name can hold decomposed accents (C-65)
   it('should match a category whose name is stored in the other Unicode form', async () => {
-    const cream = await seedCategory({ name: 'Crème' });
+    const cream = await seedCategory({ name: 'Cr\u00E8me' });
 
-    const res = await previewOf('Crème');
+    const res = await previewOf('Cre\u0300me');
 
     expect(res.body.categories[0]).toMatchObject({ status: 'matched', existingMatch: { id: cream.id } });
   });
 
   it('should put the bottles of a decomposed category to create in the composed one', async () => {
-    const cream = await seedCategory({ name: 'Crème' });
+    const cream = await seedCategory({ name: 'Cr\u00E8me' });
 
-    const res = await confirm([{ categoryName: 'Crème' }], { 'crème': { action: 'create', data: { name: 'Crème' } } });
+    const res = await confirm([{ categoryName: 'Cre\u0300me' }], { 'cre\u0300me': { action: 'create', data: { name: 'Cre\u0300me' } } });
 
     expect(res.status).toBe(201);
     expect(await bottleCategoryIds()).toEqual([cream.id]);
@@ -1624,8 +1639,8 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
   // The resolutions are keyed by the file's name in lower case only: a row naming the other form
   // misses that key and finds the category through the index, created rows included
   it('should put a row naming the decomposed form in the category created for the composed one', async () => {
-    const res = await confirm([{ categoryName: 'Crème' }, { categoryName: 'Crème' }], {
-      'crème': { action: 'create', data: { name: 'Crème' } },
+    const res = await confirm([{ categoryName: 'Cr\u00E8me' }, { categoryName: 'Cre\u0300me' }], {
+      'cr\u00E8me': { action: 'create', data: { name: 'Cr\u00E8me' } },
     });
 
     expect(res.status).toBe(201);
@@ -1635,13 +1650,13 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
   });
 
   it('should store a category it creates composed, translations included', async () => {
-    const res = await confirm([{ categoryName: 'Crème' }], {
-      'crème': { action: 'create', data: { name: 'Crème', nameTranslations: { fr: 'Crème' } } },
+    const res = await confirm([{ categoryName: 'Cre\u0300me' }], {
+      'cre\u0300me': { action: 'create', data: { name: 'Cre\u0300me', nameTranslations: { fr: 'Cre\u0300me' } } },
     });
 
     expect(res.status).toBe(201);
     const cream = await prisma.category.findFirstOrThrow();
-    expect(cream).toMatchObject({ name: 'Crème', nameTranslations: JSON.stringify({ fr: 'Crème' }) });
+    expect(cream).toMatchObject({ name: 'Cr\u00E8me', nameTranslations: JSON.stringify({ fr: 'Cr\u00E8me' }) });
     expect(await bottleCategoryIds()).toEqual([cream.id]);
   });
 

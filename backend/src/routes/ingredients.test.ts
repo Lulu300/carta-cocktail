@@ -190,9 +190,9 @@ describe('DELETE /api/ingredients/:id', () => {
   });
 });
 
-// 'Crème' and its decomposed form look the same: a new name is stored composed (C-65)
-const COMPOSED = 'Crème';
-const DECOMPOSED = 'Crème';
+// 'Cr\u00E8me' and its decomposed form look the same: a new name is stored composed (C-65)
+const COMPOSED = 'Cr\u00E8me';
+const DECOMPOSED = 'Cre\u0300me';
 
 describe('Ingredient names in another Unicode form', () => {
   it('should store a new name and its translations composed', async () => {

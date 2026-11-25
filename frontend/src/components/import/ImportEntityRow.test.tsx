@@ -110,6 +110,25 @@ describe('ImportEntityRow', () => {
     expect(screen.queryByRole('option', { name: 'Gordon' })).not.toBeInTheDocument();
   });
 
+  // Compared like the backend compares category names (C-65): case and Unicode form ignored
+  it.each([
+    ['decomposed, the existing one composed', 'CRÈME', 'Crème'],
+    ['composed, the existing one decomposed', 'CRÈME', 'Crème'],
+  ])('lists the bottles of a category written %s', async (_case, fileCategory, existingCategory) => {
+    const user = userEvent.setup();
+    const bottle: ImportEntityResolution = { ref: { name: 'Cassis', categoryName: fileCategory }, existingMatch: null, status: 'missing' };
+    const options = [
+      { id: 1, name: 'Gordon', category: { name: 'Gin' } },
+      { id: 2, name: 'Lejay', category: { name: existingCategory } },
+    ];
+    render(<Harness entity={bottle} type="bottles" existingOptions={options} initial={createResolution('bottles', bottle)} />);
+
+    await user.click(screen.getByRole('button', { name: 'cocktails.importWizard.useExisting' }));
+
+    expect(screen.getByRole('option', { name: 'Lejay' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Gordon' })).not.toBeInTheDocument();
+  });
+
   it('maps a unit to another existing one', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();

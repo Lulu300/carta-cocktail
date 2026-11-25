@@ -180,15 +180,15 @@ describe('PUT /api/category-types/:name', () => {
 
   // Like the type names (C-61) and the names of categories, units and ingredients (C-65)
   it('should compose the translations the admin changes, and keep the ones sent back as they are', async () => {
-    await prisma.categoryType.create({ data: { name: 'CREAM', color: 'red', nameTranslations: JSON.stringify({ fr: 'Crème' }) } });
+    await prisma.categoryType.create({ data: { name: 'CREAM', color: 'red', nameTranslations: JSON.stringify({ fr: 'Cre\u0300me' }) } });
     const res = await request.put('/api/category-types/CREAM').set(authHeader())
-      .send({ nameTranslations: { fr: 'Crème', en: 'Crèam' } });
+      .send({ nameTranslations: { fr: 'Cre\u0300me', en: 'Cre\u0300am' } });
     expect(res.status).toBe(200);
-    expect(res.body.nameTranslations).toEqual({ fr: 'Crème', en: 'Crèam' });
+    expect(res.body.nameTranslations).toEqual({ fr: 'Cre\u0300me', en: 'Cr\u00E8am' });
 
     const created = await request.post('/api/category-types').set(authHeader())
-      .send({ name: 'LIQUEUR', nameTranslations: { fr: 'Liqueur à la crème' } });
-    expect(created.body.nameTranslations).toEqual({ fr: 'Liqueur à la crème' });
+      .send({ name: 'LIQUEUR', nameTranslations: { fr: 'Liqueur a\u0300 la cre\u0300me' } });
+    expect(created.body.nameTranslations).toEqual({ fr: 'Liqueur \u00E0 la cr\u00E8me' });
   });
 });
 
