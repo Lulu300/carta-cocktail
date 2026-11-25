@@ -623,8 +623,8 @@ describe('names in another Unicode form', () => {
 
 // Ingredient names are unique as stored: one stored name is one ingredient, used as it is (C-65)
 describe('ingredients to create that an ingredient already holds', () => {
-  const COMPOSED = 'Crème';
-  const DECOMPOSED = 'Crème';
+  const COMPOSED = 'Cr\u00E8me';
+  const DECOMPOSED = 'Cre\u0300me';
   const ingredientLine = (sourceName: string) => ({ sourceType: 'INGREDIENT', sourceName, quantity: 1, unit: CL });
   const createIngredient = (name: string) => ({ action: 'create', data: { name } });
 

@@ -922,8 +922,8 @@ describe('POST /api/bottles/import/preview', () => {
 
   // Category names are compared ignoring case and Unicode form (C-65)
   it.each([
-    ['decomposed, the existing one composed', 'CRÈME', 'Crème'],
-    ['composed, the existing one decomposed', 'CRÈME', 'Crème'],
+    ['decomposed, the existing one composed', 'CRE\u0300ME', 'Cr\u00E8me'],
+    ['composed, the existing one decomposed', 'CR\u00C8ME', 'Cre\u0300me'],
   ])('should list a duplicate whose category is written %s', async (_case, fileCategory, existingCategory) => {
     const cream = await seedCategory({ name: existingCategory });
     await seedBottle({ name: 'Lejay', categoryId: cream.id, capacityMl: 700 });

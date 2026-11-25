@@ -112,8 +112,8 @@ describe('ImportEntityRow', () => {
 
   // Compared like the backend compares category names (C-65): case and Unicode form ignored
   it.each([
-    ['decomposed, the existing one composed', 'CRÈME', 'Crème'],
-    ['composed, the existing one decomposed', 'CRÈME', 'Crème'],
+    ['decomposed, the existing one composed', 'CRE\u0300ME', 'Cr\u00E8me'],
+    ['composed, the existing one decomposed', 'CR\u00C8ME', 'Cre\u0300me'],
   ])('lists the bottles of a category written %s', async (_case, fileCategory, existingCategory) => {
     const user = userEvent.setup();
     const bottle: ImportEntityResolution = { ref: { name: 'Cassis', categoryName: fileCategory }, existingMatch: null, status: 'missing' };
