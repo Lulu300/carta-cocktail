@@ -1576,6 +1576,17 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
     });
   });
 
+  it('should flag a category several hold ignoring case that only the rows of a JSON file name', async () => {
+    await seedCategory({ name: 'Rhum' });
+    await seedCategory({ name: 'RHUM' });
+    const file = { version: 1, bottles: [{ name: 'Havana', categoryName: 'rhum', capacityMl: 700 }] };
+
+    const res = await request.post('/api/bottles/import/preview').set(authHeader())
+      .attach('file', Buffer.from(JSON.stringify(file)), 'bottles.json');
+
+    expect(res.body.categories).toEqual([expect.objectContaining({ ref: expect.objectContaining({ name: 'rhum' }), status: 'ambiguous' })]);
+  });
+
   it.each([
     ['in another case', 'rhum'],
     ['exactly', 'Rhum'],
@@ -1650,6 +1661,32 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
     expect(res.status).toBe(201);
     const target = await prisma.category.findUniqueOrThrow({ where: { name: expected } });
     expect(await bottleCategoryIds()).toEqual([target.id]);
+  });
+
+  // Duplicates are counted in the category a row goes in, not by the file's category name
+  it('should count no duplicate for a row put in a category created under another name', async () => {
+    const rhum = await seedCategory({ name: 'Rhum' });
+    await seedBottle({ name: 'Havana', categoryId: rhum.id, capacityMl: 700 });
+
+    const res = await confirm([{ categoryName: 'Rhum' }], { rhum: { action: 'create', data: { name: 'Rhum agricole' } } });
+
+    expect(res.status).toBe(201);
+    expect(res.body.duplicatesCreated).toBe(0);
+  });
+
+  it.each([
+    ['the one that holds the same bottle', 'Rhum', 1],
+    ['the other one', 'RHUM', 0],
+  ])('should count the duplicates of a row put in %s of two categories equal ignoring case', async (_case, picked, duplicates) => {
+    const rhum = await seedCategory({ name: 'Rhum' });
+    const upperRhum = await seedCategory({ name: 'RHUM' });
+    await seedBottle({ name: 'Havana', categoryId: rhum.id, capacityMl: 700 });
+    const existingId = picked === 'Rhum' ? rhum.id : upperRhum.id;
+
+    const res = await confirm([{ categoryName: 'rhum' }], { rhum: { action: 'use_existing', existingId } });
+
+    expect(res.status).toBe(201);
+    expect(res.body.duplicatesCreated).toBe(duplicates);
   });
 
   it('should put a row in the exact category when others are equal to it ignoring case', async () => {
