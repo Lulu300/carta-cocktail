@@ -4,7 +4,7 @@ import { datePattern, isoDatePattern } from '../../utils/dates';
 
 // Codes and sources this version can name. A newer backend may send others:
 // they get a generic reason, or the raw source, rather than an i18n key.
-const KNOWN_CODES: readonly string[] = ['required', 'outOfRange', 'invalidDate', 'invalidNumber'];
+const KNOWN_CODES: readonly string[] = ['required', 'outOfRange', 'invalidDate', 'invalidNumber', 'malformedQuotes'];
 const KNOWN_SOURCES: readonly string[] = ['bottles', 'categories'];
 
 /** Rows of the file the backend left out, with the line and the reason. */
@@ -19,6 +19,11 @@ export default function BottleImportRowErrors({ errors }: { errors: BottleImport
     KNOWN_SOURCES.includes(source) ? t(`bottles.importWizard.rowErrors.source.${source}`) : source;
   const reasonKey = (code: string) =>
     `bottles.importWizard.rowErrors.code.${KNOWN_CODES.includes(code) ? code : 'unknown'}`;
+  // A cell past the last named column has no name: its number stands for it
+  const fieldLabel = ({ field, column }: BottleImportRowError) => {
+    if (field || column === undefined) return field;
+    return t('bottles.importWizard.rowErrors.column', { number: column });
+  };
 
   return (
     <section role="alert" className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg p-3 text-sm space-y-2">
@@ -29,7 +34,7 @@ export default function BottleImportRowErrors({ errors }: { errors: BottleImport
             <span className="font-medium">
               {t('bottles.importWizard.rowErrors.position', { source: sourceLabel(error.source), line: error.line })}
             </span>{' '}
-            <span>{t(reasonKey(error.code), { field: error.field, ...dateFormats })}</span>
+            <span>{t(reasonKey(error.code), { field: fieldLabel(error), ...dateFormats })}</span>
           </li>
         ))}
       </ul>

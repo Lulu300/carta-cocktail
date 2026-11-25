@@ -41,6 +41,7 @@
     "ambiguousUnitAbbreviation": "Several units match the abbreviation \"{{name}}\" when case is ignored, and none exactly: {{matches}}. Use one of them, or change their abbreviations so that they differ by more than case",
     "import": {
       "missingColumn": "The CSV file must have a name column and a capacityMl column",
+      "malformedHeader": "The column names of {{file}} (its first line) have a misplaced quotation mark",
       "invalidJson": "The file is not valid JSON",
       "unsupportedVersion": "This file is not a bottle export of Carta Cocktail, or its version is not supported",
       "bottlesRequired": "The JSON file has no list of bottles",

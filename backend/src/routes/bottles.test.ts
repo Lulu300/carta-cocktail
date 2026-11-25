@@ -801,6 +801,22 @@ describe('POST /api/bottles/import/preview', () => {
     });
   });
 
+  it('should refuse a ZIP whose categories.csv header has a misplaced quote, naming that file', async () => {
+    const zip = new AdmZip();
+    zip.addFile('bottles.csv', Buffer.from('name,capacityMl\nHavana,700'));
+    zip.addFile('categories.csv', Buffer.from('"name,type\nRhum,SPIRIT'));
+    const res = await request.post('/api/bottles/import/preview')
+      .set(authHeader())
+      .set('Accept-Language', 'fr')
+      .attach('file', zip.toBuffer(), 'bottles.zip');
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({
+      error: 'Les noms de colonnes de categories.csv (sa première ligne) contiennent un guillemet mal placé',
+      details: { code: 'malformedHeader', file: 'categories.csv' },
+    });
+  });
+
   it('should parse a CSV saved by Excel: BOM and semicolons', async () => {
     const csv = '\uFEFFname;categoryName;capacityMl;purchasePrice\r\nHavana 7;Rhum;700;25,90\r\n';
     const res = await request.post('/api/bottles/import/preview').set(authHeader())

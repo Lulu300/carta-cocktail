@@ -354,16 +354,18 @@ export interface BottleRowPreview {
   potentialDuplicates: BottleDuplicateEntry[];
 }
 
-export type BottleImportRowErrorCode = 'required' | 'outOfRange' | 'invalidDate' | 'invalidNumber';
+export type BottleImportRowErrorCode = 'required' | 'outOfRange' | 'invalidDate' | 'invalidNumber' | 'malformedQuotes';
 
 /**
  * A row of the file left out of the import. `line` is the CSV line (header = 1)
- * or the position in the JSON list (first = 1), within `source`.
+ * or the position in the JSON list (first = 1), within `source`. A CSV cell past the
+ * last named column has an empty `field`, and its `column` number (first = 1).
  */
 export interface BottleImportRowError {
   source: 'bottles' | 'categories';
   line: number;
   field: string;
+  column?: number;
   code: BottleImportRowErrorCode;
 }
 
