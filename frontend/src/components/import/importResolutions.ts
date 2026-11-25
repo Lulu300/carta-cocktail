@@ -150,6 +150,11 @@ export const UNIQUE_FIELD: Partial<Record<ImportEntityType, 'name' | 'abbreviati
  * The existing row a category or unit to create meets, by name or by abbreviation: the backend
  * uses a row found as it is, and refuses an ambiguous value. Bottles and ingredients are always
  * created, their names need not be unique.
+ *
+ * Limit: only the existing rows count. Two entries of one import created under names equal
+ * ignoring case meet nothing here, while the backend creates the first and uses it for the
+ * second (`findOrCreate`): neither shows the "used as it is" hint, and the bottle summary
+ * counts both as created.
  */
 export function existingRowFor(type: ImportEntityType, data: ImportEntityRef, existing: ExistingRows): ExistingMatch<UniqueRow> {
   // The backend trims these values

@@ -172,6 +172,7 @@
     "ambiguous": "Plusieurs correspondances",
     "pickOne": "Plusieurs existantes ne diffèrent que par la casse : {{names}}. Utilisez l'une d'elles, ou créez-la sous un autre nom.",
     "pickMatch": "— Choisir l'une d'elles —",
+    "existingEntry": "Entrée existante à utiliser",
     "usedAsItIs": "Existe déjà sous « {{name}} » : elle sera utilisée telle quelle, et les autres champs ignorés.",
     "ambiguousName": "Correspond à {{names}}, qui ne diffèrent que par la casse : utilisez l'une d'elles, ou changez cette valeur."
   },

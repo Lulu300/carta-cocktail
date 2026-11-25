@@ -78,7 +78,7 @@ export default function BottleImportCategoryStep({
                 </ChoiceButton>
               </div>
               {isAmbiguous && choice === 'use_existing' && (
-                <Field label={t('cocktails.importWizard.existingEntity')} hideLabel>
+                <Field label={t('importMatches.existingEntry')} hideLabel>
                   <Select
                     value={resolution?.action === 'use_existing' ? resolution.existingId ?? '' : ''}
                     onChange={(e) => onChange(key, { action: 'use_existing', existingId: Number(e.target.value) })}

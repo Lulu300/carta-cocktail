@@ -493,7 +493,7 @@ describe('ImportBottlesWizard - categories equal ignoring case', () => {
     expect(screen.getByText('importMatches.pickOne')).toBeInTheDocument();
     expect(screen.getByText('bottles.importWizard.categoriesToResolve')).toBeInTheDocument();
     expect(nextButton()).toBeDisabled();
-    const matchSelect = screen.getByLabelText('cocktails.importWizard.existingEntity');
+    const matchSelect = screen.getByLabelText('importMatches.existingEntry');
     expect(matchSelect).toHaveValue('');
 
     await user.selectOptions(matchSelect, 'RHUM');
@@ -519,7 +519,7 @@ describe('ImportBottlesWizard - categories equal ignoring case', () => {
 
     // Back to "use existing": still no match picked
     await user.click(screen.getByText('bottles.importWizard.useExisting'));
-    expect(screen.getByLabelText('cocktails.importWizard.existingEntity')).toHaveValue('');
+    expect(screen.getByLabelText('importMatches.existingEntry')).toHaveValue('');
     expect(nextButton()).toBeDisabled();
 
     await user.click(screen.getByText('bottles.importWizard.createNew'));

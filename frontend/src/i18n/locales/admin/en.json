@@ -172,6 +172,7 @@
     "ambiguous": "Several matches",
     "pickOne": "Several existing ones differ only by case: {{names}}. Use one of them, or create it under another name.",
     "pickMatch": "— Pick one of them —",
+    "existingEntry": "Existing entry to use",
     "usedAsItIs": "Already exists as \"{{name}}\": it will be used as it is, and the other fields are ignored.",
     "ambiguousName": "Matches {{names}}, which differ only by case: use one of them, or change this value."
   },
