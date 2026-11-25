@@ -86,6 +86,12 @@ describe('countCategoriesToCreate', () => {
     };
     expect(countCategoriesToCreate(resolutions, existing)).toBe(1);
   });
+
+  it('counts once two categories of the file created under names equal ignoring case, as the rows step offers them', () => {
+    const categories = { mezcal: creating('Mezcal'), 'mezcal joven': creating('MEZCAL') };
+    expect(countCategoriesToCreate({ categories, bottles: {} }, existing)).toBe(1);
+    expect(rowCategories(existing, categories).options.filter((option) => option.isNew)).toEqual([{ name: 'Mezcal', isNew: true }]);
+  });
 });
 
 describe('rowCategories', () => {

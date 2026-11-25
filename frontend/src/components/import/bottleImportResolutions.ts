@@ -94,11 +94,12 @@ export function existingCategoryFor(key: string, resolution: CategoryCreation, c
   return matchIgnoringCase(categories, nameToCreate(key, resolution), (category) => category.name);
 }
 
-/** Categories the confirmation creates: one to create that exists ignoring case uses that one. */
+/**
+ * Categories the confirmation creates: one to create that a category holds ignoring case, existing
+ * or created earlier in the import, uses that one.
+ */
 export function countCategoriesToCreate(resolutions: BottleImportResolutions, categories: Category[]): number {
-  return Object.entries(resolutions.categories).filter(
-    ([key, resolution]) => resolution.action === 'create' && existingCategoryFor(key, resolution, categories).status === 'none',
-  ).length;
+  return applyCategoryResolutions(categories, resolutions.categories).categories.filter((category) => category.isNew).length;
 }
 
 /**
@@ -153,15 +154,12 @@ export interface RowCategories {
 }
 
 /**
- * The categories of the rows, by the rules of the confirmation (`POST /bottles/import/confirm`).
- * It applies the category resolutions in order: a category to create that a category already
- * holds ignoring case, created earlier in the import included, uses that one. Then it puts each
- * row in the category resolved for its name, else in the category that holds that name.
- *
- * An option a row cannot reach by its name is left out: a resolution of that name sends the row
- * elsewhere, such as `Rhum` when the file's `rhum` is resolved to `RHUM` or renamed.
+ * The categories once the confirmation (`POST /bottles/import/confirm`) has applied the category
+ * resolutions, in order: the existing ones then those it creates, and the category each resolution
+ * key stands for. A category to create that a category already holds ignoring case, created
+ * earlier in the import included, uses that one.
  */
-export function rowCategories(existing: Category[], resolutions: Record<string, BottleCategoryResolution>): RowCategories {
+function applyCategoryResolutions(existing: Category[], resolutions: Record<string, BottleCategoryResolution>) {
   const existingById = new Map(existing.map((category) => [category.id, { name: category.name, isNew: false }]));
   const categories: CategoryOption[] = [...existingById.values()];
   const resolvedByKey = new Map<string, CategoryOption>();
@@ -182,6 +180,19 @@ export function rowCategories(existing: Category[], resolutions: Record<string, 
     }
     if (category) resolvedByKey.set(key, category);
   }
+  return { categories, resolvedByKey };
+}
+
+/**
+ * The categories of the rows, by the rules of the confirmation: once the category resolutions are
+ * applied (`applyCategoryResolutions`), it puts each row in the category resolved for its name,
+ * else in the category that holds that name.
+ *
+ * An option a row cannot reach by its name is left out: a resolution of that name sends the row
+ * elsewhere, such as `Rhum` when the file's `rhum` is resolved to `RHUM` or renamed.
+ */
+export function rowCategories(existing: Category[], resolutions: Record<string, BottleCategoryResolution>): RowCategories {
+  const { categories, resolvedByKey } = applyCategoryResolutions(existing, resolutions);
 
   const categoryOf = (categoryName: string) => {
     // The backend trims the name of a row
