@@ -457,3 +457,99 @@ describe('ImportBottlesWizard', () => {
     expect(screen.queryByText('Validation error')).not.toBeInTheDocument();
   });
 });
+
+// Data older than C-07 can hold two categories that differ only by case: the backend refuses to
+// create a third one, or to guess which one a row means (C-19)
+describe('ImportBottlesWizard - categories equal ignoring case', () => {
+  const rhum = buildCategory({ id: 1, name: 'Rhum' });
+  const upperRhum = buildCategory({ id: 2, name: 'RHUM' });
+  const fileCategory = { ...samplePreview.categories[0].ref, name: 'rhum' };
+  const ambiguousPreview: BottleImportPreviewResponse = {
+    ...samplePreview,
+    payload: { ...samplePreview.payload, categories: [fileCategory] },
+    categories: [{
+      ref: fileCategory,
+      existingMatch: null,
+      status: 'ambiguous',
+      ambiguousMatches: [{ id: 1, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 }, { id: 2, name: 'RHUM', type: 'SPIRIT', desiredStock: 1 }],
+    }],
+    bottles: [{ ...samplePreview.bottles[0], ref: { ...samplePreview.bottles[0].ref, categoryName: 'rhum' } }],
+  };
+
+  beforeEach(() => {
+    mockApiResponse('get', '/api/categories', [rhum, upperRhum]);
+  });
+
+  function nextButton() {
+    return screen.getAllByText('bottles.importWizard.next').at(-1)!.closest('button')!;
+  }
+
+  it('blocks the import until one of the matches is picked, then sends it', async () => {
+    const confirmed = captureRequest('post', '/api/bottles/import/confirm');
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    const user = await previewWith(ambiguousPreview);
+
+    expect(screen.getByText('importMatches.ambiguous')).toBeInTheDocument();
+    expect(screen.getByText('importMatches.pickOne')).toBeInTheDocument();
+    expect(screen.getByText('bottles.importWizard.categoriesToResolve')).toBeInTheDocument();
+    expect(nextButton()).toBeDisabled();
+    const matchSelect = screen.getByLabelText('importMatches.existingEntry');
+    expect(matchSelect).toHaveValue('');
+
+    await user.selectOptions(matchSelect, 'RHUM');
+    expect(screen.queryByText('bottles.importWizard.categoriesToResolve')).not.toBeInTheDocument();
+    await user.click(nextButton());
+    await user.click(screen.getByText('bottles.importWizard.confirmImport'));
+
+    await screen.findByText('bottles.importWizard.successCount');
+    expect(await confirmed.body).toMatchObject({ resolutions: { categories: { rhum: { action: 'use_existing', existingId: 2 } } } });
+  });
+
+  it('creates it only under a name the matches do not hold', async () => {
+    const confirmed = captureRequest('post', '/api/bottles/import/confirm');
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    const user = await previewWith(ambiguousPreview);
+
+    await user.click(screen.getByText('bottles.importWizard.createNew'));
+    const name = screen.getByLabelText('categories.name');
+    expect(name).toHaveAttribute('aria-invalid', 'true');
+    expect(name).toHaveAccessibleDescription('importMatches.ambiguousName');
+    expect(screen.getByText('bottles.importWizard.categoriesToResolve')).toBeInTheDocument();
+    expect(nextButton()).toBeDisabled();
+
+    // Back to "use existing": still no match picked
+    await user.click(screen.getByText('bottles.importWizard.useExisting'));
+    expect(screen.getByLabelText('importMatches.existingEntry')).toHaveValue('');
+    expect(nextButton()).toBeDisabled();
+
+    await user.click(screen.getByText('bottles.importWizard.createNew'));
+    await user.type(screen.getByLabelText('categories.name'), ' blanc');
+    expect(screen.getByLabelText('categories.name')).not.toHaveAttribute('aria-invalid');
+    await user.click(nextButton());
+    expect(screen.getByText('bottles.importWizard.categoriesToCreate').nextSibling).toHaveTextContent('1');
+    await user.click(screen.getByText('bottles.importWizard.confirmImport'));
+
+    await screen.findByText('bottles.importWizard.successCount');
+    expect(await confirmed.body).toMatchObject({
+      resolutions: { categories: { rhum: { action: 'create', data: { name: 'rhum blanc' } } } },
+    });
+  });
+
+  it('says that a category to create that exists ignoring case is used as it is, and not created', async () => {
+    mockApiResponse('get', '/api/categories', [rhum]);
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    const user = await previewWith({
+      ...ambiguousPreview,
+      categories: [{ ref: fileCategory, existingMatch: { id: 1, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 }, status: 'matched' }],
+    });
+
+    await user.click(screen.getByText('bottles.importWizard.createNew'));
+    const name = screen.getByLabelText('categories.name');
+    expect(await screen.findByText('importMatches.usedAsItIs')).toBeInTheDocument();
+    expect(name).toHaveAccessibleDescription('importMatches.usedAsItIs');
+    expect(name).not.toHaveAttribute('aria-invalid');
+
+    await user.click(nextButton());
+    expect(screen.getByText('bottles.importWizard.categoriesToCreate').nextSibling).toHaveTextContent('0');
+  });
+});

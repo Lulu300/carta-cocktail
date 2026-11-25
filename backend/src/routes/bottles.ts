@@ -48,9 +48,13 @@ const CREATE_BATCH_SIZE = 500;
 // A 2,000-bottle import takes well under a second; the 5 s default leaves no margin on a slow disk
 const IMPORT_TRANSACTION_TIMEOUT_MS = 30_000;
 
-/** Same name, capacity and category, whatever the case: the import warns about such a bottle. */
-function duplicateKey(name: string, capacityMl: number, categoryName: string): string {
-  return `${name.toLowerCase()}|${capacityMl}|${categoryName.toLowerCase()}`;
+/**
+ * Same name whatever the case, capacity and category: the import warns about such a bottle.
+ * `category` is the lowercased category name in the preview, which has no resolution yet, and
+ * the id of the category a row is resolved to in the confirmation.
+ */
+function duplicateKey(name: string, capacityMl: number, category: string | number): string {
+  return `${name.toLowerCase()}|${capacityMl}|${category}`;
 }
 
 function previewCategory(category: Category) {
@@ -79,7 +83,7 @@ router.post('/import/preview', importUpload.single('file'), async (req: AuthRequ
   const categoriesByName = new CaseInsensitiveIndex(await prisma.category.findMany(), (category) => category.name);
   const bottlesByKey = new Map<string, typeof allBottles>();
   for (const bottle of allBottles) {
-    const key = duplicateKey(bottle.name, bottle.capacityMl, bottle.category.name);
+    const key = duplicateKey(bottle.name, bottle.capacityMl, bottle.category.name.toLowerCase());
     const sameKey = bottlesByKey.get(key);
     if (sameKey) sameKey.push(bottle);
     else bottlesByKey.set(key, [bottle]);
@@ -91,7 +95,7 @@ router.post('/import/preview', importUpload.single('file'), async (req: AuthRequ
   }));
 
   const bottles = payload.bottles.map((b) => {
-    const duplicates = (bottlesByKey.get(duplicateKey(b.name, b.capacityMl, b.categoryName)) ?? [])
+    const duplicates = (bottlesByKey.get(duplicateKey(b.name, b.capacityMl, b.categoryName.toLowerCase())) ?? [])
       .map((d) => ({
         id: d.id,
         name: d.name,
@@ -141,7 +145,9 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
             },
           });
         });
-        resolvedCategories.set(categoryName.toLowerCase(), category.id);
+        // Under the file's name, as `use_existing`: the rows name it, even when the admin renamed
+        // the category. A row moved to the new name finds it in `existingCategories`.
+        resolvedCategories.set(key.toLowerCase(), category.id);
       }
     }
 
@@ -155,9 +161,11 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
 
     const bottleResolutions = resolutions?.bottles || {};
 
-    const existingBottles = await tx.bottle.findMany({ include: { category: true } });
+    // By category id: a row may go in a category created under another name than the file's,
+    // or in one of several categories that differ only by case
+    const existingBottles = await tx.bottle.findMany();
     const existingKeys = new Set(
-      existingBottles.map((b) => duplicateKey(b.name, b.capacityMl, b.category.name))
+      existingBottles.map((b) => duplicateKey(b.name, b.capacityMl, b.categoryId))
     );
 
     for (let i = 0; i < payload.bottles.length; i++) {
@@ -177,7 +185,7 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
         continue;
       }
 
-      if (existingKeys.has(duplicateKey(b.name, b.capacityMl, finalCategoryName))) {
+      if (existingKeys.has(duplicateKey(b.name, b.capacityMl, categoryId))) {
         duplicatesCreated += b.quantity;
       }
 

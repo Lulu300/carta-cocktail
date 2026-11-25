@@ -8,7 +8,7 @@ effort: S
 status: todo
 owner: agent
 depends_on: [C-61, C-19]
-touches: [backend/src/utils/uniqueness.ts, backend/src/utils/uniqueness.test.ts, backend/src/services/integrityService.ts, backend/src/services/integrityService.test.ts, backend/src/routes/categories.ts, backend/src/routes/categories.test.ts, backend/src/routes/units.ts, backend/src/routes/units.test.ts, backend/src/routes/ingredients.ts, backend/src/routes/ingredients.test.ts]
+touches: [backend/src/utils/uniqueness.ts, backend/src/utils/uniqueness.test.ts, frontend/src/components/import/importResolutions.ts, frontend/src/components/import/importResolutions.test.ts, backend/src/services/integrityService.ts, backend/src/services/integrityService.test.ts, backend/src/routes/categories.ts, backend/src/routes/categories.test.ts, backend/src/routes/units.ts, backend/src/routes/units.test.ts, backend/src/routes/ingredients.ts, backend/src/routes/ingredients.test.ts]
 sources: []
 branch:
 pr:
@@ -54,6 +54,7 @@ Sur la branche de C-61 (#222) et celle de C-19 (#226) :
 - Même règle que C-61 : NFC, pas NFKC (NFKC changerait des caractères dessinés autrement : ligatures, chiffres pleine largeur, jamo hangul de compatibilité).
 - Le contrôle d'intégrité est lancé par `scripts/check-integrity.ts` : comparer en JS lit toutes les lignes des trois tables, acceptable pour un script ponctuel.
 - `uniqueness.test.ts` est ajouté par C-19.
+- Depuis C-64, les assistants d'import appliquent la même règle au nom saisi pour une catégorie ou une unité à créer : `matchIgnoringCase` (`frontend/src/components/import/importResolutions.ts`), miroir de `CaseInsensitiveIndex.match`. Une normalisation ajoutée à la clé du backend doit y être reportée (le frontend a déjà `composeName`, C-61), sinon l'assistant laisse passer une valeur que la confirmation refuse.
 
 ## Journal
 

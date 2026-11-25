@@ -377,7 +377,8 @@ export interface BottleImportPreviewResponse {
 }
 
 export type BottleCategoryResolution =
-  | { action: 'use_existing'; existingId: number }
+  // No id while the admin has not picked one of several matches yet
+  | { action: 'use_existing'; existingId?: number }
   | {
       action: 'create';
       data: {

@@ -1576,6 +1576,17 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
     });
   });
 
+  it('should flag a category several hold ignoring case that only the rows of a JSON file name', async () => {
+    await seedCategory({ name: 'Rhum' });
+    await seedCategory({ name: 'RHUM' });
+    const file = { version: 1, bottles: [{ name: 'Havana', categoryName: 'rhum', capacityMl: 700 }] };
+
+    const res = await request.post('/api/bottles/import/preview').set(authHeader())
+      .attach('file', Buffer.from(JSON.stringify(file)), 'bottles.json');
+
+    expect(res.body.categories).toEqual([expect.objectContaining({ ref: expect.objectContaining({ name: 'rhum' }), status: 'ambiguous' })]);
+  });
+
   it.each([
     ['in another case', 'rhum'],
     ['exactly', 'Rhum'],
@@ -1618,6 +1629,64 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
     expect(await prisma.bottle.count()).toBe(0);
     expect(await prisma.category.count()).toBe(1);
     expect(await prisma.categoryType.count()).toBe(typeCount);
+  });
+
+  // The wizard keeps each row on the file's category name: the category created for it holds them (C-64)
+  it('should put the rows of a category created under another name in it', async () => {
+    const res = await confirm([{ categoryName: 'Rhum' }], { rhum: { action: 'create', data: { name: 'Rhum agricole' } } });
+
+    expect(res.status).toBe(201);
+    expect(res.body.skippedNoCategory).toBe(0);
+    const created = await prisma.category.findUniqueOrThrow({ where: { name: 'Rhum agricole' } });
+    expect(await bottleCategoryIds()).toEqual([created.id]);
+  });
+
+  it('should find a category created under another name for a row moved to that name', async () => {
+    const res = await confirm([{ categoryName: 'Rhum agricole' }], { rhum: { action: 'create', data: { name: 'Rhum agricole' } } });
+
+    expect(res.status).toBe(201);
+    const created = await prisma.category.findUniqueOrThrow({ where: { name: 'Rhum agricole' } });
+    expect(await bottleCategoryIds()).toEqual([created.id]);
+  });
+
+  it.each([
+    ['one of them', 'RHUM', null],
+    ['a category created under another name', 'Rhum blanc', { action: 'create', data: { name: 'Rhum blanc' } }],
+  ])('should put the rows of a category several hold ignoring case in %s', async (_case, expected, resolution) => {
+    await seedCategory({ name: 'Rhum' });
+    const upperRhum = await seedCategory({ name: 'RHUM' });
+
+    const res = await confirm([{ categoryName: 'rhum' }], { rhum: resolution ?? { action: 'use_existing', existingId: upperRhum.id } });
+
+    expect(res.status).toBe(201);
+    const target = await prisma.category.findUniqueOrThrow({ where: { name: expected } });
+    expect(await bottleCategoryIds()).toEqual([target.id]);
+  });
+
+  // Duplicates are counted in the category a row goes in, not by the file's category name
+  it('should count no duplicate for a row put in a category created under another name', async () => {
+    const rhum = await seedCategory({ name: 'Rhum' });
+    await seedBottle({ name: 'Havana', categoryId: rhum.id, capacityMl: 700 });
+
+    const res = await confirm([{ categoryName: 'Rhum' }], { rhum: { action: 'create', data: { name: 'Rhum agricole' } } });
+
+    expect(res.status).toBe(201);
+    expect(res.body.duplicatesCreated).toBe(0);
+  });
+
+  it.each([
+    ['the one that holds the same bottle', 'Rhum', 1],
+    ['the other one', 'RHUM', 0],
+  ])('should count the duplicates of a row put in %s of two categories equal ignoring case', async (_case, picked, duplicates) => {
+    const rhum = await seedCategory({ name: 'Rhum' });
+    const upperRhum = await seedCategory({ name: 'RHUM' });
+    await seedBottle({ name: 'Havana', categoryId: rhum.id, capacityMl: 700 });
+    const existingId = picked === 'Rhum' ? rhum.id : upperRhum.id;
+
+    const res = await confirm([{ categoryName: 'rhum' }], { rhum: { action: 'use_existing', existingId } });
+
+    expect(res.status).toBe(201);
+    expect(res.body.duplicatesCreated).toBe(duplicates);
   });
 
   it('should put a row in the exact category when others are equal to it ignoring case', async () => {

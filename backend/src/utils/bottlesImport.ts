@@ -564,12 +564,28 @@ export function parseCsvBottles(csv: string, language: string): NormalizedImport
 
   const kept = readBottles(rows, errors, language);
 
-  // A CSV has no category list: each category named by a kept row is created with the defaults
-  const categories = new Map<string, ImportCategoryRecord>();
+  // A CSV has no category list
+  return {
+    version: BOTTLE_IMPORT_VERSION,
+    categories: withRowCategories([], kept),
+    bottles: kept.map(({ bottle }) => bottle),
+    errors: byLine(errors),
+  };
+}
+
+/**
+ * The categories listed, followed by each other category a kept row names, with the defaults.
+ * The preview matches every category the rows need, so a name several existing categories
+ * hold ignoring case is flagged before the confirmation refuses it.
+ */
+function withRowCategories(listed: ImportCategoryRecord[], kept: KeptBottle[]): ImportCategoryRecord[] {
+  const known = new Set(listed.map((category) => category.name.toLowerCase()));
+  const named: ImportCategoryRecord[] = [];
   for (const { bottle, row } of kept) {
     const key = bottle.categoryName.toLowerCase();
-    if (!bottle.categoryName || categories.has(key)) continue;
-    categories.set(key, {
+    if (!bottle.categoryName || known.has(key)) continue;
+    known.add(key);
+    named.push({
       name: bottle.categoryName,
       type: toText(row.values.categoryType) || 'SPIRIT',
       desiredStock: 1,
@@ -577,13 +593,7 @@ export function parseCsvBottles(csv: string, language: string): NormalizedImport
       nameTranslations: null,
     });
   }
-
-  return {
-    version: BOTTLE_IMPORT_VERSION,
-    categories: Array.from(categories.values()),
-    bottles: kept.map(({ bottle }) => bottle),
-    errors: byLine(errors),
-  };
+  return [...listed, ...named];
 }
 
 /** JSON arrays numbered from 1, as the admin counts them. */
@@ -598,9 +608,15 @@ export function parseJsonBottles(json: unknown, language: string): NormalizedImp
   if (!Array.isArray(json.bottles)) throw new ImportParseError('bottlesRequired');
 
   const errors: ImportRowError[] = [];
-  const categories = readCategories(numberJsonRows(Array.isArray(json.categories) ? json.categories : []), errors);
-  const bottles = readBottles(numberJsonRows(json.bottles), errors, language).map(({ bottle }) => bottle);
-  return { version: BOTTLE_IMPORT_VERSION, categories, bottles, errors };
+  const listed = readCategories(numberJsonRows(Array.isArray(json.categories) ? json.categories : []), errors);
+  const kept = readBottles(numberJsonRows(json.bottles), errors, language);
+  // A hand-made file may leave out of its list a category its rows name, as a CSV always does
+  return {
+    version: BOTTLE_IMPORT_VERSION,
+    categories: withRowCategories(listed, kept),
+    bottles: kept.map(({ bottle }) => bottle),
+    errors,
+  };
 }
 
 function parseCategoriesCsv(csv: string, errors: ImportRowError[]): ImportCategoryRecord[] {

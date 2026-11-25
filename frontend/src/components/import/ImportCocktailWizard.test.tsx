@@ -230,6 +230,52 @@ describe('ImportCocktailWizard', () => {
     });
   });
 
+  // Data older than C-07 can hold two categories that differ only by case (C-19)
+  it('blocks the import until one of the categories a name could mean is picked', async () => {
+    mockApiResponse('get', '/api/categories', [buildCategory({ id: 10, name: 'Rhum' }), buildCategory({ id: 11, name: 'RHUM' })]);
+    answerPreview = (name) => HttpResponse.json({
+      ...matchedPreview(name),
+      categories: [{
+        ref: { name: 'rhum' },
+        existingMatch: null,
+        status: 'ambiguous',
+        ambiguousMatches: [{ id: 10, name: 'Rhum' }, { id: 11, name: 'RHUM' }],
+      }],
+    });
+    render(<ImportCocktailWizard onClose={vi.fn()} />);
+
+    uploadJson(recipe('Daiquiri'));
+    await user.click(await screen.findByRole('button', { name: 'cocktails.importWizard.next' }));
+    expect(await screen.findByText('importMatches.pickOne')).toBeInTheDocument();
+    expect(screen.getByText('cocktails.importWizard.unresolvedCount')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'cocktails.importWizard.next' })).toBeDisabled();
+
+    await user.selectOptions(screen.getByLabelText('cocktails.importWizard.existingEntity'), await screen.findByRole('option', { name: 'RHUM' }));
+    expect(screen.getByText('cocktails.importWizard.allResolved')).toBeInTheDocument();
+    await goToConfirmationFromResolve();
+    await confirmImport();
+
+    expect(await screen.findByText('cocktails.importWizard.success')).toBeInTheDocument();
+    expect(confirmations[0].resolutions.categories).toEqual({ rhum: { action: 'use_existing', existingId: 11 } });
+  });
+
+  it('shows a category to create that exists ignoring case as used, not created', async () => {
+    render(<ImportCocktailWizard onClose={vi.fn()} />);
+
+    uploadJson(recipe('Daiquiri'));
+    await user.click(await screen.findByRole('button', { name: 'cocktails.importWizard.next' }));
+    await user.click(await screen.findByRole('button', { name: /^Rhum/ }));
+    await user.click(screen.getByRole('button', { name: 'cocktails.importWizard.createNew' }));
+    const name = screen.getByLabelText(/categories\.name/);
+    await user.clear(name);
+    await user.type(name, 'RHUM');
+    expect(name).toHaveAccessibleDescription('importMatches.usedAsItIs');
+    await goToConfirmationFromResolve();
+
+    expect(screen.getByText(/cocktails\.importWizard\.entitiesMapped/)).toBeInTheDocument();
+    expect(screen.queryByText(/cocktails\.importWizard\.entitiesToCreate/)).not.toBeInTheDocument();
+  });
+
   it('refreshes the lists after a confirmation that created an entity', async () => {
     answerPreview = () => HttpResponse.json(bottleToCreatePreview);
     render(<ImportCocktailWizard onClose={vi.fn()} />);
