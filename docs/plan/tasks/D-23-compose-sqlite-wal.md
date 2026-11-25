@@ -25,9 +25,9 @@ Trouvé pendant D-13. Les deux fichiers compose listent les variables du backend
 
 ## Ce qu'il faut faire
 
-1. `docker-compose.yml` et `docker-compose.prod.yml` : ajouter `- SQLITE_WAL=${SQLITE_WAL:-true}` à l'`environment` de `carta-cocktail-backend`.
+1. `docker-compose.yml` et `docker-compose.prod.yml` : ajouter `- SQLITE_WAL=${SQLITE_WAL:-true}` à l'`environment` de `carta-cocktail-backend`. *Remplacé par la PR #224 : `${VAR:-}` (vide = défaut du backend), pour `SQLITE_WAL` et les autres variables facultatives (voir le Journal).*
 2. README, section « Database files and network shares » et ligne `SQLITE_WAL` du tableau : remplacer la consigne d'édition du compose (et la phrase « Add this line again each time you download a new compose file ») par « dans `.env` ». `.env.example` : retirer la remarque sur Docker.
-3. Section « Required actions » de la PR (règle 9) : *before* — une instance qui a ajouté `- SQLITE_WAL=false` à la main dans son compose met `SQLITE_WAL=false` dans `.env` avant la mise à jour. La mise à jour remplace `docker-compose.prod.yml` par un fichier téléchargé (`UPGRADING.md`, v1.6.0, étape 5) : l'ajout à la main disparaît et `${SQLITE_WAL:-true}` repasserait la base en WAL sans prévenir. Ligne « Notes de version » correspondante dans le Journal.
+3. Section « Required actions » de la PR (règle 9) : *before* — une instance qui a ajouté `- SQLITE_WAL=false` à la main dans son compose met `SQLITE_WAL=false` dans `.env` avant la mise à jour. La mise à jour remplace `docker-compose.prod.yml` par un fichier téléchargé (`UPGRADING.md`, v1.6.0, étape 5) : l'ajout à la main disparaît et `${SQLITE_WAL:-true}` repasserait la base en WAL sans prévenir. Ligne « Notes de version » correspondante dans le Journal. *Remplacé par la PR #224 : aucune action requise ; la consigne de déplacer la ligne dans `.env` en téléchargeant le nouveau compose est dans la ligne « Notes de version » du Journal.*
 
 ## Critères d'acceptation
 
