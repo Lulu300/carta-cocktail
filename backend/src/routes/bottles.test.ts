@@ -1621,6 +1621,19 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
     expect(await prisma.category.count()).toBe(1);
   });
 
+  // The resolutions are keyed by the file's name in lower case only: a row naming the other form
+  // misses that key and finds the category through the index, created rows included
+  it('should put a row naming the decomposed form in the category created for the composed one', async () => {
+    const res = await confirm([{ categoryName: 'Crème' }, { categoryName: 'Crème' }], {
+      'crème': { action: 'create', data: { name: 'Crème' } },
+    });
+
+    expect(res.status).toBe(201);
+    const cream = await prisma.category.findFirstOrThrow();
+    expect(await bottleCategoryIds()).toEqual([cream.id, cream.id]);
+    expect(await prisma.category.count()).toBe(1);
+  });
+
   it('should store a category it creates composed, translations included', async () => {
     const res = await confirm([{ categoryName: 'Crème' }], {
       'crème': { action: 'create', data: { name: 'Crème', nameTranslations: { fr: 'Crème' } } },
