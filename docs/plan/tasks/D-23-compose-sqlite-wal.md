@@ -25,9 +25,9 @@ Trouvé pendant D-13. Les deux fichiers compose listent les variables du backend
 
 ## Ce qu'il faut faire
 
-1. `docker-compose.yml` et `docker-compose.prod.yml` : ajouter `- SQLITE_WAL=${SQLITE_WAL:-true}` à l'`environment` de `carta-cocktail-backend`.
+1. `docker-compose.yml` et `docker-compose.prod.yml` : ajouter `- SQLITE_WAL=${SQLITE_WAL:-true}` à l'`environment` de `carta-cocktail-backend`. *Fait autrement dans la PR #224 : `${VAR:-}` (vide = défaut du backend), pour `SQLITE_WAL` et les autres variables facultatives (voir le Journal).*
 2. README, section « Database files and network shares » et ligne `SQLITE_WAL` du tableau : remplacer la consigne d'édition du compose (et la phrase « Add this line again each time you download a new compose file ») par « dans `.env` ». `.env.example` : retirer la remarque sur Docker.
-3. Section « Required actions » de la PR (règle 9) : *before* — une instance qui a ajouté `- SQLITE_WAL=false` à la main dans son compose met `SQLITE_WAL=false` dans `.env` avant la mise à jour. La mise à jour remplace `docker-compose.prod.yml` par un fichier téléchargé (`UPGRADING.md`, v1.6.0, étape 5) : l'ajout à la main disparaît et `${SQLITE_WAL:-true}` repasserait la base en WAL sans prévenir. Ligne « Notes de version » correspondante dans le Journal.
+3. Section « Required actions » de la PR (règle 9) : *before* — une instance qui a ajouté `- SQLITE_WAL=false` à la main dans son compose met `SQLITE_WAL=false` dans `.env` avant la mise à jour. La mise à jour remplace `docker-compose.prod.yml` par un fichier téléchargé (`UPGRADING.md`, v1.6.0, étape 5) : l'ajout à la main disparaît et `${SQLITE_WAL:-true}` repasserait la base en WAL sans prévenir. Ligne « Notes de version » correspondante dans le Journal. *Remplacé par la PR #224 : aucune action requise ; la consigne de déplacer la ligne dans `.env` en téléchargeant le nouveau compose est dans la ligne « Notes de version » du Journal.*
 
 ## Critères d'acceptation
 
@@ -42,7 +42,7 @@ Trouvé pendant D-13. Les deux fichiers compose listent les variables du backend
 ## Points d'attention
 
 - Zone séquentielle : `docker-compose*.yml` (voir `docs/plan/README.md`). Regrouper avec une autre tâche compose si l'une est ouverte.
-- `UPGRADING.md` n'est pas modifié par la tâche (règle 9) : le coordinateur adapte la section v1.6.0 au moment de la release s'il le juge utile.
+- `UPGRADING.md` n'est pas modifié par la tâche (règle 9) : le coordinateur adapte la section v1.6.0 au moment de la release s'il le juge utile. *Finalement modifié dans la PR #224, à la demande du coordinateur (voir le Journal).*
 
 ## Journal
 
