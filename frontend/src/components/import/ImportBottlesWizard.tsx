@@ -22,6 +22,7 @@ import BottleImportConfirmStep from './BottleImportConfirmStep';
 import {
   buildAutoBottleImportResolutions,
   categoryOptions,
+  countCategoriesToResolve,
   countCategoriesWithoutType,
   countRowsWithoutCategory,
 } from './bottleImportResolutions';
@@ -95,12 +96,16 @@ export default function ImportBottlesWizard({ onClose, onImported }: ImportBottl
 
   const rowsWithoutCategory = preview ? countRowsWithoutCategory(preview, resolutions) : 0;
   const categoriesWithoutType = countCategoriesWithoutType(resolutions, categoryTypes);
-  const isIncomplete = rowsWithoutCategory > 0 || categoriesWithoutType > 0;
+  const categoriesToResolve = preview ? countCategoriesToResolve(preview, resolutions, existingCategories) : 0;
+  const isIncomplete = rowsWithoutCategory > 0 || categoriesWithoutType > 0 || categoriesToResolve > 0;
 
-  // Says why "Next" or "Import" is disabled: the flagged type field can be out of sight
-  const typeWarning = categoriesWithoutType > 0 && (
-    <div className="bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-lg p-3 text-sm">
-      {t('bottles.importWizard.categoriesWithoutType', { count: categoriesWithoutType })}
+  // Says why "Next" or "Import" is disabled: the flagged category can be out of sight
+  const blockingReasons: string[] = [];
+  if (categoriesToResolve > 0) blockingReasons.push(t('bottles.importWizard.categoriesToResolve', { count: categoriesToResolve }));
+  if (categoriesWithoutType > 0) blockingReasons.push(t('bottles.importWizard.categoriesWithoutType', { count: categoriesWithoutType }));
+  const blockingWarning = blockingReasons.length > 0 && (
+    <div className="bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-lg p-3 text-sm space-y-1">
+      {blockingReasons.map((reason) => <p key={reason}>{reason}</p>)}
     </div>
   );
 
@@ -160,7 +165,7 @@ export default function ImportBottlesWizard({ onClose, onImported }: ImportBottl
       {step === 'resolve' && preview && (
         <div className="space-y-4">
           {/* Above the scrolled list, so that it stays in sight */}
-          {typeWarning}
+          {blockingWarning}
           <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-1">
             <div className="bg-canvas border border-gray-700 rounded-lg p-3 text-sm flex gap-6 text-fg-muted">
               <span>{t('bottles.importWizard.summaryCategories', { count: preview.categories.length })}</span>
@@ -171,6 +176,7 @@ export default function ImportBottlesWizard({ onClose, onImported }: ImportBottl
               categories={preview.categories}
               resolutions={resolutions.categories}
               categoryTypes={categoryTypes}
+              existingCategories={existingCategories}
               onChange={updateCategory}
             />
             <BottleImportRowsStep
@@ -185,8 +191,8 @@ export default function ImportBottlesWizard({ onClose, onImported }: ImportBottl
 
       {step === 'confirm' && preview && (
         <div className="space-y-4">
-          {typeWarning}
-          <BottleImportConfirmStep preview={preview} resolutions={resolutions} />
+          {blockingWarning}
+          <BottleImportConfirmStep preview={preview} resolutions={resolutions} existingCategories={existingCategories} />
         </div>
       )}
 

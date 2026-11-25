@@ -1,16 +1,17 @@
 import { useTranslation } from 'react-i18next';
-import type { BottleImportPreviewResponse, BottleImportResolutions } from '../../types';
-import { countBottlesToCreate, countDuplicateRows, countRowsWithoutCategory } from './bottleImportResolutions';
+import type { BottleImportPreviewResponse, BottleImportResolutions, Category } from '../../types';
+import { countBottlesToCreate, countCategoriesToCreate, countDuplicateRows, countRowsWithoutCategory } from './bottleImportResolutions';
 
 interface BottleImportConfirmStepProps {
   preview: BottleImportPreviewResponse;
   resolutions: BottleImportResolutions;
+  existingCategories: Category[];
 }
 
 /** What the confirmation creates, with the duplicates and the rows it would leave out. */
-export default function BottleImportConfirmStep({ preview, resolutions }: BottleImportConfirmStepProps) {
+export default function BottleImportConfirmStep({ preview, resolutions, existingCategories }: BottleImportConfirmStepProps) {
   const { t } = useTranslation();
-  const categoriesToCreate = Object.values(resolutions.categories).filter((r) => r.action === 'create').length;
+  const categoriesToCreate = countCategoriesToCreate(resolutions, existingCategories);
   const skippedRows = Object.values(resolutions.bottles).filter((r) => r.action === 'skip').length;
   const duplicateRows = countDuplicateRows(preview, resolutions);
   const rowsWithoutCategory = countRowsWithoutCategory(preview, resolutions);

@@ -7,7 +7,14 @@ import type {
   Category,
   CategoryType,
 } from '../../types';
-import { DEFAULT_CATEGORY_TYPE, DEFAULT_DESIRED_STOCK, isMissingCategoryType, resolutionKey } from './importResolutions';
+import {
+  DEFAULT_CATEGORY_TYPE,
+  DEFAULT_DESIRED_STOCK,
+  isMissingCategoryType,
+  matchIgnoringCase,
+  resolutionKey,
+  type ExistingMatch,
+} from './importResolutions';
 
 // The backend gives this default to a category file that leaves it out
 const DEFAULT_MINIMUM_PERCENT = 30;
@@ -24,10 +31,14 @@ export function defaultCategoryData(ref: BottleImportCategoryRecord): Extract<Bo
   };
 }
 
-/** Uses the category the backend matched, and creates every other one. */
+/**
+ * Uses the category the backend matched, and creates every other one. A category several
+ * existing ones match ignoring case gets nothing: the admin picks one of them.
+ */
 export function buildAutoCategoryResolutions(preview: BottleImportPreviewResponse): Record<string, BottleCategoryResolution> {
   const resolutions: Record<string, BottleCategoryResolution> = {};
   for (const entry of preview.categories) {
+    if (entry.status === 'ambiguous') continue;
     resolutions[resolutionKey('categories', entry.ref)] = entry.status === 'matched' && entry.existingMatch
       ? { action: 'use_existing', existingId: entry.existingMatch.id }
       : { action: 'create', data: defaultCategoryData(entry.ref) };
@@ -62,6 +73,47 @@ export function countRowsWithoutCategory(preview: BottleImportPreviewResponse, r
   return preview.bottles.filter((entry, index) => {
     const resolution = resolutions.bottles[String(index)];
     return resolution?.action !== 'skip' && !rowCategory(entry.ref.categoryName, resolution);
+  }).length;
+}
+
+type CategoryCreation = Extract<BottleCategoryResolution, { action: 'create' }>;
+
+/**
+ * The existing category a category to create meets ignoring case (`matchIgnoringCase`): the
+ * backend uses a category found as it is, and refuses an ambiguous name. A blank name stands
+ * for the file's, which the backend reads from the resolution key.
+ */
+export function existingCategoryFor(key: string, resolution: CategoryCreation, categories: Category[]): ExistingMatch<Category> {
+  // The backend trims the name
+  return matchIgnoringCase(categories, resolution.data.name.trim() || key, (category) => category.name);
+}
+
+/** Categories the confirmation creates: one to create that exists ignoring case uses that one. */
+export function countCategoriesToCreate(resolutions: BottleImportResolutions, categories: Category[]): number {
+  return Object.entries(resolutions.categories).filter(
+    ([key, resolution]) => resolution.action === 'create' && existingCategoryFor(key, resolution, categories).status === 'none',
+  ).length;
+}
+
+/**
+ * False while the confirmation would refuse the category (409): nothing chosen for a category
+ * several existing ones match, none of them picked, or a name to create that several hold.
+ */
+function isCategoryResolved(key: string, resolution: BottleCategoryResolution | undefined, categories: Category[]): boolean {
+  if (!resolution) return false;
+  if (resolution.action === 'use_existing') return resolution.existingId !== undefined;
+  return existingCategoryFor(key, resolution, categories).status !== 'ambiguous';
+}
+
+/** Categories of the file still to resolve: they block the import. */
+export function countCategoriesToResolve(
+  preview: BottleImportPreviewResponse,
+  resolutions: BottleImportResolutions,
+  categories: Category[],
+): number {
+  return preview.categories.filter((entry) => {
+    const key = resolutionKey('categories', entry.ref);
+    return !isCategoryResolved(key, resolutions.categories[key], categories);
   }).length;
 }
 

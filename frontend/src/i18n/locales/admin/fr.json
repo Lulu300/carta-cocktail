@@ -123,6 +123,7 @@
       "willCreate": "à créer",
       "categoryRequired": "Catégorie obligatoire pour cette bouteille",
       "categoriesWithoutType": "{{count}} catégorie(s) à créer sans type qui a un nom : choisissez un autre type.",
+      "categoriesToResolve": "{{count}} catégorie(s) correspondent à plusieurs existantes qui ne diffèrent que par la casse : utilisez l'une d'elles, ou créez-la sous un autre nom.",
       "duplicateFlag": "{{count}} doublon(s) existant(s)",
       "confirmTitle": "Résumé de l'import",
       "categoriesToCreate": "Catégories à créer",
@@ -166,6 +167,13 @@
     "usage": "Utilisation",
     "usableAsApero": "Utilisable comme apéritif",
     "usableAsDigestif": "Utilisable comme digestif"
+  },
+  "importMatches": {
+    "ambiguous": "Plusieurs correspondances",
+    "pickOne": "Plusieurs existantes ne diffèrent que par la casse : {{names}}. Utilisez l'une d'elles, ou créez-la sous un autre nom.",
+    "pickMatch": "— Choisir l'une d'elles —",
+    "usedAsItIs": "Existe déjà sous « {{name}} » : elle sera utilisée telle quelle, et les autres champs ignorés.",
+    "ambiguousName": "Correspond à {{names}}, qui ne diffèrent que par la casse : utilisez l'une d'elles, ou changez cette valeur."
   },
   "ingredients": {
     "title": "Ingrédients",
