@@ -154,8 +154,9 @@ export const UNIQUE_FIELD: Partial<Record<ImportEntityType, 'name' | 'abbreviati
  *
  * Limit: only the existing rows count. Two entries of one import created under names equal
  * ignoring case meet nothing here, while the backend creates the first and uses it for the
- * second (`findOrCreate`): neither shows the "used as it is" hint, and the bottle summary
- * counts both as created.
+ * second (`findOrCreate`): neither shows the "used as it is" hint, and the recipe import summary
+ * lists both as created. The bottle import replays that order to count its creations
+ * (`countCategoriesToCreate`).
  */
 export function existingRowFor(type: ImportEntityType, data: ImportEntityRef, existing: ExistingRows): ExistingMatch<UniqueRow> {
   // The backend trims these values

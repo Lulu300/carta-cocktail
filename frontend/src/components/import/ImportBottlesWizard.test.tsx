@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createTestQueryClient, render, screen, waitFor, fireEvent } from '../../test/test-utils';
+import { createTestQueryClient, render, screen, waitFor, fireEvent, within } from '../../test/test-utils';
 import { qk } from '../../queries/keys';
 import userEvent from '@testing-library/user-event';
 import ImportBottlesWizard from './ImportBottlesWizard';
@@ -496,8 +496,12 @@ describe('ImportBottlesWizard - categories equal ignoring case', () => {
     const matchSelect = screen.getByLabelText('importMatches.existingEntry');
     expect(matchSelect).toHaveValue('');
 
+    // The row's `rhum` holds no category yet
+    expect(screen.getByLabelText('bottles.category')).toHaveValue('');
+
     await user.selectOptions(matchSelect, 'RHUM');
     expect(screen.queryByText('bottles.importWizard.categoriesToResolve')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('bottles.category')).toHaveDisplayValue('RHUM');
     await user.click(nextButton());
     await user.click(screen.getByText('bottles.importWizard.confirmImport'));
 
@@ -551,5 +555,32 @@ describe('ImportBottlesWizard - categories equal ignoring case', () => {
 
     await user.click(nextButton());
     expect(screen.getByText('bottles.importWizard.categoriesToCreate').nextSibling).toHaveTextContent('0');
+  });
+
+  it('shows each row in the category the confirmation puts it in', async () => {
+    mockApiResponse('get', '/api/categories', [rhum]);
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    const user = await previewWith({
+      ...ambiguousPreview,
+      categories: [{ ref: fileCategory, existingMatch: { id: 1, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 }, status: 'matched' }],
+    });
+    const rowCategory = screen.getByLabelText('bottles.category');
+    // The row sends the file's `rhum`, which the confirmation puts in `Rhum`
+    expect(rowCategory).toHaveDisplayValue('Rhum');
+
+    // Created under the name of the file, the category is the existing one: nothing to create
+    await user.click(screen.getByText('bottles.importWizard.createNew'));
+    expect(rowCategory).toHaveDisplayValue('Rhum');
+    expect(within(rowCategory).queryByRole('option', { name: /bottles\.importWizard\.willCreate/ })).not.toBeInTheDocument();
+
+    // Renamed, it is created, and the row goes in it
+    const name = screen.getByLabelText('categories.name');
+    await user.clear(name);
+    await user.type(name, 'Rhum agricole');
+    expect(rowCategory).toHaveDisplayValue('Rhum agricole (bottles.importWizard.willCreate)');
+    expect(within(rowCategory).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'bottles.importWizard.pickCategory',
+      'Rhum agricole (bottles.importWizard.willCreate)',
+    ]);
   });
 });

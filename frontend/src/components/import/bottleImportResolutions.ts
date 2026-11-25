@@ -79,20 +79,27 @@ export function countRowsWithoutCategory(preview: BottleImportPreviewResponse, r
 type CategoryCreation = Extract<BottleCategoryResolution, { action: 'create' }>;
 
 /**
- * The existing category a category to create meets ignoring case (`matchIgnoringCase`): the
- * backend uses a category found as it is, and refuses an ambiguous name. A blank name stands
- * for the file's, which the backend reads from the resolution key.
+ * The name the backend gives a category to create: the trimmed name, or, when it is blank, the
+ * file's, which the backend reads from the resolution key.
  */
-export function existingCategoryFor(key: string, resolution: CategoryCreation, categories: Category[]): ExistingMatch<Category> {
-  // The backend trims the name
-  return matchIgnoringCase(categories, resolution.data.name.trim() || key, (category) => category.name);
+function nameToCreate(key: string, resolution: CategoryCreation): string {
+  return resolution.data.name.trim() || key;
 }
 
-/** Categories the confirmation creates: one to create that exists ignoring case uses that one. */
+/**
+ * The existing category a category to create meets ignoring case (`matchIgnoringCase`): the
+ * backend uses a category found as it is, and refuses an ambiguous name.
+ */
+export function existingCategoryFor(key: string, resolution: CategoryCreation, categories: Category[]): ExistingMatch<Category> {
+  return matchIgnoringCase(categories, nameToCreate(key, resolution), (category) => category.name);
+}
+
+/**
+ * Categories the confirmation creates: one to create that a category holds ignoring case, existing
+ * or created earlier in the import, uses that one.
+ */
 export function countCategoriesToCreate(resolutions: BottleImportResolutions, categories: Category[]): number {
-  return Object.entries(resolutions.categories).filter(
-    ([key, resolution]) => resolution.action === 'create' && existingCategoryFor(key, resolution, categories).status === 'none',
-  ).length;
+  return applyCategoryResolutions(categories, resolutions.categories).categories.filter((category) => category.isNew).length;
 }
 
 /**
@@ -133,22 +140,69 @@ export function countBottlesToCreate(preview: BottleImportPreviewResponse, resol
   return importedRows(preview, resolutions).reduce((total, entry) => total + (entry.ref.quantity || 1), 0);
 }
 
+/** A category a row can go in: an existing one, or one the confirmation creates. */
 export interface CategoryOption {
   name: string;
   isNew: boolean;
 }
 
-/** Categories a row can be put in: the existing ones and those the import creates. */
-export function categoryOptions(
-  existing: Category[],
-  preview: BottleImportPreviewResponse,
-  resolutions: BottleImportResolutions,
-): CategoryOption[] {
-  const created = preview.categories.filter(
-    (entry) => resolutions.categories[resolutionKey('categories', entry.ref)]?.action === 'create',
-  );
-  return [
-    ...existing.map((category) => ({ name: category.name, isNew: false })),
-    ...created.map((entry) => ({ name: entry.ref.name, isNew: true })),
-  ];
+export interface RowCategories {
+  /** One option per category a row can be put in, under the name that puts a row there. */
+  options: CategoryOption[];
+  /** The option of the category the confirmation puts a row naming `categoryName` in, if any. */
+  categoryOf: (categoryName: string) => CategoryOption | undefined;
+}
+
+/**
+ * The categories once the confirmation (`POST /bottles/import/confirm`) has applied the category
+ * resolutions, in order: the existing ones then those it creates, and the category each resolution
+ * key stands for. A category to create that a category already holds ignoring case, created
+ * earlier in the import included, uses that one.
+ */
+function applyCategoryResolutions(existing: Category[], resolutions: Record<string, BottleCategoryResolution>) {
+  const existingById = new Map(existing.map((category) => [category.id, { name: category.name, isNew: false }]));
+  const categories: CategoryOption[] = [...existingById.values()];
+  const resolvedByKey = new Map<string, CategoryOption>();
+
+  for (const [key, resolution] of Object.entries(resolutions)) {
+    let category: CategoryOption | undefined;
+    if (resolution.action === 'use_existing') {
+      category = resolution.existingId === undefined ? undefined : existingById.get(resolution.existingId);
+    } else {
+      const name = nameToCreate(key, resolution);
+      const match = matchIgnoringCase(categories, name, (option) => option.name);
+      if (match.status === 'found') category = match.row;
+      if (match.status === 'none') {
+        category = { name, isNew: true };
+        categories.push(category);
+      }
+      // An ambiguous name stays unresolved: the confirmation refuses it, and the wizard blocks it
+    }
+    if (category) resolvedByKey.set(key, category);
+  }
+  return { categories, resolvedByKey };
+}
+
+/**
+ * The categories of the rows, by the rules of the confirmation: once the category resolutions are
+ * applied (`applyCategoryResolutions`), it puts each row in the category resolved for its name,
+ * else in the category that holds that name.
+ *
+ * An option a row cannot reach by its name is left out: a resolution of that name sends the row
+ * elsewhere, such as `Rhum` when the file's `rhum` is resolved to `RHUM` or renamed.
+ */
+export function rowCategories(existing: Category[], resolutions: Record<string, BottleCategoryResolution>): RowCategories {
+  const { categories, resolvedByKey } = applyCategoryResolutions(existing, resolutions);
+
+  const categoryOf = (categoryName: string) => {
+    // The backend trims the name of a row
+    const name = categoryName.trim();
+    if (!name) return undefined;
+    const resolved = resolvedByKey.get(resolutionKey('categories', { name }));
+    if (resolved) return resolved;
+    const match = matchIgnoringCase(categories, name, (option) => option.name);
+    return match.status === 'found' ? match.row : undefined;
+  };
+  const options = categories.filter((category) => categoryOf(category.name) === category);
+  return { options, categoryOf };
 }
