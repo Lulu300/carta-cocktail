@@ -385,6 +385,24 @@ describe('parseJsonBottles', () => {
     ]);
   });
 
+  it('adds the categories the rows name that the list leaves out, with the defaults, as a CSV does', () => {
+    const payload = parseJsonBottles({
+      version: 1,
+      categories: [{ name: 'Rhum', type: 'SPIRIT', desiredStock: 3 }],
+      bottles: [
+        jsonBottle({ categoryName: 'RHUM' }),
+        jsonBottle({ categoryName: 'Gin' }),
+        jsonBottle({ categoryName: 'gin' }),
+        jsonBottle({ categoryName: '' }),
+      ],
+    }, 'en');
+
+    expect(payload.categories).toEqual([
+      { name: 'Rhum', type: 'SPIRIT', desiredStock: 3, minimumPercent: 30, nameTranslations: null },
+      { name: 'Gin', type: 'SPIRIT', desiredStock: 1, minimumPercent: 30, nameTranslations: null },
+    ]);
+  });
+
   it('keeps a valid opening date as written', () => {
     const payload = parseJsonBottles({ version: 1, bottles: [jsonBottle({ openedAt: '2026-10-11' })] }, 'en');
     expect(payload.bottles[0].openedAt).toBe('2026-10-11');
