@@ -2,17 +2,17 @@ import { useTranslation } from 'react-i18next';
 import type { BottleRowPreview, BottleRowResolution } from '../../types';
 import { cx } from '../ui/classNames';
 import Select from '../ui/Select';
-import { rowCategory, type CategoryOption } from './bottleImportResolutions';
+import { rowCategory, type RowCategories } from './bottleImportResolutions';
 
 interface BottleImportRowsStepProps {
   rows: BottleRowPreview[];
   resolutions: Record<string, BottleRowResolution>;
-  categoryOptions: CategoryOption[];
+  categories: RowCategories;
   onChange: (index: string, resolution: BottleRowResolution) => void;
 }
 
 /** Bottles of the file: pick each one's category, or skip it. */
-export default function BottleImportRowsStep({ rows, resolutions, categoryOptions, onChange }: BottleImportRowsStepProps) {
+export default function BottleImportRowsStep({ rows, resolutions, categories, onChange }: BottleImportRowsStepProps) {
   const { t } = useTranslation();
 
   return (
@@ -26,6 +26,8 @@ export default function BottleImportRowsStep({ rows, resolutions, categoryOption
           const resolution = resolutions[key];
           const isSkipped = resolution?.action === 'skip';
           const category = rowCategory(entry.ref.categoryName, resolution);
+          // The category the confirmation uses, which may differ from the name the row sends
+          const shownCategory = categories.categoryOf(category);
           const needsCategory = entry.needsCategory && !category;
           return (
             <div
@@ -54,14 +56,14 @@ export default function BottleImportRowsStep({ rows, resolutions, categoryOption
               <div className="flex items-center gap-2">
                 <Select
                   aria-label={t('bottles.category')}
-                  value={category}
+                  value={shownCategory?.name ?? ''}
                   onChange={(e) => onChange(key, { action: 'import', categoryName: e.target.value })}
                   disabled={isSkipped}
                   className="flex-1"
                 >
                   <option value="">{t('bottles.importWizard.pickCategory')}</option>
-                  {categoryOptions.map((option) => (
-                    <option key={`${option.isNew ? 'new' : 'existing'}-${option.name}`} value={option.name}>
+                  {categories.options.map((option) => (
+                    <option key={option.name} value={option.name}>
                       {option.name}{option.isNew ? ` (${t('bottles.importWizard.willCreate')})` : ''}
                     </option>
                   ))}

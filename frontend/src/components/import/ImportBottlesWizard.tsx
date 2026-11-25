@@ -21,10 +21,10 @@ import BottleImportRowsStep from './BottleImportRowsStep';
 import BottleImportConfirmStep from './BottleImportConfirmStep';
 import {
   buildAutoBottleImportResolutions,
-  categoryOptions,
   countCategoriesToResolve,
   countCategoriesWithoutType,
   countRowsWithoutCategory,
+  rowCategories,
 } from './bottleImportResolutions';
 
 type Step = 'upload' | 'resolve' | 'confirm' | 'success' | 'error';
@@ -182,7 +182,7 @@ export default function ImportBottlesWizard({ onClose, onImported }: ImportBottl
             <BottleImportRowsStep
               rows={preview.bottles}
               resolutions={resolutions.bottles}
-              categoryOptions={categoryOptions(existingCategories, preview, resolutions)}
+              categories={rowCategories(existingCategories, resolutions.categories)}
               onChange={updateRow}
             />
           </div>
