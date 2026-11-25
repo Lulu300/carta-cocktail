@@ -268,6 +268,7 @@ function renderPage() {
   return renderWithFeedback(
     <Routes>
       <Route path="/admin/menus/:id/bottles" element={<MenuBottleEditPage />} />
+      <Route path="/admin/menus/:id" element={<p>cocktail editor</p>} />
     </Routes>,
   );
 }
@@ -803,7 +804,8 @@ describe('MenuBottleEditPage', () => {
     storeMenu({ type: 'COCKTAILS', slug: 'summer', bottles: [] });
     renderPage();
 
-    await waitFor(() => expect(window.location.pathname).toBe('/admin/menus/5'));
+    expect(await screen.findByText('cocktail editor')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/admin/menus/5');
     expect(screen.queryByRole('heading', { name: 'menus.bottles.title' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'menus.bottles.addTitle' })).not.toBeInTheDocument();
   });
