@@ -5,13 +5,13 @@ phase: C
 lane: frontend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-64]
-touches: [frontend/src/components/import/BottleImportRowsStep.tsx, frontend/src/components/import/bottleImportResolutions.ts, frontend/src/components/import/bottleImportResolutions.test.ts, frontend/src/components/import/ImportBottlesWizard.test.tsx]
+touches: [frontend/src/components/import/BottleImportRowsStep.tsx, frontend/src/components/import/bottleImportResolutions.ts, frontend/src/components/import/bottleImportResolutions.test.ts, frontend/src/components/import/ImportBottlesWizard.tsx, frontend/src/components/import/ImportBottlesWizard.test.tsx, docs/plan/tasks/C-68-bottle-import-row-existing-category.md]
 sources: []
-branch:
-pr:
+branch: fix/C-66-bottle-row-category-display
+pr: https://github.com/Lulu300/carta-cocktail/pull/229
 ---
 
 ## Contexte
@@ -34,8 +34,8 @@ Vérifié sur la branche de C-64 (sonde jetable sur `BottleImportRowsStep`) :
 
 ## Critères d'acceptation
 
-- [ ] Une ligne dont la catégorie du fichier ne diffère que par la casse de la catégorie utilisée affiche celle-ci.
-- [ ] Le sélecteur ne promet pas de créer une catégorie que l'import reprend.
+- [x] Une ligne dont la catégorie du fichier ne diffère que par la casse de la catégorie utilisée affiche celle-ci.
+- [x] Le sélecteur ne promet pas de créer une catégorie que l'import reprend.
 
 ## Tests à ajouter ou adapter
 
@@ -49,3 +49,5 @@ Vérifié sur la branche de C-64 (sonde jetable sur `BottleImportRowsStep`) :
 ## Journal
 
 - 2026-11-25 : tâche créée pendant C-64 (hors périmètre : comportement antérieur des lignes, distinct des catégories ambiguës).
+- 2026-11-25 : PR #229 (branche `fix/C-66-bottle-row-category-display`). `rowCategories()` rejoue les règles de la confirmation (résolutions de catégories dans l'ordre, création reprise par une catégorie existante ou déjà créée par l'import à la casse près, puis ligne par la clé de résolution de son nom, sinon `matchIgnoringCase`). Le sélecteur affiche cette catégorie, propose une option par catégorie qu'une ligne atteint par son nom, et ne marque « (sera créée) » que les vraies créations, sous le nom créé. Une catégorie existante qu'une résolution du nom détourne n'est plus proposée : C-68 créée pour permettre de l'atteindre (changement d'API).
+- Notes de version : « The bottle import wizard now shows, for each bottle, the category the import puts it in, instead of "Pick a category" when the file names it with another case (`rhum` for `Rhum`), when one of several matches was picked, or when the category is created under another name; the list marks as "will be created" only the categories the import actually creates, under the name they get. »
