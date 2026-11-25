@@ -141,7 +141,9 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
             },
           });
         });
-        resolvedCategories.set(categoryName.toLowerCase(), category.id);
+        // Under the file's name, as `use_existing`: the rows name it, even when the admin renamed
+        // the category. A row moved to the new name finds it in `existingCategories`.
+        resolvedCategories.set(key.toLowerCase(), category.id);
       }
     }
 

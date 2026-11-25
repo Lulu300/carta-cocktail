@@ -1620,6 +1620,38 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
     expect(await prisma.categoryType.count()).toBe(typeCount);
   });
 
+  // The wizard keeps each row on the file's category name: the category created for it holds them (C-64)
+  it('should put the rows of a category created under another name in it', async () => {
+    const res = await confirm([{ categoryName: 'Rhum' }], { rhum: { action: 'create', data: { name: 'Rhum agricole' } } });
+
+    expect(res.status).toBe(201);
+    expect(res.body.skippedNoCategory).toBe(0);
+    const created = await prisma.category.findUniqueOrThrow({ where: { name: 'Rhum agricole' } });
+    expect(await bottleCategoryIds()).toEqual([created.id]);
+  });
+
+  it('should find a category created under another name for a row moved to that name', async () => {
+    const res = await confirm([{ categoryName: 'Rhum agricole' }], { rhum: { action: 'create', data: { name: 'Rhum agricole' } } });
+
+    expect(res.status).toBe(201);
+    const created = await prisma.category.findUniqueOrThrow({ where: { name: 'Rhum agricole' } });
+    expect(await bottleCategoryIds()).toEqual([created.id]);
+  });
+
+  it.each([
+    ['one of them', 'RHUM', null],
+    ['a category created under another name', 'Rhum blanc', { action: 'create', data: { name: 'Rhum blanc' } }],
+  ])('should put the rows of a category several hold ignoring case in %s', async (_case, expected, resolution) => {
+    await seedCategory({ name: 'Rhum' });
+    const upperRhum = await seedCategory({ name: 'RHUM' });
+
+    const res = await confirm([{ categoryName: 'rhum' }], { rhum: resolution ?? { action: 'use_existing', existingId: upperRhum.id } });
+
+    expect(res.status).toBe(201);
+    const target = await prisma.category.findUniqueOrThrow({ where: { name: expected } });
+    expect(await bottleCategoryIds()).toEqual([target.id]);
+  });
+
   it('should put a row in the exact category when others are equal to it ignoring case', async () => {
     await seedCategory({ name: 'Rhum' });
     const upperRhum = await seedCategory({ name: 'RHUM' });
