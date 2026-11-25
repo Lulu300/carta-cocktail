@@ -575,3 +575,48 @@ describe('units and categories that exist ignoring case', () => {
     });
   });
 });
+
+// A name pasted from a macOS file name can hold decomposed accents: 'Crème' looks like 'Crème' (C-65)
+describe('names in another Unicode form', () => {
+  const PEEL = { name: 'Écorce', abbreviation: 'écorce', conversionFactorToMl: null };
+  const creamLine = { sourceType: 'CATEGORY', sourceName: 'Crème', quantity: 2, unit: PEEL };
+
+  it('should match a category and a unit stored in the composed form', async () => {
+    const cream = await seedCategory({ name: 'Crème' });
+    const peel = await seedUnit({ name: 'Écorce', abbreviation: 'ÉCORCE' });
+
+    const preview = await previewImport(recipe([creamLine]));
+
+    expect(preview.categories[0]).toMatchObject({ status: 'matched', existingMatch: { id: cream.id } });
+    expect(preview.units[0]).toMatchObject({ status: 'matched', existingMatch: { id: peel.id } });
+  });
+
+  it('should use the composed category and unit instead of creating their decomposed form', async () => {
+    const cream = await seedCategory({ name: 'Crème' });
+    const peel = await seedUnit({ name: 'Écorce', abbreviation: 'écorce' });
+
+    const cocktail = await confirmImport(recipe([creamLine]), resolutions({
+      units: { 'écorce': { action: 'create', data: PEEL } },
+      categories: { 'crème': { action: 'create', data: { name: 'Crème' } } },
+    }));
+
+    expect(cocktail.ingredients[0]).toMatchObject({ categoryId: cream.id, unitId: peel.id });
+    expect(await prisma.category.count()).toBe(1);
+    expect(await prisma.unit.count()).toBe(1);
+  });
+
+  it('should store a category, unit and ingredient it creates composed, translations included', async () => {
+    const translations = { nameTranslations: { fr: 'Crème' } };
+
+    await confirmImport(recipe([creamLine, { sourceType: 'INGREDIENT', sourceName: 'Crème', quantity: 1, unit: PEEL }]), resolutions({
+      units: { 'écorce': { action: 'create', data: { ...PEEL, ...translations } } },
+      categories: { 'crème': { action: 'create', data: { name: 'Crème', ...translations } } },
+      ingredients: { 'crème': { action: 'create', data: { name: 'Crème', ...translations } } },
+    }));
+
+    const composed = { nameTranslations: JSON.stringify({ fr: 'Crème' }) };
+    expect(await prisma.unit.findMany()).toEqual([expect.objectContaining({ name: 'Écorce', abbreviation: 'écorce', ...composed })]);
+    expect(await prisma.category.findMany()).toEqual([expect.objectContaining({ name: 'Crème', ...composed })]);
+    expect(await prisma.ingredient.findMany()).toEqual([expect.objectContaining({ name: 'Crème', ...composed })]);
+  });
+});

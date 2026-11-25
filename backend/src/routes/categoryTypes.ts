@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { ConflictError, NotFoundError } from '../errors';
 import { parseNameTranslations, serializeTranslations } from '../utils/translations';
+import { translationsToStore } from '../utils/storedNames';
 import { valid, validate } from '../validation/validate';
 import {
   CategoryTypeCreate, CategoryTypeParams, CategoryTypeQuery, CategoryTypeUpdate,
@@ -33,7 +34,7 @@ router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Respons
   const created = await prisma.categoryType.create({
     data: {
       name: typeName,
-      nameTranslations: serializeTranslations(nameTranslations),
+      nameTranslations: serializeTranslations(translationsToStore(nameTranslations)),
       color: color || 'gray',
     },
   });
@@ -48,7 +49,7 @@ async function updateCategoryType(typeName: string, { nameTranslations, color }:
   const updated = await prisma.categoryType.update({
     where: { name: typeName },
     data: {
-      nameTranslations: serializeTranslations(nameTranslations),
+      nameTranslations: serializeTranslations(translationsToStore(nameTranslations, existing.nameTranslations)),
       ...(color !== undefined && { color }),
     },
   });

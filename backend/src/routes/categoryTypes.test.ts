@@ -177,6 +177,19 @@ describe('PUT /api/category-types/:name', () => {
     expect(res.status).toBe(200);
     expect(res.body.nameTranslations).toEqual({ fr: 'Spiritueux' });
   });
+
+  // Like the type names (C-61) and the names of categories, units and ingredients (C-65)
+  it('should compose the translations the admin changes, and keep the ones sent back as they are', async () => {
+    await prisma.categoryType.create({ data: { name: 'CREAM', color: 'red', nameTranslations: JSON.stringify({ fr: 'Crème' }) } });
+    const res = await request.put('/api/category-types/CREAM').set(authHeader())
+      .send({ nameTranslations: { fr: 'Crème', en: 'Crèam' } });
+    expect(res.status).toBe(200);
+    expect(res.body.nameTranslations).toEqual({ fr: 'Crème', en: 'Crèam' });
+
+    const created = await request.post('/api/category-types').set(authHeader())
+      .send({ name: 'LIQUEUR', nameTranslations: { fr: 'Liqueur à la crème' } });
+    expect(created.body.nameTranslations).toEqual({ fr: 'Liqueur à la crème' });
+  });
 });
 
 // Data older than v1.9.0 can hold a type whose name has spaces around it, next to the

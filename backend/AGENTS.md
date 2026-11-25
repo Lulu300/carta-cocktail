@@ -94,7 +94,7 @@ backend/
 │   │   ├── translations.ts   # Translated names: serialize, parse
 │   │   ├── bottlesExport.ts  # Bottle export (JSON, CSV)
 │   │   ├── bottlesImport.ts  # Bottle import parsing (JSON, CSV)
-│   │   └── ...               # importDates, records, uniqueness
+│   │   └── ...               # importDates, records, storedNames, uniqueness
 │   ├── validation/           # zod schemas, one file per resource, validate() and valid()
 │   ├── test/                 # Test helpers, factories, database lifecycle (globalSetup, setup)
 │   └── i18n/
@@ -205,6 +205,10 @@ Never `JSON.stringify` or `JSON.parse` them by hand: use the helpers of `src/uti
 - `parseNameTranslations(entity)` turns the strings of an entity and of its relations into objects
   before `res.json()`: every response sends objects, never strings;
 - `parseTranslations(raw)` reads one column (exports).
+
+The names and translations of categories, units and ingredients, and the translations of category
+types, go through `nameToStore` / `translationsToStore` (`src/utils/storedNames.ts`) before they are
+written: a new value is stored composed (NFC), a value sent back exactly as stored is kept.
 
 ### File Uploads
 

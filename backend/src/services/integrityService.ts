@@ -1,4 +1,5 @@
 import { PrismaClient } from '../generated/prisma/client';
+import { caseInsensitiveKey } from '../utils/invisibleCharacters';
 
 /**
  * Read-only audit of the data that the schema does not protect (or did not
@@ -7,12 +8,17 @@ import { PrismaClient } from '../generated/prisma/client';
  *
  * The queries use raw SQL on columns that already exist in older schemas, so
  * the audit also works on a database that has not been migrated yet.
+ *
+ * Duplicates are grouped in JS, under the key the routes and the imports compare
+ * names with (`caseInsensitiveKey`): SQLite's lower() only changes ASCII letters,
+ * so it missed 'Écorce' and 'écorce', and a name and its decomposed form.
  */
 
 /** Only raw queries are needed: any client or transaction client fits. */
 export type IntegrityDb = Pick<PrismaClient, '$queryRaw'>;
 
 export interface DuplicateGroup {
+  /** The shared key: the name in lower case, composed (NFC). */
   value: string;
   count: number;
 }
@@ -30,11 +36,11 @@ export interface ForeignKeyViolation {
 }
 
 export interface IntegrityIssues {
-  /** Same name ignoring case. Blocking: the migration refuses exact duplicates, and imports match names ignoring case. */
+  /** Same name ignoring case and Unicode form. Blocking: the migration refuses exact duplicates, and imports match names ignoring case. */
   duplicateCategoryNames: DuplicateGroup[];
-  /** Same abbreviation ignoring case. Blocking: the migration refuses exact duplicates, and the routes refuse case-only ones. */
+  /** Same abbreviation ignoring case and Unicode form. Blocking: the migration refuses exact duplicates, and the routes refuse case-only ones. */
   duplicateUnitAbbreviations: DuplicateGroup[];
-  /** Same name ignoring case. Allowed (cocktail names are not unique), listed for information. */
+  /** Same name ignoring case and Unicode form. Allowed (cocktail names are not unique), listed for information. */
   duplicateCocktailNames: DuplicateGroup[];
   /** Recipe lines whose source (bottle, category or ingredient) is missing: the cocktail is never available. */
   invalidIngredientLines: InvalidIngredientLine[];
@@ -46,26 +52,23 @@ export interface IntegrityIssues {
 
 export type IntegrityCounts = Record<keyof IntegrityIssues, number>;
 
-// SQLite returns COUNT(*) as a BigInt through Prisma
-interface RawDuplicate {
-  value: string;
-  count: bigint | number;
-}
-
-function toDuplicateGroups(rows: RawDuplicate[]): DuplicateGroup[] {
-  return rows.map((row) => ({ value: row.value, count: Number(row.count) }));
+/** The keys several values share, with their number of values, sorted by key. */
+function duplicateGroups(rows: { value: string }[]): DuplicateGroup[] {
+  const counts = new Map<string, number>();
+  for (const { value } of rows) {
+    const key = caseInsensitiveKey(value);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return Array.from(counts, ([value, count]) => ({ value, count }))
+    .filter((group) => group.count > 1)
+    // The keys are distinct: no two groups compare equal
+    .sort((a, b) => (a.value < b.value ? -1 : 1));
 }
 
 export async function findIntegrityIssues(db: IntegrityDb): Promise<IntegrityIssues> {
-  const duplicateCategoryNames = await db.$queryRaw<RawDuplicate[]>`
-    SELECT lower(name) AS value, COUNT(*) AS count FROM Category
-    GROUP BY value HAVING count > 1 ORDER BY value`;
-  const duplicateUnitAbbreviations = await db.$queryRaw<RawDuplicate[]>`
-    SELECT lower(abbreviation) AS value, COUNT(*) AS count FROM Unit
-    GROUP BY value HAVING count > 1 ORDER BY value`;
-  const duplicateCocktailNames = await db.$queryRaw<RawDuplicate[]>`
-    SELECT lower(name) AS value, COUNT(*) AS count FROM Cocktail
-    GROUP BY value HAVING count > 1 ORDER BY value`;
+  const categoryNames = await db.$queryRaw<{ value: string }[]>`SELECT name AS value FROM Category`;
+  const unitAbbreviations = await db.$queryRaw<{ value: string }[]>`SELECT abbreviation AS value FROM Unit`;
+  const cocktailNames = await db.$queryRaw<{ value: string }[]>`SELECT name AS value FROM Cocktail`;
   const invalidIngredientLines = await db.$queryRaw<InvalidIngredientLine[]>`
     SELECT id, cocktailId, sourceType FROM CocktailIngredient
     WHERE (sourceType = 'BOTTLE' AND bottleId IS NULL)
@@ -80,9 +83,9 @@ export async function findIntegrityIssues(db: IntegrityDb): Promise<IntegrityIss
     SELECT "table", rowid, parent FROM pragma_foreign_key_check`;
 
   return {
-    duplicateCategoryNames: toDuplicateGroups(duplicateCategoryNames),
-    duplicateUnitAbbreviations: toDuplicateGroups(duplicateUnitAbbreviations),
-    duplicateCocktailNames: toDuplicateGroups(duplicateCocktailNames),
+    duplicateCategoryNames: duplicateGroups(categoryNames),
+    duplicateUnitAbbreviations: duplicateGroups(unitAbbreviations),
+    duplicateCocktailNames: duplicateGroups(cocktailNames),
     invalidIngredientLines: invalidIngredientLines.map((line) => ({
       ...line,
       id: Number(line.id),

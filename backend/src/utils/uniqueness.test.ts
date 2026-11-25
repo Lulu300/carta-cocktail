@@ -29,6 +29,28 @@ describe('CaseInsensitiveIndex.match', () => {
     expect(indexOf('Rum').match('Rhum')).toEqual({ status: 'none' });
   });
 
+  // C-65: 'Crème' and 'Crème' look the same
+  it('should find the only row equal ignoring case and Unicode form, accents included', () => {
+    expect(indexOf('Crème', 'Gin').match('Crème')).toEqual({ status: 'found', row: { id: 1, name: 'Crème' } });
+    expect(indexOf('Crème').match('CRÈME')).toEqual({ status: 'found', row: { id: 1, name: 'Crème' } });
+    expect(indexOf('Écorce').match('écorce')).toEqual({ status: 'found', row: { id: 1, name: 'Écorce' } });
+  });
+
+  it('should be ambiguous between a name and its decomposed form, unless one is exact', () => {
+    const index = indexOf('Crème', 'Crème');
+
+    expect(index.match('CRÈME')).toEqual({
+      status: 'ambiguous', rows: [{ id: 1, name: 'Crème' }, { id: 2, name: 'Crème' }],
+    });
+    expect(index.match('Crème')).toEqual({ status: 'found', row: { id: 2, name: 'Crème' } });
+  });
+
+  // Same cases as matchIgnoringCase in frontend/src/components/import/importResolutions.test.ts
+  it('should match a Greek letter that upper case decomposes', () => {
+    expect(indexOf('ΐ').match('Ϊ́')).toEqual({ status: 'found', row: { id: 1, name: 'ΐ' } });
+    expect(indexOf('ΐ').match('Ϊ́')).toEqual({ status: 'found', row: { id: 1, name: 'ΐ' } });
+  });
+
   it('should find a row added after its creation', () => {
     const index = indexOf();
     index.add({ id: 7, name: 'Mezcal' });
@@ -113,6 +135,10 @@ describe('assertUniqueIgnoringCase', () => {
 
   it('should refuse a value another row holds ignoring case', () => {
     expect(() => assertUniqueIgnoringCase(rows, 'CL')).toThrow(expect.objectContaining({ status: 409 }));
+  });
+
+  it('should refuse the decomposed form of a value another row holds', () => {
+    expect(() => assertUniqueIgnoringCase([{ id: 1, value: 'écorce' }], 'ÉCORCE')).toThrow(expect.objectContaining({ status: 409 }));
   });
 
   it("should accept a row's own value in another case, and a new value", () => {

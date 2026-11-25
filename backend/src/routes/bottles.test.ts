@@ -1602,6 +1602,36 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
     expect(await prisma.categoryType.count()).toBe(typeCount);
   });
 
+  // A name pasted from a macOS file name can hold decomposed accents (C-65)
+  it('should match a category whose name is stored in the other Unicode form', async () => {
+    const cream = await seedCategory({ name: 'Crème' });
+
+    const res = await previewOf('Crème');
+
+    expect(res.body.categories[0]).toMatchObject({ status: 'matched', existingMatch: { id: cream.id } });
+  });
+
+  it('should put the bottles of a decomposed category to create in the composed one', async () => {
+    const cream = await seedCategory({ name: 'Crème' });
+
+    const res = await confirm([{ categoryName: 'Crème' }], { 'crème': { action: 'create', data: { name: 'Crème' } } });
+
+    expect(res.status).toBe(201);
+    expect(await bottleCategoryIds()).toEqual([cream.id]);
+    expect(await prisma.category.count()).toBe(1);
+  });
+
+  it('should store a category it creates composed, translations included', async () => {
+    const res = await confirm([{ categoryName: 'Crème' }], {
+      'crème': { action: 'create', data: { name: 'Crème', nameTranslations: { fr: 'Crème' } } },
+    });
+
+    expect(res.status).toBe(201);
+    const cream = await prisma.category.findFirstOrThrow();
+    expect(cream).toMatchObject({ name: 'Crème', nameTranslations: JSON.stringify({ fr: 'Crème' }) });
+    expect(await bottleCategoryIds()).toEqual([cream.id]);
+  });
+
   it('should create a category once when two file categories create it under names equal ignoring case', async () => {
     const res = await confirm([{ categoryName: 'Mezcal' }, { categoryName: 'MEZCAL' }], {
       mezcal: { action: 'create', data: { name: 'Mezcal' } },

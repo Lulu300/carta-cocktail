@@ -19,6 +19,7 @@ import { BottleCreate, BottleExportQuery, BottleListQuery, BottleUpdate } from '
 import { BottleImportConfirm } from '../validation/bottleImport';
 import { importedCategoryTypePath } from '../validation/categories';
 import { CaseInsensitiveIndex, previewMatch } from '../utils/uniqueness';
+import { nameToStore, translationsToStore } from '../utils/storedNames';
 
 const router = Router();
 
@@ -137,11 +138,11 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
           await createMissingCategoryType(tx, typeName);
           return tx.category.create({
             data: {
-              name: categoryName,
+              name: nameToStore(categoryName),
               type: typeName,
               desiredStock,
               minimumPercent,
-              nameTranslations: serializeTranslations(nameTranslations),
+              nameTranslations: serializeTranslations(translationsToStore(nameTranslations)),
             },
           });
         });

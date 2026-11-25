@@ -173,3 +173,45 @@ describe('DELETE /api/units/:id', () => {
     expect(await prisma.unit.findUnique({ where: { id: unit.id } })).not.toBeNull();
   });
 });
+
+// 'écorce' and its decomposed form look the same: a new value is stored composed (C-65)
+const COMPOSED = 'écorce';
+const DECOMPOSED = 'écorce';
+
+describe('Unit names and abbreviations in another Unicode form', () => {
+  it('should return 409 for a decomposed abbreviation next to the composed one, or the composed one in upper case', async () => {
+    await seedUnit({ abbreviation: COMPOSED });
+    const decomposed = await request.post('/api/units').set(authHeader()).send({ name: 'Peel', abbreviation: DECOMPOSED });
+    const upperCase = await request.post('/api/units').set(authHeader()).send({ name: 'Peel', abbreviation: 'ÉCORCE' });
+    expect(decomposed.status).toBe(409);
+    expect(upperCase.status).toBe(409);
+    expect(await prisma.unit.count()).toBe(1);
+  });
+
+  it('should store a new name, abbreviation and translations composed', async () => {
+    const res = await request.post('/api/units').set(authHeader())
+      .send({ name: 'Écorce', abbreviation: DECOMPOSED, nameTranslations: { fr: 'Écorce' } });
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ name: 'Écorce', abbreviation: COMPOSED, nameTranslations: { fr: 'Écorce' } });
+  });
+
+  it('should keep a stored decomposed value sent back as it is, and compose the values the admin changes', async () => {
+    const unit = await seedUnit({ name: 'Écorce', abbreviation: DECOMPOSED });
+    const res = await request.put(`/api/units/${unit.id}`).set(authHeader())
+      .send({ name: 'Zéste', abbreviation: DECOMPOSED, nameTranslations: { fr: 'Zéste' } });
+    expect(res.status).toBe(200);
+    expect(await prisma.unit.findUniqueOrThrow({ where: { id: unit.id } })).toMatchObject({
+      name: 'Zéste',
+      abbreviation: DECOMPOSED,
+      nameTranslations: JSON.stringify({ fr: 'Zéste' }),
+    });
+
+    const renamed = await request.put(`/api/units/${unit.id}`).set(authHeader()).send({ abbreviation: 'ZÉSTE' });
+    expect(renamed.body.abbreviation).toBe('ZÉSTE');
+  });
+
+  it('should return 404 for a unit that does not exist', async () => {
+    const res = await request.put('/api/units/9999').set(authHeader()).send({ name: 'Zeste' });
+    expect(res.status).toBe(404);
+  });
+});

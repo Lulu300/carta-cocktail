@@ -7,7 +7,7 @@ import type {
   ImportPreviewResponse,
   Unit,
 } from '../../types';
-import { tidyName } from '../../utils/invisibleCharacters';
+import { caseInsensitiveKey, tidyName } from '../../utils/invisibleCharacters';
 
 /** The lists of entities a recipe refers to, in the order the wizard shows them. */
 export const IMPORT_ENTITY_TYPES = ['units', 'categories', 'bottles', 'ingredients'] as const;
@@ -120,13 +120,14 @@ export type ExistingMatch<Row> =
 /**
  * The existing row the backend uses for a category name or a unit abbreviation it is asked to
  * create, by its rule (`CaseInsensitiveIndex.match`, `backend/src/utils/uniqueness.ts`): the row with
- * the exact value, else the only one equal ignoring case. Several rows equal ignoring case and none
- * exactly is ambiguous: the backend refuses to create it (409). The preview applies this rule to the
- * file's values only, while the admin may type another one.
+ * the exact value, else the only one equal ignoring case and Unicode form (`caseInsensitiveKey`, the
+ * backend's key). Several rows equal ignoring case and none exactly is ambiguous: the backend refuses
+ * to create it (409). The preview applies this rule to the file's values only, while the admin may
+ * type another one.
  */
 export function matchIgnoringCase<Row>(rows: Row[], value: string, valueOf: (row: Row) => string): ExistingMatch<Row> {
-  const key = value.toLowerCase();
-  const candidates = rows.filter((row) => valueOf(row).toLowerCase() === key);
+  const key = caseInsensitiveKey(value);
+  const candidates = rows.filter((row) => caseInsensitiveKey(valueOf(row)) === key);
   const exact = candidates.find((row) => valueOf(row) === value);
   if (exact) return { status: 'found', row: exact };
   if (candidates.length === 1) return { status: 'found', row: candidates[0] };

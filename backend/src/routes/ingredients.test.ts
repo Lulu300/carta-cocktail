@@ -189,3 +189,43 @@ describe('DELETE /api/ingredients/:id', () => {
     expect(await prisma.cocktailIngredient.count()).toBe(1);
   });
 });
+
+// 'Crème' and its decomposed form look the same: a new name is stored composed (C-65)
+const COMPOSED = 'Crème';
+const DECOMPOSED = 'Crème';
+
+describe('Ingredient names in another Unicode form', () => {
+  it('should store a new name and its translations composed', async () => {
+    const res = await request.post('/api/ingredients').set(authHeader())
+      .send({ name: DECOMPOSED, nameTranslations: { fr: DECOMPOSED, en: 'Cream' } });
+    expect(res.status).toBe(201);
+    expect(res.body.name).toBe(COMPOSED);
+    expect(res.body.nameTranslations).toEqual({ fr: COMPOSED, en: 'Cream' });
+  });
+
+  it('should return 409 for a decomposed name next to the composed one', async () => {
+    await seedIngredient({ name: COMPOSED });
+    const res = await request.post('/api/ingredients').set(authHeader()).send({ name: DECOMPOSED });
+    expect(res.status).toBe(409);
+    expect(await prisma.ingredient.count()).toBe(1);
+  });
+
+  it('should compose a name the admin changes', async () => {
+    const ing = await seedIngredient({ name: 'Cream' });
+    const res = await request.put(`/api/ingredients/${ing.id}`).set(authHeader()).send({ name: DECOMPOSED });
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe(COMPOSED);
+  });
+
+  it('should keep a stored decomposed name and translation sent back as they are', async () => {
+    const ing = await seedIngredient({ name: DECOMPOSED, nameTranslations: JSON.stringify({ fr: DECOMPOSED }) });
+    const res = await request.put(`/api/ingredients/${ing.id}`).set(authHeader())
+      .send({ name: DECOMPOSED, isAvailable: false, nameTranslations: { fr: DECOMPOSED } });
+    expect(res.status).toBe(200);
+    expect(await prisma.ingredient.findUniqueOrThrow({ where: { id: ing.id } })).toMatchObject({
+      name: DECOMPOSED,
+      isAvailable: false,
+      nameTranslations: JSON.stringify({ fr: DECOMPOSED }),
+    });
+  });
+});

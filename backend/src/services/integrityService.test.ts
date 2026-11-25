@@ -69,6 +69,50 @@ describe('findIntegrityIssues', () => {
     expect(hasBlockingIssues(issues)).toBe(true);
   });
 
+  // SQLite's lower() only changes ASCII letters: the names are compared in JS (C-65)
+  it('reports category names that differ by the case of an accented letter, or by Unicode form', async () => {
+    await seedCategory({ name: 'Écorce' });
+    await seedCategory({ name: 'écorce' });
+    await seedCategory({ name: 'Crème' });
+    await seedCategory({ name: 'Crème' });
+    await seedCategory({ name: 'Gin' });
+
+    const issues = await findIntegrityIssues(prisma);
+
+    expect(issues.duplicateCategoryNames).toEqual([{ value: 'crème', count: 2 }, { value: 'écorce', count: 2 }]);
+    expect(hasBlockingIssues(issues)).toBe(true);
+  });
+
+  it('reports unit abbreviations that differ by the case of an accented letter, or by Unicode form', async () => {
+    await seedUnit({ abbreviation: 'écorce' });
+    await seedUnit({ abbreviation: 'ÉCORCE' });
+
+    const issues = await findIntegrityIssues(prisma);
+
+    expect(issues.duplicateUnitAbbreviations).toEqual([{ value: 'écorce', count: 2 }]);
+  });
+
+  it('lists cocktail names that differ by Unicode form without blocking', async () => {
+    await seedCocktail({ name: 'Café' });
+    await seedCocktail({ name: 'CAFÉ' });
+
+    const issues = await findIntegrityIssues(prisma);
+
+    expect(issues.duplicateCocktailNames).toEqual([{ value: 'café', count: 2 }]);
+    expect(hasBlockingIssues(issues)).toBe(false);
+  });
+
+  it('sorts the duplicates by value, whatever the order of the rows', async () => {
+    await seedCocktail({ name: 'Zombie' });
+    await seedCocktail({ name: 'Mojito' });
+    await seedCocktail({ name: 'ZOMBIE' });
+    await seedCocktail({ name: 'MOJITO' });
+
+    const issues = await findIntegrityIssues(prisma);
+
+    expect(issues.duplicateCocktailNames).toEqual([{ value: 'mojito', count: 2 }, { value: 'zombie', count: 2 }]);
+  });
+
   it('lists duplicate cocktail names without blocking', async () => {
     await seedCocktail({ name: 'Mojito' });
     await seedCocktail({ name: 'mojito' });

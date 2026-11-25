@@ -4,6 +4,7 @@ import { AuthRequest } from '../middleware/auth';
 import { NotFoundError } from '../errors';
 import { parseNameTranslations, serializeTranslations } from '../utils/translations';
 import { assertUniqueIgnoringCase } from '../utils/uniqueness';
+import { nameToStore, translationsToStore } from '../utils/storedNames';
 import { deleteUnit } from '../services/deletionService';
 import { valid, validate } from '../validation/validate';
 import { IdParams, idRequest } from '../validation/common';
@@ -35,10 +36,10 @@ router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Respons
   await assertAbbreviationIsFree(abbreviation);
   const unit = await prisma.unit.create({
     data: {
-      name,
-      abbreviation,
+      name: nameToStore(name),
+      abbreviation: nameToStore(abbreviation),
       conversionFactorToMl: conversionFactorToMl ?? null,
-      nameTranslations: serializeTranslations(nameTranslations),
+      nameTranslations: serializeTranslations(translationsToStore(nameTranslations)),
     },
   });
   res.status(201).json(parseNameTranslations(unit));
@@ -49,6 +50,8 @@ const updateSchemas = { params: IdParams, body: UnitUpdate };
 router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Response) => {
   const { params: { id }, body } = valid<typeof updateSchemas>(res);
   const { name, abbreviation, conversionFactorToMl, nameTranslations } = body;
+  const stored = await prisma.unit.findUnique({ where: { id } });
+  if (!stored) throw new NotFoundError();
   if (abbreviation !== undefined) {
     await assertAbbreviationIsFree(abbreviation, id);
   }
@@ -56,10 +59,10 @@ router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Respo
   const unit = await prisma.unit.update({
     where: { id },
     data: {
-      name,
-      abbreviation,
+      name: name === undefined ? undefined : nameToStore(name, stored.name),
+      abbreviation: abbreviation === undefined ? undefined : nameToStore(abbreviation, stored.abbreviation),
       conversionFactorToMl,
-      nameTranslations: serializeTranslations(nameTranslations),
+      nameTranslations: serializeTranslations(translationsToStore(nameTranslations, stored.nameTranslations)),
     },
   });
   res.json(parseNameTranslations(unit));
