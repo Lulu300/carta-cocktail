@@ -4,6 +4,7 @@ import {
   request, authHeader, prisma, seedCategory, seedBottle, seedMenu, addBottleToMenu,
   excludeBottleFromMenu, findSystemMenu, seedMenuSection,
 } from '../test/helpers';
+import { MAX_GROUP_BOTTLES } from '../validation/menuBottles';
 
 beforeAll(async () => { await setupTestDatabase(); });
 afterAll(async () => { await teardownTestDatabase(); });
@@ -26,6 +27,8 @@ async function seedBottleOfTranslatedCategory() {
 }
 
 const TRANSLATED_CATEGORY = { fr: 'Rhum blanc' };
+
+const BOTTLE_NOT_ALLOWED = 'This bottle cannot go in this menu: only bottles checked for the menu\'s type (aperitif or digestif) can';
 
 describe('GET /api/menu-bottles/menu/:menuId', () => {
   it('should return bottles for a menu', async () => {
@@ -126,7 +129,7 @@ describe('POST /api/menu-bottles', () => {
     const res = await request.post('/api/menu-bottles').set(authHeader())
       .send({ menuId: menu.id, bottleId: bottle.id });
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe('This bottle cannot go in this menu: only bottles checked for the menu\'s type (aperitif or digestif) can');
+    expect(res.body.error).toBe(BOTTLE_NOT_ALLOWED);
     expect(await prisma.menuBottle.count()).toBe(0);
   });
 
@@ -136,6 +139,7 @@ describe('POST /api/menu-bottles', () => {
     const res = await request.post('/api/menu-bottles').set(authHeader())
       .send({ menuId: menu.id, bottleId: bottle.id });
     expect(res.status).toBe(400);
+    expect(res.body.error).toBe(BOTTLE_NOT_ALLOWED);
   });
 
   it('should return 400 for a system menu, whose bottles follow their flags', async () => {
@@ -397,7 +401,7 @@ describe('POST /api/menu-bottles/menu/:menuId/entries', () => {
       .send({ bottleIds: [apero.id, digestif.id] });
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/only bottles checked for the menu's type/);
+    expect(res.body.error).toBe(BOTTLE_NOT_ALLOWED);
     expect(await bottleIdsOf(menu.id)).toEqual([]);
   });
 
@@ -432,6 +436,7 @@ describe('POST /api/menu-bottles/menu/:menuId/entries', () => {
     const res = await request.post(`/api/menu-bottles/menu/${menu.id}/entries`).set(authHeader())
       .send({ bottleIds: [bottle.id] });
     expect(res.status).toBe(400);
+    expect(res.body.error).toBe(BOTTLE_NOT_ALLOWED);
   });
 
   it('should return 404 for an unknown menu', async () => {
@@ -884,5 +889,27 @@ describe('DELETE /api/menu-bottles/menu/:menuId/exclusions/:bottleId', () => {
     const bottle = await seedBottle({ isApero: true });
     const res = await request.delete(`/api/menu-bottles/menu/${aperitifs.id}/exclusions/${bottle.id}`).set(authHeader());
     expect(res.status).toBe(404);
+  });
+});
+
+describe('group routes: size of the list', () => {
+  const tooManyIds = Array.from({ length: MAX_GROUP_BOTTLES + 1 }, (_, index) => 10_000 + index);
+
+  it.each([
+    ['post', 'entries', 'bottleIds'],
+    ['post', 'entries/remove', 'ids'],
+    ['put', 'entries', 'ids'],
+    ['post', 'exclusions', 'bottleIds'],
+    ['post', 'exclusions/restore', 'bottleIds'],
+  ] as const)(`should accept ${MAX_GROUP_BOTTLES} ids and refuse one more: %s …/%s`, async (method, route, field) => {
+    const aperitifs = await findSystemMenu('aperitifs');
+    const send = (ids: number[]) => request[method](`/api/menu-bottles/menu/${aperitifs.id}/${route}`).set(authHeader())
+      .send({ [field]: ids, isHidden: true });
+
+    // Unknown ids: refused further on, never by the size of the list.
+    expect((await send(tooManyIds.slice(0, MAX_GROUP_BOTTLES))).body.details).toBeUndefined();
+    const tooMany = await send(tooManyIds);
+    expect(tooMany.status).toBe(400);
+    expect(tooMany.body.details[0].path).toBe(`body.${field}`);
   });
 });

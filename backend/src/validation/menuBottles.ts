@@ -21,14 +21,23 @@ export const MenuBottleUpdate = z.object({
 /** Every entry (`MenuBottle.id`) of the menu, in its new order. */
 export const MenuBottleReorder = z.object({ ids: z.array(Id) });
 
+/**
+ * Most bottles one group request can name. A group of the editor holds the identical bottles
+ * of one product: far fewer than this in any bar. The bound keeps the request and its
+ * transaction small, as MAX_EXPORT_BATCH does for the cocktail export.
+ */
+export const MAX_GROUP_BOTTLES = 500;
+
+const GroupIds = z.array(Id).min(1).max(MAX_GROUP_BOTTLES);
+
 /** Bottles added to a personal menu, or removed from or put back in a system menu, together (a group of the editor). */
 export const MenuBottleIds = z.object({
-  bottleIds: z.array(Id).min(1),
+  bottleIds: GroupIds,
 });
 
 /** Several entries (`MenuBottle.id`) of a menu, e.g. a group of the editor. */
 export const MenuBottleEntryIds = z.object({
-  ids: z.array(Id).min(1),
+  ids: GroupIds,
 });
 
 /** One change for several entries of a menu. Each keeps its position. */
