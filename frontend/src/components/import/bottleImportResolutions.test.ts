@@ -7,6 +7,7 @@ import {
   countCategoriesToResolve,
   defaultCategoryData,
   existingCategoryFor,
+  rowCategories,
 } from './bottleImportResolutions';
 
 // Data older than C-07 can hold two categories that differ only by case
@@ -84,5 +85,60 @@ describe('countCategoriesToCreate', () => {
       bottles: {},
     };
     expect(countCategoriesToCreate(resolutions, existing)).toBe(1);
+  });
+});
+
+describe('rowCategories', () => {
+  const existingRhum = { name: 'Rhum', isNew: false };
+  const existingUpperRhum = { name: 'RHUM', isNew: false };
+  const existingGin = { name: 'Gin', isNew: false };
+
+  it('shows a row in the existing category its name matches ignoring case', () => {
+    const categories = rowCategories([rhum, gin], { rhum: { action: 'use_existing', existingId: 1 } });
+    expect(categories.categoryOf('rhum')).toEqual(existingRhum);
+    expect(categories.categoryOf(' RHUM ')).toEqual(existingRhum);
+    expect(categories.categoryOf('')).toBeUndefined();
+    expect(categories.options).toEqual([existingRhum, existingGin]);
+  });
+
+  it('shows a row in the match picked for an ambiguous category, and leaves out the one it cannot reach', () => {
+    const unresolved = rowCategories(existing, {});
+    expect(unresolved.categoryOf('rhum')).toBeUndefined();
+    expect(unresolved.categoryOf('Rhum')).toEqual(existingRhum);
+    expect(unresolved.options).toEqual([existingRhum, existingUpperRhum, existingGin]);
+
+    const resolved = rowCategories(existing, { rhum: { action: 'use_existing', existingId: 2 } });
+    expect(resolved.categoryOf('rhum')).toEqual(existingUpperRhum);
+    // The confirmation puts a row naming `Rhum` in the category resolved for `rhum`
+    expect(resolved.categoryOf('Rhum')).toEqual(existingUpperRhum);
+    expect(resolved.options).toEqual([existingUpperRhum, existingGin]);
+  });
+
+  it('does not offer to create a category that exists ignoring case, and shows the existing one', () => {
+    const categories = rowCategories(existing, { gin: creating('GIN'), vodka: creating('Vodka') });
+    expect(categories.categoryOf('gin')).toEqual(existingGin);
+    expect(categories.categoryOf('vodka')).toEqual({ name: 'Vodka', isNew: true });
+    expect(categories.options).toEqual([existingRhum, existingUpperRhum, existingGin, { name: 'Vodka', isNew: true }]);
+  });
+
+  it('shows a row in a category created under another name, which the existing one of the file name gives way to', () => {
+    const categories = rowCategories([rhum, gin], { rhum: creating('Rhum agricole') });
+    const created = { name: 'Rhum agricole', isNew: true };
+    expect(categories.categoryOf('rhum')).toEqual(created);
+    expect(categories.categoryOf('rhum agricole')).toEqual(created);
+    expect(categories.options).toEqual([existingGin, created]);
+  });
+
+  it('creates once a name two categories of the file share ignoring case, and the file name of a blank one', () => {
+    const categories = rowCategories([gin], { vodka: creating('Vodka'), wodka: creating('VODKA'), rye: creating('  ') });
+    expect(categories.categoryOf('wodka')).toEqual({ name: 'Vodka', isNew: true });
+    expect(categories.categoryOf('rye')).toEqual({ name: 'rye', isNew: true });
+    expect(categories.options).toEqual([existingGin, { name: 'Vodka', isNew: true }, { name: 'rye', isNew: true }]);
+  });
+
+  it('shows no category for a name to create that several categories hold: the confirmation refuses it', () => {
+    const categories = rowCategories(existing, { rhum: creating('rhum') });
+    expect(categories.categoryOf('rhum')).toBeUndefined();
+    expect(categories.options.filter((option) => option.isNew)).toEqual([]);
   });
 });
