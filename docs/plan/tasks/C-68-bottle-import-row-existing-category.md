@@ -36,6 +36,7 @@ Depuis C-66, le sélecteur de la ligne n'offre plus ces catégories (il ne propo
 
 - [ ] Dans les deux cas ci-dessus, une ligne peut être rangée dans `Rhum`.
 - [ ] Une ligne qui garde le nom du fichier va toujours dans la catégorie résolue pour ce nom.
+- [ ] Base `Rhum` et `Gin`, fichier `rhum` créé comme `Rhum agricole` et `gin` créé comme `Rhum` : la ligne `gin` affiche `Rhum` (depuis C-66, `Rhum` n'est pas une option et le sélecteur retombe sur « Choisir une catégorie »).
 
 ## Tests à ajouter ou adapter
 
