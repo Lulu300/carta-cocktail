@@ -39,8 +39,7 @@ export class CaseInsensitiveIndex<Row> {
    * of them would be a guess.
    */
   match(value: string): CaseInsensitiveMatch<Row> {
-    const candidates = this.rowsByKey.get(value.toLowerCase()) ?? [];
-    const exact = candidates.find((row) => this.valueOf(row) === value);
+    const { candidates, exact } = this.lookup(value);
     if (exact) return { status: 'found', row: exact };
     if (candidates.length === 1) return { status: 'found', row: candidates[0] };
     return candidates.length === 0 ? { status: 'none' } : { status: 'ambiguous', rows: candidates };
@@ -52,9 +51,16 @@ export class CaseInsensitiveIndex<Row> {
    * ambiguous: the preview proposes a row, and the admin may pick another.
    */
   matchFirst(value: string): CaseInsensitiveMatch<Row> {
-    const candidates = this.rowsByKey.get(value.toLowerCase()) ?? [];
-    const row = candidates.find((candidate) => this.valueOf(candidate) === value) ?? candidates[0];
+    const { candidates, exact } = this.lookup(value);
+    const row = exact ?? candidates[0];
     return row ? { status: 'found', row } : { status: 'none' };
+  }
+
+  /** The rows equal to `value` ignoring case, and among them the one with the exact value. */
+  private lookup(value: string): { candidates: Row[]; exact: Row | undefined } {
+    const candidates = this.rowsByKey.get(value.toLowerCase()) ?? [];
+    const exact = candidates.find((row) => this.valueOf(row) === value);
+    return { candidates, exact };
   }
 
   /**
