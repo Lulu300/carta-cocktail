@@ -275,10 +275,18 @@ export interface ImportEntityRef {
   icon?: string | null;
 }
 
+/**
+ * `ambiguous` (categories and units only): several existing rows equal the name ignoring case,
+ * none exactly. `existingMatch` is null and `ambiguousMatches` lists them; the backend refuses to
+ * create the entity (409), the admin uses one of them.
+ */
+export type ImportMatchStatus = 'matched' | 'missing' | 'ambiguous';
+
 export interface ImportEntityResolution {
   ref: ImportEntityRef;
   existingMatch: { id: number; name: string } | null;
-  status: 'matched' | 'missing';
+  status: ImportMatchStatus;
+  ambiguousMatches?: { id: number; name: string }[];
 }
 
 export interface EntityResolutionAction {
@@ -328,7 +336,8 @@ export interface BottleImportPayload {
 export interface BottleCategoryPreview {
   ref: BottleImportCategoryRecord;
   existingMatch: { id: number; name: string; type: string; desiredStock: number } | null;
-  status: 'matched' | 'missing';
+  status: ImportMatchStatus;
+  ambiguousMatches?: { id: number; name: string; type: string; desiredStock: number }[];
 }
 
 export interface BottleDuplicateEntry {

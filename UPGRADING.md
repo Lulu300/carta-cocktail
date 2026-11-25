@@ -34,7 +34,7 @@ Worth checking after the upgrade:
 - **Restoring a backup made before v1.15.0.** The restore screen asks to restart the backend: the migration runs at that restart, after a new `pre-migrate` copy. See [Restoring a backup from an older version](#restoring-a-backup-from-an-older-version).
 - **Rolling back to v1.14.x.** Restore the `pre-migrate` copy made at the upgrade, then pin the images back to `:1.14`: [`docs/operations.md`](docs/operations.md#retour-arrière) ("Retour arrière") or [README › "Restoring a pre-migration backup"](README.md#restoring-a-pre-migration-backup). What was entered since the upgrade is lost, and the copy brings back its sessions: set a new `JWT_SECRET` afterwards, as in [Signing in after a restore](#signing-in-after-a-restore).
 
-**If you download `docker-compose.prod.yml` again** (not needed for this release), put back the lines you added to the `environment` list of `carta-cocktail-backend`, such as `- SQLITE_WAL=false` after `- UPLOAD_DIR=/app/uploads` (database on a network share, see [README › "Database files and network shares"](README.md#database-files-and-network-shares)), `API_RATE_LIMIT`, `LOGIN_RATE_LIMIT` or `TRUST_PROXY`: the file does not have them.
+**If you download `docker-compose.prod.yml` again** (not needed for this release), put back the lines you added to the `environment` list of `carta-cocktail-backend`, such as `- SQLITE_WAL=false` after `- UPLOAD_DIR=/app/uploads` (database on a network share, see [README › "Database files and network shares"](README.md#database-files-and-network-shares)), `API_RATE_LIMIT`, `LOGIN_RATE_LIMIT` or `TRUST_PROXY`: the file does not have them. Compose files newer than v1.15.0 pass these variables from `.env`: with one of them, put them in `.env` instead (see [README › "Environment Variables"](README.md#environment-variables)).
 
 ## v1.14.0
 
@@ -44,7 +44,7 @@ Instances older than v1.12.0: upgrade to v1.12.0 first, following the [v1.12.0 s
 
 **Testing a pre-release**: use `:1.14.0-rc.N` instead of `:1.14.0`.
 
-**If you download `docker-compose.prod.yml` again** (not needed for this release), put back the lines you added to the `environment` list of `carta-cocktail-backend`, such as `- SQLITE_WAL=false` after `- UPLOAD_DIR=/app/uploads` (database on a network share, see [README › "Database files and network shares"](README.md#database-files-and-network-shares)), `API_RATE_LIMIT`, `LOGIN_RATE_LIMIT` or `TRUST_PROXY`: the file does not have them.
+**If you download `docker-compose.prod.yml` again** (not needed for this release), put back the lines you added to the `environment` list of `carta-cocktail-backend`, such as `- SQLITE_WAL=false` after `- UPLOAD_DIR=/app/uploads` (database on a network share, see [README › "Database files and network shares"](README.md#database-files-and-network-shares)), `API_RATE_LIMIT`, `LOGIN_RATE_LIMIT` or `TRUST_PROXY`: the file does not have them. Compose files newer than v1.15.0 pass these variables from `.env`: with one of them, put them in `.env` instead (see [README › "Environment Variables"](README.md#environment-variables)).
 
 ## v1.13.0
 
@@ -54,7 +54,7 @@ Instances older than v1.12.0: upgrade to v1.12.0 first, following the [v1.12.0 s
 
 **Testing a pre-release**: use `:1.13.0-rc.N` instead of `:1.13.0`.
 
-**If you download `docker-compose.prod.yml` again** (not needed for this release), put back the lines you added to the `environment` list of `carta-cocktail-backend`, such as `- SQLITE_WAL=false` after `- UPLOAD_DIR=/app/uploads` (database on a network share, see [README › "Database files and network shares"](README.md#database-files-and-network-shares)), `API_RATE_LIMIT`, `LOGIN_RATE_LIMIT` or `TRUST_PROXY`: the file does not have them.
+**If you download `docker-compose.prod.yml` again** (not needed for this release), put back the lines you added to the `environment` list of `carta-cocktail-backend`, such as `- SQLITE_WAL=false` after `- UPLOAD_DIR=/app/uploads` (database on a network share, see [README › "Database files and network shares"](README.md#database-files-and-network-shares)), `API_RATE_LIMIT`, `LOGIN_RATE_LIMIT` or `TRUST_PROXY`: the file does not have them. Compose files newer than v1.15.0 pass these variables from `.env`: with one of them, put them in `.env` instead (see [README › "Environment Variables"](README.md#environment-variables)).
 
 ## v1.12.0
 
@@ -134,7 +134,7 @@ The backend container now runs as the `node` user (uid 1000, gid 1000) and never
    image: ghcr.io/lulu300/carta-cocktail/frontend:1.12.0
    ```
 
-   **If you had added `- SQLITE_WAL=false`** to the `environment` list of `carta-cocktail-backend` (database on a network share, see [README › "Database files and network shares"](README.md#database-files-and-network-shares)), the new file does not have it: add it again, after `- UPLOAD_DIR=/app/uploads`. Otherwise the database goes back to WAL mode, which does not work on SMB or NFS. The same goes for any variable you added there (`TRUST_PROXY`, `LOGIN_RATE_LIMIT`…): the compose files still do not pass them from `.env`.
+   **If you had added `- SQLITE_WAL=false`** to the `environment` list of `carta-cocktail-backend` (database on a network share, see [README › "Database files and network shares"](README.md#database-files-and-network-shares)), the new file does not have it: add it again, after `- UPLOAD_DIR=/app/uploads`. Otherwise the database goes back to WAL mode, which does not work on SMB or NFS. The same goes for any variable you added there (`TRUST_PROXY`, `LOGIN_RATE_LIMIT`…): the compose files still do not pass them from `.env`. Compose files newer than v1.15.0 pass these variables from `.env`: with one of them, put them in `.env` instead (see [README › "Environment Variables"](README.md#environment-variables)).
 
    ```yaml
          - UPLOAD_DIR=/app/uploads
@@ -413,7 +413,7 @@ Recommended first: export a backup from Settings > Backup & Restore.
 
    Testing a pre-release (`v1.6.0-rc.N`): the `v1.6.0` compose URL and the `:1.6.0` images only exist after the final release. Use `v1.6.0-rc.N` in the `curl` URL and pin the images to `:1.6.0-rc.N` instead (`v1.6.0-rc.1` and `:1.6.0-rc.1` for the first one).
 
-6. **Only if the database is on a network share** (a bind mount on an SMB or NFS share, a NAS mount for example): WAL does not work there. In the `docker-compose.prod.yml` from step 5, add `SQLITE_WAL=false` to the existing `environment` list of `carta-cocktail-backend`, for example after `- UPLOAD_DIR=/app/uploads`. The compose files do not pass this variable from `.env`. The default `db-data` named volume is local and needs nothing.
+6. **Only if the database is on a network share** (a bind mount on an SMB or NFS share, a NAS mount for example): WAL does not work there. In the `docker-compose.prod.yml` from step 5, add `SQLITE_WAL=false` to the existing `environment` list of `carta-cocktail-backend`, for example after `- UPLOAD_DIR=/app/uploads`. The compose files do not pass this variable from `.env`. Compose files newer than v1.15.0 do: with one of them, put `SQLITE_WAL=false` in `.env` instead (see [README › "Database files and network shares"](README.md#database-files-and-network-shares)). The default `db-data` named volume is local and needs nothing.
 
    ```yaml
          - UPLOAD_DIR=/app/uploads
@@ -569,7 +569,7 @@ A backup whose database schema is older than the one of the installed version re
 
 - **Without Docker**, from `backend/`, run `npm run db:deploy`, then restart the backend. For a backup from v1.5.0 or older, see below first.
 
-Then reload the page (the "Reload the page once the backend has restarted" button of the restore screen).
+Then open the sign-in page with the "Sign in again once the backend has restarted" button of the restore screen ("Reload the page once the backend has restarted" in older versions), and sign in with the email and password stored in the backup (see [Signing in after a restore](#signing-in-after-a-restore)).
 
 Until the database is updated, the app may answer with server errors. From v1.11.0 on, restoring a backup made before v1.11.0 breaks the admin pages and, in a browser where the admin is signed in, the public menu. Reloading the page shows "Your session could not be checked" with "Internal server error" (before v1.13.0: it signed you out), and signing in fails with the same error, even with the right password. These failures count for the login limit: after 10 attempts the login answers "Too many failed login attempts" until the restart, which clears the counters. Guests can still see the public menu.
 

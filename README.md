@@ -159,13 +159,13 @@ The backend tests its write access at startup and names the folder it cannot wri
 
 By default, the backend runs SQLite in WAL mode. While it runs, the `db-data` volume holds `carta_cocktail.db-wal` and `carta_cocktail.db-shm` next to `carta_cocktail.db`, and the latest changes may only be in the `-wal` file. Never copy `carta_cocktail.db` alone while the backend runs: use the export in Settings > Backup & Restore, which saves a consistent copy of the database with the photos, or stop the backend and copy the `.db` file together with its `-wal` and `-shm` files when they exist. To put a copy back, use the restore in Settings > Backup & Restore, or follow [Restoring a pre-migration backup](#restoring-a-pre-migration-backup), which removes the old `-wal` and `-shm` files: a restored `.db` next to a stale `-wal` file can be corrupted. A copy put back by hand also brings back its sessions, including those revoked since it was made: set a new `JWT_SECRET` afterwards, as in [UPGRADING › "Signing in after a restore"](UPGRADING.md#signing-in-after-a-restore).
 
-WAL does not work on a network share (SMB or NFS, such as a NAS folder bind-mounted as `/app/data`). In that case, set `SQLITE_WAL=false` to keep the rollback journal. The compose files do not pass this variable from `.env`: add it to the `environment` list of `carta-cocktail-backend`, after `- UPLOAD_DIR=/app/uploads`:
+WAL does not work on a network share (SMB or NFS, such as a NAS folder bind-mounted as `/app/data`). In that case, keep the rollback journal: add this line to the `.env` file next to the compose file, then recreate the backend (`docker compose -f docker-compose.prod.yml up -d`):
 
-```yaml
-      - SQLITE_WAL=false
+```bash
+SQLITE_WAL=false
 ```
 
-Add this line again each time you download a new compose file, for example when upgrading: otherwise the database goes back to WAL. The default `db-data` named volume is local and needs nothing. The startup log shows the mode in use: `SQLite journal mode: wal`, or `delete` with `SQLITE_WAL=false`. When SQLite cannot switch, it keeps the previous mode and the log shows a warning: `SQLite journal mode is <mode>, not <mode> as requested (SQLITE_WAL)`.
+The line stays in `.env` when you download a new compose file. A compose file of v1.15.0 or older does not pass `SQLITE_WAL` from `.env`: download the current one, or add `- SQLITE_WAL=false` to the `environment` list of `carta-cocktail-backend`, after `- UPLOAD_DIR=/app/uploads` (see [Environment Variables](#environment-variables)). The default `db-data` named volume is local and needs nothing. The startup log shows the mode in use: `SQLite journal mode: wal`, or `delete` with `SQLITE_WAL=false`. When SQLite cannot switch, it keeps the previous mode and the log shows a warning: `SQLite journal mode is <mode>, not <mode> as requested (SQLITE_WAL)`.
 
 #### Recovering the admin account
 
@@ -357,7 +357,7 @@ carta-cocktail/
 | `ADMIN_PASSWORD` | Admin password, at least 12 characters, used when the admin is created or reset | **required** on first start, no default |
 | `ADMIN_RESET_PASSWORD` | Exactly `true` resets the existing admin's email and password from the two variables above at startup; other values are ignored with a warning | `false` |
 | `CARTA_UID`, `CARTA_GID` | Docker only, read by the compose files from `.env`: uid and gid the backend runs as. Set them when the data folders must belong to another owner, such as a network share (see [Data folders and the node user](#data-folders-and-the-node-user)) | `1000` |
-| `SQLITE_WAL` | `false` keeps the rollback journal instead of WAL; required when the database is on a network share (SMB/NFS). Other values use WAL. In Docker, set it in the compose file (see [Database files and network shares](#database-files-and-network-shares)) | `true` |
+| `SQLITE_WAL` | `false` keeps the rollback journal instead of WAL; required when the database is on a network share (SMB/NFS). Other values use WAL. See [Database files and network shares](#database-files-and-network-shares) | `true` |
 | `JWT_EXPIRES_IN` | Lifetime of the admin session token: a number of seconds (`86400`) or a timespan (`24h`, `7d`). Applies to tokens issued after the restart. The backend refuses to start with a value it cannot read | `7d` |
 | `LOGIN_RATE_LIMIT` | Failed logins allowed per client IP address (per /64 network for IPv6) in 15 minutes; beyond that, the login answers 429 (Too Many Requests). Successful logins do not count. A positive integer, otherwise the backend refuses to start | `10` |
 | `API_RATE_LIMIT` | API requests allowed per client IP address (per /64 network for IPv6) in one minute, public menu included; beyond that, the API answers 429 (Too Many Requests). Clients that share an address, such as guests behind a bar's Internet connection, share this count: raise it if they get "Too many requests". The Docker healthcheck does not count. Backup export and import have a fixed limit of their own: 10 requests per 15 minutes from the signed-in admin. A positive integer, otherwise the backend refuses to start | `600` |
@@ -367,7 +367,10 @@ carta-cocktail/
 | `UPLOAD_DIR` | Folder of the cocktail photos | `<repo>/uploads` outside Docker; `/app/uploads` in the image and the compose files (`uploads` volume) |
 | `BACKEND_HOST` | Backend hostname for nginx proxy (frontend container) | `carta-cocktail-backend` |
 
-The compose files pass only some of these variables to the backend. To set `JWT_EXPIRES_IN`, `LOGIN_RATE_LIMIT`, `API_RATE_LIMIT`, `TRUST_PROXY` or `CORS_ORIGIN` in Docker, add it to the `environment` list of `carta-cocktail-backend`, as for `SQLITE_WAL` (see [Database files and network shares](#database-files-and-network-shares)), and add it again each time you download a new compose file. The defaults suit a standard install.
+In Docker, set these variables in the `.env` file next to the compose file, then recreate the backend (`docker compose -f docker-compose.prod.yml up -d`). They stay there when you download a new compose file. A variable that is not set, or empty, keeps its default; the defaults suit a standard install. The compose files set `DATABASE_URL`, `PORT`, `UPLOAD_DIR` and `BACKEND_HOST` themselves: a value in `.env` does not change them.
+
+- **Compose file of v1.15.0 or older.** It does not pass `SQLITE_WAL`, `JWT_EXPIRES_IN`, `LOGIN_RATE_LIMIT`, `API_RATE_LIMIT`, `TRUST_PROXY` or `CORS_ORIGIN` from `.env`. Download the current one, or add these variables to the `environment` list of `carta-cocktail-backend`, after `- UPLOAD_DIR=/app/uploads` and without quotes (compose keeps quotes as part of the value in this list), such as `- TRUST_PROXY=1`.
+- **Variables in an `env_file`.** A variable of the `environment` list wins over the same variable in an `env_file:` entry, even when it is empty. If your compose file reads these variables from an `env_file`, move them to `.env`, or remove their lines from the `environment` list of the current compose file.
 
 ### Login limit behind a reverse proxy
 
@@ -378,13 +381,11 @@ The default has limits:
 - A client on your local network connects from a private address, so it is trusted: it can forge its address and get around the limits.
 - In some installs, the first proxy (nginx, or SWAG) sees clients from the Internet under a **private** address: Docker rootless or Podman (through their port forwarder), Docker Desktop, or IPv6 clients on a published port when the Docker daemon has no IPv6 and `docker-proxy` relays the connection. Every client that arrives this way comes from the same address, and that address is trusted. Clients that do not forge `X-Forwarded-For` all get that address, so they already share each counter: `LOGIN_RATE_LIMIT` failures from any of them block the login of every client that arrives this way, the admin included, for up to 15 minutes, and together they get `API_RATE_LIMIT` requests per minute. A client that writes its own `X-Forwarded-For` gets the address it wrote, so it can change it at each request and get around the limits.
 
-In these installs, set `TRUST_PROXY=1` (nginx alone) or `TRUST_PROXY=2` (SWAG or another reverse proxy in front of nginx) in the `environment` list of `carta-cocktail-backend`:
+In these installs, set `TRUST_PROXY=1` (nginx alone) or `TRUST_PROXY=2` (SWAG or another reverse proxy in front of nginx) in `.env` (see [Environment Variables](#environment-variables)), then recreate the backend:
 
-```yaml
-      - TRUST_PROXY=1
+```bash
+TRUST_PROXY=1
 ```
-
-Write values without quotes in this list: compose keeps them as part of the value, and the backend refuses to start with `- TRUST_PROXY="loopback, linklocal, uniquelocal"`.
 
 The API then uses the address the first proxy sees and ignores what clients write in `X-Forwarded-For`. This removes the bypass and adds no risk of blocking the admin: clients that shared a counter still share it, and the others (IPv4 clients in the `docker-proxy` case) keep their own. Clients that share a counter can still block the admin with their failures; raise `LOGIN_RATE_LIMIT` if that happens too often, and `API_RATE_LIMIT` if guests get "Too many requests". The backup limit counts only the signed-in admin's requests, so other clients cannot use it up. The counters are kept in memory: restarting the backend clears them.
 

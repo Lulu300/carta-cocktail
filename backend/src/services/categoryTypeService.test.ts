@@ -8,6 +8,10 @@ beforeAll(async () => { await setupTestDatabase(); });
 afterAll(async () => { await teardownTestDatabase(); });
 beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
 
+// 'CRÈME' with a composed È (U+00C8), and with E followed by a combining grave accent (U+0300)
+const COMPOSED = 'CR\u00C8ME';
+const DECOMPOSED = 'CRE\u0300ME';
+
 async function typeNames(): Promise<string[]> {
   const types = await prisma.categoryType.findMany({ orderBy: { name: 'asc' } });
   return types.map((type) => type.name);
@@ -43,6 +47,22 @@ describe('newCategoryTypeName', () => {
   // A byte order mark is white space for JS, but HTML draws nothing for it: not a space either
   it('should remove a byte order mark inside the name rather than make it a space', () => {
     expect(newCategoryTypeName('X\uFEFFY')).toBe('XY');
+  });
+
+  // HTML shows 'E\u0300' exactly like 'È'
+  it.each([
+    [`${DECOMPOSED} DE CASSIS`, `${COMPOSED} DE CASSIS`],
+    ['\u1109\u116E\u11AF', '\uC220'],
+    ['CRE\u200B\u0300ME ', COMPOSED],
+  ])('should compose %j as %j', (name, expected) => {
+    expect(newCategoryTypeName(name)).toBe(expected);
+  });
+
+  // NFKC would change them, though they are drawn differently
+  it.each([
+    '\uFB01NO', 'CO\u2082', '\uFF36\uFF2F\uFF24\uFF2B\uFF21', '\u3131\u314F',
+  ])('should keep the compatibility characters of %j', (name) => {
+    expect(newCategoryTypeName(name)).toBe(name);
   });
 
   it.each([
@@ -112,6 +132,25 @@ describe('ensureCategoryType', () => {
 
     expect(await ensureCategoryType(prisma, 'X\u200BY')).toBe('XY');
     expect(await typeNames()).toEqual(['SOFT', 'SPIRIT', 'SYRUP', 'XY']);
+  });
+
+  it('should keep an existing decomposed type as it is', async () => {
+    await prisma.categoryType.create({ data: { name: DECOMPOSED, color: 'red' } });
+
+    expect(await ensureCategoryType(prisma, DECOMPOSED)).toBe(DECOMPOSED);
+    expect(await typeNames()).toEqual([DECOMPOSED, 'SOFT', 'SPIRIT', 'SYRUP']);
+  });
+
+  it('should create a new decomposed type composed', async () => {
+    expect(await ensureCategoryType(prisma, DECOMPOSED)).toBe(COMPOSED);
+    expect(await typeNames()).toEqual([COMPOSED, 'SOFT', 'SPIRIT', 'SYRUP']);
+  });
+
+  it('should use the existing composed type rather than create a decomposed copy of it', async () => {
+    await prisma.categoryType.create({ data: { name: COMPOSED, color: 'red' } });
+
+    expect(await ensureCategoryType(prisma, DECOMPOSED)).toBe(COMPOSED);
+    expect(await typeNames()).toEqual([COMPOSED, 'SOFT', 'SPIRIT', 'SYRUP']);
   });
 
   it('should refuse a name of invisible characters that names no type, and create nothing', async () => {

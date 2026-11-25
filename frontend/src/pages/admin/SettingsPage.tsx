@@ -11,6 +11,7 @@ import Field from '../../components/ui/Field';
 import Icon from '../../components/ui/Icon';
 import Input from '../../components/ui/Input';
 import { cx } from '../../components/ui/classNames';
+import { openSignInAfterRestore } from '../../utils/signInAfterRestore';
 
 const ICON_OPTIONS = [
   '', '🍸', '🍹', '🥃', '🍷', '🥂', '🍺', '🧉', '🫗',
@@ -55,7 +56,7 @@ async function orNoAnswer<T>(call: () => Promise<T>): Promise<T | typeof NO_ANSW
   }
 }
 
-/** A restore result the admin must read before the page reloads. */
+/** A restore result the admin must read before the sign-in page opens. */
 function needsAdminAttention(result: BackupRestoreResult): boolean {
   return result.restartRecommended || result.skippedFiles > 0;
 }
@@ -75,8 +76,8 @@ function RestoreReport({ result }: { result: BackupRestoreResult }) {
       {result.skippedFiles > 0 && (
         <p className="text-sm text-fg-muted">{t('settings.backup.skippedFiles', { count: result.skippedFiles })}</p>
       )}
-      <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>
-        {result.restartRecommended ? t('settings.backup.reloadAfterRestart') : t('settings.backup.reload')}
+      <Button variant="secondary" size="sm" onClick={openSignInAfterRestore}>
+        {result.restartRecommended ? t('settings.backup.signInAfterRestart') : t('auth.signInAgain')}
       </Button>
     </div>
   );
@@ -248,18 +249,18 @@ export default function SettingsPage() {
       }
       setBackupFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      // Every restore signs the admin out (the session is revoked, at once or when the backend
+      // next starts), so both outcomes end on the sign-in page.
       if (needsAdminAttention(result)) {
-        // No automatic reload: it would hide the report before the admin reads it and,
-        // after an older backup, log the admin out until the backend restarts.
+        // Not opened by itself: it would hide the report before the admin reads it.
         setBackupMessage(t('settings.backup.importDone'));
         // Not a plain success while the backend still has to update the database
         if (result.restartRecommended) toast.info(t('settings.backup.importDone'));
         else toast.success(t('settings.backup.importDone'));
         setRestoreResult(result);
       } else {
-        setBackupMessage(t('settings.backup.importSuccess'));
-        toast.success(t('settings.backup.importSuccess'));
-        setTimeout(() => window.location.reload(), 1500);
+        // Nothing to read here: the sign-in page says that the backup was restored.
+        openSignInAfterRestore();
       }
     } catch (err: unknown) {
       showBackupError(err, restoreMayStillRun('settings.backup.restoreTimeout'));

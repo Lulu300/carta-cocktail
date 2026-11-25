@@ -12,8 +12,8 @@ const doubleSpaced = buildCategoryType({ name: 'X  Y' });
 const SPACED_SPIRIT_LABEL = '␣SPIRIT␣ categoryTypes.withSpaces';
 
 function renderOptions(value: string, categoryTypes: CategoryType[]) {
-  render(<CategoryTypeSelect aria-label="type" value={value} onChange={() => undefined} categoryTypes={categoryTypes} />);
-  return within(screen.getByLabelText('type')).getAllByRole('option').map((option) => option.textContent);
+  render(<CategoryTypeSelect value={value} onChange={() => undefined} categoryTypes={categoryTypes} />);
+  return within(screen.getByRole('combobox')).getAllByRole('option').map((option) => option.textContent);
 }
 
 describe('CategoryTypeSelect', () => {
@@ -33,6 +33,6 @@ describe('CategoryTypeSelect', () => {
 
   it("marks the file's own type when it is not in the list", () => {
     expect(renderOptions(' SPIRIT ', [spirit])).toEqual([SPACED_SPIRIT_LABEL, 'SPIRIT']);
-    expect(screen.getByLabelText('type')).toHaveValue(' SPIRIT ');
+    expect(screen.getByRole('combobox')).toHaveValue(' SPIRIT ');
   });
 });

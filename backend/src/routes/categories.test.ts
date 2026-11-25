@@ -231,6 +231,23 @@ describe('POST /api/categories', () => {
     expect(await prisma.categoryType.findUnique({ where: { name: 'XY' } })).toBeNull();
   });
 
+  it('should compose a new decomposed type', async () => {
+    const res = await request.post('/api/categories').set(authHeader()).send({ name: 'Cassis', type: 'CRE\u0300ME' });
+    expect(res.status).toBe(201);
+    expect(res.body.type).toBe('CR\u00C8ME');
+    expect(await prisma.categoryType.findUnique({ where: { name: 'CRE\u0300ME' } })).toBeNull();
+  });
+
+  it('should file the category under the type chosen when one is decomposed and the other composed', async () => {
+    await prisma.categoryType.create({ data: { name: 'CRE\u0300ME', color: 'red' } });
+    await prisma.categoryType.create({ data: { name: 'CR\u00C8ME', color: 'blue' } });
+    const decomposed = await request.post('/api/categories').set(authHeader()).send({ name: 'Cassis', type: 'CRE\u0300ME' });
+    const composed = await request.post('/api/categories').set(authHeader()).send({ name: 'Mûre', type: 'CR\u00C8ME' });
+    expect(decomposed.body.type).toBe('CRE\u0300ME');
+    expect(composed.body.type).toBe('CR\u00C8ME');
+    expect(await prisma.categoryType.count()).toBe(5);
+  });
+
   it('should return 409 when the name exists with another case', async () => {
     await seedCategory({ name: 'Rhum' });
     const res = await request.post('/api/categories').set(authHeader())
@@ -319,6 +336,22 @@ describe('PUT /api/categories/:id', () => {
     expect(res.status).toBe(200);
     expect(res.body.type).toBe('FRUIT JUICE');
     expect(await prisma.categoryType.findUnique({ where: { name: ' FRUIT   JUICE ' } })).toBeNull();
+  });
+
+  it('should compose a new decomposed type given on edit', async () => {
+    const cat = await seedCategory({ name: 'Cassis' });
+    const res = await request.put(`/api/categories/${cat.id}`).set(authHeader()).send({ type: 'CRE\u0300ME' });
+    expect(res.status).toBe(200);
+    expect(res.body.type).toBe('CR\u00C8ME');
+  });
+
+  it('should keep an existing decomposed type when the category is saved', async () => {
+    await prisma.categoryType.create({ data: { name: 'CRE\u0300ME', color: 'red' } });
+    const cat = await seedCategory({ name: 'Cassis', type: 'CRE\u0300ME' });
+    const res = await request.put(`/api/categories/${cat.id}`).set(authHeader()).send({ name: 'Cassis', type: 'CRE\u0300ME' });
+    expect(res.status).toBe(200);
+    expect(await prisma.category.findUniqueOrThrow({ where: { id: cat.id } })).toMatchObject({ type: 'CRE\u0300ME' });
+    expect(await prisma.categoryType.findUnique({ where: { name: 'CR\u00C8ME' } })).toBeNull();
   });
 
   it('should return 400 for a blank type that names no type, and change nothing', async () => {

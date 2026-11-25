@@ -7,6 +7,11 @@ import { useCategoryTypeName } from './useCategoryTypeName';
 const WITH_SPACES = 'categoryTypes.withSpaces';
 const EMPTY_NAME = 'categoryTypes.emptyName';
 const WITH_INVISIBLE = 'categoryTypes.withInvisibleCharacters';
+const NON_STANDARD_FORM = 'categoryTypes.nonStandardForm';
+
+// 'CRÈME' with a composed È (U+00C8), and with E followed by a combining grave accent (U+0300)
+const COMPOSED = 'CR\u00C8ME';
+const DECOMPOSED = 'CRE\u0300ME';
 
 function renderNames() {
   return renderHook(() => useCategoryTypeName()).result.current;
@@ -57,6 +62,28 @@ describe('useCategoryTypeName', () => {
       expect(renderNames().visibleName(' X\u200BY')).toBe(`␣X[U+200B]Y ${WITH_SPACES} ${WITH_INVISIBLE}`);
     });
 
+    // Both forms look the same: only the note tells the decomposed one apart
+    it('announces a name that is not in the composed form, and keeps the composed one as it is', () => {
+      const { visibleName } = renderNames();
+      expect(visibleName(DECOMPOSED)).toBe(`${DECOMPOSED} ${NON_STANDARD_FORM}`);
+      expect(visibleName(COMPOSED)).toBe(COMPOSED);
+      // Hangul as macOS file names store it: one jamo per letter instead of the syllable
+      expect(visibleName('\u1109\u116E\u11AF')).toBe(`\u1109\u116E\u11AF ${NON_STANDARD_FORM}`);
+      expect(visibleName('\uC220')).toBe('\uC220');
+    });
+
+    // The compatibility characters NFKC would change are drawn differently, and are not marked
+    it('keeps the ligatures, subscripts and full-width letters as they are', () => {
+      const { visibleName } = renderNames();
+      const names = ['\uFB01NO', 'CO\u2082', '\uFF36\uFF2F\uFF24\uFF2B\uFF21', '\u3131\u314F'];
+      expect(names.map(visibleName)).toEqual(names);
+    });
+
+    it('announces the spaces, the invisible characters and the form together', () => {
+      expect(renderNames().visibleName(` ${DECOMPOSED}\u200B`))
+        .toBe(`␣${DECOMPOSED}[U+200B] ${WITH_SPACES} ${WITH_INVISIBLE} ${NON_STANDARD_FORM}`);
+    });
+
     it('keeps the joiners and variation selectors that change how a name is drawn', () => {
       const { visibleName } = renderNames();
       const names = ['CRÈME', 'می\u200Cخواهم', 'क\u094D\u200Dष', 'ന\u0D4D\u200D', '👩\u200D💻', '❤\uFE0F'];
@@ -84,6 +111,14 @@ describe('useCategoryTypeName', () => {
     it('adds the marked stored name to the translation of a type with an invisible character', () => {
       const type = buildCategoryType({ name: 'X\u200BY', nameTranslations: { en: 'Mixers' } });
       expect(renderNames().typeLabel(type)).toBe(`Mixers – X[U+200B]Y ${WITH_INVISIBLE}`);
+    });
+
+    it('adds the marked stored name to the translation of a decomposed type, not of the composed one', () => {
+      const { typeLabel } = renderNames();
+      const nameTranslations = { en: 'Cream liqueurs' };
+      expect(typeLabel(buildCategoryType({ name: DECOMPOSED, nameTranslations })))
+        .toBe(`Cream liqueurs – ${DECOMPOSED} ${NON_STANDARD_FORM}`);
+      expect(typeLabel(buildCategoryType({ name: COMPOSED, nameTranslations }))).toBe('Cream liqueurs');
     });
 
     it('shows an untranslated type by its stored name, marked once', () => {

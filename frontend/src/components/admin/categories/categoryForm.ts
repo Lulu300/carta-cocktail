@@ -56,7 +56,8 @@ export function toCategoryForm(categoryTypes: CategoryType[], category?: Categor
  * backend stores it, so a blank one gets the field message rather than the backend's 400.
  */
 export function toCategoryInput(form: CategoryForm): CategoryInput | null {
-  const type = form.type === OTHER_TYPE ? tidyName(form.customType).toUpperCase() : form.type;
+  // Upper case first: it can decompose a composed letter ('ΐ' becomes 'Ι\u0308\u0301')
+  const type = form.type === OTHER_TYPE ? tidyName(form.customType.toUpperCase()) : form.type;
   if (!type) return null;
   return {
     name: form.name,

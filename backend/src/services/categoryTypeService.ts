@@ -8,10 +8,10 @@ type Db = Prisma.TransactionClient;
 
 /**
  * The name a new category type is stored under: without the characters HTML draws as nothing
- * (zero-width space, soft hyphen…), without spaces around it, and with every run of spaces inside
- * it reduced to one space, blank characters such as the braille pattern blank included. HTML shows
- * 'X\u200BY' exactly like 'XY', and 'X  Y' like 'X Y', so two types that differ only there could not
- * be told apart.
+ * (zero-width space, soft hyphen…), in the composed form (NFC), without spaces around it, and with
+ * every run of spaces inside it reduced to one space, blank characters such as the braille pattern
+ * blank included. HTML shows 'X\u200BY' exactly like 'XY', 'X  Y' like 'X Y', and 'E\u0300' like 'È',
+ * so two types that differ only there could not be told apart.
  */
 export function newCategoryTypeName(name: string): string {
   return tidyName(name);
@@ -34,17 +34,34 @@ export function requireNewCategoryTypeName(name: string, path: PropertyKey[]): s
 /**
  * A category may name a type that does not exist yet: it is created, in gray,
  * before the category, which the foreign key ties to an existing type.
- * A name that matches an existing type exactly keeps that type as it is, spaces and invisible
- * characters included (older data can hold 'X  Y', ' SPIRIT ' or 'X\u200BY'). Any other name is
- * tidied first, so it may match a type that already has the tidy form.
+ * A name that matches an existing type exactly keeps that type as it is, spaces, invisible
+ * characters and decomposed letters included (older data can hold 'X  Y', ' SPIRIT ', 'X\u200BY'
+ * or 'E\u0300'). Any other name is tidied first, so it may match a type that already has the tidy
+ * form.
  * Returns the name of the type the category goes under.
  * `typePath` is where the request sent the name: a blank new name is refused with a 400 that
  * points there, like the other issues of the request. The default is the category routes' own.
  */
 export async function ensureCategoryType(db: Db, name: string, typePath: PropertyKey[] = ['body', 'type']): Promise<string> {
+  const typeName = await categoryTypeNameFor(db, name, typePath);
+  await createMissingCategoryType(db, typeName);
+  return typeName;
+}
+
+/**
+ * The read-only half of `ensureCategoryType`: the name of the type a category given `name` goes
+ * under, by the same rule (an existing type matched exactly, else the tidied new name), with the
+ * same 400 at `typePath` when nothing is left. It writes nothing, so an import can check the type of
+ * a category to create before it knows whether it reuses an existing category instead (C-19): the
+ * request is valid or not whatever the database holds, and a reused category creates no type.
+ */
+export async function categoryTypeNameFor(db: Db, name: string, typePath: PropertyKey[]): Promise<string> {
   const existing = await db.categoryType.findUnique({ where: { name } });
   if (existing) return existing.name;
-  const typeName = requireNewCategoryTypeName(name, typePath);
+  return requireNewCategoryTypeName(name, typePath);
+}
+
+/** The write half of `ensureCategoryType`: creates, in gray, the type `categoryTypeNameFor` named if it is new. */
+export async function createMissingCategoryType(db: Db, typeName: string): Promise<void> {
   await db.categoryType.upsert({ where: { name: typeName }, update: {}, create: { name: typeName, color: 'gray' } });
-  return typeName;
 }

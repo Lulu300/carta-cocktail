@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '../../test/test-utils';
+import { createTestQueryClient, render, screen, waitFor, fireEvent } from '../../test/test-utils';
+import { qk } from '../../queries/keys';
 import userEvent from '@testing-library/user-event';
 import ImportBottlesWizard from './ImportBottlesWizard';
 import { buildCategory, buildCategoryType } from '../../test/factories';
@@ -289,6 +290,85 @@ describe('ImportBottlesWizard', () => {
     expect(await screen.findByRole('option', { name: 'Spirits' })).toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText('categories.type'), 'Liqueur');
     expect(screen.getByLabelText('categories.type')).toHaveValue('LIQUEUR');
+  });
+
+  it('blocks the import while a category to create has the type with an empty name', async () => {
+    mockApiResponse('get', '/api/category-types', [
+      buildCategoryType({ name: 'SPIRIT' }),
+      buildCategoryType({ name: '' }),
+      buildCategoryType({ name: '   ' }),
+    ]);
+    const confirmed = captureRequest('post', '/api/bottles/import/confirm');
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    const user = await previewWith(samplePreview);
+    const next = screen.getAllByText('bottles.importWizard.next').at(-1)!.closest('button')!;
+    const typeSelect = screen.getByLabelText('categories.type');
+    await screen.findByRole('option', { name: 'categoryTypes.emptyName' });
+
+    await user.selectOptions(typeSelect, '');
+    expect(typeSelect).toHaveAttribute('aria-invalid', 'true');
+    expect(typeSelect).toHaveAccessibleDescription('categories.typeRequired');
+    expect(next).toBeDisabled();
+    expect(screen.getByText('bottles.importWizard.categoriesWithoutType')).toBeInTheDocument();
+
+    // An existing type made only of spaces is kept as picked, as the backend does
+    await user.selectOptions(typeSelect, '   ');
+    expect(typeSelect).not.toHaveAttribute('aria-invalid');
+    expect(screen.queryByText('categories.typeRequired')).not.toBeInTheDocument();
+    expect(screen.queryByText('bottles.importWizard.categoriesWithoutType')).not.toBeInTheDocument();
+    await user.click(next);
+    await user.click(screen.getByText('bottles.importWizard.confirmImport'));
+
+    await screen.findByText('bottles.importWizard.successCount');
+    expect(await confirmed.body).toMatchObject({
+      resolutions: { categories: { rhum: { action: 'create', data: { type: '   ' } } } },
+    });
+  });
+
+  it('flags a file type made only of invisible characters as soon as the step opens', async () => {
+    // The file reader trims each cell, and trimming keeps a zero-width space
+    const invisibleType = '​';
+    mockApiResponse('get', '/api/category-types', [buildCategoryType({ name: 'SPIRIT' })]);
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    const user = await previewWith({
+      ...samplePreview,
+      categories: [{ ...samplePreview.categories[0], ref: { ...samplePreview.categories[0].ref, type: invisibleType } }],
+    });
+    const next = screen.getAllByText('bottles.importWizard.next').at(-1)!.closest('button')!;
+    const typeSelect = screen.getByLabelText('categories.type');
+    await screen.findByRole('option', { name: 'SPIRIT' });
+
+    expect(typeSelect).toHaveValue(invisibleType);
+    expect(typeSelect).toHaveAccessibleDescription('categories.typeRequired');
+    expect(screen.getByText('bottles.importWizard.categoriesWithoutType')).toBeInTheDocument();
+    expect(next).toBeDisabled();
+
+    await user.selectOptions(typeSelect, 'SPIRIT');
+    expect(screen.queryByText('bottles.importWizard.categoriesWithoutType')).not.toBeInTheDocument();
+    expect(next).toBeEnabled();
+  });
+
+  it('disables the import when the type picked disappears from the list before confirming', async () => {
+    const invisibleType = '​';
+    // An existing type is kept as picked, even one made only of invisible characters
+    mockApiResponse('get', '/api/category-types', [buildCategoryType({ name: invisibleType })]);
+    const queryClient = createTestQueryClient();
+    render(<ImportBottlesWizard onClose={() => undefined} />, { queryClient });
+    const user = await previewWith({
+      ...samplePreview,
+      categories: [{ ...samplePreview.categories[0], ref: { ...samplePreview.categories[0].ref, type: invisibleType } }],
+    });
+    await waitFor(() => expect(screen.getByLabelText('categories.type')).not.toHaveAttribute('aria-invalid'));
+    await user.click(screen.getAllByText('bottles.importWizard.next').at(-1)!);
+    const importButton = screen.getByText('bottles.importWizard.confirmImport').closest('button')!;
+    expect(importButton).toBeEnabled();
+
+    // The type is deleted elsewhere: the import would now create a blank type, which the backend refuses
+    mockApiResponse('get', '/api/category-types', [buildCategoryType({ name: 'SPIRIT' })]);
+    await queryClient.invalidateQueries({ queryKey: qk.categoryTypes });
+
+    await waitFor(() => expect(importButton).toBeDisabled());
+    expect(screen.getByText('bottles.importWizard.categoriesWithoutType')).toBeInTheDocument();
   });
 
   it('maps a category to the existing match and offers the existing categories for each row', async () => {

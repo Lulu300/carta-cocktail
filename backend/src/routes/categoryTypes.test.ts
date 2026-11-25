@@ -111,6 +111,36 @@ describe('POST /api/category-types', () => {
     expect(await prisma.categoryType.count({ where: { name: { startsWith: 'X' } } })).toBe(1);
   });
 
+  // HTML shows 'E\u0300' exactly like 'È': a new type is stored composed
+  it('should compose a new decomposed type', async () => {
+    const res = await request.post('/api/category-types').set(authHeader()).send({ name: 'cre\u0300me' });
+    expect(res.status).toBe(201);
+    expect(res.body.name).toBe('CR\u00C8ME');
+    expect(await prisma.categoryType.findUnique({ where: { name: 'CRE\u0300ME' } })).toBeNull();
+  });
+
+  it('should return 409 for a name that only differs from an existing type by its decomposed letters', async () => {
+    await request.post('/api/category-types').set(authHeader()).send({ name: 'cr\u00E8me' });
+    const res = await request.post('/api/category-types').set(authHeader()).send({ name: 'cre\u0300me' });
+    expect(res.status).toBe(409);
+    expect(await prisma.categoryType.count({ where: { name: { startsWith: 'CR' } } })).toBe(1);
+  });
+
+  it('should create the composed type next to an older decomposed one', async () => {
+    await prisma.categoryType.create({ data: { name: 'CRE\u0300ME', color: 'red' } });
+    const res = await request.post('/api/category-types').set(authHeader()).send({ name: 'cr\u00E8me' });
+    expect(res.status).toBe(201);
+    expect(res.body.name).toBe('CR\u00C8ME');
+    expect(await prisma.categoryType.findUnique({ where: { name: 'CRE\u0300ME' } })).toMatchObject({ color: 'red' });
+  });
+
+  // Upper case decomposes 'ΐ' into 'Ι\u0308\u0301': the name is composed after it
+  it('should store a new type composed after its upper case', async () => {
+    const res = await request.post('/api/category-types').set(authHeader()).send({ name: '\u0390' });
+    expect(res.status).toBe(201);
+    expect(res.body.name).toBe('\u03AA\u0301');
+  });
+
   it('should return 400 for a name of invisible characters, and create nothing', async () => {
     const typeCount = await prisma.categoryType.count();
     const res = await request.post('/api/category-types').set(authHeader()).send({ name: '\u200B \u2800\u00AD' });

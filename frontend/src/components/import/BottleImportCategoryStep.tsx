@@ -1,8 +1,9 @@
 import { useTranslation } from 'react-i18next';
 import type { BottleCategoryPreview, BottleCategoryResolution, CategoryType } from '../../types';
+import Field from '../ui/Field';
 import Input from '../ui/Input';
 import { defaultCategoryData } from './bottleImportResolutions';
-import { resolutionKey } from './importResolutions';
+import { isMissingCategoryType, resolutionKey } from './importResolutions';
 import ChoiceButton from './ChoiceButton';
 import CategoryTypeSelect from './CategoryTypeSelect';
 import { MatchBadge, MatchDot } from './MatchStatus';
@@ -65,12 +66,17 @@ export default function BottleImportCategoryStep({ categories, resolutions, cate
                     onChange={(e) => onChange(key, { ...resolution, data: { ...resolution.data, name: e.target.value } })}
                     placeholder={t('categories.name')}
                   />
-                  <CategoryTypeSelect
-                    aria-label={t('categories.type')}
-                    value={resolution.data.type}
-                    onChange={(type) => onChange(key, { ...resolution, data: { ...resolution.data, type } })}
-                    categoryTypes={categoryTypes}
-                  />
+                  <Field
+                    label={t('categories.type')}
+                    hideLabel
+                    error={isMissingCategoryType(resolution.data.type, categoryTypes) ? t('categories.typeRequired') : undefined}
+                  >
+                    <CategoryTypeSelect
+                      value={resolution.data.type}
+                      onChange={(type) => onChange(key, { ...resolution, data: { ...resolution.data, type } })}
+                      categoryTypes={categoryTypes}
+                    />
+                  </Field>
                 </div>
               )}
             </div>

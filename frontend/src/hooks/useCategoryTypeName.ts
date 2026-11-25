@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from './useLocalizedName';
-import { replaceInvisibleCharacters, SPACE_LIKE } from '../utils/invisibleCharacters';
+import { composeName, replaceInvisibleCharacters, SPACE_LIKE } from '../utils/invisibleCharacters';
 import type { CategoryType } from '../types';
 
 /** Shown in place of each space HTML would hide. */
@@ -24,13 +24,22 @@ function hasInvisibleCharacters(name: string): boolean {
 }
 
 /**
+ * Not in the composed form a new name is stored in: a decomposed letter ('E\u0300') looks exactly
+ * like the composed one ('È'), so there is nothing to show, only a note.
+ */
+function isNotComposed(name: string): boolean {
+  return composeName(name) !== name;
+}
+
+/**
  * Data older than v1.9.0 can hold a type named ' SPIRIT ' next to 'SPIRIT', or a type with an
- * empty name, and data older than v1.15.0 a type named 'X  Y' or 'X\u2800Y' (braille pattern
- * blank) next to 'X Y', or 'X\u200BY' (with a zero-width space) next to 'XY'. HTML shows the spaced names and the names with an invisible
- * character exactly like the others, and the empty one as nothing.
+ * empty name, and data stored before new names were tidied a type named 'X  Y' or 'X\u2800Y'
+ * (braille pattern blank) next to 'X Y', 'X\u200BY' (with a zero-width space) next to 'XY', or
+ * 'E\u0300' (decomposed) next to 'È'. HTML shows the spaced names, the names with an invisible
+ * character and the decomposed ones exactly like the others, and the empty one as nothing.
  */
 function isHiddenByHtml(name: string): boolean {
-  return name === '' || name.match(HIDDEN_SPACES) !== null || hasInvisibleCharacters(name);
+  return name === '' || name.match(HIDDEN_SPACES) !== null || hasInvisibleCharacters(name) || isNotComposed(name);
 }
 
 /**
@@ -51,6 +60,7 @@ export function useCategoryTypeName() {
     const notes: string[] = [];
     if (spacesShown !== charactersShown) notes.push(t('categoryTypes.withSpaces'));
     if (charactersShown !== text) notes.push(t('categoryTypes.withInvisibleCharacters'));
+    if (isNotComposed(text)) notes.push(t('categoryTypes.nonStandardForm'));
     return notes.length === 0 ? text : `${spacesShown} ${notes.join(' ')}`;
   }, [t]);
 

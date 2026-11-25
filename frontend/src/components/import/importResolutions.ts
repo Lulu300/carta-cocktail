@@ -1,4 +1,5 @@
-import type { EntityResolutionAction, ImportEntityRef, ImportEntityResolution, ImportPreviewResponse } from '../../types';
+import type { CategoryType, EntityResolutionAction, ImportEntityRef, ImportEntityResolution, ImportPreviewResponse } from '../../types';
+import { tidyName } from '../../utils/invisibleCharacters';
 
 /** The lists of entities a recipe refers to, in the order the wizard shows them. */
 export const IMPORT_ENTITY_TYPES = ['units', 'categories', 'bottles', 'ingredients'] as const;
@@ -9,7 +10,7 @@ export type ImportEntityType = (typeof IMPORT_ENTITY_TYPES)[number];
 export type ImportResolutions = Record<ImportEntityType, Record<string, EntityResolutionAction>>;
 
 /** A field of the creation form the backend would refuse, or replace with the file's value. */
-export type CreateDataField = 'name' | 'abbreviation' | 'capacityMl' | 'desiredStock';
+export type CreateDataField = 'name' | 'abbreviation' | 'type' | 'capacityMl' | 'desiredStock';
 
 // A recipe never gives the capacity of a bottle: a standard 70 cl bottle is assumed.
 const DEFAULT_BOTTLE_CAPACITY_ML = 700;
@@ -97,26 +98,46 @@ export function buildAutoResolutions(preview: ImportPreviewResponse): ImportReso
   return resolutions;
 }
 
+/**
+ * True when the backend refuses to create a category under this type, as the category form does:
+ * the empty name data older than v1.9.0 can hold, or a new type made only of blanks or invisible
+ * characters. An existing type is kept exactly as picked, so an old type of spaces is accepted.
+ */
+export function isMissingCategoryType(type: string, categoryTypes: CategoryType[]): boolean {
+  if (type === '') return true;
+  const isExistingType = categoryTypes.some((categoryType) => categoryType.name === type);
+  return !isExistingType && tidyName(type) === '';
+}
+
 function isWholeNumber(value: number | null | undefined, min: number): boolean {
   return typeof value === 'number' && Number.isInteger(value) && value >= min;
 }
 
-/** Fields of the creation data that block the import: blank names, missing or invalid numbers. */
-export function invalidCreateFields(type: ImportEntityType, data: ImportEntityRef): CreateDataField[] {
+/**
+ * Fields of the creation data that block the import: blank names, a category type the backend
+ * refuses, missing or invalid numbers. `categoryTypes` are the existing types, kept as picked.
+ */
+export function invalidCreateFields(type: ImportEntityType, data: ImportEntityRef, categoryTypes: CategoryType[]): CreateDataField[] {
   const invalid: CreateDataField[] = [];
   if (!data.name?.trim()) invalid.push('name');
   if (type === 'units' && !data.abbreviation?.trim()) invalid.push('abbreviation');
+  // The backend gives its default type to a category sent without one
+  if (type === 'categories' && isMissingCategoryType(data.type ?? DEFAULT_CATEGORY_TYPE, categoryTypes)) invalid.push('type');
   if (type === 'bottles' && !isWholeNumber(data.capacityMl, 1)) invalid.push('capacityMl');
   if (type === 'categories' && !isWholeNumber(data.desiredStock, 0)) invalid.push('desiredStock');
   return invalid;
 }
 
-export function isResolutionComplete(type: ImportEntityType, resolution: EntityResolutionAction | undefined): boolean {
+export function isResolutionComplete(
+  type: ImportEntityType,
+  resolution: EntityResolutionAction | undefined,
+  categoryTypes: CategoryType[],
+): boolean {
   switch (resolution?.action) {
     case 'use_existing':
       return resolution.existingId !== undefined;
     case 'create':
-      return resolution.data !== undefined && invalidCreateFields(type, resolution.data).length === 0;
+      return resolution.data !== undefined && invalidCreateFields(type, resolution.data, categoryTypes).length === 0;
     case 'skip':
       return true;
     default:
@@ -125,11 +146,15 @@ export function isResolutionComplete(type: ImportEntityType, resolution: EntityR
 }
 
 /** Number of entities whose resolution cannot be sent as it is. */
-export function countIncompleteResolutions(preview: ImportPreviewResponse, resolutions: ImportResolutions): number {
+export function countIncompleteResolutions(
+  preview: ImportPreviewResponse,
+  resolutions: ImportResolutions,
+  categoryTypes: CategoryType[],
+): number {
   let count = 0;
   for (const type of IMPORT_ENTITY_TYPES) {
     for (const entity of preview[type]) {
-      if (!isResolutionComplete(type, resolutions[type][resolutionKey(type, entity.ref)])) count += 1;
+      if (!isResolutionComplete(type, resolutions[type][resolutionKey(type, entity.ref)], categoryTypes)) count += 1;
     }
   }
   return count;

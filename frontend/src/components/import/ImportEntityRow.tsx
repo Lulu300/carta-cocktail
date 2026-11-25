@@ -34,6 +34,7 @@ interface ImportEntityRowProps {
 const FIELD_ERROR_KEYS: Record<CreateDataField, string> = {
   name: 'cocktails.importWizard.fieldRequired',
   abbreviation: 'cocktails.importWizard.fieldRequired',
+  type: 'categories.typeRequired',
   capacityMl: 'cocktails.importWizard.capacityInvalid',
   desiredStock: 'cocktails.importWizard.desiredStockInvalid',
 };
@@ -68,7 +69,7 @@ export default function ImportEntityRow({
   const choice: ResolutionChoice = resolution?.action ?? (isMatched ? 'use_existing' : 'create');
   const options = pickableOptions(entity, type, existingOptions);
   const createData = (resolution?.action === 'create' && resolution.data) || defaultCreateData(type, entity.ref);
-  const invalidFields = invalidCreateFields(type, createData);
+  const invalidFields = invalidCreateFields(type, createData, categoryTypes);
   const errorOf = (field: CreateDataField) => (invalidFields.includes(field) ? t(FIELD_ERROR_KEYS[field]) : undefined);
 
   const choose = (next: ResolutionChoice) => {
@@ -155,7 +156,7 @@ export default function ImportEntityRow({
               {type === 'units' && textField('abbreviation', t('units.abbreviation'))}
               {type === 'categories' && (
                 <>
-                  <Field label={t('categories.type')}>
+                  <Field label={t('categories.type')} error={errorOf('type')}>
                     <CategoryTypeSelect
                       value={createData.type ?? ''}
                       onChange={(categoryType) => updateCreateData('type', categoryType)}

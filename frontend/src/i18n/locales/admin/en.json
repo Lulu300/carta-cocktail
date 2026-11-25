@@ -21,6 +21,7 @@
     "password": "Password",
     "loginButton": "Sign In",
     "loginError": "Invalid email or password",
+    "backupRestored": "Backup restored. Sign in with the email and password that were in use when the backup was made.",
     "welcome": "Welcome to Carta Cocktail"
   },
   "dashboard": {
@@ -66,7 +67,8 @@
     "deleted": "Type deleted",
     "emptyName": "(no name)",
     "withSpaces": "(with spaces)",
-    "withInvisibleCharacters": "(with invisible characters)"
+    "withInvisibleCharacters": "(with invisible characters)",
+    "nonStandardForm": "(non-standard Unicode form)"
   },
   "bottles": {
     "title": "Bottles",
@@ -120,6 +122,7 @@
       "pickCategory": "— Pick a category —",
       "willCreate": "will be created",
       "categoryRequired": "Category required for this bottle",
+      "categoriesWithoutType": "{{count}} category(ies) to create have no type with a name: choose another type.",
       "duplicateFlag": "{{count}} existing duplicate(s)",
       "confirmTitle": "Import summary",
       "categoriesToCreate": "Categories to create",
@@ -424,11 +427,10 @@
       "import": "Restore Backup",
       "importing": "Restoring...",
       "selectFile": "Select ZIP file",
-      "confirmRestore": "This will replace ALL current data (database and images). This action cannot be undone. Continue?",
+      "confirmRestore": "This will replace ALL current data (database, images and admin account). This action cannot be undone. You will then have to sign in again with the email and password that were in use when the backup was made. Continue?",
       "exportSuccess": "Backup exported successfully",
       "exportTimeout": "Preparing the backup took too long: the proxy in front of the server stopped waiting. Trying again right away will probably fail the same way. Try again later, when the server is less busy. If it keeps failing, check the backend logs and the timeout of any reverse proxy in front of Carta Cocktail.",
       "exportNoAnswer": "The connection to the server was cut before the backup was fully downloaded. The export changes nothing on the server: check your connection and try again.",
-      "importSuccess": "Backup restored successfully. The page will reload.",
       "importDone": "Backup restored.",
       "restoreTimeout": "The server did not answer in time, but the restore may still be running.",
       "restoreNoAnswer": "The connection to the server was cut before it answered (the browser or a proxy stopped waiting, or the network was lost), but the restore may still be running. Check your network connection.",
@@ -439,8 +441,7 @@
       "restartMayFail": "This may not be enough: for a backup from v1.0.x, or from before v1.8.0 with duplicate category names or unit abbreviations, or, without Docker, from v1.5.0 or older, the database update fails. Read \"Restoring a backup from an older version\" in UPGRADING.md before restarting.",
       "skippedFiles_one": "{{count}} file of the uploads folder was not restored: only JPG, PNG and WebP images are restored, once per file name.",
       "skippedFiles_other": "{{count}} files of the uploads folder were not restored: only JPG, PNG and WebP images are restored, once per file name.",
-      "reload": "Reload the page",
-      "reloadAfterRestart": "Reload the page once the backend has restarted",
+      "signInAfterRestart": "Sign in again once the backend has restarted",
       "fileSelected": "File: {{name}}"
     },
     "noIcon": "No icon"

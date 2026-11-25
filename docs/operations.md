@@ -44,7 +44,7 @@ Références :
    ADMIN_PASSWORD=<au moins 12 caractères>
    ```
 
-   `.env` contient les secrets : il est prudent de le réserver à son propriétaire (`chmod 600 .env`). `ADMIN_PASSWORD` ne sert qu'à créer l'admin au premier démarrage ; changez ensuite le mot de passe dans Paramètres > Profil administrateur (Settings > Admin Profile).
+   `.env` contient les secrets : il est prudent de le réserver à son propriétaire (`chmod 600 .env`). `ADMIN_PASSWORD` ne sert qu'à créer l'admin au premier démarrage ; changez ensuite le mot de passe dans Paramètres > Profil administrateur (Settings > Admin Profile). Les variables facultatives (`SQLITE_WAL`, `TRUST_PROXY`, limites de débit…) se mettent aussi dans `.env` : voir [README › "Environment Variables"](../README.md#environment-variables).
 
 4. Démarrer et attendre que les deux conteneurs soient sains :
 
@@ -166,7 +166,7 @@ Pensez à mettre à jour `CARTA_PASSWORD` quand vous changez le mot de passe adm
 
 1. Lire les sections d'[`UPGRADING.md`](../UPGRADING.md) de toutes les versions entre la vôtre et la nouvelle, et faire leurs actions « Before upgrading ». Ce guide ne les recopie pas.
 2. Sauvegarder : export depuis l'admin, ou [sauvegarde à froid](#sauvegarde-à-froid-des-volumes).
-3. Changer le tag des deux lignes `image:` de `docker-compose.prod.yml` (par exemple `:1.14` → `:1.15`). Avec un tag `:X.Y`, les correctifs de la même mineure arrivent par un simple `pull`. Si la version demande un nouveau fichier compose, téléchargez celui de son tag et remettez-y vos modifications (port, `SQLITE_WAL=false`, autres variables ajoutées à `environment`).
+3. Changer le tag des deux lignes `image:` de `docker-compose.prod.yml` (par exemple `:1.14` → `:1.15`). Avec un tag `:X.Y`, les correctifs de la même mineure arrivent par un simple `pull`. Si la version demande un nouveau fichier compose, téléchargez celui de son tag et remettez-y vos modifications (port, volumes). Les variables facultatives (`SQLITE_WAL`, `TRUST_PROXY`, limites de débit…) restent dans `.env` : si vous les aviez ajoutées à la liste `environment` d'un fichier compose de la v1.15.0 ou plus ancien, mettez-les dans `.env` au lieu de les remettre dans le nouveau fichier.
 4. Télécharger et redémarrer :
 
    ```bash

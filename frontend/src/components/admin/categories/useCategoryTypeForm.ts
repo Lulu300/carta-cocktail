@@ -67,8 +67,9 @@ export function useCategoryTypeForm() {
       update.mutate({ name: editing.name, ...changes }, { onSuccess: resetForm });
       return;
     }
-    // Tidied as the backend stores it: a name of spaces or invisible characters is not sent
-    const name = tidyName(form.name).toUpperCase();
+    // Tidied as the backend stores it, after the upper case, which can decompose a letter: a name
+    // of spaces or invisible characters is not sent
+    const name = tidyName(form.name.toUpperCase());
     if (name) create.mutate({ name, ...changes }, { onSuccess: resetForm });
   };
 

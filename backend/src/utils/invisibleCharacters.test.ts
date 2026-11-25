@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { replaceInvisibleCharacters, tidyName } from './invisibleCharacters';
+import { composeName, replaceInvisibleCharacters, tidyName } from './invisibleCharacters';
 
 // Same cases as frontend/src/utils/invisibleCharacters.test.ts: both packages apply one rule.
 function removeInvisible(text: string): string {
@@ -97,19 +97,62 @@ describe('replaceInvisibleCharacters', () => {
   });
 });
 
-describe('tidyName', () => {
+describe('composeName', () => {
   it.each([
-    ['JUICE', 'JUICE'],
-    [' FRUIT \t\n JUICE ', 'FRUIT JUICE'],
-    ['\u200B X \u200B Y \u200E', 'X Y'],
-    ['X\uFEFFY', 'XY'],
-    ['X\u2800Y', 'X Y'],
-    ['\u2800SPIRIT\u3164', 'SPIRIT'],
-    ['X \u2800\uFFA0 Y', 'X Y'],
-    ['\u2800\u200B \u3164', ''],
-    ['梅\u200D酒', '梅酒'],
-    ['می\u200Cخواهم', 'می\u200Cخواهم'],
-  ])('should tidy %j as %j', (name, expected) => {
+    ['a decomposed accent', 'CRE\u0300ME', 'CR\u00C8ME'],
+    ['decomposed Hangul, as macOS file names store it', '\u1109\u116E\u11AF', '\uC220'],
+    ['accents in another order', 'A\u0316\u0301', '\u00C1\u0316'],
+    ['the angstrom sign', '\u212B', '\u00C5'],
+  ])('should compose %s', (_name, text, expected) => {
+    expect(composeName(text)).toBe(expected);
+  });
+
+  // NFKC would change them, though they are drawn differently
+  it.each([
+    ['a ligature', '\uFB01NO'],
+    ['a subscript', 'CO\u2082'],
+    ['full-width letters', '\uFF36\uFF2F\uFF24\uFF2B\uFF21'],
+    ['half-width kana', '\uFF76\uFF9E'],
+    ['Hangul compatibility jamo', '\u3131\u314F'],
+    ['the numero sign', '\u2116 5'],
+    ['a Hangul filler', 'X\u3164Y'],
+    ['an already composed name', 'CR\u00C8ME'],
+  ])('should keep %s', (_name, text) => {
+    expect(composeName(text)).toBe(text);
+  });
+});
+
+const TIDY_CASES: [string, string][] = [
+  ['JUICE', 'JUICE'],
+  [' FRUIT \t\n JUICE ', 'FRUIT JUICE'],
+  ['\u200B X \u200B Y \u200E', 'X Y'],
+  ['X\uFEFFY', 'XY'],
+  ['X\u2800Y', 'X Y'],
+  ['\u2800SPIRIT\u3164', 'SPIRIT'],
+  ['X \u2800\uFFA0 Y', 'X Y'],
+  ['\u2800\u200B \u3164', ''],
+  ['梅\u200D酒', '梅酒'],
+  ['می\u200Cخواهم', 'می\u200Cخواهم'],
+  ['CRE\u0300ME', 'CR\u00C8ME'],
+  [' CRE\u0300ME  DE\u200B CASSIS ', 'CR\u00C8ME DE CASSIS'],
+  // The accent is composed with its letter once the invisible character between them is gone
+  ['CRE\u200B\u0300ME', 'CR\u00C8ME'],
+  ['\uFB01NO', '\uFB01NO'],
+  // Composing changes the character before a joiner: the joiner rule is applied again after it
+  ['E\u0308\u200DX', '\u00CBX'],
+  ['e\u0308\u200C\u0915', '\u00EB\u0915'],
+  ['E\u200B\u0308\u200D', '\u00CB'],
+];
+
+describe('tidyName', () => {
+  it.each(TIDY_CASES)('should tidy %j as %j', (name, expected) => {
     expect(tidyName(name)).toBe(expected);
+  });
+
+  // A tidy name is stored as it is and never marked: tidying it again changes nothing
+  it.each(TIDY_CASES)('should leave nothing to tidy in the tidy form of %j', (name) => {
+    const tidy = tidyName(name);
+    expect(tidyName(tidy)).toBe(tidy);
+    expect(removeInvisible(tidy)).toBe(tidy);
   });
 });
