@@ -1145,6 +1145,37 @@ describe('DELETE /api/cocktails/:id - with imagePath set', () => {
   });
 });
 
+// The service tests cover the rule (C-19): this one checks the message the admin reads
+describe('POST /api/cocktails/import/confirm - unit that several units hold ignoring case', () => {
+  it('should answer 409 with a message naming the abbreviation and the units, and write nothing', async () => {
+    await seedUnit({ abbreviation: 'CL' });
+    await seedUnit({ abbreviation: 'Cl' });
+
+    const res = await request.post('/api/cocktails/import/confirm').set(authHeader()).set('Accept-Language', 'en').send({
+      recipe: {
+        version: 1,
+        cocktail: {
+          name: 'Daiquiri',
+          ingredients: [{ sourceType: 'INGREDIENT', sourceName: 'Lime', quantity: 2, unit: { abbreviation: 'cl' } }],
+        },
+      },
+      resolutions: {
+        units: { cl: { action: 'create', data: { name: 'Centilitre', abbreviation: 'cl' } } },
+        ingredients: { lime: { action: 'create', data: { name: 'Lime' } } },
+      },
+    });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe(
+      'Several units match the abbreviation "cl" when case is ignored, and none exactly: CL, Cl. '
+      + 'Use one of them, or change their abbreviations so that they differ by more than case',
+    );
+    expect(await prisma.unit.count()).toBe(2);
+    expect(await prisma.cocktail.count()).toBe(0);
+    expect(await prisma.ingredient.count()).toBe(0);
+  });
+});
+
 describe('POST /api/cocktails/:id/image - upload replacing existing', () => {
   it('should return 400 when no file is uploaded', async () => {
     const cocktail = await seedCocktail({ name: 'No Image Cocktail' });

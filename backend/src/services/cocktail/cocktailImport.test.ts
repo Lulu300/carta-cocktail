@@ -409,3 +409,169 @@ describe('confirmImport - recipe lines', () => {
     expect(await prisma.ingredient.count()).toBe(0);
   });
 });
+
+// The routes refuse a second category or unit that differs only by case (C-07): an import uses the
+// existing one instead of creating it (C-19). Older data may still hold 'Rum' next to 'RUM'.
+describe('units and categories that exist ignoring case', () => {
+  const rumLine = { sourceType: 'CATEGORY', sourceName: 'rum', quantity: 4, unit: CL };
+
+  describe('previewImport', () => {
+    it('should match the exact row before the others equal ignoring case', async () => {
+      await seedCategory({ name: 'Rum' });
+      const rum = await seedCategory({ name: 'rum' });
+      await seedUnit({ abbreviation: 'CL' });
+      const cl = await seedUnit({ abbreviation: 'cl' });
+
+      const preview = await previewImport(recipe([rumLine]));
+
+      expect(preview.categories[0]).toMatchObject({ status: 'matched', existingMatch: { id: rum.id, name: 'rum' } });
+      expect(preview.units[0]).toMatchObject({ status: 'matched', existingMatch: { id: cl.id, name: 'cl' } });
+    });
+
+    it('should list the rows a name could mean when several are equal ignoring case and none exactly', async () => {
+      const rum = await seedCategory({ name: 'Rum', nameTranslations: JSON.stringify({ fr: 'Rhum' }) });
+      const upperRum = await seedCategory({ name: 'RUM' });
+      const upperCl = await seedUnit({ abbreviation: 'CL' });
+      const titleCl = await seedUnit({ abbreviation: 'Cl' });
+
+      const preview = await previewImport(recipe([rumLine]));
+
+      expect(preview.categories[0]).toMatchObject({
+        status: 'ambiguous',
+        existingMatch: null,
+        ambiguousMatches: [
+          { id: rum.id, name: 'Rum', nameTranslations: { fr: 'Rhum' } },
+          { id: upperRum.id, name: 'RUM' },
+        ],
+      });
+      expect(preview.units[0]).toMatchObject({
+        status: 'ambiguous',
+        existingMatch: null,
+        ambiguousMatches: [{ id: upperCl.id, name: 'CL' }, { id: titleCl.id, name: 'Cl' }],
+      });
+    });
+
+    // Bottles and ingredients need not be unique ignoring case: the exact row first, else the first one
+    it('should propose the exact bottle or ingredient first, else the first one equal ignoring case', async () => {
+      const rum = await seedCategory({ name: 'Rum' });
+      const havana = await seedBottle({ name: 'Havana', categoryId: rum.id });
+      const lowerHavana = await seedBottle({ name: 'havana', categoryId: rum.id });
+      const lime = await seedIngredient({ name: 'Lime' });
+      const lowerLime = await seedIngredient({ name: 'lime' });
+
+      const preview = await previewImport(recipe([
+        { ...rumBottleLine, sourceName: 'havana' },
+        { sourceType: 'INGREDIENT', sourceName: 'lime', quantity: 1, unit: CL },
+      ]));
+
+      expect(preview.bottles).toEqual([expect.objectContaining({ status: 'matched', existingMatch: expect.objectContaining({ id: lowerHavana.id }) })]);
+      expect(preview.ingredients).toEqual([expect.objectContaining({ status: 'matched', existingMatch: expect.objectContaining({ id: lowerLime.id }) })]);
+
+      const upperPreview = await previewImport(recipe([
+        { ...rumBottleLine, sourceName: 'HAVANA' },
+        { sourceType: 'INGREDIENT', sourceName: 'LIME', quantity: 1, unit: CL },
+      ]));
+      expect(upperPreview.bottles[0]).toMatchObject({ status: 'matched', existingMatch: { id: havana.id } });
+      expect(upperPreview.ingredients[0]).toMatchObject({ status: 'matched', existingMatch: { id: lime.id } });
+    });
+  });
+
+  describe('confirmImport', () => {
+    it.each([
+      ['in another case', 'rum'],
+      ['exactly', 'Rum'],
+      ['under the name the admin typed', 'RUM'],
+    ])('should use a category that exists %s instead of creating it, with its own type', async (_case, name) => {
+      const rum = await seedCategory({ name: 'Rum', type: 'SPIRIT' });
+      const unit = await seedUnit();
+      const typeCount = await prisma.categoryType.count();
+
+      const cocktail = await confirmImport(recipe([rumLine]), resolutions({
+        units: { cl: { action: 'use_existing', existingId: unit.id } },
+        categories: { rum: { action: 'create', data: { name, type: 'NEW TYPE' } } },
+      }));
+
+      expect(cocktail.ingredients[0]).toMatchObject({ sourceType: 'CATEGORY', categoryId: rum.id });
+      expect(await prisma.category.count()).toBe(1);
+      expect(await prisma.category.findUniqueOrThrow({ where: { id: rum.id } })).toMatchObject({ name: 'Rum', type: 'SPIRIT' });
+      expect(await prisma.categoryType.count()).toBe(typeCount);
+    });
+
+    it('should use a unit whose abbreviation exists in another case instead of creating it', async () => {
+      const unit = await seedUnit({ name: 'Centilitre', abbreviation: 'CL' });
+
+      const cocktail = await confirmImport(recipe([{ sourceType: 'INGREDIENT', sourceName: 'Lime', quantity: 1, unit: CL }]), resolutions({
+        units: { cl: { action: 'create', data: CL } },
+        ingredients: { lime: { action: 'create', data: { name: 'Lime' } } },
+      }));
+
+      expect(cocktail.ingredients[0]).toMatchObject({ unitId: unit.id });
+      expect(await prisma.unit.findMany({ select: { abbreviation: true } })).toEqual([{ abbreviation: 'CL' }]);
+    });
+
+    it('should create a category once when two references create it under names equal ignoring case', async () => {
+      const cocktail = await confirmImport(recipe([
+        { sourceType: 'CATEGORY', sourceName: 'Mezcal', quantity: 2, unit: CL },
+        { sourceType: 'CATEGORY', sourceName: 'Agave', quantity: 1, unit: CL },
+      ]), resolutions({
+        units: { cl: { action: 'create', data: CL } },
+        categories: {
+          mezcal: { action: 'create', data: { name: 'Mezcal' } },
+          agave: { action: 'create', data: { name: 'MEZCAL' } },
+        },
+      }));
+
+      const mezcal = await prisma.category.findUniqueOrThrow({ where: { name: 'Mezcal' } });
+      expect(cocktail.ingredients.map((line) => line.categoryId)).toEqual([mezcal.id, mezcal.id]);
+      expect(await prisma.category.count()).toBe(1);
+    });
+
+    it.each([
+      ['category', 'errors.ambiguousCategoryName', { categories: { rum: { action: 'create', data: { name: 'rum' } } } }, 'rum', 'Rum, RUM'],
+      ['unit', 'errors.ambiguousUnitAbbreviation', { units: { cl: { action: 'create', data: CL } } }, 'cl', 'CL, Cl'],
+    ])('should refuse a %s to create that several rows hold ignoring case, naming them, and write nothing', async (
+      _kind, i18nKey, chosen, name, matches,
+    ) => {
+      await seedCategory({ name: 'Rum' });
+      await seedCategory({ name: 'RUM' });
+      await seedUnit({ abbreviation: 'CL' });
+      await seedUnit({ abbreviation: 'Cl' });
+      const before = await rowCounts();
+
+      await expect(confirmImport(recipe([rumLine]), resolutions(chosen)))
+        .rejects.toMatchObject({ status: 409, i18nKey, details: { name, matches } });
+      expect(await rowCounts()).toEqual(before);
+    });
+
+    it.each([
+      ['a blank', '   '],
+      ['an invisible', '\u200B'],
+    ])('should refuse %s new type even when the category exists ignoring case, and write nothing', async (_case, type) => {
+      await seedCategory({ name: 'Rum' });
+      const unit = await seedUnit();
+      const before = await rowCounts();
+      const typeCount = await prisma.categoryType.count();
+
+      await expect(confirmImport(recipe([rumLine]), resolutions({
+        units: { cl: { action: 'use_existing', existingId: unit.id } },
+        categories: { rum: { action: 'create', data: { name: 'rum', type } } },
+      }))).rejects.toMatchObject({ status: 400, details: [{ path: 'body.resolutions.categories.rum.data.type' }] });
+      expect(await rowCounts()).toEqual(before);
+      expect(await prisma.categoryType.count()).toBe(typeCount);
+    });
+
+    it('should put a category to create under the exact row when others are equal to it ignoring case', async () => {
+      await seedCategory({ name: 'Rum' });
+      const lowerRum = await seedCategory({ name: 'rum' });
+      const unit = await seedUnit();
+
+      const cocktail = await confirmImport(recipe([rumLine]), resolutions({
+        units: { cl: { action: 'use_existing', existingId: unit.id } },
+        categories: { rum: { action: 'create', data: { name: 'rum' } } },
+      }));
+
+      expect(cocktail.ingredients[0]).toMatchObject({ categoryId: lowerRum.id });
+      expect(await prisma.category.count()).toBe(2);
+    });
+  });
+});

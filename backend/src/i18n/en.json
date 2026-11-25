@@ -37,6 +37,8 @@
     "sectionNotInMenu": "This section is not one of this menu's sections",
     "unknownReference": "A recipe line names a unit, bottle, category or ingredient that does not exist (it may have just been deleted): reload the page and check the recipe",
     "importUnresolved": "The recipe cannot be imported: some of its units, bottles, categories or ingredients are neither matched with an existing one nor created (a new bottle also needs its category)",
+    "ambiguousCategoryName": "Several categories match \"{{name}}\" when case is ignored, and none exactly: {{matches}}. Use one of them, or rename them so that their names differ by more than case",
+    "ambiguousUnitAbbreviation": "Several units match the abbreviation \"{{name}}\" when case is ignored, and none exactly: {{matches}}. Use one of them, or change their abbreviations so that they differ by more than case",
     "import": {
       "missingColumn": "The CSV file must have a name column and a capacityMl column",
       "invalidJson": "The file is not valid JSON",

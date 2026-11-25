@@ -2,6 +2,7 @@
 // in the Docker image. The shared client also loads backend/.env
 import { prisma } from '../lib/prisma';
 import { ensureAdmin } from '../bootstrap/ensureAdmin';
+import { ensureDefaultUnits } from '../bootstrap/defaultUnits';
 
 async function main() {
   await ensureAdmin(prisma);
@@ -20,57 +21,7 @@ async function main() {
     });
   }
 
-  // Ensure all default units exist (upsert each one)
-  const defaultUnits = [
-    { name: 'Centilitre', abbreviation: 'cl', conversionFactorToMl: 10,
-      nameTranslations: JSON.stringify({ fr: 'Centilitre', en: 'Centiliter' }) },
-    { name: 'Millilitre', abbreviation: 'ml', conversionFactorToMl: 1,
-      nameTranslations: JSON.stringify({ fr: 'Millilitre', en: 'Milliliter' }) },
-    { name: 'Once (US)', abbreviation: 'oz', conversionFactorToMl: 29.5735,
-      nameTranslations: JSON.stringify({ fr: 'Once (US)', en: 'Ounce (US)' }) },
-    { name: 'Pièce', abbreviation: 'pce', conversionFactorToMl: null,
-      nameTranslations: JSON.stringify({ fr: 'Pièce', en: 'Piece' }) },
-    { name: 'Trait', abbreviation: 'trait', conversionFactorToMl: 0.6,
-      nameTranslations: JSON.stringify({ fr: 'Trait', en: 'Dash' }) },
-    { name: 'Cuillère à café', abbreviation: 'cc', conversionFactorToMl: 5,
-      nameTranslations: JSON.stringify({ fr: 'Cuillère à café', en: 'Teaspoon' }) },
-    { name: 'Cuillère à soupe', abbreviation: 'cs', conversionFactorToMl: 15,
-      nameTranslations: JSON.stringify({ fr: 'Cuillère à soupe', en: 'Tablespoon' }) },
-    { name: 'Feuille', abbreviation: 'feuille', conversionFactorToMl: null,
-      nameTranslations: JSON.stringify({ fr: 'Feuille', en: 'Leaf' }) },
-    { name: 'Tranche', abbreviation: 'tranche', conversionFactorToMl: null,
-      nameTranslations: JSON.stringify({ fr: 'Tranche', en: 'Slice' }) },
-    { name: 'Zeste', abbreviation: 'zeste', conversionFactorToMl: null,
-      nameTranslations: JSON.stringify({ fr: 'Zeste', en: 'Zest' }) },
-    { name: 'Gramme', abbreviation: 'g', conversionFactorToMl: null,
-      nameTranslations: JSON.stringify({ fr: 'Gramme', en: 'Gram' }) },
-    { name: 'Goutte', abbreviation: 'goutte', conversionFactorToMl: null,
-      nameTranslations: JSON.stringify({ fr: 'Goutte', en: 'Drop' }) },
-    { name: 'Rondelle', abbreviation: 'rondelle', conversionFactorToMl: null,
-      nameTranslations: JSON.stringify({ fr: 'Rondelle', en: 'Wheel' }) },
-    { name: 'Pincée', abbreviation: 'pincée', conversionFactorToMl: null,
-      nameTranslations: JSON.stringify({ fr: 'Pincée', en: 'Pinch' }) },
-    { name: 'Brin', abbreviation: 'brin', conversionFactorToMl: null,
-      nameTranslations: JSON.stringify({ fr: 'Brin', en: 'Sprig' }) },
-    { name: 'Branche', abbreviation: 'branche', conversionFactorToMl: null,
-      nameTranslations: JSON.stringify({ fr: 'Branche', en: 'Branch' }) },
-    { name: 'Écorce', abbreviation: 'écorce', conversionFactorToMl: null,
-      nameTranslations: JSON.stringify({ fr: 'Écorce', en: 'Peel' }) },
-    { name: 'Tasse', abbreviation: 'tasse', conversionFactorToMl: 250,
-      nameTranslations: JSON.stringify({ fr: 'Tasse', en: 'Cup' }) },
-  ];
-  for (const unit of defaultUnits) {
-    const existing = await prisma.unit.findFirst({ where: { abbreviation: unit.abbreviation } });
-    if (!existing) {
-      await prisma.unit.create({ data: unit });
-    } else if (!existing.nameTranslations) {
-      // Update existing units with translations if they don't have them
-      await prisma.unit.update({
-        where: { id: existing.id },
-        data: { nameTranslations: unit.nameTranslations },
-      });
-    }
-  }
+  await ensureDefaultUnits(prisma);
 
   // Remove "Dash" unit (duplicate of "Trait")
   const dashUnit = await prisma.unit.findFirst({ where: { abbreviation: 'dash' } });

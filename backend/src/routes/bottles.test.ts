@@ -1510,3 +1510,125 @@ describe('bottle menus', () => {
     expect(await prisma.bottle.count()).toBe(0);
   });
 });
+
+// The routes refuse a second category that differs only by case (C-07): the import uses the
+// existing one instead of creating it (C-19). Older data may still hold 'Rhum' next to 'RHUM'.
+describe('POST /api/bottles/import - categories that exist ignoring case', () => {
+  function previewOf(categoryName: string) {
+    const file = {
+      version: 1,
+      categories: [{ name: categoryName, type: 'SPIRIT', desiredStock: 1, minimumPercent: 30, nameTranslations: null }],
+      bottles: [{ name: 'Havana', categoryName, capacityMl: 700, quantity: 1 }],
+    };
+    return request.post('/api/bottles/import/preview').set(authHeader())
+      .attach('file', Buffer.from(JSON.stringify(file)), 'bottles.json');
+  }
+
+  function confirm(bottles: Record<string, unknown>[], categories: Record<string, unknown> = {}) {
+    const payload = { version: 1, categories: [], bottles: bottles.map(importRow) };
+    return request.post('/api/bottles/import/confirm').set(authHeader())
+      .send({ payload, resolutions: { categories } });
+  }
+
+  async function bottleCategoryIds() {
+    return (await prisma.bottle.findMany({ orderBy: { id: 'asc' } })).map((bottle) => bottle.categoryId);
+  }
+
+  it('should match the exact category before the others equal ignoring case', async () => {
+    await seedCategory({ name: 'Rhum' });
+    const lowerRhum = await seedCategory({ name: 'rhum' });
+
+    const res = await previewOf('rhum');
+
+    expect(res.body.categories[0]).toMatchObject({ status: 'matched', existingMatch: { id: lowerRhum.id, name: 'rhum' } });
+  });
+
+  it('should list the categories a name could mean when several are equal ignoring case and none exactly', async () => {
+    const rhum = await seedCategory({ name: 'Rhum', desiredStock: 3 });
+    const upperRhum = await seedCategory({ name: 'RHUM' });
+
+    const res = await previewOf('rhum');
+
+    expect(res.body.categories[0]).toEqual({
+      ref: expect.objectContaining({ name: 'rhum' }),
+      existingMatch: null,
+      status: 'ambiguous',
+      ambiguousMatches: [
+        { id: rhum.id, name: 'Rhum', type: 'SPIRIT', desiredStock: 3 },
+        { id: upperRhum.id, name: 'RHUM', type: 'SPIRIT', desiredStock: 1 },
+      ],
+    });
+  });
+
+  it.each([
+    ['in another case', 'rhum'],
+    ['exactly', 'Rhum'],
+  ])('should put the bottles in a category to create that exists %s, with its own type', async (_case, name) => {
+    const rhum = await seedCategory({ name: 'Rhum', type: 'SPIRIT' });
+    const typeCount = await prisma.categoryType.count();
+
+    const res = await confirm([{ categoryName: name }], { [name.toLowerCase()]: { action: 'create', data: { name, type: 'NEW TYPE' } } });
+
+    expect(res.status).toBe(201);
+    expect(await bottleCategoryIds()).toEqual([rhum.id]);
+    expect(await prisma.category.findMany({ select: { name: true, type: true } })).toEqual([{ name: 'Rhum', type: 'SPIRIT' }]);
+    expect(await prisma.categoryType.count()).toBe(typeCount);
+  });
+
+  it('should create a category once when two file categories create it under names equal ignoring case', async () => {
+    const res = await confirm([{ categoryName: 'Mezcal' }, { categoryName: 'MEZCAL' }], {
+      mezcal: { action: 'create', data: { name: 'Mezcal' } },
+      // The admin typed 'MEZCAL' for the file's 'Mescal'
+      mescal: { action: 'create', data: { name: 'MEZCAL' } },
+    });
+
+    expect(res.status).toBe(201);
+    const mezcal = await prisma.category.findUniqueOrThrow({ where: { name: 'Mezcal' } });
+    expect(await bottleCategoryIds()).toEqual([mezcal.id, mezcal.id]);
+    expect(await prisma.category.count()).toBe(1);
+  });
+
+  it.each([
+    ['a blank', '   '],
+    ['an invisible', '\u200B'],
+  ])('should refuse %s new type even when the category exists ignoring case, and write nothing', async (_case, type) => {
+    await seedCategory({ name: 'Rhum' });
+    const typeCount = await prisma.categoryType.count();
+
+    const res = await confirm([{ categoryName: 'rhum' }], { rhum: { action: 'create', data: { name: 'rhum', type } } });
+
+    expect(res.status).toBe(400);
+    expect(res.body.details).toEqual([expect.objectContaining({ path: 'body.resolutions.categories.rhum.data.type' })]);
+    expect(await prisma.bottle.count()).toBe(0);
+    expect(await prisma.category.count()).toBe(1);
+    expect(await prisma.categoryType.count()).toBe(typeCount);
+  });
+
+  it('should put a row in the exact category when others are equal to it ignoring case', async () => {
+    await seedCategory({ name: 'Rhum' });
+    const upperRhum = await seedCategory({ name: 'RHUM' });
+
+    const res = await confirm([{ categoryName: 'RHUM' }]);
+
+    expect(res.status).toBe(201);
+    expect(await bottleCategoryIds()).toEqual([upperRhum.id]);
+  });
+
+  it.each([
+    ['a category to create', [{ categoryName: 'rhum' }], { rhum: { action: 'create', data: { name: 'rhum' } } }],
+    ['the category of a row', [{ categoryName: 'Gin' }, { categoryName: 'rhum' }], {}],
+  ])('should refuse %s that several categories hold ignoring case, naming them, and write nothing', async (_case, bottles, categories) => {
+    await seedCategory({ name: 'Gin' });
+    await seedCategory({ name: 'Rhum' });
+    await seedCategory({ name: 'RHUM' });
+
+    const res = await confirm(bottles, categories).set('Accept-Language', 'fr');
+
+    expect(res.status).toBe(409);
+    expect(res.body.details).toEqual({ name: 'rhum', matches: 'Rhum, RHUM' });
+    expect(res.body.error).toContain('« rhum »');
+    expect(res.body.error).toContain('Rhum, RHUM');
+    expect(await prisma.category.count()).toBe(3);
+    expect(await prisma.bottle.count()).toBe(0);
+  });
+});
