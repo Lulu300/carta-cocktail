@@ -9,6 +9,7 @@ import {
   matchesSearchText,
   type LocalizeName,
 } from '../../utils/cocktailSearch';
+import { isBottleMenu } from '../../utils/menuType';
 
 type MenuItem = MenuCocktail | MenuBottle;
 
@@ -52,10 +53,6 @@ interface IndexedMenu {
   bottleBlocks: MenuBlock<MenuBottle>[];
   /** Normalized searchable text of each menu item, by menu item id. */
   searchTexts: Map<number, string>;
-}
-
-export function isBottleMenu(menu: Menu): boolean {
-  return menu.type === 'APEROS' || menu.type === 'DIGESTIFS';
 }
 
 /** Items without a section come first, then each section in the admin's order. */

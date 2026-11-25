@@ -1,7 +1,8 @@
-import { useParams } from 'react-router-dom';
+import { Navigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { menus as menusApi, menuBottles as menuBottlesApi } from '../../services/api';
 import type { Menu } from '../../types';
+import { isBottleMenu, type BottleMenuType } from '../../utils/menuType';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
@@ -12,6 +13,7 @@ import MenuComposition from '../../components/admin/menus/MenuComposition';
 import MenuEditorLayout from '../../components/admin/menus/MenuEditorLayout';
 import MenuItemRow from '../../components/admin/menus/MenuItemRow';
 import { groupBySection } from '../../components/admin/menus/groupBySection';
+import { menuEditorPath } from '../../components/admin/menus/bottleMenuType';
 import { isSystemMenu } from '../../components/admin/menus/isSystemMenu';
 import { groupMenuBottles, hasBottle, type MenuBottleGroup } from '../../components/admin/menus/menuBottleGroups';
 import { useMenuBottles, type EntryChanges } from '../../components/admin/menus/useMenuBottles';
@@ -35,10 +37,9 @@ interface MenuTypeTexts {
   unchecked: string;
 }
 
-// A cocktail menu holds no bottle: only reached through a typed URL.
-const COCKTAIL_MENU_TEXTS: MenuKindTexts = { title: 'menus.edit', hint: 'menus.bottles.cocktailMenu', empty: 'menus.bottles.cocktailMenu' };
+type BottleMenu = Menu & { type: BottleMenuType };
 
-const TYPE_TEXTS: Record<Menu['type'], MenuTypeTexts> = {
+const TYPE_TEXTS: Record<BottleMenuType, MenuTypeTexts> = {
   APEROS: {
     system: { title: 'menus.bottles.aperos.title', hint: 'menus.bottles.aperos.hint', empty: 'menus.bottles.aperos.empty' },
     personal: {
@@ -61,16 +62,9 @@ const TYPE_TEXTS: Record<Menu['type'], MenuTypeTexts> = {
     noChoice: 'menus.bottles.digestifs.noChoice',
     unchecked: 'menus.bottles.digestifs.unchecked',
   },
-  COCKTAILS: {
-    system: COCKTAIL_MENU_TEXTS,
-    personal: COCKTAIL_MENU_TEXTS,
-    choices: 'menus.bottles.cocktailMenu',
-    noChoice: 'menus.bottles.cocktailMenu',
-    unchecked: 'menus.bottles.cocktailMenu',
-  },
 };
 
-function kindTexts(menu: Menu): MenuKindTexts {
+function kindTexts(menu: BottleMenu): MenuKindTexts {
   return isSystemMenu(menu) ? TYPE_TEXTS[menu.type].system : TYPE_TEXTS[menu.type].personal;
 }
 
@@ -78,9 +72,14 @@ export default function MenuBottleEditPage() {
   const { t } = useTranslation();
   const menuId = Number(useParams().id);
 
+  // A cocktail menu holds no bottle: a URL typed by hand opens its own editor, under the same title.
   return (
-    <MenuEditorLayout menuId={menuId} itemLabel="bottles" title={(menu) => t(kindTexts(menu).title)}>
-      {(menu) => <MenuBottles menu={menu} />}
+    <MenuEditorLayout
+      menuId={menuId}
+      itemLabel="bottles"
+      title={(menu) => t(isBottleMenu(menu) ? kindTexts(menu).title : 'menus.edit')}
+    >
+      {(menu) => (isBottleMenu(menu) ? <MenuBottles menu={menu} /> : <Navigate to={menuEditorPath(menu)} replace />)}
     </MenuEditorLayout>
   );
 }
@@ -89,7 +88,7 @@ export default function MenuBottleEditPage() {
  * The bottles of the menu, grouped when identical: every change is saved at once.
  * A system menu gets its bottles from their boxes, a personal menu from the list of bottles to add.
  */
-function MenuBottles({ menu }: { menu: Menu }) {
+function MenuBottles({ menu }: { menu: BottleMenu }) {
   const { t } = useTranslation();
   const confirm = useConfirm();
   const mutations = useMenuBottles(menu.id);

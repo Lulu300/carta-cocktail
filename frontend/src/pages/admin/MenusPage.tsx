@@ -9,6 +9,7 @@ import { qk } from '../../queries/keys';
 import { useMenus } from '../../queries/menus';
 import { useCrudMutations } from '../../queries/crud';
 import { getBadgeClasses } from '../../utils/colors';
+import { isBottleMenu } from '../../utils/menuType';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import Field from '../../components/ui/Field';
@@ -24,7 +25,7 @@ import { cx, focusRingClasses } from '../../components/ui/classNames';
 import DataTable, { type Column } from '../../components/admin/DataTable';
 import { useConfirmDelete } from '../../components/admin/useConfirmDelete';
 import { useEntityForm } from '../../components/admin/useEntityForm';
-import { isBottleMenu, menuEditorPath } from '../../components/admin/menus/bottleMenuType';
+import { menuEditorPath } from '../../components/admin/menus/bottleMenuType';
 import { isSystemMenu } from '../../components/admin/menus/isSystemMenu';
 import { toSlug } from '../../components/admin/menus/menuSlug';
 

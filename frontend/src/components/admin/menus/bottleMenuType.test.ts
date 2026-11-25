@@ -1,16 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { isAvailableForMenu, isBottleMenu, menuEditorPath } from './bottleMenuType';
+import { isAvailableForMenu, menuEditorPath } from './bottleMenuType';
 
 const apero = { isApero: true, isDigestif: false };
 const digestif = { isApero: false, isDigestif: true };
-
-describe('isBottleMenu', () => {
-  it('recognises the aperitifs and digestifs types only', () => {
-    expect(isBottleMenu({ type: 'APEROS' })).toBe(true);
-    expect(isBottleMenu({ type: 'DIGESTIFS' })).toBe(true);
-    expect(isBottleMenu({ type: 'COCKTAILS' })).toBe(false);
-  });
-});
 
 describe('isAvailableForMenu', () => {
   it('follows the box of the menu type', () => {

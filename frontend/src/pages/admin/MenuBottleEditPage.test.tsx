@@ -799,6 +799,15 @@ describe('MenuBottleEditPage', () => {
     expect(screen.getByText('menus.bottles.digestifs.empty')).toBeInTheDocument();
   });
 
+  it('opens the cocktail editor for a cocktail menu reached by its bottles URL', async () => {
+    storeMenu({ type: 'COCKTAILS', slug: 'summer', bottles: [] });
+    renderPage();
+
+    await waitFor(() => expect(window.location.pathname).toBe('/admin/menus/5'));
+    expect(screen.queryByRole('heading', { name: 'menus.bottles.title' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'menus.bottles.addTitle' })).not.toBeInTheDocument();
+  });
+
   it('shows an error when the menu does not exist', async () => {
     answer.menuRead = async () => errorResponse(404, 'Resource not found');
     renderPage();

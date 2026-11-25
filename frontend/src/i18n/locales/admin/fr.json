@@ -357,7 +357,6 @@
       "addTitle": "Ajouter des bouteilles",
       "addLabel": "Ajouter {{name}} à la carte",
       "searchChoices": "Rechercher les bouteilles à ajouter",
-      "cocktailMenu": "Cette carte est une carte de cocktails : elle ne contient pas de bouteilles.",
       "aperos": {
         "title": "Gérer la carte des apéritifs",
         "hint": "Les bouteilles cochées comme apéritif apparaissent automatiquement ici. Utilisez « Synchroniser » pour mettre à jour la liste.",

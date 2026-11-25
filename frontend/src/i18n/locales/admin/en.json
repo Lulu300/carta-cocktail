@@ -357,7 +357,6 @@
       "addTitle": "Add bottles",
       "addLabel": "Add {{name}} to the menu",
       "searchChoices": "Search the bottles to add",
-      "cocktailMenu": "This is a cocktail menu: it holds no bottles.",
       "aperos": {
         "title": "Manage the aperitifs menu",
         "hint": "Bottles checked as aperitif appear here automatically. Use \"Synchronize\" to update the list.",
