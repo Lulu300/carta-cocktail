@@ -575,3 +575,103 @@ describe('units and categories that exist ignoring case', () => {
     });
   });
 });
+
+// A name pasted from a macOS file name can hold decomposed accents: 'Cre\u0300me' looks like 'Cr\u00E8me' (C-65)
+describe('names in another Unicode form', () => {
+  const PEEL = { name: 'E\u0301corce', abbreviation: 'e\u0301corce', conversionFactorToMl: null };
+  const creamLine = { sourceType: 'CATEGORY', sourceName: 'Cre\u0300me', quantity: 2, unit: PEEL };
+
+  it('should match a category and a unit stored in the composed form', async () => {
+    const cream = await seedCategory({ name: 'Cr\u00E8me' });
+    const peel = await seedUnit({ name: '\u00C9corce', abbreviation: '\u00C9CORCE' });
+
+    const preview = await previewImport(recipe([creamLine]));
+
+    expect(preview.categories[0]).toMatchObject({ status: 'matched', existingMatch: { id: cream.id } });
+    expect(preview.units[0]).toMatchObject({ status: 'matched', existingMatch: { id: peel.id } });
+  });
+
+  it('should use the composed category and unit instead of creating their decomposed form', async () => {
+    const cream = await seedCategory({ name: 'Cr\u00E8me' });
+    const peel = await seedUnit({ name: '\u00C9corce', abbreviation: '\u00E9corce' });
+
+    const cocktail = await confirmImport(recipe([creamLine]), resolutions({
+      units: { 'e\u0301corce': { action: 'create', data: PEEL } },
+      categories: { 'cre\u0300me': { action: 'create', data: { name: 'Cre\u0300me' } } },
+    }));
+
+    expect(cocktail.ingredients[0]).toMatchObject({ categoryId: cream.id, unitId: peel.id });
+    expect(await prisma.category.count()).toBe(1);
+    expect(await prisma.unit.count()).toBe(1);
+  });
+
+  it('should store a category, unit and ingredient it creates composed, translations included', async () => {
+    const translations = { nameTranslations: { fr: 'Cre\u0300me' } };
+
+    await confirmImport(recipe([creamLine, { sourceType: 'INGREDIENT', sourceName: 'Cre\u0300me', quantity: 1, unit: PEEL }]), resolutions({
+      units: { 'e\u0301corce': { action: 'create', data: { ...PEEL, ...translations } } },
+      categories: { 'cre\u0300me': { action: 'create', data: { name: 'Cre\u0300me', ...translations } } },
+      ingredients: { 'cre\u0300me': { action: 'create', data: { name: 'Cre\u0300me', ...translations } } },
+    }));
+
+    const composed = { nameTranslations: JSON.stringify({ fr: 'Cr\u00E8me' }) };
+    expect(await prisma.unit.findMany()).toEqual([expect.objectContaining({ name: '\u00C9corce', abbreviation: '\u00E9corce', ...composed })]);
+    expect(await prisma.category.findMany()).toEqual([expect.objectContaining({ name: 'Cr\u00E8me', ...composed })]);
+    expect(await prisma.ingredient.findMany()).toEqual([expect.objectContaining({ name: 'Cr\u00E8me', ...composed })]);
+  });
+});
+
+// Ingredient names are unique as stored: one stored name is one ingredient, used as it is (C-65)
+describe('ingredients to create that an ingredient already holds', () => {
+  const COMPOSED = 'Cr\u00E8me';
+  const DECOMPOSED = 'Cre\u0300me';
+  const ingredientLine = (sourceName: string) => ({ sourceType: 'INGREDIENT', sourceName, quantity: 1, unit: CL });
+  const createIngredient = (name: string) => ({ action: 'create', data: { name } });
+
+  async function importIngredients(names: string[]) {
+    return confirmImport(recipe(names.map(ingredientLine)), resolutions({
+      units: { cl: { action: 'create', data: CL } },
+      ingredients: Object.fromEntries(names.map((name) => [name.toLowerCase(), createIngredient(name)])),
+    }));
+  }
+
+  it('should create one ingredient for two lines naming it in each Unicode form', async () => {
+    const cocktail = await importIngredients([COMPOSED, DECOMPOSED]);
+
+    const [cream] = await prisma.ingredient.findMany();
+    expect(cream.name).toBe(COMPOSED);
+    expect(cocktail.ingredients.map((line) => line.ingredientId)).toEqual([cream.id, cream.id]);
+    expect(await prisma.ingredient.count()).toBe(1);
+  });
+
+  it.each([
+    ['in the other Unicode form', COMPOSED, DECOMPOSED],
+    ['decomposed, under its composed form', DECOMPOSED, COMPOSED],
+    ['under its exact name', COMPOSED, COMPOSED],
+  ])('should use an existing ingredient named %s instead of creating it', async (_case, stored, typed) => {
+    const cream = await seedIngredient({ name: stored });
+
+    const cocktail = await importIngredients([typed]);
+
+    expect(cocktail.ingredients[0]).toMatchObject({ ingredientId: cream.id });
+    expect(await prisma.ingredient.findMany({ select: { name: true } })).toEqual([{ name: stored }]);
+  });
+
+  it('should use the ingredient stored under the composed name when both forms exist', async () => {
+    await seedIngredient({ name: DECOMPOSED });
+    const composed = await seedIngredient({ name: COMPOSED });
+
+    const cocktail = await importIngredients([DECOMPOSED]);
+
+    expect(cocktail.ingredients[0]).toMatchObject({ ingredientId: composed.id });
+    expect(await prisma.ingredient.count()).toBe(2);
+  });
+
+  it('should still create an ingredient whose name differs by case', async () => {
+    await seedIngredient({ name: 'Lime' });
+
+    await importIngredients(['lime']);
+
+    expect(await prisma.ingredient.findMany({ select: { name: true }, orderBy: { id: 'asc' } })).toEqual([{ name: 'Lime' }, { name: 'lime' }]);
+  });
+});

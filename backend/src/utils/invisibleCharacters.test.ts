@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { composeName, replaceInvisibleCharacters, tidyName } from './invisibleCharacters';
+import { caseInsensitiveKey, composeName, replaceInvisibleCharacters, tidyName } from './invisibleCharacters';
 
 // Same cases as frontend/src/utils/invisibleCharacters.test.ts: both packages apply one rule.
 function removeInvisible(text: string): string {
@@ -119,6 +119,24 @@ describe('composeName', () => {
     ['an already composed name', 'CR\u00C8ME'],
   ])('should keep %s', (_name, text) => {
     expect(composeName(text)).toBe(text);
+  });
+});
+
+describe('caseInsensitiveKey', () => {
+  it.each([
+    ['a name in each case and form', ['Cr\u00E8me', 'Cre\u0300me', 'CR\u00C8ME', 'CRE\u0300ME', 'cre\u0300me'], 'cr\u00E8me'],
+    // Upper case decomposes it: '\u0399\u0308\u0301', whose composed form '\u03AA\u0301' is lower-cased to '\u03CA\u0301'
+    ['a Greek letter that upper case decomposes', ['\u0390', '\u03B9\u0308\u0301', '\u0399\u0308\u0301', '\u03AA\u0301'], '\u0390'],
+    // Its lower case is 'i' and a combining dot, which has no composed form
+    ['a Turkish capital I with a dot', ['\u0130', 'I\u0307', 'i\u0307'], 'i\u0307'],
+  ])('should give %s one composed key', (_name, names, expected) => {
+    names.forEach((name) => expect(caseInsensitiveKey(name)).toBe(expected));
+  });
+
+  it('should keep apart names that differ otherwise than by case and form', () => {
+    expect(caseInsensitiveKey('\u0130')).not.toBe(caseInsensitiveKey('I'));
+    expect(caseInsensitiveKey('\uFB01NO')).not.toBe(caseInsensitiveKey('FINO'));
+    expect(caseInsensitiveKey('Creme')).not.toBe(caseInsensitiveKey('Cr\u00E8me'));
   });
 });
 

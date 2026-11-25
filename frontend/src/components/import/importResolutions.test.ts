@@ -162,6 +162,34 @@ describe('matchIgnoringCase', () => {
   it('finds nothing for a value no row holds', () => {
     expect(matchIgnoringCase([rhum, gin], 'Vodka', byName)).toEqual({ status: 'none' });
   });
+
+  // Same cases as CaseInsensitiveIndex.match in backend/src/utils/uniqueness.test.ts (C-65)
+  const named = (id: number, name: string) => ({ id, name });
+
+  it('finds the only row equal ignoring case and Unicode form, accents included', () => {
+    const cream = named(1, 'Cr\u00E8me');
+    const decomposedCream = named(2, 'Cre\u0300me');
+    const peel = named(3, '\u00C9corce');
+
+    expect(matchIgnoringCase([cream, gin], 'Cre\u0300me', byName)).toEqual({ status: 'found', row: cream });
+    expect(matchIgnoringCase([decomposedCream], 'CR\u00C8ME', byName)).toEqual({ status: 'found', row: decomposedCream });
+    expect(matchIgnoringCase([peel], '\u00E9corce', byName)).toEqual({ status: 'found', row: peel });
+  });
+
+  it('is ambiguous between a name and its decomposed form, unless one is exact', () => {
+    const cream = named(1, 'Cr\u00E8me');
+    const decomposedCream = named(2, 'Cre\u0300me');
+
+    expect(matchIgnoringCase([cream, decomposedCream], 'CR\u00C8ME', byName)).toEqual({ status: 'ambiguous', rows: [cream, decomposedCream] });
+    expect(matchIgnoringCase([cream, decomposedCream], 'Cre\u0300me', byName)).toEqual({ status: 'found', row: decomposedCream });
+  });
+
+  it('matches a Greek letter that upper case decomposes, as the backend does', () => {
+    const dialytika = named(1, '\u0390');
+
+    expect(matchIgnoringCase([dialytika], '\u0399\u0308\u0301', byName)).toEqual({ status: 'found', row: dialytika });
+    expect(matchIgnoringCase([dialytika], '\u03AA\u0301', byName)).toEqual({ status: 'found', row: dialytika });
+  });
 });
 
 describe('existingRowFor', () => {

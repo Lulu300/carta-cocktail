@@ -1,4 +1,5 @@
 import { ConflictError } from '../errors';
+import { caseInsensitiveKey } from './invisibleCharacters';
 
 export interface UniqueValueRow {
   id: number;
@@ -13,11 +14,12 @@ export type CaseInsensitiveMatch<Row> =
 
 /**
  * Rows of a small reference table (categories, units) by the value that must be unique
- * ignoring case: a category name, a unit abbreviation.
+ * ignoring case: a category name, a unit abbreviation. "Ignoring case" also ignores the Unicode
+ * form (`caseInsensitiveKey`): 'Crème' and its decomposed form 'Cre\u0300me' look the same.
  *
- * The unique indexes of SQLite compare text with case, and Prisma has no case-insensitive
- * filter on SQLite: the comparison is done here. Data older than that rule (C-07) may still
- * hold two rows that differ only by case ('Rum' and 'rum').
+ * The unique indexes of SQLite compare text with case and form, and Prisma has no case-insensitive
+ * filter on SQLite: the comparison is done here. Data older than that rule (C-07, C-65) may still
+ * hold two rows that differ only by case or form ('Rum' and 'rum').
  */
 export class CaseInsensitiveIndex<Row> {
   private readonly rowsByKey = new Map<string, Row[]>();
@@ -27,7 +29,7 @@ export class CaseInsensitiveIndex<Row> {
   }
 
   add(row: Row): void {
-    const key = this.valueOf(row).toLowerCase();
+    const key = caseInsensitiveKey(this.valueOf(row));
     const sameKey = this.rowsByKey.get(key);
     if (sameKey) sameKey.push(row);
     else this.rowsByKey.set(key, [row]);
@@ -58,7 +60,7 @@ export class CaseInsensitiveIndex<Row> {
 
   /** The rows equal to `value` ignoring case, and among them the one with the exact value. */
   private lookup(value: string): { candidates: Row[]; exact: Row | undefined } {
-    const candidates = this.rowsByKey.get(value.toLowerCase()) ?? [];
+    const candidates = this.rowsByKey.get(caseInsensitiveKey(value)) ?? [];
     const exact = candidates.find((row) => this.valueOf(row) === value);
     return { candidates, exact };
   }

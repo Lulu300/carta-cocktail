@@ -147,6 +147,16 @@ export function composeName(name: string): string {
 }
 
 /**
+ * The key under which two names are the same ignoring case and Unicode form: 'Crème', 'CRÈME' and
+ * 'Cre\u0300me' share one. Lower case first, then composed: lower case can leave a letter that has
+ * a composed form decomposed ('Ϊ\u0301' becomes 'ϊ\u0301', whose composed form is 'ΐ'), so
+ * composing first would put 'ΐ' and its upper case under two keys.
+ */
+export function caseInsensitiveKey(name: string): string {
+  return composeName(name.toLowerCase());
+}
+
+/**
  * Without invisible characters, and composed. Each step can undo the other: removing a character
  * can bring a letter next to its accent ('E\u200B\u0300'), and composing changes the character
  * before a joiner, which the joiner rule looks at ('E\u0308\u200D' becomes 'Ë\u200D', a joiner

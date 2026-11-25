@@ -31,6 +31,16 @@ describe('ensureDefaultUnits', () => {
     expect(await abbreviationsLike('cl')).toEqual(['CL']);
   });
 
+  // C-65: 'e\u0301corce' (decomposed, as macOS file names store it) looks like '\u00E9corce'
+  it('should not create écorce again next to its decomposed form', async () => {
+    await seedUnit({ abbreviation: 'e\u0301corce' });
+
+    await ensureDefaultUnits(prisma);
+
+    const peels = (await prisma.unit.findMany()).filter((unit) => unit.abbreviation.normalize('NFC') === '\u00E9corce');
+    expect(peels.map((unit) => unit.abbreviation)).toEqual(['e\u0301corce']);
+  });
+
   it('should leave units that differ only by case as they are, and add none', async () => {
     await seedUnit({ abbreviation: 'CL', nameTranslations: null });
     await seedUnit({ abbreviation: 'Cl', nameTranslations: null });

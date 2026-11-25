@@ -8,6 +8,8 @@ import { SOURCE_KEYS, SourceType } from '../../validation/cocktails';
 import { categoryTypeNameFor, createMissingCategoryType } from '../categoryTypeService';
 import { parseNameTranslations, serializeTranslations } from '../../utils/translations';
 import { CaseInsensitiveIndex, CaseInsensitiveMatch, previewMatch } from '../../utils/uniqueness';
+import { nameToStore, translationsToStore } from '../../utils/storedNames';
+import { composeName } from '../../utils/invisibleCharacters';
 import { createCocktailIn, IngredientLineValue } from './cocktailService';
 import { collectImportReferences, ImportReferences, ImportedLine, lowercase } from './importReferences';
 
@@ -161,8 +163,32 @@ function firstLineUsingBottle(recipe: ImportedRecipe, key: string): number {
   });
 }
 
+interface IngredientRow {
+  id: number;
+  name: string;
+}
+
+/**
+ * Ingredients by the name a new one would be stored under (composed, `nameToStore`): the unique
+ * index refuses a second ingredient of that name, so an ingredient to create that one already holds,
+ * existing or created earlier by this import, is used as it is, as a category or a unit that exists
+ * ignoring case is. The row stored exactly under that name comes first; else a row whose name is
+ * only its decomposed form, which looks the same. Unlike categories and units, the case counts:
+ * ingredient names may differ only by case (C-19).
+ */
+function ingredientsByStoredName(rows: IngredientRow[]) {
+  const byName = new Map<string, IngredientRow>();
+  const add = (row: IngredientRow) => {
+    const name = composeName(row.name);
+    if (!byName.has(name) || row.name === name) byName.set(name, row);
+  };
+  rows.forEach(add);
+  return { add, get: (name: string) => byName.get(name) };
+}
+
 // A name the admin cleared in the wizard falls back on the one in the file. A unit or category
-// to create that already exists ignoring case is used as it is (`findOrCreate`)
+// to create that already exists ignoring case is used as it is (`findOrCreate`). The names of a
+// created unit, category or ingredient are stored composed, like the routes store them
 async function resolveAll(db: Db, recipe: ImportedRecipe, refs: ImportReferences, resolutions: Resolutions | undefined) {
   const units = new CaseInsensitiveIndex(await db.unit.findMany(), byAbbreviation);
   const unit = await resolveEntities(refs.units, resolutions?.units, async (data, ref, key) => {
@@ -170,10 +196,10 @@ async function resolveAll(db: Db, recipe: ImportedRecipe, refs: ImportReferences
     const row = await units.findOrCreate(abbreviation, 'errors.ambiguousUnitAbbreviation', () => db.unit.create({
       data: {
         // A hand-made file may give no unit name: the abbreviation names it then
-        name: data.name || ref.name || abbreviation,
-        abbreviation,
+        name: nameToStore(data.name || ref.name || abbreviation),
+        abbreviation: nameToStore(abbreviation),
         conversionFactorToMl: data.conversionFactorToMl ?? null,
-        nameTranslations: serializeTranslations(data.nameTranslations),
+        nameTranslations: serializeTranslations(translationsToStore(data.nameTranslations)),
       },
     }));
     return row.id;
@@ -189,11 +215,11 @@ async function resolveAll(db: Db, recipe: ImportedRecipe, refs: ImportReferences
       await createMissingCategoryType(db, typeName);
       return db.category.create({
         data: {
-          name,
+          name: nameToStore(name),
           type: typeName,
           desiredStock: data.desiredStock,
           minimumPercent: data.minimumPercent,
-          nameTranslations: serializeTranslations(data.nameTranslations),
+          nameTranslations: serializeTranslations(translationsToStore(data.nameTranslations)),
         },
       });
     });
@@ -212,14 +238,19 @@ async function resolveAll(db: Db, recipe: ImportedRecipe, refs: ImportReferences
     return created.id;
   });
 
+  const ingredients = ingredientsByStoredName(await db.ingredient.findMany());
   const ingredient = await resolveEntities(refs.ingredients, resolutions?.ingredients, async (data, ref, key) => {
+    const name = nameToStore(data.name || ref.name || key);
+    const existing = ingredients.get(name);
+    if (existing) return existing.id;
     const created = await db.ingredient.create({
       data: {
-        name: data.name || ref.name || key,
+        name,
         icon: data.icon ?? null,
-        nameTranslations: serializeTranslations(data.nameTranslations),
+        nameTranslations: serializeTranslations(translationsToStore(data.nameTranslations)),
       },
     });
+    ingredients.add(created);
     return created.id;
   });
 

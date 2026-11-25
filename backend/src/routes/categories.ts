@@ -4,6 +4,7 @@ import { AuthRequest } from '../middleware/auth';
 import { NotFoundError } from '../errors';
 import { parseNameTranslations, serializeTranslations } from '../utils/translations';
 import { assertUniqueIgnoringCase } from '../utils/uniqueness';
+import { nameToStore, translationsToStore } from '../utils/storedNames';
 import { deleteCategory, isForceRequested } from '../services/deletionService';
 import { ensureCategoryType } from '../services/categoryTypeService';
 import { valid, validate } from '../validation/validate';
@@ -44,12 +45,12 @@ router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Respons
   await assertCategoryNameIsFree(name);
   const category = await prisma.category.create({
     data: {
-      name,
+      name: nameToStore(name),
       type: await ensureCategoryType(prisma, type),
       // ?? and not ||: a desired stock of 0 is kept
       desiredStock: desiredStock ?? 1,
       minimumPercent: minimumPercent ?? 30,
-      nameTranslations: serializeTranslations(nameTranslations),
+      nameTranslations: serializeTranslations(translationsToStore(nameTranslations)),
     },
   });
   res.status(201).json(parseNameTranslations(category));
@@ -61,6 +62,8 @@ const updateSchemas = { params: IdParams, body: CategoryUpdate };
 router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Response) => {
   const { params: { id }, body } = valid<typeof updateSchemas>(res);
   const { name, type, desiredStock, minimumPercent, nameTranslations } = body;
+  const stored = await prisma.category.findUnique({ where: { id } });
+  if (!stored) throw new NotFoundError();
   if (name !== undefined) {
     await assertCategoryNameIsFree(name, id);
   }
@@ -69,11 +72,11 @@ router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Respo
   const category = await prisma.category.update({
     where: { id },
     data: {
-      name,
+      name: name === undefined ? undefined : nameToStore(name, stored.name),
       type: typeName,
       desiredStock,
       minimumPercent,
-      nameTranslations: serializeTranslations(nameTranslations),
+      nameTranslations: serializeTranslations(translationsToStore(nameTranslations, stored.nameTranslations)),
     },
   });
   res.json(parseNameTranslations(category));

@@ -19,6 +19,8 @@ import { BottleCreate, BottleExportQuery, BottleListQuery, BottleUpdate } from '
 import { BottleImportConfirm } from '../validation/bottleImport';
 import { importedCategoryTypePath } from '../validation/categories';
 import { CaseInsensitiveIndex, previewMatch } from '../utils/uniqueness';
+import { nameToStore, translationsToStore } from '../utils/storedNames';
+import { caseInsensitiveKey } from '../utils/invisibleCharacters';
 
 const router = Router();
 
@@ -50,8 +52,9 @@ const IMPORT_TRANSACTION_TIMEOUT_MS = 30_000;
 
 /**
  * Same name whatever the case, capacity and category: the import warns about such a bottle.
- * `category` is the lowercased category name in the preview, which has no resolution yet, and
- * the id of the category a row is resolved to in the confirmation.
+ * `category` is the category name in the preview, which has no resolution yet, under the key
+ * categories are compared with (`caseInsensitiveKey`), and the id of the category a row is
+ * resolved to in the confirmation.
  */
 function duplicateKey(name: string, capacityMl: number, category: string | number): string {
   return `${name.toLowerCase()}|${capacityMl}|${category}`;
@@ -83,7 +86,7 @@ router.post('/import/preview', importUpload.single('file'), async (req: AuthRequ
   const categoriesByName = new CaseInsensitiveIndex(await prisma.category.findMany(), (category) => category.name);
   const bottlesByKey = new Map<string, typeof allBottles>();
   for (const bottle of allBottles) {
-    const key = duplicateKey(bottle.name, bottle.capacityMl, bottle.category.name.toLowerCase());
+    const key = duplicateKey(bottle.name, bottle.capacityMl, caseInsensitiveKey(bottle.category.name));
     const sameKey = bottlesByKey.get(key);
     if (sameKey) sameKey.push(bottle);
     else bottlesByKey.set(key, [bottle]);
@@ -95,7 +98,7 @@ router.post('/import/preview', importUpload.single('file'), async (req: AuthRequ
   }));
 
   const bottles = payload.bottles.map((b) => {
-    const duplicates = (bottlesByKey.get(duplicateKey(b.name, b.capacityMl, b.categoryName.toLowerCase())) ?? [])
+    const duplicates = (bottlesByKey.get(duplicateKey(b.name, b.capacityMl, caseInsensitiveKey(b.categoryName))) ?? [])
       .map((d) => ({
         id: d.id,
         name: d.name,
@@ -137,11 +140,11 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
           await createMissingCategoryType(tx, typeName);
           return tx.category.create({
             data: {
-              name: categoryName,
+              name: nameToStore(categoryName),
               type: typeName,
               desiredStock,
               minimumPercent,
-              nameTranslations: serializeTranslations(nameTranslations),
+              nameTranslations: serializeTranslations(translationsToStore(nameTranslations)),
             },
           });
         });
