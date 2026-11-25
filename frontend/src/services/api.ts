@@ -361,6 +361,18 @@ export const menuBottles = {
     }),
   delete: (id: number) =>
     request<{ message: string }>(`/menu-bottles/${id}`, { method: 'DELETE' }),
+  /** Adds these bottles at the end of a personal menu, in this order, all of them or none. */
+  addBottles: (menuId: number, bottleIds: number[]) =>
+    request<{ message: string }>(`/menu-bottles/menu/${menuId}/entries`, {
+      method: 'POST',
+      body: JSON.stringify({ bottleIds }),
+    }),
+  /** Removes these entries (`MenuBottle.id`) of the menu, all of them or none; a system menu keeps them as exclusions. */
+  removeEntries: (menuId: number, ids: number[]) =>
+    request<{ message: string }>(`/menu-bottles/menu/${menuId}/entries/remove`, {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    }),
   sync: (menuId: number) =>
     request<{ message: string; added: number; removed: number }>(`/menu-bottles/menu/${menuId}/sync`, { method: 'POST' }),
   /** `ids` lists every entry (`MenuBottle.id`) of the menu, in the new order: one transaction. */

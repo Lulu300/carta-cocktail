@@ -1,23 +1,26 @@
 import { useTranslation } from 'react-i18next';
 import type { MenuBottleExclusion } from '../../../services/api';
-import Button from '../../ui/Button';
+import type { Menu } from '../../../types';
 import Card from '../../ui/Card';
 import Spinner from '../../ui/Spinner';
 import LoadError from '../LoadError';
-import BottleGroupLabel from './BottleGroupLabel';
+import BottleGroupActionRow from './BottleGroupActionRow';
+import { isAvailableForMenu } from './bottleMenuType';
 import { groupExcludedBottles } from './menuBottleGroups';
 import { useMenuExclusions } from './useMenuBottles';
 
 interface ExcludedBottlesProps {
-  menuId: number;
+  menu: Pick<Menu, 'id' | 'type'>;
+  /** Shown on a bottle no longer checked for the menu's type: putting it back does not bring it into the menu. */
+  uncheckedNote: string;
   /** Receives every removed bottle of a group of identical bottles. */
   onRestore: (exclusions: MenuBottleExclusion[]) => void;
 }
 
 /** The bottles removed from a system menu, grouped like the menu, each group with a button that puts it back. */
-export default function ExcludedBottles({ menuId, onRestore }: ExcludedBottlesProps) {
+export default function ExcludedBottles({ menu, uncheckedNote, onRestore }: ExcludedBottlesProps) {
   const { t } = useTranslation();
-  const exclusionsQuery = useMenuExclusions(menuId);
+  const exclusionsQuery = useMenuExclusions(menu.id);
   const exclusions = exclusionsQuery.data ?? [];
   const groups = groupExcludedBottles(exclusions);
 
@@ -36,19 +39,16 @@ export default function ExcludedBottles({ menuId, onRestore }: ExcludedBottlesPr
           )}
           <ul className="space-y-2">
             {groups.map((group) => (
-              <li key={group.key} className="flex items-center gap-3 p-3 rounded-lg border border-line-strong bg-canvas">
-                <div className="flex-1 min-w-0">
-                  <BottleGroupLabel bottle={group.bottle} count={group.exclusions.length} isEmpty={group.isEmpty} />
-                </div>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  aria-label={t('menus.bottles.restoreLabel', { name: group.bottle.name })}
-                  onClick={() => onRestore(group.exclusions)}
-                >
-                  {t('menus.bottles.restore')}
-                </Button>
-              </li>
+              <BottleGroupActionRow
+                key={group.key}
+                bottle={group.bottle}
+                count={group.exclusions.length}
+                isEmpty={group.isEmpty}
+                note={isAvailableForMenu(group.bottle, menu) ? undefined : uncheckedNote}
+                actionText={t('menus.bottles.restore')}
+                actionLabel={t('menus.bottles.restoreLabel', { name: group.bottle.name })}
+                onAction={() => onRestore(group.exclusions)}
+              />
             ))}
           </ul>
         </div>

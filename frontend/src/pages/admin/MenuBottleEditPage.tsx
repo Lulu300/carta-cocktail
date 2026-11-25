@@ -1,51 +1,94 @@
-import { useParams } from 'react-router-dom';
+import { Navigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { menus as menusApi, menuBottles as menuBottlesApi } from '../../services/api';
 import type { Menu } from '../../types';
+import { isBottleMenu, type BottleMenuType } from '../../utils/menuType';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import BottleGroupLabel from '../../components/admin/menus/BottleGroupLabel';
+import BottlesToAdd from '../../components/admin/menus/BottlesToAdd';
 import ExcludedBottles from '../../components/admin/menus/ExcludedBottles';
 import MenuComposition from '../../components/admin/menus/MenuComposition';
 import MenuEditorLayout from '../../components/admin/menus/MenuEditorLayout';
 import MenuItemRow from '../../components/admin/menus/MenuItemRow';
 import { groupBySection } from '../../components/admin/menus/groupBySection';
+import { menuEditorPath } from '../../components/admin/menus/bottleMenuType';
 import { isSystemMenu } from '../../components/admin/menus/isSystemMenu';
 import { groupMenuBottles, hasBottle, type MenuBottleGroup } from '../../components/admin/menus/menuBottleGroups';
 import { useMenuBottles, type EntryChanges } from '../../components/admin/menus/useMenuBottles';
 import { useMenuMutation } from '../../components/admin/menus/useMenuMutation';
 
-interface MenuTypeTexts {
+/** i18n keys of the texts that depend on the kind of menu. */
+interface MenuKindTexts {
   title: string;
   hint: string;
   empty: string;
 }
 
-const TYPE_TEXTS: Record<Menu['type'], MenuTypeTexts> = {
-  APEROS: { title: 'menus.bottles.aperos.title', hint: 'menus.bottles.aperos.hint', empty: 'menus.bottles.aperos.empty' },
-  DIGESTIFS: {
-    title: 'menus.bottles.digestifs.title',
-    hint: 'menus.bottles.digestifs.hint',
-    empty: 'menus.bottles.digestifs.empty',
+/** A system menu follows the boxes of the bottles; a personal menu is filled by hand. */
+interface MenuTypeTexts {
+  system: MenuKindTexts;
+  personal: MenuKindTexts;
+  /** What the list of bottles to add offers, on a personal menu. */
+  choices: string;
+  noChoice: string;
+  /** Shown on a bottle removed from a system menu and no longer checked for its type. */
+  unchecked: string;
+}
+
+type BottleMenu = Menu & { type: BottleMenuType };
+
+const TYPE_TEXTS: Record<BottleMenuType, MenuTypeTexts> = {
+  APEROS: {
+    system: { title: 'menus.bottles.aperos.title', hint: 'menus.bottles.aperos.hint', empty: 'menus.bottles.aperos.empty' },
+    personal: {
+      title: 'menus.bottles.aperos.personalTitle',
+      hint: 'menus.bottles.aperos.personalHint',
+      empty: 'menus.bottles.aperos.personalEmpty',
+    },
+    choices: 'menus.bottles.aperos.choices',
+    noChoice: 'menus.bottles.aperos.noChoice',
+    unchecked: 'menus.bottles.aperos.unchecked',
   },
-  // A cocktail menu holds no bottle: only reached through a typed URL.
-  COCKTAILS: { title: 'menus.edit', hint: 'menus.bottles.cocktailMenu', empty: 'menus.bottles.cocktailMenu' },
+  DIGESTIFS: {
+    system: { title: 'menus.bottles.digestifs.title', hint: 'menus.bottles.digestifs.hint', empty: 'menus.bottles.digestifs.empty' },
+    personal: {
+      title: 'menus.bottles.digestifs.personalTitle',
+      hint: 'menus.bottles.digestifs.personalHint',
+      empty: 'menus.bottles.digestifs.personalEmpty',
+    },
+    choices: 'menus.bottles.digestifs.choices',
+    noChoice: 'menus.bottles.digestifs.noChoice',
+    unchecked: 'menus.bottles.digestifs.unchecked',
+  },
 };
+
+function kindTexts(menu: BottleMenu): MenuKindTexts {
+  return isSystemMenu(menu) ? TYPE_TEXTS[menu.type].system : TYPE_TEXTS[menu.type].personal;
+}
 
 export default function MenuBottleEditPage() {
   const { t } = useTranslation();
   const menuId = Number(useParams().id);
 
+  // A cocktail menu holds no bottle: a URL typed by hand opens its own editor, under the same title.
   return (
-    <MenuEditorLayout menuId={menuId} itemLabel="bottles" title={(menu) => t(TYPE_TEXTS[menu.type].title)}>
-      {(menu) => <MenuBottles menu={menu} />}
+    <MenuEditorLayout
+      menuId={menuId}
+      itemLabel="bottles"
+      title={(menu) => t(isBottleMenu(menu) ? kindTexts(menu).title : 'menus.edit')}
+    >
+      {(menu) => (isBottleMenu(menu) ? <MenuBottles menu={menu} /> : <Navigate to={menuEditorPath(menu)} replace />)}
     </MenuEditorLayout>
   );
 }
 
-/** The bottles of the menu, grouped when identical: every change is saved at once. */
-function MenuBottles({ menu }: { menu: Menu }) {
+/**
+ * The bottles of the menu, grouped when identical: every change is saved at once.
+ * A system menu gets its bottles from their boxes, a personal menu from the list of bottles to add.
+ */
+function MenuBottles({ menu }: { menu: BottleMenu }) {
   const { t } = useTranslation();
   const confirm = useConfirm();
   const mutations = useMenuBottles(menu.id);
@@ -64,7 +107,8 @@ function MenuBottles({ menu }: { menu: Menu }) {
   const groups = groupMenuBottles((menu.bottles ?? []).filter(hasBottle));
   // A bottle put back in the menu has no id yet: the new order cannot name it.
   const canReorder = groups.every((group) => group.isSaved);
-  const texts = TYPE_TEXTS[menu.type];
+  const typeTexts = TYPE_TEXTS[menu.type];
+  const texts = kindTexts(menu);
 
   const updateGroup = (group: MenuBottleGroup, changes: EntryChanges) => {
     mutations.update.mutate({ entryIds: group.entries.map((entry) => entry.id), changes });
@@ -84,14 +128,22 @@ function MenuBottles({ menu }: { menu: Menu }) {
     if (confirmed) mutations.exclude.mutate(group.entries);
   };
 
+  // A system menu keeps a removed bottle as an exclusion; a personal menu just lets it go.
+  const remove = (group: MenuBottleGroup) => {
+    if (isSystem) exclude(group);
+    else mutations.remove.mutate(group.entries);
+  };
+
   return (
     <>
       <Card as="section">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">{t('menus.bottles.title')}</h2>
-          <Button variant="secondary" size="sm" loading={sync.isPending} onClick={() => sync.mutate(undefined)}>
-            {t('menus.bottles.sync')}
-          </Button>
+          {isSystem && (
+            <Button variant="secondary" size="sm" loading={sync.isPending} onClick={() => sync.mutate(undefined)}>
+              {t('menus.bottles.sync')}
+            </Button>
+          )}
         </div>
         <p className="mb-4 p-3 bg-info/10 border border-info/30 rounded-lg text-sm text-info">{t(texts.hint)}</p>
         {groups.length === 0 ? (
@@ -110,7 +162,7 @@ function MenuBottles({ menu }: { menu: Menu }) {
                 sectionId={group.menuSectionId}
                 onSectionChange={(menuSectionId) => updateGroup(group, { menuSectionId })}
                 move={{ ...move, disableUp: move.disableUp || !canReorder, disableDown: move.disableDown || !canReorder }}
-                onRemove={isSystem ? () => exclude(group) : undefined}
+                onRemove={() => remove(group)}
                 disabled={!group.isSaved}
                 details={group.bottle.alcoholPercentage != null && (
                   <span className="text-xs text-fg-muted">{t('units.abv', { value: group.bottle.alcoholPercentage })}</span>
@@ -122,7 +174,20 @@ function MenuBottles({ menu }: { menu: Menu }) {
           />
         )}
       </Card>
-      {isSystem && <ExcludedBottles menuId={menu.id} onRestore={(exclusions) => mutations.restore.mutate(exclusions)} />}
+      {isSystem ? (
+        <ExcludedBottles
+          menu={menu}
+          uncheckedNote={t(typeTexts.unchecked)}
+          onRestore={(exclusions) => mutations.restore.mutate(exclusions)}
+        />
+      ) : (
+        <BottlesToAdd
+          menu={menu}
+          hint={t(typeTexts.choices)}
+          noChoice={t(typeTexts.noChoice)}
+          onAdd={(bottles) => mutations.add.mutate(bottles)}
+        />
+      )}
     </>
   );
 }

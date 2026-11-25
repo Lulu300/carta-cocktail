@@ -169,6 +169,8 @@ const menuBottleHandlers = [
   http.post('/api/menu-bottles/menu/:menuId/sync', () => HttpResponse.json({ message: 'OK', added: 0, removed: 0 })),
   http.post('/api/menu-bottles/menu/:menuId/reorder', done),
   http.put('/api/menu-bottles/menu/:menuId/entries', done),
+  http.post('/api/menu-bottles/menu/:menuId/entries', done),
+  http.post('/api/menu-bottles/menu/:menuId/entries/remove', done),
   http.post('/api/menu-bottles', echoCreated),
   http.put('/api/menu-bottles/:id', echoUpdated),
   http.delete('/api/menu-bottles/:id', deleted),

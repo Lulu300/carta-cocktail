@@ -7,6 +7,7 @@ import { valid, validate } from '../validation/validate';
 import { IdParams, idRequest, MenuIdParams } from '../validation/common';
 import {
   MenuBottleCreate,
+  MenuBottleEntryIds,
   MenuBottleExclusionParams,
   MenuBottleGroupUpdate,
   MenuBottleIds,
@@ -15,6 +16,7 @@ import {
 } from '../validation/menuBottles';
 import { assertSectionInMenu, nextPosition, reorder } from '../services/positions';
 import {
+  addBottles,
   assertBottlesAllowed,
   excludeBottles,
   isSystemMenu,
@@ -99,6 +101,38 @@ router.put('/menu/:menuId/entries', validate(groupUpdateSchemas), async (req: Au
     await tx.menuBottle.updateMany({ where: { id: { in: entryIds } }, data: { isHidden, menuSectionId } });
   });
   res.json({ message: req.t('menuBottles.updated') });
+});
+
+// Add several bottles at the end of a personal menu at once, in the order given: all of them or none
+const addManySchemas = { params: MenuIdParams, body: MenuBottleIds };
+
+router.post('/menu/:menuId/entries', validate(addManySchemas), async (req: AuthRequest, res: Response) => {
+  const { params: { menuId }, body: { bottleIds } } = valid<typeof addManySchemas>(res);
+  await prisma.$transaction((tx) => addBottles(tx, menuId, bottleIds));
+  res.status(201).json({ message: req.t('menuBottles.added') });
+});
+
+// Remove several entries of a menu at once, as DELETE /:id does for one (an exclusion on a
+// system menu): all of them or none
+const removeManySchemas = { params: MenuIdParams, body: MenuBottleEntryIds };
+
+router.post('/menu/:menuId/entries/remove', validate(removeManySchemas), async (req: AuthRequest, res: Response) => {
+  const { params: { menuId }, body: { ids } } = valid<typeof removeManySchemas>(res);
+  const entryIds = [...new Set(ids)];
+  await prisma.$transaction(async (tx) => {
+    const entries = await tx.menuBottle.findMany({
+      where: { menuId, id: { in: entryIds } },
+      select: { bottleId: true, menu: { select: { slug: true } } },
+    });
+    // As for one entry: an id that is not an entry of this menu is not found
+    if (entries.length !== entryIds.length) throw new NotFoundError();
+    if (isSystemMenu(entries[0].menu)) {
+      await excludeBottles(tx, menuId, entries.map((entry) => entry.bottleId));
+    } else {
+      await tx.menuBottle.deleteMany({ where: { id: { in: entryIds } } });
+    }
+  });
+  res.json({ message: req.t('menuBottles.removed') });
 });
 
 // Reorder all the bottles of a menu at once: ids lists every entry of the menu, in its new order

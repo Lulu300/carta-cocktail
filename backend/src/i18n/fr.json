@@ -94,6 +94,8 @@
     "deleted": "Carte supprimée avec succès"
   },
   "menuBottles": {
+    "added": "Bouteilles ajoutées à la carte",
+    "removed": "Bouteilles retirées de la carte",
     "deleted": "Bouteille retirée de la carte",
     "updated": "Bouteilles mises à jour",
     "synced": "Carte synchronisée avec les bouteilles",

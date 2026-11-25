@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useSort } from '../../hooks/useSort';
 import { usePagination } from '../../hooks/usePagination';
@@ -9,6 +9,7 @@ import { qk } from '../../queries/keys';
 import { useMenus } from '../../queries/menus';
 import { useCrudMutations } from '../../queries/crud';
 import { getBadgeClasses } from '../../utils/colors';
+import { isBottleMenu } from '../../utils/menuType';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import Field from '../../components/ui/Field';
@@ -17,12 +18,14 @@ import IconButton from '../../components/ui/IconButton';
 import Input from '../../components/ui/Input';
 import Modal from '../../components/ui/Modal';
 import SearchInput from '../../components/ui/SearchInput';
+import Select from '../../components/ui/Select';
 import Textarea from '../../components/ui/Textarea';
 import ToggleSwitch from '../../components/ui/ToggleSwitch';
 import { cx, focusRingClasses } from '../../components/ui/classNames';
 import DataTable, { type Column } from '../../components/admin/DataTable';
 import { useConfirmDelete } from '../../components/admin/useConfirmDelete';
 import { useEntityForm } from '../../components/admin/useEntityForm';
+import { menuEditorPath } from '../../components/admin/menus/bottleMenuType';
 import { isSystemMenu } from '../../components/admin/menus/isSystemMenu';
 import { toSlug } from '../../components/admin/menus/menuSlug';
 
@@ -31,9 +34,11 @@ interface MenuForm {
   slug: string;
   description: string;
   isPublic: boolean;
+  /** Fixed at the creation: the backend refuses to change it later. */
+  type: Menu['type'];
 }
 
-const EMPTY_MENU_FORM: MenuForm = { name: '', slug: '', description: '', isPublic: false };
+const EMPTY_MENU_FORM: MenuForm = { name: '', slug: '', description: '', isPublic: false, type: 'COCKTAILS' };
 
 const TYPE_BADGES: Record<Menu['type'], { labelKey: string; color: string }> = {
   COCKTAILS: { labelKey: 'menus.types.cocktails', color: 'purple' },
@@ -41,15 +46,18 @@ const TYPE_BADGES: Record<Menu['type'], { labelKey: string; color: string }> = {
   DIGESTIFS: { labelKey: 'menus.types.digestifs', color: 'orange' },
 };
 
-function isBottleMenu(menu: Menu): boolean {
-  return menu.type === 'APEROS' || menu.type === 'DIGESTIFS';
+const MENU_TYPES = Object.keys(TYPE_BADGES) as Menu['type'][];
+
+function isMenuType(value: string): value is Menu['type'] {
+  return (MENU_TYPES as string[]).includes(value);
 }
 
 export default function MenusPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const confirmDelete = useConfirmDelete();
   const menusQuery = useMenus();
-  const { create, remove } = useCrudMutations<MenuInput>({
+  const { create, remove } = useCrudMutations<MenuInput, Menu>({
     key: qk.menus,
     api: menusApi,
     messages: { created: 'menus.created', updated: 'menus.updated', deleted: 'menus.deleted' },
@@ -69,9 +77,15 @@ export default function MenusPage() {
   const pagination = usePagination(sort.sortedItems);
 
   // A slug already taken comes back as a 409, shown in the error toast; the form stays open.
+  // A new menu is empty: its editor opens at once.
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    create.mutate(form, { onSuccess: menuForm.close });
+    create.mutate(form, {
+      onSuccess: (menu) => {
+        menuForm.close();
+        navigate(menuEditorPath(menu));
+      },
+    });
   };
 
   const handleDelete = async (menu: Menu) => {
@@ -133,7 +147,7 @@ export default function MenusPage() {
       render: (menu) => (
         <div className="flex items-center justify-end gap-1">
           <Link
-            to={isBottleMenu(menu) ? `/admin/menus/${menu.id}/bottles` : `/admin/menus/${menu.id}`}
+            to={menuEditorPath(menu)}
             aria-label={t('common.edit')}
             title={t('common.edit')}
             className={cx('inline-flex items-center justify-center min-w-10 min-h-10 rounded-lg text-accent hover:bg-accent/10', focusRingClasses)}
@@ -174,6 +188,18 @@ export default function MenusPage() {
           </Field>
           <Field label={t('menus.slug')} required>
             <Input value={form.slug} onChange={(event) => setField('slug', toSlug(event.target.value))} />
+          </Field>
+          <Field label={t('menus.type')} hint={t('menus.typeHint')}>
+            <Select
+              value={form.type}
+              onChange={(event) => {
+                if (isMenuType(event.target.value)) setField('type', event.target.value);
+              }}
+            >
+              {MENU_TYPES.map((type) => (
+                <option key={type} value={type}>{t(TYPE_BADGES[type].labelKey)}</option>
+              ))}
+            </Select>
           </Field>
           <Field label={t('menus.description')}>
             <Textarea

@@ -355,20 +355,36 @@
       "noExcluded": "No bottle removed from this menu.",
       "restore": "Put back",
       "restoreLabel": "Put {{name}} back in the menu",
-      "cocktailMenu": "This is a cocktail menu: it holds no bottles.",
+      "add": "Add",
+      "addTitle": "Add bottles",
+      "addLabel": "Add {{name}} to the menu",
+      "searchChoices": "Search the bottles to add",
       "aperos": {
         "title": "Manage the aperitifs menu",
         "hint": "Bottles checked as aperitif appear here automatically. Use \"Synchronize\" to update the list.",
-        "empty": "No bottles. Check bottles as aperitif, then synchronize."
+        "empty": "No bottles. Check bottles as aperitif, then synchronize.",
+        "personalTitle": "Manage an aperitifs menu",
+        "personalHint": "Choose the bottles of this menu among the bottles checked as aperitif. Unchecking a bottle removes it from this menu.",
+        "personalEmpty": "No bottles yet. Add bottles checked as aperitif from the list below.",
+        "choices": "Bottles checked as aperitif that are not in this menu yet. An empty bottle stays hidden from guests until it is refilled.",
+        "noChoice": "Every bottle checked as aperitif is already in this menu. Check more bottles as aperitif to add them here.",
+        "unchecked": "No longer checked as aperitif: \"Put back\" only takes it off this list. The menu gets it back once it is checked as aperitif again."
       },
       "digestifs": {
         "title": "Manage the digestifs menu",
         "hint": "Bottles checked as digestif appear here automatically. Use \"Synchronize\" to update the list.",
-        "empty": "No bottles. Check bottles as digestif, then synchronize."
+        "empty": "No bottles. Check bottles as digestif, then synchronize.",
+        "personalTitle": "Manage a digestifs menu",
+        "personalHint": "Choose the bottles of this menu among the bottles checked as digestif. Unchecking a bottle removes it from this menu.",
+        "personalEmpty": "No bottles yet. Add bottles checked as digestif from the list below.",
+        "choices": "Bottles checked as digestif that are not in this menu yet. An empty bottle stays hidden from guests until it is refilled.",
+        "noChoice": "Every bottle checked as digestif is already in this menu. Check more bottles as digestif to add them here.",
+        "unchecked": "No longer checked as digestif: \"Put back\" only takes it off this list. The menu gets it back once it is checked as digestif again."
       }
     },
     "search": "Search menus",
     "type": "Type",
+    "typeHint": "Cannot be changed later. Aperitifs and digestifs menus hold bottles, chosen among the bottles checked for their type.",
     "types": {
       "cocktails": "Cocktails",
       "aperos": "Aperitifs",

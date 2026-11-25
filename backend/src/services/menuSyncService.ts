@@ -173,6 +173,24 @@ export async function syncNewBottles(db: Db, bottleIds: readonly number[]): Prom
 }
 
 /**
+ * Adds bottles at the end of a personal menu, visible and outside any section, in the order
+ * of `bottleIds`. Refuses a system menu (its bottles follow their flags), a bottle that is not
+ * available for the menu's type, and a bottle already in the menu (409, from the unique key).
+ * Run it in a transaction: all or nothing.
+ */
+export async function addBottles(db: Db, menuId: number, bottleIds: number[]): Promise<void> {
+  const menu = await findMenu(db, menuId);
+  if (isSystemMenu(menu)) throw new BadRequestError('errors.systemMenuBottlesManaged');
+  const uniqueIds = [...new Set(bottleIds)];
+  await assertBottlesAllowed(db, menu, uniqueIds);
+
+  const firstPosition = await nextPosition(db, 'menuBottle', menuId);
+  await db.menuBottle.createMany({
+    data: uniqueIds.map((bottleId, index) => ({ menuId, bottleId, position: firstPosition + index })),
+  });
+}
+
+/**
  * Removes bottles from a system menu and records why, so the sync never adds them back.
  * A bottle that is not in the menu is ignored. Run it in a transaction: all or nothing.
  */

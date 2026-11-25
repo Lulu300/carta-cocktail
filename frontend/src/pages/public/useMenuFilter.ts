@@ -4,12 +4,12 @@ import type { TFunction } from 'i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
 import type { Menu, MenuBottle, MenuCocktail, MenuSection } from '../../types';
 import {
-  buildSearchText,
+  getBottleSearchText,
   getCocktailSearchText,
-  getEntityNames,
   matchesSearchText,
   type LocalizeName,
 } from '../../utils/cocktailSearch';
+import { isBottleMenu } from '../../utils/menuType';
 
 type MenuItem = MenuCocktail | MenuBottle;
 
@@ -55,10 +55,6 @@ interface IndexedMenu {
   searchTexts: Map<number, string>;
 }
 
-export function isBottleMenu(menu: Menu): boolean {
-  return menu.type === 'APEROS' || menu.type === 'DIGESTIFS';
-}
-
 /** Items without a section come first, then each section in the admin's order. */
 function splitBySection<Item extends MenuItem>(
   items: Item[],
@@ -100,18 +96,13 @@ function splitByCategory(bottles: MenuBottle[], localize: LocalizeName, otherTit
   return [...blocks.values()];
 }
 
-function getBottleSearchText(menuBottle: MenuBottle, localize: LocalizeName): string {
-  const bottle = menuBottle.bottle;
-  return buildSearchText([bottle?.name, ...getEntityNames(bottle?.category, localize)]);
-}
-
 function indexMenu(menu: Menu, localize: LocalizeName, t: TFunction): IndexedMenu {
   const sections = menu.sections ?? [];
   const searchTexts = new Map<number, string>();
 
   if (isBottleMenu(menu)) {
     const bottles = (menu.bottles ?? []).filter((item) => !item.isHidden && item.bottle);
-    bottles.forEach((item) => searchTexts.set(item.id, getBottleSearchText(item, localize)));
+    bottles.forEach((item) => searchTexts.set(item.id, getBottleSearchText(item.bottle, localize)));
     const bottleBlocks = sections.length > 0
       ? splitBySection(bottles, sections, t('public.withoutSection'))
       : splitByCategory(bottles, localize, t('public.other'));
