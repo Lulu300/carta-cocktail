@@ -16,6 +16,7 @@
     "cannotDeleteDefaultMenu": "Impossible de supprimer un menu système",
     "cannotModifySystemMenu": "Le slug et le type d’un menu système ne peuvent pas être modifiés",
     "fileTooLarge": "Le fichier ou la requête est trop volumineux",
+    "invalidImage": "La photo est illisible : envoyez une image JPEG, PNG ou WebP",
     "invalidJson": "Le corps de la requête n’est pas un JSON valide",
     "noFileUploaded": "Aucun fichier envoyé",
     "backupSchemaTooNew": "Cette sauvegarde vient d’une version plus récente de Carta Cocktail : mettez l’application à jour avant de la restaurer",

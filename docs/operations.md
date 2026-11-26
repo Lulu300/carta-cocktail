@@ -117,7 +117,7 @@ L'archive restaure les fichiers avec leur propriétaire d'origine (uid 1000). Un
 Dans Paramètres > Sauvegarde & Restauration (Settings > Backup & Restore) :
 
 - **Exporter la sauvegarde** télécharge un ZIP : une copie cohérente de la base, prise sans arrêter le backend, et toutes les photos. Le backend reste disponible.
-- **Restaurer une sauvegarde** remplace la base et les photos par celles du ZIP.
+- **Restaurer une sauvegarde** remplace la base et les photos par celles du ZIP. Les photos d'une sauvegarde plus ancienne n'ont pas encore leurs copies réduites (WebP pour la carte, JPEG pour les aperçus de liens) : le backend les crée en arrière-plan juste après, et la carte affiche la photo d'origine en attendant.
 
 > **Attention : destructif.** La restauration remplace **toutes** les données actuelles. Le backend garde une copie de la base remplacée dans `/app/data/backups/pre-restore-<date>.db`, mais pas des photos : exportez d'abord une sauvegarde.
 

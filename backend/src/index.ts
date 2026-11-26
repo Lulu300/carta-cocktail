@@ -6,6 +6,7 @@ import { resolveDatabasePath } from './lib/databasePath';
 import { applySessionFloor } from './services/sessionFloor';
 import { configureServerTimeouts } from './serverTimeouts';
 import { reportStartupVersion } from './services/upgradeNoticeService';
+import { backfillImageVariants } from './services/cocktail/imageVariants';
 
 // In-flight requests get this long to finish before the process is killed
 const SHUTDOWN_TIMEOUT_MS = 10_000;
@@ -27,6 +28,9 @@ async function main(): Promise<void> {
       process.exit(1);
     }
     console.log(`🍸 Carta Cocktail API running on port ${config.port}`);
+    // In the background, so the healthcheck does not wait: until a photo has its smaller
+    // copies, the pages show the photo itself. Never rejects.
+    void backfillImageVariants(prisma);
   });
   configureServerTimeouts(server);
 

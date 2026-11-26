@@ -12,6 +12,7 @@ import {
   addCocktailToMenu,
 } from '../test/helpers';
 import { config } from '../config';
+import { writeStoredPhoto } from '../test/images';
 
 beforeAll(async () => {
   await setupTestDatabase();
@@ -46,8 +47,7 @@ async function seedIllustratedCocktail(
   imagePath: string,
   description: string | null = null,
 ) {
-  const cocktail = await seedCocktail({ name, description });
-  return prisma.cocktail.update({ where: { id: cocktail.id }, data: { imagePath } });
+  return seedCocktail({ name, description, imagePath });
 }
 
 function getShare(path: string) {
@@ -156,8 +156,20 @@ describe('GET /api/public/share/menu/:slug/cocktail/:id', () => {
     expect(metaContent(res.text, 'og:url')).toBe(
       `http://${HOST}/menu/summer/cocktail/${mojito.id}`,
     );
+    // No JPEG copy on disk (a photo the backfill has not reached): the photo itself
     expect(metaContent(res.text, 'og:image')).toBe(`http://${HOST}/uploads/mojito.jpg`);
     expect(res.text).not.toContain('good rum');
+  });
+
+  it('should show the JPEG copy of the photo, which every messaging app displays', async () => {
+    const menu = await seedMenu({ name: 'Summer', slug: 'summer', isPublic: true });
+    const mojito = await seedIllustratedCocktail('Mojito', 'mojito.webp');
+    await addCocktailToMenu(menu.id, mojito.id);
+    await writeStoredPhoto('mojito-og.jpg');
+
+    const res = await getShare(`/menu/summer/cocktail/${mojito.id}`);
+
+    expect(metaContent(res.text, 'og:image')).toBe(`http://${HOST}/uploads/mojito-og.jpg`);
   });
 
   it('should escape the names and descriptions it inserts', async () => {
