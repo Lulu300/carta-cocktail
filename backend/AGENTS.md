@@ -106,6 +106,7 @@ backend/
 │   ├── schema.prisma          # Database schema
 │   └── migrations/            # Versioned migrations, applied at each container start
 ├── docker/
+│   ├── prisma.config.js       # Image: loads the Prisma CLI config bundled into dist/lib/
 │   └── prune-unused-deps.mjs  # Image build: removes from node_modules the packages the image never loads
 ├── package.json
 ├── tsconfig.json
@@ -255,7 +256,7 @@ nginx (`frontend/nginx.conf.template`) limits the whole multipart body, so its `
 
 **Install scripts**: npm 12 skips the install scripts of dependencies that `allowScripts` in `package.json` does not list (npm 11.19 only warns). Only `better-sqlite3` is allowed: without its script the native binary is missing. `esbuild`, `prisma`, `@prisma/engines` and `fsevents` are denied (`false`): their binaries come from platform packages or from `prisma generate` (the project `postinstall`). Keys have no version, so a Dependabot bump keeps working. A new dependency whose script is needed must be added to `allowScripts` (`npm install-scripts approve <pkg> --no-allow-scripts-pin`), otherwise denied (`npm install-scripts deny <pkg>`), so that `npm ci` prints no `install-scripts` warning. The `prod-deps` stage of the `Dockerfile` opens `better-sqlite3` and fails the build when its binary is missing.
 
-The Docker image holds the runtime dependencies only and runs as the `node` user (uid 1000): code that runs there (server, seed, scripts) lives in `src/` and is compiled by `npm run build`. It never relies on `tsx`. `src/lib/databasePath.ts` is the only source file copied into the image (for `prisma.config.ts`): it imports Node built-ins only. A new file in `src/scripts/` stays a thin entry point and is added to the coverage exclusions (`vitest.config.ts` and `ci.yml`).
+The Docker image holds the runtime dependencies only and runs as the `node` user (uid 1000): code that runs there (server, seed, scripts) lives in `src/` and is compiled by `npm run build`. It never relies on `tsx`. The image has no `src/`: the Dockerfile bundles `prisma.config.ts` with `src/lib/databasePath.ts` into `dist/lib/prisma.config.js` (esbuild), which `docker/prisma.config.js` loads, so `databasePath.ts` imports Node built-ins only. A new file in `src/scripts/` stays a thin entry point and is added to the coverage exclusions (`vitest.config.ts` and `ci.yml`).
 
 ## Database
 
