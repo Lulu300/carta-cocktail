@@ -4,6 +4,7 @@ import path from 'path';
 import en from './en.json';
 import fr from './fr.json';
 import i18next from '.';
+import { messageAt, placeholders, type Messages } from '../test/messages';
 
 const SRC_DIR = path.resolve(__dirname, '..');
 // The Prisma client is generated code: it holds no message key
@@ -21,10 +22,6 @@ const KEY_PATTERNS: { pattern: RegExp; prefix: string }[] = [
   { pattern: /new ImportParseError\(\s*['"`](\w+)['"`]/g, prefix: 'errors.import.' },
 ];
 
-const PLACEHOLDER = /{{\s*(\w+)/g;
-
-type Messages = { [key: string]: string | Messages };
-
 function sourceFiles(dir: string): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const fullPath = path.join(dir, entry.name);
@@ -40,18 +37,6 @@ function flattenKeys(messages: Messages, prefix = ''): string[] {
     const key = prefix + name;
     return typeof value === 'string' ? [key] : flattenKeys(value, `${key}.`);
   });
-}
-
-function messageAt(messages: Messages, key: string): string | undefined {
-  let node: string | Messages | undefined = messages;
-  for (const part of key.split('.')) {
-    node = typeof node === 'object' ? node[part] : undefined;
-  }
-  return typeof node === 'string' ? node : undefined;
-}
-
-function placeholders(message: string): string[] {
-  return [...message.matchAll(PLACEHOLDER)].map((match) => match[1]).sort();
 }
 
 /** `file: key` for every key a source file uses. */
