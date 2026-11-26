@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, onTestFinished, type Mock } from 'vitest';
 import { render, screen, waitFor, within } from '../../test/test-utils';
 import userEvent from '@testing-library/user-event';
 import { act, fireEvent } from '@testing-library/react';
@@ -9,8 +9,6 @@ import { toast } from '../../components/ui/ToastStore';
 import type { BackupRestoreResult } from '../../services/api';
 import { mockDownload } from '../../test/download';
 import { buildSiteSettings } from '../../test/factories';
-import { server } from '../../test/msw/server';
-import { http, HttpResponse } from 'msw';
 import i18n from '../../i18n';
 import { ADMIN_USER } from '../../test/msw/handlers';
 import {
@@ -156,20 +154,26 @@ function holdExportDownload() {
   let archive: ReadableStreamDefaultController<Uint8Array> | undefined;
   let answered: () => void = () => {};
   const headersSent = new Promise<void>((resolve) => { answered = resolve; });
-  server.use(
-    http.get('/api/backup/export', () => {
-      const body = new ReadableStream<Uint8Array>({
-        start(controller) {
-          archive = controller;
-          controller.enqueue(new Uint8Array(8));
-        },
-      });
-      answered();
-      return new HttpResponse(body, {
+  // Answered by a stub of fetch: MSW closes a response body that errors mid-stream instead of
+  // cutting it, so it cannot simulate a lost connection.
+  const realFetch = globalThis.fetch;
+  const spy = vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+    const url = input instanceof Request ? input.url : String(input);
+    if (!url.includes('/api/backup/export')) return realFetch(input, init);
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        archive = controller;
+        controller.enqueue(new Uint8Array(8));
+      },
+    });
+    answered();
+    return Promise.resolve(
+      new Response(body, {
         headers: { 'Content-Type': 'application/zip', 'Content-Disposition': 'attachment; filename="backup.zip"' },
-      });
-    }),
-  );
+      }),
+    );
+  });
+  onTestFinished(() => spy.mockRestore());
   return {
     headersSent,
     finish: () => archive?.close(),
