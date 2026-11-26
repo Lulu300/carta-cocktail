@@ -11,7 +11,7 @@ depends_on: [E-15]
 touches: [frontend/src/queries/crud.ts, frontend/src/queries/invalidate.ts, frontend/src/components/admin/useForcedDelete.tsx, frontend/src/components/admin/useForcedDelete.test.tsx, frontend/src/pages/admin/BottlesPage.tsx, frontend/src/pages/admin/CategoriesPage.tsx, frontend/src/pages/admin/IngredientsPage.tsx, frontend/src/pages/admin/MenusPage.tsx]
 sources: ["05-frontend-archi.md §H2"]
 branch: refactor/E-35-crud-forced-delete
-pr:
+pr: 280
 ---
 
 ## Contexte
