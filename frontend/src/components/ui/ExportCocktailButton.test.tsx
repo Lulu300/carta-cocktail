@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { render, screen, waitFor } from '../../test/test-utils';
+import { screen, waitFor } from '../../test/test-utils';
+import { clearToasts, renderWithFeedback as render } from '../../test/feedback';
 import userEvent from '@testing-library/user-event';
 import { mockDownload } from '../../test/download';
 import { server } from '../../test/msw/server';
@@ -32,6 +33,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  clearToasts();
   vi.restoreAllMocks();
 });
 
@@ -82,15 +84,17 @@ describe('ExportCocktailButton', () => {
     expect(screen.getByTitle('cocktails.export')).toHaveClass('custom-class');
   });
 
-  it('logs a failed export and downloads nothing', async () => {
+  it.each([
+    ['admin', false, '/api/cocktails/:id/export'],
+    ['public', true, '/api/public/cocktails/:id/export'],
+  ])('reports a failed %s export in a toast and downloads nothing', async (_name, isPublic, path) => {
     const user = userEvent.setup();
-    mockApiError('get', '/api/cocktails/:id/export', 404, 'Cocktail not found');
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    render(<ExportCocktailButton cocktailId={1} />);
+    mockApiError('get', path, 404, 'Cocktail not found');
+    render(<ExportCocktailButton cocktailId={1} isPublic={isPublic} />);
 
     await user.click(screen.getByTitle('cocktails.export'));
 
-    await waitFor(() => expect(consoleError).toHaveBeenCalledWith('Export failed:', expect.objectContaining({ status: 404 })));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/\S/);
     expect(downloads).toEqual([]);
   });
 });

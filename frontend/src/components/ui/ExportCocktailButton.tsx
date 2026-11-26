@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { cocktails as cocktailsApi, publicApi } from '../../services/api';
+import { toast } from './ToastStore';
 
 interface ExportCocktailButtonProps {
   cocktailId: number;
@@ -29,7 +30,7 @@ export default function ExportCocktailButton({ cocktailId, isPublic, className }
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Export failed:', error);
+      toast.error(error);
     }
   };
 

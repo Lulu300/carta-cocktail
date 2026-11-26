@@ -1,5 +1,5 @@
 import { cx } from '../../ui/classNames';
-import { parseTags } from './parseTags';
+import { parseTags } from '../../../utils/parseTags';
 
 interface TagListProps {
   /** Comma-separated, as stored or as typed in the form. */

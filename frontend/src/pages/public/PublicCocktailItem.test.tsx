@@ -48,6 +48,12 @@ describe('PublicCocktailItem', () => {
     expect(screen.getByText('+2')).toHaveAttribute('aria-hidden', 'true');
   });
 
+  it('shows one badge per tag and none for a blank entry', () => {
+    renderItem(buildMenuCocktail({ id: 1, cocktail: { tags: 'rum, ,mint' } }));
+
+    expect(screen.getAllByText(/^#/).map((badge) => badge.textContent)).toEqual(['#rum', '#mint']);
+  });
+
   it('tells the cocktail page that the guest comes from the menu', async () => {
     const user = userEvent.setup();
     renderItem();

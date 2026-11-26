@@ -5,6 +5,7 @@ import { useLocalizedName } from '../../hooks/useLocalizedName';
 import type { CocktailAvailability, CocktailIngredient, MenuCocktail } from '../../types';
 import { getUploadUrl } from '../../utils/uploads';
 import { cx } from '../../components/ui/classNames';
+import { parseTags } from '../../utils/parseTags';
 
 // Beyond four ingredients a card becomes a wall of pills: the rest is summed up as "+N".
 const MAX_VISIBLE_INGREDIENTS = 4;
@@ -36,6 +37,7 @@ function PublicCocktailItem({
   const isUnavailable = cocktail.available === false;
   const isList = viewMode === 'list';
   const ingredients = cocktail.ingredients ?? [];
+  const tags = parseTags(cocktail.tags);
   const hiddenIngredientCount = ingredients.length - MAX_VISIBLE_INGREDIENTS;
   const linkState: CocktailLinkState = { fromMenu: true };
 
@@ -102,11 +104,11 @@ function PublicCocktailItem({
           </p>
         )}
 
-        {cocktail.tags && cocktail.tags.trim() && (
+        {tags.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {cocktail.tags.split(',').map((tag, index) => (
+            {tags.map((tag, index) => (
               <span key={index} className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded border border-accent/20">
-                #{tag.trim()}
+                #{tag}
               </span>
             ))}
           </div>
