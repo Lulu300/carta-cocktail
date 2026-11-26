@@ -13,6 +13,7 @@ import Input from '../../components/ui/Input';
 import { cx } from '../../components/ui/classNames';
 import { exceedsUploadLimit, MAX_BACKUP_UPLOAD_BYTES } from '../../utils/uploadLimits';
 import { openSignInAfterLogoutEverywhere, openSignInAfterRestore } from '../../utils/signInAfterRestore';
+import Alert from '../../components/ui/Alert';
 
 const ICON_OPTIONS = [
   '', '🍸', '🍹', '🥃', '🍷', '🥂', '🍺', '🧉', '🫗',
@@ -58,12 +59,11 @@ function RestoreReport({ result }: { result: BackupRestoreResult }) {
   return (
     <div className="mt-4 space-y-3">
       {result.restartRecommended && (
-        <div role="alert" className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm text-warning space-y-2">
-          <p className="font-semibold">{t('settings.backup.restartTitle')}</p>
+        <Alert tone="warning" size="md" role="alert" title={t('settings.backup.restartTitle')}>
           <p>{t('settings.backup.restartRequired')}</p>
           <p>{t('settings.backup.restartHow')}</p>
           <p>{t('settings.backup.restartMayFail')}</p>
-        </div>
+        </Alert>
       )}
       {result.skippedFiles > 0 && (
         <p className="text-sm text-fg-muted">{t('settings.backup.skippedFiles', { count: result.skippedFiles })}</p>

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { CocktailExportFormat } from '../../types';
 import Button from '../ui/Button';
 import FileDropzone from './FileDropzone';
+import Alert from '../ui/Alert';
 
 interface ImportStepUploadProps {
   recipes: CocktailExportFormat[];
@@ -105,11 +106,7 @@ export default function ImportStepUpload({ recipes, onLoaded, onNext }: ImportSt
         fileName={fileName}
       />
 
-      {error && (
-        <div role="alert" className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg p-3 text-sm">
-          {error}
-        </div>
-      )}
+      {error && <Alert tone="danger">{error}</Alert>}
 
       {isBatch && (
         <div className="bg-canvas border border-gray-700 rounded-xl p-5 space-y-3">

@@ -27,6 +27,7 @@ import {
   countRowsWithoutCategory,
   rowCategories,
 } from './bottleImportResolutions';
+import Alert from '../ui/Alert';
 
 type Step = 'upload' | 'resolve' | 'confirm' | 'success' | 'error';
 
@@ -110,9 +111,9 @@ export default function ImportBottlesWizard({ onClose, onImported }: ImportBottl
   if (categoriesToResolve > 0) blockingReasons.push(t('bottles.importWizard.categoriesToResolve', { count: categoriesToResolve }));
   if (categoriesWithoutType > 0) blockingReasons.push(t('bottles.importWizard.categoriesWithoutType', { count: categoriesWithoutType }));
   const blockingWarning = blockingReasons.length > 0 && (
-    <div className="bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-lg p-3 text-sm space-y-1">
+    <Alert tone="warning">
       {blockingReasons.map((reason) => <p key={reason}>{reason}</p>)}
-    </div>
+    </Alert>
   );
 
   const footer = (step === 'resolve' || step === 'confirm') && (
@@ -156,7 +157,7 @@ export default function ImportBottlesWizard({ onClose, onImported }: ImportBottl
             fileName={file?.name}
           />
           {error && (
-            <div role="alert" className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg p-3 text-sm">{error}</div>
+            <Alert tone="danger">{error}</Alert>
           )}
           {file && (
             <div className="flex justify-end">

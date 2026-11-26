@@ -5,12 +5,12 @@ phase: E
 lane: frontend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [E-08]
-touches: [frontend/src/components/ui/Alert.tsx, frontend/src/components/ui/Alert.test.tsx, frontend/src/components/import/, frontend/src/pages/auth/LoginPage.tsx, frontend/src/pages/admin/ShortagesPage.tsx, frontend/src/pages/admin/DashboardPage.tsx]
+touches: [frontend/src/components/ui/Alert.tsx, frontend/src/components/ui/Alert.test.tsx, frontend/src/components/import/, frontend/src/pages/auth/LoginPage.tsx, frontend/src/pages/admin/ShortagesPage.tsx, frontend/src/pages/admin/SettingsPage.tsx]
 sources: []
-branch:
+branch: refactor/E-28-ui-alert
 pr:
 ---
 
@@ -49,3 +49,4 @@ E-03 a créé les primitives de `components/ui/` (`Button`, `Badge`, `Field`, `M
 ## Journal
 
 - 2026-10-12 : tâche créée par E-08, à partir de la relecture de la PR #119.
+- 2026-11-26 : `ui/Alert` créée (tons `danger`, `warning`, `success`, `info`, quatre tailles reprenant les marges existantes). Elle remplace les blocs des assistants d'import, de `LoginPage`, de `ShortagesPage` et l'avis de redémarrage de `SettingsPage`. Hors périmètre : le lien d'alerte de `DashboardPage` (déjà aux jetons, ce n'est pas un bloc de message) et l'aide de `MenuBottleEditPage` (texte permanent, un `role="status"` l'annoncerait à tort). Les nuances orange et ambre des avertissements passent au jeton `warning` (jaune). Notes de version : les avertissements des assistants d'import et les messages d'information de la page de connexion sont désormais annoncés par les lecteurs d'écran (`role="status"`).

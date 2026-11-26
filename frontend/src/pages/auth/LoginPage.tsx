@@ -9,6 +9,7 @@ import Field from '../../components/ui/Field';
 import Input from '../../components/ui/Input';
 import LanguageSelector from '../../components/ui/LanguageSelector';
 import { isSignInAfterLogoutEverywhere, isSignInAfterRestore } from '../../utils/signInAfterRestore';
+import Alert from '../../components/ui/Alert';
 
 const ADMIN_HOME = '/admin';
 
@@ -77,22 +78,14 @@ export default function LoginPage() {
           <h2 className="text-xl font-semibold text-center">{t('auth.login')}</h2>
 
           {isSignInAfterRestore(location.search) && (
-            <p className="bg-info/10 border border-info/30 text-info px-4 py-3 rounded-lg text-sm">
-              {t('auth.backupRestored')}
-            </p>
+            <Alert tone="info" size="md">{t('auth.backupRestored')}</Alert>
           )}
 
           {isSignInAfterLogoutEverywhere(location.search) && (
-            <p className="bg-info/10 border border-info/30 text-info px-4 py-3 rounded-lg text-sm">
-              {t('auth.loggedOutEverywhere')}
-            </p>
+            <Alert tone="info" size="md">{t('auth.loggedOutEverywhere')}</Alert>
           )}
 
-          {error && (
-            <div role="alert" className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
+          {error && <Alert tone="danger" size="md">{error}</Alert>}
 
           <Field label={t('auth.email')}>
             <Input
