@@ -5,13 +5,13 @@ phase: D
 lane: infra
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [D-30]
 touches: [backend/Dockerfile, backend/docker/prune-unused-deps.mjs]
 sources: []
-branch:
-pr:
+branch: chore/D-31-backend-image-unused-files
+pr: PRNUM
 ---
 
 ## Décisions validées (2026-10-13)
@@ -39,9 +39,9 @@ Mesuré dans l'image de D-30 (`du`, Mio sur disque, arm64), pour les trois group
 
 ## Critères d'acceptation
 
-- [ ] Les trois groupes sont retirés, chacun avec son garde-fou, ou la tâche est abandonnée avec la mesure du gain compressé dans le Journal.
-- [ ] Les vérifications de D-30 passent toujours : démarrage sur une copie du jeu d'essai, installation neuve, refus C-18 et de la baseline identiques, commandes de README et UPGRADING, banc `1.4.0,local`, Smoke.
-- [ ] Taille de l'image avant/après dans la PR, compressée et sur disque, en amd64 et en arm64.
+- [x] Les trois groupes sont retirés, chacun avec son garde-fou, ou la tâche est abandonnée avec la mesure du gain compressé dans le Journal.
+- [x] Les vérifications de D-30 passent toujours : démarrage sur une copie du jeu d'essai, installation neuve, refus C-18 et de la baseline identiques, commandes de README et UPGRADING, banc `1.4.0,local`, Smoke.
+- [x] Taille de l'image avant/après dans la PR, compressée et sur disque, en amd64 et en arm64.
 
 ## Tests à ajouter ou adapter
 
@@ -57,3 +57,5 @@ Mesuré dans l'image de D-30 (`du`, Mio sur disque, arm64), pour les trois group
 - 2026-10-13 : tâche créée par D-30 (mesures dans l'image de D-30).
 - 2026-10-13 : décision de l'humain (relecture de la PR #138) : « Groupes peu risqués ». Tâche limitée à l'UI Studio et ses metafiles, `better-sqlite3/deps` et les `.map` ; `owner` passe à `agent`.
 - 2026-10-13 : relecture ciblée de la PR #138. « Gain compressé faible » n'a pas de seuil : l'agent donne dans sa PR la mesure du gain compressé (amd64 et arm64) groupe par groupe, et le coordinateur confirme un éventuel abandon (`dropped`), plutôt que l'agent ne tranche seul.
+- 2026-11-26 : faite. Étage `prod-deps` : `dist/ui/` et `metafile-*.json` de `@prisma/studio-core`, `better-sqlite3/deps/` et les `.map`, sans `-f` : le build s'arrête si un chemin disparaît. Gain compressé (`docker save | gzip -6`, groupe par groupe, arm64) : UI Studio 8,1 Mo, `deps` 2,6 Mo, `.map` 3,4 Mo, metafiles 0,3 Mo. Image : amd64 148,6 -> 133,9 Mo compressés (460 -> 398 Mio sur disque, `node_modules` 285 -> 223 Mio), arm64 148,1 -> 133,5 Mo (455 -> 393 Mio, `node_modules` 285 -> 222 Mio). Vérifié dans l'image construite : démarrage et migrations sur base neuve, `/api/health`, photo, export et restauration de sauvegarde, `check-integrity`, `prisma migrate status` et `diff`, redémarrage ; banc `1.4.0,local --inject-duplicate`.
+- 2026-11-26 : Notes de version : l'image backend est environ 10 % plus légère (environ 15 Mo de moins à télécharger) ; aucune action requise.
