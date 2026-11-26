@@ -37,6 +37,7 @@
     "print": "Print",
     "back": "Back to menu",
     "backHome": "Back to home",
+    "pageNotFound": "Page not found",
     "menuLoadError": "Unable to load the menu",
     "cocktailLoadError": "Unable to load the cocktail",
     "loadErrorHint": "Check your connection and try again.",
