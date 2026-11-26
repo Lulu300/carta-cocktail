@@ -17,8 +17,7 @@ function availability(overrides: Partial<CocktailAvailability>): CocktailAvailab
     isAvailable: true,
     maxServings: 5,
     ingredients: [],
-    missingIngredients: [],
-    lowStockWarnings: [],
+    lowStock: [],
     ...overrides,
   };
 }

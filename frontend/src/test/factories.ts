@@ -307,8 +307,7 @@ export function buildAvailability(overrides: Partial<CocktailAvailability> = {})
     isAvailable: true,
     maxServings: 4,
     ingredients: [],
-    missingIngredients: [],
-    lowStockWarnings: [],
+    lowStock: [],
     ...overrides,
   };
 }

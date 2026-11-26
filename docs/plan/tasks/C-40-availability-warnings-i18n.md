@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: basse
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [E-10]
 touches: [backend/src/services/availabilityService.ts, backend/src/services/availabilityService.test.ts, backend/src/routes/availability.test.ts, frontend/src/types/index.ts, frontend/src/components/admin/cocktails/AvailabilityWarnings.tsx, frontend/src/components/admin/cocktails/, frontend/src/pages/admin/CocktailsPage.test.tsx, frontend/src/pages/admin/CocktailFormPage.test.tsx, frontend/src/i18n/locales/admin/, frontend/src/i18n/bundles.test.ts]
 sources: []
-branch:
-pr:
+branch: fix/C-40-availability-warnings-i18n
+pr: 0
 ---
 
 ## Contexte
@@ -52,3 +52,5 @@ La disponibilité d'un cocktail (`GET /api/availability/cocktails` et `/cocktail
 ## Journal
 
 - 2026-10-13 : tâche créée par E-10, à partir de la relecture de la PR #134.
+- 2026-11-26 : faite. Le service renvoie des données (`lowStock` avec `servings`, `nameTranslations` parsé, drapeau `orphan`) et le frontend compose les textes (clés `cocktails.lowStockItem_one/_other`, `cocktails.unknownSource`) avec les noms localisés. `missingIngredients`, `lowStockWarnings` et `reason` sont retirés : le frontend de l'admin est leur seul client (`public.ts` ne lit que `available`) et il part dans la même PR ; « Missing » se déduit des `ingredients` non disponibles. Les noms de bouteilles n'ont pas de traduction (`nameTranslations: null`). Carte publique non concernée : bundle inchangé (136,57 kB gzip).
+- Notes de version : dans l'admin, les avertissements de stock des cocktails (« plus que 2 doses », ingrédients manquants) suivent la langue de l'interface et affichent les noms traduits ; `GET /api/availability/cocktails` remplace `missingIngredients`, `lowStockWarnings` et `reason` par `lowStock` et `orphan` (aucune action requise).

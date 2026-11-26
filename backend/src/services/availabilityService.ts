@@ -1,6 +1,7 @@
 import { PrismaClient } from '../generated/prisma/client';
 import { prisma } from '../lib/prisma';
 import { NotFoundError } from '../errors';
+import { parseTranslations, type StoredTranslations } from '../utils/translations';
 
 /** A resource that allows this many servings or fewer is reported as running low. */
 export const LOW_STOCK_THRESHOLD = 3;
@@ -11,29 +12,39 @@ export const UNLIMITED_SERVINGS = 999;
 // Absorbs binary float error: 3 × 0.6 ml is 1.7999999999999998, not 1.8.
 const FLOAT_TOLERANCE = 1e-9;
 
-export interface IngredientAvailability {
+/** A name the frontend localizes: `nameTranslations` is null when the row has none (bottles never do). */
+export interface LocalizedName {
+  name: string;
+  nameTranslations: StoredTranslations | null;
+}
+
+export interface IngredientAvailability extends LocalizedName {
   cocktailIngredientId: number;
   sourceType: string;
-  name: string;
+  /** The source is gone or unreadable: `name` is empty and the frontend shows a placeholder. */
+  orphan: boolean;
   icon: string | null;
   quantity: number;
   unit: string;
   isAvailable: boolean;
   /** Servings this line's resource allows; null when unlimited or not measured. */
   availableCount: number | null;
-  /** Why the line is unavailable (English, not translated). */
-  reason?: string;
   /** CATEGORY lines with preferred bottles only: at least one preferred bottle is not empty. */
   preferredAvailable?: boolean;
 }
 
+/** A resource that allows only a few servings; the frontend words the warning in the interface language. */
+export interface LowStockResource extends LocalizedName {
+  servings: number;
+}
+
+/** The lines to flag as missing are the `ingredients` whose `isAvailable` is false. */
 export interface CocktailAvailability {
   cocktailId: number;
   isAvailable: boolean;
   maxServings: number;
   ingredients: IngredientAvailability[];
-  missingIngredients: string[];
-  lowStockWarnings: string[];
+  lowStock: LowStockResource[];
 }
 
 /** One recipe line, as the calculation needs it (no Prisma type, so tests build it by hand). */
@@ -56,14 +67,12 @@ export interface StockBottle {
   remainingPercent: number;
 }
 
-export interface StockCategory {
+export interface StockCategory extends LocalizedName {
   id: number;
-  name: string;
 }
 
-export interface StockIngredient {
+export interface StockIngredient extends LocalizedName {
   id: number;
-  name: string;
   icon: string | null;
   isAvailable: boolean;
 }
@@ -85,14 +94,11 @@ export interface AvailabilityData {
 export type AvailabilityDb = Pick<PrismaClient, 'bottle' | 'category' | 'ingredient' | 'cocktail'>;
 
 /** A bottle or a category: the stock that every line naming it shares. */
-interface VolumeResource {
+interface VolumeResource extends LocalizedName {
   key: string;
-  name: string;
   availableMl: number;
   /** At least one non-empty bottle: enough for a line whose unit has no ml equivalent. */
   hasStock: boolean;
-  emptyReason: string;
-  insufficientReason: string;
 }
 
 /**
@@ -102,8 +108,8 @@ interface VolumeResource {
  * `invalid`: an unknown source type.
  */
 type LineResolution =
-  | { kind: 'invalid'; reason: string }
-  | { kind: 'orphan'; reason: string }
+  | { kind: 'invalid' }
+  | { kind: 'orphan' }
   | { kind: 'ingredient'; ingredient: StockIngredient }
   | { kind: 'volume'; resource: VolumeResource; requiredMl: number | null };
 
@@ -111,11 +117,6 @@ interface ResourceUsage {
   resource: VolumeResource;
   servings: number;
 }
-
-const INVALID_CONFIGURATION_REASON = 'Invalid ingredient configuration';
-
-/** Name of a line whose source cannot be read. */
-const UNKNOWN_SOURCE_NAME = 'Unknown';
 
 function isNotEmpty(bottle: StockBottle): boolean {
   return bottle.remainingPercent > 0;
@@ -129,10 +130,9 @@ function bottleResource(bottle: StockBottle): VolumeResource {
   return {
     key: `bottle:${bottle.id}`,
     name: bottle.name,
+    nameTranslations: null,
     availableMl: remainingMl(bottle),
     hasStock: isNotEmpty(bottle),
-    emptyReason: 'Bottle is empty',
-    insufficientReason: 'Bottle has insufficient quantity',
   };
 }
 
@@ -151,10 +151,9 @@ function categoryResource(category: StockCategory, stock: StockSnapshot): Volume
   return {
     key: `category:${category.id}`,
     name: category.name,
+    nameTranslations: category.nameTranslations,
     availableMl: bottles.reduce((sum, bottle) => sum + remainingMl(bottle), 0),
     hasStock: bottles.length > 0,
-    emptyReason: `No ${category.name} bottles available`,
-    insufficientReason: `Insufficient ${category.name} in stock`,
   };
 }
 
@@ -174,27 +173,23 @@ function findSource<T>(rows: Map<number, T>, sourceId: number | null): T | undef
   return sourceId === null ? undefined : rows.get(sourceId);
 }
 
-function orphanLine(sourceId: number | null, notFoundReason: string): LineResolution {
-  return { kind: 'orphan', reason: sourceId === null ? INVALID_CONFIGURATION_REASON : notFoundReason };
-}
-
 function resolveLine(line: RecipeLine, stock: StockSnapshot): LineResolution {
   if (line.sourceType === 'INGREDIENT') {
     const ingredient = findSource(stock.ingredients, line.ingredientId);
-    if (!ingredient) return orphanLine(line.ingredientId, 'Ingredient not found');
+    if (!ingredient) return { kind: 'orphan' };
     return { kind: 'ingredient', ingredient };
   }
   if (line.sourceType === 'BOTTLE') {
     const bottle = findSource(stock.bottles, line.bottleId);
-    if (!bottle) return orphanLine(line.bottleId, 'Bottle not found');
+    if (!bottle) return { kind: 'orphan' };
     return { kind: 'volume', resource: bottleResource(bottle), requiredMl: requiredMlOf(line) };
   }
   if (line.sourceType === 'CATEGORY') {
     const category = findSource(stock.categories, line.categoryId);
-    if (!category) return orphanLine(line.categoryId, 'Category not found');
+    if (!category) return { kind: 'orphan' };
     return { kind: 'volume', resource: categoryResource(category, stock), requiredMl: requiredMlOf(line) };
   }
-  return { kind: 'invalid', reason: INVALID_CONFIGURATION_REASON };
+  return { kind: 'invalid' };
 }
 
 /**
@@ -235,6 +230,8 @@ function describeLine(
     cocktailIngredientId: line.id,
     sourceType: line.sourceType,
     name: '',
+    nameTranslations: null,
+    orphan: false,
     icon: null,
     quantity: line.quantity,
     unit: line.unit.abbreviation,
@@ -243,46 +240,28 @@ function describeLine(
   };
 
   if (resolution.kind === 'invalid' || resolution.kind === 'orphan') {
-    return { ...base, name: UNKNOWN_SOURCE_NAME, reason: resolution.reason };
+    return { ...base, orphan: true };
   }
 
   if (resolution.kind === 'ingredient') {
-    const { name, icon, isAvailable } = resolution.ingredient;
-    return {
-      ...base,
-      name,
-      icon,
-      isAvailable,
-      availableCount: isAvailable ? null : 0,
-      reason: isAvailable ? undefined : 'Ingredient marked as unavailable',
-    };
+    const { name, nameTranslations, icon, isAvailable } = resolution.ingredient;
+    return { ...base, name, nameTranslations, icon, isAvailable, availableCount: isAvailable ? null : 0 };
   }
 
   const { resource } = resolution;
+  const named = { name: resource.name, nameTranslations: resource.nameTranslations };
   const usage = usages.get(resource.key);
   // No line measures this resource: having some stock is enough
   if (!usage) {
-    return {
-      ...base,
-      name: resource.name,
-      isAvailable: resource.hasStock,
-      availableCount: resource.hasStock ? null : 0,
-      reason: resource.hasStock ? undefined : resource.emptyReason,
-    };
+    return { ...base, ...named, isAvailable: resource.hasStock, availableCount: resource.hasStock ? null : 0 };
   }
-  return {
-    ...base,
-    name: resource.name,
-    isAvailable: usage.servings > 0,
-    availableCount: usage.servings,
-    reason: usage.servings > 0 ? undefined : resource.insufficientReason,
-  };
+  return { ...base, ...named, isAvailable: usage.servings > 0, availableCount: usage.servings };
 }
 
-function lowStockWarnings(usages: Map<string, ResourceUsage>): string[] {
+function lowStockResources(usages: Map<string, ResourceUsage>): LowStockResource[] {
   return [...usages.values()]
     .filter(({ servings }) => servings > 0 && servings <= LOW_STOCK_THRESHOLD)
-    .map(({ resource, servings }) => `${resource.name}: only ${servings} servings left`);
+    .map(({ resource, servings }) => ({ name: resource.name, nameTranslations: resource.nameTranslations, servings }));
 }
 
 /**
@@ -307,11 +286,8 @@ export function computeAvailability(
     return availability;
   });
 
-  const missingIngredients = ingredients
-    .filter((ingredient) => !ingredient.isAvailable)
-    .map((ingredient) => ingredient.name);
-  // Decision of 2026-10-11: an orphan line stays unavailable and listed in
-  // missingIngredients, so the admin still sees it, but it no longer makes the
+  // Decision of 2026-10-11: an orphan line stays unavailable and listed as
+  // missing, so the admin still sees it, but it no longer makes the
   // cocktail unavailable: nothing is missing from the stock.
   const isAvailable = ingredients.every(
     (ingredient, index) => ingredient.isAvailable || resolutions[index].kind === 'orphan',
@@ -324,8 +300,7 @@ export function computeAvailability(
     isAvailable,
     maxServings: isAvailable ? stockServings : 0,
     ingredients,
-    missingIngredients,
-    lowStockWarnings: lowStockWarnings(usages),
+    lowStock: lowStockResources(usages),
   };
 }
 
@@ -359,8 +334,8 @@ export async function loadStock(db: AvailabilityDb = prisma, cocktailIds?: numbe
     db.bottle.findMany({
       select: { id: true, name: true, categoryId: true, capacityMl: true, remainingPercent: true },
     }),
-    db.category.findMany({ select: { id: true, name: true } }),
-    db.ingredient.findMany({ select: { id: true, name: true, icon: true, isAvailable: true } }),
+    db.category.findMany({ select: { id: true, name: true, nameTranslations: true } }),
+    db.ingredient.findMany({ select: { id: true, name: true, nameTranslations: true, icon: true, isAvailable: true } }),
     db.cocktail.findMany({
       where: cocktailIds === undefined ? {} : { id: { in: cocktailIds } },
       select: {
@@ -385,7 +360,12 @@ export async function loadStock(db: AvailabilityDb = prisma, cocktailIds?: numbe
       preferredBottleIds: preferredBottles.map(({ bottleId }) => bottleId),
     })),
   ]));
-  return { recipes, stock: buildStockSnapshot(bottles, categories, ingredients) };
+  const withParsedNames = <T extends { nameTranslations: string | null }>(row: T) => ({
+    ...row,
+    nameTranslations: parseTranslations(row.nameTranslations),
+  });
+  const stock = buildStockSnapshot(bottles, categories.map(withParsedNames), ingredients.map(withParsedNames));
+  return { recipes, stock };
 }
 
 /** Availability of the given cocktails (all of them when `cocktailIds` is omitted), keyed by cocktail id. */
