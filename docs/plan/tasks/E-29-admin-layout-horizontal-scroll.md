@@ -5,13 +5,13 @@ phase: E
 lane: frontend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [E-09]
-touches: [frontend/src/components/layout/AdminLayout.tsx, frontend/src/components/layout/AdminLayout.test.tsx, frontend/src/components/admin/DataTable.tsx, frontend/src/components/admin/DataTable.test.tsx, frontend/src/components/admin/bottles/BottleHistoryTable.tsx]
+touches: [frontend/src/components/layout/AdminLayout.tsx, frontend/src/components/layout/AdminLayout.test.tsx, frontend/src/components/admin/DataTable.tsx, frontend/src/components/admin/DataTable.test.tsx, frontend/src/components/admin/bottles/BottleHistoryTable.tsx, frontend/src/components/ui/ScrollableTable.tsx, frontend/src/pages/admin/CocktailsPage.tsx, frontend/src/pages/admin/IngredientsPage.tsx]
 sources: ["06-frontend-ux-perf.md §3"]
-branch:
-pr:
+branch: fix/E-29-admin-horizontal-scroll
+pr: 273
 ---
 
 ## Contexte
@@ -49,3 +49,5 @@ Relevé par la relecture de la PR #128 (E-09), dans Chromium : sur `/admin/bottl
 ## Journal
 
 - 2026-10-12 : tâche créée après la relecture de la PR #128 (E-09).
+- 2026-11-26 : faite. `AdminLayout` : `lg:shrink-0` sur la barre latérale, `min-w-0` sur la colonne de contenu. Nouveau `ui/ScrollableTable` (`overflow-x-auto` autour du seul `<table>`) utilisé par `DataTable` et `BottleHistoryTable` ; les boutons de la dernière colonne font défiler au Tab, sans arrêt de tabulation en plus. Mesuré dans Chrome sans interface (`scrollWidth` contre `clientWidth`) sur 9 pages admin à 1280, 1024, 768 et 390 px : avant, bouteilles à 1289 px (1280 et 1024), 1090 (768) et toutes les pages de 424 à 815 px à 390 px ; après, aucun dépassement et barre latérale à 256 px. `IngredientsPage` et `CocktailsPage` : les `overflow-hidden` sont sans effet, mais leurs rangées de boutons d'en-tête dépassaient à 390 px (`flex-wrap`), comme l'en-tête du layout (`px-4 sm:px-6`, `gap-2 sm:gap-4`) ; ajoutés à `touches`.
+- Notes de version : Admin : la page des bouteilles ne défile plus horizontalement en grand écran, la barre latérale garde sa largeur et un tableau trop large défile dans son cadre.

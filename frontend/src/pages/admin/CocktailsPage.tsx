@@ -129,9 +129,9 @@ export default function CocktailsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-bold font-serif text-accent">{t('cocktails.title')}</h1>
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-wrap gap-2 items-center">
           {selectionMode ? (
             <>
               <label className="flex items-center gap-2 text-sm text-fg-muted cursor-pointer">

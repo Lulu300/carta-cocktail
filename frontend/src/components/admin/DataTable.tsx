@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { cx } from '../ui/classNames';
 import LiveResultCount from '../ui/LiveResultCount';
 import Pagination from '../ui/Pagination';
+import ScrollableTable from '../ui/ScrollableTable';
 import Skeleton from '../ui/Skeleton';
 import SortableHeader from '../ui/SortableHeader';
 import LoadError from './LoadError';
@@ -84,6 +85,7 @@ export default function DataTable<T>({
 
   return (
     <div className="bg-surface border border-line rounded-xl overflow-hidden">
+      <ScrollableTable>
       <table className="w-full">
         <thead className="bg-canvas">
           <tr>
@@ -115,6 +117,7 @@ export default function DataTable<T>({
             : rows.map((row) => <Fragment key={getRowKey(row)}>{(renderRow ?? renderCells)(row)}</Fragment>)}
         </tbody>
       </table>
+      </ScrollableTable>
       {isLoading && <p role="status" className="sr-only">{t('common.loading')}</p>}
       {isError && <LoadError onRetry={onRetry} />}
       {isEmpty && <div className="text-center py-8 text-fg-muted">{emptyLabel}</div>}
