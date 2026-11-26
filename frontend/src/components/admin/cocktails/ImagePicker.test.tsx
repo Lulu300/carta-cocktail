@@ -28,7 +28,7 @@ describe('ImagePicker', () => {
     expect(container.querySelector('img')).toBeNull();
 
     const file = pngFile('a.png');
-    await user.upload(screen.getByLabelText('cocktails.image'), file);
+    await user.upload(screen.getByLabelText('Image'), file);
 
     expect(onChange).toHaveBeenCalledWith(file);
     expect(container.querySelector('img')).toHaveAttribute('src', 'blob:preview-1');
@@ -54,7 +54,7 @@ describe('ImagePicker', () => {
       render(<ImagePicker imagePath={null} onChange={onChange} />);
 
       const file = photoOfSize(size);
-      await user.upload(screen.getByLabelText('cocktails.image'), file);
+      await user.upload(screen.getByLabelText('Image'), file);
 
       expect(onChange).toHaveBeenCalledWith(file);
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -64,12 +64,12 @@ describe('ImagePicker', () => {
       const user = userEvent.setup();
       const onChange = vi.fn();
       const { container } = render(<ImagePicker imagePath={null} onChange={onChange} />);
-      const input = screen.getByLabelText('cocktails.image');
+      const input = screen.getByLabelText('Image');
       await user.upload(input, pngFile('small.png'));
 
       await user.upload(input, photoOfSize(BACKEND_LIMIT + 1));
 
-      expect(screen.getByRole('alert')).toHaveTextContent('common.requestTooLarge');
+      expect(screen.getByRole('alert')).toHaveTextContent('The file or request is too large');
       expect(onChange).toHaveBeenCalledTimes(1);
       expect(container.querySelector('img')).toHaveAttribute('src', 'blob:preview-1');
     });
@@ -77,7 +77,7 @@ describe('ImagePicker', () => {
     it('forgets the refusal when a smaller photo is chosen next', async () => {
       const user = userEvent.setup();
       render(<ImagePicker imagePath={null} onChange={vi.fn()} />);
-      const input = screen.getByLabelText('cocktails.image');
+      const input = screen.getByLabelText('Image');
       await user.upload(input, photoOfSize(BACKEND_LIMIT + 1));
 
       await user.upload(input, pngFile('small.png'));
@@ -89,7 +89,7 @@ describe('ImagePicker', () => {
   it('revokes the previous preview when another file is picked, and the last one on unmount', async () => {
     const user = userEvent.setup();
     const { unmount } = render(<ImagePicker imagePath={null} onChange={vi.fn()} />);
-    const input = screen.getByLabelText('cocktails.image');
+    const input = screen.getByLabelText('Image');
 
     await user.upload(input, pngFile('a.png'));
     await user.upload(input, pngFile('b.png'));

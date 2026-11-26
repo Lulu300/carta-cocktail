@@ -4,10 +4,10 @@ import { buildCategoryType } from '../test/factories';
 import { useCategoryTypeName } from './useCategoryTypeName';
 
 // The test mock of i18next renders keys, in English.
-const WITH_SPACES = 'categoryTypes.withSpaces';
-const EMPTY_NAME = 'categoryTypes.emptyName';
-const WITH_INVISIBLE = 'categoryTypes.withInvisibleCharacters';
-const NON_STANDARD_FORM = 'categoryTypes.nonStandardForm';
+const WITH_SPACES = '(with spaces)';
+const EMPTY_NAME = '(no name)';
+const WITH_INVISIBLE = '(with invisible characters)';
+const NON_STANDARD_FORM = '(non-standard Unicode form)';
 
 // 'CRÈME' with a composed È (U+00C8), and with E followed by a combining grave accent (U+0300)
 const COMPOSED = 'CR\u00C8ME';

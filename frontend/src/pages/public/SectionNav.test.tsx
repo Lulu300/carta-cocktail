@@ -43,7 +43,7 @@ describe('SectionNav', () => {
   it('lists the sections in a labelled navigation, the first one active', () => {
     renderWithSections();
 
-    expect(screen.getByRole('navigation', { name: 'public.sectionNav' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Menu sections' })).toBeInTheDocument();
     expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Classics', 'Signatures', 'Mocktails']);
     expect(chip('Classics')).toHaveAttribute('aria-current', 'true');
     expect(chip('Signatures')).not.toHaveAttribute('aria-current');

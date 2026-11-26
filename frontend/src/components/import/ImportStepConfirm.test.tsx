@@ -47,7 +47,7 @@ describe('ImportStepConfirm', () => {
     renderConfirm();
 
     const rhum = screen.getByText('Rhum').closest('li');
-    expect(rhum).toHaveTextContent('Rhum→cocktails.importWizard.mapsToRhum ambré');
+    expect(rhum).toHaveTextContent('Rhum→maps toRhum ambré');
     // A unit is named with its abbreviation on both sides
     expect(screen.getAllByText('Centilitre (cl)')).toHaveLength(2);
   });
@@ -55,9 +55,9 @@ describe('ImportStepConfirm', () => {
   it('falls back on the backend match while the lists are loading', () => {
     renderConfirm({ lists: { ...lists, units: [], categories: [] } });
 
-    expect(screen.getByText('Centilitre (cl)').closest('li')).toHaveTextContent('Centilitre (cl)→cocktails.importWizard.mapsToCentilitre');
+    expect(screen.getByText('Centilitre (cl)').closest('li')).toHaveTextContent('Centilitre (cl)→maps toCentilitre');
     // Another entity than the match: its name is unknown until the lists arrive
-    expect(screen.getByText('Rhum').closest('li')).toHaveTextContent('Rhum→cocktails.importWizard.mapsTo?');
+    expect(screen.getByText('Rhum').closest('li')).toHaveTextContent('Rhum→maps to?');
   });
 
   it('lists the entities to create under their edited name, and the skipped ones', () => {
@@ -73,8 +73,8 @@ describe('ImportStepConfirm', () => {
     const user = userEvent.setup();
     const { onBack, onConfirm } = renderConfirm();
 
-    await user.click(screen.getByText('cocktails.importWizard.confirmImport'));
-    await user.click(screen.getByText('cocktails.importWizard.back'));
+    await user.click(screen.getByText('Confirm import'));
+    await user.click(screen.getByText('Back'));
 
     expect(onConfirm).toHaveBeenCalled();
     expect(onBack).toHaveBeenCalled();
@@ -83,7 +83,7 @@ describe('ImportStepConfirm', () => {
   it('blocks both buttons while importing', () => {
     renderConfirm({ isLoading: true });
 
-    expect(screen.getByText('cocktails.importWizard.importing').closest('button')).toBeDisabled();
-    expect(screen.getByText('cocktails.importWizard.back').closest('button')).toBeDisabled();
+    expect(screen.getByText('Importing...').closest('button')).toBeDisabled();
+    expect(screen.getByText('Back').closest('button')).toBeDisabled();
   });
 });

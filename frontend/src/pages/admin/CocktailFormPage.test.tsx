@@ -67,17 +67,17 @@ function renderAt(path: string, queryClient = createTestQueryClient()) {
 
 async function renderNewForm() {
   renderAt('/admin/cocktails/new');
-  return screen.findByRole('textbox', { name: /cocktails\.name/ });
+  return screen.findByRole('textbox', { name: /Name/ });
 }
 
 function ingredientRows() {
-  const section = screen.getByRole('heading', { name: 'cocktails.ingredients' }).closest('div.rounded-xl');
+  const section = screen.getByRole('heading', { name: 'Ingredients' }).closest('div.rounded-xl');
   if (!(section instanceof HTMLElement)) throw new Error('No ingredients section');
   return within(section).queryAllByRole('listitem');
 }
 
 async function addIngredientRow(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole('button', { name: 'cocktails.addIngredient' }));
+  await user.click(screen.getByRole('button', { name: 'Add Ingredient' }));
   const row = ingredientRows().at(-1);
   if (!row) throw new Error('No ingredient row');
   return row;
@@ -101,7 +101,7 @@ function isCocktailInput(body: unknown): body is CocktailInput {
 }
 
 async function setQuantity(user: ReturnType<typeof userEvent.setup>, row: HTMLElement, quantity: string) {
-  const input = within(row).getByRole('spinbutton', { name: 'cocktails.quantity' });
+  const input = within(row).getByRole('spinbutton', { name: 'Qty' });
   await user.clear(input);
   if (quantity) await user.type(input, quantity);
 }
@@ -124,12 +124,12 @@ describe('CocktailFormPage, creation', () => {
     const user = userEvent.setup();
     const created = captureRecipe('post');
     await user.type(await renderNewForm(), 'Daiquiri');
-    await user.type(screen.getByRole('textbox', { name: 'cocktails.tags' }), 'classic, ,sour');
+    await user.type(screen.getByRole('textbox', { name: 'Tags' }), 'classic, ,sour');
     const row = await addIngredientRow(user);
     await setQuantity(user, row, '2');
-    await user.type(screen.getByRole('textbox', { name: 'cocktails.step' }), 'Shake');
-    await user.click(screen.getByRole('button', { name: 'cocktails.addInstruction' }));
-    await user.click(screen.getByRole('button', { name: 'common.save' }));
+    await user.type(screen.getByRole('textbox', { name: /^Step .+$/ }), 'Shake');
+    await user.click(screen.getByRole('button', { name: 'Add Step' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(await screen.findByText('cocktail list')).toBeInTheDocument();
     // JSON drops the undefined preferredBottleIds, as the server receives it
@@ -145,7 +145,7 @@ describe('CocktailFormPage, creation', () => {
       }],
       instructions: [{ text: 'Shake' }],
     });
-    expect(screen.getByText('cocktails.created')).toBeInTheDocument();
+    expect(screen.getByText('Cocktail created')).toBeInTheDocument();
   });
 
   it('blocks the submission and shows the errors on the line, without any request', async () => {
@@ -153,13 +153,13 @@ describe('CocktailFormPage, creation', () => {
     const created = captureRecipe('post');
     await renderNewForm();
     const row = await addIngredientRow(user);
-    await user.selectOptions(within(row).getByRole('combobox', { name: 'cocktails.freeIngredient' }), '');
+    await user.selectOptions(within(row).getByRole('combobox', { name: 'Other Ingredient' }), '');
     await setQuantity(user, row, '0');
-    await user.click(screen.getByRole('button', { name: 'common.save' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
-    expect(await within(row).findByText('validation.sourceRequired · validation.positive')).toBeInTheDocument();
-    expect(screen.getByText('validation.required')).toBeInTheDocument();
-    expect(within(row).getByRole('spinbutton', { name: 'cocktails.quantity' })).toHaveAttribute('aria-invalid', 'true');
+    expect(await within(row).findByText('Choose an item · Must be greater than 0')).toBeInTheDocument();
+    expect(screen.getByText('Required')).toBeInTheDocument();
+    expect(within(row).getByRole('spinbutton', { name: 'Qty' })).toHaveAttribute('aria-invalid', 'true');
     expect(created.count()).toBe(0);
   });
 
@@ -170,9 +170,9 @@ describe('CocktailFormPage, creation', () => {
     await user.type(await renderNewForm(), 'Daiquiri');
     const row = await addIngredientRow(user);
     await setQuantity(user, row, '');
-    await user.click(screen.getByRole('button', { name: 'common.save' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
-    expect(await within(row).findByText('validation.positive · validation.required')).toBeInTheDocument();
+    expect(await within(row).findByText('Must be greater than 0 · Required')).toBeInTheDocument();
     expect(created.count()).toBe(0);
   });
 
@@ -183,11 +183,11 @@ describe('CocktailFormPage, creation', () => {
     await setQuantity(user, await addIngredientRow(user), '2');
     await setQuantity(user, await addIngredientRow(user), '7');
 
-    await user.click(within(ingredientRows()[1]).getByRole('button', { name: 'common.delete' }));
+    await user.click(within(ingredientRows()[1]).getByRole('button', { name: 'Delete' }));
 
     const rows = ingredientRows();
     expect(rows).toHaveLength(2);
-    expect(within(rows[1]).getByRole('spinbutton', { name: 'cocktails.quantity' })).toHaveValue(7);
+    expect(within(rows[1]).getByRole('spinbutton', { name: 'Qty' })).toHaveValue(7);
   });
 
   it('resets the source fields when the source changes, and sends the preferred bottles of a category', async () => {
@@ -196,17 +196,17 @@ describe('CocktailFormPage, creation', () => {
     await user.type(await renderNewForm(), 'Daiquiri');
     const row = await addIngredientRow(user);
 
-    await user.selectOptions(within(row).getByRole('combobox', { name: 'cocktails.sourceType' }), 'BOTTLE');
-    const bottleSelect = within(row).getByRole('combobox', { name: 'cocktails.specificBottle' });
+    await user.selectOptions(within(row).getByRole('combobox', { name: 'Source' }), 'BOTTLE');
+    const bottleSelect = within(row).getByRole('combobox', { name: 'Specific Bottle' });
     expect(bottleSelect).toHaveValue('');
     // Empty bottles cannot be picked for a new line.
     expect(within(bottleSelect).queryByText('Empty rum (Rum)')).not.toBeInTheDocument();
     await user.selectOptions(bottleSelect, '1');
 
-    await user.selectOptions(within(row).getByRole('combobox', { name: 'cocktails.sourceType' }), 'CATEGORY');
-    await user.selectOptions(within(row).getByRole('combobox', { name: 'cocktails.categoryType' }), '1');
+    await user.selectOptions(within(row).getByRole('combobox', { name: 'Source' }), 'CATEGORY');
+    await user.selectOptions(within(row).getByRole('combobox', { name: 'Category (any bottle)' }), '1');
     await user.click(within(row).getByRole('checkbox', { name: 'Havana' }));
-    await user.click(screen.getByRole('button', { name: 'common.save' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
     expect((await created.recipe()).ingredients).toEqual([{
       sourceType: 'CATEGORY', bottleId: null, categoryId: 1, ingredientId: null,
@@ -217,15 +217,15 @@ describe('CocktailFormPage, creation', () => {
   it('removes a recipe step', async () => {
     const user = userEvent.setup();
     await renderNewForm();
-    await user.click(screen.getByRole('button', { name: 'cocktails.addInstruction' }));
-    const steps = screen.getAllByRole('textbox', { name: 'cocktails.step' });
+    await user.click(screen.getByRole('button', { name: 'Add Step' }));
+    const steps = screen.getAllByRole('textbox', { name: /^Step .+$/ });
     expect(steps).toHaveLength(2);
 
     const stepsList = steps[0].closest('ol');
     if (!(stepsList instanceof HTMLElement)) throw new Error('No steps list');
-    await user.click(within(stepsList).getAllByRole('button', { name: 'common.delete' })[0]);
+    await user.click(within(stepsList).getAllByRole('button', { name: 'Delete' })[0]);
 
-    expect(screen.getAllByRole('textbox', { name: 'cocktails.step' })).toHaveLength(1);
+    expect(screen.getAllByRole('textbox', { name: /^Step .+$/ })).toHaveLength(1);
   });
 
   it('creates the cocktail only once on a fast double click', async () => {
@@ -234,9 +234,9 @@ describe('CocktailFormPage, creation', () => {
     const created = captureRecipe('post');
     await user.type(await renderNewForm(), 'Mojito');
 
-    await user.dblClick(screen.getByRole('button', { name: 'common.save' }));
+    await user.dblClick(screen.getByRole('button', { name: 'Save' }));
     // The spinner of a pending button adds to its name.
-    await waitFor(() => expect(screen.getByRole('button', { name: /common\.save/ })).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: /Save/ })).toBeDisabled());
     expect(created.count()).toBe(1);
 
     releaseCreate();
@@ -267,10 +267,10 @@ describe('CocktailFormPage, creation', () => {
     const user = userEvent.setup();
     mockApiError('post', '/api/cocktails', 400, 'Name is required');
     await user.type(await renderNewForm(), 'Mojito');
-    await user.click(screen.getByRole('button', { name: 'common.save' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(await screen.findByText('Name is required')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'common.save' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
     expect(screen.queryByText('cocktail list')).not.toBeInTheDocument();
   });
 
@@ -279,7 +279,7 @@ describe('CocktailFormPage, creation', () => {
     const message = 'A recipe line names a unit, bottle, category or ingredient that does not exist';
     mockApiResponse('post', '/api/cocktails', { error: message, details: [{ line: 1, field: 'ingredientId' }] }, 400);
     await user.type(await renderNewForm(), 'Mojito');
-    await user.click(screen.getByRole('button', { name: 'common.save' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(await screen.findByText(message)).toBeInTheDocument();
   });
@@ -306,18 +306,18 @@ describe('CocktailFormPage, creation', () => {
     const lastUpload = captureRequest('post', '/api/cocktails/:id/image');
     const image = new File(['img'], 'mojito.png', { type: 'image/png' });
     await user.type(await renderNewForm(), 'Mojito');
-    await user.upload(screen.getByLabelText('cocktails.image'), image);
-    await user.click(screen.getByRole('button', { name: 'common.save' }));
+    await user.upload(screen.getByLabelText('Image'), image);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(await screen.findByText('Upload failed')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/admin/cocktails/42');
-    expect(await screen.findByText('cocktails.edit')).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: /cocktails\.name/ })).toHaveValue('Mojito');
+    expect(await screen.findByText('Edit Cocktail')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /Name/ })).toHaveValue('Mojito');
     // The preview is decorative (empty alt): it has no img role.
     expect(document.querySelector('img[src="blob:preview"]')).not.toBeNull();
 
     // No new pick: the same file is sent again with the update.
-    await user.click(screen.getByRole('button', { name: 'common.save' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(await screen.findByText('cocktail list')).toBeInTheDocument();
     expect(creations.count()).toBe(1);
@@ -337,12 +337,14 @@ describe('CocktailFormPage, creation', () => {
     const created = captureRecipe('post');
     await renderNewForm();
     const ingredientsReloaded = captureRequest('get', '/api/ingredients');
-    await user.click(screen.getByRole('button', { name: '+ ingredients.add' }));
-    await user.type(screen.getByRole('textbox', { name: 'ingredients.name' }), ' Lime {Enter}');
+    await user.click(screen.getByRole('button', { name: '+ Add Ingredient' }));
+    // The cocktail's own name field is named "Name" too: the ingredient field opens after it
+    expect(screen.getAllByRole('textbox', { name: 'Name' })).toHaveLength(2);
+    await user.type(screen.getAllByRole('textbox', { name: 'Name' }).at(-1)!, ' Lime {Enter}');
 
     expect(await createdIngredient.body).toEqual({ name: 'Lime' });
-    expect(await screen.findByText('ingredients.created')).toBeInTheDocument();
-    expect(screen.queryByRole('textbox', { name: 'ingredients.name' })).not.toBeInTheDocument();
+    expect(await screen.findByText('Ingredient created')).toBeInTheDocument();
+    expect(screen.getAllByRole('textbox', { name: 'Name' })).toHaveLength(1);
     await waitFor(() => expect(ingredientsReloaded.count()).toBe(1));
     expect(created.count()).toBe(0);
   });
@@ -351,8 +353,8 @@ describe('CocktailFormPage, creation', () => {
     const user = userEvent.setup();
     const createdIngredient = captureRequest('post', '/api/ingredients');
     await renderNewForm();
-    await user.click(screen.getByRole('button', { name: '+ ingredients.add' }));
-    await user.click(screen.getByRole('button', { name: 'common.create' }));
+    await user.click(screen.getByRole('button', { name: '+ Add Ingredient' }));
+    await user.click(screen.getByRole('button', { name: 'Create' }));
 
     expect(createdIngredient.count()).toBe(0);
   });
@@ -363,9 +365,9 @@ describe('CocktailFormPage, edition', () => {
     mockApiResponse('get', '/api/units', []);
     renderAt('/admin/cocktails/42');
 
-    expect(await screen.findByRole('textbox', { name: /cocktails\.name/ })).toHaveValue('Mojito');
-    expect(screen.getByRole('textbox', { name: 'cocktails.description' })).toHaveValue('Fresh');
-    expect(screen.getByRole('textbox', { name: 'cocktails.step' })).toHaveValue('Muddle the mint');
+    expect(await screen.findByRole('textbox', { name: /Name/ })).toHaveValue('Mojito');
+    expect(screen.getByRole('textbox', { name: 'Description' })).toHaveValue('Fresh');
+    expect(screen.getByRole('textbox', { name: /^Step .+$/ })).toHaveValue('Muddle the mint');
     expect(screen.getByText('mint')).toBeInTheDocument();
   });
 
@@ -374,14 +376,14 @@ describe('CocktailFormPage, edition', () => {
     const updated = captureRecipe('put');
     renderAt('/admin/cocktails/42');
 
-    const row = (await screen.findByRole('combobox', { name: 'cocktails.categoryType' })).closest('li');
+    const row = (await screen.findByRole('combobox', { name: 'Category (any bottle)' })).closest('li');
     if (!row) throw new Error('No ingredient row');
     const emptyPreferred = within(row).getByRole('checkbox', { name: 'Diplomatico' });
     expect(emptyPreferred).toBeChecked();
     expect(within(row).queryByRole('checkbox', { name: 'Empty rum' })).not.toBeInTheDocument();
 
     await user.click(emptyPreferred);
-    await user.click(screen.getByRole('button', { name: 'common.save' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
     expect((await updated.recipe()).ingredients?.[0].preferredBottleIds).toEqual([]);
   });
@@ -390,7 +392,7 @@ describe('CocktailFormPage, edition', () => {
     const user = userEvent.setup();
     const updated = captureRecipe('put');
     renderAt('/admin/cocktails/42');
-    await user.click(await screen.findByRole('button', { name: 'common.cancel' }));
+    await user.click(await screen.findByRole('button', { name: 'Cancel' }));
 
     expect(await screen.findByText('cocktail list')).toBeInTheDocument();
     expect(updated.count()).toBe(0);
@@ -400,7 +402,7 @@ describe('CocktailFormPage, edition', () => {
     const user = userEvent.setup();
     const queryClient = createTestQueryClient();
     renderAt('/admin/cocktails/42', queryClient);
-    const nameInput = await screen.findByRole('textbox', { name: /cocktails\.name/ });
+    const nameInput = await screen.findByRole('textbox', { name: /Name/ });
     await user.clear(nameInput);
     await user.type(nameInput, 'Virgin mojito');
     const cocktailReloaded = captureRequest('get', '/api/cocktails/:id');
@@ -420,7 +422,7 @@ describe('CocktailFormPage, edition', () => {
     const user = userEvent.setup();
     const queryClient = createTestQueryClient();
     renderAt('/admin/cocktails/42', queryClient);
-    const nameInput = await screen.findByRole('textbox', { name: /cocktails\.name/ });
+    const nameInput = await screen.findByRole('textbox', { name: /Name/ });
     await user.clear(nameInput);
     await user.type(nameInput, 'Virgin mojito');
 
@@ -431,27 +433,27 @@ describe('CocktailFormPage, edition', () => {
     expect(reloaded.count()).toBe(1);
     expect(nameInput).toBeInTheDocument();
     expect(nameInput).toHaveValue('Virgin mojito');
-    expect(screen.queryByRole('button', { name: 'common.retry' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
   });
 
   it('empties the form when going from a cocktail to a new one', async () => {
     const user = userEvent.setup();
     renderAt('/admin/cocktails/42');
-    expect(await screen.findByRole('textbox', { name: /cocktails\.name/ })).toHaveValue('Mojito');
+    expect(await screen.findByRole('textbox', { name: /Name/ })).toHaveValue('Mojito');
 
     await user.click(screen.getByRole('link', { name: 'new cocktail' }));
 
-    expect(await screen.findByText('cocktails.add')).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: /cocktails\.name/ })).toHaveValue('');
-    expect(screen.queryByRole('textbox', { name: 'cocktails.step' })).toHaveValue('');
+    expect(await screen.findByText('Add Cocktail')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /Name/ })).toHaveValue('');
+    expect(screen.queryByRole('textbox', { name: /^Step .+$/ })).toHaveValue('');
   });
 
   it('sends an emptied description as null and shows a toast', async () => {
     const user = userEvent.setup();
     const updated = captureRecipe('put');
     renderAt('/admin/cocktails/42');
-    await user.clear(await screen.findByRole('textbox', { name: 'cocktails.description' }));
-    await user.click(screen.getByRole('button', { name: 'common.save' }));
+    await user.clear(await screen.findByRole('textbox', { name: 'Description' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(await screen.findByText('cocktail list')).toBeInTheDocument();
     expect((await updated.url).pathname).toBe('/api/cocktails/42');
@@ -460,7 +462,7 @@ describe('CocktailFormPage, edition', () => {
       tags: ['rum', 'mint'],
       ingredients: [expect.objectContaining({ sourceType: 'CATEGORY', categoryId: 1, preferredBottleIds: [2] })],
     });
-    expect(screen.getByText('cocktails.updated')).toBeInTheDocument();
+    expect(screen.getByText('Cocktail updated')).toBeInTheDocument();
   });
 
   it('warns when no preferred bottle of a category line is available', async () => {
@@ -475,7 +477,7 @@ describe('CocktailFormPage, edition', () => {
     });
     renderAt('/admin/cocktails/42');
 
-    const warning = (await screen.findByText('⚠️ cocktails.noPreferredAvailable')).parentElement;
+    const warning = (await screen.findByText('⚠️ No preferred bottle available')).parentElement;
     if (!warning) throw new Error('No warning');
     expect(within(warning).getByText('Rum')).toBeInTheDocument();
   });
@@ -484,8 +486,8 @@ describe('CocktailFormPage, edition', () => {
     mockApiError('get', '/api/cocktails/:id', 404, 'Cocktail not found');
     renderAt('/admin/cocktails/999');
 
-    expect(await screen.findByText('cocktails.notFound')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'cocktails.backToList' })).toHaveAttribute('href', '/admin/cocktails');
+    expect(await screen.findByText('This cocktail does not exist.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back to cocktails' })).toHaveAttribute('href', '/admin/cocktails');
   });
 
   it('offers to retry when the cocktail fails to load', async () => {
@@ -493,11 +495,11 @@ describe('CocktailFormPage, edition', () => {
     mockApiError('get', '/api/cocktails/:id', 500, 'Server error');
     renderAt('/admin/cocktails/42');
 
-    const retry = await screen.findByRole('button', { name: 'common.retry' });
+    const retry = await screen.findByRole('button', { name: 'Retry' });
     mockCocktail(mojito);
     await user.click(retry);
 
-    expect(await screen.findByRole('textbox', { name: /cocktails\.name/ })).toHaveValue('Mojito');
+    expect(await screen.findByRole('textbox', { name: /Name/ })).toHaveValue('Mojito');
   });
 
   it('offers to retry when a list fails to load', async () => {
@@ -505,12 +507,12 @@ describe('CocktailFormPage, edition', () => {
     mockApiError('get', '/api/units', 500, 'Server error');
     renderAt('/admin/cocktails/new');
 
-    const retry = await screen.findByRole('button', { name: 'common.retry' });
+    const retry = await screen.findByRole('button', { name: 'Retry' });
     mockApiResponse('get', '/api/units', [buildUnit({ id: 1, abbreviation: 'cl' })]);
     const unitsReloaded = captureRequest('get', '/api/units');
     await user.click(retry);
 
-    expect(await screen.findByRole('textbox', { name: /cocktails\.name/ })).toBeInTheDocument();
+    expect(await screen.findByRole('textbox', { name: /Name/ })).toBeInTheDocument();
     expect(unitsReloaded.count()).toBe(1);
   });
 });
@@ -532,7 +534,7 @@ describe('CocktailFormPage, lines stored with a defect (C-21)', () => {
   });
 
   async function renameTo(user: ReturnType<typeof userEvent.setup>, name: string) {
-    const nameInput = await screen.findByRole('textbox', { name: /cocktails\.name/ });
+    const nameInput = await screen.findByRole('textbox', { name: /Name/ });
     await user.clear(nameInput);
     await user.type(nameInput, name);
   }
@@ -545,7 +547,7 @@ describe('CocktailFormPage, lines stored with a defect (C-21)', () => {
     renderAt('/admin/cocktails/42');
     await renameTo(user, 'Old mojito');
 
-    await user.click(screen.getByRole('button', { name: 'common.save' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(await screen.findByText('Row 2, Quantity: value too small')).toBeInTheDocument();
     expect(screen.queryByText('Validation error')).not.toBeInTheDocument();
@@ -562,7 +564,7 @@ describe('CocktailFormPage, lines stored with a defect (C-21)', () => {
     renderAt('/admin/cocktails/42');
     await renameTo(user, 'Old mojito');
 
-    await user.click(screen.getByRole('button', { name: 'common.save' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(await screen.findByText('Row 2, Ingredient: this item no longer exists, choose another one')).toBeInTheDocument();
     expect(screen.queryByText('cocktail list')).not.toBeInTheDocument();
@@ -574,8 +576,8 @@ describe('CocktailFormPage, lines stored with a defect (C-21)', () => {
     renderAt('/admin/cocktails/42');
     await renameTo(user, 'Old mojito');
 
-    expect(screen.getAllByText('cocktails.storedDefect')).toHaveLength(2);
-    await user.click(screen.getByRole('button', { name: 'common.save' }));
+    expect(screen.getAllByText('This line was saved incomplete by an earlier version (deleted source or quantity 0). It is kept as is: fix or remove it when you can.')).toHaveLength(2);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(await screen.findByText('cocktail list')).toBeInTheDocument();
     expect(await updated.recipe()).toEqual(expect.objectContaining({
@@ -594,10 +596,10 @@ describe('CocktailFormPage, lines stored with a defect (C-21)', () => {
     await renameTo(user, 'Old mojito');
     const orphanRow = ingredientRows()[0];
     await setQuantity(user, orphanRow, '5');
-    await user.click(screen.getByRole('button', { name: 'common.save' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
-    expect(await within(orphanRow).findByText('validation.sourceRequired')).toBeInTheDocument();
-    expect(within(orphanRow).queryByText('cocktails.storedDefect')).not.toBeInTheDocument();
+    expect(await within(orphanRow).findByText('Choose an item')).toBeInTheDocument();
+    expect(within(orphanRow).queryByText('This line was saved incomplete by an earlier version (deleted source or quantity 0). It is kept as is: fix or remove it when you can.')).not.toBeInTheDocument();
     expect(updated.count()).toBe(0);
   });
 
@@ -608,9 +610,9 @@ describe('CocktailFormPage, lines stored with a defect (C-21)', () => {
     await renameTo(user, 'Old mojito');
     const newRow = await addIngredientRow(user);
     await setQuantity(user, newRow, '0');
-    await user.click(screen.getByRole('button', { name: 'common.save' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
-    expect(await within(newRow).findByText('validation.positive')).toBeInTheDocument();
+    expect(await within(newRow).findByText('Must be greater than 0')).toBeInTheDocument();
     expect(updated.count()).toBe(0);
   });
 });

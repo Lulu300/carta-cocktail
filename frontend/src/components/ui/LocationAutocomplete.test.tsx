@@ -149,7 +149,7 @@ describe('LocationAutocomplete', () => {
     render(<Harness onChange={onChange} />);
     await user.type(getCombobox(), 'Bar');
 
-    await user.click(screen.getByRole('button', { name: 'common.clear' }));
+    await user.click(screen.getByRole('button', { name: 'Clear' }));
 
     expect(onChange).toHaveBeenLastCalledWith('');
     expect(getCombobox()).toHaveValue('');
@@ -162,7 +162,7 @@ describe('LocationAutocomplete', () => {
     await user.keyboard('{Escape}');
 
     await user.tab();
-    expect(screen.getByRole('button', { name: 'common.clear' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Clear' })).toHaveFocus();
     await user.keyboard('{Enter}');
 
     expect(getCombobox()).toHaveValue('');

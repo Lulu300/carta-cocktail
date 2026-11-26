@@ -121,7 +121,7 @@ describe('MenuEditPage', () => {
     expect(received.menuReads).toEqual([3]);
     expect(screen.getByDisplayValue('Summer')).toBeInTheDocument();
     expect(screen.getByDisplayValue('summer')).not.toHaveAttribute('readonly');
-    expect(screen.getByRole('link', { name: /menus.backToList/ })).toHaveAttribute('href', '/admin/menus');
+    expect(screen.getByRole('link', { name: /Back to the list/ })).toHaveAttribute('href', '/admin/menus');
   });
 
   it('saves the section of a cocktail at once, with every cocktail of the menu', async () => {
@@ -129,7 +129,7 @@ describe('MenuEditPage', () => {
     renderPage();
     await screen.findByText('Mojito');
 
-    await user.selectOptions(within(rowOf('Negroni')).getByRole('combobox', { name: 'menus.sections.select' }), '7');
+    await user.selectOptions(within(rowOf('Negroni')).getByRole('combobox', { name: /^Section of .+$/ }), '7');
 
     await waitFor(() => expect(received.updates).toHaveLength(1));
     expect(sentCocktails()).toEqual([
@@ -146,7 +146,7 @@ describe('MenuEditPage', () => {
     renderPage();
     await screen.findByText('Mojito');
 
-    await user.click(screen.getByRole('button', { name: 'menus.addCocktail' }));
+    await user.click(screen.getByRole('button', { name: 'Add Cocktail' }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).queryByText('Mojito')).not.toBeInTheDocument();
     await user.click(await within(dialog).findByRole('button', { name: 'Spritz' }));
@@ -161,9 +161,9 @@ describe('MenuEditPage', () => {
     renderPage();
     await screen.findByText('Mojito');
 
-    await user.click(within(rowOf('Mojito')).getByRole('button', { name: 'menus.removeItem' }));
+    await user.click(within(rowOf('Mojito')).getByRole('button', { name: /^Remove .+ from the menu$/ }));
     await waitFor(() => expect(screen.queryByText('Mojito')).not.toBeInTheDocument());
-    await user.click(within(rowOf('Negroni')).getByRole('button', { name: 'menus.hideItem' }));
+    await user.click(within(rowOf('Negroni')).getByRole('button', { name: /^Hide .+$/ }));
 
     await waitFor(() => expect(received.updates).toHaveLength(2));
     expect(sentCocktails(0)).toEqual([{ cocktailId: 2, position: 0, isHidden: false, menuSectionId: null }]);
@@ -175,11 +175,11 @@ describe('MenuEditPage', () => {
     renderPage();
     await screen.findByText('Mojito');
 
-    await user.click(within(rowOf('Mojito')).getByRole('button', { name: 'menus.moveDown' }));
+    await user.click(within(rowOf('Mojito')).getByRole('button', { name: /^Move .+ down$/ }));
 
     await waitFor(() => expect(received.updates).toHaveLength(1));
     expect(sentCocktailIds()).toEqual([2, 1]);
-    expect(within(rowOf('Negroni')).getByRole('button', { name: 'menus.moveUp' })).toBeDisabled();
+    expect(within(rowOf('Negroni')).getByRole('button', { name: /^Move .+ up$/ })).toBeDisabled();
   });
 
   it('puts the cocktail back and shows the server error when the save fails', async () => {
@@ -189,7 +189,7 @@ describe('MenuEditPage', () => {
     renderPage();
     await screen.findByText('Mojito');
 
-    await user.click(within(rowOf('Mojito')).getByRole('button', { name: 'menus.removeItem' }));
+    await user.click(within(rowOf('Mojito')).getByRole('button', { name: /^Remove .+ from the menu$/ }));
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Unknown section'));
     // The refetch never answers: the editor put the cocktail back by itself.
@@ -210,10 +210,10 @@ describe('MenuEditPage', () => {
     renderPage();
     await screen.findByText('Mojito');
 
-    await user.click(within(rowOf('Mojito')).getByRole('button', { name: 'menus.hideItem' }));
-    await user.click(within(rowOf('Negroni')).getByRole('button', { name: 'menus.hideItem' }));
-    await user.click(within(rowOf('Spritz')).getByRole('button', { name: 'menus.hideItem' }));
-    expect(within(rowOf('Mojito')).getByRole('button', { name: 'menus.showItem' })).toBeInTheDocument();
+    await user.click(within(rowOf('Mojito')).getByRole('button', { name: /^Hide .+$/ }));
+    await user.click(within(rowOf('Negroni')).getByRole('button', { name: /^Hide .+$/ }));
+    await user.click(within(rowOf('Spritz')).getByRole('button', { name: /^Hide .+$/ }));
+    expect(within(rowOf('Mojito')).getByRole('button', { name: /^Show .+$/ })).toBeInTheDocument();
     await waitFor(() => expect(received.updates).toHaveLength(1));
 
     answers[0].reject('Boom');
@@ -221,9 +221,9 @@ describe('MenuEditPage', () => {
     // Without the refused Mojito change, and without the Spritz change still waiting.
     expect(hiddenFlags(1)).toEqual([false, true, false]);
     // The screen drops the refused change and keeps the ones still waiting.
-    expect(within(rowOf('Mojito')).getByRole('button', { name: 'menus.hideItem' })).toBeInTheDocument();
-    expect(within(rowOf('Negroni')).getByRole('button', { name: 'menus.showItem' })).toBeInTheDocument();
-    expect(within(rowOf('Spritz')).getByRole('button', { name: 'menus.showItem' })).toBeInTheDocument();
+    expect(within(rowOf('Mojito')).getByRole('button', { name: /^Hide .+$/ })).toBeInTheDocument();
+    expect(within(rowOf('Negroni')).getByRole('button', { name: /^Show .+$/ })).toBeInTheDocument();
+    expect(within(rowOf('Spritz')).getByRole('button', { name: /^Show .+$/ })).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('Boom');
 
     answers[1].resolve();
@@ -233,9 +233,9 @@ describe('MenuEditPage', () => {
 
     await waitFor(() => expect(received.menuReads).toHaveLength(2));
     expect(storedMenu.cocktails?.map((item) => item.isHidden)).toEqual([false, true, true]);
-    expect(within(rowOf('Mojito')).getByRole('button', { name: 'menus.hideItem' })).toBeInTheDocument();
-    expect(within(rowOf('Negroni')).getByRole('button', { name: 'menus.showItem' })).toBeInTheDocument();
-    expect(within(rowOf('Spritz')).getByRole('button', { name: 'menus.showItem' })).toBeInTheDocument();
+    expect(within(rowOf('Mojito')).getByRole('button', { name: /^Hide .+$/ })).toBeInTheDocument();
+    expect(within(rowOf('Negroni')).getByRole('button', { name: /^Show .+$/ })).toBeInTheDocument();
+    expect(within(rowOf('Spritz')).getByRole('button', { name: /^Show .+$/ })).toBeInTheDocument();
   });
 
   it('saves the menu info with its button only', async () => {
@@ -248,10 +248,10 @@ describe('MenuEditPage', () => {
     const slug = screen.getByDisplayValue('summer');
     await user.clear(slug);
     await user.type(slug, 'Winter Menu');
-    await user.type(screen.getByRole('textbox', { name: 'menus.description' }), 'Hot drinks');
-    await user.click(screen.getByRole('switch', { name: 'menus.isPublic' }));
+    await user.type(screen.getByRole('textbox', { name: 'Description' }), 'Hot drinks');
+    await user.click(screen.getByRole('switch', { name: 'Public' }));
     expect(received.updates).toEqual([]);
-    await user.click(screen.getByRole('button', { name: 'common.save' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(received.updates).toEqual([{
       name: 'Winter', slug: 'winter-menu', description: 'Hot drinks', isPublic: true,
@@ -261,13 +261,13 @@ describe('MenuEditPage', () => {
   it('saves the menu info once on a double click', async () => {
     renderPage();
     await screen.findByDisplayValue('Summer');
-    const save = screen.getByRole('button', { name: 'common.save' });
+    const save = screen.getByRole('button', { name: 'Save' });
 
     // Two clicks before React re-renders: the button is not disabled yet.
     fireEvent.click(save);
     fireEvent.click(save);
 
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('menus.updated'));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Menu updated'));
     expect(received.updates).toHaveLength(1);
   });
 
@@ -282,16 +282,16 @@ describe('MenuEditPage', () => {
     answerRead = async () => errorResponse(404, 'Resource not found');
     renderPage();
 
-    expect(await screen.findByText('menus.loadError')).toBeInTheDocument();
-    expect(screen.queryByText('common.loading')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /menus.backToList/ })).toBeInTheDocument();
+    expect(await screen.findByText('This menu could not be loaded.')).toBeInTheDocument();
+    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Back to the list/ })).toBeInTheDocument();
   });
 
   it('shows an empty menu', async () => {
     storedMenu = makeMenu([], []);
     renderPage();
 
-    expect(await screen.findByText('menus.noCocktails')).toBeInTheDocument();
-    expect(screen.getByText('menus.sections.empty.cocktails')).toBeInTheDocument();
+    expect(await screen.findByText('No cocktails in this menu yet')).toBeInTheDocument();
+    expect(screen.getByText('No custom section. Cocktails are shown without grouping.')).toBeInTheDocument();
   });
 });

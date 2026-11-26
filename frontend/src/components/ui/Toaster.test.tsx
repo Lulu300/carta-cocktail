@@ -46,7 +46,7 @@ describe('Toaster', () => {
     });
 
     await user.tab();
-    expect(screen.getByRole('button', { name: 'common.close' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus();
     await user.keyboard('{Enter}');
 
     expect(screen.queryByText('Failed')).not.toBeInTheDocument();
@@ -75,7 +75,7 @@ describe('Toaster', () => {
 
     await user.click(screen.getByRole('button', { name: 'Save' }));
     await user.tab();
-    expect(screen.getByRole('button', { name: 'common.close' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus();
     await user.keyboard('{Enter}');
 
     expect(screen.queryByText('Failed')).not.toBeInTheDocument();
@@ -110,7 +110,7 @@ describe('Toaster', () => {
 
     expect(screen.queryByText('First')).not.toBeInTheDocument();
     const remainingClose = within(screen.getByText('Second').parentElement as HTMLElement)
-      .getByRole('button', { name: 'common.close' });
+      .getByRole('button', { name: 'Close' });
     expect(remainingClose).toHaveFocus();
   });
 
@@ -142,7 +142,7 @@ describe('Toaster', () => {
       toast.error(new Error('Failed'), { action: { label: 'Retry', onClick: vi.fn() } });
     });
     const action = screen.getByRole('button', { name: 'Retry' });
-    const close = screen.getByRole('button', { name: 'common.close' });
+    const close = screen.getByRole('button', { name: 'Close' });
 
     fireEvent.focus(action);
     fireEvent.blur(action, { relatedTarget: close });

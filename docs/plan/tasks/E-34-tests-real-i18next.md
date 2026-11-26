@@ -5,12 +5,12 @@ phase: E
 lane: frontend
 criticite: basse
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [E-13]
 touches: [frontend/src/test/, frontend/src/**/*.test.tsx, frontend/src/**/*.test.ts, frontend/AGENTS.md]
 sources: ["04-tests.md §5.1"]
-branch:
+branch: test/E-34-tests-real-i18next
 pr:
 ---
 
@@ -63,3 +63,4 @@ Cette tâche reprend l'étape 8 d'E-13, laissée en option et sortie de la tâch
 ## Journal
 
 - 2026-10-13 : tâche créée à partir de l'étape 8 d'E-13, sur décision de l'humain lors de la relecture de la PR #140 (« Créer une tâche »).
+- 2026-11-26 : faite. `setup.ts` charge la vraie instance (paquets public et admin) et repasse en anglais après chaque test ; une clé absente des paquets fait échouer le test qui l'affiche (`src/test/missingKeys.ts`, test dans `missingKeys.test.ts`). Les assertions lisent les textes anglais ; `translateWithValues.ts` et les mocks de `react-i18next` sont supprimés, sauf `LanguageSelectorFallback.test.tsx` (valeurs de `i18n.language` que l'instance réelle ne produit jamais, commenté). Les tests en français changent la langue pour de bon. `bundles.test.ts` lit les fichiers de messages bruts (i18next fusionne le paquet admin dans les objets JSON importés) et `feedback.tsx` / `appProviders.tsx` restent à part : seules les pages qui en ont besoin les importent. Durée de `npm test` : 9,2 s avant, 9,4 s après (1560 tests, aucun retiré). Sonde : une clé retirée de `admin/en.json` fait échouer 21 tests de `UnitsPage`, une clé retirée de `admin/fr.json` fait échouer `bundles.test.ts`.

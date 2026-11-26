@@ -32,14 +32,14 @@ describe('Button', () => {
     const button = screen.getByRole('button');
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute('aria-busy', 'true');
-    expect(within(button).getByText('common.loading')).toBeInTheDocument();
+    expect(within(button).getByText('Loading...')).toBeInTheDocument();
     await user.click(button);
     expect(onClick).not.toHaveBeenCalled();
   });
 
   it('does not render a spinner by default', () => {
     render(<Button>Save</Button>);
-    expect(screen.queryByText('common.loading')).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
     expect(screen.getByRole('button')).not.toHaveAttribute('aria-busy');
   });
 });

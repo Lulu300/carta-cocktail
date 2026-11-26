@@ -27,7 +27,7 @@ describe('PublicErrorState', () => {
     const onRetry = renderState(new ApiError(500, 'Server error'));
 
     expect(screen.getByRole('alert')).toHaveTextContent(/^Menu could not be loaded$/);
-    await userEvent.click(screen.getByRole('button', { name: 'common.retry' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(onRetry).toHaveBeenCalledOnce();
   });
 

@@ -57,9 +57,9 @@ describe('RouteErrorBoundary', () => {
   it('replaces a page that throws with the translated error screen', async () => {
     const { container } = renderAt('/broken');
 
-    expect(screen.getByRole('alert')).toHaveTextContent('errors.pageLoadFailed');
-    expect(screen.getByRole('button', { name: 'errors.reload' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'public.backHome' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('alert')).toHaveTextContent('This page could not be displayed');
+    expect(screen.getByRole('button', { name: 'Reload' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back to home' })).toHaveAttribute('href', '/');
     expect(await axe(container)).toHaveNoViolations();
   });
 
@@ -67,7 +67,7 @@ describe('RouteErrorBoundary', () => {
     renderAt('/broken');
 
     const alert = screen.getByRole('alert');
-    expect(alert).toHaveTextContent(/^errors\.pageLoadFailed$/);
+    expect(alert).toHaveTextContent(/^This page could not be displayed$/);
     expect(alert).toHaveFocus();
   });
 
@@ -86,7 +86,7 @@ describe('RouteErrorBoundary', () => {
 
     expect(screen.getByRole('alert').closest('.min-h-screen')).toBeNull();
     expect(screen.getByRole('link', { name: 'start' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'public.backHome' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Back to home' })).not.toBeInTheDocument();
   });
 
   it('clears the error with a link to the page that failed, once the cause is gone', async () => {
@@ -95,7 +95,7 @@ describe('RouteErrorBoundary', () => {
     expect(screen.getByRole('alert')).toBeInTheDocument();
 
     homeIsBroken = false;
-    await userEvent.click(screen.getByRole('link', { name: 'public.backHome' }));
+    await userEvent.click(screen.getByRole('link', { name: 'Back to home' }));
 
     expect(screen.getByText('/')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -106,7 +106,7 @@ describe('RouteErrorBoundary', () => {
     vi.stubGlobal('location', { ...window.location, reload });
     renderAt('/broken');
 
-    await userEvent.click(screen.getByRole('button', { name: 'errors.reload' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Reload' }));
 
     expect(reload).toHaveBeenCalledOnce();
   });
@@ -114,7 +114,7 @@ describe('RouteErrorBoundary', () => {
   it('clears the error when the visitor goes back home', async () => {
     renderAt('/broken');
 
-    await userEvent.click(screen.getByRole('link', { name: 'public.backHome' }));
+    await userEvent.click(screen.getByRole('link', { name: 'Back to home' }));
 
     expect(screen.getByText('/')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();

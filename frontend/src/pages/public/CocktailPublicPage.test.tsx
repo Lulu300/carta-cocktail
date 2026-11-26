@@ -104,9 +104,9 @@ describe('CocktailPublicPage', () => {
       expect(screen.getByText('Negroni')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('cocktails.notes')).toBeInTheDocument();
+    expect(screen.getByText('Notes')).toBeInTheDocument();
     expect(screen.getByText('Use the large mixing glass.')).toBeInTheDocument();
-    expect(screen.getByText('cocktails.preferredBottles')).toBeInTheDocument();
+    expect(screen.getByText('Preferred Bottles')).toBeInTheDocument();
     expect(screen.getByText('Cocchi Vermouth di Torino')).toBeInTheDocument();
   });
 
@@ -137,7 +137,7 @@ describe('CocktailPublicPage', () => {
       openFrom(null);
       render(<CocktailPublicPage />);
 
-      const back = await screen.findByRole('link', { name: /public\.back/ });
+      const back = await screen.findByRole('link', { name: /Back to menu/ });
 
       expect(back).toHaveAttribute('href', '/menu/summer-menu');
     });
@@ -147,7 +147,7 @@ describe('CocktailPublicPage', () => {
       openFrom({ fromMenu: true });
       render(<CocktailPublicPage />);
 
-      await user.click(await screen.findByRole('link', { name: /public\.back/ }));
+      await user.click(await screen.findByRole('link', { name: /Back to menu/ }));
 
       expect(mockNavigate).toHaveBeenCalledWith(-1);
     });
@@ -157,7 +157,7 @@ describe('CocktailPublicPage', () => {
       openFrom(null);
       render(<CocktailPublicPage />);
 
-      await user.click(await screen.findByRole('link', { name: /public\.back/ }));
+      await user.click(await screen.findByRole('link', { name: /Back to menu/ }));
 
       expect(mockNavigate).not.toHaveBeenCalled();
       expect(window.location.pathname).toBe('/menu/summer-menu');
@@ -167,7 +167,7 @@ describe('CocktailPublicPage', () => {
       const user = userEvent.setup();
       openFrom({ fromMenu: true });
       render(<CocktailPublicPage />);
-      const back = await screen.findByRole('link', { name: /public\.back/ });
+      const back = await screen.findByRole('link', { name: /Back to menu/ });
 
       await user.keyboard('{Control>}');
       await user.click(back);
@@ -193,9 +193,9 @@ describe('CocktailPublicPage', () => {
       mockApiError('get', '/api/public/cocktails/:id', 404, 'Not found');
       render(<CocktailPublicPage />);
 
-      expect(await screen.findByRole('alert')).toHaveTextContent('public.cocktailNotFound');
-      expect(screen.getByRole('link', { name: 'public.back' })).toHaveAttribute('href', '/menu/summer-menu');
-      expect(screen.queryByRole('button', { name: 'common.retry' })).not.toBeInTheDocument();
+      expect(await screen.findByRole('alert')).toHaveTextContent('Cocktail not found');
+      expect(screen.getByRole('link', { name: 'Back to menu' })).toHaveAttribute('href', '/menu/summer-menu');
+      expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
     });
 
     it('offers a retry when the recipe cannot be loaded', async () => {
@@ -203,9 +203,9 @@ describe('CocktailPublicPage', () => {
       mockApiError('get', '/api/public/cocktails/:id', 503, 'Unavailable');
       render(<CocktailPublicPage />);
 
-      expect(await screen.findByRole('alert')).toHaveTextContent('public.cocktailLoadError');
+      expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load the cocktail');
       mockApiResponse('get', '/api/public/cocktails/:id', negroni);
-      await user.click(screen.getByRole('button', { name: 'common.retry' }));
+      await user.click(screen.getByRole('button', { name: 'Retry' }));
 
       expect(await screen.findByText('Negroni')).toBeInTheDocument();
     });
@@ -217,10 +217,10 @@ describe('CocktailPublicPage', () => {
     mockUseAuth.mockReturnValue({ user: null });
     render(<CocktailPublicPage />);
 
-    await user.click(await screen.findByRole('button', { name: /public\.print/ }));
+    await user.click(await screen.findByRole('button', { name: /Print/ }));
 
     expect(print).toHaveBeenCalled();
-    expect(screen.getByTitle('cocktails.export')).toBeInTheDocument();
+    expect(screen.getByTitle('Export')).toBeInTheDocument();
   });
 });
 

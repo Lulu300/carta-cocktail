@@ -1,13 +1,23 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import i18n from './index';
-import publicEn from './locales/public/en.json';
-import publicFr from './locales/public/fr.json';
-import adminEn from './locales/admin/en.json';
-import adminFr from './locales/admin/fr.json';
+import type { i18n as I18n } from 'i18next';
 
-// Uses the real i18next instance: setup.ts only mocks react-i18next.
+// Uses the real i18next instance, which setup.ts loads with both bundles.
 
 type Messages = { [key: string]: string | Messages };
+
+// The message files as written: i18next merges the admin messages into the very objects the app
+// imports from the public files, and setup.ts registers them, so the JSON modules are no longer
+// the bundles on their own.
+const messageFiles = import.meta.glob<string>('./locales/*/*.json', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+});
+
+function readMessages(bundle: 'public' | 'admin', language: 'en' | 'fr'): Messages {
+  return JSON.parse(messageFiles[`./locales/${bundle}/${language}.json`]);
+}
 
 /** Dotted path of every message: { a: { b: 'x' } } gives { 'a.b': 'x' }. */
 function flatten(messages: Messages, prefix = ''): Record<string, string> {
@@ -20,8 +30,8 @@ function flatten(messages: Messages, prefix = ''): Record<string, string> {
 }
 
 const BUNDLES = {
-  public: { en: flatten(publicEn), fr: flatten(publicFr) },
-  admin: { en: flatten(adminEn), fr: flatten(adminFr) },
+  public: { en: flatten(readMessages('public', 'en')), fr: flatten(readMessages('public', 'fr')) },
+  admin: { en: flatten(readMessages('admin', 'en')), fr: flatten(readMessages('admin', 'fr')) },
 };
 
 const PLURAL_SUFFIX = /_(zero|one|two|few|many|other)$/;
@@ -174,6 +184,9 @@ describe('public bundle', () => {
 
 describe('admin bundle registration', () => {
   it('adds the admin messages to the public ones in every language', async () => {
+    // A page load: a fresh instance, which only knows the public messages until ./admin runs.
+    vi.resetModules();
+    const i18n: I18n = (await import('./index')).default;
     const adminKeys = Object.keys(BUNDLES.admin.en);
     expect(adminKeys.filter((key) => i18n.exists(key))).toEqual([]);
 
@@ -190,8 +203,7 @@ describe('admin bundle registration', () => {
     }
   });
 
-  it('keeps the English fallback for the admin messages', async () => {
-    await import('./admin');
+  it('keeps the English fallback for the admin messages', () => {
     expect(i18n.t('auth.login', { lng: 'de' })).toBe(BUNDLES.admin.en['auth.login']);
   });
 });
@@ -294,8 +306,7 @@ describe('plural forms', () => {
     expect(t('menus.cocktailCount', { count: 1 })).toBe('1 cocktail');
   });
 
-  it('show unlimited servings with the plural form', async () => {
-    await import('./admin');
+  it('show unlimited servings with the plural form', () => {
     const t = i18n.getFixedT('fr');
     expect(t('cocktails.doses', { count: 1, servings: 1 })).toBe('1 dose');
     expect(t('cocktails.doses', { count: 999, servings: '∞' })).toBe('∞ doses');
@@ -303,8 +314,7 @@ describe('plural forms', () => {
 });
 
 describe('plural forms of the import wizards and selections', () => {
-  it('count imported bottles in French, where 0 is singular', async () => {
-    await import('./admin');
+  it('count imported bottles in French, where 0 is singular', () => {
     const t = i18n.getFixedT('fr');
     const key = 'bottles.importWizard.successCount';
     expect(t(key, { count: 0 })).toBe('0 bouteille importée');
@@ -312,24 +322,21 @@ describe('plural forms of the import wizards and selections', () => {
     expect(t(key, { count: 2 })).toBe('2 bouteilles importées');
   });
 
-  it('count imported bottles in English', async () => {
-    await import('./admin');
+  it('count imported bottles in English', () => {
     const t = i18n.getFixedT('en');
     const key = 'bottles.importWizard.successCount';
     expect(t(key, { count: 1 })).toBe('1 bottle imported');
     expect(t(key, { count: 2 })).toBe('2 bottles imported');
   });
 
-  it('agree the batch summary with the number of imported recipes', async () => {
-    await import('./admin');
+  it('agree the batch summary with the number of imported recipes', () => {
     const t = i18n.getFixedT('fr');
     const key = 'cocktails.importWizard.batchSummaryCount';
     expect(t(key, { count: 1, success: 1, total: 3 })).toBe('1 sur 3 importé avec succès');
     expect(t(key, { count: 2, success: 2, total: 3 })).toBe('2 sur 3 importés avec succès');
   });
 
-  it('agree the selection count in French', async () => {
-    await import('./admin');
+  it('agree the selection count in French', () => {
     const t = i18n.getFixedT('fr');
     expect(t('common.selected', { count: 1 })).toBe('1 sélectionné');
     expect(t('common.selected', { count: 3 })).toBe('3 sélectionnés');

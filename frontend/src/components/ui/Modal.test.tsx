@@ -100,7 +100,7 @@ describe('Modal', () => {
   it('calls onClose from the close button', async () => {
     const user = userEvent.setup();
     const { onClose } = renderModal();
-    await user.click(screen.getByRole('button', { name: 'common.close' }));
+    await user.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
@@ -176,7 +176,7 @@ describe('Modal', () => {
     expect(dialog.open).toBe(true);
     expect(document.body.style.overflow).toBe('hidden');
 
-    fireEvent.click(screen.getByRole('button', { name: 'common.close' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(dialog.open).toBe(false);
     // The close event fired by dialog.close() must not report the closing twice.
     expect(closeSpy).toHaveBeenCalledTimes(1);

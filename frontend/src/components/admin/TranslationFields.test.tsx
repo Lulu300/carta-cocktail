@@ -8,7 +8,7 @@ describe('TranslationFields', () => {
     const user = userEvent.setup();
     render(<TranslationFields value={{ fr: '', en: '' }} onChange={vi.fn()} />);
 
-    const toggle = screen.getByRole('button', { name: 'common.translations' });
+    const toggle = screen.getByRole('button', { name: 'Translations' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByLabelText('Français')).not.toBeInTheDocument();
 

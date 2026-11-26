@@ -23,8 +23,8 @@ function dialog() {
 }
 
 async function confirmDeletion(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getAllByRole('button', { name: 'common.delete' })[0]);
-  await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.delete' }));
+  await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]);
+  await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
 }
 
 beforeEach(() => {
@@ -36,7 +36,7 @@ afterEach(clearToasts);
 describe('IngredientsPage', () => {
   it('shows a card per ingredient, with a default icon', async () => {
     await renderLoadedPage();
-    expect(screen.getByRole('heading', { name: 'ingredients.title' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Ingredients' })).toBeInTheDocument();
     expect(screen.getByText('Sugar')).toBeInTheDocument();
     expect(screen.getByText('🍋')).toBeInTheDocument();
     expect(screen.getByText('📦')).toBeInTheDocument();
@@ -46,21 +46,21 @@ describe('IngredientsPage', () => {
     mockApiPending('get', '/api/ingredients');
     renderPage();
 
-    expect(screen.getByText('common.loading')).toBeInTheDocument();
-    expect(screen.queryByText('common.noResults')).not.toBeInTheDocument();
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    expect(screen.queryByText('No results')).not.toBeInTheDocument();
   });
 
   it('shows "no results" once loaded without ingredients', async () => {
     mockApiResponse('get', '/api/ingredients', []);
     renderPage();
-    expect(await screen.findByText('common.noResults')).toBeInTheDocument();
+    expect(await screen.findByText('No results')).toBeInTheDocument();
   });
 
   it('shows a load error with a retry button', async () => {
     const user = userEvent.setup();
     mockNetworkError('get', '/api/ingredients');
     renderPage();
-    const retry = await screen.findByRole('button', { name: 'common.retry' });
+    const retry = await screen.findByRole('button', { name: 'Retry' });
 
     mockApiResponse('get', '/api/ingredients', [lime, sugar]);
     await user.click(retry);
@@ -70,7 +70,7 @@ describe('IngredientsPage', () => {
 
   it('shows the availability filters with their counts', async () => {
     await renderLoadedPage();
-    expect(screen.getByText('ingredients.filter.all')).toBeInTheDocument();
+    expect(screen.getByText('All')).toBeInTheDocument();
     expect(screen.getAllByText('(1)')).toHaveLength(2);
   });
 
@@ -78,11 +78,11 @@ describe('IngredientsPage', () => {
     const user = userEvent.setup();
     await renderLoadedPage();
 
-    await user.click(screen.getByText('ingredients.filter.available'));
+    await user.click(screen.getByRole('button', { name: /^Available/ }));
     expect(screen.getByText('Lime')).toBeInTheDocument();
     expect(screen.queryByText('Sugar')).not.toBeInTheDocument();
 
-    await user.click(screen.getByText('ingredients.filter.unavailable'));
+    await user.click(screen.getByRole('button', { name: /^Unavailable/ }));
     expect(screen.getByText('Sugar')).toBeInTheDocument();
     expect(screen.queryByText('Lime')).not.toBeInTheDocument();
   });
@@ -91,7 +91,7 @@ describe('IngredientsPage', () => {
     const user = userEvent.setup();
     await renderLoadedPage();
 
-    await user.type(screen.getByPlaceholderText('common.search'), 'lim');
+    await user.type(screen.getByPlaceholderText('Search...'), 'lim');
 
     expect(screen.getByText('Lime')).toBeInTheDocument();
     expect(screen.queryByText('Sugar')).not.toBeInTheDocument();
@@ -103,12 +103,12 @@ describe('IngredientsPage', () => {
     const reloaded = captureRequest('get', '/api/ingredients');
 
     const allAvailable = captureRequest('post', '/api/ingredients/bulk-availability');
-    await user.click(screen.getByRole('button', { name: 'ingredients.allAvailable' }));
+    await user.click(screen.getByRole('button', { name: 'All available' }));
     expect(await allAvailable.body).toEqual({ available: true });
     await waitFor(() => expect(reloaded.count()).toBe(1));
 
     const allUnavailable = captureRequest('post', '/api/ingredients/bulk-availability');
-    await user.click(screen.getByRole('button', { name: 'ingredients.allUnavailable' }));
+    await user.click(screen.getByRole('button', { name: 'All unavailable' }));
     expect(await allUnavailable.body).toEqual({ available: false });
     await waitFor(() => expect(reloaded.count()).toBe(2));
   });
@@ -144,11 +144,11 @@ describe('IngredientsPage', () => {
     const user = userEvent.setup();
     await renderLoadedPage();
 
-    expect(screen.getByRole('searchbox', { name: 'ingredients.search' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'ingredients.filter.all' })).toHaveAttribute('aria-pressed', 'true');
-    await user.click(screen.getByRole('button', { name: /ingredients\.filter\.available/ }));
-    expect(screen.getByRole('button', { name: /ingredients\.filter\.available/ })).toHaveAttribute('aria-pressed', 'true');
-    expect(await screen.findByText('common.resultCount')).toHaveAttribute('aria-live', 'polite');
+    expect(screen.getByRole('searchbox', { name: 'Search ingredients' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
+    await user.click(screen.getByRole('button', { name: /Available/ }));
+    expect(screen.getByRole('button', { name: /Available/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(await screen.findByText(/^\d+ results?$/)).toHaveAttribute('aria-live', 'polite');
   });
 
   it('shows an error toast when the toggle fails', async () => {
@@ -165,14 +165,14 @@ describe('IngredientsPage', () => {
     const user = userEvent.setup();
     await renderLoadedPage();
     const created = captureRequest('post', '/api/ingredients');
-    await user.click(screen.getByRole('button', { name: 'ingredients.add' }));
+    await user.click(screen.getByRole('button', { name: 'Add Ingredient' }));
 
-    await user.type(within(dialog()).getByLabelText(/ingredients\.name/), 'Mint');
+    await user.type(within(dialog()).getByLabelText(/Name/), 'Mint');
     await user.click(within(dialog()).getByText('🌿'));
-    await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
+    await user.click(within(dialog()).getByRole('button', { name: 'Save' }));
 
     expect(await created.body).toEqual({ name: 'Mint', icon: '🌿', nameTranslations: null });
-    expect(await screen.findByText('ingredients.created')).toBeInTheDocument();
+    expect(await screen.findByText('Ingredient created')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
@@ -181,9 +181,9 @@ describe('IngredientsPage', () => {
     mockApiPending('post', '/api/ingredients');
     const created = captureRequest('post', '/api/ingredients');
     await renderLoadedPage();
-    await user.click(screen.getByRole('button', { name: 'ingredients.add' }));
-    await user.type(within(dialog()).getByLabelText(/ingredients\.name/), 'Mint');
-    const save = within(dialog()).getByRole('button', { name: 'common.save' });
+    await user.click(screen.getByRole('button', { name: 'Add Ingredient' }));
+    await user.type(within(dialog()).getByLabelText(/Name/), 'Mint');
+    const save = within(dialog()).getByRole('button', { name: 'Save' });
 
     fireEvent.click(save);
     fireEvent.click(save);
@@ -196,12 +196,12 @@ describe('IngredientsPage', () => {
     const user = userEvent.setup();
     await renderLoadedPage();
     const updated = captureRequest('put', '/api/ingredients/:id');
-    await user.click(screen.getAllByRole('button', { name: 'common.edit' })[1]);
+    await user.click(screen.getAllByRole('button', { name: 'Edit' })[1]);
 
     const name = within(dialog()).getByDisplayValue('Sugar');
     await user.clear(name);
     await user.type(name, 'Cane sugar');
-    await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
+    await user.click(within(dialog()).getByRole('button', { name: 'Save' }));
 
     expect((await updated.url).pathname).toBe('/api/ingredients/2');
     expect(await updated.body).toEqual({
@@ -209,7 +209,7 @@ describe('IngredientsPage', () => {
       icon: null,
       nameTranslations: { fr: 'Sucre', en: 'Sugar' },
     });
-    expect(await screen.findByText('ingredients.updated')).toBeInTheDocument();
+    expect(await screen.findByText('Ingredient updated')).toBeInTheDocument();
     // The edit button does not toggle the card it sits on.
     expect(updated.count()).toBe(1);
   });
@@ -223,7 +223,7 @@ describe('IngredientsPage', () => {
 
     await confirmDeletion(user);
 
-    expect(await screen.findByText('ingredients.deleted')).toBeInTheDocument();
+    expect(await screen.findByText('Ingredient deleted')).toBeInTheDocument();
     expect((await deleted.url).pathname).toBe('/api/ingredients/1');
     // The delete button does not toggle the card it sits on.
     expect(updated.count()).toBe(0);
@@ -235,8 +235,8 @@ describe('IngredientsPage', () => {
     await renderLoadedPage();
     const deleted = captureRequest('delete', '/api/ingredients/:id');
 
-    await user.click(screen.getAllByRole('button', { name: 'common.delete' })[0]);
-    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.cancel' }));
+    await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]);
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
 
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(deleted.count()).toBe(0);
@@ -252,11 +252,11 @@ describe('IngredientsPage', () => {
     const reloaded = captureRequest('get', '/api/ingredients');
 
     await confirmDeletion(user);
-    const forced = await screen.findByRole('alertdialog', { name: 'deletion.forced.title' });
+    const forced = await screen.findByRole('alertdialog', { name: 'Delete an item in use?' });
     await user.click(within(forced).getByRole('checkbox'));
-    await user.click(within(forced).getByRole('button', { name: 'deletion.forced.confirm' }));
+    await user.click(within(forced).getByRole('button', { name: 'Delete anyway' }));
 
-    expect(await screen.findByText('deletion.forced.summary')).toBeInTheDocument();
+    expect(await screen.findByText('Ingredient deleted: 1 cocktail changed.')).toBeInTheDocument();
     expect(requests.map((url) => `${url.pathname}${url.search}`)).toEqual(['/api/ingredients/1', '/api/ingredients/1?force=true']);
     await waitFor(() => expect(reloaded.count()).toBe(1));
   });
@@ -270,7 +270,7 @@ describe('IngredientsPage', () => {
     await renderLoadedPage();
 
     await confirmDeletion(user);
-    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'common.cancel' }));
+    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('This ingredient is used by cocktails'));
   });
@@ -279,12 +279,12 @@ describe('IngredientsPage', () => {
     const user = userEvent.setup();
     await renderLoadedPage();
 
-    await user.click(screen.getAllByRole('button', { name: 'common.edit' })[1]);
-    await user.click(within(dialog()).getByRole('button', { name: 'common.translations' }));
+    await user.click(screen.getAllByRole('button', { name: 'Edit' })[1]);
+    await user.click(within(dialog()).getByRole('button', { name: 'Translations' }));
     expect(within(dialog()).getByLabelText('Français')).toHaveValue('Sucre');
-    await user.click(within(dialog()).getByRole('button', { name: 'common.cancel' }));
+    await user.click(within(dialog()).getByRole('button', { name: 'Cancel' }));
 
-    await user.click(screen.getAllByRole('button', { name: 'common.edit' })[0]);
+    await user.click(screen.getAllByRole('button', { name: 'Edit' })[0]);
 
     expect(within(dialog()).queryByLabelText('Français')).not.toBeInTheDocument();
   });

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { buildBottle, buildCategory, buildCategoryType } from '../../../test/factories';
@@ -6,11 +6,11 @@ import type { Bottle, Category } from '../../../types';
 import { useEntityForm } from '../useEntityForm';
 import BottleFormModal from './BottleFormModal';
 import { toBottleForm, type BottleInput } from './bottleForm';
+import i18n from '../../../i18n';
 
-// The app is in French, whatever the language of the browser running the tests.
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'fr' } }),
-}));
+beforeEach(async () => {
+  await i18n.changeLanguage('fr');
+});
 
 /** The modal as BottlesPage opens it: on a bottle to edit, or empty to create one. */
 function BottleFormHarness({ categories, bottle, onSubmit }: {
@@ -45,9 +45,9 @@ describe('BottleFormModal', () => {
     const onSubmit = vi.fn();
     const user = await renderOpenForm({ categories, onSubmit });
 
-    await user.type(dialog().getByRole('textbox', { name: /bottles\.name/ }), 'Hendricks');
-    await user.type(dialog().getByLabelText('bottles.openedAt'), '03/12/2024');
-    await user.click(dialog().getByRole('button', { name: 'common.save' }));
+    await user.type(dialog().getByRole('textbox', { name: /Nom \(marque\)/ }), 'Hendricks');
+    await user.type(dialog().getByLabelText('Ouverte le'), '03/12/2024');
+    await user.click(dialog().getByRole('button', { name: 'Enregistrer' }));
 
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ openedAt: '2024-12-03' }), false);
   });
@@ -57,8 +57,8 @@ describe('BottleFormModal', () => {
     const bottle = buildBottle({ openedAt: '2024-06-01T00:00:00.000Z' });
     const user = await renderOpenForm({ categories, bottle, onSubmit });
 
-    expect(dialog().getByLabelText('bottles.openedAt')).toHaveValue('01/06/2024');
-    await user.click(dialog().getByRole('button', { name: 'common.save' }));
+    expect(dialog().getByLabelText('Ouverte le')).toHaveValue('01/06/2024');
+    await user.click(dialog().getByRole('button', { name: 'Enregistrer' }));
 
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ openedAt: '2024-06-01' }), false);
   });
@@ -67,12 +67,12 @@ describe('BottleFormModal', () => {
     const onSubmit = vi.fn();
     const user = await renderOpenForm({ categories, onSubmit });
 
-    await user.type(dialog().getByRole('textbox', { name: /bottles\.name/ }), 'Hendricks');
-    await user.type(dialog().getByLabelText('bottles.openedAt'), '31/02/2024');
-    await user.click(dialog().getByRole('button', { name: 'common.save' }));
+    await user.type(dialog().getByRole('textbox', { name: /Nom \(marque\)/ }), 'Hendricks');
+    await user.type(dialog().getByLabelText('Ouverte le'), '31/02/2024');
+    await user.click(dialog().getByRole('button', { name: 'Enregistrer' }));
 
     expect(onSubmit).not.toHaveBeenCalled();
-    expect(dialog().getByText('dates.invalid')).toBeInTheDocument();
+    expect(dialog().getByText(/^Saisissez une date valide au format .+$/)).toBeInTheDocument();
   });
 
   describe('category list, with type names HTML would hide', () => {
@@ -82,7 +82,7 @@ describe('BottleFormModal', () => {
 
     async function categoryOptions(categoryList: Category[]) {
       await renderOpenForm({ categories: categoryList, onSubmit: vi.fn() });
-      return within(dialog().getByLabelText('bottles.category')).getAllByRole('option').map((option) => option.textContent);
+      return within(dialog().getByLabelText('Catégorie')).getAllByRole('option').map((option) => option.textContent);
     }
 
     it('tells the stored names apart, and labels the empty name', async () => {
@@ -92,12 +92,12 @@ describe('BottleFormModal', () => {
         categoryOfType(3, 'Water', ''),
         categoryOfType(4, 'Tonic', 'X  Y'),
       ])).toEqual([
-        'Rum (␣SPIRIT␣ categoryTypes.withSpaces)',
+        'Rum (␣SPIRIT␣ (avec espaces))',
         'Gin (SPIRIT)',
-        'Water (categoryTypes.emptyName)',
-        'Tonic (X␣␣Y categoryTypes.withSpaces)',
+        'Water ((sans nom))',
+        'Tonic (X␣␣Y (avec espaces))',
       ]);
-      expect(dialog().getByRole('option', { name: 'Rum (␣SPIRIT␣ categoryTypes.withSpaces)' })).toBeInTheDocument();
+      expect(dialog().getByRole('option', { name: 'Rum (␣SPIRIT␣ (avec espaces))' })).toBeInTheDocument();
     });
 
     it('adds the stored name to a translation that would hide it', async () => {
@@ -105,12 +105,12 @@ describe('BottleFormModal', () => {
       expect(await categoryOptions([
         categoryOfType(1, 'Rum', ' SPIRIT ', nameTranslations),
         categoryOfType(2, 'Gin', 'SPIRIT', nameTranslations),
-      ])).toEqual(['Rum (Spiritueux – ␣SPIRIT␣ categoryTypes.withSpaces)', 'Gin (Spiritueux)']);
+      ])).toEqual(['Rum (Spiritueux – ␣SPIRIT␣ (avec espaces))', 'Gin (Spiritueux)']);
     });
 
     it('marks the stored name of a category sent without its type', async () => {
       expect(await categoryOptions([buildCategory({ id: 1, name: 'Rum', type: ' SPIRIT ', categoryType: null })]))
-        .toEqual(['Rum (␣SPIRIT␣ categoryTypes.withSpaces)']);
+        .toEqual(['Rum (␣SPIRIT␣ (avec espaces))']);
     });
   });
 });
