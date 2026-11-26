@@ -90,6 +90,12 @@ docker compose up --build
 - Frontend: `http://localhost` (port 80)
 - Backend API: `http://localhost:3001`
 
+The backend image holds the release notes of `docs/releases/`, for the upgrade guide shown in the admin after an upgrade. They sit outside the backend build context, so the build receives them as a named context: `docker-compose.yml` passes it (`additional_contexts`, Docker Compose 2.17 or later). A compose file of your own that builds the backend image needs the same `additional_contexts: { releases: ./docs/releases }` under `build:`. A manual build passes it too, from the repository root, otherwise Docker looks for an image named `releases`:
+
+```bash
+docker build --build-context releases=./docs/releases -t carta-cocktail-backend ./backend
+```
+
 ### Docker (production with pre-built images)
 
 > **Warning:** set `JWT_SECRET` and `ADMIN_PASSWORD` before exposing the app to the Internet. `docker compose` refuses to start without `JWT_SECRET`, and the backend refuses a secret shorter than 32 characters or a known default.
@@ -202,7 +208,7 @@ npm run db:check      # exit 0: the migrations match schema.prisma
 2. If the database exists and a migration of the image is not applied yet (no migration history, a new migration, or one marked rolled back with `prisma migrate resolve --rolled-back`), it copies the database to `backups/pre-migrate-<date>.db`, next to the database (`/app/data/backups/` in the `db-data` volume). It keeps the 10 most recent copies, and skips the copy when the database has not changed since the last one. It makes no copy while a migration is marked failed: the newest copy stays the one made before the failed attempt.
 3. It applies the pending migrations with `prisma migrate deploy`. A new database is created from scratch. If a migration fails, **it refuses to start** and names the migration and the copy to restore: see [Recovering from a failed migration](#recovering-from-a-failed-migration).
 4. A database created by `db push` (v1.5.0 and older) has no migration history. If its schema is exactly the one of the first migration, `0_init`, the entrypoint marks `0_init` as applied and continues. Otherwise **it refuses to start**: it prints the differences, leaves the database untouched, and the container exits.
-5. It runs the seed, then starts Node.
+5. It runs the seed, then starts Node. Before listening, the backend records its version. After an upgrade, it logs the required actions of the versions in between, read from the release notes in the image, and the admin shows them in a banner until they are confirmed. A `dev` build records nothing.
 
 ### Checking a production database before the first upgrade
 
@@ -365,6 +371,7 @@ carta-cocktail/
 | `CORS_ORIGIN` | Origin allowed to call the API from another site, such as `https://example.com` (a single origin, without a trailing slash). Empty: no other origin is allowed. The app does not need one: nginx, and the Vite proxy in development, serve the frontend and the API on the same origin | empty |
 | `PORT` | Backend port | `3001` |
 | `UPLOAD_DIR` | Folder of the cocktail photos | `<repo>/uploads` outside Docker; `/app/uploads` in the image and the compose files (`uploads` volume) |
+| `RELEASES_DIR` | Folder of the release notes read by the upgrade guide of the admin | `<repo>/docs/releases` outside Docker; `/app/releases` in the image |
 | `BACKEND_HOST` | Backend hostname for nginx proxy (frontend container) | `carta-cocktail-backend` |
 
 In Docker, set these variables in the `.env` file next to the compose file, then recreate the backend (`docker compose -f docker-compose.prod.yml up -d`). They stay there when you download a new compose file. A variable that is not set, or empty, keeps its default; the defaults suit a standard install. The compose files set `DATABASE_URL`, `PORT`, `UPLOAD_DIR` and `BACKEND_HOST` themselves: a value in `.env` does not change them.

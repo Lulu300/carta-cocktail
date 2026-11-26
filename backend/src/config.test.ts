@@ -1,9 +1,35 @@
 import { describe, it, expect } from 'vitest';
+import fs from 'fs';
 import path from 'path';
 import jwt from 'jsonwebtoken';
 import {
-  assertJwtSecret, parseJwtExpiresIn, parsePositiveInteger, parseTrustProxy, resolveUploadDir,
+  appVersion, assertJwtSecret, parseJwtExpiresIn, parsePositiveInteger, parseTrustProxy, resolveReleasesDir,
+  resolveUploadDir,
 } from './config';
+
+describe('resolveReleasesDir', () => {
+  it('should use RELEASES_DIR when it is set', () => {
+    expect(resolveReleasesDir({ RELEASES_DIR: '/app/releases' })).toBe(path.resolve('/app/releases'));
+  });
+
+  it('should default to docs/releases of the repository, found from this file and not from the cwd', () => {
+    const dir = resolveReleasesDir({});
+    expect(dir).toBe(path.resolve(__dirname, '../../docs/releases'));
+    expect(fs.existsSync(path.join(dir, 'TEMPLATE.md'))).toBe(true);
+  });
+
+  it('should fall back to the default when RELEASES_DIR is empty', () => {
+    expect(resolveReleasesDir({ RELEASES_DIR: '' })).toBe(resolveReleasesDir({}));
+  });
+});
+
+describe('appVersion', () => {
+  it('should give APP_VERSION, or dev when it is not set or empty', () => {
+    expect(appVersion({ APP_VERSION: '1.17.0-rc.1' })).toBe('1.17.0-rc.1');
+    expect(appVersion({})).toBe('dev');
+    expect(appVersion({ APP_VERSION: '' })).toBe('dev');
+  });
+});
 
 describe('resolveUploadDir', () => {
   it('should use UPLOAD_DIR when it is an absolute path', () => {

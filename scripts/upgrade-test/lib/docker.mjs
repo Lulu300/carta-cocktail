@@ -33,8 +33,10 @@ export function pullImage(ref, platform) {
   docker(['pull', '--quiet', '--platform', platform, ref]);
 }
 
-export function buildImage(tag, contextDir) {
-  docker(['build', '--quiet', '--tag', tag, contextDir]);
+/** `namedContexts` maps a name to a folder, for a Dockerfile's `COPY --from=<name>`. */
+export function buildImage(tag, contextDir, namedContexts = {}) {
+  const contextArgs = Object.entries(namedContexts).flatMap(([name, dir]) => ['--build-context', `${name}=${dir}`]);
+  docker(['build', '--quiet', '--tag', tag, ...contextArgs, contextDir]);
 }
 
 export function helperImageExists() {

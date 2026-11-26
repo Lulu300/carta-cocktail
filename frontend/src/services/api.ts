@@ -492,6 +492,28 @@ export const settings = {
     request<{ id: number; email: string; token?: string }>('/settings/profile', { method: 'PUT', body: JSON.stringify(data) }),
 };
 
+// System (admin)
+export interface RequiredAction {
+  version: string;
+  /** Before or after the upgrade, as the release notes say: "before" ones can only be checked now. */
+  when: 'before' | 'after';
+  /** Text of the release notes, in English. */
+  action: string;
+}
+
+/** Required actions of the versions between `from` and `to`, until the admin confirms them. */
+export interface UpgradeNotice {
+  from: string;
+  to: string;
+  actions: RequiredAction[];
+}
+
+export const system = {
+  /** null when there is no notice to show (204). */
+  getUpgradeNotice: async () => (await request<UpgradeNotice | undefined>('/system/upgrade-notice')) ?? null,
+  acknowledgeUpgradeNotice: () => request<void>('/system/upgrade-notice/acknowledge', { method: 'POST' }),
+};
+
 // Backup
 export interface BackupRestoreResult {
   message: string;

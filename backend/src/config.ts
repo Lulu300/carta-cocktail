@@ -15,11 +15,33 @@ dotenv.config({ path: path.resolve(__dirname, '../.env'), quiet: true });
  * `/uploads`, outside the volume: that is why the image sets UPLOAD_DIR.
  */
 export function resolveUploadDir(env: NodeJS.ProcessEnv = process.env): string {
-  if (env.UPLOAD_DIR) {
-    return path.resolve(env.UPLOAD_DIR);
+  return resolveRepositoryFolder(env.UPLOAD_DIR, 'uploads');
+}
+
+/**
+ * Resolves the folder of the release notes read by the in-app upgrade guide.
+ * Same rule as UPLOAD_DIR: `<repo>/docs/releases` by default, and the Docker
+ * image, which holds the notes in `/app/releases`, sets RELEASES_DIR.
+ */
+export function resolveReleasesDir(env: NodeJS.ProcessEnv = process.env): string {
+  return resolveRepositoryFolder(env.RELEASES_DIR, 'docs/releases');
+}
+
+/** The folder a variable names, or `<repo>/<devDefault>`, found from this file and not from the cwd. */
+function resolveRepositoryFolder(value: string | undefined, devDefault: string): string {
+  if (value) {
+    return path.resolve(value);
   }
-  // Dev default: <repo>/uploads
-  return path.resolve(__dirname, '../../uploads');
+  return path.resolve(__dirname, '../..', devDefault);
+}
+
+/**
+ * Version of the running backend: the tag version in a released image
+ * (`1.12.0`, `1.12.0-rc.1`), `dev` in any other build. Read at each call, as
+ * the tests change it. `||`, not `??`: an APP_VERSION set but empty is `dev` too.
+ */
+export function appVersion(env: NodeJS.ProcessEnv = process.env): string {
+  return env.APP_VERSION || 'dev';
 }
 
 const MIN_JWT_SECRET_LENGTH = 32;
@@ -121,4 +143,5 @@ export const config = {
   // through nginx in production and the Vite proxy in development.
   corsOrigin: process.env.CORS_ORIGIN || '',
   uploadDir: resolveUploadDir(),
+  releasesDir: resolveReleasesDir(),
 };

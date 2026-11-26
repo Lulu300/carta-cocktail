@@ -25,4 +25,5 @@ export const qk = {
   publicMenus: ['public', 'menus'] as const,
   publicMenu: (slug: string, viewer: PublicViewer) => ['public', 'menu', slug, viewer] as const,
   publicCocktail: (id: number, viewer: PublicViewer) => ['public', 'cocktail', id, viewer] as const,
+  upgradeNotice: ['system', 'upgradeNotice'] as const,
 };

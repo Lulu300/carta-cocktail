@@ -3,12 +3,13 @@ import os from 'os';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import AdmZip from 'adm-zip';
-import type { PrismaClient } from '../generated/prisma/client';
+import type { AppState, PrismaClient } from '../generated/prisma/client';
 import { config } from '../config';
 import { PRISMA_DIR, resolveDatabasePath } from '../lib/databasePath';
 import { checkpointWal, configureSqlite, createPrismaClient, prisma } from '../lib/prisma';
 import { BadRequestError, ConflictError } from '../errors';
 import { hasTokenVersionColumn, writeSessionFloor } from './sessionFloor';
+import { APP_STATE_ID } from './upgradeNoticeService';
 
 /** Format of the backup archive, written to metadata.json. Every published version wrote 1. */
 export const BACKUP_FORMAT_VERSION = 1;
@@ -212,6 +213,19 @@ async function highestLiveTokenVersion(): Promise<number> {
   return _max.tokenVersion ?? 0;
 }
 
+/** What the restored database takes from the live one, read right before the switch. */
+interface LiveState {
+  tokenVersion: number;
+  appState: AppState | null;
+}
+
+async function readLiveState(): Promise<LiveState> {
+  return {
+    tokenVersion: await highestLiveTokenVersion(),
+    appState: await prisma.appState.findUnique({ where: { id: APP_STATE_ID } }),
+  };
+}
+
 /**
  * Raises the token version of every user of the restored database above both
  * its own and the live one, so that no token issued before the restore is
@@ -221,12 +235,33 @@ async function highestLiveTokenVersion(): Promise<number> {
  * Returns false for a backup made before the tokenVersion column existed: its
  * migration adds the column at the next start, and the session floor raises it then.
  */
-async function raiseRestoredTokenVersion(restoredDbPath: string, liveTokenVersion: number): Promise<boolean> {
+async function raiseRestoredTokenVersion(client: PrismaClient, liveTokenVersion: number): Promise<boolean> {
+  if (!(await hasTokenVersionColumn(client))) return false;
+  await client.$executeRaw`UPDATE "User" SET "tokenVersion" = MAX("tokenVersion", ${liveTokenVersion}) + 1`;
+  return true;
+}
+
+/**
+ * Puts the live AppState row in the restored database. It describes the
+ * running instance, not its content: the version of the backup would show a
+ * false upgrade notice, or a downgrade warning, at the next start. A backup
+ * made before the table existed gets it, empty, from its migration at the next
+ * start, which then records the running version without a notice.
+ */
+async function keepLiveAppState(client: PrismaClient, liveAppState: AppState | null): Promise<void> {
+  if (!(await listTables(client)).includes('AppState')) return;
+  await client.$transaction([
+    client.appState.deleteMany(),
+    ...(liveAppState ? [client.appState.create({ data: liveAppState })] : []),
+  ]);
+}
+
+/** Returns false when the token version is left to the session floor (see raiseRestoredTokenVersion). */
+async function prepareRestoredDatabase(restoredDbPath: string, live: LiveState): Promise<boolean> {
   const client = createPrismaClient(`file:${restoredDbPath}`);
   try {
-    if (!(await hasTokenVersionColumn(client))) return false;
-    await client.$executeRaw`UPDATE "User" SET "tokenVersion" = MAX("tokenVersion", ${liveTokenVersion}) + 1`;
-    return true;
+    await keepLiveAppState(client, live.appState);
+    return await raiseRestoredTokenVersion(client, live.tokenVersion);
   } finally {
     await client.$disconnect();
   }
@@ -351,7 +386,8 @@ function fileTimestamp(date: Date): string {
  * a copy of the replaced database in `<database folder>/backups/`, and puts the
  * previous database and uploads back if it fails. The restored database comes
  * with a raised token version (at the next start for a backup made before
- * v1.11.0): every session, the restoring one included, ends.
+ * v1.11.0): every session, the restoring one included, ends. It keeps the
+ * live AppState row (version that ran last, upgrade notice).
  */
 async function replaceLiveData(zipPath: string): Promise<RestoreResult> {
   const zip = openArchive(zipPath);
@@ -381,13 +417,13 @@ async function replaceLiveData(zipPath: string): Promise<RestoreResult> {
     // pages over the restored file: flush it and close them all first.
     await checkpointWal();
     // Read last, right before closing: a token issued earlier carries this version at most
-    const liveTokenVersion = await highestLiveTokenVersion();
+    const live = await readLiveState();
     await prisma.$disconnect();
-    if (!(await raiseRestoredTokenVersion(restoredDbPath, liveTokenVersion))) {
+    if (!(await prepareRestoredDatabase(restoredDbPath, live))) {
       // Kept even if the restore fails below: a floor applied over the previous
       // database only signs the admin out once more, while removing it could
       // leave a restored file without the column live and its sessions open.
-      writeSessionFloor(dbPath, liveTokenVersion);
+      writeSessionFloor(dbPath, live.tokenVersion);
     }
     fs.mkdirSync(path.dirname(preRestorePath), { recursive: true });
     fs.copyFileSync(dbPath, preRestorePath);

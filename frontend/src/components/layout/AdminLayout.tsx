@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteSettings } from '../../contexts/SiteSettingsContext';
 import { useShortages } from '../../queries/shortages';
+import UpgradeNoticeBanner from '../admin/UpgradeNoticeBanner';
 import { cx } from '../ui/classNames';
 import LanguageSelector from '../ui/LanguageSelector';
 import { useDisclosure } from '../ui/useDisclosure';
@@ -148,6 +149,8 @@ export default function AdminLayout() {
             </button>
           </div>
         </header>
+
+        <UpgradeNoticeBanner />
 
         <main id={MAIN_CONTENT_ID} tabIndex={-1} className="flex-1 p-6">
           <Outlet />
