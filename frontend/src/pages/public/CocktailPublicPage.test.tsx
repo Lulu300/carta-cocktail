@@ -94,6 +94,19 @@ describe('CocktailPublicPage', () => {
     expect(await screen.findByRole('button', { name: '30 ml' })).toBeInTheDocument();
   });
 
+  it('fetches the photo first, in the copy that fills the recipe card', async () => {
+    mockUseAuth.mockReturnValue({ user: null });
+
+    render(<CocktailPublicPage />);
+
+    const photo = await screen.findByRole('img', { name: 'Negroni' });
+    expect(photo).toHaveAttribute('src', '/uploads/cocktails/negroni.jpg');
+    expect(photo).toHaveAttribute('srcset', expect.stringContaining('negroni-480.webp 480w'));
+    expect(photo).toHaveAttribute('sizes', '(min-width: 42rem) 40rem, calc(100vw - 2rem)');
+    expect(photo).toHaveAttribute('fetchpriority', 'high');
+    expect(photo).not.toHaveAttribute('loading');
+  });
+
   it('puts the cocktail name before the site name in the tab title', async () => {
     mockUseAuth.mockReturnValue({ user: null });
     mockApiResponse('get', '/api/public/settings', buildSiteSettings({ siteName: 'Chez Lulu' }));
