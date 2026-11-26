@@ -27,5 +27,9 @@ export default function LiveResultCount({ count }: LiveResultCountProps) {
     return () => clearTimeout(timer);
   }, [message]);
 
-  return <p className="sr-only" aria-live="polite">{announcedMessage}</p>;
+  return (
+    <p className="sr-only" aria-live="polite">
+      {announcedMessage}
+    </p>
+  );
 }

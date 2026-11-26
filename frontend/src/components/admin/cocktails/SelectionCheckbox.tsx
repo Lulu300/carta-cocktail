@@ -9,7 +9,12 @@ interface SelectionCheckboxProps {
 }
 
 /** Checkbox of a clickable item: its own click must not reach the item and toggle twice. */
-export default function SelectionCheckbox({ name, checked, onToggle, className }: SelectionCheckboxProps) {
+export default function SelectionCheckbox({
+  name,
+  checked,
+  onToggle,
+  className,
+}: SelectionCheckboxProps) {
   return (
     <input
       type="checkbox"
@@ -17,7 +22,10 @@ export default function SelectionCheckbox({ name, checked, onToggle, className }
       checked={checked}
       onChange={onToggle}
       onClick={(event) => event.stopPropagation()}
-      className={cx('size-5 rounded bg-canvas border-line-strong accent-accent cursor-pointer', className)}
+      className={cx(
+        'size-5 rounded bg-canvas border-line-strong accent-accent cursor-pointer',
+        className,
+      )}
     />
   );
 }

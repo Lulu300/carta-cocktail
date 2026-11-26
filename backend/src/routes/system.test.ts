@@ -5,7 +5,14 @@ import path from 'path';
 import { config } from '../config';
 import { recordStartup } from '../services/upgradeNoticeService';
 import {
-  authHeader, cleanDatabase, prisma, request, seedAppState, seedRequiredData, setupTestDatabase, teardownTestDatabase,
+  authHeader,
+  cleanDatabase,
+  prisma,
+  request,
+  seedAppState,
+  seedRequiredData,
+  setupTestDatabase,
+  teardownTestDatabase,
 } from '../test/helpers';
 
 const NOTES_1_6_0 = `---
@@ -103,6 +110,8 @@ describe('POST /api/system/upgrade-notice/acknowledge', () => {
   });
 
   it('should answer 204 when there is no notice to confirm', async () => {
-    expect((await request.post('/api/system/upgrade-notice/acknowledge').set(authHeader())).status).toBe(204);
+    expect(
+      (await request.post('/api/system/upgrade-notice/acknowledge').set(authHeader())).status,
+    ).toBe(204);
   });
 });

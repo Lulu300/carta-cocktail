@@ -30,16 +30,27 @@ export function BatchProgress({ state }: { state: CocktailImportState }) {
             name: currentRecipe(state)?.cocktail.name,
           })}
         </span>
-        <span>{Object.keys(state.results).length}/{total}</span>
+        <span>
+          {Object.keys(state.results).length}/{total}
+        </span>
       </div>
       <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
-        <div className="h-full bg-accent transition-all duration-300 motion-reduce:transition-none" style={{ width: `${(state.currentIndex / total) * 100}%` }} />
+        <div
+          className="h-full bg-accent transition-all duration-300 motion-reduce:transition-none"
+          style={{ width: `${(state.currentIndex / total) * 100}%` }}
+        />
       </div>
     </div>
   );
 }
 
-export function ImportSuccess({ result, onClose }: { result: ImportResult | undefined; onClose: () => void }) {
+export function ImportSuccess({
+  result,
+  onClose,
+}: {
+  result: ImportResult | undefined;
+  onClose: () => void;
+}) {
   const { t } = useTranslation();
   return (
     <WizardResult
@@ -48,9 +59,15 @@ export function ImportSuccess({ result, onClose }: { result: ImportResult | unde
       message={result?.name}
       actions={
         <>
-          <Button variant="ghost" onClick={onClose}>{t('cocktails.importWizard.close')}</Button>
+          <Button variant="ghost" onClick={onClose}>
+            {t('cocktails.importWizard.close')}
+          </Button>
           {result?.id !== undefined && (
-            <Link to={`/admin/cocktails/${result.id}`} onClick={onClose} className={editLinkClasses}>
+            <Link
+              to={`/admin/cocktails/${result.id}`}
+              onClick={onClose}
+              className={editLinkClasses}
+            >
               {t('cocktails.importWizard.editImported')}
             </Link>
           )}
@@ -85,11 +102,19 @@ export function ImportFailure({ state, onBack, onSkip, onRetry, onClose }: Impor
       message={state.error ?? undefined}
       actions={
         <>
-          <Button variant="ghost" onClick={onClose}>{t('cocktails.importWizard.close')}</Button>
-          {canGoBack(state) && <Button variant="secondary" onClick={onBack}>{t('cocktails.importWizard.back')}</Button>}
+          <Button variant="ghost" onClick={onClose}>
+            {t('cocktails.importWizard.close')}
+          </Button>
+          {canGoBack(state) && (
+            <Button variant="secondary" onClick={onBack}>
+              {t('cocktails.importWizard.back')}
+            </Button>
+          )}
           {batch && (
             <Button variant="secondary" onClick={onSkip}>
-              {hasNextRecipe(state) ? t('cocktails.importWizard.skipRecipe') : t('cocktails.importWizard.showSummary')}
+              {hasNextRecipe(state)
+                ? t('cocktails.importWizard.skipRecipe')
+                : t('cocktails.importWizard.showSummary')}
             </Button>
           )}
           <Button onClick={onRetry}>{t('cocktails.importWizard.tryAgain')}</Button>
@@ -98,7 +123,9 @@ export function ImportFailure({ state, onBack, onSkip, onRetry, onClose }: Impor
     >
       {state.errorDetails.length > 0 && (
         <ul className="text-left max-w-md mx-auto space-y-1 text-sm text-danger list-disc list-inside">
-          {state.errorDetails.map((detail) => <li key={detail}>{detail}</li>)}
+          {state.errorDetails.map((detail) => (
+            <li key={detail}>{detail}</li>
+          ))}
         </ul>
       )}
     </WizardResult>
@@ -106,15 +133,27 @@ export function ImportFailure({ state, onBack, onSkip, onRetry, onClose }: Impor
 }
 
 /** One line per recipe of the batch, imported or not. */
-export function ImportBatchSummary({ state, onClose }: { state: CocktailImportState; onClose: () => void }) {
+export function ImportBatchSummary({
+  state,
+  onClose,
+}: {
+  state: CocktailImportState;
+  onClose: () => void;
+}) {
   const { t } = useTranslation();
-  const results = state.recipes.map((recipe, index) => state.results[index] ?? { name: recipe.cocktail.name, success: false });
+  const results = state.recipes.map(
+    (recipe, index) => state.results[index] ?? { name: recipe.cocktail.name, success: false },
+  );
   const successCount = results.filter((result) => result.success).length;
   return (
     <WizardResult
       variant="summary"
       title={t('cocktails.importWizard.batchComplete')}
-      message={t('cocktails.importWizard.batchSummaryCount', { count: successCount, success: successCount, total: results.length })}
+      message={t('cocktails.importWizard.batchSummaryCount', {
+        count: successCount,
+        success: successCount,
+        total: results.length,
+      })}
       actions={<Button onClick={onClose}>{t('cocktails.importWizard.close')}</Button>}
     >
       <ul className="text-left max-w-md mx-auto space-y-2">
@@ -129,10 +168,16 @@ export function ImportBatchSummary({ state, onClose }: { state: CocktailImportSt
             <span aria-hidden="true">{result.success ? '✓' : '✗'}</span>
             <span className="flex-1">{result.name}</span>
             <span className="sr-only">
-              {result.success ? t('cocktails.importWizard.resultImported') : t('cocktails.importWizard.resultNotImported')}
+              {result.success
+                ? t('cocktails.importWizard.resultImported')
+                : t('cocktails.importWizard.resultNotImported')}
             </span>
             {result.success && result.id !== undefined && (
-              <Link to={`/admin/cocktails/${result.id}`} onClick={onClose} className="text-xs text-accent hover:underline">
+              <Link
+                to={`/admin/cocktails/${result.id}`}
+                onClick={onClose}
+                className="text-xs text-accent hover:underline"
+              >
                 {t('common.edit')}
               </Link>
             )}

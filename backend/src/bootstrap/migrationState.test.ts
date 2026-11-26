@@ -5,7 +5,12 @@ import path from 'path';
 import type { PrismaClient } from '../generated/prisma/client';
 import { PRISMA_DIR } from '../lib/databasePath';
 import { createPrismaClient } from '../lib/prisma';
-import { formatMigrationState, listLocalMigrations, readMigrationState, summarizeError } from './migrationState';
+import {
+  formatMigrationState,
+  listLocalMigrations,
+  readMigrationState,
+  summarizeError,
+} from './migrationState';
 
 // The table as `prisma migrate deploy` creates it in SQLite
 const MIGRATIONS_TABLE = `CREATE TABLE "_prisma_migrations" (
@@ -43,7 +48,9 @@ beforeEach(async () => {
   migrationsDir = path.join(tmpDir, 'migrations');
   fs.mkdirSync(migrationsDir);
   fs.writeFileSync(path.join(migrationsDir, 'migration_lock.toml'), 'provider = "sqlite"\n');
-  ['0_init', '20261010173910_schema_integrity', '20261011120000_user_token_version'].forEach(addLocalMigration);
+  ['0_init', '20261010173910_schema_integrity', '20261011120000_user_token_version'].forEach(
+    addLocalMigration,
+  );
   client = createPrismaClient(`file:${path.join(tmpDir, 'carta.db')}`);
 });
 
@@ -97,7 +104,10 @@ describe('readMigrationState', () => {
 
     const state = await readMigrationState(client, migrationsDir);
 
-    expect(state.unapplied).toEqual(['20261010173910_schema_integrity', '20261011120000_user_token_version']);
+    expect(state.unapplied).toEqual([
+      '20261010173910_schema_integrity',
+      '20261011120000_user_token_version',
+    ]);
     expect(state.failed).toEqual([]);
   });
 
@@ -109,7 +119,10 @@ describe('readMigrationState', () => {
     const state = await readMigrationState(client, migrationsDir);
 
     expect(state.failed).toEqual(['20261010173910_schema_integrity']);
-    expect(state.unapplied).toEqual(['20261010173910_schema_integrity', '20261011120000_user_token_version']);
+    expect(state.unapplied).toEqual([
+      '20261010173910_schema_integrity',
+      '20261011120000_user_token_version',
+    ]);
   });
 
   // `prisma migrate status` reports this database as up to date: the entrypoint
@@ -122,7 +135,10 @@ describe('readMigrationState', () => {
 
     const state = await readMigrationState(client, migrationsDir);
 
-    expect(state.unapplied).toEqual(['20261010173910_schema_integrity', '20261011120000_user_token_version']);
+    expect(state.unapplied).toEqual([
+      '20261010173910_schema_integrity',
+      '20261011120000_user_token_version',
+    ]);
     expect(state.failed).toEqual([]);
   });
 
@@ -160,7 +176,9 @@ describe('formatMigrationState', () => {
 
 describe('summarizeError', () => {
   it('should keep the last line of a multi-line Prisma message', () => {
-    const err = new Error('\nInvalid `prisma.$queryRaw()` invocation:\n\n\nRaw query failed. Code: `SQLITE_NOTADB`.\n');
+    const err = new Error(
+      '\nInvalid `prisma.$queryRaw()` invocation:\n\n\nRaw query failed. Code: `SQLITE_NOTADB`.\n',
+    );
 
     expect(summarizeError(err)).toBe('Raw query failed. Code: `SQLITE_NOTADB`.');
   });

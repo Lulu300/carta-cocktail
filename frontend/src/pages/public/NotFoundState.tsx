@@ -15,11 +15,14 @@ export default function NotFoundState({ title, linkTo, linkLabel }: NotFoundStat
       title={title}
       titleProps={{ role: 'alert' }}
       className="min-h-[60vh] justify-center"
-      action={(
-        <Link to={linkTo} className="text-accent hover:text-accent-soft underline underline-offset-4">
+      action={
+        <Link
+          to={linkTo}
+          className="text-accent hover:text-accent-soft underline underline-offset-4"
+        >
           {linkLabel}
         </Link>
-      )}
+      }
     />
   );
 }

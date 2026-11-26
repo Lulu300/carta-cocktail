@@ -21,9 +21,8 @@ async function main(): Promise<number> {
   // Loaded after the check: the shared client resolves DATABASE_URL when it is
   // imported, and would fail with a stack trace instead of this exit code.
   const { prisma } = await import('../lib/prisma');
-  const { findIntegrityIssues, formatIntegrityReport, hasBlockingIssues } = await import(
-    '../services/integrityService'
-  );
+  const { findIntegrityIssues, formatIntegrityReport, hasBlockingIssues } =
+    await import('../services/integrityService');
   try {
     const countsOnly = process.argv.includes('--counts-only');
     const issues = await findIntegrityIssues(prisma);

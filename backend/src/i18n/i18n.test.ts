@@ -82,13 +82,19 @@ describe('backend translations', () => {
   it('uses the same placeholders in English and in French', () => {
     const different = enKeys.filter((key) => {
       const french = messageAt(fr, key);
-      return french !== undefined && placeholders(messageAt(en, key)!).join() !== placeholders(french).join();
+      return (
+        french !== undefined &&
+        placeholders(messageAt(en, key)!).join() !== placeholders(french).join()
+      );
     });
     expect(different).toEqual([]);
   });
 
   it('does not HTML-escape interpolated values: the messages go out as JSON', () => {
-    const message = i18next.t('test.unknownKey', { defaultValue: 'Name: {{name}}', replace: { name: 'Gin & <Tonic>' } });
+    const message = i18next.t('test.unknownKey', {
+      defaultValue: 'Name: {{name}}',
+      replace: { name: 'Gin & <Tonic>' },
+    });
     expect(message).toBe('Name: Gin & <Tonic>');
   });
 

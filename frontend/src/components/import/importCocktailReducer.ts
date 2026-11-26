@@ -1,8 +1,13 @@
 import type { CocktailExportFormat, ImportPreviewResponse } from '../../types';
-import { buildAutoResolutions, emptyResolutions, type ImportResolutions } from './importResolutions';
+import {
+  buildAutoResolutions,
+  emptyResolutions,
+  type ImportResolutions,
+} from './importResolutions';
 
 /** `previewing`: the preview of the current recipe is requested; the wizard sends it. */
-export type CocktailImportStep = 'upload' | 'previewing' | 'resolve' | 'confirm' | 'success' | 'error' | 'batchSummary';
+export type CocktailImportStep =
+  'upload' | 'previewing' | 'resolve' | 'confirm' | 'success' | 'error' | 'batchSummary';
 
 export interface ImportResult {
   name: string;
@@ -44,7 +49,11 @@ export type CocktailImportAction =
   | { type: 'SKIP' }
   | { type: 'BACK' };
 
-const NO_ERROR = { error: null, errorDetails: [], failedRequest: null } satisfies Partial<CocktailImportState>;
+const NO_ERROR = {
+  error: null,
+  errorDetails: [],
+  failedRequest: null,
+} satisfies Partial<CocktailImportState>;
 
 export const initialCocktailImportState: CocktailImportState = {
   step: 'upload',
@@ -84,11 +93,17 @@ export function canGoBack(state: CocktailImportState): boolean {
   return previousStep(state) !== null;
 }
 
-function failure({ message, details = [] }: ImportRefusal): Pick<CocktailImportState, 'error' | 'errorDetails'> {
+function failure({
+  message,
+  details = [],
+}: ImportRefusal): Pick<CocktailImportState, 'error' | 'errorDetails'> {
   return { error: message, errorDetails: details };
 }
 
-function withResult(state: CocktailImportState, result: ImportResult): Record<number, ImportResult> {
+function withResult(
+  state: CocktailImportState,
+  result: ImportResult,
+): Record<number, ImportResult> {
   return { ...state.results, [state.currentIndex]: result };
 }
 
@@ -97,7 +112,10 @@ function failedResult(state: CocktailImportState): ImportResult {
 }
 
 /** Moves to the next recipe of the batch, or to the summary after the last one. */
-function advance(state: CocktailImportState, results: Record<number, ImportResult>): CocktailImportState {
+function advance(
+  state: CocktailImportState,
+  results: Record<number, ImportResult>,
+): CocktailImportState {
   if (!hasNextRecipe(state)) return { ...state, results, step: 'batchSummary', ...NO_ERROR };
   return {
     ...state,
@@ -110,22 +128,40 @@ function advance(state: CocktailImportState, results: Record<number, ImportResul
   };
 }
 
-export function importCocktailReducer(state: CocktailImportState, action: CocktailImportAction): CocktailImportState {
+export function importCocktailReducer(
+  state: CocktailImportState,
+  action: CocktailImportAction,
+): CocktailImportState {
   switch (action.type) {
     case 'LOADED':
       return { ...initialCocktailImportState, recipes: action.recipes };
     case 'PREVIEW_REQUESTED':
       return { ...state, step: 'previewing', ...NO_ERROR };
     case 'PREVIEW_OK':
-      return { ...state, step: 'resolve', preview: action.preview, resolutions: buildAutoResolutions(action.preview) };
+      return {
+        ...state,
+        step: 'resolve',
+        preview: action.preview,
+        resolutions: buildAutoResolutions(action.preview),
+      };
     case 'PREVIEW_FAILED':
-      return { ...state, step: 'error', preview: null, ...failure(action), failedRequest: 'preview' };
+      return {
+        ...state,
+        step: 'error',
+        preview: null,
+        ...failure(action),
+        failedRequest: 'preview',
+      };
     case 'RESOLUTIONS_CHANGED':
       return { ...state, resolutions: action.resolutions };
     case 'NEXT':
       return state.step === 'resolve' ? { ...state, step: 'confirm' } : state;
     case 'CONFIRM_OK': {
-      const results = withResult(state, { name: action.cocktail.name, success: true, id: action.cocktail.id });
+      const results = withResult(state, {
+        name: action.cocktail.name,
+        success: true,
+        id: action.cocktail.id,
+      });
       return isBatch(state) ? advance(state, results) : { ...state, results, step: 'success' };
     }
     case 'CONFIRM_FAILED':
@@ -139,7 +175,11 @@ export function importCocktailReducer(state: CocktailImportState, action: Cockta
     case 'RETRY':
       if (state.step !== 'error') return state;
       // A failed confirmation keeps the preview and the admin's choices
-      return { ...state, step: state.failedRequest === 'confirm' ? 'resolve' : 'previewing', ...NO_ERROR };
+      return {
+        ...state,
+        step: state.failedRequest === 'confirm' ? 'resolve' : 'previewing',
+        ...NO_ERROR,
+      };
     case 'SKIP':
       return advance(state, withResult(state, failedResult(state)));
     case 'BACK': {

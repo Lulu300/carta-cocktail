@@ -49,10 +49,20 @@ export interface ImportReferences {
 }
 
 // A category named by a bottle; a category line of the recipe describes it better
-function addBottleCategory(refs: ImportReferences, name: string, type: string, nameTranslations?: Translations): void {
+function addBottleCategory(
+  refs: ImportReferences,
+  name: string,
+  type: string,
+  nameTranslations?: Translations,
+): void {
   const key = lowercase(name);
   if (refs.categories.has(key)) return;
-  refs.categories.set(key, { name, type, desiredStock: 1, ...(nameTranslations !== undefined && { nameTranslations }) });
+  refs.categories.set(key, {
+    name,
+    type,
+    desiredStock: 1,
+    ...(nameTranslations !== undefined && { nameTranslations }),
+  });
 }
 
 function addSource(refs: ImportReferences, line: ImportedLine): void {
@@ -65,7 +75,12 @@ function addSource(refs: ImportReferences, line: ImportedLine): void {
       categoryType: detail?.categoryType || 'SPIRIT',
     });
     if (detail?.categoryName) {
-      addBottleCategory(refs, detail.categoryName, detail.categoryType || 'SPIRIT', detail.categoryNameTranslations || null);
+      addBottleCategory(
+        refs,
+        detail.categoryName,
+        detail.categoryType || 'SPIRIT',
+        detail.categoryNameTranslations || null,
+      );
     }
   } else if (line.sourceType === 'CATEGORY') {
     refs.categories.set(key, {
@@ -98,10 +113,18 @@ function addPreferredBottles(refs: ImportReferences, line: ImportedLine): void {
 
 /** Lists the units, categories, bottles and ingredients the recipe lines name. */
 export function collectImportReferences(recipe: ImportedRecipe): ImportReferences {
-  const refs: ImportReferences = { units: new Map(), categories: new Map(), bottles: new Map(), ingredients: new Map() };
+  const refs: ImportReferences = {
+    units: new Map(),
+    categories: new Map(),
+    bottles: new Map(),
+    ingredients: new Map(),
+  };
   for (const line of recipe.ingredients ?? []) {
     if (line.unit) {
-      refs.units.set(lowercase(line.unit.abbreviation), { ...line.unit, nameTranslations: line.unit.nameTranslations || null });
+      refs.units.set(lowercase(line.unit.abbreviation), {
+        ...line.unit,
+        nameTranslations: line.unit.nameTranslations || null,
+      });
     }
     addSource(refs, line);
     addPreferredBottles(refs, line);

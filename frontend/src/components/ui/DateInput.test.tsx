@@ -16,10 +16,21 @@ async function changeLanguage(language: string) {
 }
 
 /** A form holding the ISO value, as BottleFormModal does, with a submit button. */
-function DateForm({ initialValue = '', onSubmit }: { initialValue?: string; onSubmit: (value: string) => void }) {
+function DateForm({
+  initialValue = '',
+  onSubmit,
+}: {
+  initialValue?: string;
+  onSubmit: (value: string) => void;
+}) {
   const [value, setValue] = useState(initialValue);
   return (
-    <form onSubmit={(event) => { event.preventDefault(); onSubmit(value); }}>
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit(value);
+      }}
+    >
       <DateInput label="Opened on" value={value} onChange={setValue} />
       <button type="submit">Save</button>
     </form>
@@ -87,25 +98,26 @@ describe('DateInput', () => {
     expect(onSubmit).toHaveBeenCalledWith('');
   });
 
-  it.each(['31/02/2024', 'abc'])('shows a translated error for %s and does not submit it', async (text) => {
-    const user = userEvent.setup();
-    const onSubmit = vi.fn();
-    const { container } = render(<DateForm initialValue="2024-12-03" onSubmit={onSubmit} />);
+  it.each(['31/02/2024', 'abc'])(
+    'shows a translated error for %s and does not submit it',
+    async (text) => {
+      const user = userEvent.setup();
+      const onSubmit = vi.fn();
+      const { container } = render(<DateForm initialValue="2024-12-03" onSubmit={onSubmit} />);
 
-    await user.clear(dateField());
-    await user.type(dateField(), text);
-    await user.click(screen.getByRole('button', { name: 'Save' }));
+      await user.clear(dateField());
+      await user.type(dateField(), text);
+      await user.click(screen.getByRole('button', { name: 'Save' }));
 
-    const error = 'Saisissez une date valide au format jj/mm/aaaa';
-    expect(onSubmit).not.toHaveBeenCalled();
-    expect(dateField()).toBeInvalid();
-    expect(dateField()).toHaveAttribute('aria-invalid', 'true');
-    expect(dateField()).toHaveAccessibleDescription(
-      `${'Format : jj/mm/aaaa'} ${error}`,
-    );
-    expect((dateField() as HTMLInputElement).validationMessage).toBe(error);
-    expect(await axe(container)).toHaveNoViolations();
-  });
+      const error = 'Saisissez une date valide au format jj/mm/aaaa';
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(dateField()).toBeInvalid();
+      expect(dateField()).toHaveAttribute('aria-invalid', 'true');
+      expect(dateField()).toHaveAccessibleDescription(`${'Format : jj/mm/aaaa'} ${error}`);
+      expect((dateField() as HTMLInputElement).validationMessage).toBe(error);
+      expect(await axe(container)).toHaveNoViolations();
+    },
+  );
 
   it('shows the error when Enter submits an invalid date, without leaving the field', async () => {
     const user = userEvent.setup();
@@ -124,14 +136,18 @@ describe('DateInput', () => {
     render(<DateForm onSubmit={vi.fn()} />);
 
     await user.type(dateField(), '03/1');
-    expect(screen.queryByText('Saisissez une date valide au format jj/mm/aaaa')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Saisissez une date valide au format jj/mm/aaaa'),
+    ).not.toBeInTheDocument();
 
     await user.tab();
     expect(screen.getByText('Saisissez une date valide au format jj/mm/aaaa')).toBeInTheDocument();
 
     await user.click(dateField());
     await user.type(dateField(), '2/2024');
-    expect(screen.queryByText('Saisissez une date valide au format jj/mm/aaaa')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Saisissez une date valide au format jj/mm/aaaa'),
+    ).not.toBeInTheDocument();
   });
 
   it('shows and reads a date day first in English (UK)', async () => {
@@ -176,7 +192,9 @@ describe('DateInput', () => {
 
   it('shows a value replaced by the form', () => {
     const onChange = vi.fn();
-    const { rerender } = render(<DateInput label="Opened on" value="2024-12-03" onChange={onChange} />);
+    const { rerender } = render(
+      <DateInput label="Opened on" value="2024-12-03" onChange={onChange} />,
+    );
     fireEvent.change(dateField(), { target: { value: '3/12/2024' } });
     expect(dateField()).toHaveValue('3/12/2024');
 

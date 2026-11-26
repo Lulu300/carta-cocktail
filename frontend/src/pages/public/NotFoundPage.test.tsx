@@ -13,7 +13,11 @@ beforeEach(() => {
 
 describe('NotFoundPage', () => {
   it('tells the page does not exist, titles the tab and links to the home page', async () => {
-    const { container } = render(<AppProviders><NotFoundPage /></AppProviders>);
+    const { container } = render(
+      <AppProviders>
+        <NotFoundPage />
+      </AppProviders>,
+    );
 
     // The title comes after the site settings: waiting for it leaves no update pending
     await waitFor(() => expect(document.title).toBe('Page not found · Chez Lulu'));

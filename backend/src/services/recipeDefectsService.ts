@@ -3,7 +3,12 @@ import type { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { BadRequestError } from '../errors';
 import {
-  IngredientLine, IngredientLineUpdate, missingSourceKeyMessage, SOURCE_KEYS, SourceKey, SourceType,
+  IngredientLine,
+  IngredientLineUpdate,
+  missingSourceKeyMessage,
+  SOURCE_KEYS,
+  SourceKey,
+  SourceType,
 } from '../validation/cocktails';
 import { toValidationIssue, ValidationIssue } from '../validation/validate';
 
@@ -21,7 +26,10 @@ import { toValidationIssue, ValidationIssue } from '../validation/validate';
  */
 
 type RequestLine = z.output<typeof IngredientLineUpdate>;
-type StoredLine = Pick<CocktailIngredient, 'sourceType' | 'bottleId' | 'categoryId' | 'ingredientId' | 'quantity'>;
+type StoredLine = Pick<
+  CocktailIngredient,
+  'sourceType' | 'bottleId' | 'categoryId' | 'ingredientId' | 'quantity'
+>;
 
 /** A missing source key (one kind per source type) or a quantity of 0. */
 type Defect = SourceKey | 'quantity';
@@ -53,7 +61,8 @@ function countDefects(lines: StoredLine[]): Map<Defect, number> {
 // Used only if the strict schema stops reporting a defect under its own key: the
 // defect is still refused (fail closed) rather than silently accepted.
 function fallbackIssue(line: RequestLine, index: number, defect: Defect): ValidationIssue {
-  const message = defect === 'quantity' ? 'Must be greater than 0' : missingSourceKeyMessage(line.sourceType);
+  const message =
+    defect === 'quantity' ? 'Must be greater than 0' : missingSourceKeyMessage(line.sourceType);
   return { path: ['body', 'ingredients', index, defect].join('.'), code: 'custom', message };
 }
 
@@ -70,7 +79,10 @@ function strictIssues(line: RequestLine, index: number, defect: Defect): Validat
  * Lists the defects of the request lines that the stored recipe does not already have.
  * The first defective lines of each kind, in request order, use up the stored ones.
  */
-export function findNewRecipeDefects(lines: RequestLine[], storedLines: StoredLine[]): ValidationIssue[] {
+export function findNewRecipeDefects(
+  lines: RequestLine[],
+  storedLines: StoredLine[],
+): ValidationIssue[] {
   const allowed = countDefects(storedLines);
   const issues: ValidationIssue[] = [];
   lines.forEach((line, index) => {
@@ -87,11 +99,20 @@ export function findNewRecipeDefects(lines: RequestLine[], storedLines: StoredLi
 }
 
 /** Throws the 400 of the `validate` middleware when the update adds a recipe defect. */
-export async function refuseNewRecipeDefects(cocktailId: number, lines: RequestLine[]): Promise<void> {
+export async function refuseNewRecipeDefects(
+  cocktailId: number,
+  lines: RequestLine[],
+): Promise<void> {
   if (!lines.some((line) => defectsOf(line).length > 0)) return;
   const storedLines = await prisma.cocktailIngredient.findMany({
     where: { cocktailId },
-    select: { sourceType: true, bottleId: true, categoryId: true, ingredientId: true, quantity: true },
+    select: {
+      sourceType: true,
+      bottleId: true,
+      categoryId: true,
+      ingredientId: true,
+      quantity: true,
+    },
   });
   const issues = findNewRecipeDefects(lines, storedLines);
   if (issues.length > 0) throw new BadRequestError('errors.validationError', issues);

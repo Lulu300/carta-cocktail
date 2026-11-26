@@ -41,7 +41,8 @@ export interface ImportBottleRecord {
   quantity: number;
 }
 
-export type ImportRowErrorCode = 'required' | 'outOfRange' | 'invalidDate' | 'invalidNumber' | 'malformedQuotes';
+export type ImportRowErrorCode =
+  'required' | 'outOfRange' | 'invalidDate' | 'invalidNumber' | 'malformedQuotes';
 
 /** The list a row belongs to: a JSON file or a ZIP archive holds both. */
 export type ImportRowSource = 'bottles' | 'categories';
@@ -208,7 +209,8 @@ class CsvReader {
     const line = this.line;
     const cells: string[] = [];
     for (;;) {
-      const cell = this.text[this.position] === QUOTE ? this.readQuotedCell() : this.readPlainCell();
+      const cell =
+        this.text[this.position] === QUOTE ? this.readQuotedCell() : this.readPlainCell();
       if (cell === null) return { line, cells, malformedCell: cells.length };
       cells.push(cell);
       if (this.text[this.position] !== this.separator) break;
@@ -266,7 +268,8 @@ class CsvReader {
   private restartAfterLineOf(position: number, line: number): void {
     this.position = position;
     this.line = line;
-    while (this.position < this.text.length && !isLineBreak(this.text[this.position])) this.position++;
+    while (this.position < this.text.length && !isLineBreak(this.text[this.position]))
+      this.position++;
     this.skipLineBreak();
   }
 
@@ -312,7 +315,12 @@ function detectSeparator(headerLine: string): string {
   return countOutsideQuotes(headerLine, ';') > countOutsideQuotes(headerLine, ',') ? ';' : ',';
 }
 
-function malformedRowError(line: number, cell: number, headers: string[], source: ImportRowSource): ImportRowError {
+function malformedRowError(
+  line: number,
+  cell: number,
+  headers: string[],
+  source: ImportRowSource,
+): ImportRowError {
   const field = headers[cell] ?? '';
   const error: ImportRowError = { source, line, field, code: 'malformedQuotes' };
   return field ? error : { ...error, column: cell + 1 };
@@ -322,11 +330,18 @@ function malformedRowError(line: number, cell: number, headers: string[], source
  * Rows keyed by column name. Rows whose cells are all blank (left by spreadsheets) are dropped;
  * rows with malformed quotes are listed in `errors`.
  */
-function readCsvRows(csv: string, source: ImportRowSource): { headers: string[]; rows: NumberedRow[]; errors: ImportRowError[] } {
+function readCsvRows(
+  csv: string,
+  source: ImportRowSource,
+): { headers: string[]; rows: NumberedRow[]; errors: ImportRowError[] } {
   const text = stripBom(csv);
-  const [header, ...records] = new CsvReader(text, detectSeparator(firstNonBlankLine(text))).readAll();
+  const [header, ...records] = new CsvReader(
+    text,
+    detectSeparator(firstNonBlankLine(text)),
+  ).readAll();
   if (header === undefined) return { headers: [], rows: [], errors: [] };
-  if (header.malformedCell !== undefined) throw new ImportParseError('malformedHeader', { file: `${source}.csv` });
+  if (header.malformedCell !== undefined)
+    throw new ImportParseError('malformedHeader', { file: `${source}.csv` });
 
   const headers = header.cells.map((cell) => cell.trim());
   const rows: NumberedRow[] = [];
@@ -339,7 +354,9 @@ function readCsvRows(csv: string, source: ImportRowSource): { headers: string[];
     const cells = record.cells.map((cell) => unprotectFormula(cell.trim()));
     if (cells.every((cell) => cell === '')) continue;
     const values: RawRow = {};
-    headers.forEach((column, index) => { values[column] = cells[index] ?? ''; });
+    headers.forEach((column, index) => {
+      values[column] = cells[index] ?? '';
+    });
     rows.push({ line: record.line, values });
   }
   return { headers, rows, errors };
@@ -393,7 +410,9 @@ function toNumber(value: unknown, unit?: ColumnUnit): number | null {
   const withoutUnit = stripUnit(trimmed, unit);
   // A unit alone is not a number (Number('') would read it as 0)
   if (withoutUnit === '') return NaN;
-  const text = SPACE_GROUPED_THOUSANDS.test(withoutUnit) ? withoutUnit.replace(/\s/gu, '') : withoutUnit;
+  const text = SPACE_GROUPED_THOUSANDS.test(withoutUnit)
+    ? withoutUnit.replace(/\s/gu, '')
+    : withoutUnit;
   // Excel in a French locale writes decimals with a comma
   return Number(DECIMAL_COMMA.test(text) ? text.replace(',', '.') : text);
 }
@@ -527,7 +546,10 @@ interface ReadRow {
  * A bottle row. `categoryType` is the type of its category, used when no list and no earlier
  * row gives that category (see `withRowCategories`).
  */
-function readBottle(row: NumberedRow, language: string): ReadRow & { bottle: ImportBottleRecord; categoryType: string } {
+function readBottle(
+  row: NumberedRow,
+  language: string,
+): ReadRow & { bottle: ImportBottleRecord; categoryType: string } {
   const reader = new RowReader(row, 'bottles');
   const bottle: ImportBottleRecord = {
     name: reader.requiredText('name'),
@@ -589,7 +611,8 @@ function readBottles(rows: NumberedRow[], report: RowReport, language: string): 
   const kept: KeptBottle[] = [];
   for (const row of rows) {
     const read = readBottle(row, language);
-    if (reportRow(read, report)) kept.push({ bottle: read.bottle, categoryType: read.categoryType });
+    if (reportRow(read, report))
+      kept.push({ bottle: read.bottle, categoryType: read.categoryType });
   }
   if (totalQuantity(kept.map(({ bottle }) => bottle)) > MAX_IMPORT_BOTTLES) {
     throw new ImportParseError('tooManyBottles', { max: MAX_IMPORT_BOTTLES });
@@ -643,7 +666,10 @@ export function parseCsvBottles(csv: string, language: string): NormalizedImport
  * The preview matches every category the rows need, so a name several existing categories
  * hold ignoring case is flagged before the confirmation refuses it.
  */
-function withRowCategories(listed: ImportCategoryRecord[], kept: KeptBottle[]): ImportCategoryRecord[] {
+function withRowCategories(
+  listed: ImportCategoryRecord[],
+  kept: KeptBottle[],
+): ImportCategoryRecord[] {
   const known = new Set(listed.map((category) => category.name.toLowerCase()));
   const named: ImportCategoryRecord[] = [];
   for (const { bottle, categoryType } of kept) {
@@ -673,7 +699,10 @@ export function parseJsonBottles(json: unknown, language: string): NormalizedImp
   if (!Array.isArray(json.bottles)) throw new ImportParseError('bottlesRequired');
 
   const report: RowReport = { errors: [], warnings: [] };
-  const listed = readCategories(numberJsonRows(Array.isArray(json.categories) ? json.categories : []), report);
+  const listed = readCategories(
+    numberJsonRows(Array.isArray(json.categories) ? json.categories : []),
+    report,
+  );
   const kept = readBottles(numberJsonRows(json.bottles), report, language);
   // A hand-made file may leave out of its list a category its rows name, as a CSV always does
   return {
@@ -718,7 +747,7 @@ export function parseZipBottles(buffer: Buffer, language: string): NormalizedImp
   const entries = readZipEntries(buffer).filter((entry) => !entry.isDirectory);
 
   const bottlesEntry = entries.find(
-    (e) => e.entryName === 'bottles.csv' || e.entryName === 'bottles.json'
+    (e) => e.entryName === 'bottles.csv' || e.entryName === 'bottles.json',
   );
   if (!bottlesEntry) throw new ImportParseError('zipMissingBottles');
 
@@ -729,7 +758,10 @@ export function parseZipBottles(buffer: Buffer, language: string): NormalizedImp
 
   const categoriesEntry = entries.find((e) => e.entryName === 'categories.csv');
   if (categoriesEntry) {
-    const explicitCategories = parseCategoriesCsv(decodeCsvBytes(readZipEntryBytes(categoriesEntry)), payload);
+    const explicitCategories = parseCategoriesCsv(
+      decodeCsvBytes(readZipEntryBytes(categoriesEntry)),
+      payload,
+    );
     const merged = new Map<string, ImportCategoryRecord>();
     for (const c of payload.categories) merged.set(c.name.toLowerCase(), c);
     for (const c of explicitCategories) merged.set(c.name.toLowerCase(), c);
@@ -739,7 +771,11 @@ export function parseZipBottles(buffer: Buffer, language: string): NormalizedImp
   return payload;
 }
 
-export function parseImportFile(filename: string, buffer: Buffer, language: string): NormalizedImportPayload {
+export function parseImportFile(
+  filename: string,
+  buffer: Buffer,
+  language: string,
+): NormalizedImportPayload {
   const lower = filename.toLowerCase();
   if (lower.endsWith('.zip')) {
     return parseZipBottles(buffer, language);

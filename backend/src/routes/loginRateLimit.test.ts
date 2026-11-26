@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
-  setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData, request,
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+  request,
 } from '../test/helpers';
 
 // Read by config.ts when the app is imported: hoisted above the imports. Each
@@ -9,9 +13,16 @@ vi.hoisted(() => {
   process.env.LOGIN_RATE_LIMIT = '3';
 });
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
-beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
+beforeEach(async () => {
+  await cleanDatabase();
+  await seedRequiredData();
+});
 
 const GOOD_PASSWORD = 'testpass123';
 
@@ -25,7 +36,8 @@ const OUTER_PROXY_IP = '172.18.0.5';
  * client addresses and starts with empty counters.
  */
 function loginWithForwardedFor(forwardedFor: string, password: string) {
-  return request.post('/api/auth/login')
+  return request
+    .post('/api/auth/login')
     .set('X-Forwarded-For', forwardedFor)
     .send({ email: 'admin@test.local', password });
 }
@@ -44,7 +56,9 @@ describe('Login rate limit (LOGIN_RATE_LIMIT=3)', () => {
     const blocked = await loginFrom('203.0.113.1', 'wrong').set('Accept-Language', 'fr');
     expect(blocked.status).toBe(429);
     expect(blocked.headers['content-type']).toMatch(/application\/json/);
-    expect(blocked.body.error).toBe('Trop de tentatives de connexion échouées : réessayez dans quelques minutes');
+    expect(blocked.body.error).toBe(
+      'Trop de tentatives de connexion échouées : réessayez dans quelques minutes',
+    );
     expect(blocked.headers['retry-after']).toBeDefined();
 
     // Even the right password waits for the window to end
@@ -82,9 +96,14 @@ describe('Login rate limit (LOGIN_RATE_LIMIT=3)', () => {
     for (let attempt = 0; attempt < 4; attempt++) {
       await loginWithForwardedFor(`198.51.100.1, ${OUTER_PROXY_IP}`, 'wrong');
     }
-    expect((await loginWithForwardedFor(`198.51.100.1, ${OUTER_PROXY_IP}`, 'wrong')).status).toBe(429);
+    expect((await loginWithForwardedFor(`198.51.100.1, ${OUTER_PROXY_IP}`, 'wrong')).status).toBe(
+      429,
+    );
 
-    const otherClient = await loginWithForwardedFor(`198.51.100.2, ${OUTER_PROXY_IP}`, GOOD_PASSWORD);
+    const otherClient = await loginWithForwardedFor(
+      `198.51.100.2, ${OUTER_PROXY_IP}`,
+      GOOD_PASSWORD,
+    );
     expect(otherClient.status).toBe(200);
   });
 

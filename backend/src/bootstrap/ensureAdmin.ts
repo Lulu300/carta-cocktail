@@ -31,7 +31,9 @@ function readAdminPassword(env: NodeJS.ProcessEnv): string {
   return password;
 }
 
-async function credentialsFromEnv(env: NodeJS.ProcessEnv): Promise<{ email: string; passwordHash: string }> {
+async function credentialsFromEnv(
+  env: NodeJS.ProcessEnv,
+): Promise<{ email: string; passwordHash: string }> {
   const password = readAdminPassword(env);
   return {
     email: env.ADMIN_EMAIL || DEFAULT_ADMIN_EMAIL,
@@ -63,8 +65,8 @@ async function warnIfDefaultPassword(passwordHash: string): Promise<void> {
   if (await bcrypt.compare(FORBIDDEN_ADMIN_PASSWORD, passwordHash)) {
     console.warn(
       `WARNING: the admin password is still the old default '${FORBIDDEN_ADMIN_PASSWORD}'. ` +
-      'Change it in Settings > Admin Profile, or set ADMIN_RESET_PASSWORD=true with a new ADMIN_PASSWORD ' +
-      'for one restart, then remove the flag.',
+        'Change it in Settings > Admin Profile, or set ADMIN_RESET_PASSWORD=true with a new ADMIN_PASSWORD ' +
+        'for one restart, then remove the flag.',
     );
   }
 }

@@ -1,10 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createTestQueryClient, render, screen, waitFor, fireEvent, within } from '../../test/test-utils';
+import {
+  createTestQueryClient,
+  render,
+  screen,
+  waitFor,
+  fireEvent,
+  within,
+} from '../../test/test-utils';
 import { qk } from '../../queries/keys';
 import userEvent from '@testing-library/user-event';
 import ImportBottlesWizard from './ImportBottlesWizard';
 import { buildCategory, buildCategoryType } from '../../test/factories';
-import { captureRequest, mockApiError, mockApiResponse, mockValidationError } from '../../test/msw/utils';
+import {
+  captureRequest,
+  mockApiError,
+  mockApiResponse,
+  mockValidationError,
+} from '../../test/msw/utils';
 // The validation messages of a refused import are admin messages, as in the app
 import '../../i18n/admin';
 import type { BottleImportConfirmResponse, BottleImportPreviewResponse } from '../../types';
@@ -33,7 +45,13 @@ const samplePreview: BottleImportPreviewResponse = {
   },
   categories: [
     {
-      ref: { name: 'Rhum', type: 'SPIRIT', desiredStock: 1, minimumPercent: 30, nameTranslations: null },
+      ref: {
+        name: 'Rhum',
+        type: 'SPIRIT',
+        desiredStock: 1,
+        minimumPercent: 30,
+        nameTranslations: null,
+      },
       existingMatch: null,
       status: 'missing',
     },
@@ -60,7 +78,11 @@ const samplePreview: BottleImportPreviewResponse = {
   errors: [],
 };
 
-const importDone: BottleImportConfirmResponse = { created: { bottles: 2 }, duplicatesCreated: 0, skippedNoCategory: 0 };
+const importDone: BottleImportConfirmResponse = {
+  created: { bottles: 2 },
+  duplicatesCreated: 0,
+  skippedNoCategory: 0,
+};
 
 function mockPreview(preview: BottleImportPreviewResponse) {
   mockApiResponse('post', '/api/bottles/import/preview', preview);
@@ -96,7 +118,9 @@ describe('ImportBottlesWizard', () => {
     const categoriesRead = captureRequest('get', '/api/categories');
     render(<ImportBottlesWizard onClose={() => undefined} />);
     expect(screen.getByText('Import bottles')).toBeInTheDocument();
-    expect(screen.getByText('Drop a CSV, JSON, or ZIP file here, or click to browse')).toBeInTheDocument();
+    expect(
+      screen.getByText('Drop a CSV, JSON, or ZIP file here, or click to browse'),
+    ).toBeInTheDocument();
     // The lists of the resolve step load in the background
     await waitFor(() => expect(categoriesRead.count()).toBe(1));
   });
@@ -108,7 +132,9 @@ describe('ImportBottlesWizard', () => {
     // fireEvent.change bypasses the input's `accept` attribute filter that
     // userEvent.upload honors, letting us assert the wizard's own validation.
     fireEvent.change(input, { target: { files: [file] } });
-    expect(await screen.findByText('Unsupported file format. Use .csv, .json, or .zip')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Unsupported file format. Use .csv, .json, or .zip'),
+    ).toBeInTheDocument();
   });
 
   describe('file size', () => {
@@ -142,7 +168,9 @@ describe('ImportBottlesWizard', () => {
 
       await user.upload(fileInput(), fileOfSize(BACKEND_LIMIT + 1));
 
-      expect(await screen.findByRole('alert')).toHaveTextContent('The file or request is too large');
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'The file or request is too large',
+      );
       expect(screen.queryByText('Next')).not.toBeInTheDocument();
       expect(preview.count()).toBe(0);
     });
@@ -177,7 +205,9 @@ describe('ImportBottlesWizard', () => {
     const append = vi.spyOn(FormData.prototype, 'append');
     render(<ImportBottlesWizard onClose={() => undefined} />);
 
-    const file = new File(['\uFEFFname;capacityMl\nHavana;700'], 'bottles-2026-10-12.csv', { type: 'text/csv' });
+    const file = new File(['\uFEFFname;capacityMl\nHavana;700'], 'bottles-2026-10-12.csv', {
+      type: 'text/csv',
+    });
     await user.upload(fileInput(), file);
     await user.click(screen.getByText('Next'));
 
@@ -206,9 +236,19 @@ describe('ImportBottlesWizard', () => {
   it('flags bottles missing a category with categoryRequired warning', async () => {
     const user = userEvent.setup();
     mockPreview({
-      payload: { version: 1, categories: [], bottles: [{ ...samplePreview.payload.bottles[0]!, categoryName: '' }] },
+      payload: {
+        version: 1,
+        categories: [],
+        bottles: [{ ...samplePreview.payload.bottles[0]!, categoryName: '' }],
+      },
       categories: [],
-      bottles: [{ ref: { ...samplePreview.bottles[0]!.ref, categoryName: '' }, needsCategory: true, potentialDuplicates: [] }],
+      bottles: [
+        {
+          ref: { ...samplePreview.bottles[0]!.ref, categoryName: '' },
+          needsCategory: true,
+          potentialDuplicates: [],
+        },
+      ],
       errors: [],
     });
     render(<ImportBottlesWizard onClose={() => undefined} />);
@@ -224,12 +264,20 @@ describe('ImportBottlesWizard', () => {
     const user = userEvent.setup();
     mockPreview({
       ...samplePreview,
-      bottles: [{
-        ...samplePreview.bottles[0]!,
-        potentialDuplicates: [
-          { id: 99, name: 'Havana 7', capacityMl: 700, categoryName: 'Rhum', remainingPercent: 50 },
-        ],
-      }],
+      bottles: [
+        {
+          ...samplePreview.bottles[0]!,
+          potentialDuplicates: [
+            {
+              id: 99,
+              name: 'Havana 7',
+              capacityMl: 700,
+              categoryName: 'Rhum',
+              remainingPercent: 50,
+            },
+          ],
+        },
+      ],
     });
     render(<ImportBottlesWizard onClose={() => undefined} />);
     await user.upload(fileInput(), new File(['x'], 'bottles.json'));
@@ -336,7 +384,9 @@ describe('ImportBottlesWizard', () => {
     });
 
     const warnings = screen.getByRole('status');
-    expect(within(warnings).getByText('2 values to check, imported as they are')).toBeInTheDocument();
+    expect(
+      within(warnings).getByText('2 values to check, imported as they are'),
+    ).toBeInTheDocument();
     expect(within(warnings).getAllByText(/^.+ spans several lines$/)).toHaveLength(2);
     await user.click(screen.getAllByText('Next').at(-1)!);
     await user.click(screen.getByText('Confirm import'));
@@ -380,13 +430,17 @@ describe('ImportBottlesWizard', () => {
     expect(typeSelect).toHaveAttribute('aria-invalid', 'true');
     expect(typeSelect).toHaveAccessibleDescription('Choose or enter a type with a name.');
     expect(next).toBeDisabled();
-    expect(screen.getByText('1 category to create has no type with a name: choose another type.')).toBeInTheDocument();
+    expect(
+      screen.getByText('1 category to create has no type with a name: choose another type.'),
+    ).toBeInTheDocument();
 
     // An existing type made only of spaces is kept as picked, as the backend does
     await user.selectOptions(typeSelect, '   ');
     expect(typeSelect).not.toHaveAttribute('aria-invalid');
     expect(screen.queryByText('Choose or enter a type with a name.')).not.toBeInTheDocument();
-    expect(screen.queryByText('1 category to create has no type with a name: choose another type.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('1 category to create has no type with a name: choose another type.'),
+    ).not.toBeInTheDocument();
     await user.click(next);
     await user.click(screen.getByText('Confirm import'));
 
@@ -403,7 +457,12 @@ describe('ImportBottlesWizard', () => {
     render(<ImportBottlesWizard onClose={() => undefined} />);
     const user = await previewWith({
       ...samplePreview,
-      categories: [{ ...samplePreview.categories[0]!, ref: { ...samplePreview.categories[0]!.ref, type: invisibleType } }],
+      categories: [
+        {
+          ...samplePreview.categories[0]!,
+          ref: { ...samplePreview.categories[0]!.ref, type: invisibleType },
+        },
+      ],
     });
     const next = screen.getAllByText('Next').at(-1)!.closest('button')!;
     const typeSelect = screen.getByLabelText('Type');
@@ -411,11 +470,15 @@ describe('ImportBottlesWizard', () => {
 
     expect(typeSelect).toHaveValue(invisibleType);
     expect(typeSelect).toHaveAccessibleDescription('Choose or enter a type with a name.');
-    expect(screen.getByText('1 category to create has no type with a name: choose another type.')).toBeInTheDocument();
+    expect(
+      screen.getByText('1 category to create has no type with a name: choose another type.'),
+    ).toBeInTheDocument();
     expect(next).toBeDisabled();
 
     await user.selectOptions(typeSelect, 'SPIRIT');
-    expect(screen.queryByText('1 category to create has no type with a name: choose another type.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('1 category to create has no type with a name: choose another type.'),
+    ).not.toBeInTheDocument();
     expect(next).toBeEnabled();
   });
 
@@ -427,7 +490,12 @@ describe('ImportBottlesWizard', () => {
     render(<ImportBottlesWizard onClose={() => undefined} />, { queryClient });
     const user = await previewWith({
       ...samplePreview,
-      categories: [{ ...samplePreview.categories[0]!, ref: { ...samplePreview.categories[0]!.ref, type: invisibleType } }],
+      categories: [
+        {
+          ...samplePreview.categories[0]!,
+          ref: { ...samplePreview.categories[0]!.ref, type: invisibleType },
+        },
+      ],
     });
     await waitFor(() => expect(screen.getByLabelText('Type')).not.toHaveAttribute('aria-invalid'));
     await user.click(screen.getAllByText('Next').at(-1)!);
@@ -439,17 +507,29 @@ describe('ImportBottlesWizard', () => {
     await queryClient.invalidateQueries({ queryKey: qk.categoryTypes });
 
     await waitFor(() => expect(importButton).toBeDisabled());
-    expect(screen.getByText('1 category to create has no type with a name: choose another type.')).toBeInTheDocument();
+    expect(
+      screen.getByText('1 category to create has no type with a name: choose another type.'),
+    ).toBeInTheDocument();
   });
 
   it('maps a category to the existing match and offers the existing categories for each row', async () => {
     mockApiResponse('get', '/api/categories', [buildCategory({ id: 5, name: 'Rhum ambré' })]);
-    mockApiResponse('post', '/api/bottles/import/confirm', { created: { bottles: 2 }, duplicatesCreated: 1, skippedNoCategory: 1 });
+    mockApiResponse('post', '/api/bottles/import/confirm', {
+      created: { bottles: 2 },
+      duplicatesCreated: 1,
+      skippedNoCategory: 1,
+    });
     const confirmed = captureRequest('post', '/api/bottles/import/confirm');
     render(<ImportBottlesWizard onClose={() => undefined} />);
     const user = await previewWith({
       ...samplePreview,
-      categories: [{ ...samplePreview.categories[0]!, existingMatch: { id: 4, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 }, status: 'matched' }],
+      categories: [
+        {
+          ...samplePreview.categories[0]!,
+          existingMatch: { id: 4, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 },
+          status: 'matched',
+        },
+      ],
     });
 
     await user.click(screen.getByText('Create'));
@@ -457,16 +537,24 @@ describe('ImportBottlesWizard', () => {
     await user.click(screen.getByText('Use existing'));
     expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
 
-    await user.selectOptions(screen.getByLabelText('Category'), await screen.findByRole('option', { name: 'Rhum ambré' }));
+    await user.selectOptions(
+      screen.getByLabelText('Category'),
+      await screen.findByRole('option', { name: 'Rhum ambré' }),
+    );
     await user.click(screen.getAllByText('Next').at(-1)!);
     await user.click(screen.getByText('Confirm import'));
 
     await screen.findByText('2 bottles imported');
     expect(await confirmed.body).toEqual({
       payload: samplePreview.payload,
-      resolutions: { categories: { rhum: { action: 'use_existing', existingId: 4 } }, bottles: { 0: { action: 'import', categoryId: 5 } } },
+      resolutions: {
+        categories: { rhum: { action: 'use_existing', existingId: 4 } },
+        bottles: { 0: { action: 'import', categoryId: 5 } },
+      },
     });
-    expect(screen.getByText('1 duplicate added in addition to existing bottles')).toBeInTheDocument();
+    expect(
+      screen.getByText('1 duplicate added in addition to existing bottles'),
+    ).toBeInTheDocument();
     expect(screen.getByText('1 row skipped due to missing category')).toBeInTheDocument();
   });
 
@@ -475,10 +563,22 @@ describe('ImportBottlesWizard', () => {
     const user = await previewWith({
       ...samplePreview,
       bottles: [
-        { ref: { ...samplePreview.bottles[0]!.ref, categoryName: '' }, needsCategory: true, potentialDuplicates: [] },
+        {
+          ref: { ...samplePreview.bottles[0]!.ref, categoryName: '' },
+          needsCategory: true,
+          potentialDuplicates: [],
+        },
         {
           ...samplePreview.bottles[0]!,
-          potentialDuplicates: [{ id: 99, name: 'Havana 7', capacityMl: 700, categoryName: 'Rhum', remainingPercent: 50 }],
+          potentialDuplicates: [
+            {
+              id: 99,
+              name: 'Havana 7',
+              capacityMl: 700,
+              categoryName: 'Rhum',
+              remainingPercent: 50,
+            },
+          ],
         },
       ],
     });
@@ -492,11 +592,15 @@ describe('ImportBottlesWizard', () => {
 
     expect(screen.getByText('Import summary')).toBeInTheDocument();
     expect(screen.getByText('Potential duplicates detected')).toBeInTheDocument();
-    expect(screen.queryByText('1 bottle has no category. Go back and assign one, or skip it.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('1 bottle has no category. Go back and assign one, or skip it.'),
+    ).not.toBeInTheDocument();
 
     await user.click(screen.getByText('Back'));
     await user.click(screen.getByText('Back'));
-    expect(screen.getByText('Drop a CSV, JSON, or ZIP file here, or click to browse')).toBeInTheDocument();
+    expect(
+      screen.getByText('Drop a CSV, JSON, or ZIP file here, or click to browse'),
+    ).toBeInTheDocument();
   });
 
   it('shows the error screen when the confirmation fails, then closes', async () => {
@@ -538,13 +642,23 @@ describe('ImportBottlesWizard - categories equal ignoring case', () => {
   const ambiguousPreview: BottleImportPreviewResponse = {
     ...samplePreview,
     payload: { ...samplePreview.payload, categories: [fileCategory] },
-    categories: [{
-      ref: fileCategory,
-      existingMatch: null,
-      status: 'ambiguous',
-      ambiguousMatches: [{ id: 1, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 }, { id: 2, name: 'RHUM', type: 'SPIRIT', desiredStock: 1 }],
-    }],
-    bottles: [{ ...samplePreview.bottles[0]!, ref: { ...samplePreview.bottles[0]!.ref, categoryName: 'rhum' } }],
+    categories: [
+      {
+        ref: fileCategory,
+        existingMatch: null,
+        status: 'ambiguous',
+        ambiguousMatches: [
+          { id: 1, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 },
+          { id: 2, name: 'RHUM', type: 'SPIRIT', desiredStock: 1 },
+        ],
+      },
+    ],
+    bottles: [
+      {
+        ...samplePreview.bottles[0]!,
+        ref: { ...samplePreview.bottles[0]!.ref, categoryName: 'rhum' },
+      },
+    ],
   };
 
   beforeEach(() => {
@@ -561,8 +675,16 @@ describe('ImportBottlesWizard - categories equal ignoring case', () => {
     const user = await previewWith(ambiguousPreview);
 
     expect(screen.getByText('Several matches')).toBeInTheDocument();
-    expect(screen.getByText(/^Several existing ones differ only by case: .+\. Use one of them, or create it under another name\.$/)).toBeInTheDocument();
-    expect(screen.getByText('1 category matches several existing ones that differ only by case: use one of them, or create it under another name.')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /^Several existing ones differ only by case: .+\. Use one of them, or create it under another name\.$/,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        '1 category matches several existing ones that differ only by case: use one of them, or create it under another name.',
+      ),
+    ).toBeInTheDocument();
     expect(nextButton()).toBeDisabled();
     const matchSelect = screen.getByLabelText('Existing entry to use');
     expect(matchSelect).toHaveValue('');
@@ -571,13 +693,19 @@ describe('ImportBottlesWizard - categories equal ignoring case', () => {
     expect(screen.getByLabelText('Category')).toHaveValue('');
 
     await user.selectOptions(matchSelect, 'RHUM');
-    expect(screen.queryByText('1 category matches several existing ones that differ only by case: use one of them, or create it under another name.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        '1 category matches several existing ones that differ only by case: use one of them, or create it under another name.',
+      ),
+    ).not.toBeInTheDocument();
     expect(screen.getByLabelText('Category')).toHaveDisplayValue('RHUM');
     await user.click(nextButton());
     await user.click(screen.getByText('Confirm import'));
 
     await screen.findByText('2 bottles imported');
-    expect(await confirmed.body).toMatchObject({ resolutions: { categories: { rhum: { action: 'use_existing', existingId: 2 } } } });
+    expect(await confirmed.body).toMatchObject({
+      resolutions: { categories: { rhum: { action: 'use_existing', existingId: 2 } } },
+    });
   });
 
   // A row naming `Rhum` would go in `RHUM`, resolved for the file's `rhum`: the row sends the id (C-68)
@@ -588,18 +716,20 @@ describe('ImportBottlesWizard - categories equal ignoring case', () => {
     await user.selectOptions(screen.getByLabelText('Existing entry to use'), 'RHUM');
 
     const rowCategory = screen.getByLabelText('Category');
-    expect(within(rowCategory).getAllByRole('option').map((option) => option.textContent)).toEqual([
-      '— Pick a category —',
-      'Rhum',
-      'RHUM',
-    ]);
+    expect(
+      within(rowCategory)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['— Pick a category —', 'Rhum', 'RHUM']);
     await user.selectOptions(rowCategory, 'Rhum');
     expect(rowCategory).toHaveDisplayValue('Rhum');
     await user.click(nextButton());
     await user.click(screen.getByText('Confirm import'));
 
     await screen.findByText('2 bottles imported');
-    expect(await confirmed.body).toMatchObject({ resolutions: { bottles: { 0: { action: 'import', categoryId: 1 } } } });
+    expect(await confirmed.body).toMatchObject({
+      resolutions: { bottles: { 0: { action: 'import', categoryId: 1 } } },
+    });
   });
 
   it('creates it only under a name the matches do not hold', async () => {
@@ -610,8 +740,14 @@ describe('ImportBottlesWizard - categories equal ignoring case', () => {
     await user.click(screen.getByText('Create'));
     const name = screen.getByLabelText('Name');
     expect(name).toHaveAttribute('aria-invalid', 'true');
-    expect(name).toHaveAccessibleDescription(/^Matches .+, which differ only by case: use one of them, or change this value\.$/);
-    expect(screen.getByText('1 category matches several existing ones that differ only by case: use one of them, or create it under another name.')).toBeInTheDocument();
+    expect(name).toHaveAccessibleDescription(
+      /^Matches .+, which differ only by case: use one of them, or change this value\.$/,
+    );
+    expect(
+      screen.getByText(
+        '1 category matches several existing ones that differ only by case: use one of them, or create it under another name.',
+      ),
+    ).toBeInTheDocument();
     expect(nextButton()).toBeDisabled();
 
     // Back to "use existing": still no match picked
@@ -637,13 +773,25 @@ describe('ImportBottlesWizard - categories equal ignoring case', () => {
     render(<ImportBottlesWizard onClose={() => undefined} />);
     const user = await previewWith({
       ...ambiguousPreview,
-      categories: [{ ref: fileCategory, existingMatch: { id: 1, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 }, status: 'matched' }],
+      categories: [
+        {
+          ref: fileCategory,
+          existingMatch: { id: 1, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 },
+          status: 'matched',
+        },
+      ],
     });
 
     await user.click(screen.getByText('Create'));
     const name = screen.getByLabelText('Name');
-    expect(await screen.findByText(/^Already exists as ".+": it will be used as it is, and the other fields are ignored\.$/)).toBeInTheDocument();
-    expect(name).toHaveAccessibleDescription(/^Already exists as ".+": it will be used as it is, and the other fields are ignored\.$/);
+    expect(
+      await screen.findByText(
+        /^Already exists as ".+": it will be used as it is, and the other fields are ignored\.$/,
+      ),
+    ).toBeInTheDocument();
+    expect(name).toHaveAccessibleDescription(
+      /^Already exists as ".+": it will be used as it is, and the other fields are ignored\.$/,
+    );
     expect(name).not.toHaveAttribute('aria-invalid');
 
     await user.click(nextButton());
@@ -655,7 +803,13 @@ describe('ImportBottlesWizard - categories equal ignoring case', () => {
     render(<ImportBottlesWizard onClose={() => undefined} />);
     const user = await previewWith({
       ...ambiguousPreview,
-      categories: [{ ref: fileCategory, existingMatch: { id: 1, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 }, status: 'matched' }],
+      categories: [
+        {
+          ref: fileCategory,
+          existingMatch: { id: 1, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 },
+          status: 'matched',
+        },
+      ],
     });
     const rowCategory = screen.getByLabelText('Category');
     // The row sends the file's `rhum`, which the confirmation puts in `Rhum`
@@ -664,18 +818,20 @@ describe('ImportBottlesWizard - categories equal ignoring case', () => {
     // Created under the name of the file, the category is the existing one: nothing to create
     await user.click(screen.getByText('Create'));
     expect(rowCategory).toHaveDisplayValue('Rhum');
-    expect(within(rowCategory).queryByRole('option', { name: /will be created/ })).not.toBeInTheDocument();
+    expect(
+      within(rowCategory).queryByRole('option', { name: /will be created/ }),
+    ).not.toBeInTheDocument();
 
     // Renamed, it is created, and the row goes in it
     const name = screen.getByLabelText('Name');
     await user.clear(name);
     await user.type(name, 'Rhum agricole');
     expect(rowCategory).toHaveDisplayValue('Rhum agricole (will be created)');
-    expect(within(rowCategory).getAllByRole('option').map((option) => option.textContent)).toEqual([
-      '— Pick a category —',
-      'Rhum',
-      'Rhum agricole (will be created)',
-    ]);
+    expect(
+      within(rowCategory)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['— Pick a category —', 'Rhum', 'Rhum agricole (will be created)']);
   });
 
   it('puts a row in the existing category of the name the file category is created away from', async () => {
@@ -684,7 +840,13 @@ describe('ImportBottlesWizard - categories equal ignoring case', () => {
     render(<ImportBottlesWizard onClose={() => undefined} />);
     const user = await previewWith({
       ...ambiguousPreview,
-      categories: [{ ref: fileCategory, existingMatch: { id: 1, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 }, status: 'matched' }],
+      categories: [
+        {
+          ref: fileCategory,
+          existingMatch: { id: 1, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 },
+          status: 'matched',
+        },
+      ],
       bottles: [ambiguousPreview.bottles[0]!, ambiguousPreview.bottles[0]!],
     });
     await user.click(screen.getByText('Create'));
@@ -701,7 +863,12 @@ describe('ImportBottlesWizard - categories equal ignoring case', () => {
 
     await screen.findByText('2 bottles imported');
     expect(await confirmed.body).toMatchObject({
-      resolutions: { bottles: { 0: { action: 'import', categoryId: 1 }, 1: { action: 'import', categoryName: 'rhum' } } },
+      resolutions: {
+        bottles: {
+          0: { action: 'import', categoryId: 1 },
+          1: { action: 'import', categoryName: 'rhum' },
+        },
+      },
     });
   });
 
@@ -714,10 +881,23 @@ describe('ImportBottlesWizard - categories equal ignoring case', () => {
       ...ambiguousPreview,
       payload: { ...ambiguousPreview.payload, categories: [fileCategory, ginCategory] },
       categories: [
-        { ref: fileCategory, existingMatch: { id: 1, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 }, status: 'matched' },
-        { ref: ginCategory, existingMatch: { id: 3, name: 'Gin', type: 'SPIRIT', desiredStock: 1 }, status: 'matched' },
+        {
+          ref: fileCategory,
+          existingMatch: { id: 1, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 },
+          status: 'matched',
+        },
+        {
+          ref: ginCategory,
+          existingMatch: { id: 3, name: 'Gin', type: 'SPIRIT', desiredStock: 1 },
+          status: 'matched',
+        },
       ],
-      bottles: [{ ...ambiguousPreview.bottles[0]!, ref: { ...ambiguousPreview.bottles[0]!.ref, categoryName: 'gin' } }],
+      bottles: [
+        {
+          ...ambiguousPreview.bottles[0]!,
+          ref: { ...ambiguousPreview.bottles[0]!.ref, categoryName: 'gin' },
+        },
+      ],
     });
 
     const [createRhum, createGin] = screen.getAllByText('Create');

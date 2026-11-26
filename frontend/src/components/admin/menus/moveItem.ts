@@ -15,7 +15,10 @@ function isIndexOf(list: unknown[], index: number): boolean {
 }
 
 /** The items in the order of `ids`, each with its new position; an item missing from `ids` is left out. */
-export function orderByIds<T extends { id: number; position: number }>(items: T[], ids: number[]): T[] {
+export function orderByIds<T extends { id: number; position: number }>(
+  items: T[],
+  ids: number[],
+): T[] {
   return ids
     .flatMap((id) => items.filter((item) => item.id === id))
     .map((item, position) => ({ ...item, position }));

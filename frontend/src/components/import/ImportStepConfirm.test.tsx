@@ -8,9 +8,19 @@ import type { ImportReferenceLists } from './useImportReferenceLists';
 
 const preview: ImportPreviewResponse = {
   cocktail: { name: 'Daiquiri', description: 'Fresh and sour', tags: [], alreadyExists: false },
-  units: [{ ref: { name: 'Centilitre', abbreviation: 'cl' }, existingMatch: { id: 1, name: 'Centilitre' }, status: 'matched' }],
-  categories: [{ ref: { name: 'Rhum' }, existingMatch: { id: 10, name: 'Rhum' }, status: 'matched' }],
-  bottles: [{ ref: { name: 'Havana 3', categoryName: 'Rhum' }, existingMatch: null, status: 'missing' }],
+  units: [
+    {
+      ref: { name: 'Centilitre', abbreviation: 'cl' },
+      existingMatch: { id: 1, name: 'Centilitre' },
+      status: 'matched',
+    },
+  ],
+  categories: [
+    { ref: { name: 'Rhum' }, existingMatch: { id: 10, name: 'Rhum' }, status: 'matched' },
+  ],
+  bottles: [
+    { ref: { name: 'Havana 3', categoryName: 'Rhum' }, existingMatch: null, status: 'missing' },
+  ],
   ingredients: [{ ref: { name: 'Lime' }, existingMatch: null, status: 'missing' }],
 };
 
@@ -38,7 +48,16 @@ function resolutions() {
 
 function renderConfirm(props: Partial<Parameters<typeof ImportStepConfirm>[0]> = {}) {
   const handlers = { onBack: vi.fn(), onConfirm: vi.fn() };
-  render(<ImportStepConfirm preview={preview} resolutions={resolutions()} lists={lists} isLoading={false} {...handlers} {...props} />);
+  render(
+    <ImportStepConfirm
+      preview={preview}
+      resolutions={resolutions()}
+      lists={lists}
+      isLoading={false}
+      {...handlers}
+      {...props}
+    />,
+  );
   return handlers;
 }
 
@@ -55,7 +74,9 @@ describe('ImportStepConfirm', () => {
   it('falls back on the backend match while the lists are loading', () => {
     renderConfirm({ lists: { ...lists, units: [], categories: [] } });
 
-    expect(screen.getByText('Centilitre (cl)').closest('li')).toHaveTextContent('Centilitre (cl)→maps toCentilitre');
+    expect(screen.getByText('Centilitre (cl)').closest('li')).toHaveTextContent(
+      'Centilitre (cl)→maps toCentilitre',
+    );
     // Another entity than the match: its name is unknown until the lists arrive
     expect(screen.getByText('Rhum').closest('li')).toHaveTextContent('Rhum→maps to?');
   });

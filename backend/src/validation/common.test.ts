@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { IdParams, NullableDate, OptionalIntQuery, Percent, RequiredText, Translations } from './common';
+import {
+  IdParams,
+  NullableDate,
+  OptionalIntQuery,
+  Percent,
+  RequiredText,
+  Translations,
+} from './common';
 
 describe('IdParams', () => {
   it('coerces a numeric path segment', () => {
@@ -55,7 +62,9 @@ describe('Translations', () => {
 describe('NullableDate', () => {
   it('reads a date input value and a full ISO timestamp', () => {
     expect(NullableDate.parse('2026-10-11')).toEqual(new Date('2026-10-11'));
-    expect(NullableDate.parse('2026-10-11T08:30:00.000Z')).toEqual(new Date('2026-10-11T08:30:00.000Z'));
+    expect(NullableDate.parse('2026-10-11T08:30:00.000Z')).toEqual(
+      new Date('2026-10-11T08:30:00.000Z'),
+    );
   });
 
   it('turns null and an empty string into null', () => {

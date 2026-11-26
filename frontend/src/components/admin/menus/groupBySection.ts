@@ -17,7 +17,8 @@ export function groupBySection<T extends { menuSectionId: number | null }>(
   sections: MenuSection[],
 ): SectionGroup<T>[] {
   const sectionIds = new Set(sections.map((section) => section.id));
-  const isInSection = (item: T) => item.menuSectionId !== null && sectionIds.has(item.menuSectionId);
+  const isInSection = (item: T) =>
+    item.menuSectionId !== null && sectionIds.has(item.menuSectionId);
 
   return [
     { section: null, items: items.filter((item) => !isInSection(item)) },
@@ -32,6 +33,13 @@ export function groupBySection<T extends { menuSectionId: number | null }>(
  * Every item of the menu in display order, after moving one item inside the
  * group at `groupIndex`: the full new order that the server stores.
  */
-export function moveWithinGroup<T>(groups: SectionGroup<T>[], groupIndex: number, from: number, to: number): T[] {
-  return groups.flatMap((group, index) => (index === groupIndex ? moveItem(group.items, from, to) : group.items));
+export function moveWithinGroup<T>(
+  groups: SectionGroup<T>[],
+  groupIndex: number,
+  from: number,
+  to: number,
+): T[] {
+  return groups.flatMap((group, index) =>
+    index === groupIndex ? moveItem(group.items, from, to) : group.items,
+  );
 }

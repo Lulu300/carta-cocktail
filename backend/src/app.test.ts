@@ -6,14 +6,31 @@ import supertest from 'supertest';
 import app from './app';
 import { config } from './config';
 import {
-  setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
-  request, authHeader, seedUnit, seedCategory, seedBottle, seedIngredient, seedCocktailUsing, prisma,
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+  request,
+  authHeader,
+  seedUnit,
+  seedCategory,
+  seedBottle,
+  seedIngredient,
+  seedCocktailUsing,
+  prisma,
 } from './test/helpers';
 import { MAX_IMAGE_BYTES } from './services/cocktail/cocktailImage';
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
-beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
+beforeEach(async () => {
+  await cleanDatabase();
+  await seedRequiredData();
+});
 
 // Every error answer must be JSON with a string message and nothing internal.
 function expectJsonError(res: { headers: Record<string, string>; body: unknown }) {
@@ -56,7 +73,9 @@ describe('DELETE of a row still referenced', () => {
     expect(res.status).toBe(409);
     expectJsonError(res);
     expect(res.body.error).toBe('Cannot delete: this item is used by cocktail recipes');
-    expect(res.body.details.cocktails).toEqual([{ id: cocktail.id, name: 'Uses the unit', removedLines: 1 }]);
+    expect(res.body.details.cocktails).toEqual([
+      { id: cocktail.id, name: 'Uses the unit', removedLines: 1 },
+    ]);
     expect(await prisma.unit.findUnique({ where: { id: unit.id } })).not.toBeNull();
   });
 
@@ -73,30 +92,41 @@ describe('DELETE of a row still referenced', () => {
 
 describe('Request body errors', () => {
   it('answers 400 JSON for a malformed JSON body', async () => {
-    const res = await request.post('/api/units').set(authHeader())
-      .set('Content-Type', 'application/json').send('{');
+    const res = await request
+      .post('/api/units')
+      .set(authHeader())
+      .set('Content-Type', 'application/json')
+      .send('{');
     expect(res.status).toBe(400);
     expectJsonError(res);
     expect(res.body.error).toBe('The request body is not valid JSON');
   });
 
   it('translates the malformed JSON message from Accept-Language', async () => {
-    const res = await request.post('/api/units').set(authHeader())
+    const res = await request
+      .post('/api/units')
+      .set(authHeader())
       .set('Accept-Language', 'fr')
-      .set('Content-Type', 'application/json').send('{');
+      .set('Content-Type', 'application/json')
+      .send('{');
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('Le corps de la requête n’est pas un JSON valide');
   });
 
   it('keeps the 415 status of a body in an unsupported charset', async () => {
-    const res = await request.post('/api/units').set(authHeader())
-      .set('Content-Type', 'application/json; charset=latin1').send('{}');
+    const res = await request
+      .post('/api/units')
+      .set(authHeader())
+      .set('Content-Type', 'application/json; charset=latin1')
+      .send('{}');
     expect(res.status).toBe(415);
     expectJsonError(res);
   });
 
   it('answers 413 JSON for a JSON body over the parser limit', async () => {
-    const res = await request.post('/api/units').set(authHeader())
+    const res = await request
+      .post('/api/units')
+      .set(authHeader())
       .set('Content-Type', 'application/json')
       .send(JSON.stringify({ name: 'x'.repeat(200 * 1024) }));
     expect(res.status).toBe(413);
@@ -104,7 +134,9 @@ describe('Request body errors', () => {
   });
 
   it('answers 413 JSON for a bottle import confirmation over its own 5 MB limit', async () => {
-    const res = await request.post('/api/bottles/import/confirm').set(authHeader())
+    const res = await request
+      .post('/api/bottles/import/confirm')
+      .set(authHeader())
       .set('Content-Type', 'application/json')
       .send(JSON.stringify({ name: 'x'.repeat(5 * 1024 * 1024) }));
     expect(res.status).toBe(413);
@@ -115,7 +147,9 @@ describe('Request body errors', () => {
     const cocktail = await prisma.cocktail.create({ data: { name: 'Big Picture' } });
     const tooLarge = Buffer.alloc(MAX_IMAGE_BYTES + 1);
 
-    const res = await request.post(`/api/cocktails/${cocktail.id}/image`).set(authHeader())
+    const res = await request
+      .post(`/api/cocktails/${cocktail.id}/image`)
+      .set(authHeader())
       .attach('image', tooLarge, { filename: 'big.jpg', contentType: 'image/jpeg' });
 
     expect(res.status).toBe(413);
@@ -126,7 +160,9 @@ describe('Request body errors', () => {
   it('answers 400 JSON for an unexpected upload field', async () => {
     const cocktail = await prisma.cocktail.create({ data: { name: 'Wrong Field' } });
 
-    const res = await request.post(`/api/cocktails/${cocktail.id}/image`).set(authHeader())
+    const res = await request
+      .post(`/api/cocktails/${cocktail.id}/image`)
+      .set(authHeader())
       .attach('photo', Buffer.from('x'), { filename: 'a.jpg', contentType: 'image/jpeg' });
 
     expect(res.status).toBe(400);
@@ -162,7 +198,8 @@ describe('CORS', () => {
   });
 
   it('answers a preflight request without allowing the origin', async () => {
-    const res = await request.options('/api/auth/login')
+    const res = await request
+      .options('/api/auth/login')
       .set('Origin', 'https://evil.example')
       .set('Access-Control-Request-Method', 'POST');
     expect(res.headers['access-control-allow-origin']).toBeUndefined();
@@ -177,7 +214,9 @@ describe('Security headers', () => {
     fs.mkdirSync(config.uploadDir, { recursive: true });
     fs.writeFileSync(photoPath, Buffer.from('not really a png'));
   });
-  afterAll(() => { fs.rmSync(photoPath, { force: true }); });
+  afterAll(() => {
+    fs.rmSync(photoPath, { force: true });
+  });
 
   // The helmet headers that HSTS must not take down with it
   const HELMET_HEADERS = {
@@ -203,11 +242,14 @@ describe('Security headers', () => {
     expect(res.headers['strict-transport-security']).toBeUndefined();
   });
 
-  it.each(['/api/public/settings', `/uploads/${PHOTO_NAME}`])('%s keeps the other helmet headers', async (url) => {
-    const res = await request.get(url);
-    expect(res.headers).toEqual(expect.objectContaining(HELMET_HEADERS));
-    expect(res.headers['content-security-policy']).toContain("default-src 'self'");
-  });
+  it.each(['/api/public/settings', `/uploads/${PHOTO_NAME}`])(
+    '%s keeps the other helmet headers',
+    async (url) => {
+      const res = await request.get(url);
+      expect(res.headers).toEqual(expect.objectContaining(HELMET_HEADERS));
+      expect(res.headers['content-security-policy']).toContain("default-src 'self'");
+    },
+  );
 });
 
 describe('Request logs', () => {
@@ -229,7 +271,9 @@ describe('Request logs', () => {
   }
 
   it('are not written in tests', async () => {
-    expect(await stdoutDuringRequest(app, '/api/quiet-in-tests')).not.toContain('/api/quiet-in-tests');
+    expect(await stdoutDuringRequest(app, '/api/quiet-in-tests')).not.toContain(
+      '/api/quiet-in-tests',
+    );
   });
 
   it('are written outside tests', async () => {

@@ -38,7 +38,10 @@ function getDummyHash(): Promise<string> {
  * Checks a password against a stored hash. Without a hash (unknown user) it
  * still runs a full bcrypt comparison, then answers false.
  */
-export async function verifyPassword(password: string, passwordHash: string | undefined): Promise<boolean> {
+export async function verifyPassword(
+  password: string,
+  passwordHash: string | undefined,
+): Promise<boolean> {
   if (passwordHash === undefined) {
     await bcrypt.compare(password, await getDummyHash());
     return false;

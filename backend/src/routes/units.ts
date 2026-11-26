@@ -14,7 +14,11 @@ const router = Router();
 
 async function assertAbbreviationIsFree(abbreviation: string, ownId?: number) {
   const units = await prisma.unit.findMany({ select: { id: true, abbreviation: true } });
-  assertUniqueIgnoringCase(units.map((u) => ({ id: u.id, value: u.abbreviation })), abbreviation, ownId);
+  assertUniqueIgnoringCase(
+    units.map((u) => ({ id: u.id, value: u.abbreviation })),
+    abbreviation,
+    ownId,
+  );
 }
 
 router.get('/', async (_req: AuthRequest, res: Response) => {
@@ -32,7 +36,8 @@ router.get('/:id', validate(idRequest), async (_req: AuthRequest, res: Response)
 const createSchemas = { body: UnitCreate };
 
 router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Response) => {
-  const { name, abbreviation, conversionFactorToMl, nameTranslations } = valid<typeof createSchemas>(res).body;
+  const { name, abbreviation, conversionFactorToMl, nameTranslations } =
+    valid<typeof createSchemas>(res).body;
   await assertAbbreviationIsFree(abbreviation);
   const unit = await prisma.unit.create({
     data: {
@@ -48,7 +53,10 @@ router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Respons
 const updateSchemas = { params: IdParams, body: UnitUpdate };
 
 router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Response) => {
-  const { params: { id }, body } = valid<typeof updateSchemas>(res);
+  const {
+    params: { id },
+    body,
+  } = valid<typeof updateSchemas>(res);
   const { name, abbreviation, conversionFactorToMl, nameTranslations } = body;
   const stored = await prisma.unit.findUnique({ where: { id } });
   if (!stored) throw new NotFoundError();
@@ -60,9 +68,12 @@ router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Respo
     where: { id },
     data: {
       name: name === undefined ? undefined : nameToStore(name, stored.name),
-      abbreviation: abbreviation === undefined ? undefined : nameToStore(abbreviation, stored.abbreviation),
+      abbreviation:
+        abbreviation === undefined ? undefined : nameToStore(abbreviation, stored.abbreviation),
       conversionFactorToMl,
-      nameTranslations: serializeTranslations(translationsToStore(nameTranslations, stored.nameTranslations)),
+      nameTranslations: serializeTranslations(
+        translationsToStore(nameTranslations, stored.nameTranslations),
+      ),
     },
   });
   res.json(parseNameTranslations(unit));

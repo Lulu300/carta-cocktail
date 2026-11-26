@@ -2,14 +2,32 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData, prisma } from '../test/helpers';
 import {
-  checkUploads, formatUploadsWarnings, isOnMount, parseMountPoints, reportUploadsCheck, UploadsCheckResult,
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+  prisma,
+} from '../test/helpers';
+import {
+  checkUploads,
+  formatUploadsWarnings,
+  isOnMount,
+  parseMountPoints,
+  reportUploadsCheck,
+  UploadsCheckResult,
 } from './uploadsCheck';
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
-beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
+beforeEach(async () => {
+  await cleanDatabase();
+  await seedRequiredData();
+});
 
 // Shortened /proc/self/mountinfo lines of a backend container
 function mountInfoLine(mountPoint: string): string {
@@ -23,7 +41,10 @@ let mountInfoPath: string;
 let dockerMarker: string;
 
 function writeMountInfo(...mountPoints: string[]): void {
-  fs.writeFileSync(mountInfoPath, [OVERLAY_ROOT, ...mountPoints.map(mountInfoLine)].join('\n') + '\n');
+  fs.writeFileSync(
+    mountInfoPath,
+    [OVERLAY_ROOT, ...mountPoints.map(mountInfoLine)].join('\n') + '\n',
+  );
 }
 
 function markAsContainer(): void {
@@ -65,7 +86,9 @@ describe('isOnMount', () => {
   });
 
   it('ignores the root file system and mounts beside the folder', () => {
-    expect(isOnMount('/app/uploads', ['/', '/uploads', '/app/data', '/app/uploads-old'])).toBe(false);
+    expect(isOnMount('/app/uploads', ['/', '/uploads', '/app/data', '/app/uploads-old'])).toBe(
+      false,
+    );
   });
 });
 
@@ -77,7 +100,11 @@ describe('checkUploads', () => {
     const result = await checkUploads(prisma, options());
 
     expect(result).toEqual({
-      uploadDir, inContainer: true, onMount: false, referencedPhotos: 0, missingPhotos: 0,
+      uploadDir,
+      inContainer: true,
+      onMount: false,
+      referencedPhotos: 0,
+      missingPhotos: 0,
     });
   });
 
@@ -133,7 +160,11 @@ describe('checkUploads', () => {
 
 describe('formatUploadsWarnings', () => {
   const healthy: UploadsCheckResult = {
-    uploadDir: '/app/uploads', inContainer: true, onMount: true, referencedPhotos: 42, missingPhotos: 0,
+    uploadDir: '/app/uploads',
+    inContainer: true,
+    onMount: true,
+    referencedPhotos: 42,
+    missingPhotos: 0,
   };
 
   it('returns nothing when everything is fine', () => {
@@ -150,7 +181,9 @@ describe('formatUploadsWarnings', () => {
 
     expect(warning).toContain('/app/uploads is not a mounted volume or host folder');
     // Mounting the folder recreates the container: the photos inside must be copied out first
-    expect(warning).toContain('Before recreating it, copy them out with `docker cp <backend container>:/app/uploads/. ./uploads-rescue/`');
+    expect(warning).toContain(
+      'Before recreating it, copy them out with `docker cp <backend container>:/app/uploads/. ./uploads-rescue/`',
+    );
     expect(warning).toContain('UPGRADING.md#v160');
   });
 
@@ -207,18 +240,27 @@ describe('reportUploadsCheck', () => {
   it('logs only the first line of a multi-line error message', async () => {
     const logger = { warn: vi.fn() };
     const failingDb = {
-      cocktail: { findMany: () => Promise.reject(new Error('\nInvalid invocation in\n/app/dist/services/uploadsCheck.js:80:1\n')) },
+      cocktail: {
+        findMany: () =>
+          Promise.reject(
+            new Error('\nInvalid invocation in\n/app/dist/services/uploadsCheck.js:80:1\n'),
+          ),
+      },
     } as unknown as Parameters<typeof reportUploadsCheck>[0];
 
     await reportUploadsCheck(failingDb, options(), logger);
 
-    expect(logger.warn).toHaveBeenCalledWith(`[uploads] Startup check of ${uploadDir} skipped: Invalid invocation in`);
+    expect(logger.warn).toHaveBeenCalledWith(
+      `[uploads] Startup check of ${uploadDir} skipped: Invalid invocation in`,
+    );
   });
 
   it('logs the error code of a Prisma error instead of its message', async () => {
     const logger = { warn: vi.fn() };
     // The cocktail table does not exist in a database that was never migrated
-    const missingTable = await prisma.$queryRawUnsafe('SELECT * FROM "NoSuchTable"').catch((error: unknown) => error);
+    const missingTable = await prisma
+      .$queryRawUnsafe('SELECT * FROM "NoSuchTable"')
+      .catch((error: unknown) => error);
     const failingDb = {
       cocktail: { findMany: () => Promise.reject(missingTable) },
     } as unknown as Parameters<typeof reportUploadsCheck>[0];
@@ -238,6 +280,8 @@ describe('reportUploadsCheck', () => {
     const result = await reportUploadsCheck(failingDb, options(), logger);
 
     expect(result).toBeNull();
-    expect(logger.warn).toHaveBeenCalledWith(`[uploads] Startup check of ${uploadDir} skipped: database is locked`);
+    expect(logger.warn).toHaveBeenCalledWith(
+      `[uploads] Startup check of ${uploadDir} skipped: database is locked`,
+    );
   });
 });

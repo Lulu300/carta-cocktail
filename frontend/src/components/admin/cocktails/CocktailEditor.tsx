@@ -4,7 +4,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { Cocktail, CocktailAvailability, CocktailInput } from '../../../types';
-import { useCreateCocktail, useSetCocktailData, useUpdateCocktail, useUploadCocktailImage } from '../../../queries/cocktails';
+import {
+  useCreateCocktail,
+  useSetCocktailData,
+  useUpdateCocktail,
+  useUploadCocktailImage,
+} from '../../../queries/cocktails';
 import Button from '../../ui/Button';
 import Card from '../../ui/Card';
 import Field from '../../ui/Field';
@@ -58,7 +63,12 @@ export default function CocktailEditor({ cocktail, availability, lists }: Cockta
     values,
     resetOptions: { keepDirtyValues: true },
   });
-  const { control, register, handleSubmit, formState: { errors, isSubmitting } } = form;
+  const {
+    control,
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = form;
   const tags = useWatch({ control, name: 'tags' });
 
   /**
@@ -76,7 +86,9 @@ export default function CocktailEditor({ cocktail, availability, lists }: Cockta
   const saveRecipe = async (data: CocktailInput) => {
     let saved: Cocktail;
     try {
-      saved = cocktail ? await update.mutateAsync({ id: cocktail.id, data }) : await create.mutateAsync(data);
+      saved = cocktail
+        ? await update.mutateAsync({ id: cocktail.id, data })
+        : await create.mutateAsync(data);
     } catch {
       return;
     }
@@ -125,7 +137,11 @@ export default function CocktailEditor({ cocktail, availability, lists }: Cockta
               control={control}
               name="isAvailable"
               render={({ field }) => (
-                <ToggleSwitch checked={field.value} onChange={field.onChange} label={t('cocktails.available')} />
+                <ToggleSwitch
+                  checked={field.value}
+                  onChange={field.onChange}
+                  label={t('cocktails.available')}
+                />
               )}
             />
           </Card>
@@ -135,8 +151,12 @@ export default function CocktailEditor({ cocktail, availability, lists }: Cockta
           <InstructionsFields />
 
           <div className="flex justify-end gap-3">
-            <Button variant="ghost" onClick={() => navigate(LIST_PATH)}>{t('common.cancel')}</Button>
-            <Button type="submit" loading={isSubmitting}>{t('common.save')}</Button>
+            <Button variant="ghost" onClick={() => navigate(LIST_PATH)}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="submit" loading={isSubmitting}>
+              {t('common.save')}
+            </Button>
           </div>
         </form>
       </FormProvider>

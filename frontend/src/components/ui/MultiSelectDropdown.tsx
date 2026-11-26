@@ -23,18 +23,20 @@ interface MultiSelectDropdownProps {
  * A disclosure, not a listbox: the panel holds real form controls.
  */
 export default function MultiSelectDropdown({
-  options, selected, onChange, placeholder, className = '',
+  options,
+  selected,
+  onChange,
+  placeholder,
+  className = '',
 }: MultiSelectDropdownProps) {
   const { t } = useTranslation();
   const [filterText, setFilterText] = useState('');
-  const { isOpen, panelId, containerRef, handleKeyDown, triggerProps } = useDisclosure(useCallback(() => setFilterText(''), []));
+  const { isOpen, panelId, containerRef, handleKeyDown, triggerProps } = useDisclosure(
+    useCallback(() => setFilterText(''), []),
+  );
 
   const toggle = (value: string) => {
-    onChange(
-      selected.includes(value)
-        ? selected.filter((v) => v !== value)
-        : [...selected, value]
-    );
+    onChange(selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value]);
   };
 
   const visibleOptions = options.filter(
@@ -58,7 +60,10 @@ export default function MultiSelectDropdown({
         )}
         <Icon
           name="chevron-down"
-          className={cx('size-4 text-fg-muted transition-transform motion-reduce:transition-none', isOpen && 'rotate-180')}
+          className={cx(
+            'size-4 text-fg-muted transition-transform motion-reduce:transition-none',
+            isOpen && 'rotate-180',
+          )}
         />
       </button>
 
@@ -67,8 +72,10 @@ export default function MultiSelectDropdown({
           {selected.map((val) => {
             const label = options.find((o) => o.value === val)?.label ?? val;
             return (
-              <span key={val}
-                className="inline-flex items-center gap-1 bg-accent/10 text-accent text-xs pl-2 rounded-full">
+              <span
+                key={val}
+                className="inline-flex items-center gap-1 bg-accent/10 text-accent text-xs pl-2 rounded-full"
+              >
                 {label}
                 <button
                   type="button"
@@ -104,8 +111,10 @@ export default function MultiSelectDropdown({
           </div>
           <div className="overflow-y-auto max-h-56 py-1">
             {visibleOptions.map((opt) => (
-              <label key={opt.value}
-                className="flex items-center gap-2 px-3 py-2 hover:bg-line/50 cursor-pointer text-sm">
+              <label
+                key={opt.value}
+                className="flex items-center gap-2 px-3 py-2 hover:bg-line/50 cursor-pointer text-sm"
+              >
                 <input
                   type="checkbox"
                   checked={selected.includes(opt.value)}

@@ -18,7 +18,10 @@ export function readDeletionImpact(error: unknown): DeletionImpact | null {
 }
 
 function listNames(t: TFunction, items: { name: string }[]): string {
-  const listed = items.slice(0, MAX_LISTED_NAMES).map((item) => item.name).join(', ');
+  const listed = items
+    .slice(0, MAX_LISTED_NAMES)
+    .map((item) => item.name)
+    .join(', ');
   const hidden = items.length - MAX_LISTED_NAMES;
   return hidden > 0 ? `${listed} ${t('deletion.more', { count: hidden })}` : listed;
 }
@@ -34,8 +37,10 @@ export function describeMutationError(error: unknown, t: TFunction, inUseHint?: 
   if (!impact) return error;
 
   const parts = [(error as Error).message];
-  if (impact.cocktails.length > 0) parts.push(t('deletion.usedByCocktails', { names: listNames(t, impact.cocktails) }));
-  if (impact.bottles.length > 0) parts.push(t('deletion.usedByBottles', { names: listNames(t, impact.bottles) }));
+  if (impact.cocktails.length > 0)
+    parts.push(t('deletion.usedByCocktails', { names: listNames(t, impact.cocktails) }));
+  if (impact.bottles.length > 0)
+    parts.push(t('deletion.usedByBottles', { names: listNames(t, impact.bottles) }));
   if (inUseHint) parts.push(inUseHint);
   return new Error(parts.join(' '));
 }

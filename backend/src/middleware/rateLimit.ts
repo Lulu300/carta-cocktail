@@ -26,7 +26,10 @@ const IPV6_SUBNET = 64;
  * enough for a single instance.
  */
 export function createRateLimiter({
-  windowMs, limit, messageKey, skipSuccessfulRequests = false,
+  windowMs,
+  limit,
+  messageKey,
+  skipSuccessfulRequests = false,
 }: RateLimiterOptions): RequestHandler {
   const store = new MemoryStore();
   stores.push(store);

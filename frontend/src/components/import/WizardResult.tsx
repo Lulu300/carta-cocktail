@@ -25,10 +25,18 @@ const VARIANT_TITLE_CLASSES: Record<ResultVariant, string> = {
 };
 
 /** Last screen of an import wizard: outcome, details and what to do next. */
-export default function WizardResult({ variant, title, message, children, actions }: WizardResultProps) {
+export default function WizardResult({
+  variant,
+  title,
+  message,
+  children,
+  actions,
+}: WizardResultProps) {
   return (
     <div className="text-center py-6 space-y-4" role={variant === 'error' ? 'alert' : 'status'}>
-      <div aria-hidden="true" className="text-5xl">{VARIANT_ICONS[variant]}</div>
+      <div aria-hidden="true" className="text-5xl">
+        {VARIANT_ICONS[variant]}
+      </div>
       <p className={cx('text-lg font-semibold', VARIANT_TITLE_CLASSES[variant])}>{title}</p>
       {message && <p className="text-sm text-fg-muted">{message}</p>}
       {children}

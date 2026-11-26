@@ -16,17 +16,37 @@ const BUTTON_CLASSES = cx(
 );
 
 /** ▲ / ▼ buttons that move an item one place up or down. */
-export default function ReorderButtons({ onUp, onDown, disableUp, disableDown, label }: ReorderButtonsProps) {
+export default function ReorderButtons({
+  onUp,
+  onDown,
+  disableUp,
+  disableDown,
+  label,
+}: ReorderButtonsProps) {
   const { t } = useTranslation();
   const upLabel = t('menus.moveUp', { name: label });
   const downLabel = t('menus.moveDown', { name: label });
 
   return (
     <div className="flex flex-col gap-1">
-      <button type="button" onClick={onUp} disabled={disableUp} aria-label={upLabel} title={upLabel} className={BUTTON_CLASSES}>
+      <button
+        type="button"
+        onClick={onUp}
+        disabled={disableUp}
+        aria-label={upLabel}
+        title={upLabel}
+        className={BUTTON_CLASSES}
+      >
         ▲
       </button>
-      <button type="button" onClick={onDown} disabled={disableDown} aria-label={downLabel} title={downLabel} className={BUTTON_CLASSES}>
+      <button
+        type="button"
+        onClick={onDown}
+        disabled={disableDown}
+        aria-label={downLabel}
+        title={downLabel}
+        className={BUTTON_CLASSES}
+      >
         ▼
       </button>
     </div>

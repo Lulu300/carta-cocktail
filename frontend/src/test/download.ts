@@ -10,7 +10,9 @@ export function mockDownload(): string[] {
   const spies = [
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:download'),
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {}),
-    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function recordDownload(this: HTMLAnchorElement) {
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function recordDownload(
+      this: HTMLAnchorElement,
+    ) {
       fileNames.push(this.download);
     }),
   ];

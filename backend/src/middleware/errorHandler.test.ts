@@ -5,7 +5,12 @@ import multer from 'multer';
 import i18next from '../i18n';
 import { toHttpError, errorHandler } from './errorHandler';
 import {
-  HttpError, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError,
+  HttpError,
+  BadRequestError,
+  UnauthorizedError,
+  ForbiddenError,
+  NotFoundError,
+  ConflictError,
   PayloadTooLargeError,
 } from '../errors';
 
@@ -34,7 +39,9 @@ describe('error classes', () => {
   });
 
   it('keeps optional details', () => {
-    expect(new BadRequestError('errors.import.invalidZip', { code: 'invalidZip' }).details).toEqual({ code: 'invalidZip' });
+    expect(new BadRequestError('errors.import.invalidZip', { code: 'invalidZip' }).details).toEqual(
+      { code: 'invalidZip' },
+    );
     expect(new ConflictError('errors.cannotDelete', ['a']).details).toEqual(['a']);
   });
 });
@@ -59,7 +66,9 @@ describe('toHttpError', () => {
   });
 
   it('maps a Prisma validation error (such as a NaN id) to 400', () => {
-    const error = new Prisma.PrismaClientValidationError('Invalid value', { clientVersion: 'test' });
+    const error = new Prisma.PrismaClientValidationError('Invalid value', {
+      clientVersion: 'test',
+    });
     expect(toHttpError(error)).toMatchObject({ status: 400, i18nKey: 'errors.validationError' });
   });
 
@@ -74,17 +83,24 @@ describe('toHttpError', () => {
   });
 
   it('maps an invalid JSON body to 400', () => {
-    expect(toHttpError(bodyParserError('entity.parse.failed')))
-      .toMatchObject({ status: 400, i18nKey: 'errors.invalidJson' });
+    expect(toHttpError(bodyParserError('entity.parse.failed'))).toMatchObject({
+      status: 400,
+      i18nKey: 'errors.invalidJson',
+    });
   });
 
   it('maps a body over the parser limit to 413', () => {
-    expect(toHttpError(bodyParserError('entity.too.large')))
-      .toMatchObject({ status: 413, i18nKey: 'errors.fileTooLarge' });
+    expect(toHttpError(bodyParserError('entity.too.large'))).toMatchObject({
+      status: 413,
+      i18nKey: 'errors.fileTooLarge',
+    });
   });
 
   it('keeps the status of other exposed client errors', () => {
-    const error = Object.assign(bodyParserError('charset.unsupported'), { status: 415, expose: true });
+    const error = Object.assign(bodyParserError('charset.unsupported'), {
+      status: 415,
+      expose: true,
+    });
     expect(toHttpError(error)).toMatchObject({ status: 415, i18nKey: 'errors.validationError' });
   });
 
@@ -102,7 +118,9 @@ describe('toHttpError', () => {
 });
 
 describe('errorHandler', () => {
-  afterEach(() => { vi.restoreAllMocks(); });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   function mockResponse(headersSent = false) {
     const res = { headersSent, status: vi.fn(), json: vi.fn() };
@@ -123,8 +141,12 @@ describe('errorHandler', () => {
     const res = mockResponse();
     const next = vi.fn();
 
-    errorHandler(new BadRequestError('errors.import.invalidZip', { code: 'invalidZip' }),
-      req as unknown as Request, res as unknown as Response, next);
+    errorHandler(
+      new BadRequestError('errors.import.invalidZip', { code: 'invalidZip' }),
+      req as unknown as Request,
+      res as unknown as Response,
+      next,
+    );
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({
@@ -135,26 +157,44 @@ describe('errorHandler', () => {
   });
 
   it('fills the placeholders of the message with object details, in the request language', () => {
-    const tooManyRows = new BadRequestError('errors.import.tooManyRows', { code: 'tooManyRows', max: 2000 });
-    const zipEntryTooLarge = new BadRequestError('errors.import.zipEntryTooLarge', { code: 'zipEntryTooLarge', maxMb: 20 });
+    const tooManyRows = new BadRequestError('errors.import.tooManyRows', {
+      code: 'tooManyRows',
+      max: 2000,
+    });
+    const zipEntryTooLarge = new BadRequestError('errors.import.zipEntryTooLarge', {
+      code: 'zipEntryTooLarge',
+      maxMb: 20,
+    });
 
-    expect(sentError(tooManyRows, 'en')).toBe('The file has more than 2,000 rows: split it into several imports');
-    expect(sentError(tooManyRows, 'fr')).toBe('Le fichier a plus de 2 000 lignes : répartissez-le en plusieurs imports');
-    expect(sentError(zipEntryTooLarge, 'en')).toBe('A file of the ZIP archive is over 20 MB once uncompressed');
+    expect(sentError(tooManyRows, 'en')).toBe(
+      'The file has more than 2,000 rows: split it into several imports',
+    );
+    expect(sentError(tooManyRows, 'fr')).toBe(
+      'Le fichier a plus de 2 000 lignes : répartissez-le en plusieurs imports',
+    );
+    expect(sentError(zipEntryTooLarge, 'en')).toBe(
+      'A file of the ZIP archive is over 20 MB once uncompressed',
+    );
   });
 
   it('never lets a detail named like an i18next option change the message', () => {
     const error = new BadRequestError('errors.import.tooManyRows', { max: 5, lng: 'fr', count: 2 });
 
-    expect(sentError(error, 'en')).toBe('The file has more than 5 rows: split it into several imports');
+    expect(sentError(error, 'en')).toBe(
+      'The file has more than 5 rows: split it into several imports',
+    );
   });
 
   it('does not interpolate a list of details', () => {
     const t = vi.fn((key: string) => key);
     const req = { method: 'POST', t };
 
-    errorHandler(new BadRequestError('errors.validationError', [{ path: 'body.name' }]),
-      req as unknown as Request, mockResponse() as unknown as Response, vi.fn());
+    errorHandler(
+      new BadRequestError('errors.validationError', [{ path: 'body.name' }]),
+      req as unknown as Request,
+      mockResponse() as unknown as Response,
+      vi.fn(),
+    );
 
     expect(t).toHaveBeenCalledWith('errors.validationError', {});
   });
@@ -163,7 +203,12 @@ describe('errorHandler', () => {
     const req = { method: 'GET', t: (key: string) => key };
     const res = mockResponse();
 
-    errorHandler(new NotFoundError(), req as unknown as Request, res as unknown as Response, vi.fn());
+    errorHandler(
+      new NotFoundError(),
+      req as unknown as Request,
+      res as unknown as Response,
+      vi.fn(),
+    );
 
     expect(res.json).toHaveBeenCalledWith({ error: 'errors.notFound' });
   });
@@ -172,7 +217,12 @@ describe('errorHandler', () => {
     const req = { method: 'POST' };
     const res = mockResponse();
 
-    errorHandler(bodyParserError('entity.parse.failed'), req as unknown as Request, res as unknown as Response, vi.fn());
+    errorHandler(
+      bodyParserError('entity.parse.failed'),
+      req as unknown as Request,
+      res as unknown as Response,
+      vi.fn(),
+    );
 
     expect(res.json).toHaveBeenCalledWith({ error: 'The request body is not valid JSON' });
   });
@@ -194,7 +244,12 @@ describe('errorHandler', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     const req = { method: 'GET', t: (key: string) => key };
 
-    errorHandler(new NotFoundError(), req as unknown as Request, mockResponse() as unknown as Response, vi.fn());
+    errorHandler(
+      new NotFoundError(),
+      req as unknown as Request,
+      mockResponse() as unknown as Response,
+      vi.fn(),
+    );
 
     expect(consoleError).not.toHaveBeenCalled();
   });

@@ -7,7 +7,13 @@ function renderDialog(props: Partial<React.ComponentProps<typeof ConfirmDialog>>
   const onConfirm = vi.fn();
   const onCancel = vi.fn();
   const utils = render(
-    <ConfirmDialog open title="Delete the category?" onConfirm={onConfirm} onCancel={onCancel} {...props} />,
+    <ConfirmDialog
+      open
+      title="Delete the category?"
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+      {...props}
+    />,
   );
   return { onConfirm, onCancel, ...utils };
 }
@@ -54,11 +60,18 @@ describe('ConfirmDialog', () => {
   it('shows the details under the message', () => {
     renderDialog({
       message: 'Used by:',
-      details: <ul><li>Negroni</li><li>Americano</li></ul>,
+      details: (
+        <ul>
+          <li>Negroni</li>
+          <li>Americano</li>
+        </ul>
+      ),
     });
     const message = screen.getByText('Used by:');
     const details = screen.getByRole('list');
-    expect(message.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      message.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
   });
 

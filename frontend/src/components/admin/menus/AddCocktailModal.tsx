@@ -16,7 +16,12 @@ interface AddCocktailModalProps {
 }
 
 /** Lists the cocktails that are not in the menu yet; a click adds one. */
-export default function AddCocktailModal({ open, onClose, excludedIds, onAdd }: AddCocktailModalProps) {
+export default function AddCocktailModal({
+  open,
+  onClose,
+  excludedIds,
+  onAdd,
+}: AddCocktailModalProps) {
   const { t } = useTranslation();
 
   return (
@@ -27,15 +32,24 @@ export default function AddCocktailModal({ open, onClose, excludedIds, onAdd }: 
 }
 
 /** Mounted with the modal content: the cocktails load on the first opening only. */
-function CocktailChoices({ excludedIds, onAdd }: Pick<AddCocktailModalProps, 'excludedIds' | 'onAdd'>) {
+function CocktailChoices({
+  excludedIds,
+  onAdd,
+}: Pick<AddCocktailModalProps, 'excludedIds' | 'onAdd'>) {
   const { t } = useTranslation();
   const cocktailsQuery = useCocktails();
 
-  if (cocktailsQuery.isPending) return <div className="flex justify-center py-4"><Spinner /></div>;
+  if (cocktailsQuery.isPending)
+    return (
+      <div className="flex justify-center py-4">
+        <Spinner />
+      </div>
+    );
   if (cocktailsQuery.isError) return <LoadError onRetry={() => cocktailsQuery.refetch()} />;
 
   const choices = cocktailsQuery.data.filter((cocktail) => !excludedIds.includes(cocktail.id));
-  if (choices.length === 0) return <p className="text-center py-4 text-fg-muted">{t('common.noResults')}</p>;
+  if (choices.length === 0)
+    return <p className="text-center py-4 text-fg-muted">{t('common.noResults')}</p>;
 
   return (
     <ul className="max-h-64 overflow-y-auto space-y-2">
@@ -44,7 +58,10 @@ function CocktailChoices({ excludedIds, onAdd }: Pick<AddCocktailModalProps, 'ex
           <button
             type="button"
             onClick={() => onAdd(cocktail)}
-            className={cx('w-full text-left px-4 py-3 rounded-lg bg-canvas hover:bg-line flex items-center justify-between', focusRingClasses)}
+            className={cx(
+              'w-full text-left px-4 py-3 rounded-lg bg-canvas hover:bg-line flex items-center justify-between',
+              focusRingClasses,
+            )}
           >
             <span>{cocktail.name}</span>
             {!cocktail.isAvailable && <Badge tone="danger">{t('cocktails.unavailable')}</Badge>}

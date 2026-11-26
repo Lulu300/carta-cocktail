@@ -38,13 +38,18 @@ export function renderSharePage(preview: SharePreview): string {
     metaTag('name', 'twitter:card', imageUrl ? 'summary_large_image' : 'summary'),
   ];
   if (description) {
-    tags.push(metaTag('name', 'description', description), metaTag('property', 'og:description', description));
+    tags.push(
+      metaTag('name', 'description', description),
+      metaTag('property', 'og:description', description),
+    );
   }
   if (imageUrl) {
     tags.push(metaTag('property', 'og:image', imageUrl));
   }
   const link = `<a href="${escapeHtml(pageUrl)}">${escapeHtml(title)}</a>`;
-  const body = description ? `<h1>${link}</h1>\n<p>${escapeHtml(description)}</p>` : `<h1>${link}</h1>`;
+  const body = description
+    ? `<h1>${link}</h1>\n<p>${escapeHtml(description)}</p>`
+    : `<h1>${link}</h1>`;
 
   return [
     '<!doctype html>',

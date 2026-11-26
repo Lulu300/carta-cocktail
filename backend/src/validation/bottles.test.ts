@@ -10,8 +10,15 @@ function issuePaths(result: { success: boolean; error?: { issues: { path: Proper
 describe('BottleCreate', () => {
   it('accepts the fields the bottle form sends', () => {
     const body = {
-      ...validBottle, purchasePrice: null, remainingPercent: 100, openedAt: null,
-      alcoholPercentage: null, location: null, isApero: false, isDigestif: false, quantity: 3,
+      ...validBottle,
+      purchasePrice: null,
+      remainingPercent: 100,
+      openedAt: null,
+      alcoholPercentage: null,
+      location: null,
+      isApero: false,
+      isDigestif: false,
+      quantity: 3,
     };
     expect(BottleCreate.safeParse(body).success).toBe(true);
   });
@@ -36,7 +43,11 @@ describe('BottleCreate', () => {
   });
 
   it('requires a name, a category and a capacity', () => {
-    expect(issuePaths(BottleCreate.safeParse({})).sort()).toEqual(['capacityMl', 'categoryId', 'name']);
+    expect(issuePaths(BottleCreate.safeParse({})).sort()).toEqual([
+      'capacityMl',
+      'categoryId',
+      'name',
+    ]);
   });
 });
 

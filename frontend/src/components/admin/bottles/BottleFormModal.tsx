@@ -20,7 +20,12 @@ interface BottleFormModalProps {
   onSubmit: (data: BottleInput, duplicate: boolean) => void;
 }
 
-export default function BottleFormModal({ entityForm, categories, isSaving, onSubmit }: BottleFormModalProps) {
+export default function BottleFormModal({
+  entityForm,
+  categories,
+  isSaving,
+  onSubmit,
+}: BottleFormModalProps) {
   const { t } = useTranslation();
   const localize = useLocalizedName();
   const { categoryTypeLabel } = useCategoryTypeName();
@@ -32,7 +37,9 @@ export default function BottleFormModal({ entityForm, categories, isSaving, onSu
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    const data = editing ? toBottleInput(form) : { ...toBottleInput(form), quantity: form.quantity };
+    const data = editing
+      ? toBottleInput(form)
+      : { ...toBottleInput(form), quantity: form.quantity };
     onSubmit(data, submitIntent.current === 'duplicate');
   };
 
@@ -58,9 +65,14 @@ export default function BottleFormModal({ entityForm, categories, isSaving, onSu
           <Input value={form.name} onChange={(event) => setField('name', event.target.value)} />
         </Field>
         <Field label={t('bottles.category')}>
-          <Select value={form.categoryId} onChange={(event) => setField('categoryId', parseInt(event.target.value))}>
+          <Select
+            value={form.categoryId}
+            onChange={(event) => setField('categoryId', parseInt(event.target.value))}
+          >
             {categories.map((category) => (
-              <option key={category.id} value={category.id}>{categoryLabel(category)}</option>
+              <option key={category.id} value={category.id}>
+                {categoryLabel(category)}
+              </option>
             ))}
           </Select>
         </Field>
@@ -98,7 +110,11 @@ export default function BottleFormModal({ entityForm, categories, isSaving, onSu
             className="w-full accent-accent"
           />
         </div>
-        <DateInput label={t('bottles.openedAt')} value={form.openedAt} onChange={(value) => setField('openedAt', value)} />
+        <DateInput
+          label={t('bottles.openedAt')}
+          value={form.openedAt}
+          onChange={(value) => setField('openedAt', value)}
+        />
         <Field label={t('bottles.alcoholPercentage')}>
           <Input
             type="number"
@@ -141,7 +157,9 @@ export default function BottleFormModal({ entityForm, categories, isSaving, onSu
         {!editing && (
           <Field
             label={t('bottles.quantity')}
-            hint={form.quantity > 1 ? t('bottles.quantityHint', { count: form.quantity }) : undefined}
+            hint={
+              form.quantity > 1 ? t('bottles.quantityHint', { count: form.quantity }) : undefined
+            }
           >
             <Input
               type="number"
@@ -153,13 +171,17 @@ export default function BottleFormModal({ entityForm, categories, isSaving, onSu
           </Field>
         )}
         <div className="flex justify-end gap-3 pt-2">
-          <Button variant="ghost" onClick={entityForm.close}>{t('common.cancel')}</Button>
+          <Button variant="ghost" onClick={entityForm.close}>
+            {t('common.cancel')}
+          </Button>
           {!editing && (
             <Button variant="secondary" onClick={handleSaveAndDuplicate} disabled={isSaving}>
               {t('bottles.saveDuplicate')}
             </Button>
           )}
-          <Button type="submit" loading={isSaving}>{t('common.save')}</Button>
+          <Button type="submit" loading={isSaving}>
+            {t('common.save')}
+          </Button>
         </div>
       </form>
     </Modal>

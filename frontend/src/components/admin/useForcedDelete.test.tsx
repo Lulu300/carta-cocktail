@@ -11,7 +11,10 @@ import { useForcedDelete, useForcedDeleteCrudMutations } from './useForcedDelete
 
 const CATEGORY_PATH = '/api/categories/:id';
 const usedByRecipes: DeletionImpact = {
-  cocktails: [{ id: 4, name: 'Moscow Mule', removedLines: 1 }, { id: 5, name: 'Mojito', removedLines: 2 }],
+  cocktails: [
+    { id: 4, name: 'Moscow Mule', removedLines: 1 },
+    { id: 5, name: 'Mojito', removedLines: 2 },
+  ],
   bottles: [],
 };
 const holdsBottles: DeletionImpact = { cocktails: [], bottles: [{ id: 7, name: 'Absolut' }] };
@@ -67,11 +70,17 @@ describe('useForcedDelete', () => {
     await requestDeletion(user);
 
     const confirmation = await screen.findByRole('alertdialog', { name: 'Delete an item in use?' });
-    expect(confirmation).toHaveAccessibleDescription('These recipes will lose the matching lines and become incomplete. This action cannot be undone.');
+    expect(confirmation).toHaveAccessibleDescription(
+      'These recipes will lose the matching lines and become incomplete. This action cannot be undone.',
+    );
     expect(confirmation).toHaveTextContent('2 cocktails changed:');
     expect(confirmation).toHaveTextContent('Moscow Mule: 1 line removed');
     expect(confirmation).toHaveTextContent('Mojito: 2 lines removed');
-    expect(within(confirmation).getByRole('checkbox', { name: 'I understand that these recipes will be changed' })).not.toBeChecked();
+    expect(
+      within(confirmation).getByRole('checkbox', {
+        name: 'I understand that these recipes will be changed',
+      }),
+    ).not.toBeChecked();
     expect(within(confirmation).getByRole('button', { name: 'Cancel' })).toHaveFocus();
     expect(await axe(container)).toHaveNoViolations();
   });
@@ -99,12 +108,15 @@ describe('useForcedDelete', () => {
     await user.click(within(forcedConfirmation()).getByRole('checkbox'));
     await user.click(deleteAnywayButton());
 
-    expect(await screen.findByText(
-      'Category deleted: 2 cocktails changed.',
-    )).toBeInTheDocument();
+    expect(await screen.findByText('Category deleted: 2 cocktails changed.')).toBeInTheDocument();
     expect(requests.map((url) => url.search)).toEqual(['', '?force=true']);
     expect(refreshedKeys()).toEqual([
-      qk.categories, qk.cocktails, qk.availability, qk.shortages, qk.bottles, qk.menus,
+      qk.categories,
+      qk.cocktails,
+      qk.availability,
+      qk.shortages,
+      qk.bottles,
+      qk.menus,
     ]);
   });
 
@@ -116,20 +128,27 @@ describe('useForcedDelete', () => {
     await requestDeletion(user);
 
     const confirmation = await screen.findByRole('alertdialog');
-    expect(confirmation).toHaveAccessibleDescription('The bottles of this category will be deleted too. This action cannot be undone.');
+    expect(confirmation).toHaveAccessibleDescription(
+      'The bottles of this category will be deleted too. This action cannot be undone.',
+    );
     expect(confirmation).toHaveTextContent('1 bottle deleted:');
     expect(within(confirmation).getByRole('listitem')).toHaveTextContent('Absolut');
-    await user.click(within(confirmation).getByRole('checkbox', { name: 'I understand that these bottles will be deleted' }));
+    await user.click(
+      within(confirmation).getByRole('checkbox', {
+        name: 'I understand that these bottles will be deleted',
+      }),
+    );
     await user.click(deleteAnywayButton());
 
-    expect(await screen.findByText(
-      'Category deleted: 1 bottle deleted.',
-    )).toBeInTheDocument();
+    expect(await screen.findByText('Category deleted: 1 bottle deleted.')).toBeInTheDocument();
   });
 
   it('asks to accept both the changed recipes and the deleted bottles of a category', async () => {
     const user = userEvent.setup();
-    mockItemInUse(CATEGORY_PATH, { cocktails: usedByRecipes.cocktails, bottles: holdsBottles.bottles });
+    mockItemInUse(CATEGORY_PATH, {
+      cocktails: usedByRecipes.cocktails,
+      bottles: holdsBottles.bottles,
+    });
     renderButton();
 
     await requestDeletion(user);
@@ -138,12 +157,16 @@ describe('useForcedDelete', () => {
     expect(confirmation).toHaveAccessibleDescription(
       'These recipes will lose the matching lines and become incomplete. The bottles of this category will be deleted too. This action cannot be undone.',
     );
-    await user.click(within(confirmation).getByRole('checkbox', { name: 'I understand that these recipes will be changed and these bottles deleted' }));
+    await user.click(
+      within(confirmation).getByRole('checkbox', {
+        name: 'I understand that these recipes will be changed and these bottles deleted',
+      }),
+    );
     await user.click(deleteAnywayButton());
 
-    expect(await screen.findByText(
-      'Category deleted: 1 bottle deleted, 2 cocktails changed.',
-    )).toBeInTheDocument();
+    expect(
+      await screen.findByText('Category deleted: 1 bottle deleted, 2 cocktails changed.'),
+    ).toBeInTheDocument();
   });
 
   it('deletes nothing when cancelled and keeps the list in an error toast', async () => {
@@ -194,7 +217,11 @@ describe('useForcedDeleteCrudMutations', () => {
       key: qk.categories,
       api: categoriesApi,
       invalidates: [qk.availability],
-      messages: { created: 'categories.created', updated: 'categories.updated', deleted: 'categories.deleted' },
+      messages: {
+        created: 'categories.created',
+        updated: 'categories.updated',
+        deleted: 'categories.deleted',
+      },
     });
     return <button onClick={() => remove(3)}>delete-category</button>;
   }
@@ -208,6 +235,9 @@ describe('useForcedDeleteCrudMutations', () => {
     await requestDeletion(userEvent.setup());
 
     expect(await screen.findByText('Category deleted')).toBeInTheDocument();
-    expect(invalidate.mock.calls.map(([filters]) => filters?.queryKey)).toEqual([qk.categories, qk.availability]);
+    expect(invalidate.mock.calls.map(([filters]) => filters?.queryKey)).toEqual([
+      qk.categories,
+      qk.availability,
+    ]);
   });
 });

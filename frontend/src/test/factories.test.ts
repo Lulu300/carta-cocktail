@@ -44,7 +44,12 @@ describe('factories', () => {
   it('applies overrides and does not use up an id when one is given', () => {
     const bottle = buildBottle({ id: 42, name: 'Hendrick’s', remainingPercent: 30 });
 
-    expect(bottle).toMatchObject({ id: 42, name: 'Hendrick’s', remainingPercent: 30, capacityMl: 700 });
+    expect(bottle).toMatchObject({
+      id: 42,
+      name: 'Hendrick’s',
+      remainingPercent: 30,
+      capacityMl: 700,
+    });
     expect(buildBottle().id).toBe(1);
   });
 
@@ -67,8 +72,17 @@ describe('factories', () => {
     const negroni = buildMenuCocktail({ id: 4, cocktail: { name: 'Negroni' }, menuSectionId: 10 });
     const suze = buildMenuBottle({ id: 6, bottle: { name: 'Suze' } });
 
-    expect(negroni).toMatchObject({ id: 4, cocktailId: 4, menuSectionId: 10, cocktail: { id: 4, name: 'Negroni' } });
-    expect(suze).toMatchObject({ id: 6, bottleId: 6, bottle: { id: 6, name: 'Suze', isApero: true } });
+    expect(negroni).toMatchObject({
+      id: 4,
+      cocktailId: 4,
+      menuSectionId: 10,
+      cocktail: { id: 4, name: 'Negroni' },
+    });
+    expect(suze).toMatchObject({
+      id: 6,
+      bottleId: 6,
+      bottle: { id: 6, name: 'Suze', isApero: true },
+    });
     expect(buildMenuCocktail({ id: 4, cocktail: { id: 8 } }).cocktailId).toBe(8);
   });
 
@@ -79,8 +93,15 @@ describe('factories', () => {
   it('builds a recipe line on a free ingredient sharing its id', () => {
     const line = buildCocktailIngredient({ id: 3 });
 
-    expect(line).toMatchObject({ sourceType: 'INGREDIENT', ingredientId: 3, ingredient: { id: 3 }, position: 3 });
-    expect(buildCocktailIngredient({ sourceType: 'CATEGORY', ingredient: null }).ingredientId).toBeNull();
+    expect(line).toMatchObject({
+      sourceType: 'INGREDIENT',
+      ingredientId: 3,
+      ingredient: { id: 3 },
+      position: 3,
+    });
+    expect(
+      buildCocktailIngredient({ sourceType: 'CATEGORY', ingredient: null }).ingredientId,
+    ).toBeNull();
   });
 
   it('derives the menu slug from its name', () => {
@@ -93,7 +114,10 @@ describe('factories', () => {
     expect(buildCategoryType({ name: 'BITTER' }).name).toBe('BITTER');
     expect(buildCategoryType().name).toBe('SOFT');
     expect(buildShortage().totalPercent).toBeLessThan(buildShortage().requiredPercent);
-    expect(buildAvailability({ cocktailId: 3 })).toMatchObject({ cocktailId: 3, isAvailable: true });
+    expect(buildAvailability({ cocktailId: 3 })).toMatchObject({
+      cocktailId: 3,
+      isAvailable: true,
+    });
     expect(buildSiteSettings({ siteName: 'Bar' }).siteName).toBe('Bar');
   });
 

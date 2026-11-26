@@ -1,5 +1,14 @@
 export const CATEGORY_TYPE_COLORS = [
-  'blue', 'purple', 'green', 'red', 'orange', 'yellow', 'pink', 'teal', 'indigo', 'gray',
+  'blue',
+  'purple',
+  'green',
+  'red',
+  'orange',
+  'yellow',
+  'pink',
+  'teal',
+  'indigo',
+  'gray',
 ] as const;
 
 export type CategoryTypeColor = (typeof CATEGORY_TYPE_COLORS)[number];

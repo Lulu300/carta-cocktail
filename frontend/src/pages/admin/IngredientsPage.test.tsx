@@ -3,11 +3,24 @@ import userEvent from '@testing-library/user-event';
 import { fireEvent, screen, waitFor, within } from '../../test/test-utils';
 import { clearToasts, renderWithFeedback } from '../../test/feedback';
 import { buildIngredient } from '../../test/factories';
-import { captureRequest, mockApiError, mockApiPending, mockApiResponse, mockItemInUse, mockNetworkError } from '../../test/msw/utils';
+import {
+  captureRequest,
+  mockApiError,
+  mockApiPending,
+  mockApiResponse,
+  mockItemInUse,
+  mockNetworkError,
+} from '../../test/msw/utils';
 import IngredientsPage from './IngredientsPage';
 
 const lime = buildIngredient({ id: 1, name: 'Lime', icon: '🍋', isAvailable: true });
-const sugar = buildIngredient({ id: 2, name: 'Sugar', nameTranslations: { fr: 'Sucre', en: 'Sugar' }, icon: null, isAvailable: false });
+const sugar = buildIngredient({
+  id: 2,
+  name: 'Sugar',
+  nameTranslations: { fr: 'Sucre', en: 'Sugar' },
+  icon: null,
+  isAvailable: false,
+});
 
 function renderPage() {
   return renderWithFeedback(<IngredientsPage />);
@@ -147,7 +160,10 @@ describe('IngredientsPage', () => {
     expect(screen.getByRole('searchbox', { name: 'Search ingredients' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
     await user.click(screen.getByRole('button', { name: /Available/ }));
-    expect(screen.getByRole('button', { name: /Available/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /Available/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
     expect(await screen.findByText(/^\d+ results?$/)).toHaveAttribute('aria-live', 'polite');
   });
 
@@ -236,7 +252,9 @@ describe('IngredientsPage', () => {
     const deleted = captureRequest('delete', '/api/ingredients/:id');
 
     await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
-    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }),
+    );
 
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(deleted.count()).toBe(0);
@@ -257,22 +275,33 @@ describe('IngredientsPage', () => {
     await user.click(within(forced).getByRole('button', { name: 'Delete anyway' }));
 
     expect(await screen.findByText('Ingredient deleted: 1 cocktail changed.')).toBeInTheDocument();
-    expect(requests.map((url) => `${url.pathname}${url.search}`)).toEqual(['/api/ingredients/1', '/api/ingredients/1?force=true']);
+    expect(requests.map((url) => `${url.pathname}${url.search}`)).toEqual([
+      '/api/ingredients/1',
+      '/api/ingredients/1?force=true',
+    ]);
     await waitFor(() => expect(reloaded.count()).toBe(1));
   });
 
   it('shows the backend message when the forced deletion is cancelled', async () => {
     const user = userEvent.setup();
-    mockItemInUse('/api/ingredients/:id', {
-      cocktails: [{ id: 5, name: 'Mojito', removedLines: 1 }],
-      bottles: [],
-    }, 'This ingredient is used by cocktails');
+    mockItemInUse(
+      '/api/ingredients/:id',
+      {
+        cocktails: [{ id: 5, name: 'Mojito', removedLines: 1 }],
+        bottles: [],
+      },
+      'This ingredient is used by cocktails',
+    );
     await renderLoadedPage();
 
     await confirmDeletion(user);
-    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
+    await user.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Cancel' }),
+    );
 
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('This ingredient is used by cocktails'));
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('This ingredient is used by cocktails'),
+    );
   });
 
   it('collapses the translations block again when another ingredient is opened', async () => {

@@ -5,7 +5,10 @@ import { qk } from './keys';
 
 /** The required actions of the last upgrade, null when there are none to confirm. */
 export function useUpgradeNotice(): UseQueryResult<UpgradeNotice | null, Error> {
-  return useQuery({ queryKey: qk.upgradeNotice, queryFn: ({ signal }) => systemApi.getUpgradeNotice(signal) });
+  return useQuery({
+    queryKey: qk.upgradeNotice,
+    queryFn: ({ signal }) => systemApi.getUpgradeNotice(signal),
+  });
 }
 
 export function useAcknowledgeUpgradeNotice(): EntityMutation<void> {

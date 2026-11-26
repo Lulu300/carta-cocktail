@@ -6,16 +6,39 @@ import { qk } from '../../queries/keys';
 import { axe } from '../../test/axe';
 import { buildCategory, buildCategoryType } from '../../test/factories';
 import type { CategoryType } from '../../types';
-import { captureRequest, mockApiError, mockApiPending, mockApiResponse, mockItemInUse } from '../../test/msw/utils';
+import {
+  captureRequest,
+  mockApiError,
+  mockApiPending,
+  mockApiResponse,
+  mockItemInUse,
+} from '../../test/msw/utils';
 import CategoriesPage from './CategoriesPage';
 
 const spirit = buildCategoryType({ name: 'SPIRIT', color: 'blue', _count: { categories: 1 } });
 const syrup = buildCategoryType({ name: 'SYRUP', color: 'red', _count: { categories: 1 } });
 const garnish = buildCategoryType({ name: 'GARNISH', color: 'green', _count: { categories: 0 } });
-const vodka = buildCategory({ id: 1, name: 'Vodka', type: 'SPIRIT', categoryType: spirit, desiredStock: 2, _count: { bottles: 3 } });
-const grenadine = buildCategory({ id: 2, name: 'Grenadine', type: 'SYRUP', categoryType: syrup, _count: { bottles: 1 } });
+const vodka = buildCategory({
+  id: 1,
+  name: 'Vodka',
+  type: 'SPIRIT',
+  categoryType: spirit,
+  desiredStock: 2,
+  _count: { bottles: 3 },
+});
+const grenadine = buildCategory({
+  id: 2,
+  name: 'Grenadine',
+  type: 'SYRUP',
+  categoryType: syrup,
+  _count: { bottles: 1 },
+});
 // Data older than v1.9.0 can hold these names: HTML would show ' SPIRIT ' as 'SPIRIT', and '' as nothing.
-const spacedSpirit = buildCategoryType({ name: ' SPIRIT ', color: 'gray', _count: { categories: 1 } });
+const spacedSpirit = buildCategoryType({
+  name: ' SPIRIT ',
+  color: 'gray',
+  _count: { categories: 1 },
+});
 const unnamed = buildCategoryType({ name: '', color: 'gray', _count: { categories: 0 } });
 const SPACED_SPIRIT_LABEL = '␣SPIRIT␣ (with spaces)';
 // Data older than v1.15.0 can hold these: HTML shows each of them as 'X Y'.
@@ -28,8 +51,16 @@ const zeroWidth = buildCategoryType({ name: 'X\u200BY', color: 'gray', _count: {
 const joined = buildCategoryType({ name: 'XY', color: 'gray', _count: { categories: 0 } });
 const ZERO_WIDTH_LABEL = 'X[U+200B]Y (with invisible characters)';
 // HTML shows 'E' and a combining grave accent (U+0300) exactly like the composed 'È' (U+00C8).
-const decomposed = buildCategoryType({ name: 'CRE\u0300ME', color: 'gray', _count: { categories: 1 } });
-const composed = buildCategoryType({ name: 'CR\u00C8ME', color: 'gray', _count: { categories: 0 } });
+const decomposed = buildCategoryType({
+  name: 'CRE\u0300ME',
+  color: 'gray',
+  _count: { categories: 1 },
+});
+const composed = buildCategoryType({
+  name: 'CR\u00C8ME',
+  color: 'gray',
+  _count: { categories: 0 },
+});
 const DECOMPOSED_LABEL = 'CRE\u0300ME (non-standard Unicode form)';
 
 type User = ReturnType<typeof userEvent.setup>;
@@ -102,8 +133,11 @@ describe('CategoriesPage', () => {
     }
 
     /** A category of the given type, which the categories list sends with it. */
-    const categoryOfType = (name: string, categoryType: CategoryType | null, type = categoryType?.name ?? '') =>
-      buildCategory({ name, type, categoryType });
+    const categoryOfType = (
+      name: string,
+      categoryType: CategoryType | null,
+      type = categoryType?.name ?? '',
+    ) => buildCategory({ name, type, categoryType });
 
     it('tells the stored names apart, and labels the empty name', async () => {
       mockApiResponse('get', '/api/categories', [
@@ -225,7 +259,9 @@ describe('CategoriesPage', () => {
       expect(within(categoryDialog()).getByLabelText('Type')).not.toHaveAttribute('aria-invalid');
 
       await user.type(customType, 'mixer');
-      expect(within(categoryDialog()).queryByText('Choose or enter a type with a name.')).not.toBeInTheDocument();
+      expect(
+        within(categoryDialog()).queryByText('Choose or enter a type with a name.'),
+      ).not.toBeInTheDocument();
       await user.click(within(categoryDialog()).getByRole('button', { name: 'Save' }));
       expect(await created.body).toMatchObject({ type: 'MIXER' });
     });
@@ -310,10 +346,20 @@ describe('CategoriesPage', () => {
     // Data older than v1.9.0 can hold ' SPIRIT ' next to 'SPIRIT': the edit sends the type as stored.
     it('keeps a type with surrounding spaces when a category is saved', async () => {
       const user = userEvent.setup();
-      const spacedSpirit = buildCategoryType({ name: ' SPIRIT ', color: 'gray', _count: { categories: 1 } });
+      const spacedSpirit = buildCategoryType({
+        name: ' SPIRIT ',
+        color: 'gray',
+        _count: { categories: 1 },
+      });
       mockApiResponse('get', '/api/category-types', [spirit, spacedSpirit]);
       mockApiResponse('get', '/api/categories', [
-        buildCategory({ id: 3, name: 'Rum', type: ' SPIRIT ', categoryType: spacedSpirit, _count: { bottles: 0 } }),
+        buildCategory({
+          id: 3,
+          name: 'Rum',
+          type: ' SPIRIT ',
+          categoryType: spacedSpirit,
+          _count: { bottles: 0 },
+        }),
       ]);
       renderPage();
       await screen.findByText('Rum');
@@ -328,7 +374,12 @@ describe('CategoriesPage', () => {
     it('shows a type missing from the list as a custom type', async () => {
       const user = userEvent.setup();
       mockApiResponse('get', '/api/categories', [
-        buildCategory({ name: 'Water', type: 'UNKNOWN', categoryType: null, _count: { bottles: 0 } }),
+        buildCategory({
+          name: 'Water',
+          type: 'UNKNOWN',
+          categoryType: null,
+          _count: { bottles: 0 },
+        }),
       ]);
       renderPage();
       await screen.findByText('Water');
@@ -343,7 +394,9 @@ describe('CategoriesPage', () => {
       async function openTypeOptions(user: User) {
         await renderLoadedPage();
         await user.click(screen.getByRole('button', { name: 'Add Category' }));
-        const options = within(within(categoryDialog()).getByLabelText('Type')).getAllByRole('option');
+        const options = within(within(categoryDialog()).getByLabelText('Type')).getAllByRole(
+          'option',
+        );
         return options.map((option) => option.textContent);
       }
 
@@ -352,7 +405,10 @@ describe('CategoriesPage', () => {
         mockApiResponse('get', '/api/category-types', [unnamed, spacedSpirit, spirit]);
 
         expect(await openTypeOptions(user)).toEqual([
-          '(no name)', SPACED_SPIRIT_LABEL, 'SPIRIT', 'Other...',
+          '(no name)',
+          SPACED_SPIRIT_LABEL,
+          'SPIRIT',
+          'Other...',
         ]);
       });
 
@@ -366,7 +422,10 @@ describe('CategoriesPage', () => {
         ]);
 
         expect(await openTypeOptions(user)).toEqual([
-          'Spirits – (no name)', `Spirits – ${SPACED_SPIRIT_LABEL}`, 'Spirits', 'Other...',
+          'Spirits – (no name)',
+          `Spirits – ${SPACED_SPIRIT_LABEL}`,
+          'Spirits',
+          'Other...',
         ]);
       });
 
@@ -375,50 +434,84 @@ describe('CategoriesPage', () => {
         mockApiResponse('get', '/api/category-types', [doubleSpaced, singleSpaced, tabbed]);
 
         expect(await openTypeOptions(user)).toEqual([
-          DOUBLE_SPACED_LABEL, 'X Y', 'X␣Y (with spaces)', 'Other...',
+          DOUBLE_SPACED_LABEL,
+          'X Y',
+          'X␣Y (with spaces)',
+          'Other...',
         ]);
-        expect(within(categoryDialog()).getByRole('option', { name: DOUBLE_SPACED_LABEL })).toBeInTheDocument();
+        expect(
+          within(categoryDialog()).getByRole('option', { name: DOUBLE_SPACED_LABEL }),
+        ).toBeInTheDocument();
       });
 
       it('adds the stored name with inner spaces to a translation that would hide it', async () => {
         const user = userEvent.setup();
         const nameTranslations = { en: 'Mixers' };
         mockApiResponse('get', '/api/category-types', [
-          { ...doubleSpaced, nameTranslations }, { ...singleSpaced, nameTranslations },
+          { ...doubleSpaced, nameTranslations },
+          { ...singleSpaced, nameTranslations },
         ]);
 
-        expect(await openTypeOptions(user)).toEqual([`Mixers – ${DOUBLE_SPACED_LABEL}`, 'Mixers', 'Other...']);
+        expect(await openTypeOptions(user)).toEqual([
+          `Mixers – ${DOUBLE_SPACED_LABEL}`,
+          'Mixers',
+          'Other...',
+        ]);
       });
 
       it('tells a type with an invisible character from the type without it, also with the same translation', async () => {
         const user = userEvent.setup();
         const nameTranslations = { en: 'Mixers' };
         mockApiResponse('get', '/api/category-types', [
-          zeroWidth, joined, { ...zeroWidth, name: 'Z\u200BW', nameTranslations }, { ...joined, name: 'ZW', nameTranslations },
+          zeroWidth,
+          joined,
+          { ...zeroWidth, name: 'Z\u200BW', nameTranslations },
+          { ...joined, name: 'ZW', nameTranslations },
         ]);
 
         expect(await openTypeOptions(user)).toEqual([
-          ZERO_WIDTH_LABEL, 'XY', 'Mixers – Z[U+200B]W (with invisible characters)', 'Mixers', 'Other...',
+          ZERO_WIDTH_LABEL,
+          'XY',
+          'Mixers – Z[U+200B]W (with invisible characters)',
+          'Mixers',
+          'Other...',
         ]);
-        expect(within(categoryDialog()).getByRole('option', { name: ZERO_WIDTH_LABEL })).toBeInTheDocument();
+        expect(
+          within(categoryDialog()).getByRole('option', { name: ZERO_WIDTH_LABEL }),
+        ).toBeInTheDocument();
       });
 
       it('tells a decomposed type from the composed one, also with the same translation', async () => {
         const user = userEvent.setup();
         const nameTranslations = { en: 'Creams' };
         mockApiResponse('get', '/api/category-types', [
-          decomposed, composed, { ...decomposed, name: 'CRE\u0301ME', nameTranslations }, { ...composed, name: 'CR\u00C9ME', nameTranslations },
+          decomposed,
+          composed,
+          { ...decomposed, name: 'CRE\u0301ME', nameTranslations },
+          { ...composed, name: 'CR\u00C9ME', nameTranslations },
         ]);
 
         expect(await openTypeOptions(user)).toEqual([
-          DECOMPOSED_LABEL, 'CR\u00C8ME', 'Creams – CRE\u0301ME (non-standard Unicode form)', 'Creams', 'Other...',
+          DECOMPOSED_LABEL,
+          'CR\u00C8ME',
+          'Creams – CRE\u0301ME (non-standard Unicode form)',
+          'Creams',
+          'Other...',
         ]);
-        expect(within(categoryDialog()).getByRole('option', { name: DECOMPOSED_LABEL })).toBeInTheDocument();
+        expect(
+          within(categoryDialog()).getByRole('option', { name: DECOMPOSED_LABEL }),
+        ).toBeInTheDocument();
       });
     });
 
     describe('a category whose type has an empty name', () => {
-      const water = buildCategory({ id: 4, name: 'Water', type: '', categoryType: unnamed, _count: { bottles: 0 } });
+      const water = buildCategory({
+        id: 4,
+        name: 'Water',
+        type: '',
+        categoryType: unnamed,
+        _count: { bottles: 0 },
+      });
 
       beforeEach(() => {
         mockApiResponse('get', '/api/category-types', [unnamed, spirit]);
@@ -452,7 +545,9 @@ describe('CategoriesPage', () => {
         await saveWater(user);
 
         await user.selectOptions(within(categoryDialog()).getByLabelText('Type'), 'SPIRIT');
-        expect(within(categoryDialog()).queryByText('Choose or enter a type with a name.')).not.toBeInTheDocument();
+        expect(
+          within(categoryDialog()).queryByText('Choose or enter a type with a name.'),
+        ).not.toBeInTheDocument();
         await user.click(within(categoryDialog()).getByRole('button', { name: 'Save' }));
 
         expect(await updated.body).toMatchObject({ type: 'SPIRIT' });
@@ -465,7 +560,9 @@ describe('CategoriesPage', () => {
         await user.click(within(categoryDialog()).getByRole('button', { name: 'Cancel' }));
         await user.click(screen.getByRole('button', { name: 'Edit' }));
 
-        expect(within(categoryDialog()).queryByText('Choose or enter a type with a name.')).not.toBeInTheDocument();
+        expect(
+          within(categoryDialog()).queryByText('Choose or enter a type with a name.'),
+        ).not.toBeInTheDocument();
       });
 
       it('has no accessibility violation with the message', async () => {
@@ -514,7 +611,13 @@ describe('CategoriesPage', () => {
       expect(await screen.findByText('Category deleted')).toBeInTheDocument();
       expect((await deleted.url).pathname).toBe('/api/categories/1');
       const refreshed = invalidate.mock.calls.map(([filters]) => filters?.queryKey);
-      expect(refreshed).toEqual([qk.categories, qk.categoryTypes, qk.bottles, qk.shortages, qk.availability]);
+      expect(refreshed).toEqual([
+        qk.categories,
+        qk.categoryTypes,
+        qk.bottles,
+        qk.shortages,
+        qk.availability,
+      ]);
       await waitFor(() => expect(reloaded.count()).toBe(1));
     });
 
@@ -524,7 +627,9 @@ describe('CategoriesPage', () => {
       const deleted = captureRequest('delete', '/api/categories/:id');
 
       await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
-      await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
+      await user.click(
+        within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }),
+      );
 
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
       expect(deleted.count()).toBe(0);
@@ -532,33 +637,56 @@ describe('CategoriesPage', () => {
 
     it('lists the bottles a forced deletion of the category deletes with it', async () => {
       const user = userEvent.setup();
-      const requests = mockItemInUse('/api/categories/:id', {
-        cocktails: [{ id: 4, name: 'Moscow Mule', removedLines: 1 }],
-        bottles: [{ id: 7, name: 'Absolut' }, { id: 8, name: 'Grey Goose' }],
-      }, 'This category still has bottles');
+      const requests = mockItemInUse(
+        '/api/categories/:id',
+        {
+          cocktails: [{ id: 4, name: 'Moscow Mule', removedLines: 1 }],
+          bottles: [
+            { id: 7, name: 'Absolut' },
+            { id: 8, name: 'Grey Goose' },
+          ],
+        },
+        'This category still has bottles',
+      );
       await renderLoadedPage();
 
       await deleteFirstCategory(user);
 
       const forced = await screen.findByRole('alertdialog', { name: 'Delete an item in use?' });
-      const listed = within(forced).getAllByRole('listitem').map((item) => item.textContent);
+      const listed = within(forced)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent);
       expect(listed).toEqual(['Moscow Mule: 1 line removed', 'Absolut', 'Grey Goose']);
-      await user.click(within(forced).getByRole('checkbox', { name: 'I understand that these recipes will be changed and these bottles deleted' }));
+      await user.click(
+        within(forced).getByRole('checkbox', {
+          name: 'I understand that these recipes will be changed and these bottles deleted',
+        }),
+      );
       await user.click(within(forced).getByRole('button', { name: 'Delete anyway' }));
 
-      expect(await screen.findByText('Category deleted: 2 bottles deleted, 1 cocktail changed.')).toBeInTheDocument();
+      expect(
+        await screen.findByText('Category deleted: 2 bottles deleted, 1 cocktail changed.'),
+      ).toBeInTheDocument();
       expect(requests.map((url) => url.search)).toEqual(['', '?force=true']);
     });
 
     it('keeps a category that still has bottles when the forced deletion is cancelled', async () => {
       const user = userEvent.setup();
-      mockItemInUse('/api/categories/:id', { cocktails: [], bottles: [{ id: 7, name: 'Absolut' }] }, 'This category still has bottles');
+      mockItemInUse(
+        '/api/categories/:id',
+        { cocktails: [], bottles: [{ id: 7, name: 'Absolut' }] },
+        'This category still has bottles',
+      );
       await renderLoadedPage();
 
       await deleteFirstCategory(user);
-      await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
+      await user.click(
+        within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Cancel' }),
+      );
 
-      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('This category still has bottles'));
+      await waitFor(() =>
+        expect(screen.getByRole('alert')).toHaveTextContent('This category still has bottles'),
+      );
       expect(screen.getByRole('alert')).toHaveTextContent(/Bottles in it: .+\./);
       expect(screen.getByText('Vodka')).toBeInTheDocument();
     });
@@ -571,7 +699,9 @@ describe('CategoriesPage', () => {
 
       const manager = await openTypesManager(user);
 
-      expect(within(manager).getByText('GARNISH', { selector: 'span.font-medium' })).toBeInTheDocument();
+      expect(
+        within(manager).getByText('GARNISH', { selector: 'span.font-medium' }),
+      ).toBeInTheDocument();
       expect(within(manager).getByText('(0)')).toBeInTheDocument();
     });
 
@@ -670,7 +800,10 @@ describe('CategoriesPage', () => {
 
       await user.type(within(manager).getByPlaceholderText('GARNISH, MIXER...'), 'bitter');
       await user.click(within(manager).getByRole('button', { name: 'Red' }));
-      expect(within(manager).getByRole('button', { name: 'Red' })).toHaveAttribute('aria-pressed', 'true');
+      expect(within(manager).getByRole('button', { name: 'Red' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
       await user.click(within(manager).getByRole('button', { name: 'Create' }));
 
       expect(await created.body).toEqual({ name: 'BITTER', nameTranslations: null, color: 'red' });
@@ -699,7 +832,9 @@ describe('CategoriesPage', () => {
       await user.click(within(manager).getAllByRole('button', { name: 'Edit' })[2]!);
       expect(within(manager).getByDisplayValue('GARNISH')).toBeDisabled();
       await user.click(within(manager).getByRole('button', { name: 'Delete' }));
-      await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
+      await user.click(
+        within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }),
+      );
 
       await waitFor(() => expect(within(manager).getByText('Add Type')).toBeInTheDocument());
       expect(within(manager).getByPlaceholderText('GARNISH, MIXER...')).toHaveValue('');
@@ -712,7 +847,9 @@ describe('CategoriesPage', () => {
 
       await user.click(within(manager).getAllByRole('button', { name: 'Edit' })[0]!);
       await user.click(within(manager).getByRole('button', { name: 'Delete' }));
-      await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
+      await user.click(
+        within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }),
+      );
 
       expect(await screen.findByText('Type deleted')).toBeInTheDocument();
       expect(within(manager).getByDisplayValue('SPIRIT')).toBeDisabled();
@@ -725,7 +862,9 @@ describe('CategoriesPage', () => {
 
       const manager = await openTypesManager(user);
 
-      const rows = within(manager).getAllByRole('listitem').map((row) => row.textContent);
+      const rows = within(manager)
+        .getAllByRole('listitem')
+        .map((row) => row.textContent);
       expect(rows[0]).toContain('(no name)(no name)(0)');
       expect(rows[1]).toContain(`${SPACED_SPIRIT_LABEL}${SPACED_SPIRIT_LABEL}(1)`);
       expect(rows[2]).toContain('SPIRITSPIRIT(1)');
@@ -733,12 +872,16 @@ describe('CategoriesPage', () => {
 
     it('keeps the translation of a type with surrounding spaces next to its stored name', async () => {
       const user = userEvent.setup();
-      mockApiResponse('get', '/api/category-types', [{ ...spacedSpirit, nameTranslations: { en: 'Spirits' } }]);
+      mockApiResponse('get', '/api/category-types', [
+        { ...spacedSpirit, nameTranslations: { en: 'Spirits' } },
+      ]);
       await renderLoadedPage();
 
       const manager = await openTypesManager(user);
 
-      expect(within(manager).getByRole('listitem')).toHaveTextContent(`Spirits${SPACED_SPIRIT_LABEL}(1)`);
+      expect(within(manager).getByRole('listitem')).toHaveTextContent(
+        `Spirits${SPACED_SPIRIT_LABEL}(1)`,
+      );
     });
 
     it('tells a type with inner spaces from the type with one space', async () => {
@@ -748,7 +891,9 @@ describe('CategoriesPage', () => {
 
       const manager = await openTypesManager(user);
 
-      const rows = within(manager).getAllByRole('listitem').map((row) => row.textContent);
+      const rows = within(manager)
+        .getAllByRole('listitem')
+        .map((row) => row.textContent);
       expect(rows[0]).toContain(`${DOUBLE_SPACED_LABEL}${DOUBLE_SPACED_LABEL}(1)`);
       expect(rows[1]).toContain('X YX Y(0)');
     });
@@ -760,7 +905,9 @@ describe('CategoriesPage', () => {
 
       const manager = await openTypesManager(user);
 
-      const rows = within(manager).getAllByRole('listitem').map((row) => row.textContent);
+      const rows = within(manager)
+        .getAllByRole('listitem')
+        .map((row) => row.textContent);
       expect(rows[0]).toContain(`${ZERO_WIDTH_LABEL}${ZERO_WIDTH_LABEL}(1)`);
       expect(rows[1]).toContain('XYXY(0)');
     });
@@ -772,7 +919,9 @@ describe('CategoriesPage', () => {
 
       const manager = await openTypesManager(user);
 
-      const rows = within(manager).getAllByRole('listitem').map((row) => row.textContent);
+      const rows = within(manager)
+        .getAllByRole('listitem')
+        .map((row) => row.textContent);
       expect(rows[0]).toContain(`${DECOMPOSED_LABEL}${DECOMPOSED_LABEL}(1)`);
       expect(rows[1]).toContain('CR\u00C8MECR\u00C8ME(0)');
     });
@@ -788,7 +937,9 @@ describe('CategoriesPage', () => {
 
       const manager = await openTypesManager(user);
 
-      const rows = within(manager).getAllByRole('listitem').map((row) => row.textContent);
+      const rows = within(manager)
+        .getAllByRole('listitem')
+        .map((row) => row.textContent);
       expect(rows[0]).toContain(`Mixers${DOUBLE_SPACED_LABEL}(1)`);
       expect(rows[1]).toContain('Fruit  juiceX Y(0)');
     });
@@ -823,7 +974,9 @@ describe('CategoriesPage', () => {
         const manager = await openTypesManager(user);
 
         await user.click(within(manager).getByRole('button', { name: 'Delete' }));
-        await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
+        await user.click(
+          within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }),
+        );
 
         expect(await screen.findByText('Type deleted')).toBeInTheDocument();
         const url = await deleted.url;
@@ -834,14 +987,25 @@ describe('CategoriesPage', () => {
 
     it('shows the backend message in a toast when a type cannot be deleted', async () => {
       const user = userEvent.setup();
-      mockApiError('delete', '/api/category-types/:name', 409, 'Cannot delete: categories still use this type');
+      mockApiError(
+        'delete',
+        '/api/category-types/:name',
+        409,
+        'Cannot delete: categories still use this type',
+      );
       await renderLoadedPage();
       const manager = await openTypesManager(user);
 
       await user.click(within(manager).getByRole('button', { name: 'Delete' }));
-      await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
+      await user.click(
+        within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }),
+      );
 
-      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Cannot delete: categories still use this type'));
+      await waitFor(() =>
+        expect(screen.getByRole('alert')).toHaveTextContent(
+          'Cannot delete: categories still use this type',
+        ),
+      );
     });
 
     it('disables the deletion of a type used by categories', async () => {
@@ -849,7 +1013,9 @@ describe('CategoriesPage', () => {
       await renderLoadedPage();
       const manager = await openTypesManager(user);
 
-      const usedTypeButtons = within(manager).getAllByRole('button', { name: 'This type is used by categories and cannot be deleted.' });
+      const usedTypeButtons = within(manager).getAllByRole('button', {
+        name: 'This type is used by categories and cannot be deleted.',
+      });
       expect(usedTypeButtons).toHaveLength(2);
       usedTypeButtons.forEach((button) => expect(button).toBeDisabled());
     });

@@ -22,7 +22,10 @@ export function RemainingBar({ percent, label }: { percent: number; label: strin
   return (
     <div className="flex items-center gap-2">
       <div className="w-24 h-2 bg-line-strong rounded-full overflow-hidden">
-        <div className={cx('h-full rounded-full', remainingColor(percent))} style={{ width: `${percent}%` }} />
+        <div
+          className={cx('h-full rounded-full', remainingColor(percent))}
+          style={{ width: `${percent}%` }}
+        />
       </div>
       <span className="text-sm">{label}</span>
     </div>
@@ -34,7 +37,12 @@ export function BottleRowActions({ bottle, onEdit, onDelete }: BottleActions & {
   return (
     <div className="flex items-center justify-end gap-1">
       <IconButton icon="edit" label={t('common.edit')} onClick={() => onEdit(bottle)} />
-      <IconButton icon="delete" label={t('common.delete')} variant="danger" onClick={() => onDelete(bottle)} />
+      <IconButton
+        icon="delete"
+        label={t('common.delete')}
+        variant="danger"
+        onClick={() => onDelete(bottle)}
+      />
     </div>
   );
 }
@@ -53,21 +61,31 @@ export default function BottleRow({ bottle, indented = false, onEdit, onDelete }
   return (
     <tr className={cx('hover:bg-line/50', indented && 'bg-canvas/30')}>
       <td className={cx('py-4 font-medium', indented ? 'px-12' : 'px-6')}>
-        {indented && <span aria-hidden="true" className="text-fg-muted mr-2">└</span>}
+        {indented && (
+          <span aria-hidden="true" className="text-fg-muted mr-2">
+            └
+          </span>
+        )}
         {bottle.name}
       </td>
-      <td className="px-6 py-4 text-fg-muted">{bottle.category ? localize(bottle.category) : ''}</td>
+      <td className="px-6 py-4 text-fg-muted">
+        {bottle.category ? localize(bottle.category) : ''}
+      </td>
       <td className="px-6 py-4">{t('units.ml', { value: bottle.capacityMl })}</td>
       <td className="px-6 py-4">
         <RemainingBar percent={bottle.remainingPercent} label={`${bottle.remainingPercent}%`} />
       </td>
-      <td className="px-6 py-4 text-fg-muted">{bottle.alcoholPercentage ? t('units.abv', { value: bottle.alcoholPercentage }) : '-'}</td>
+      <td className="px-6 py-4 text-fg-muted">
+        {bottle.alcoholPercentage ? t('units.abv', { value: bottle.alcoholPercentage }) : '-'}
+      </td>
       <td className="px-6 py-4">
         <Badge tone={bottle.openedAt ? 'warning' : 'success'}>
           {bottle.openedAt ? t('bottles.opened') : t('bottles.unopened')}
         </Badge>
       </td>
-      <td className="px-6 py-4 text-fg-muted">{bottle.purchasePrice ? formatPrice(bottle.purchasePrice, i18n.language) : '-'}</td>
+      <td className="px-6 py-4 text-fg-muted">
+        {bottle.purchasePrice ? formatPrice(bottle.purchasePrice, i18n.language) : '-'}
+      </td>
       <td className="px-6 py-4 text-right">
         <BottleRowActions bottle={bottle} onEdit={onEdit} onDelete={onDelete} />
       </td>

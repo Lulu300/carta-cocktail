@@ -60,5 +60,7 @@ export function useSort<T>(
 }
 
 function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
-  return path.split('.').reduce<unknown>((acc, key) => (acc as Record<string, unknown>)?.[key], obj);
+  return path
+    .split('.')
+    .reduce<unknown>((acc, key) => (acc as Record<string, unknown>)?.[key], obj);
 }

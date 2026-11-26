@@ -17,10 +17,16 @@ export function nameToStore(sent: string, stored?: string | null): string {
  * of the same language in `stored` (the `nameTranslations` column). `undefined` (field absent) and
  * `null` (translations cleared) are passed through for `serializeTranslations`.
  */
-export function translationsToStore(sent: TranslationsInput | undefined, stored?: string | null): TranslationsInput | undefined {
+export function translationsToStore(
+  sent: TranslationsInput | undefined,
+  stored?: string | null,
+): TranslationsInput | undefined {
   if (!sent) return sent;
   const storedTranslations = parseTranslations(stored);
   return Object.fromEntries(
-    Object.entries(sent).map(([language, text]) => [language, text && nameToStore(text, storedTranslations?.[language])]),
+    Object.entries(sent).map(([language, text]) => [
+      language,
+      text && nameToStore(text, storedTranslations?.[language]),
+    ]),
   );
 }

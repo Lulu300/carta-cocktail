@@ -47,7 +47,9 @@ const RESCUE_PHOTOS_GUIDE = `${UPGRADING_GUIDE}#v160`;
 
 /** The kernel escapes spaces, tabs, newlines and backslashes as octal (`\040`). */
 function unescapeMountPath(field: string): string {
-  return field.replace(/\\([0-7]{3})/g, (_, octal: string) => String.fromCharCode(parseInt(octal, 8)));
+  return field.replace(/\\([0-7]{3})/g, (_, octal: string) =>
+    String.fromCharCode(parseInt(octal, 8)),
+  );
 }
 
 /** Mount points listed in a /proc/<pid>/mountinfo file (5th field of each line). */
@@ -61,7 +63,8 @@ export function parseMountPoints(mountInfo: string): string[] {
 
 function isInside(folder: string, parent: string): boolean {
   const relative = path.relative(parent, folder);
-  const outside = relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative);
+  const outside =
+    relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative);
   return !outside;
 }
 
@@ -87,13 +90,20 @@ function readMountPoints(mountInfoPath: string): string[] | null {
   }
 }
 
-async function countPhotos(db: UploadsCheckDb, uploadDir: string): Promise<{ referenced: number; missing: number }> {
+async function countPhotos(
+  db: UploadsCheckDb,
+  uploadDir: string,
+): Promise<{ referenced: number; missing: number }> {
   const cocktails = await db.cocktail.findMany({
     where: { imagePath: { not: null } },
     select: { imagePath: true },
   });
-  const imagePaths = cocktails.map((cocktail) => cocktail.imagePath).filter((imagePath): imagePath is string => Boolean(imagePath));
-  const missing = imagePaths.filter((imagePath) => !fs.existsSync(path.join(uploadDir, imagePath))).length;
+  const imagePaths = cocktails
+    .map((cocktail) => cocktail.imagePath)
+    .filter((imagePath): imagePath is string => Boolean(imagePath));
+  const missing = imagePaths.filter(
+    (imagePath) => !fs.existsSync(path.join(uploadDir, imagePath)),
+  ).length;
   return { referenced: imagePaths.length, missing };
 }
 
@@ -101,7 +111,10 @@ async function countPhotos(db: UploadsCheckDb, uploadDir: string): Promise<{ ref
  * Checks where the photos are stored and whether the referenced ones exist.
  * Read-only, and returns counts only: callers never get file or cocktail names.
  */
-export async function checkUploads(db: UploadsCheckDb, options: UploadsCheckOptions): Promise<UploadsCheckResult> {
+export async function checkUploads(
+  db: UploadsCheckDb,
+  options: UploadsCheckOptions,
+): Promise<UploadsCheckResult> {
   const {
     uploadDir,
     mountInfoPath = DEFAULT_MOUNT_INFO_PATH,
@@ -128,17 +141,17 @@ export function formatUploadsWarnings(result: UploadsCheckResult): string[] {
   const warnings: string[] = [];
   if (result.inContainer && result.onMount === false) {
     warnings.push(
-      `[uploads] WARNING: the upload folder ${result.uploadDir} is not a mounted volume or host folder. `
-      + 'Photos stored there are lost when the container is recreated (at the next update at the latest). '
-      + `Before recreating it, copy them out with \`docker cp <backend container>:${result.uploadDir}/. ./uploads-rescue/\`, `
-      + `then mount a volume or host folder on ${result.uploadDir} and copy the photos back: `
-      + `see ${RESCUE_PHOTOS_GUIDE} ("Check that the photos are on a mount", then "After upgrading").`,
+      `[uploads] WARNING: the upload folder ${result.uploadDir} is not a mounted volume or host folder. ` +
+        'Photos stored there are lost when the container is recreated (at the next update at the latest). ' +
+        `Before recreating it, copy them out with \`docker cp <backend container>:${result.uploadDir}/. ./uploads-rescue/\`, ` +
+        `then mount a volume or host folder on ${result.uploadDir} and copy the photos back: ` +
+        `see ${RESCUE_PHOTOS_GUIDE} ("Check that the photos are on a mount", then "After upgrading").`,
     );
   }
   if (result.missingPhotos > 0) {
     warnings.push(
-      `[uploads] WARNING: ${result.missingPhotos} of ${result.referencedPhotos} cocktail photos are missing from ${result.uploadDir}. `
-      + `If they are in another folder or volume, mount it on ${result.uploadDir}: see ${MOVE_MOUNT_GUIDE}.`,
+      `[uploads] WARNING: ${result.missingPhotos} of ${result.referencedPhotos} cocktail photos are missing from ${result.uploadDir}. ` +
+        `If they are in another folder or volume, mount it on ${result.uploadDir}: see ${MOVE_MOUNT_GUIDE}.`,
     );
   }
   return warnings;
@@ -156,7 +169,10 @@ function describeError(error: unknown): string {
   if (typeof code === 'string') {
     return `${error.name} ${code}`;
   }
-  const firstLine = error.message.split('\n').map((line) => line.trim()).find(Boolean);
+  const firstLine = error.message
+    .split('\n')
+    .map((line) => line.trim())
+    .find(Boolean);
   return firstLine ?? error.name;
 }
 

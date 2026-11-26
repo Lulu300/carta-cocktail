@@ -27,18 +27,30 @@ interface MenuInfoFormProps {
 }
 
 function initialValues(menu: Menu): MenuInfoValues {
-  return { name: menu.name, slug: menu.slug, description: menu.description ?? '', isPublic: menu.isPublic };
+  return {
+    name: menu.name,
+    slug: menu.slug,
+    description: menu.description ?? '',
+    isPublic: menu.isPublic,
+  };
 }
 
 function withoutFields(values: MenuInfoValues, fields: MenuInfoField[]): Partial<MenuInfoValues> {
-  return Object.fromEntries(Object.entries(values).filter(([field]) => !fields.includes(field as MenuInfoField)));
+  return Object.fromEntries(
+    Object.entries(values).filter(([field]) => !fields.includes(field as MenuInfoField)),
+  );
 }
 
 /**
  * Name, slug, description and publication of a menu: free text, so saved with
  * a button, unlike the composition of the menu.
  */
-export default function MenuInfoForm({ menu, lockedFields = [], onSave, isSaving }: MenuInfoFormProps) {
+export default function MenuInfoForm({
+  menu,
+  lockedFields = [],
+  onSave,
+  isSaving,
+}: MenuInfoFormProps) {
   const { t } = useTranslation();
   // Kept apart from the menu: a refetch after a composition change must not erase a draft.
   const [values, setValues] = useState(() => initialValues(menu));
@@ -60,7 +72,10 @@ export default function MenuInfoForm({ menu, lockedFields = [], onSave, isSaving
           <Field label={t('menus.name')} required>
             <Input value={values.name} onChange={(event) => setField('name', event.target.value)} />
           </Field>
-          <Field label={t('menus.slug')} hint={isLocked('slug') ? t('menus.slugLocked') : undefined}>
+          <Field
+            label={t('menus.slug')}
+            hint={isLocked('slug') ? t('menus.slugLocked') : undefined}
+          >
             <Input
               value={values.slug}
               onChange={(event) => setField('slug', toSlug(event.target.value))}
@@ -79,14 +94,25 @@ export default function MenuInfoForm({ menu, lockedFields = [], onSave, isSaving
         </Field>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <ToggleSwitch checked={values.isPublic} onChange={(isPublic) => setField('isPublic', isPublic)} label={t('menus.isPublic')} />
+            <ToggleSwitch
+              checked={values.isPublic}
+              onChange={(isPublic) => setField('isPublic', isPublic)}
+              label={t('menus.isPublic')}
+            />
             {menu.isPublic && (
-              <a href={`/menu/${menu.slug}`} target="_blank" rel="noopener noreferrer" className="text-xs text-info hover:underline">
+              <a
+                href={`/menu/${menu.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-info hover:underline"
+              >
                 {`/menu/${menu.slug}`}
               </a>
             )}
           </div>
-          <Button type="submit" loading={isSaving}>{t('common.save')}</Button>
+          <Button type="submit" loading={isSaving}>
+            {t('common.save')}
+          </Button>
         </div>
       </form>
     </Card>

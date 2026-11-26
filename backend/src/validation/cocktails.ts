@@ -36,19 +36,33 @@ function checkLineCoherence({ requireSourceKey }: { requireSourceKey: boolean })
     for (const key of Object.values(SOURCE_KEYS)) {
       const isSet = line[key] != null;
       if (key === expectedKey && !isSet && requireSourceKey) {
-        ctx.addIssue({ code: 'custom', path: [key], message: missingSourceKeyMessage(line.sourceType) });
+        ctx.addIssue({
+          code: 'custom',
+          path: [key],
+          message: missingSourceKeyMessage(line.sourceType),
+        });
       } else if (key !== expectedKey && isSet) {
-        ctx.addIssue({ code: 'custom', path: [key], message: `Must be empty when sourceType is ${line.sourceType}` });
+        ctx.addIssue({
+          code: 'custom',
+          path: [key],
+          message: `Must be empty when sourceType is ${line.sourceType}`,
+        });
       }
     }
     const hasPreferredBottles = (line.preferredBottleIds?.length ?? 0) > 0;
     if (hasPreferredBottles && line.sourceType !== 'CATEGORY') {
-      ctx.addIssue({ code: 'custom', path: ['preferredBottleIds'], message: 'Only allowed when sourceType is CATEGORY' });
+      ctx.addIssue({
+        code: 'custom',
+        path: ['preferredBottleIds'],
+        message: 'Only allowed when sourceType is CATEGORY',
+      });
     }
   };
 }
 
-export const IngredientLine = IngredientLineFields.superRefine(checkLineCoherence({ requireSourceKey: true }));
+export const IngredientLine = IngredientLineFields.superRefine(
+  checkLineCoherence({ requireSourceKey: true }),
+);
 
 /**
  * Line of a cocktail update. Recipes stored before v1.9.0 can hold lines whose source was

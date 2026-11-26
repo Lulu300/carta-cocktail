@@ -32,7 +32,7 @@ export function getBaseLanguage(locale: string): string {
  */
 export function getLocalizedName(
   entity: { name: string; nameTranslations?: Record<string, string> | null },
-  locale: string
+  locale: string,
 ): string {
   const t = entity.nameTranslations;
   if (!t || typeof t !== 'object') return entity.name;
@@ -41,7 +41,7 @@ export function getLocalizedName(
     t[locale] ||
     t[getBaseLanguage(locale)] ||
     t[FALLBACK_LANGUAGE] ||
-    Object.values(t).find(v => v) ||
+    Object.values(t).find((v) => v) ||
     entity.name
   );
 }

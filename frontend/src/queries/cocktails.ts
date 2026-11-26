@@ -32,10 +32,14 @@ interface AvailabilityQueryOptions {
 }
 
 /** Availability of every cocktail, keyed by cocktail id. */
-export function useCocktailsAvailability(
-  { enabled = true }: AvailabilityQueryOptions = {},
-): UseQueryResult<Record<number, CocktailAvailability>, Error> {
-  return useQuery({ queryKey: qk.availability, queryFn: ({ signal }) => availabilityApi.getAllCocktails(signal), enabled });
+export function useCocktailsAvailability({
+  enabled = true,
+}: AvailabilityQueryOptions = {}): UseQueryResult<Record<number, CocktailAvailability>, Error> {
+  return useQuery({
+    queryKey: qk.availability,
+    queryFn: ({ signal }) => availabilityApi.getAllCocktails(signal),
+    enabled,
+  });
 }
 
 export function useCreateCocktail(): EntityMutation<CocktailInput, Cocktail> {

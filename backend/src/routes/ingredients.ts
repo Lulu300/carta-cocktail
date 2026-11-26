@@ -18,13 +18,17 @@ router.get('/', async (_req: AuthRequest, res: Response) => {
 
 const bulkSchemas = { body: BulkAvailability };
 
-router.post('/bulk-availability', validate(bulkSchemas), async (req: AuthRequest, res: Response) => {
-  const { available } = valid<typeof bulkSchemas>(res).body;
-  const result = await prisma.ingredient.updateMany({
-    data: { isAvailable: available },
-  });
-  res.json({ message: req.t('ingredients.availabilityUpdated'), updated: result.count });
-});
+router.post(
+  '/bulk-availability',
+  validate(bulkSchemas),
+  async (req: AuthRequest, res: Response) => {
+    const { available } = valid<typeof bulkSchemas>(res).body;
+    const result = await prisma.ingredient.updateMany({
+      data: { isAvailable: available },
+    });
+    res.json({ message: req.t('ingredients.availabilityUpdated'), updated: result.count });
+  },
+);
 
 router.get('/:id', validate(idRequest), async (_req: AuthRequest, res: Response) => {
   const ingredient = await prisma.ingredient.findUnique({
@@ -51,7 +55,10 @@ router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Respons
 const updateSchemas = { params: IdParams, body: IngredientUpdate };
 
 router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Response) => {
-  const { params: { id }, body } = valid<typeof updateSchemas>(res);
+  const {
+    params: { id },
+    body,
+  } = valid<typeof updateSchemas>(res);
   const { name, icon, isAvailable, nameTranslations } = body;
   const stored = await prisma.ingredient.findUnique({ where: { id } });
   if (!stored) throw new NotFoundError();
@@ -62,7 +69,9 @@ router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Respo
       name: name === undefined ? undefined : nameToStore(name, stored.name),
       icon,
       isAvailable,
-      nameTranslations: serializeTranslations(translationsToStore(nameTranslations, stored.nameTranslations)),
+      nameTranslations: serializeTranslations(
+        translationsToStore(nameTranslations, stored.nameTranslations),
+      ),
     },
   });
   res.json(parseNameTranslations(ingredient));
@@ -70,7 +79,10 @@ router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Respo
 
 // Refused while recipes use the ingredient, unless ?force=true
 router.delete('/:id', validate(deleteRequest), async (req: AuthRequest, res: Response) => {
-  const { params: { id }, query } = valid<typeof deleteRequest>(res);
+  const {
+    params: { id },
+    query,
+  } = valid<typeof deleteRequest>(res);
   const impact = await deleteIngredient(id, isForceRequested(query.force));
   res.json({ message: req.t('ingredients.deleted'), deleted: true, impact });
 });

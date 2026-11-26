@@ -16,7 +16,10 @@ export const MenuIdParams = z.object({ menuId: PathId });
 export const idRequest = { params: IdParams };
 
 /** DELETE with an optional `?force=true`; `isForceRequested` reads the value. */
-export const deleteRequest = { params: IdParams, query: z.object({ force: z.string().optional() }) };
+export const deleteRequest = {
+  params: IdParams,
+  query: z.object({ force: z.string().optional() }),
+};
 
 export const OptionalIntQuery = z.coerce.number().int().positive().optional();
 
@@ -35,7 +38,9 @@ export const SUPPORTED_LANGUAGES = ['fr', 'en'] as const;
  * the forms only send the languages the admin filled in. A partial record also
  * rejects unknown languages. `serializeTranslations` (utils/translations.ts) stores its output.
  */
-export const Translations = z.partialRecord(z.enum(SUPPORTED_LANGUAGES), z.string().trim()).nullable();
+export const Translations = z
+  .partialRecord(z.enum(SUPPORTED_LANGUAGES), z.string().trim())
+  .nullable();
 
 function isParsableDate(value: string): boolean {
   return !Number.isNaN(Date.parse(value));

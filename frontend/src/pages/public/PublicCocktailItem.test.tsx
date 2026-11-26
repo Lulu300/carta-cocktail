@@ -21,7 +21,14 @@ function renderItem(item = buildMenuCocktail({ id: 1, cocktail: { name: 'Mojito'
       <Routes>
         <Route
           path="/menu/summer"
-          element={<PublicCocktailItem menuCocktail={item} menuSlug="summer" viewMode="grid" showAvailability={false} />}
+          element={
+            <PublicCocktailItem
+              menuCocktail={item}
+              menuSlug="summer"
+              viewMode="grid"
+              showAvailability={false}
+            />
+          }
         />
         <Route path="/menu/summer/cocktail/:id" element={<CocktailPageProbe />} />
       </Routes>
@@ -32,7 +39,12 @@ function renderItem(item = buildMenuCocktail({ id: 1, cocktail: { name: 'Mojito'
 describe('PublicCocktailItem', () => {
   it('shows four ingredients and sums up the others', () => {
     const names = ['Rum', 'Lime', 'Mint', 'Sugar', 'Soda', 'Ice'];
-    renderItem(buildMenuCocktail({ id: 1, cocktail: { ingredients: names.map((name, index) => ingredient(index + 1, name)) } }));
+    renderItem(
+      buildMenuCocktail({
+        id: 1,
+        cocktail: { ingredients: names.map((name, index) => ingredient(index + 1, name)) },
+      }),
+    );
 
     expect(screen.getByText('Sugar')).toBeInTheDocument();
     expect(screen.queryByText('Soda')).not.toBeInTheDocument();
@@ -87,7 +99,10 @@ describe('PublicCocktailItem', () => {
 
   it('treats the photo as decoration: the heading already names the link', () => {
     renderItem(buildMenuCocktail({ id: 1, cocktail: { imagePath: 'mojito.jpg' } }));
-    expect(screen.getByRole('link', { name: /Mojito/ }).querySelector('img')).toHaveAttribute('alt', '');
+    expect(screen.getByRole('link', { name: /Mojito/ }).querySelector('img')).toHaveAttribute(
+      'alt',
+      '',
+    );
   });
 
   it('hides the placeholder emoji from screen readers', () => {

@@ -1,4 +1,7 @@
-export function getUploadUrl(imagePath: string | null | undefined, baseUrl = import.meta.env.BASE_URL || '/'): string | null {
+export function getUploadUrl(
+  imagePath: string | null | undefined,
+  baseUrl = import.meta.env.BASE_URL || '/',
+): string | null {
   if (!imagePath) return null;
 
   const normalizedBase = baseUrl.replace(/\/+$/, '');

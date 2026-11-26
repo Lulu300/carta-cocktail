@@ -28,7 +28,9 @@ function WarningBox({ tone, title, names, more }: WarningBoxProps) {
     <div className={cx('mb-2 p-2 border rounded text-xs', TONE_CLASSES[tone])}>
       <div className="font-medium mb-1">{title}</div>
       {names.slice(0, MAX_LISTED).map((name, index) => (
-        <div key={index} className="opacity-80 truncate">{name}</div>
+        <div key={index} className="opacity-80 truncate">
+          {name}
+        </div>
       ))}
       {names.length > MAX_LISTED && more}
     </div>
@@ -49,9 +51,12 @@ export default function AvailabilityWarnings({ availability, loading }: Availabi
   const lineName = (line: IngredientAvailability) =>
     line.orphan ? t('cocktails.unknownSource') : localizedName(line);
   const lowStock = availability.lowStock.map((resource) =>
-    t('cocktails.lowStockItem', { name: localizedName(resource), count: resource.servings }));
+    t('cocktails.lowStockItem', { name: localizedName(resource), count: resource.servings }),
+  );
   const missing = availability.ingredients.filter((line) => !line.isAvailable).map(lineName);
-  const withoutPreferred = availability.ingredients.filter((line) => line.preferredAvailable === false).map(lineName);
+  const withoutPreferred = availability.ingredients
+    .filter((line) => line.preferredAvailable === false)
+    .map(lineName);
 
   return (
     <>
@@ -60,9 +65,17 @@ export default function AvailabilityWarnings({ availability, loading }: Availabi
         tone="danger"
         title={`❌ ${t('cocktails.missing')}`}
         names={missing}
-        more={<div className="opacity-60">{t('cocktails.moreMissing', { count: missing.length - MAX_LISTED })}</div>}
+        more={
+          <div className="opacity-60">
+            {t('cocktails.moreMissing', { count: missing.length - MAX_LISTED })}
+          </div>
+        }
       />
-      <WarningBox tone="warning" title={`⚠️ ${t('cocktails.noPreferredAvailable')}`} names={withoutPreferred} />
+      <WarningBox
+        tone="warning"
+        title={`⚠️ ${t('cocktails.noPreferredAvailable')}`}
+        names={withoutPreferred}
+      />
     </>
   );
 }

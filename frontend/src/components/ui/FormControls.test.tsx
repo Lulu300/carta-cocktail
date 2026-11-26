@@ -10,7 +10,9 @@ describe('Input, Select and Textarea', () => {
     render(
       <>
         <Input aria-label="Name" className="uppercase" />
-        <Select aria-label="Type"><option>Spirit</option></Select>
+        <Select aria-label="Type">
+          <option>Spirit</option>
+        </Select>
         <Textarea aria-label="Notes" />
       </>,
     );
@@ -18,7 +20,9 @@ describe('Input, Select and Textarea', () => {
     expect(input.className).toContain('bg-canvas');
     expect(input.className).toContain('uppercase');
     expect(input).not.toHaveAttribute('id');
-    expect(screen.getByRole('combobox', { name: 'Type' }).className).toContain('border-line-strong');
+    expect(screen.getByRole('combobox', { name: 'Type' }).className).toContain(
+      'border-line-strong',
+    );
     expect(screen.getByRole('textbox', { name: 'Notes' }).tagName).toBe('TEXTAREA');
   });
 
@@ -33,7 +37,9 @@ describe('Input, Select and Textarea', () => {
     render(
       <>
         <Field label="Type" error="Pick a type" required>
-          <Select><option>Spirit</option></Select>
+          <Select>
+            <option>Spirit</option>
+          </Select>
         </Field>
         <Field label="Notes" hint="Optional">
           <Textarea />

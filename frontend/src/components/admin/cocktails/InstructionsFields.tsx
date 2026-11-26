@@ -28,9 +28,20 @@ export default function InstructionsFields() {
           const stepLabel = t('cocktails.step', { number: index + 1 });
           return (
             <li key={field.id} className="flex gap-2 items-center">
-              <span aria-hidden="true" className="text-xs text-fg-muted w-6">{index + 1}.</span>
-              <Input aria-label={stepLabel} className="text-sm" {...register(`instructions.${index}.text`)} />
-              <IconButton icon="close" label={t('common.delete')} variant="danger" onClick={() => remove(index)} />
+              <span aria-hidden="true" className="text-xs text-fg-muted w-6">
+                {index + 1}.
+              </span>
+              <Input
+                aria-label={stepLabel}
+                className="text-sm"
+                {...register(`instructions.${index}.text`)}
+              />
+              <IconButton
+                icon="close"
+                label={t('common.delete')}
+                variant="danger"
+                onClick={() => remove(index)}
+              />
             </li>
           );
         })}

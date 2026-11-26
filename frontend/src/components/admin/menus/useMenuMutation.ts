@@ -1,5 +1,10 @@
 import { useTranslation } from 'react-i18next';
-import { useMutation, useQueryClient, type QueryClient, type UseMutationResult } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQueryClient,
+  type QueryClient,
+  type UseMutationResult,
+} from '@tanstack/react-query';
 import type { MenuBottleExclusion } from '../../../services/api';
 import type { Menu } from '../../../types';
 import { qk } from '../../../queries/keys';
@@ -24,7 +29,12 @@ interface MenuMutationOptions<Variables, Data> {
   successMessage?: string;
 }
 
-export type MenuMutation<Variables, Data = unknown> = UseMutationResult<Data, Error, Variables, PendingChange>;
+export type MenuMutation<Variables, Data = unknown> = UseMutationResult<
+  Data,
+  Error,
+  Variables,
+  PendingChange
+>;
 
 interface PendingChange {
   apply: (state: MenuState) => MenuState;

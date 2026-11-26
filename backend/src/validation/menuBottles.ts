@@ -41,6 +41,8 @@ export const MenuBottleEntryIds = z.object({
 });
 
 /** One change for several entries of a menu. Each keeps its position. */
-export const MenuBottleGroupUpdate = MenuBottleUpdate.omit({ position: true }).extend(MenuBottleEntryIds.shape);
+export const MenuBottleGroupUpdate = MenuBottleUpdate.omit({ position: true }).extend(
+  MenuBottleEntryIds.shape,
+);
 
 export const MenuBottleExclusionParams = MenuIdParams.extend({ bottleId: PathId });

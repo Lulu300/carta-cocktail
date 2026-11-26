@@ -9,7 +9,10 @@ import MenuComposition from '../../components/admin/menus/MenuComposition';
 import MenuEditorLayout from '../../components/admin/menus/MenuEditorLayout';
 import MenuItemRow from '../../components/admin/menus/MenuItemRow';
 import { groupBySection } from '../../components/admin/menus/groupBySection';
-import { cocktailsEdits, useSaveMenuCocktails } from '../../components/admin/menus/useSaveMenuCocktails';
+import {
+  cocktailsEdits,
+  useSaveMenuCocktails,
+} from '../../components/admin/menus/useSaveMenuCocktails';
 
 export default function MenuEditPage() {
   const { t } = useTranslation();
@@ -34,18 +37,27 @@ function MenuCocktails({ menu }: { menu: Menu }) {
     setIsAdding(false);
     // The id comes with the server's answer; the editor never sends it.
     const added: MenuCocktail = {
-      id: 0, menuId: menu.id, cocktailId: cocktail.id, cocktail, menuSectionId: null, position: cocktails.length, isHidden: false,
+      id: 0,
+      menuId: menu.id,
+      cocktailId: cocktail.id,
+      cocktail,
+      menuSectionId: null,
+      position: cocktails.length,
+      isHidden: false,
     };
     save.mutate(cocktailsEdits.add(added));
   };
 
-  const nameOf = (item: MenuCocktail) => item.cocktail?.name ?? t('menus.cocktailFallback', { id: item.cocktailId });
+  const nameOf = (item: MenuCocktail) =>
+    item.cocktail?.name ?? t('menus.cocktailFallback', { id: item.cocktailId });
 
   return (
     <Card as="section">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold">{t('cocktails.title')}</h2>
-        <Button variant="secondary" size="sm" onClick={() => setIsAdding(true)}>{t('menus.addCocktail')}</Button>
+        <Button variant="secondary" size="sm" onClick={() => setIsAdding(true)}>
+          {t('menus.addCocktail')}
+        </Button>
       </div>
       {cocktails.length === 0 ? (
         <p className="text-center py-8 text-fg-muted">{t('menus.noCocktails')}</p>
@@ -53,15 +65,21 @@ function MenuCocktails({ menu }: { menu: Menu }) {
         <MenuComposition
           groups={groupBySection(cocktails, sections)}
           getKey={(item) => item.cocktailId}
-          onReorder={(items) => save.mutate(cocktailsEdits.order(items.map((item) => item.cocktailId)))}
+          onReorder={(items) =>
+            save.mutate(cocktailsEdits.order(items.map((item) => item.cocktailId)))
+          }
           renderItem={(item, move) => (
             <MenuItemRow
               label={nameOf(item)}
               isHidden={item.isHidden}
-              onToggleHidden={() => save.mutate(cocktailsEdits.update(item.cocktailId, { isHidden: !item.isHidden }))}
+              onToggleHidden={() =>
+                save.mutate(cocktailsEdits.update(item.cocktailId, { isHidden: !item.isHidden }))
+              }
               sections={sections}
               sectionId={item.menuSectionId}
-              onSectionChange={(menuSectionId) => save.mutate(cocktailsEdits.update(item.cocktailId, { menuSectionId }))}
+              onSectionChange={(menuSectionId) =>
+                save.mutate(cocktailsEdits.update(item.cocktailId, { menuSectionId }))
+              }
               move={move}
               onRemove={() => save.mutate(cocktailsEdits.remove(item.cocktailId))}
             >

@@ -18,7 +18,11 @@ describe('Button', () => {
   });
 
   it('applies the variant and size classes', () => {
-    render(<Button variant="danger" size="sm" className="w-full">Delete</Button>);
+    render(
+      <Button variant="danger" size="sm" className="w-full">
+        Delete
+      </Button>,
+    );
     const button = screen.getByRole('button', { name: 'Delete' });
     expect(button.className).toContain('text-danger');
     expect(button.className).toContain('px-3 py-1.5');
@@ -28,7 +32,11 @@ describe('Button', () => {
   it('disables the button and shows a spinner while loading', async () => {
     const onClick = vi.fn();
     const user = userEvent.setup();
-    render(<Button loading onClick={onClick}>Save</Button>);
+    render(
+      <Button loading onClick={onClick}>
+        Save
+      </Button>,
+    );
     const button = screen.getByRole('button');
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute('aria-busy', 'true');

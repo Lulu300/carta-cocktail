@@ -25,7 +25,9 @@ export default function SectionNav({ items }: SectionNavProps) {
   const [observedId, setObservedId] = useState(items[0]?.anchorId);
   const listRef = useRef<HTMLUListElement>(null);
   // A search can remove the active section: fall back to the first one left.
-  const activeId = items.some((item) => item.anchorId === observedId) ? observedId : items[0]?.anchorId;
+  const activeId = items.some((item) => item.anchorId === observedId)
+    ? observedId
+    : items[0]?.anchorId;
 
   useEffect(() => {
     const targets = items
@@ -33,12 +35,15 @@ export default function SectionNav({ items }: SectionNavProps) {
       .filter((element): element is HTMLElement => element !== null);
     if (targets.length === 0) return;
 
-    const observer = new IntersectionObserver((entries) => {
-      const topmost = entries
-        .filter((entry) => entry.isIntersecting)
-        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-      if (topmost) setObservedId(topmost.target.id);
-    }, { rootMargin: ACTIVE_BAND_MARGIN });
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const topmost = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+        if (topmost) setObservedId(topmost.target.id);
+      },
+      { rootMargin: ACTIVE_BAND_MARGIN },
+    );
     targets.forEach((target) => observer.observe(target));
     return () => observer.disconnect();
   }, [items]);

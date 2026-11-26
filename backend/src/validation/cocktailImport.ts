@@ -37,7 +37,9 @@ const ImportIngredientLine = z.object({
   quantity: z.number(),
   unit: ImportUnit.nullish(),
   position: z.number().optional(),
-  preferredBottles: z.array(z.object({ name: RequiredText, categoryName: z.string().optional() })).optional(),
+  preferredBottles: z
+    .array(z.object({ name: RequiredText, categoryName: z.string().optional() }))
+    .optional(),
 });
 
 export const ImportRecipeV1 = z.object({
@@ -50,7 +52,9 @@ export const ImportRecipeV1 = z.object({
     tags: Tags.optional(),
     ingredients: z.array(ImportIngredientLine).optional(),
     // Blank steps are accepted, unlike Instruction: files exported before C-04 keep importing
-    instructions: z.array(z.object({ stepNumber: z.number().optional(), text: z.string() })).optional(),
+    instructions: z
+      .array(z.object({ stepNumber: z.number().optional(), text: z.string() }))
+      .optional(),
   }),
 });
 

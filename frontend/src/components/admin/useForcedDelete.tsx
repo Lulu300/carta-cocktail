@@ -25,13 +25,26 @@ interface ForcedDeleteOptions {
 
 // A forced deletion removes recipe lines, and a category its bottles: whatever
 // shows a recipe, its availability or the stock is out of date.
-const FORCED_DELETION_KEYS = [qk.cocktails, qk.availability, qk.shortages, qk.bottles, qk.categories, qk.menus];
+const FORCED_DELETION_KEYS = [
+  qk.cocktails,
+  qk.availability,
+  qk.shortages,
+  qk.bottles,
+  qk.categories,
+  qk.menus,
+];
 
 /** "Category deleted", and after a forced deletion "Category deleted: 2 bottles deleted, 3 cocktails changed." */
-function describeDeletion(t: TFunction, deletedMessage: string, { cocktails, bottles }: DeletionImpact): string {
+function describeDeletion(
+  t: TFunction,
+  deletedMessage: string,
+  { cocktails, bottles }: DeletionImpact,
+): string {
   const changes: string[] = [];
-  if (bottles.length > 0) changes.push(t('deletion.forced.bottlesDeleted', { count: bottles.length }));
-  if (cocktails.length > 0) changes.push(t('deletion.forced.cocktailsChanged', { count: cocktails.length }));
+  if (bottles.length > 0)
+    changes.push(t('deletion.forced.bottlesDeleted', { count: bottles.length }));
+  if (cocktails.length > 0)
+    changes.push(t('deletion.forced.cocktailsChanged', { count: cocktails.length }));
   if (changes.length === 0) return t(deletedMessage);
   return t('deletion.forced.summary', { deleted: t(deletedMessage), changes: changes.join(', ') });
 }
@@ -57,19 +70,24 @@ function acknowledgeKey({ cocktails, bottles }: DeletionImpact): string {
  * accept the changes. Cancelling deletes nothing and keeps the list in a toast,
  * so the admin can fix the recipes first.
  */
-export function useForcedDelete({ deleteItem, invalidates, deletedMessage }: ForcedDeleteOptions): (id: number) => Promise<void> {
+export function useForcedDelete({
+  deleteItem,
+  invalidates,
+  deletedMessage,
+}: ForcedDeleteOptions): (id: number) => Promise<void> {
   const { t } = useTranslation();
   const confirm = useConfirm();
   const invalidateQueries = useInvalidateQueries();
 
-  const confirmForcedDeletion = (impact: DeletionImpact) => confirm({
-    title: t('deletion.forced.title'),
-    message: forcedDeletionWarning(t, impact),
-    details: <DeletionImpactList impact={impact} />,
-    acknowledgeLabel: t(acknowledgeKey(impact)),
-    confirmLabel: t('deletion.forced.confirm'),
-    tone: 'danger',
-  });
+  const confirmForcedDeletion = (impact: DeletionImpact) =>
+    confirm({
+      title: t('deletion.forced.title'),
+      message: forcedDeletionWarning(t, impact),
+      details: <DeletionImpactList impact={impact} />,
+      acknowledgeLabel: t(acknowledgeKey(impact)),
+      confirmLabel: t('deletion.forced.confirm'),
+      tone: 'danger',
+    });
 
   const remove = async (id: number, force: boolean) => {
     const { impact } = await deleteItem(id, { force });
@@ -99,7 +117,9 @@ export function useForcedDelete({ deleteItem, invalidates, deletedMessage }: For
 }
 
 interface ForcedDeleteCrudOptions<Input, Entity> extends CrudMutationsOptions<Input, Entity> {
-  api: CrudMutationsOptions<Input, Entity>['api'] & { delete(id: number, options: DeleteOptions): Promise<DeletionResponse> };
+  api: CrudMutationsOptions<Input, Entity>['api'] & {
+    delete(id: number, options: DeleteOptions): Promise<DeletionResponse>;
+  };
   /** i18n keys of the success toasts. */
   messages: { created: string; updated: string; deleted: string };
 }

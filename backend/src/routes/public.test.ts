@@ -1,14 +1,33 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
-  setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
-  request, authHeader, getAuthToken, prisma, seedCocktail, seedCategory, seedBottle, seedUnit, seedIngredient,
-  seedMenu, lineOfSource,
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+  request,
+  authHeader,
+  getAuthToken,
+  prisma,
+  seedCocktail,
+  seedCategory,
+  seedBottle,
+  seedUnit,
+  seedIngredient,
+  seedMenu,
+  lineOfSource,
 } from '../test/helpers';
 import type { CocktailExportFile } from '../services/cocktail/cocktailExport';
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
-beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
+beforeEach(async () => {
+  await cleanDatabase();
+  await seedRequiredData();
+});
 
 const PRIVATE_BOTTLE_FIELDS = ['purchasePrice', 'openedAt', 'remainingPercent'];
 
@@ -62,17 +81,35 @@ function expiredAdminToken(): string {
 async function seedPrivateCocktail() {
   const unit = await seedUnit({ name: 'Centilitre', abbreviation: 'cl' });
   const category = await seedCategory({ name: 'Rum', type: 'SPIRIT' });
-  const bottle = await seedBottle({ name: 'Havana Club', categoryId: category.id, purchasePrice: 42 });
+  const bottle = await seedBottle({
+    name: 'Havana Club',
+    categoryId: category.id,
+    purchasePrice: 42,
+  });
   await prisma.bottle.update({ where: { id: bottle.id }, data: { openedAt: new Date() } });
 
   const cocktail = await prisma.cocktail.create({
     data: { name: 'Secret Daiquiri', notes: 'Use the good rum', tags: '' },
   });
   await prisma.cocktailIngredient.create({
-    data: { cocktailId: cocktail.id, sourceType: 'BOTTLE', bottleId: bottle.id, quantity: 5, unitId: unit.id, position: 0 },
+    data: {
+      cocktailId: cocktail.id,
+      sourceType: 'BOTTLE',
+      bottleId: bottle.id,
+      quantity: 5,
+      unitId: unit.id,
+      position: 0,
+    },
   });
   const categoryIngredient = await prisma.cocktailIngredient.create({
-    data: { cocktailId: cocktail.id, sourceType: 'CATEGORY', categoryId: category.id, quantity: 1, unitId: unit.id, position: 1 },
+    data: {
+      cocktailId: cocktail.id,
+      sourceType: 'CATEGORY',
+      categoryId: category.id,
+      quantity: 1,
+      unitId: unit.id,
+      position: 1,
+    },
   });
   await prisma.cocktailPreferredBottle.create({
     data: { cocktailIngredientId: categoryIngredient.id, bottleId: bottle.id },
@@ -274,7 +311,11 @@ describe('GET /api/public/units', () => {
   });
 
   it('should return nameTranslations as an object', async () => {
-    await seedUnit({ name: 'Centilitre', abbreviation: 'cl', nameTranslations: JSON.stringify({ fr: 'Centilitre', en: 'Centiliter' }) });
+    await seedUnit({
+      name: 'Centilitre',
+      abbreviation: 'cl',
+      nameTranslations: JSON.stringify({ fr: 'Centilitre', en: 'Centiliter' }),
+    });
     const res = await request.get('/api/public/units');
     expect(res.status).toBe(200);
     expect(res.body[0].nameTranslations).toEqual({ fr: 'Centilitre', en: 'Centiliter' });
@@ -320,7 +361,9 @@ describe('GET /api/public/cocktails/:id', () => {
   it('should treat an expired admin token as a guest on an off-menu cocktail', async () => {
     const cocktail = await seedCocktail({ name: 'Draft' });
 
-    const detail = await request.get(`/api/public/cocktails/${cocktail.id}`).set(bearer(expiredAdminToken()));
+    const detail = await request
+      .get(`/api/public/cocktails/${cocktail.id}`)
+      .set(bearer(expiredAdminToken()));
     expect(detail.status).toBe(404);
 
     const exported = await request
@@ -393,7 +436,9 @@ describe('GET /api/public/cocktails/:id/export', () => {
     const guest = await request.get(`/api/public/cocktails/${cocktail.id}/export`);
     expect(guest.status).toBe(404);
 
-    const admin = await request.get(`/api/public/cocktails/${cocktail.id}/export`).set(authHeader());
+    const admin = await request
+      .get(`/api/public/cocktails/${cocktail.id}/export`)
+      .set(authHeader());
     expect(admin.status).toBe(200);
   });
 
@@ -415,7 +460,9 @@ describe('GET /api/public/cocktails/:id/export', () => {
     await addCocktailToMenu(cocktail.id);
 
     const guest = await request.get(`/api/public/cocktails/${cocktail.id}/export`);
-    const adminPublic = await request.get(`/api/public/cocktails/${cocktail.id}/export`).set(authHeader());
+    const adminPublic = await request
+      .get(`/api/public/cocktails/${cocktail.id}/export`)
+      .set(authHeader());
     const admin = await request.get(`/api/cocktails/${cocktail.id}/export`).set(authHeader());
 
     expect(adminPublic.body.cocktail).toEqual(admin.body.cocktail);
@@ -662,7 +709,9 @@ describe('GET /api/public/menus/:slug - menu with cocktails and bottles', () => 
 describe('GET /api/public/menus/:slug - bottle menus', () => {
   async function createBottle(name: string, remainingPercent: number) {
     const category = (await prisma.category.findFirst()) ?? (await seedCategory());
-    const res = await request.post('/api/bottles').set(authHeader())
+    const res = await request
+      .post('/api/bottles')
+      .set(authHeader())
       .send({ name, categoryId: category.id, capacityMl: 700, remainingPercent, isApero: true });
     return res.body as { id: number };
   }
@@ -678,7 +727,10 @@ describe('GET /api/public/menus/:slug - bottle menus', () => {
     const personal = await seedMenu({ slug: 'summer', type: 'APEROS', isPublic: true });
     await createBottle('Aperol', 100);
     const empty = await createBottle('Campari', 0);
-    await request.post('/api/menu-bottles').set(authHeader()).send({ menuId: personal.id, bottleId: empty.id });
+    await request
+      .post('/api/menu-bottles')
+      .set(authHeader())
+      .send({ menuId: personal.id, bottleId: empty.id });
 
     expect(await publicBottleNames('aperitifs')).toEqual(['Aperol']);
     expect(await publicBottleNames('summer')).toEqual([]);
@@ -687,10 +739,15 @@ describe('GET /api/public/menus/:slug - bottle menus', () => {
   });
 
   it('should not show a bottle excluded from the system menu', async () => {
-    const aperitifs = await prisma.menu.update({ where: { slug: 'aperitifs' }, data: { isPublic: true } });
+    const aperitifs = await prisma.menu.update({
+      where: { slug: 'aperitifs' },
+      data: { isPublic: true },
+    });
     await createBottle('Aperol', 100);
     const excluded = await createBottle('Lillet', 100);
-    const entry = await prisma.menuBottle.findFirstOrThrow({ where: { menuId: aperitifs.id, bottleId: excluded.id } });
+    const entry = await prisma.menuBottle.findFirstOrThrow({
+      where: { menuId: aperitifs.id, bottleId: excluded.id },
+    });
     await request.delete(`/api/menu-bottles/${entry.id}`).set(authHeader());
 
     await request.post(`/api/menu-bottles/menu/${aperitifs.id}/sync`).set(authHeader());
@@ -707,7 +764,11 @@ describe('public availability (manual switch and stock)', () => {
    * A cocktail in the public menu whose recipe takes 4 cl of a bottle filled at
    * `remainingPercent`, then one unit of each of `otherLines`.
    */
-  async function seedMenuCocktail(isAvailable: boolean, remainingPercent: number, otherLines: OtherLine[] = []) {
+  async function seedMenuCocktail(
+    isAvailable: boolean,
+    remainingPercent: number,
+    otherLines: OtherLine[] = [],
+  ) {
     const unit = await seedUnit({ abbreviation: 'cl', conversionFactorToMl: 10 });
     const bottle = await seedBottle({ name: 'Rum', capacityMl: 700, remainingPercent });
     const lines = [
@@ -764,7 +825,9 @@ describe('public availability (manual switch and stock)', () => {
 
   it('should still mark a cocktail with a switched-off ingredient unavailable', async () => {
     const mint = await seedIngredient({ name: 'Mint', isAvailable: false });
-    const cocktail = await seedMenuCocktail(true, 100, [{ sourceType: 'INGREDIENT', ingredientId: mint.id }]);
+    const cocktail = await seedMenuCocktail(true, 100, [
+      { sourceType: 'INGREDIENT', ingredientId: mint.id },
+    ]);
 
     for (const served of await fetchPublicCocktail(cocktail.id)) {
       expect(served).toMatchObject({ isAvailable: true, available: false });

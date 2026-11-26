@@ -2,13 +2,26 @@ import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vites
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import {
-  setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
-  request, authHeader, getAuthToken, prisma,
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+  request,
+  authHeader,
+  getAuthToken,
+  prisma,
 } from '../test/helpers';
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
-beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
+beforeEach(async () => {
+  await cleanDatabase();
+  await seedRequiredData();
+});
 
 describe('POST /api/auth/login', () => {
   it('should return 400 if email is missing', async () => {
@@ -29,7 +42,9 @@ describe('POST /api/auth/login', () => {
 
   it('should return 401 for non-existent email, after a bcrypt comparison', async () => {
     const compare = vi.spyOn(bcrypt, 'compare');
-    const res = await request.post('/api/auth/login').send({ email: 'nobody@test.local', password: 'wrong' });
+    const res = await request
+      .post('/api/auth/login')
+      .send({ email: 'nobody@test.local', password: 'wrong' });
     expect(res.status).toBe(401);
     expect(res.body.error).toBe('Invalid email or password');
     // Same work as for a wrong password, so the response time does not reveal unknown emails
@@ -39,13 +54,17 @@ describe('POST /api/auth/login', () => {
   });
 
   it('should return 401 for wrong password', async () => {
-    const res = await request.post('/api/auth/login').send({ email: 'admin@test.local', password: 'wrongpass' });
+    const res = await request
+      .post('/api/auth/login')
+      .send({ email: 'admin@test.local', password: 'wrongpass' });
     expect(res.status).toBe(401);
     expect(res.body.error).toBe('Invalid email or password');
   });
 
   it('should return 200 with token and user for valid credentials', async () => {
-    const res = await request.post('/api/auth/login').send({ email: 'admin@test.local', password: 'testpass123' });
+    const res = await request
+      .post('/api/auth/login')
+      .send({ email: 'admin@test.local', password: 'testpass123' });
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('token');
     expect(res.body.user).toMatchObject({ email: 'admin@test.local' });
@@ -55,7 +74,9 @@ describe('POST /api/auth/login', () => {
     const before = await prisma.user.findUniqueOrThrow({ where: { id: 1 } });
     expect(bcrypt.getRounds(before.passwordHash)).toBe(10); // as seeded, like the old seed
 
-    const res = await request.post('/api/auth/login').send({ email: 'admin@test.local', password: 'testpass123' });
+    const res = await request
+      .post('/api/auth/login')
+      .send({ email: 'admin@test.local', password: 'testpass123' });
     expect(res.status).toBe(200);
 
     const after = await prisma.user.findUniqueOrThrow({ where: { id: 1 } });
@@ -64,15 +85,20 @@ describe('POST /api/auth/login', () => {
   });
 
   it('should still log in when the rehash cannot be saved', async () => {
-    const update = vi.spyOn(prisma.user, 'update').mockRejectedValueOnce(new Error('database is locked'));
+    const update = vi
+      .spyOn(prisma.user, 'update')
+      .mockRejectedValueOnce(new Error('database is locked'));
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    const res = await request.post('/api/auth/login').send({ email: 'admin@test.local', password: 'testpass123' });
+    const res = await request
+      .post('/api/auth/login')
+      .send({ email: 'admin@test.local', password: 'testpass123' });
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('token');
     expect(warn).toHaveBeenCalledWith(
-      'Could not rehash the admin password at the current bcrypt cost:', expect.any(Error),
+      'Could not rehash the admin password at the current bcrypt cost:',
+      expect.any(Error),
     );
     update.mockRestore();
     warn.mockRestore();
@@ -82,7 +108,9 @@ describe('POST /api/auth/login', () => {
     const hash = await bcrypt.hash('testpass123', 12);
     await prisma.user.update({ where: { id: 1 }, data: { passwordHash: hash } });
 
-    await request.post('/api/auth/login').send({ email: 'admin@test.local', password: 'testpass123' });
+    await request
+      .post('/api/auth/login')
+      .send({ email: 'admin@test.local', password: 'testpass123' });
 
     const after = await prisma.user.findUniqueOrThrow({ where: { id: 1 } });
     expect(after.passwordHash).toBe(hash);
@@ -90,14 +118,18 @@ describe('POST /api/auth/login', () => {
 
   it('should not rehash after a wrong password', async () => {
     const before = await prisma.user.findUniqueOrThrow({ where: { id: 1 } });
-    await request.post('/api/auth/login').send({ email: 'admin@test.local', password: 'wrongpass' });
+    await request
+      .post('/api/auth/login')
+      .send({ email: 'admin@test.local', password: 'wrongpass' });
     const after = await prisma.user.findUniqueOrThrow({ where: { id: 1 } });
     expect(after.passwordHash).toBe(before.passwordHash);
   });
 
   it('should return an HS256 token carrying the user token version', async () => {
     await prisma.user.update({ where: { id: 1 }, data: { tokenVersion: 3 } });
-    const res = await request.post('/api/auth/login').send({ email: 'admin@test.local', password: 'testpass123' });
+    const res = await request
+      .post('/api/auth/login')
+      .send({ email: 'admin@test.local', password: 'testpass123' });
     const decoded = jwt.decode(res.body.token, { complete: true });
     expect(decoded?.header.alg).toBe('HS256');
     expect(decoded?.payload).toMatchObject({ userId: 1, tv: 3 });
@@ -123,14 +155,20 @@ describe('GET /api/auth/me', () => {
   it('should return 401 with invalid token', async () => {
     const res = await request.get('/api/auth/me').set('Authorization', 'Bearer invalid-token');
     expect(res.status).toBe(401);
-    expect(res.body).toEqual({ error: 'Your session has expired or is no longer valid: sign in again' });
+    expect(res.body).toEqual({
+      error: 'Your session has expired or is no longer valid: sign in again',
+    });
   });
 
   it('should answer the 401 of an invalid token in French', async () => {
-    const res = await request.get('/api/auth/me').set('Authorization', 'Bearer invalid-token')
+    const res = await request
+      .get('/api/auth/me')
+      .set('Authorization', 'Bearer invalid-token')
       .set('Accept-Language', 'fr');
     expect(res.status).toBe(401);
-    expect(res.body).toEqual({ error: 'Votre session a expiré ou n’est plus valide : reconnectez-vous' });
+    expect(res.body).toEqual({
+      error: 'Votre session a expiré ou n’est plus valide : reconnectez-vous',
+    });
   });
 
   it('should return user data with valid token', async () => {
@@ -147,7 +185,10 @@ describe('Rejected tokens on a protected route', () => {
   it.each([
     ['signed with another secret', () => getAuthToken(1, { secret: 'another-secret' })],
     ['expired', () => getAuthToken(1, { expiresInSeconds: -1 })],
-    ['forged with alg: none', () => `${encode({ alg: 'none', typ: 'JWT' })}.${encode({ userId: 1, tv: 0 })}.`],
+    [
+      'forged with alg: none',
+      () => `${encode({ alg: 'none', typ: 'JWT' })}.${encode({ userId: 1, tv: 0 })}.`,
+    ],
     ['without a token version', () => jwt.sign({ userId: 1 }, secret)],
     ['of another token version', () => getAuthToken(1, { tokenVersion: 1 })],
   ])('answers 401 for a token %s', async (_label, buildToken) => {
@@ -171,14 +212,18 @@ describe('POST /api/auth/logout-all', () => {
 
   it('should revoke every existing token', async () => {
     const otherDevice = authHeader();
-    const res = await request.post('/api/auth/logout-all').set(authHeader())
+    const res = await request
+      .post('/api/auth/logout-all')
+      .set(authHeader())
       .set('Accept-Language', 'fr');
     expect(res.status).toBe(200);
     expect(res.body.message).toBe('Déconnecté de tous les appareils');
 
     expect((await request.get('/api/auth/me').set(otherDevice)).status).toBe(401);
 
-    const login = await request.post('/api/auth/login').send({ email: 'admin@test.local', password: 'testpass123' });
+    const login = await request
+      .post('/api/auth/login')
+      .send({ email: 'admin@test.local', password: 'testpass123' });
     const me = await request.get('/api/auth/me').set('Authorization', `Bearer ${login.body.token}`);
     expect(me.status).toBe(200);
   });

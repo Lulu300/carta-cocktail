@@ -4,12 +4,20 @@ import type { Bottle } from '../types';
 import { bottleGroupKey, groupBottles, isGroup } from './bottleGrouping';
 
 function bottle(overrides: Partial<Bottle>): Bottle {
-  return buildBottle({ id: 1, name: 'Havana 3', categoryId: 10, purchasePrice: null, ...overrides });
+  return buildBottle({
+    id: 1,
+    name: 'Havana 3',
+    categoryId: 10,
+    purchasePrice: null,
+    ...overrides,
+  });
 }
 
 describe('bottleGroupKey', () => {
   it('ignores the case of the name', () => {
-    expect(bottleGroupKey(bottle({ name: 'HAVANA 3' }))).toBe(bottleGroupKey(bottle({ name: 'havana 3' })));
+    expect(bottleGroupKey(bottle({ name: 'HAVANA 3' }))).toBe(
+      bottleGroupKey(bottle({ name: 'havana 3' })),
+    );
   });
 
   it('tells apart bottles of another capacity, category or strength', () => {

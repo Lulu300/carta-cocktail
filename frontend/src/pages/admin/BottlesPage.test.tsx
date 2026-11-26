@@ -6,7 +6,14 @@ import { qk } from '../../queries/keys';
 import { useShortages } from '../../queries/shortages';
 import { mockDownload } from '../../test/download';
 import { buildBottle, buildCategory, buildShortage } from '../../test/factories';
-import { captureRequest, mockApiError, mockApiPending, mockApiResponse, mockItemInUse, mockNetworkError } from '../../test/msw/utils';
+import {
+  captureRequest,
+  mockApiError,
+  mockApiPending,
+  mockApiResponse,
+  mockItemInUse,
+  mockNetworkError,
+} from '../../test/msw/utils';
 import type { Bottle } from '../../types';
 import BottlesPage from './BottlesPage';
 
@@ -20,8 +27,18 @@ vi.mock('../../components/import/ImportBottlesWizard', () => ({
   ),
 }));
 
-const vodka = buildCategory({ id: 1, name: 'Vodka', categoryType: { name: 'SPIRIT', color: 'blue' }, desiredStock: 2 });
-const gin = buildCategory({ id: 2, name: 'Gin', categoryType: { name: 'SPIRIT', color: 'blue' }, desiredStock: 2 });
+const vodka = buildCategory({
+  id: 1,
+  name: 'Vodka',
+  categoryType: { name: 'SPIRIT', color: 'blue' },
+  desiredStock: 2,
+});
+const gin = buildCategory({
+  id: 2,
+  name: 'Gin',
+  categoryType: { name: 'SPIRIT', color: 'blue' },
+  desiredStock: 2,
+});
 
 const absolut = buildBottle({
   id: 1,
@@ -183,7 +200,10 @@ describe('BottlesPage', () => {
     it('sorts the category column on the localized name', async () => {
       const user = userEvent.setup();
       mockBottles([
-        { ...absolut, category: { ...vodka, name: 'A-vodka', nameTranslations: { en: 'Zubrowka' } } },
+        {
+          ...absolut,
+          category: { ...vodka, name: 'A-vodka', nameTranslations: { en: 'Zubrowka' } },
+        },
         { ...hendricks, category: { ...gin, name: 'Z-gin', nameTranslations: { en: 'Gin' } } },
       ]);
       renderPage();
@@ -207,7 +227,8 @@ describe('BottlesPage', () => {
         expect(screen.getAllByText('Absolut')).toHaveLength(3);
         expect(screen.getByText('~60%')).toBeInTheDocument();
         const keyWarnings = consoleError.mock.calls.filter((args) =>
-          args.some((arg) => typeof arg === 'string' && arg.includes('unique "key"')));
+          args.some((arg) => typeof arg === 'string' && arg.includes('unique "key"')),
+        );
         expect(keyWarnings).toHaveLength(0);
       } finally {
         consoleError.mockRestore();
@@ -230,8 +251,15 @@ describe('BottlesPage', () => {
 
     it('keeps a group open after a page change and back', async () => {
       const user = userEvent.setup();
-      const singles = Array.from({ length: 25 }, (_, index) => ({ ...hendricks, id: 100 + index, name: `Bottle ${index + 1}` }));
-      const group = [{ ...absolut, id: 1 }, { ...absolut, id: 2 }];
+      const singles = Array.from({ length: 25 }, (_, index) => ({
+        ...hendricks,
+        id: 100 + index,
+        name: `Bottle ${index + 1}`,
+      }));
+      const group = [
+        { ...absolut, id: 1 },
+        { ...absolut, id: 2 },
+      ];
       mockBottles([...singles, ...group]);
       renderPage();
       await screen.findByText('Bottle 1');
@@ -438,7 +466,9 @@ describe('BottlesPage', () => {
       expect(within(dialog()).getByLabelText('Opened On')).toHaveValue('06/01/2024');
       expect(within(dialog()).getByLabelText('Can be served as an aperitif')).toBeChecked();
       expect(within(dialog()).getByLabelText('Can be served as a digestif')).not.toBeChecked();
-      expect(within(dialog()).queryByRole('button', { name: 'Save and duplicate' })).not.toBeInTheDocument();
+      expect(
+        within(dialog()).queryByRole('button', { name: 'Save and duplicate' }),
+      ).not.toBeInTheDocument();
     });
 
     it('updates a bottle without a quantity and confirms with a toast', async () => {
@@ -465,7 +495,12 @@ describe('BottlesPage', () => {
 
     it('refreshes the shortages badge after a bottle is updated, without leaving the page', async () => {
       const user = userEvent.setup();
-      renderWithFeedback(<><BottlesPage /><ShortagesBadge /></>);
+      renderWithFeedback(
+        <>
+          <BottlesPage />
+          <ShortagesBadge />
+        </>,
+      );
       await screen.findByText('Absolut');
       await waitFor(() => expect(screen.getByTestId('shortages-badge')).toHaveTextContent('0'));
       mockApiResponse('get', '/api/shortages', [buildShortage({ category: { id: 1 } })]);
@@ -493,7 +528,13 @@ describe('BottlesPage', () => {
       expect(await screen.findByText('Bottle deleted')).toBeInTheDocument();
       expect((await deleted.url).pathname).toBe('/api/bottles/1');
       const refreshed = invalidate.mock.calls.map(([filters]) => filters?.queryKey);
-      expect(refreshed).toEqual([qk.bottles, qk.shortages, qk.categories, qk.menus, qk.availability]);
+      expect(refreshed).toEqual([
+        qk.bottles,
+        qk.shortages,
+        qk.categories,
+        qk.menus,
+        qk.availability,
+      ]);
     });
 
     it('deletes an empty bottle from the history', async () => {
@@ -514,7 +555,9 @@ describe('BottlesPage', () => {
       const deleted = captureRequest('delete', '/api/bottles/:id');
 
       await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
-      await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
+      await user.click(
+        within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }),
+      );
 
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
       expect(deleted.count()).toBe(0);
@@ -535,28 +578,41 @@ describe('BottlesPage', () => {
       expect(forced).toHaveTextContent('Moscow Mule: 1 line removed');
       const deleteAnyway = within(forced).getByRole('button', { name: 'Delete anyway' });
       expect(deleteAnyway).toBeDisabled();
-      await user.click(within(forced).getByRole('checkbox', { name: 'I understand that these recipes will be changed' }));
+      await user.click(
+        within(forced).getByRole('checkbox', {
+          name: 'I understand that these recipes will be changed',
+        }),
+      );
       await user.click(deleteAnyway);
 
-      expect(await screen.findByText(
-        'Bottle deleted: 1 cocktail changed.',
-      )).toBeInTheDocument();
-      expect(requests.map((url) => `${url.pathname}${url.search}`)).toEqual(['/api/bottles/1', '/api/bottles/1?force=true']);
+      expect(await screen.findByText('Bottle deleted: 1 cocktail changed.')).toBeInTheDocument();
+      expect(requests.map((url) => `${url.pathname}${url.search}`)).toEqual([
+        '/api/bottles/1',
+        '/api/bottles/1?force=true',
+      ]);
       await waitFor(() => expect(reloaded.count()).toBe(1));
     });
 
     it('keeps a bottle in use when the forced deletion is cancelled', async () => {
       const user = userEvent.setup();
-      const requests = mockItemInUse('/api/bottles/:id', {
-        cocktails: [{ id: 4, name: 'Moscow Mule', removedLines: 1 }],
-        bottles: [],
-      }, 'This bottle is used by cocktails');
+      const requests = mockItemInUse(
+        '/api/bottles/:id',
+        {
+          cocktails: [{ id: 4, name: 'Moscow Mule', removedLines: 1 }],
+          bottles: [],
+        },
+        'This bottle is used by cocktails',
+      );
       await renderLoadedPage();
 
       await confirmDeletion(user);
-      await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
+      await user.click(
+        within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Cancel' }),
+      );
 
-      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('This bottle is used by cocktails'));
+      await waitFor(() =>
+        expect(screen.getByRole('alert')).toHaveTextContent('This bottle is used by cocktails'),
+      );
       expect(screen.getByRole('alert')).toHaveTextContent(/Used by these cocktails: .+\./);
       expect(requests).toHaveLength(1);
       expect(screen.getByText('Absolut')).toBeInTheDocument();
@@ -587,7 +643,14 @@ describe('BottlesPage', () => {
       await user.click(screen.getByText('finish-import'));
 
       const refreshed = invalidate.mock.calls.map(([filters]) => filters?.queryKey);
-      expect(refreshed).toEqual([qk.bottles, qk.shortages, qk.categories, qk.menus, qk.availability, qk.categoryTypes]);
+      expect(refreshed).toEqual([
+        qk.bottles,
+        qk.shortages,
+        qk.categories,
+        qk.menus,
+        qk.availability,
+        qk.categoryTypes,
+      ]);
       await waitFor(() => expect(reloaded.count()).toBe(1));
     });
 

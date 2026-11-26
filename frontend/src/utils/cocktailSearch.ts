@@ -15,7 +15,10 @@ export function normalize(value: string): string {
 }
 
 /** Raw and localized names, so a search matches in any language. */
-export function getEntityNames(entity: NamedEntity | null | undefined, localize: LocalizeName): string[] {
+export function getEntityNames(
+  entity: NamedEntity | null | undefined,
+  localize: LocalizeName,
+): string[] {
   if (!entity) return [];
   return [entity.name, localize(entity)];
 }
@@ -46,7 +49,10 @@ interface CocktailSearchOptions {
 }
 
 /** Searchable text of a bottle: its name and the names of its category. */
-export function getBottleSearchText(bottle: Pick<Bottle, 'name' | 'category'> | undefined, localize: LocalizeName): string {
+export function getBottleSearchText(
+  bottle: Pick<Bottle, 'name' | 'category'> | undefined,
+  localize: LocalizeName,
+): string {
   return buildSearchText([bottle?.name, ...getEntityNames(bottle?.category, localize)]);
 }
 
@@ -62,7 +68,9 @@ export function getCocktailSearchText(
     cocktail.description,
     includeNotes ? cocktail.notes : null,
     cocktail.tags,
-    ...(cocktail.ingredients || []).flatMap((ingredient) => getIngredientNames(ingredient, localize)),
+    ...(cocktail.ingredients || []).flatMap((ingredient) =>
+      getIngredientNames(ingredient, localize),
+    ),
     ...(cocktail.instructions || []).map((instruction) => instruction.text),
   ]);
 }

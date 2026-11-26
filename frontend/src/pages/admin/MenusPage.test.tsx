@@ -3,10 +3,21 @@ import userEvent from '@testing-library/user-event';
 import { fireEvent, screen, waitFor, within } from '../../test/test-utils';
 import { clearToasts, renderWithFeedback } from '../../test/feedback';
 import { buildMenu } from '../../test/factories';
-import { captureRequest, mockApiError, mockApiPending, mockApiResponse } from '../../test/msw/utils';
+import {
+  captureRequest,
+  mockApiError,
+  mockApiPending,
+  mockApiResponse,
+} from '../../test/msw/utils';
 import MenusPage from './MenusPage';
 
-const aperitifs = buildMenu({ id: 1, name: 'Apéritifs', slug: 'aperitifs', type: 'APEROS', _count: { cocktails: 0, bottles: 5 } });
+const aperitifs = buildMenu({
+  id: 1,
+  name: 'Apéritifs',
+  slug: 'aperitifs',
+  type: 'APEROS',
+  _count: { cocktails: 0, bottles: 5 },
+});
 const digestifs = buildMenu({
   id: 2,
   name: 'Digestifs',
@@ -15,8 +26,20 @@ const digestifs = buildMenu({
   isPublic: false,
   _count: { cocktails: 0, bottles: 2 },
 });
-const summer = buildMenu({ id: 3, name: 'Summer Menu', slug: 'summer', description: 'Summer cocktails', _count: { cocktails: 8, bottles: 0 } });
-const summerAperos = buildMenu({ id: 4, name: 'Summer Aperos', slug: 'summer-aperos', type: 'APEROS', _count: { cocktails: 0, bottles: 3 } });
+const summer = buildMenu({
+  id: 3,
+  name: 'Summer Menu',
+  slug: 'summer',
+  description: 'Summer cocktails',
+  _count: { cocktails: 8, bottles: 0 },
+});
+const summerAperos = buildMenu({
+  id: 4,
+  name: 'Summer Aperos',
+  slug: 'summer-aperos',
+  type: 'APEROS',
+  _count: { cocktails: 0, bottles: 3 },
+});
 
 type User = ReturnType<typeof userEvent.setup>;
 
@@ -75,7 +98,10 @@ describe('MenusPage', () => {
     expect(screen.getAllByText('(default)')).toHaveLength(2);
     const rows = screen.getAllByRole('row').slice(1);
     const deletable = rows.filter((row) => within(row).queryByRole('button', { name: 'Delete' }));
-    expect(deletable.map((row) => within(row).getAllByRole('link')[0]!.textContent)).toEqual(['Summer Menu', 'Summer Aperos']);
+    expect(deletable.map((row) => within(row).getAllByRole('link')[0]!.textContent)).toEqual([
+      'Summer Menu',
+      'Summer Aperos',
+    ]);
   });
 
   it('never shows "no results" while the menus are loading', () => {
@@ -103,7 +129,12 @@ describe('MenusPage', () => {
 
   it('creates a cocktail menu by default with a cleaned slug, confirms with a toast and opens its editor', async () => {
     const user = userEvent.setup();
-    mockApiResponse('post', '/api/menus', buildMenu({ id: 9, name: 'Winter', slug: 'winter-menu-' }), 201);
+    mockApiResponse(
+      'post',
+      '/api/menus',
+      buildMenu({ id: 9, name: 'Winter', slug: 'winter-menu-' }),
+      201,
+    );
     await renderLoadedPage();
     const created = captureRequest('post', '/api/menus');
     await fillCreateForm(user, 'Winter', 'Winter Menu!');
@@ -126,22 +157,35 @@ describe('MenusPage', () => {
 
   it('creates an aperitifs menu and opens the bottle editor', async () => {
     const user = userEvent.setup();
-    mockApiResponse('post', '/api/menus', buildMenu({ id: 9, name: 'Summer aperitif', slug: 'summer-aperitif', type: 'APEROS' }), 201);
+    mockApiResponse(
+      'post',
+      '/api/menus',
+      buildMenu({ id: 9, name: 'Summer aperitif', slug: 'summer-aperitif', type: 'APEROS' }),
+      201,
+    );
     await renderLoadedPage();
     const created = captureRequest('post', '/api/menus');
     await fillCreateForm(user, 'Summer aperitif', 'summer-aperitif');
     const type = within(dialog()).getByRole('combobox', { name: 'Type' });
     expect(type).toHaveValue('COCKTAILS');
-    expect(type).toHaveAccessibleDescription('Cannot be changed later. Aperitifs and digestifs menus hold bottles, chosen among the bottles checked for their type.');
-    expect(within(type).getAllByRole('option').map((option) => option.textContent)).toEqual([
-      'Cocktails', 'Aperitifs', 'Digestifs',
-    ]);
+    expect(type).toHaveAccessibleDescription(
+      'Cannot be changed later. Aperitifs and digestifs menus hold bottles, chosen among the bottles checked for their type.',
+    );
+    expect(
+      within(type)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['Cocktails', 'Aperitifs', 'Digestifs']);
 
     await user.selectOptions(type, 'APEROS');
     await user.click(within(dialog()).getByRole('button', { name: 'Save' }));
 
     expect(await created.body).toEqual({
-      name: 'Summer aperitif', slug: 'summer-aperitif', description: '', isPublic: false, type: 'APEROS',
+      name: 'Summer aperitif',
+      slug: 'summer-aperitif',
+      description: '',
+      isPublic: false,
+      type: 'APEROS',
     });
     await waitFor(() => expect(window.location.pathname).toBe('/admin/menus/9/bottles'));
   });
@@ -154,7 +198,9 @@ describe('MenusPage', () => {
 
     await user.click(within(dialog()).getByRole('button', { name: 'Save' }));
 
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('This slug is already used'));
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('This slug is already used'),
+    );
     expect(within(dialog()).getByDisplayValue('summer')).toBeInTheDocument();
   });
 
@@ -204,7 +250,9 @@ describe('MenusPage', () => {
     const deleted = captureRequest('delete', '/api/menus/:id');
 
     await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
-    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }),
+    );
 
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(deleted.count()).toBe(0);

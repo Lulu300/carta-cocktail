@@ -1,20 +1,38 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import {
-  setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
-  request, authHeader, prisma, seedCocktail, seedMenu, addCocktailToMenu,
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+  request,
+  authHeader,
+  prisma,
+  seedCocktail,
+  seedMenu,
+  addCocktailToMenu,
 } from '../test/helpers';
 import { config } from '../config';
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
 beforeEach(async () => {
   await cleanDatabase();
   await seedRequiredData();
-  await prisma.siteSettings.upsert({ where: { id: 1 }, update: { siteName: 'My Bar' }, create: { siteName: 'My Bar' } });
+  await prisma.siteSettings.upsert({
+    where: { id: 1 },
+    update: { siteName: 'My Bar' },
+    create: { siteName: 'My Bar' },
+  });
 });
 
 const savedPublicBaseUrl = config.publicBaseUrl;
-afterEach(() => { config.publicBaseUrl = savedPublicBaseUrl; });
+afterEach(() => {
+  config.publicBaseUrl = savedPublicBaseUrl;
+});
 
 const HOST = 'carte.test';
 
@@ -23,7 +41,11 @@ function metaContent(html: string, key: string): string | undefined {
   return html.match(new RegExp(`<meta (?:property|name)="${key}" content="([^"]*)">`))?.[1];
 }
 
-async function seedIllustratedCocktail(name: string, imagePath: string, description: string | null = null) {
+async function seedIllustratedCocktail(
+  name: string,
+  imagePath: string,
+  description: string | null = null,
+) {
   const cocktail = await seedCocktail({ name, description });
   return prisma.cocktail.update({ where: { id: cocktail.id }, data: { imagePath } });
 }
@@ -34,7 +56,12 @@ function getShare(path: string) {
 
 describe('GET /api/public/share/menu/:slug', () => {
   it('should describe a public menu with the photo of its first visible illustrated cocktail', async () => {
-    const menu = await seedMenu({ name: 'Summer', slug: 'summer', isPublic: true, description: 'Fresh drinks' });
+    const menu = await seedMenu({
+      name: 'Summer',
+      slug: 'summer',
+      isPublic: true,
+      description: 'Fresh drinks',
+    });
     const plain = await seedCocktail({ name: 'Plain' });
     const hidden = await seedIllustratedCocktail('Hidden', 'hidden.jpg');
     const mojito = await seedIllustratedCocktail('Mojito', 'mojito.jpg');
@@ -126,7 +153,9 @@ describe('GET /api/public/share/menu/:slug/cocktail/:id', () => {
     expect(res.status).toBe(200);
     expect(metaContent(res.text, 'og:title')).toBe('Mojito · My Bar');
     expect(metaContent(res.text, 'og:description')).toBe('Mint and lime');
-    expect(metaContent(res.text, 'og:url')).toBe(`http://${HOST}/menu/summer/cocktail/${mojito.id}`);
+    expect(metaContent(res.text, 'og:url')).toBe(
+      `http://${HOST}/menu/summer/cocktail/${mojito.id}`,
+    );
     expect(metaContent(res.text, 'og:image')).toBe(`http://${HOST}/uploads/mojito.jpg`);
     expect(res.text).not.toContain('good rum');
   });
@@ -144,9 +173,12 @@ describe('GET /api/public/share/menu/:slug/cocktail/:id', () => {
     expect(res.status).toBe(200);
     expect(res.text).not.toContain('<script>');
     expect(res.text).not.toContain('<img');
-    expect(metaContent(res.text, 'og:title'))
-      .toBe('&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; co · My Bar');
-    expect(metaContent(res.text, 'og:description')).toBe('&quot;&gt;&lt;img src=x onerror=alert(1)&gt;');
+    expect(metaContent(res.text, 'og:title')).toBe(
+      '&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; co · My Bar',
+    );
+    expect(metaContent(res.text, 'og:description')).toBe(
+      '&quot;&gt;&lt;img src=x onerror=alert(1)&gt;',
+    );
   });
 
   it('should answer 404 for a cocktail hidden in the menu', async () => {
@@ -172,7 +204,9 @@ describe('GET /api/public/share/menu/:slug/cocktail/:id', () => {
     await addCocktailToMenu(menu.id, cocktail.id);
 
     expect((await getShare(`/menu/draft/cocktail/${cocktail.id}`)).status).toBe(404);
-    expect((await getShare(`/menu/draft/cocktail/${cocktail.id}`).set(authHeader())).status).toBe(404);
+    expect((await getShare(`/menu/draft/cocktail/${cocktail.id}`).set(authHeader())).status).toBe(
+      404,
+    );
   });
 
   it.each(['abc', '0', '1.5'])('should answer 404 for the id %s', async (id) => {

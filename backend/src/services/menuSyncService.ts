@@ -19,7 +19,10 @@ export type BottleMenuType = keyof typeof BOTTLE_MENU_FLAG;
 const BOTTLE_MENU_TYPES = Object.keys(BOTTLE_MENU_FLAG) as BottleMenuType[];
 
 // Created by the seed; A-02 forbids changing their slug and type, so the slug identifies them.
-export const SYSTEM_MENU_SLUGS: Record<BottleMenuType, string> = { APEROS: 'aperitifs', DIGESTIFS: 'digestifs' };
+export const SYSTEM_MENU_SLUGS: Record<BottleMenuType, string> = {
+  APEROS: 'aperitifs',
+  DIGESTIFS: 'digestifs',
+};
 
 interface BottleFlags {
   id: number;
@@ -27,7 +30,11 @@ interface BottleFlags {
   isDigestif: boolean;
 }
 
-const BOTTLE_FLAGS_SELECT = { id: true, isApero: true, isDigestif: true } satisfies Prisma.BottleSelect;
+const BOTTLE_FLAGS_SELECT = {
+  id: true,
+  isApero: true,
+  isDigestif: true,
+} satisfies Prisma.BottleSelect;
 
 interface MenuIdentity {
   id: number;
@@ -49,20 +56,32 @@ export function isAvailableFor(bottle: Omit<BottleFlags, 'id'>, type: BottleMenu
 }
 
 /** Whether a bottle belongs to the system menu of `type`, whose exclusions are `excludedIds`. */
-export function isEligible(bottle: BottleFlags, type: BottleMenuType, excludedIds: ReadonlySet<number>): boolean {
+export function isEligible(
+  bottle: BottleFlags,
+  type: BottleMenuType,
+  excludedIds: ReadonlySet<number>,
+): boolean {
   return isAvailableFor(bottle, type) && !excludedIds.has(bottle.id);
 }
 
 /** Refuses a menu that holds no bottles, or a bottle that is not available for the menu's type. */
-export async function assertBottlesAllowed(db: Db, menu: { type: string }, bottleIds: number[]): Promise<void> {
+export async function assertBottlesAllowed(
+  db: Db,
+  menu: { type: string },
+  bottleIds: number[],
+): Promise<void> {
   const uniqueIds = [...new Set(bottleIds)];
   // An empty list only clears the menu, which any menu allows
   if (uniqueIds.length === 0) return;
   const { type } = menu;
   if (!isBottleMenuType(type)) throw new BadRequestError('errors.bottleNotAllowedInMenu');
 
-  const bottles = await db.bottle.findMany({ where: { id: { in: uniqueIds } }, select: BOTTLE_FLAGS_SELECT });
-  const allAvailable = bottles.length === uniqueIds.length && bottles.every((bottle) => isAvailableFor(bottle, type));
+  const bottles = await db.bottle.findMany({
+    where: { id: { in: uniqueIds } },
+    select: BOTTLE_FLAGS_SELECT,
+  });
+  const allAvailable =
+    bottles.length === uniqueIds.length && bottles.every((bottle) => isAvailableFor(bottle, type));
   if (!allAvailable) throw new BadRequestError('errors.bottleNotAllowedInMenu');
 }
 
@@ -74,14 +93,19 @@ export function assertCocktailsAllowed(menu: { type: string }, cocktailIds: unkn
 }
 
 async function findMenu(db: Db, menuId: number): Promise<MenuIdentity> {
-  const menu = await db.menu.findUnique({ where: { id: menuId }, select: { id: true, slug: true, type: true } });
+  const menu = await db.menu.findUnique({
+    where: { id: menuId },
+    select: { id: true, slug: true, type: true },
+  });
   if (!menu) throw new NotFoundError();
   return menu;
 }
 
 /** Adds the bottle at the end of the menu, visible and outside any section. */
 async function appendBottle(db: Db, menuId: number, bottleId: number): Promise<void> {
-  await db.menuBottle.create({ data: { menuId, bottleId, position: await nextPosition(db, 'menuBottle', menuId) } });
+  await db.menuBottle.create({
+    data: { menuId, bottleId, position: await nextPosition(db, 'menuBottle', menuId) },
+  });
 }
 
 /** The type of a system menu, or an error naming why the menu cannot be synchronized. */
@@ -105,7 +129,10 @@ export async function syncMenu(
   // Filtered here rather than in the queries: an import's id list could pass SQLite's parameter limit
   const inScope = (bottleId: number) => !onlyBottleIds || onlyBottleIds.has(bottleId);
 
-  const exclusions = await db.menuBottleExclusion.findMany({ where: { menuId }, select: { bottleId: true } });
+  const exclusions = await db.menuBottleExclusion.findMany({
+    where: { menuId },
+    select: { bottleId: true },
+  });
   const excludedIds = new Set(exclusions.map((exclusion) => exclusion.bottleId));
   const bottles = await db.bottle.findMany({
     select: BOTTLE_FLAGS_SELECT,
@@ -116,7 +143,10 @@ export async function syncMenu(
     .map((bottle) => bottle.id);
   const eligibleSet = new Set(eligibleIds);
 
-  const menuEntries = await db.menuBottle.findMany({ where: { menuId }, select: { id: true, bottleId: true } });
+  const menuEntries = await db.menuBottle.findMany({
+    where: { menuId },
+    select: { id: true, bottleId: true },
+  });
   const entries = menuEntries.filter((entry) => inScope(entry.bottleId));
   const presentIds = new Set(entries.map((entry) => entry.bottleId));
   const toAdd = eligibleIds.filter((bottleId) => !presentIds.has(bottleId));
@@ -155,7 +185,10 @@ async function addToSystemMenu(db: Db, bottle: BottleFlags, type: BottleMenuType
  * Exclusions are kept: a bottle unchecked then checked again stays excluded.
  */
 export async function syncBottle(db: Db, bottleId: number): Promise<void> {
-  const bottle = await db.bottle.findUniqueOrThrow({ where: { id: bottleId }, select: BOTTLE_FLAGS_SELECT });
+  const bottle = await db.bottle.findUniqueOrThrow({
+    where: { id: bottleId },
+    select: BOTTLE_FLAGS_SELECT,
+  });
   for (const type of BOTTLE_MENU_TYPES) {
     if (isAvailableFor(bottle, type)) {
       await addToSystemMenu(db, bottle, type);
@@ -193,7 +226,11 @@ export async function addBottles(db: Db, menuId: number, bottleIds: number[]): P
 
   const firstPosition = await nextPosition(db, 'menuBottle', menuId);
   await db.menuBottle.createMany({
-    data: uniqueIds.map((bottleId, index) => ({ menuId, bottleId, position: firstPosition + index })),
+    data: uniqueIds.map((bottleId, index) => ({
+      menuId,
+      bottleId,
+      position: firstPosition + index,
+    })),
   });
 }
 
@@ -212,7 +249,9 @@ export async function excludeBottles(db: Db, menuId: number, bottleIds: number[]
   if (entries.length === 0) return;
 
   await db.menuBottle.deleteMany({ where: { id: { in: entries.map((entry) => entry.id) } } });
-  await db.menuBottleExclusion.createMany({ data: entries.map(({ bottleId }) => ({ menuId, bottleId })) });
+  await db.menuBottleExclusion.createMany({
+    data: entries.map(({ bottleId }) => ({ menuId, bottleId })),
+  });
 }
 
 /**

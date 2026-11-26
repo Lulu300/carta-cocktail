@@ -6,7 +6,9 @@ import SearchInput from './SearchInput';
 
 function Harness({ placeholder }: { placeholder?: string }) {
   const [value, setValue] = useState('');
-  return <SearchInput value={value} onChange={setValue} label="Search units" placeholder={placeholder} />;
+  return (
+    <SearchInput value={value} onChange={setValue} label="Search units" placeholder={placeholder} />
+  );
 }
 
 describe('SearchInput', () => {
@@ -20,7 +22,10 @@ describe('SearchInput', () => {
 
   it('keeps a given placeholder', () => {
     render(<Harness placeholder="Name or abbreviation" />);
-    expect(screen.getByLabelText('Search units')).toHaveAttribute('placeholder', 'Name or abbreviation');
+    expect(screen.getByLabelText('Search units')).toHaveAttribute(
+      'placeholder',
+      'Name or abbreviation',
+    );
   });
 
   it('shows a named clear button only once something is typed', async () => {

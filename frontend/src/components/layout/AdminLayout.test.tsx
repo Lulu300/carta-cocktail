@@ -7,7 +7,12 @@ import { axe } from '../../test/axe';
 import { AppProviders } from '../../test/appProviders';
 import { buildShortage, buildSiteSettings } from '../../test/factories';
 import { ADMIN_USER } from '../../test/msw/handlers';
-import { captureRequest, mockApiError, mockApiResponse, type CapturedRequest } from '../../test/msw/utils';
+import {
+  captureRequest,
+  mockApiError,
+  mockApiResponse,
+  type CapturedRequest,
+} from '../../test/msw/utils';
 import AdminLayout from './AdminLayout';
 
 const twoShortages = [buildShortage(), buildShortage()];
@@ -46,7 +51,14 @@ function renderLayoutWithBrokenPages() {
           <Route index element={<p>dashboard page</p>} />
           <Route path="units" element={<p>units page</p>} />
           <Route path="categories" element={<BrokenPage />} />
-          <Route path="bottles" element={<Suspense fallback={null}><MissingChunkPage /></Suspense>} />
+          <Route
+            path="bottles"
+            element={
+              <Suspense fallback={null}>
+                <MissingChunkPage />
+              </Suspense>
+            }
+          />
         </Route>
       </Routes>
     </AppProviders>,
@@ -143,8 +155,13 @@ describe('AdminLayout accessibility', () => {
     renderLayout();
     const nav = screen.getByRole('navigation', { name: 'Administration' });
 
-    expect(within(nav).getByRole('link', { name: 'Categories' })).toHaveAttribute('aria-current', 'page');
-    expect(within(nav).getByRole('link', { name: 'Dashboard' })).not.toHaveAttribute('aria-current');
+    expect(within(nav).getByRole('link', { name: 'Categories' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(within(nav).getByRole('link', { name: 'Dashboard' })).not.toHaveAttribute(
+      'aria-current',
+    );
     expect(within(nav).getByText('🏷️')).toHaveAttribute('aria-hidden', 'true');
     await waitForLayoutData();
   });
@@ -259,7 +276,9 @@ describe('AdminLayout upgrade notice', () => {
     });
     renderLayout();
 
-    expect(await screen.findByRole('heading', { name: /^Upgrade from v.+ to v.+$/ })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: /^Upgrade from v.+ to v.+$/ }),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole('link', { name: /Units/ }));
 
     expect(await screen.findByText('units page')).toBeInTheDocument();
@@ -273,7 +292,9 @@ describe('AdminLayout width', () => {
     renderLayout();
     await waitForLayoutData();
 
-    expect(screen.getByRole('navigation', { name: 'Administration' }).closest('aside')).toHaveClass('lg:shrink-0');
+    expect(screen.getByRole('navigation', { name: 'Administration' }).closest('aside')).toHaveClass(
+      'lg:shrink-0',
+    );
     expect(screen.getByRole('main').parentElement).toHaveClass('min-w-0');
   });
 });
@@ -297,7 +318,9 @@ describe('AdminLayout page error', () => {
     expect(screen.getByRole('navigation', { name: 'Administration' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Logout' })).toBeInTheDocument();
     expect(screen.getByRole('main')).toContainElement(alert);
-    expect(within(screen.getByRole('main')).getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/admin');
+    expect(
+      within(screen.getByRole('main')).getByRole('link', { name: 'Dashboard' }),
+    ).toHaveAttribute('href', '/admin');
     // The site name of the sidebar is empty until the settings arrive
     await screen.findByRole('link', { name: /Chez Lulu/ });
     expect(await axe(container)).toHaveNoViolations();
@@ -308,7 +331,11 @@ describe('AdminLayout page error', () => {
     renderLayoutWithBrokenPages();
     await screen.findByRole('alert');
 
-    await userEvent.click(within(screen.getByRole('navigation', { name: 'Administration' })).getByRole('link', { name: /Units/ }));
+    await userEvent.click(
+      within(screen.getByRole('navigation', { name: 'Administration' })).getByRole('link', {
+        name: /Units/,
+      }),
+    );
 
     expect(await screen.findByText('units page')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -319,7 +346,9 @@ describe('AdminLayout page error', () => {
     renderLayoutWithBrokenPages();
     await screen.findByRole('alert');
 
-    await userEvent.click(within(screen.getByRole('main')).getByRole('link', { name: 'Dashboard' }));
+    await userEvent.click(
+      within(screen.getByRole('main')).getByRole('link', { name: 'Dashboard' }),
+    );
 
     expect(await screen.findByText('dashboard page')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();

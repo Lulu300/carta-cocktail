@@ -10,20 +10,33 @@ import { updateMenu, useMenuMutation, type MenuMutation, type MenuState } from '
 export type CocktailsEdit = (cocktails: MenuCocktail[]) => MenuCocktail[];
 
 export const cocktailsEdits = {
-  update: (cocktailId: number, changes: Pick<Partial<MenuCocktail>, 'isHidden' | 'menuSectionId'>): CocktailsEdit =>
-    (cocktails) => cocktails.map((item) => (item.cocktailId === cocktailId ? { ...item, ...changes } : item)),
+  update:
+    (
+      cocktailId: number,
+      changes: Pick<Partial<MenuCocktail>, 'isHidden' | 'menuSectionId'>,
+    ): CocktailsEdit =>
+    (cocktails) =>
+      cocktails.map((item) => (item.cocktailId === cocktailId ? { ...item, ...changes } : item)),
 
-  remove: (cocktailId: number): CocktailsEdit =>
-    (cocktails) => cocktails.filter((item) => item.cocktailId !== cocktailId),
+  remove:
+    (cocktailId: number): CocktailsEdit =>
+    (cocktails) =>
+      cocktails.filter((item) => item.cocktailId !== cocktailId),
 
-  add: (added: MenuCocktail): CocktailsEdit =>
-    (cocktails) => (cocktails.some((item) => item.cocktailId === added.cocktailId) ? cocktails : [...cocktails, added]),
+  add:
+    (added: MenuCocktail): CocktailsEdit =>
+    (cocktails) =>
+      cocktails.some((item) => item.cocktailId === added.cocktailId)
+        ? cocktails
+        : [...cocktails, added],
 
   /** The cocktails in the given order; one missing from it keeps its place after them. */
-  order: (cocktailIds: number[]): CocktailsEdit => (cocktails) => [
-    ...cocktailIds.flatMap((id) => cocktails.filter((item) => item.cocktailId === id)),
-    ...cocktails.filter((item) => !cocktailIds.includes(item.cocktailId)),
-  ],
+  order:
+    (cocktailIds: number[]): CocktailsEdit =>
+    (cocktails) => [
+      ...cocktailIds.flatMap((id) => cocktails.filter((item) => item.cocktailId === id)),
+      ...cocktails.filter((item) => !cocktailIds.includes(item.cocktailId)),
+    ],
 };
 
 function withPositions(cocktails: MenuCocktail[]): MenuCocktail[] {
@@ -41,14 +54,18 @@ function editedCocktails(state: MenuState, edit: CocktailsEdit): MenuCocktail[] 
 export function useSaveMenuCocktails(menuId: number): MenuMutation<CocktailsEdit> {
   return useMenuMutation<CocktailsEdit>({
     menuId,
-    mutationFn: (edit, confirmed) => menusApi.update(menuId, {
-      cocktails: editedCocktails(confirmed, edit).map(({ cocktailId, position, isHidden, menuSectionId }) => ({
-        cocktailId,
-        position,
-        isHidden,
-        menuSectionId,
-      })),
-    }),
-    applyOptimistic: (state, edit) => updateMenu(state, (menu) => ({ ...menu, cocktails: editedCocktails(state, edit) })),
+    mutationFn: (edit, confirmed) =>
+      menusApi.update(menuId, {
+        cocktails: editedCocktails(confirmed, edit).map(
+          ({ cocktailId, position, isHidden, menuSectionId }) => ({
+            cocktailId,
+            position,
+            isHidden,
+            menuSectionId,
+          }),
+        ),
+      }),
+    applyOptimistic: (state, edit) =>
+      updateMenu(state, (menu) => ({ ...menu, cocktails: editedCocktails(state, edit) })),
   });
 }

@@ -1,8 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import { setupTestDatabase, teardownTestDatabase, request, prisma } from '../test/helpers';
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
@@ -31,7 +35,9 @@ describe('GET /api/health', () => {
   });
 
   it('answers 503 with the status only when the database query fails', async () => {
-    vi.spyOn(prisma, '$queryRaw').mockRejectedValueOnce(new Error('SQLITE_CANTOPEN: /app/data/carta_cocktail.db'));
+    vi.spyOn(prisma, '$queryRaw').mockRejectedValueOnce(
+      new Error('SQLITE_CANTOPEN: /app/data/carta_cocktail.db'),
+    );
     const res = await request.get('/api/health');
     expect(res.status).toBe(503);
     expect(res.body).toEqual({ status: 'unavailable' });

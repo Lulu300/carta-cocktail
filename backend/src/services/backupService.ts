@@ -93,7 +93,8 @@ export async function readSchemaVersion(client: PrismaClient): Promise<string | 
  */
 export function latestAppMigration(migrationsDir: string = MIGRATIONS_DIR): string | null {
   if (!fs.existsSync(migrationsDir)) return null;
-  const migrations = fs.readdirSync(migrationsDir, { withFileTypes: true })
+  const migrations = fs
+    .readdirSync(migrationsDir, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort();
@@ -178,7 +179,8 @@ async function validateDatabase(dbPath: string): Promise<string | null> {
 
   const client = createPrismaClient(`file:${dbPath}`);
   try {
-    const [integrity] = await client.$queryRawUnsafe<{ integrity_check: string }[]>('PRAGMA integrity_check;');
+    const [integrity] =
+      await client.$queryRawUnsafe<{ integrity_check: string }[]>('PRAGMA integrity_check;');
     if (integrity?.integrity_check !== 'ok') throw new BadRequestError('errors.invalidBackup');
 
     const tables = await listTables(client);
@@ -230,7 +232,10 @@ async function readLiveState(): Promise<LiveState> {
  * Returns false for a backup made before the tokenVersion column existed: its
  * migration adds the column at the next start, and the session floor raises it then.
  */
-async function raiseRestoredTokenVersion(client: PrismaClient, liveTokenVersion: number): Promise<boolean> {
+async function raiseRestoredTokenVersion(
+  client: PrismaClient,
+  liveTokenVersion: number,
+): Promise<boolean> {
   if (!(await hasTokenVersionColumn(client))) return false;
   await client.$executeRaw`UPDATE "User" SET "tokenVersion" = MAX("tokenVersion", ${liveTokenVersion}) + 1`;
   return true;
@@ -243,7 +248,10 @@ async function raiseRestoredTokenVersion(client: PrismaClient, liveTokenVersion:
  * made before the table existed gets it, empty, from its migration at the next
  * start, which then records the running version without a notice.
  */
-async function keepLiveAppState(client: PrismaClient, liveAppState: AppState | null): Promise<void> {
+async function keepLiveAppState(
+  client: PrismaClient,
+  liveAppState: AppState | null,
+): Promise<void> {
   if (!(await listTables(client)).includes('AppState')) return;
   await client.$transaction([
     client.appState.deleteMany(),
@@ -313,7 +321,12 @@ interface UploadsSwap {
   movedIn: string[];
 }
 
-function moveEntries(fromDir: string, toDir: string, names: string[], onMoved?: (name: string) => void): void {
+function moveEntries(
+  fromDir: string,
+  toDir: string,
+  names: string[],
+  onMoved?: (name: string) => void,
+): void {
   for (const name of names) {
     fs.renameSync(path.join(fromDir, name), path.join(toDir, name));
     onMoved?.(name);
@@ -348,7 +361,10 @@ function removePreviousUploads(asideDir: string): void {
   try {
     fs.rmSync(asideDir, { recursive: true, force: true });
   } catch (err) {
-    console.warn(`Backup restored, but the previous uploads could not be deleted from ${asideDir}:`, err);
+    console.warn(
+      `Backup restored, but the previous uploads could not be deleted from ${asideDir}:`,
+      err,
+    );
   }
 }
 
@@ -370,7 +386,10 @@ async function putBackPreviousDatabase(preRestorePath: string, dbPath: string): 
 
 /** `20261011-153700123`: sortable, and readable in the backups folder. */
 function fileTimestamp(date: Date): string {
-  return date.toISOString().replace(/[-:.Z]/g, '').replace('T', '-');
+  return date
+    .toISOString()
+    .replace(/[-:.Z]/g, '')
+    .replace('T', '-');
 }
 
 /**

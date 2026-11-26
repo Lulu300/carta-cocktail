@@ -3,7 +3,11 @@ import userEvent from '@testing-library/user-event';
 import { render, screen } from '../../test/test-utils';
 import SortableHeader from './SortableHeader';
 
-function renderHeader(currentSortKey: string | null, sortDirection: 'asc' | 'desc' = 'asc', onSort = vi.fn()) {
+function renderHeader(
+  currentSortKey: string | null,
+  sortDirection: 'asc' | 'desc' = 'asc',
+  onSort = vi.fn(),
+) {
   render(
     <table>
       <thead>

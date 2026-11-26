@@ -30,7 +30,16 @@ export default function BottleHistoryTable({ bottles, onEdit, onDelete }: Bottle
         aria-expanded={isOpen}
         className="flex items-center gap-2 text-fg-muted hover:text-fg transition-colors mb-3"
       >
-        <svg aria-hidden="true" className={cx('w-4 h-4 transition-transform motion-reduce:transition-none', isOpen && 'rotate-90')} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg
+          aria-hidden="true"
+          className={cx(
+            'w-4 h-4 transition-transform motion-reduce:transition-none',
+            isOpen && 'rotate-90',
+          )}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
         <span className="text-sm font-semibold uppercase tracking-wider">
@@ -40,30 +49,36 @@ export default function BottleHistoryTable({ bottles, onEdit, onDelete }: Bottle
       {isOpen && (
         <div className="bg-surface border border-line rounded-xl overflow-hidden opacity-60">
           <ScrollableTable>
-          <table className="w-full">
-            <thead className="bg-canvas">
-              <tr>
-                <th className={cx(HEADER_CLASSES, 'text-left')}>{t('bottles.name')}</th>
-                <th className={cx(HEADER_CLASSES, 'text-left')}>{t('bottles.category')}</th>
-                <th className={cx(HEADER_CLASSES, 'text-left')}>{t('bottles.capacityMl')}</th>
-                <th className={cx(HEADER_CLASSES, 'text-left')}>{t('bottles.purchasePrice')}</th>
-                <th className={cx(HEADER_CLASSES, 'text-right')}>{t('common.actions')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line text-fg-muted">
-              {bottles.map((bottle) => (
-                <tr key={bottle.id} className="hover:bg-line/50">
-                  <td className="px-6 py-4 font-medium">{bottle.name}</td>
-                  <td className="px-6 py-4">{bottle.category ? localize(bottle.category) : ''}</td>
-                  <td className="px-6 py-4">{t('units.ml', { value: bottle.capacityMl })}</td>
-                  <td className="px-6 py-4">{bottle.purchasePrice ? formatPrice(bottle.purchasePrice, i18n.language) : '-'}</td>
-                  <td className="px-6 py-4 text-right">
-                    <BottleRowActions bottle={bottle} onEdit={onEdit} onDelete={onDelete} />
-                  </td>
+            <table className="w-full">
+              <thead className="bg-canvas">
+                <tr>
+                  <th className={cx(HEADER_CLASSES, 'text-left')}>{t('bottles.name')}</th>
+                  <th className={cx(HEADER_CLASSES, 'text-left')}>{t('bottles.category')}</th>
+                  <th className={cx(HEADER_CLASSES, 'text-left')}>{t('bottles.capacityMl')}</th>
+                  <th className={cx(HEADER_CLASSES, 'text-left')}>{t('bottles.purchasePrice')}</th>
+                  <th className={cx(HEADER_CLASSES, 'text-right')}>{t('common.actions')}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-line text-fg-muted">
+                {bottles.map((bottle) => (
+                  <tr key={bottle.id} className="hover:bg-line/50">
+                    <td className="px-6 py-4 font-medium">{bottle.name}</td>
+                    <td className="px-6 py-4">
+                      {bottle.category ? localize(bottle.category) : ''}
+                    </td>
+                    <td className="px-6 py-4">{t('units.ml', { value: bottle.capacityMl })}</td>
+                    <td className="px-6 py-4">
+                      {bottle.purchasePrice
+                        ? formatPrice(bottle.purchasePrice, i18n.language)
+                        : '-'}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <BottleRowActions bottle={bottle} onEdit={onEdit} onDelete={onDelete} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </ScrollableTable>
         </div>
       )}

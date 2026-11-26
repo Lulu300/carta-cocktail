@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData, prisma, seedUnit } from '../test/helpers';
+import {
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+  prisma,
+  seedUnit,
+} from '../test/helpers';
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import { TEST_DATABASE_URL } from '../test/testDatabase';
 import { createPrismaClient } from './prisma';
@@ -43,9 +50,16 @@ describe('Lock', () => {
 });
 
 describe('queries during an interactive transaction', () => {
-  beforeAll(async () => { await setupTestDatabase(); });
-  afterAll(async () => { await teardownTestDatabase(); });
-  beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
+  beforeAll(async () => {
+    await setupTestDatabase();
+  });
+  afterAll(async () => {
+    await teardownTestDatabase();
+  });
+  beforeEach(async () => {
+    await cleanDatabase();
+    await seedRequiredData();
+  });
 
   /** Opens a transaction that writes a unit, waits, then rolls back. */
   function rolledBackTransaction(): Promise<unknown> {
@@ -61,7 +75,9 @@ describe('queries during an interactive transaction', () => {
     const transaction = rolledBackTransaction().catch(() => events.push('rolled back'));
     await sleep(50);
 
-    await seedUnit({ name: 'Outside', abbreviation: 'oth' }).then(() => events.push('outside write done'));
+    await seedUnit({ name: 'Outside', abbreviation: 'oth' }).then(() =>
+      events.push('outside write done'),
+    );
     await transaction;
 
     // Prisma 6 order: the outside write waits for the transaction to end
@@ -106,7 +122,9 @@ describe('queries during an interactive transaction', () => {
     // Another connection only sees committed rows
     const other = createPrismaClient(TEST_DATABASE_URL);
     try {
-      const committed = await other.unit.findMany({ where: { abbreviation: { in: ['nxt', 'nwr'] } } });
+      const committed = await other.unit.findMany({
+        where: { abbreviation: { in: ['nxt', 'nwr'] } },
+      });
       expect(committed.map((unit) => unit.abbreviation).sort()).toEqual(['nwr', 'nxt']);
     } finally {
       await other.$disconnect();
@@ -118,7 +136,7 @@ describe('queries during an interactive transaction', () => {
     await sleep(50);
 
     const [{ count }] = await prisma.$queryRawUnsafe<{ count: number | bigint }[]>(
-      "SELECT COUNT(*) AS count FROM \"Unit\" WHERE abbreviation = 'txu';",
+      'SELECT COUNT(*) AS count FROM "Unit" WHERE abbreviation = \'txu\';',
     );
     await transaction;
 
@@ -130,11 +148,17 @@ describe('serializeTransactions', () => {
   /** An adapter that records its calls; startTransaction fails when `failStart` is set. */
   function fakeAdapter(events: string[], failStart = false): SqliteAdapter {
     const transaction = {
-      commit: async () => { events.push('commit'); },
-      rollback: async () => { events.push('rollback'); },
+      commit: async () => {
+        events.push('commit');
+      },
+      rollback: async () => {
+        events.push('rollback');
+      },
     };
     return {
-      executeScript: async (script: string) => { events.push(script); },
+      executeScript: async (script: string) => {
+        events.push(script);
+      },
       startTransaction: async () => {
         if (failStart) throw new Error('cannot begin');
         events.push('begin');
@@ -163,20 +187,27 @@ describe('serializeTransactions', () => {
         events.push('ROLLBACK');
         throw new Error(message);
       },
-      rollback: async () => { events.push('rollback'); },
+      rollback: async () => {
+        events.push('rollback');
+      },
     };
   }
 
   function adapterWith(transaction: object, events: string[]): SqliteAdapter {
     return {
-      executeScript: async (script: string) => { events.push(script); },
+      executeScript: async (script: string) => {
+        events.push(script);
+      },
       startTransaction: async () => transaction,
     } as unknown as SqliteAdapter;
   }
 
   it('should ignore the error of a ROLLBACK when Prisma has already rolled back', async () => {
     const events: string[] = [];
-    const transaction = transactionFailingRollback(events, 'cannot rollback - no transaction is active');
+    const transaction = transactionFailingRollback(
+      events,
+      'cannot rollback - no transaction is active',
+    );
     const adapter = serializeTransactions(adapterWith(transaction, events));
 
     await (await adapter.startTransaction()).rollback();

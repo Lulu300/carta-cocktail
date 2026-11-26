@@ -6,7 +6,15 @@ import FileDropzone from './FileDropzone';
 function renderDropzone(props: Partial<Parameters<typeof FileDropzone>[0]> = {}) {
   const onFile = vi.fn();
   const onReject = vi.fn();
-  render(<FileDropzone accept=".json,.zip" onFile={onFile} onReject={onReject} label="Drop a file" {...props} />);
+  render(
+    <FileDropzone
+      accept=".json,.zip"
+      onFile={onFile}
+      onReject={onReject}
+      label="Drop a file"
+      {...props}
+    />,
+  );
   return { onFile, onReject, button: screen.getByRole('button', { name: /Drop a file/ }) };
 }
 

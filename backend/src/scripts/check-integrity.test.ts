@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { spawnSync } from 'child_process';
 import path from 'path';
-import { setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData } from '../test/helpers';
+import {
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+} from '../test/helpers';
 import { TEST_DATABASE_URL } from '../test/testDatabase';
 
 // The script runs as UPGRADING.md documents it: in its own process
@@ -13,13 +18,24 @@ function runScript(databaseUrl: string | undefined) {
   const env = { ...process.env };
   delete env.DATABASE_URL;
   if (databaseUrl !== undefined) env.DATABASE_URL = databaseUrl;
-  return spawnSync(TSX, ['src/scripts/check-integrity.ts', '--counts-only'], { cwd: BACKEND_DIR, env, encoding: 'utf8' });
+  return spawnSync(TSX, ['src/scripts/check-integrity.ts', '--counts-only'], {
+    cwd: BACKEND_DIR,
+    env,
+    encoding: 'utf8',
+  });
 }
 
 describe('src/scripts/check-integrity.ts', () => {
-  beforeAll(async () => { await setupTestDatabase(); });
-  afterAll(async () => { await teardownTestDatabase(); });
-  beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
+  beforeAll(async () => {
+    await setupTestDatabase();
+  });
+  afterAll(async () => {
+    await teardownTestDatabase();
+  });
+  beforeEach(async () => {
+    await cleanDatabase();
+    await seedRequiredData();
+  });
 
   it('should exit with 2 and say so when DATABASE_URL is not set', () => {
     const result = runScript(undefined);

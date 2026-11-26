@@ -18,7 +18,9 @@ export default function ChoiceButton({ selected, disabled, onClick, children }: 
       aria-pressed={selected}
       className={cx(
         'text-xs px-3 py-1.5 rounded-lg transition-colors border disabled:opacity-50 disabled:cursor-not-allowed',
-        selected ? 'bg-accent/10 text-accent border-accent/50' : 'text-fg-muted border-gray-700 hover:border-gray-500',
+        selected
+          ? 'bg-accent/10 text-accent border-accent/50'
+          : 'text-fg-muted border-gray-700 hover:border-gray-500',
       )}
     >
       {children}

@@ -13,7 +13,8 @@ interface PaginationProps {
 }
 
 // 40x40 px minimum hit area, like IconButton.
-const PAGE_BUTTON_BASE = 'inline-flex items-center justify-center min-w-10 min-h-10 px-2 text-sm rounded-lg transition-colors';
+const PAGE_BUTTON_BASE =
+  'inline-flex items-center justify-center min-w-10 min-h-10 px-2 text-sm rounded-lg transition-colors';
 const PAGE_BUTTON_CLASSES = cx(
   PAGE_BUTTON_BASE,
   'text-fg-muted hover:text-fg hover:bg-line disabled:opacity-30 disabled:cursor-not-allowed',
@@ -21,8 +22,12 @@ const PAGE_BUTTON_CLASSES = cx(
 const CURRENT_PAGE_CLASSES = cx(PAGE_BUTTON_BASE, 'bg-accent text-on-accent font-semibold');
 
 export default function Pagination({
-  page, totalPages, pageSize, totalItems,
-  onPageChange, onPageSizeChange,
+  page,
+  totalPages,
+  pageSize,
+  totalItems,
+  onPageChange,
+  onPageSizeChange,
   pageSizeOptions = [10, 25, 50, 100],
 }: PaginationProps) {
   const { t } = useTranslation();
@@ -37,7 +42,9 @@ export default function Pagination({
     <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-6 py-3 border-t border-line">
       <div className="flex items-center gap-3 text-sm text-fg-muted">
         <span>{t('pagination.showing', { start, end, total: totalItems })}</span>
-        <label htmlFor={pageSizeId} className="sr-only">{t('pagination.pageSize')}</label>
+        <label htmlFor={pageSizeId} className="sr-only">
+          {t('pagination.pageSize')}
+        </label>
         <select
           id={pageSizeId}
           value={pageSize}
@@ -45,7 +52,9 @@ export default function Pagination({
           className="bg-canvas border border-line-strong rounded px-2 py-1 text-fg text-sm"
         >
           {pageSizeOptions.map((size) => (
-            <option key={size} value={size}>{size} / {t('pagination.page')}</option>
+            <option key={size} value={size}>
+              {size} / {t('pagination.page')}
+            </option>
           ))}
         </select>
       </div>
@@ -73,7 +82,9 @@ export default function Pagination({
 
           {getPageNumbers(page, totalPages).map((p, i) =>
             p === '...' ? (
-              <span key={`ellipsis-${i}`} aria-hidden="true" className="px-2 text-sm text-fg-muted">...</span>
+              <span key={`ellipsis-${i}`} aria-hidden="true" className="px-2 text-sm text-fg-muted">
+                ...
+              </span>
             ) : (
               <button
                 key={p}
@@ -85,7 +96,7 @@ export default function Pagination({
               >
                 {p}
               </button>
-            )
+            ),
           )}
 
           <button

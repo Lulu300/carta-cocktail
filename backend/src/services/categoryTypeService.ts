@@ -26,7 +26,10 @@ export function requireNewCategoryTypeName(name: string, path: PropertyKey[]): s
   const typeName = newCategoryTypeName(name);
   const checked = RequiredText.safeParse(typeName);
   if (!checked.success) {
-    throw new BadRequestError('errors.validationError', checked.error.issues.map((issue) => toValidationIssue(path, issue)));
+    throw new BadRequestError(
+      'errors.validationError',
+      checked.error.issues.map((issue) => toValidationIssue(path, issue)),
+    );
   }
   return typeName;
 }
@@ -42,7 +45,11 @@ export function requireNewCategoryTypeName(name: string, path: PropertyKey[]): s
  * `typePath` is where the request sent the name: a blank new name is refused with a 400 that
  * points there, like the other issues of the request. The default is the category routes' own.
  */
-export async function ensureCategoryType(db: Db, name: string, typePath: PropertyKey[] = ['body', 'type']): Promise<string> {
+export async function ensureCategoryType(
+  db: Db,
+  name: string,
+  typePath: PropertyKey[] = ['body', 'type'],
+): Promise<string> {
   const typeName = await categoryTypeNameFor(db, name, typePath);
   await createMissingCategoryType(db, typeName);
   return typeName;
@@ -55,7 +62,11 @@ export async function ensureCategoryType(db: Db, name: string, typePath: Propert
  * a category to create before it knows whether it reuses an existing category instead (C-19): the
  * request is valid or not whatever the database holds, and a reused category creates no type.
  */
-export async function categoryTypeNameFor(db: Db, name: string, typePath: PropertyKey[]): Promise<string> {
+export async function categoryTypeNameFor(
+  db: Db,
+  name: string,
+  typePath: PropertyKey[],
+): Promise<string> {
   const existing = await db.categoryType.findUnique({ where: { name } });
   if (existing) return existing.name;
   return requireNewCategoryTypeName(name, typePath);
@@ -63,5 +74,9 @@ export async function categoryTypeNameFor(db: Db, name: string, typePath: Proper
 
 /** The write half of `ensureCategoryType`: creates, in gray, the type `categoryTypeNameFor` named if it is new. */
 export async function createMissingCategoryType(db: Db, typeName: string): Promise<void> {
-  await db.categoryType.upsert({ where: { name: typeName }, update: {}, create: { name: typeName, color: 'gray' } });
+  await db.categoryType.upsert({
+    where: { name: typeName },
+    update: {},
+    create: { name: typeName, color: 'gray' },
+  });
 }

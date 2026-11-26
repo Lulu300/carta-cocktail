@@ -17,7 +17,10 @@ const loginSchemas = { body: LoginBody };
  */
 async function upgradePasswordHash(userId: number, password: string): Promise<void> {
   try {
-    await prisma.user.update({ where: { id: userId }, data: { passwordHash: await hashPassword(password) } });
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: await hashPassword(password) },
+    });
   } catch (err) {
     console.warn('Could not rehash the admin password at the current bcrypt cost:', err);
   }

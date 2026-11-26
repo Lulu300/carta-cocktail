@@ -28,7 +28,11 @@ describe('validate', () => {
     const res = await buildApp().post('/items/12?page=2').send({ name: 'Rum' });
 
     expect(res.status).toBe(200);
-    expect(res.body.valid).toEqual({ params: { id: 12 }, query: { page: 2 }, body: { name: 'Rum' } });
+    expect(res.body.valid).toEqual({
+      params: { id: 12 },
+      query: { page: 2 },
+      body: { name: 'Rum' },
+    });
   });
 
   it('removes unknown keys from the body', async () => {
@@ -53,6 +57,10 @@ describe('validate', () => {
     const res = await buildApp().post('/items/0?page=x').send({ name: 42 });
 
     expect(res.status).toBe(400);
-    expect(res.body.details.map((d: { path: string }) => d.path)).toEqual(['params.id', 'query.page', 'body.name']);
+    expect(res.body.details.map((d: { path: string }) => d.path)).toEqual([
+      'params.id',
+      'query.page',
+      'body.name',
+    ]);
   });
 });

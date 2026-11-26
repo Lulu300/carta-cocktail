@@ -34,9 +34,11 @@ const profileSchemas = { body: ProfileUpdate };
 router.put('/profile', validate(profileSchemas), async (req: AuthRequest, res: Response) => {
   const { email, currentPassword, newPassword } = valid<typeof profileSchemas>(res).body;
 
-  if (email && !EmailAddress.safeParse(email).success) throw new BadRequestError('errors.invalidEmail');
+  if (email && !EmailAddress.safeParse(email).success)
+    throw new BadRequestError('errors.invalidEmail');
   // New passwords only: a shorter password set before this rule still logs in
-  if (newPassword && newPassword.length < MIN_PASSWORD_LENGTH) throw new BadRequestError('errors.passwordTooShort');
+  if (newPassword && newPassword.length < MIN_PASSWORD_LENGTH)
+    throw new BadRequestError('errors.passwordTooShort');
 
   const user = await prisma.user.findUnique({ where: { id: req.userId } });
   if (!user) throw new NotFoundError();

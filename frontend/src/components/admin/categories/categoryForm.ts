@@ -1,5 +1,9 @@
 import type { Category, CategoryType } from '../../../types';
-import { buildNameTranslations, toTranslationForm, type TranslationForm } from '../../../utils/translations';
+import {
+  buildNameTranslations,
+  toTranslationForm,
+  type TranslationForm,
+} from '../../../utils/translations';
 import { tidyName } from '../../../utils/invisibleCharacters';
 
 /** Value of the type select meaning "a type that is not in the list yet", typed by hand. */

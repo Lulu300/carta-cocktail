@@ -19,7 +19,13 @@ export interface ImportReferenceLists {
 }
 
 /** Lists an import can create entries in: refreshed after a confirmation that created some. */
-export const IMPORT_REFERENCE_KEYS = [qk.units, qk.categories, qk.bottles, qk.ingredients, qk.categoryTypes];
+export const IMPORT_REFERENCE_KEYS = [
+  qk.units,
+  qk.categories,
+  qk.bottles,
+  qk.ingredients,
+  qk.categoryTypes,
+];
 
 /**
  * Loads the lists once for the whole wizard. Called by the wizard rather than by

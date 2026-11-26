@@ -10,11 +10,16 @@ export default function DeletionImpactList({ impact }: { impact: DeletionImpact 
     <div className="space-y-3">
       {cocktails.length > 0 && (
         <div>
-          <p className="font-medium">{t('deletion.forced.cocktails', { count: cocktails.length })}</p>
+          <p className="font-medium">
+            {t('deletion.forced.cocktails', { count: cocktails.length })}
+          </p>
           <ul className="mt-1 list-disc pl-5">
             {cocktails.map((cocktail) => (
               <li key={cocktail.id}>
-                {t('deletion.forced.cocktailLines', { name: cocktail.name, count: cocktail.removedLines })}
+                {t('deletion.forced.cocktailLines', {
+                  name: cocktail.name,
+                  count: cocktail.removedLines,
+                })}
               </li>
             ))}
           </ul>
@@ -24,7 +29,9 @@ export default function DeletionImpactList({ impact }: { impact: DeletionImpact 
         <div>
           <p className="font-medium">{t('deletion.forced.bottles', { count: bottles.length })}</p>
           <ul className="mt-1 list-disc pl-5">
-            {bottles.map((bottle) => <li key={bottle.id}>{bottle.name}</li>)}
+            {bottles.map((bottle) => (
+              <li key={bottle.id}>{bottle.name}</li>
+            ))}
           </ul>
         </div>
       )}

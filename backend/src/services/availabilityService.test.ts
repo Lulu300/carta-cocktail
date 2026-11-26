@@ -2,20 +2,42 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import type { PrismaClient } from '../generated/prisma/client';
 import { createPrismaClient } from '../lib/prisma';
 import {
-  setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
-  prisma, seedCategory, seedUnit, seedBottle, seedIngredient, seedCocktailUsing,
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+  prisma,
+  seedCategory,
+  seedUnit,
+  seedBottle,
+  seedIngredient,
+  seedCocktailUsing,
 } from '../test/helpers';
 import {
-  calculateCocktailAvailability, calculateAllCocktailsAvailability, calculateAvailabilities, computeAvailability,
+  calculateCocktailAvailability,
+  calculateAllCocktailsAvailability,
+  calculateAvailabilities,
+  computeAvailability,
   buildStockSnapshot,
-  LOW_STOCK_THRESHOLD, UNLIMITED_SERVINGS,
-  type RecipeLine, type StockBottle, type StockIngredient, type StockSnapshot,
+  LOW_STOCK_THRESHOLD,
+  UNLIMITED_SERVINGS,
+  type RecipeLine,
+  type StockBottle,
+  type StockIngredient,
+  type StockSnapshot,
 } from './availabilityService';
 import { NotFoundError } from '../errors';
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
-beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
+beforeEach(async () => {
+  await cleanDatabase();
+  await seedRequiredData();
+});
 
 const ML = { abbreviation: 'ml', conversionFactorToMl: 1 };
 const CL = { abbreviation: 'cl', conversionFactorToMl: 10 };
@@ -26,10 +48,23 @@ const SLICE = { abbreviation: 'rondelle', conversionFactorToMl: null };
 
 const RUM = { id: 1, name: 'Rum', nameTranslations: { fr: 'Rhum' } };
 const GIN = { id: 2, name: 'Gin', nameTranslations: null };
-const LIME = { id: 1, name: 'Lime', nameTranslations: { fr: 'Citron vert' }, icon: '🍋', isAvailable: true };
+const LIME = {
+  id: 1,
+  name: 'Lime',
+  nameTranslations: { fr: 'Citron vert' },
+  icon: '🍋',
+  isAvailable: true,
+};
 
 function bottle(id: number, overrides: Partial<StockBottle> = {}): StockBottle {
-  return { id, name: `Bottle ${id}`, categoryId: RUM.id, capacityMl: 700, remainingPercent: 100, ...overrides };
+  return {
+    id,
+    name: `Bottle ${id}`,
+    categoryId: RUM.id,
+    capacityMl: 700,
+    remainingPercent: 100,
+    ...overrides,
+  };
 }
 
 /** Stock built by hand: the computeAvailability tests need no database. */
@@ -38,14 +73,22 @@ function stock(bottles: StockBottle[], ingredients: StockIngredient[] = [LIME]):
 }
 
 function missingOf(result: { ingredients: { name: string; isAvailable: boolean }[] }): string[] {
-  return result.ingredients.filter((ingredient) => !ingredient.isAvailable).map((ingredient) => ingredient.name);
+  return result.ingredients
+    .filter((ingredient) => !ingredient.isAvailable)
+    .map((ingredient) => ingredient.name);
 }
 
 let nextLineId = 1;
 function line(source: Partial<RecipeLine>): RecipeLine {
   return {
-    id: nextLineId++, sourceType: 'BOTTLE', quantity: 1, unit: ML,
-    bottleId: null, categoryId: null, ingredientId: null, preferredBottleIds: [],
+    id: nextLineId++,
+    sourceType: 'BOTTLE',
+    quantity: 1,
+    unit: ML,
+    bottleId: null,
+    categoryId: null,
+    ingredientId: null,
+    preferredBottleIds: [],
     ...source,
   };
 }
@@ -55,22 +98,37 @@ function bottleLine(bottleId: number, quantity: number, unit: RecipeLine['unit']
 }
 
 function categoryLine(
-  categoryId: number, quantity: number, unit: RecipeLine['unit'] = ML, preferredBottleIds: number[] = [],
+  categoryId: number,
+  quantity: number,
+  unit: RecipeLine['unit'] = ML,
+  preferredBottleIds: number[] = [],
 ): RecipeLine {
   return line({ sourceType: 'CATEGORY', categoryId, quantity, unit, preferredBottleIds });
 }
 
 describe('computeAvailability', () => {
   it('treats a unit without ml factor as not measured: available while the bottle has stock', () => {
-    const result = computeAvailability(1, [bottleLine(1, 2, GRAM)], stock([bottle(1, { remainingPercent: 5 })]));
+    const result = computeAvailability(
+      1,
+      [bottleLine(1, 2, GRAM)],
+      stock([bottle(1, { remainingPercent: 5 })]),
+    );
 
     expect(result.isAvailable).toBe(true);
     expect(result.maxServings).toBe(UNLIMITED_SERVINGS);
-    expect(result.ingredients[0]).toMatchObject({ isAvailable: true, availableCount: null, unit: 'g' });
+    expect(result.ingredients[0]).toMatchObject({
+      isAvailable: true,
+      availableCount: null,
+      unit: 'g',
+    });
   });
 
   it('treats a unit without ml factor as not measured: unavailable once the bottle is empty', () => {
-    const result = computeAvailability(1, [bottleLine(1, 1, SLICE)], stock([bottle(1, { remainingPercent: 0 })]));
+    const result = computeAvailability(
+      1,
+      [bottleLine(1, 1, SLICE)],
+      stock([bottle(1, { remainingPercent: 0 })]),
+    );
 
     expect(result.isAvailable).toBe(false);
     expect(result.maxServings).toBe(0);
@@ -132,18 +190,25 @@ describe('computeAvailability', () => {
   it('reports a category without stock', () => {
     const empty = stock([bottle(1, { remainingPercent: 0 })]);
 
-    expect(computeAvailability(1, [categoryLine(RUM.id, 4, CL)], empty).ingredients[0])
-      .toMatchObject({ isAvailable: false, availableCount: 0 });
-    expect(computeAvailability(1, [categoryLine(RUM.id, 1, SLICE)], empty).ingredients[0])
-      .toMatchObject({ isAvailable: false, availableCount: 0 });
+    expect(
+      computeAvailability(1, [categoryLine(RUM.id, 4, CL)], empty).ingredients[0],
+    ).toMatchObject({ isAvailable: false, availableCount: 0 });
+    expect(
+      computeAvailability(1, [categoryLine(RUM.id, 1, SLICE)], empty).ingredients[0],
+    ).toMatchObject({ isAvailable: false, availableCount: 0 });
   });
 
   it('reports a bottle with too little left', () => {
-    const result = computeAvailability(1, [bottleLine(1, 50)], stock([bottle(1, { capacityMl: 40 })]));
+    const result = computeAvailability(
+      1,
+      [bottleLine(1, 50)],
+      stock([bottle(1, { capacityMl: 40 })]),
+    );
 
     expect(result.maxServings).toBe(0);
     expect(result.ingredients[0]).toMatchObject({
-      isAvailable: false, availableCount: 0,
+      isAvailable: false,
+      availableCount: 0,
     });
   });
 
@@ -157,7 +222,11 @@ describe('computeAvailability', () => {
   });
 
   it('flags a CATEGORY line whose preferred bottle has stock', () => {
-    const result = computeAvailability(1, [categoryLine(RUM.id, 40, ML, [1, 99])], stock([bottle(1)]));
+    const result = computeAvailability(
+      1,
+      [categoryLine(RUM.id, 40, ML, [1, 99])],
+      stock([bottle(1)]),
+    );
 
     expect(result.ingredients[0].preferredAvailable).toBe(true);
   });
@@ -172,25 +241,45 @@ describe('computeAvailability', () => {
   it.each([
     ['a BOTTLE line without bottle', () => line({ sourceType: 'BOTTLE', bottleId: null })],
     ['a CATEGORY line without category', () => line({ sourceType: 'CATEGORY', categoryId: null })],
-    ['an INGREDIENT line without ingredient', () => line({ sourceType: 'INGREDIENT', ingredientId: null })],
-    ['an orphan line with quantity 0', () => line({ sourceType: 'BOTTLE', bottleId: null, quantity: 0 })],
-    ['a BOTTLE line without bottle but with a category key', () => line({ sourceType: 'BOTTLE', bottleId: null, categoryId: RUM.id })],
+    [
+      'an INGREDIENT line without ingredient',
+      () => line({ sourceType: 'INGREDIENT', ingredientId: null }),
+    ],
+    [
+      'an orphan line with quantity 0',
+      () => line({ sourceType: 'BOTTLE', bottleId: null, quantity: 0 }),
+    ],
+    [
+      'a BOTTLE line without bottle but with a category key',
+      () => line({ sourceType: 'BOTTLE', bottleId: null, categoryId: RUM.id }),
+    ],
     ['a line on a missing bottle', () => bottleLine(99, 40)],
     ['a line on a missing category', () => categoryLine(99, 40)],
     ['a line on a missing ingredient', () => line({ sourceType: 'INGREDIENT', ingredientId: 99 })],
-  ])('flags %s but keeps the cocktail available from the rest of the stock', (_label, buildLine) => {
-    const result = computeAvailability(1, [bottleLine(1, 350), buildLine()], stock([bottle(1)]));
+  ])(
+    'flags %s but keeps the cocktail available from the rest of the stock',
+    (_label, buildLine) => {
+      const result = computeAvailability(1, [bottleLine(1, 350), buildLine()], stock([bottle(1)]));
 
-    expect(result.isAvailable).toBe(true);
-    expect(result.maxServings).toBe(2);
-    expect(result.ingredients[1]).toMatchObject({
-      name: '', nameTranslations: null, orphan: true, isAvailable: false, availableCount: null,
-    });
-    expect(result.ingredients[0].orphan).toBe(false);
-  });
+      expect(result.isAvailable).toBe(true);
+      expect(result.maxServings).toBe(2);
+      expect(result.ingredients[1]).toMatchObject({
+        name: '',
+        nameTranslations: null,
+        orphan: true,
+        isAvailable: false,
+        availableCount: null,
+      });
+      expect(result.ingredients[0].orphan).toBe(false);
+    },
+  );
 
   it('shows unlimited servings when every line is an orphan', () => {
-    const result = computeAvailability(1, [line({ sourceType: 'BOTTLE', bottleId: null })], stock([bottle(1)]));
+    const result = computeAvailability(
+      1,
+      [line({ sourceType: 'BOTTLE', bottleId: null })],
+      stock([bottle(1)]),
+    );
 
     expect(result.isAvailable).toBe(true);
     expect(result.maxServings).toBe(UNLIMITED_SERVINGS);
@@ -206,34 +295,54 @@ describe('computeAvailability', () => {
   });
 
   it('makes a line with an unknown source type, and its cocktail, unavailable', () => {
-    const result = computeAvailability(1, [line({ sourceType: 'GARNISH', bottleId: 1 })], stock([bottle(1)]));
+    const result = computeAvailability(
+      1,
+      [line({ sourceType: 'GARNISH', bottleId: 1 })],
+      stock([bottle(1)]),
+    );
 
     expect(result.isAvailable).toBe(false);
     expect(result.maxServings).toBe(0);
     expect(result.ingredients[0]).toMatchObject({
-      name: '', orphan: true, isAvailable: false, availableCount: null,
+      name: '',
+      orphan: true,
+      isAvailable: false,
+      availableCount: null,
     });
   });
 
   it('makes the cocktail unavailable when a free ingredient is marked unavailable, even next to an orphan line', () => {
     const mint = { id: 2, name: 'Mint', nameTranslations: null, icon: null, isAvailable: false };
     const lines = [
-      bottleLine(1, 40), line({ sourceType: 'INGREDIENT', ingredientId: 2 }), line({ sourceType: 'BOTTLE', bottleId: null }),
+      bottleLine(1, 40),
+      line({ sourceType: 'INGREDIENT', ingredientId: 2 }),
+      line({ sourceType: 'BOTTLE', bottleId: null }),
     ];
     const result = computeAvailability(1, lines, stock([bottle(1)], [mint]));
 
     expect(result.isAvailable).toBe(false);
     expect(result.maxServings).toBe(0);
     expect(result.ingredients[1]).toMatchObject({
-      name: 'Mint', isAvailable: false, availableCount: 0,
+      name: 'Mint',
+      isAvailable: false,
+      availableCount: 0,
     });
   });
 
   it('does not limit the servings with an available free ingredient', () => {
-    const result = computeAvailability(1, [line({ sourceType: 'INGREDIENT', ingredientId: LIME.id })], stock([]));
+    const result = computeAvailability(
+      1,
+      [line({ sourceType: 'INGREDIENT', ingredientId: LIME.id })],
+      stock([]),
+    );
 
     expect(result.maxServings).toBe(UNLIMITED_SERVINGS);
-    expect(result.ingredients[0]).toMatchObject({ name: 'Lime', icon: '🍋', isAvailable: true, availableCount: null });
+    expect(result.ingredients[0]).toMatchObject({
+      name: 'Lime',
+      icon: '🍋',
+      isAvailable: true,
+      availableCount: null,
+    });
   });
 
   it('absorbs float error: 3 dashes on 1.8 ml make one serving', () => {
@@ -253,14 +362,20 @@ describe('computeAvailability', () => {
 
   it('takes the smallest servings across resources', () => {
     const lines = [bottleLine(1, 40), bottleLine(2, 40)];
-    const result = computeAvailability(1, lines, stock([bottle(1), bottle(2, { remainingPercent: 20 })]));
+    const result = computeAvailability(
+      1,
+      lines,
+      stock([bottle(1), bottle(2, { remainingPercent: 20 })]),
+    );
 
     expect(result.maxServings).toBe(3);
   });
 
   it('shows 999 servings when nothing is measured, the real count when a bottle allows more', () => {
     expect(computeAvailability(1, [], stock([])).maxServings).toBe(UNLIMITED_SERVINGS);
-    expect(computeAvailability(1, [bottleLine(1, 1, DASH)], stock([bottle(1)])).maxServings).toBe(1166);
+    expect(computeAvailability(1, [bottleLine(1, 1, DASH)], stock([bottle(1)])).maxServings).toBe(
+      1166,
+    );
   });
 
   it('warns once per resource at the low stock threshold, not above', () => {
@@ -271,7 +386,9 @@ describe('computeAvailability', () => {
     ];
     const result = computeAvailability(1, lines, stock(bottles));
 
-    expect(result.lowStock).toEqual([{ name: 'Bottle 1', nameTranslations: null, servings: LOW_STOCK_THRESHOLD }]);
+    expect(result.lowStock).toEqual([
+      { name: 'Bottle 1', nameTranslations: null, servings: LOW_STOCK_THRESHOLD },
+    ]);
   });
 });
 
@@ -280,7 +397,9 @@ describe('loading the stock', () => {
   async function countQueries(run: (db: PrismaClient) => Promise<unknown>): Promise<number> {
     const db = createPrismaClient(undefined, { log: [{ emit: 'event', level: 'query' }] });
     let queries = 0;
-    db.$on('query', () => { queries += 1; });
+    db.$on('query', () => {
+      queries += 1;
+    });
     try {
       await run(db);
     } finally {
@@ -319,7 +438,9 @@ describe('loading the stock', () => {
   it('sends no query for an empty list of cocktails', async () => {
     await seedCocktails(1);
     let result: Map<number, unknown> | undefined;
-    const queries = await countQueries(async (db) => { result = await calculateAvailabilities(db, []); });
+    const queries = await countQueries(async (db) => {
+      result = await calculateAvailabilities(db, []);
+    });
 
     expect(queries).toBe(0);
     expect(result?.size).toBe(0);
@@ -331,7 +452,11 @@ describe('loading the stock', () => {
 
     const result = await calculateCocktailAvailability(cocktail.id);
 
-    expect(result.ingredients.map((ingredient) => ingredient.sourceType)).toEqual(['BOTTLE', 'CATEGORY', 'INGREDIENT']);
+    expect(result.ingredients.map((ingredient) => ingredient.sourceType)).toEqual([
+      'BOTTLE',
+      'CATEGORY',
+      'INGREDIENT',
+    ]);
     expect(result.ingredients[1].preferredAvailable).toBe(true);
     // The rum bottle counts in its own resource and in its category's: 700 ml / 10 ml each
     expect(result.maxServings).toBe(70);
@@ -360,8 +485,12 @@ describe('calculateCocktailAvailability', () => {
     const cocktail = await prisma.cocktail.create({ data: { name: 'CL Test' } });
     await prisma.cocktailIngredient.create({
       data: {
-        cocktailId: cocktail.id, sourceType: 'BOTTLE', bottleId: bottle.id,
-        unitId: unit.id, quantity: 5, position: 0, // 5cl = 50ml
+        cocktailId: cocktail.id,
+        sourceType: 'BOTTLE',
+        bottleId: bottle.id,
+        unitId: unit.id,
+        quantity: 5,
+        position: 0, // 5cl = 50ml
       },
     });
 
@@ -380,8 +509,12 @@ describe('calculateCocktailAvailability', () => {
     const cocktail = await prisma.cocktail.create({ data: { name: 'Cat Sum' } });
     await prisma.cocktailIngredient.create({
       data: {
-        cocktailId: cocktail.id, sourceType: 'CATEGORY', categoryId: cat.id,
-        unitId: unit.id, quantity: 4, position: 0, // 4cl = 40ml
+        cocktailId: cocktail.id,
+        sourceType: 'CATEGORY',
+        categoryId: cat.id,
+        unitId: unit.id,
+        quantity: 4,
+        position: 0, // 4cl = 40ml
       },
     });
 
@@ -397,8 +530,12 @@ describe('calculateCocktailAvailability', () => {
     const cocktail = await prisma.cocktail.create({ data: { name: 'Ing Test' } });
     await prisma.cocktailIngredient.create({
       data: {
-        cocktailId: cocktail.id, sourceType: 'INGREDIENT', ingredientId: ing.id,
-        unitId: unit.id, quantity: 1, position: 0,
+        cocktailId: cocktail.id,
+        sourceType: 'INGREDIENT',
+        ingredientId: ing.id,
+        unitId: unit.id,
+        quantity: 1,
+        position: 0,
       },
     });
 
@@ -414,8 +551,12 @@ describe('calculateCocktailAvailability', () => {
     const cocktail = await prisma.cocktail.create({ data: { name: 'No Mint' } });
     await prisma.cocktailIngredient.create({
       data: {
-        cocktailId: cocktail.id, sourceType: 'INGREDIENT', ingredientId: ing.id,
-        unitId: unit.id, quantity: 1, position: 0,
+        cocktailId: cocktail.id,
+        sourceType: 'INGREDIENT',
+        ingredientId: ing.id,
+        unitId: unit.id,
+        quantity: 1,
+        position: 0,
       },
     });
 
@@ -434,8 +575,12 @@ describe('calculateCocktailAvailability', () => {
     const cocktail = await prisma.cocktail.create({ data: { name: 'Low' } });
     await prisma.cocktailIngredient.create({
       data: {
-        cocktailId: cocktail.id, sourceType: 'BOTTLE', bottleId: bottle.id,
-        unitId: unit.id, quantity: 4, position: 0,
+        cocktailId: cocktail.id,
+        sourceType: 'BOTTLE',
+        bottleId: bottle.id,
+        unitId: unit.id,
+        quantity: 4,
+        position: 0,
       },
     });
 
@@ -466,17 +611,36 @@ describe('calculateAllCocktailsAvailability', () => {
 describe('translated names', () => {
   it('returns the parsed nameTranslations of categories and ingredients, and null for bottles', async () => {
     const unit = await seedUnit({ abbreviation: 'cl', conversionFactorToMl: 10 });
-    const cat = await seedCategory({ name: 'Sugar syrup', nameTranslations: JSON.stringify({ fr: 'Sirop de sucre' }) });
+    const cat = await seedCategory({
+      name: 'Sugar syrup',
+      nameTranslations: JSON.stringify({ fr: 'Sirop de sucre' }),
+    });
     await seedBottle({ categoryId: cat.id, capacityMl: 700, remainingPercent: 10 });
     const bitters = await seedIngredient({
-      name: 'Bitters', nameTranslations: JSON.stringify({ fr: 'Amer' }), isAvailable: false,
+      name: 'Bitters',
+      nameTranslations: JSON.stringify({ fr: 'Amer' }),
+      isAvailable: false,
     });
 
     const cocktail = await prisma.cocktail.create({ data: { name: 'Translated' } });
     await prisma.cocktailIngredient.createMany({
       data: [
-        { cocktailId: cocktail.id, sourceType: 'CATEGORY', categoryId: cat.id, unitId: unit.id, quantity: 4, position: 0 },
-        { cocktailId: cocktail.id, sourceType: 'INGREDIENT', ingredientId: bitters.id, unitId: unit.id, quantity: 1, position: 1 },
+        {
+          cocktailId: cocktail.id,
+          sourceType: 'CATEGORY',
+          categoryId: cat.id,
+          unitId: unit.id,
+          quantity: 4,
+          position: 0,
+        },
+        {
+          cocktailId: cocktail.id,
+          sourceType: 'INGREDIENT',
+          ingredientId: bitters.id,
+          unitId: unit.id,
+          quantity: 1,
+          position: 1,
+        },
       ],
     });
 
@@ -484,6 +648,10 @@ describe('translated names', () => {
     expect(result.lowStock).toEqual([
       { name: 'Sugar syrup', nameTranslations: { fr: 'Sirop de sucre' }, servings: 1 },
     ]);
-    expect(result.ingredients[1]).toMatchObject({ name: 'Bitters', nameTranslations: { fr: 'Amer' }, orphan: false });
+    expect(result.ingredients[1]).toMatchObject({
+      name: 'Bitters',
+      nameTranslations: { fr: 'Amer' },
+      orphan: false,
+    });
   });
 });

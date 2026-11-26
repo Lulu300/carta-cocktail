@@ -54,19 +54,22 @@ describe('useMenuFilter on a bottle menu', () => {
     const menu = bottleMenu([
       menuBottle(1, { name: 'Tanqueray', categoryId: 2, category: gin }),
       menuBottle(2, { name: 'Suze' }),
-      menuBottle(3, { name: 'Hendrick\'s', categoryId: 2, category: gin }),
+      menuBottle(3, { name: "Hendrick's", categoryId: 2, category: gin }),
     ]);
 
     const { bottleBlocks } = filter(menu);
 
     expect(bottleBlocks.map((block) => block.title)).toEqual(['Gin', 'Amer']);
-    expect(bottleBlocks[0]!.items.map((row) => row.name)).toEqual(['Tanqueray', 'Hendrick\'s']);
+    expect(bottleBlocks[0]!.items.map((row) => row.name)).toEqual(['Tanqueray', "Hendrick's"]);
   });
 
   it('puts bottles without a category under "other"', () => {
     const menu = bottleMenu([menuBottle(1, { category: undefined })]);
 
-    expect(filter(menu).bottleBlocks[0]).toMatchObject({ title: 'Other', anchorId: 'section-category-other' });
+    expect(filter(menu).bottleBlocks[0]).toMatchObject({
+      title: 'Other',
+      anchorId: 'section-category-other',
+    });
   });
 
   it('keeps the admin order of the bottles inside a block', () => {
@@ -78,7 +81,10 @@ describe('useMenuFilter on a bottle menu', () => {
 
     const rows = filter(menu).bottleBlocks[0]!.items;
 
-    expect(rows.map((row) => [row.name, row.count])).toEqual([['Zubrowka', 2], ['Aperol', 1]]);
+    expect(rows.map((row) => [row.name, row.count])).toEqual([
+      ['Zubrowka', 2],
+      ['Aperol', 1],
+    ]);
   });
 
   it('finds a bottle without typing its accents', () => {
@@ -105,7 +111,10 @@ describe('useMenuFilter on a bottle menu', () => {
 
 describe('useMenuFilter on a cocktail menu', () => {
   it('shows a menu without sections as one untitled list', () => {
-    const menu = cocktailMenu([buildMenuCocktail({ id: 1 }), buildMenuCocktail({ id: 2, cocktail: { name: 'Negroni' } })]);
+    const menu = cocktailMenu([
+      buildMenuCocktail({ id: 1 }),
+      buildMenuCocktail({ id: 2, cocktail: { name: 'Negroni' } }),
+    ]);
 
     const { cocktailBlocks } = filter(menu);
 
@@ -121,7 +130,13 @@ describe('useMenuFilter on a cocktail menu', () => {
         buildMenuCocktail({ id: 2, cocktail: { name: 'Negroni' } }),
         buildMenuCocktail({ id: 3, cocktail: { name: 'Spritz' }, menuSectionId: 10 }),
       ],
-      { sections: [buildMenuSection({ id: 10, name: 'Classics' }), buildMenuSection({ id: 20, name: 'Signatures' }), buildMenuSection({ id: 30, name: 'Empty' })] },
+      {
+        sections: [
+          buildMenuSection({ id: 10, name: 'Classics' }),
+          buildMenuSection({ id: 20, name: 'Signatures' }),
+          buildMenuSection({ id: 30, name: 'Empty' }),
+        ],
+      },
     );
 
     const { cocktailBlocks } = filter(menu);
@@ -168,7 +183,10 @@ describe('groupMenuBottles', () => {
 
     expect(groups).toHaveLength(2);
     expect(groups[0]).toMatchObject({ name: 'Suze', count: 3 });
-    expect(groups[0]!.locations).toEqual([{ name: 'Bar', count: 2 }, { name: 'Cave', count: 1 }]);
+    expect(groups[0]!.locations).toEqual([
+      { name: 'Bar', count: 2 },
+      { name: 'Cave', count: 1 },
+    ]);
     expect(groups[1]).toMatchObject({ capacityMl: 350, count: 1, locations: [] });
   });
 });

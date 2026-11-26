@@ -140,7 +140,9 @@ const router = Router();
 
 // Never create a PrismaClient: import the shared one from src/lib/prisma.ts
 router.get('/:id', validate(idRequest), async (_req, res) => {
-  const item = await prisma.model.findUnique({ where: { id: valid<typeof idRequest>(res).params.id } });
+  const item = await prisma.model.findUnique({
+    where: { id: valid<typeof idRequest>(res).params.id },
+  });
   if (!item) throw new NotFoundError();
   res.json(item);
 });
@@ -189,7 +191,10 @@ typed values with `valid(res)`, never `req.params`, `req.query` or `req.body` di
 const updateSchemas = { params: IdParams, body: UnitUpdate };
 
 router.put('/:id', validate(updateSchemas), async (_req, res) => {
-  const { params: { id }, body } = valid<typeof updateSchemas>(res);
+  const {
+    params: { id },
+    body,
+  } = valid<typeof updateSchemas>(res);
 });
 ```
 
@@ -207,6 +212,7 @@ router.put('/:id', validate(updateSchemas), async (_req, res) => {
 
 Entity names support multi-language via JSON strings stored in SQLite (`'{"fr": "Rhum", "en": "Rum"}'`).
 Never `JSON.stringify` or `JSON.parse` them by hand: use the helpers of `src/utils/translations.ts`:
+
 - `serializeTranslations(body.nameTranslations)` writes the value the `Translations` schema checked
   (`undefined` leaves the column untouched, blank languages are left out, nothing left clears it);
 - `parseNameTranslations(entity)` turns the strings of an entity and of its relations into objects
@@ -221,11 +227,11 @@ written: a new value is stored composed (NFC), a value sent back exactly as stor
 
 Every upload goes through multer, whose `limits.fileSize` is the largest file accepted, that size included: multer (2.5.0) passes `fileSize + 1` to busboy, which stops as soon as a file reaches the limit it is given. A file of exactly the limit is therefore accepted, one byte more gives `LIMIT_FILE_SIZE` and a 413. One exported constant per limit, used by multer and by the tests at the boundary (limit - 1, limit, limit + 1):
 
-| Upload | Constant |
-|--------|----------|
+| Upload         | Constant                                                 |
+| -------------- | -------------------------------------------------------- |
 | Cocktail photo | `MAX_IMAGE_BYTES` (`services/cocktail/cocktailImage.ts`) |
-| Bottle import | `MAX_BOTTLE_IMPORT_BYTES` (`utils/bottlesImport.ts`) |
-| Backup restore | `MAX_BACKUP_UPLOAD_BYTES` (`services/backupService.ts`) |
+| Bottle import  | `MAX_BOTTLE_IMPORT_BYTES` (`utils/bottlesImport.ts`)     |
+| Backup restore | `MAX_BACKUP_UPLOAD_BYTES` (`services/backupService.ts`)  |
 
 nginx (`frontend/nginx.conf.template`) limits the whole multipart body, so its `client_max_body_size` keeps a margin above each limit for the multipart envelope. `src/uploadLimits.test.ts` reads the template and fails when a file of exactly a backend limit, with its envelope, would no longer fit under the limit of its nginx location. The admin page checks the backup size before sending it (`frontend/src/pages/admin/SettingsPage.tsx`).
 
@@ -238,21 +244,21 @@ nginx (`frontend/nginx.conf.template`) limits the whole multipart body, so its `
 
 ## Scripts
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Watch mode with tsx (port 3001) |
-| `npm run build` | TypeScript compilation to dist/ |
-| `npm start` | Run compiled JS from dist/ |
-| `npm run lint` | ESLint |
-| `npm run format:check` | Prettier check (fails until the repository reformat) |
-| `npm test` | Tests (Vitest) |
-| `npm run test:watch` | Tests in watch mode |
-| `npm run test:coverage` | Tests with coverage |
-| `npm run db:migrate` | Create and apply a Prisma migration (`-- --name <name>`) |
-| `npm run db:deploy` | Apply pending migrations without creating any |
-| `npm run db:status` | Show which migrations are applied |
-| `npm run db:check` | Fail when `schema.prisma` changed without a migration (CI) |
-| `npm run db:seed` | Seed admin, types, units, menus |
+| Command                 | Description                                                |
+| ----------------------- | ---------------------------------------------------------- |
+| `npm run dev`           | Watch mode with tsx (port 3001)                            |
+| `npm run build`         | TypeScript compilation to dist/                            |
+| `npm start`             | Run compiled JS from dist/                                 |
+| `npm run lint`          | ESLint                                                     |
+| `npm run format:check`  | Prettier check (fails until the repository reformat)       |
+| `npm test`              | Tests (Vitest)                                             |
+| `npm run test:watch`    | Tests in watch mode                                        |
+| `npm run test:coverage` | Tests with coverage                                        |
+| `npm run db:migrate`    | Create and apply a Prisma migration (`-- --name <name>`)   |
+| `npm run db:deploy`     | Apply pending migrations without creating any              |
+| `npm run db:status`     | Show which migrations are applied                          |
+| `npm run db:check`      | Fail when `schema.prisma` changed without a migration (CI) |
+| `npm run db:seed`       | Seed admin, types, units, menus                            |
 
 ## Dependencies
 
@@ -280,6 +286,7 @@ The Docker image holds the runtime dependencies only and runs as the `node` user
 ## Ingredient Source Types
 
 `CocktailIngredient.sourceType` determines which FK is populated:
+
 - `BOTTLE` → `bottleId` (specific bottle)
 - `CATEGORY` → `categoryId` (any bottle from category)
 - `INGREDIENT` → `ingredientId` (free ingredient like lime, sugar)
@@ -289,6 +296,7 @@ For `CATEGORY` sources, `CocktailPreferredBottle` records can specify preferred 
 ## Availability Calculation
 
 `availabilityService.ts` computes how many servings a cocktail can make:
+
 - `loadStock()` loads bottles, categories, ingredients and recipes in a fixed number of queries, whatever the number of cocktails
 - `computeAvailability()` is pure: volumes come from `Unit.conversionFactorToMl` (`null` = not measured, the line only needs some stock), lines sharing a bottle or a category add up before dividing
 - A category counts all its non-empty bottles; `preferredAvailable` only warns when no preferred bottle is left

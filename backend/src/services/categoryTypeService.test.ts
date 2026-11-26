@@ -1,12 +1,27 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
-  setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData, prisma,
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+  prisma,
 } from '../test/helpers';
-import { ensureCategoryType, newCategoryTypeName, requireNewCategoryTypeName } from './categoryTypeService';
+import {
+  ensureCategoryType,
+  newCategoryTypeName,
+  requireNewCategoryTypeName,
+} from './categoryTypeService';
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
-beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
+beforeEach(async () => {
+  await cleanDatabase();
+  await seedRequiredData();
+});
 
 // 'CRÈME' with a composed È (U+00C8), and with E followed by a combining grave accent (U+0300)
 const COMPOSED = 'CR\u00C8ME';
@@ -40,9 +55,12 @@ describe('newCategoryTypeName', () => {
     ['X\u2800\u2800Y', 'X Y'],
     ['\u2800', ''],
     ['梅\u200D酒', '梅酒'],
-  ])('should remove the invisible characters and reduce the blank ones of %j: %j', (name, expected) => {
-    expect(newCategoryTypeName(name)).toBe(expected);
-  });
+  ])(
+    'should remove the invisible characters and reduce the blank ones of %j: %j',
+    (name, expected) => {
+      expect(newCategoryTypeName(name)).toBe(expected);
+    },
+  );
 
   // A byte order mark is white space for JS, but HTML draws nothing for it: not a space either
   it('should remove a byte order mark inside the name rather than make it a space', () => {
@@ -59,17 +77,19 @@ describe('newCategoryTypeName', () => {
   });
 
   // NFKC would change them, though they are drawn differently
-  it.each([
-    '\uFB01NO', 'CO\u2082', '\uFF36\uFF2F\uFF24\uFF2B\uFF21', '\u3131\u314F',
-  ])('should keep the compatibility characters of %j', (name) => {
-    expect(newCategoryTypeName(name)).toBe(name);
-  });
+  it.each(['\uFB01NO', 'CO\u2082', '\uFF36\uFF2F\uFF24\uFF2B\uFF21', '\u3131\u314F'])(
+    'should keep the compatibility characters of %j',
+    (name) => {
+      expect(newCategoryTypeName(name)).toBe(name);
+    },
+  );
 
-  it.each([
-    'CRÈME DE CASSIS', 'می\u200Cخواهم', '👩\u200D💻 GEEK',
-  ])('should keep %j, whose characters are all drawn', (name) => {
-    expect(newCategoryTypeName(name)).toBe(name);
-  });
+  it.each(['CRÈME DE CASSIS', 'می\u200Cخواهم', '👩\u200D💻 GEEK'])(
+    'should keep %j, whose characters are all drawn',
+    (name) => {
+      expect(newCategoryTypeName(name)).toBe(name);
+    },
+  );
 });
 
 describe('requireNewCategoryTypeName', () => {
@@ -78,9 +98,13 @@ describe('requireNewCategoryTypeName', () => {
   });
 
   it('should refuse a name of invisible characters with the 400 of the field at the path', () => {
-    expect(() => requireNewCategoryTypeName('\u200B\u2060', ['body', 'name'])).toThrow(expect.objectContaining({
-      status: 400, i18nKey: 'errors.validationError', details: [expect.objectContaining({ path: 'body.name', code: 'too_small' })],
-    }));
+    expect(() => requireNewCategoryTypeName('\u200B\u2060', ['body', 'name'])).toThrow(
+      expect.objectContaining({
+        status: 400,
+        i18nKey: 'errors.validationError',
+        details: [expect.objectContaining({ path: 'body.name', code: 'too_small' })],
+      }),
+    );
   });
 });
 
@@ -101,9 +125,11 @@ describe('ensureCategoryType', () => {
 
   it('should create a new type with its inner spaces collapsed, in gray', async () => {
     expect(await ensureCategoryType(prisma, ' FRUIT   JUICE ')).toBe('FRUIT JUICE');
-    expect(await prisma.categoryType.findUnique({ where: { name: 'FRUIT JUICE' } })).toEqual(
-      { name: 'FRUIT JUICE', nameTranslations: null, color: 'gray' },
-    );
+    expect(await prisma.categoryType.findUnique({ where: { name: 'FRUIT JUICE' } })).toEqual({
+      name: 'FRUIT JUICE',
+      nameTranslations: null,
+      color: 'gray',
+    });
     expect(await typeNames()).toEqual(['FRUIT JUICE', 'SOFT', 'SPIRIT', 'SYRUP']);
   });
 
@@ -111,7 +137,9 @@ describe('ensureCategoryType', () => {
     await prisma.categoryType.create({ data: { name: 'X Y', color: 'red' } });
 
     expect(await ensureCategoryType(prisma, 'X  Y')).toBe('X Y');
-    expect(await prisma.categoryType.findUnique({ where: { name: 'X Y' } })).toMatchObject({ color: 'red' });
+    expect(await prisma.categoryType.findUnique({ where: { name: 'X Y' } })).toMatchObject({
+      color: 'red',
+    });
     expect(await typeNames()).toEqual(['SOFT', 'SPIRIT', 'SYRUP', 'X Y']);
   });
 
@@ -155,14 +183,17 @@ describe('ensureCategoryType', () => {
 
   it('should refuse a name of invisible characters that names no type, and create nothing', async () => {
     await expect(ensureCategoryType(prisma, '\u200B \u00AD')).rejects.toMatchObject({
-      status: 400, details: [{ path: 'body.type', code: 'too_small' }],
+      status: 400,
+      details: [{ path: 'body.type', code: 'too_small' }],
     });
     expect(await typeNames()).toEqual(['SOFT', 'SPIRIT', 'SYRUP']);
   });
 
   it('should refuse a blank name that names no type, and create nothing', async () => {
     await expect(ensureCategoryType(prisma, '   ')).rejects.toMatchObject({
-      status: 400, i18nKey: 'errors.validationError', details: [{ path: 'body.type', code: 'too_small' }],
+      status: 400,
+      i18nKey: 'errors.validationError',
+      details: [{ path: 'body.type', code: 'too_small' }],
     });
     expect(await typeNames()).toEqual(['SOFT', 'SPIRIT', 'SYRUP']);
   });

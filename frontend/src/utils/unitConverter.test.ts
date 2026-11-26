@@ -1,8 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Unit } from '../types';
 import {
-  isConvertible, toMilliliters, fromMilliliters, convertUnit,
-  roundQuantity, formatQuantity, getAllConversions,
+  isConvertible,
+  toMilliliters,
+  fromMilliliters,
+  convertUnit,
+  roundQuantity,
+  formatQuantity,
+  getAllConversions,
 } from './unitConverter';
 
 const mlUnit: Unit = { id: 1, name: 'Millilitre', abbreviation: 'ml', conversionFactorToMl: 1 };
@@ -119,12 +124,12 @@ describe('getAllConversions', () => {
     const result = getAllConversions(5, clUnit, [mlUnit, clUnit, ozUnit, pieceUnit]);
     // Should include ml and oz, but not cl (same) and not pce (non-convertible)
     expect(result).toHaveLength(2);
-    expect(result.find(r => r.unit.id === mlUnit.id)?.quantity).toBe(50);
-    expect(result.find(r => r.unit.id === ozUnit.id)?.quantity).toBe(1.69);
+    expect(result.find((r) => r.unit.id === mlUnit.id)?.quantity).toBe(50);
+    expect(result.find((r) => r.unit.id === ozUnit.id)?.quantity).toBe(1.69);
   });
 
   it('should not include the source unit', () => {
     const result = getAllConversions(5, clUnit, [mlUnit, clUnit]);
-    expect(result.every(r => r.unit.id !== clUnit.id)).toBe(true);
+    expect(result.every((r) => r.unit.id !== clUnit.id)).toBe(true);
   });
 });

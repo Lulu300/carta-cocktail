@@ -14,9 +14,15 @@ function Page({ startsLoading = false }: { startsLoading?: boolean }) {
 
   return (
     <div>
-      <button type="button" onClick={() => setReady(true)}>load</button>
-      <button type="button" onClick={() => navigate('/other')}>forward</button>
-      <button type="button" onClick={() => navigate(-1)}>back</button>
+      <button type="button" onClick={() => setReady(true)}>
+        load
+      </button>
+      <button type="button" onClick={() => navigate('/other')}>
+        forward
+      </button>
+      <button type="button" onClick={() => navigate(-1)}>
+        back
+      </button>
     </div>
   );
 }
@@ -105,7 +111,9 @@ describe('useScrollRestoration', () => {
 
   it('keeps the position of the first entry when the page is reloaded', () => {
     sessionStorage.setItem('carta:scroll:default', '800');
-    vi.spyOn(performance, 'getEntriesByType').mockReturnValue([{ type: 'reload' } as PerformanceNavigationTiming]);
+    vi.spyOn(performance, 'getEntriesByType').mockReturnValue([
+      { type: 'reload' } as PerformanceNavigationTiming,
+    ]);
 
     forgetStalePositions();
     renderPages();

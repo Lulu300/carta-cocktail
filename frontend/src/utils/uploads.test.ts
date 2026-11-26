@@ -12,6 +12,8 @@ describe('getUploadUrl', () => {
   });
 
   it('keeps an application base path when the app is served behind a reverse proxy prefix', () => {
-    expect(getUploadUrl('/cocktails/mojito.jpg', '/carta/')).toBe('/carta/uploads/cocktails/mojito.jpg');
+    expect(getUploadUrl('/cocktails/mojito.jpg', '/carta/')).toBe(
+      '/carta/uploads/cocktails/mojito.jpg',
+    );
   });
 });

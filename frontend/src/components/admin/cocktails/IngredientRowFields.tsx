@@ -5,7 +5,13 @@ import { useLocalizedName } from '../../../hooks/useLocalizedName';
 import IconButton from '../../ui/IconButton';
 import Input from '../../ui/Input';
 import Select from '../../ui/Select';
-import { SOURCE_KEYS, SOURCE_TYPES, isKeptStoredDefect, type CocktailFormValues, type SourceType } from './cocktailFormSchema';
+import {
+  SOURCE_KEYS,
+  SOURCE_TYPES,
+  isKeptStoredDefect,
+  type CocktailFormValues,
+  type SourceType,
+} from './cocktailFormSchema';
 import { hasStock, type RecipeLists } from './recipeLists';
 import { useErrorText } from './useErrorText';
 
@@ -29,17 +35,28 @@ interface SourceOption {
 
 type Localize = ReturnType<typeof useLocalizedName>;
 
-function sourceOptions(sourceType: SourceType, lists: RecipeLists, localize: Localize, selectedBottleId: number | null): SourceOption[] {
+function sourceOptions(
+  sourceType: SourceType,
+  lists: RecipeLists,
+  localize: Localize,
+  selectedBottleId: number | null,
+): SourceOption[] {
   switch (sourceType) {
     case 'BOTTLE':
       // An empty bottle is only listed when the recipe already uses it.
       return lists.bottles
         .filter((bottle) => hasStock(bottle) || bottle.id === selectedBottleId)
-        .map((bottle) => ({ id: bottle.id, label: `${bottle.name} (${bottle.category ? localize(bottle.category) : ''})` }));
+        .map((bottle) => ({
+          id: bottle.id,
+          label: `${bottle.name} (${bottle.category ? localize(bottle.category) : ''})`,
+        }));
     case 'CATEGORY':
       return lists.categories.map((category) => ({ id: category.id, label: localize(category) }));
     case 'INGREDIENT':
-      return lists.ingredients.map((ingredient) => ({ id: ingredient.id, label: localize(ingredient) }));
+      return lists.ingredients.map((ingredient) => ({
+        id: ingredient.id,
+        label: localize(ingredient),
+      }));
   }
 }
 
@@ -55,7 +72,12 @@ export default function IngredientRowFields({ index, lists, onRemove }: Ingredie
   const localize = useLocalizedName();
   const errorText = useErrorText();
   const errorId = useId();
-  const { control, register, setValue, formState: { errors } } = useFormContext<CocktailFormValues>();
+  const {
+    control,
+    register,
+    setValue,
+    formState: { errors },
+  } = useFormContext<CocktailFormValues>();
   const path = `ingredients.${index}` as const;
   const row = useWatch({ control, name: path });
   const { sourceType, categoryId, bottleId } = row;
@@ -85,8 +107,16 @@ export default function IngredientRowFields({ index, lists, onRemove }: Ingredie
   return (
     <li className="bg-canvas rounded-lg p-3 space-y-2">
       <div className="grid gap-2 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.6fr)_5.5rem_5.5rem_auto] md:items-center">
-        <Select aria-label={t('cocktails.sourceType')} className={CONTROL_CLASSES} {...register(`${path}.sourceType`, { onChange: resetSource })}>
-          {SOURCE_TYPES.map((type) => <option key={type} value={type}>{t(SOURCE_LABEL_KEYS[type])}</option>)}
+        <Select
+          aria-label={t('cocktails.sourceType')}
+          className={CONTROL_CLASSES}
+          {...register(`${path}.sourceType`, { onChange: resetSource })}
+        >
+          {SOURCE_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {t(SOURCE_LABEL_KEYS[type])}
+            </option>
+          ))}
         </Select>
 
         <Select
@@ -102,7 +132,9 @@ export default function IngredientRowFields({ index, lists, onRemove }: Ingredie
         >
           <option value="">--</option>
           {sourceOptions(sourceType, lists, localize, bottleId).map((option) => (
-            <option key={option.id} value={option.id}>{option.label}</option>
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
           ))}
         </Select>
 
@@ -117,18 +149,37 @@ export default function IngredientRowFields({ index, lists, onRemove }: Ingredie
           {...register(`${path}.quantity`, { valueAsNumber: true })}
         />
 
-        <Select aria-label={t('cocktails.unit')} className={CONTROL_CLASSES} {...invalidProps(unitError)} {...register(`${path}.unitId`, { setValueAs: toId })}>
+        <Select
+          aria-label={t('cocktails.unit')}
+          className={CONTROL_CLASSES}
+          {...invalidProps(unitError)}
+          {...register(`${path}.unitId`, { setValueAs: toId })}
+        >
           <option value="">--</option>
-          {lists.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.abbreviation}</option>)}
+          {lists.units.map((unit) => (
+            <option key={unit.id} value={unit.id}>
+              {unit.abbreviation}
+            </option>
+          ))}
         </Select>
 
-        <IconButton icon="close" label={t('common.delete')} variant="danger" className="justify-self-end" onClick={onRemove} />
+        <IconButton
+          icon="close"
+          label={t('common.delete')}
+          variant="danger"
+          className="justify-self-end"
+          onClick={onRemove}
+        />
       </div>
 
       {messages.length > 0 && (
-        <p id={errorId} className="text-xs text-danger">{messages.join(' · ')}</p>
+        <p id={errorId} className="text-xs text-danger">
+          {messages.join(' · ')}
+        </p>
       )}
-      {isKeptStoredDefect(row) && <p className="text-xs text-warning">{t('cocktails.storedDefect')}</p>}
+      {isKeptStoredDefect(row) && (
+        <p className="text-xs text-warning">{t('cocktails.storedDefect')}</p>
+      )}
 
       {sourceType === 'CATEGORY' && categoryId != null && (
         <Controller
@@ -136,22 +187,30 @@ export default function IngredientRowFields({ index, lists, onRemove }: Ingredie
           name={`${path}.preferredBottleIds`}
           render={({ field }) => (
             <fieldset className="pl-2">
-              <legend className="text-xs text-fg-muted mb-1">{t('cocktails.preferredBottles')}</legend>
+              <legend className="text-xs text-fg-muted mb-1">
+                {t('cocktails.preferredBottles')}
+              </legend>
               <div className="flex flex-wrap gap-2">
                 {/* An empty bottle stays listed while it is preferred, so it can be unticked. */}
-                {categoryBottles.filter((bottle) => hasStock(bottle) || field.value.includes(bottle.id)).map((bottle) => (
-                  <label key={bottle.id} className="flex items-center gap-1 text-xs text-fg">
-                    <input
-                      type="checkbox"
-                      checked={field.value.includes(bottle.id)}
-                      onChange={(event) => field.onChange(event.target.checked
-                        ? [...field.value, bottle.id]
-                        : field.value.filter((id) => id !== bottle.id))}
-                      className="accent-accent"
-                    />
-                    {bottle.name}
-                  </label>
-                ))}
+                {categoryBottles
+                  .filter((bottle) => hasStock(bottle) || field.value.includes(bottle.id))
+                  .map((bottle) => (
+                    <label key={bottle.id} className="flex items-center gap-1 text-xs text-fg">
+                      <input
+                        type="checkbox"
+                        checked={field.value.includes(bottle.id)}
+                        onChange={(event) =>
+                          field.onChange(
+                            event.target.checked
+                              ? [...field.value, bottle.id]
+                              : field.value.filter((id) => id !== bottle.id),
+                          )
+                        }
+                        className="accent-accent"
+                      />
+                      {bottle.name}
+                    </label>
+                  ))}
               </div>
             </fieldset>
           )}

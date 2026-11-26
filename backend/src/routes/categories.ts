@@ -15,7 +15,11 @@ const router = Router();
 
 async function assertCategoryNameIsFree(name: string, ownId?: number) {
   const categories = await prisma.category.findMany({ select: { id: true, name: true } });
-  assertUniqueIgnoringCase(categories.map((c) => ({ id: c.id, value: c.name })), name, ownId);
+  assertUniqueIgnoringCase(
+    categories.map((c) => ({ id: c.id, value: c.name })),
+    name,
+    ownId,
+  );
 }
 
 // List all categories
@@ -41,7 +45,8 @@ router.get('/:id', validate(idRequest), async (_req: AuthRequest, res: Response)
 const createSchemas = { body: CategoryCreate };
 
 router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Response) => {
-  const { name, type, desiredStock, minimumPercent, nameTranslations } = valid<typeof createSchemas>(res).body;
+  const { name, type, desiredStock, minimumPercent, nameTranslations } =
+    valid<typeof createSchemas>(res).body;
   await assertCategoryNameIsFree(name);
   const category = await prisma.category.create({
     data: {
@@ -60,7 +65,10 @@ router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Respons
 const updateSchemas = { params: IdParams, body: CategoryUpdate };
 
 router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Response) => {
-  const { params: { id }, body } = valid<typeof updateSchemas>(res);
+  const {
+    params: { id },
+    body,
+  } = valid<typeof updateSchemas>(res);
   const { name, type, desiredStock, minimumPercent, nameTranslations } = body;
   const stored = await prisma.category.findUnique({ where: { id } });
   if (!stored) throw new NotFoundError();
@@ -76,7 +84,9 @@ router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Respo
       type: typeName,
       desiredStock,
       minimumPercent,
-      nameTranslations: serializeTranslations(translationsToStore(nameTranslations, stored.nameTranslations)),
+      nameTranslations: serializeTranslations(
+        translationsToStore(nameTranslations, stored.nameTranslations),
+      ),
     },
   });
   res.json(parseNameTranslations(category));
@@ -84,7 +94,10 @@ router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Respo
 
 // Delete category: refused while it holds bottles or recipes use it, unless ?force=true
 router.delete('/:id', validate(deleteRequest), async (req: AuthRequest, res: Response) => {
-  const { params: { id }, query } = valid<typeof deleteRequest>(res);
+  const {
+    params: { id },
+    query,
+  } = valid<typeof deleteRequest>(res);
   const impact = await deleteCategory(id, isForceRequested(query.force));
   res.json({ message: req.t('categories.deleted'), deleted: true, impact });
 });

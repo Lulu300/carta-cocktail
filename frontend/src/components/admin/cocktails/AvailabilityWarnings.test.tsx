@@ -11,8 +11,17 @@ beforeEach(async () => {
 
 function line(overrides: Partial<IngredientAvailability>): IngredientAvailability {
   return {
-    cocktailIngredientId: 1, sourceType: 'INGREDIENT', name: 'Bitters', nameTranslations: { fr: 'Amer' },
-    orphan: false, icon: null, quantity: 1, unit: 'cl', isAvailable: false, availableCount: 0, ...overrides,
+    cocktailIngredientId: 1,
+    sourceType: 'INGREDIENT',
+    name: 'Bitters',
+    nameTranslations: { fr: 'Amer' },
+    orphan: false,
+    icon: null,
+    quantity: 1,
+    unit: 'cl',
+    isAvailable: false,
+    availableCount: 0,
+    ...overrides,
   };
 }
 
@@ -29,14 +38,18 @@ describe('AvailabilityWarnings', () => {
   });
 
   it('names an orphan line with the unknown source label', () => {
-    const availability = buildAvailability({ ingredients: [line({ name: '', nameTranslations: null, orphan: true })] });
+    const availability = buildAvailability({
+      ingredients: [line({ name: '', nameTranslations: null, orphan: true })],
+    });
     render(<AvailabilityWarnings availability={availability} loading={false} />);
 
     expect(screen.getByText('Source inconnue')).toBeInTheDocument();
   });
 
   it('shows nothing while loading', () => {
-    const { container } = render(<AvailabilityWarnings availability={buildAvailability()} loading />);
+    const { container } = render(
+      <AvailabilityWarnings availability={buildAvailability()} loading />,
+    );
 
     expect(container).toBeEmptyDOMElement();
   });

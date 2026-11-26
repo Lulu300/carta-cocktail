@@ -28,7 +28,10 @@ function renderTable(props: Partial<Parameters<typeof DataTable<Row>>[0]> = {}) 
   render(
     <DataTable<Row>
       columns={columns}
-      rows={[{ id: 1, name: 'Vodka' }, { id: 2, name: 'Rum' }]}
+      rows={[
+        { id: 1, name: 'Vodka' },
+        { id: 2, name: 'Rum' },
+      ]}
       getRowKey={(row) => row.id}
       sort={sort}
       pagination={pagination}
@@ -82,8 +85,12 @@ describe('DataTable', () => {
     renderTable({
       renderRow: (row) => (
         <>
-          <tr><td>{row.name}</td></tr>
-          <tr><td>{`${row.name} detail`}</td></tr>
+          <tr>
+            <td>{row.name}</td>
+          </tr>
+          <tr>
+            <td>{`${row.name} detail`}</td>
+          </tr>
         </>
       ),
     });
@@ -118,8 +125,8 @@ describe('DataTable', () => {
 
     function liveRegion() {
       act(() => {
-      vi.advanceTimersByTime(1000);
-    });
+        vi.advanceTimersByTime(1000);
+      });
       return document.querySelector('[aria-live="polite"]');
     }
 

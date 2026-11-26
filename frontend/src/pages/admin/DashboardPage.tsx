@@ -22,7 +22,9 @@ function StatCount({ query }: { query: UseQueryResult<unknown[], Error> }) {
   if (query.isError) {
     return (
       <>
-        <div aria-hidden="true" className="text-3xl font-bold text-fg-muted">–</div>
+        <div aria-hidden="true" className="text-3xl font-bold text-fg-muted">
+          –
+        </div>
         <div className="text-xs text-red-400">{t('common.error')}</div>
       </>
     );
@@ -40,9 +42,24 @@ export default function DashboardPage() {
   const shortageCount = shortageList?.length ?? 0;
 
   const statCards = [
-    { label: t('dashboard.stats.categories'), query: categoriesQuery, icon: '🏷️', path: '/admin/categories' },
-    { label: t('dashboard.stats.bottles'), query: bottlesQuery, icon: '🍾', path: '/admin/bottles' },
-    { label: t('dashboard.stats.cocktails'), query: cocktailsQuery, icon: '🍸', path: '/admin/cocktails' },
+    {
+      label: t('dashboard.stats.categories'),
+      query: categoriesQuery,
+      icon: '🏷️',
+      path: '/admin/categories',
+    },
+    {
+      label: t('dashboard.stats.bottles'),
+      query: bottlesQuery,
+      icon: '🍾',
+      path: '/admin/bottles',
+    },
+    {
+      label: t('dashboard.stats.cocktails'),
+      query: cocktailsQuery,
+      icon: '🍸',
+      path: '/admin/cocktails',
+    },
     { label: t('dashboard.stats.menus'), query: menusQuery, icon: '📋', path: '/admin/menus' },
   ];
 
@@ -55,7 +72,8 @@ export default function DashboardPage() {
           to="/admin/shortages"
           className="block mb-6 bg-danger/10 border border-danger/30 text-danger px-6 py-4 rounded-xl hover:bg-danger/20 transition-colors"
         >
-          <span aria-hidden="true">⚠️</span> {t('dashboard.shortageAlert', { count: shortageCount })}
+          <span aria-hidden="true">⚠️</span>{' '}
+          {t('dashboard.shortageAlert', { count: shortageCount })}
         </Link>
       )}
 
@@ -66,7 +84,9 @@ export default function DashboardPage() {
             to={card.path}
             className="bg-surface border border-line rounded-xl p-6 hover:border-accent/30 transition-colors"
           >
-            <div aria-hidden="true" className="text-3xl mb-2">{card.icon}</div>
+            <div aria-hidden="true" className="text-3xl mb-2">
+              {card.icon}
+            </div>
             <StatCount query={card.query} />
             <div className="text-sm text-fg-muted mt-1">{card.label}</div>
           </Link>

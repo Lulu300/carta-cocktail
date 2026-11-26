@@ -16,7 +16,11 @@ export const BottleExportQuery = BottleListQuery.extend({
   location: z.string().optional(),
   search: z.string().optional(),
   // Case-insensitive, as before
-  format: z.string().toLowerCase().pipe(z.enum(['json', 'csv'])).default('json'),
+  format: z
+    .string()
+    .toLowerCase()
+    .pipe(z.enum(['json', 'csv']))
+    .default('json'),
 });
 
 const BottleFields = z.object({

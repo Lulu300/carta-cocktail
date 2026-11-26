@@ -18,7 +18,12 @@ interface ComboboxKeyboardOptions<T> {
  * and leaving the input close the list.
  */
 export function useComboboxKeyboard<T>({
-  options, query, isOpen, onOpen, onClose, onSelect,
+  options,
+  query,
+  isOpen,
+  onOpen,
+  onClose,
+  onSelect,
 }: ComboboxKeyboardOptions<T>) {
   const listboxId = useId();
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
@@ -35,7 +40,8 @@ export function useComboboxKeyboard<T>({
   const activeOptionId = activeIndex >= 0 ? getOptionId(activeIndex) : undefined;
 
   useEffect(() => {
-    if (activeOptionId) document.getElementById(activeOptionId)?.scrollIntoView?.({ block: 'nearest' });
+    if (activeOptionId)
+      document.getElementById(activeOptionId)?.scrollIntoView?.({ block: 'nearest' });
   }, [activeOptionId]);
 
   const moveHighlight = (step: 1 | -1) => {

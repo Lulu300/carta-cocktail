@@ -80,7 +80,10 @@ export async function setImage(id: number, file: Express.Multer.File): Promise<C
     result = await prisma.$transaction(async (tx) => {
       const existing = await tx.cocktail.findUnique({ where: { id }, select: { imagePath: true } });
       if (!existing) throw new NotFoundError();
-      const cocktail = await tx.cocktail.update({ where: { id }, data: { imagePath: file.filename } });
+      const cocktail = await tx.cocktail.update({
+        where: { id },
+        data: { imagePath: file.filename },
+      });
       return { cocktail, previousImagePath: existing.imagePath };
     });
   } catch (error) {

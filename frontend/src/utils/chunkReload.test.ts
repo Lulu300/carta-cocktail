@@ -5,11 +5,17 @@ function createStorage(): Storage {
   const values = new Map<string, string>();
   return {
     getItem: (key: string) => values.get(key) ?? null,
-    setItem: (key: string, value: string) => { values.set(key, value); },
-    removeItem: (key: string) => { values.delete(key); },
+    setItem: (key: string, value: string) => {
+      values.set(key, value);
+    },
+    removeItem: (key: string) => {
+      values.delete(key);
+    },
     clear: () => values.clear(),
     key: () => null,
-    get length() { return values.size; },
+    get length() {
+      return values.size;
+    },
   };
 }
 
@@ -69,7 +75,9 @@ describe('registerChunkReloadHandler', () => {
 
   it('does not reload when session storage is unavailable', () => {
     const storage = createStorage();
-    storage.getItem = () => { throw new Error('SecurityError'); };
+    storage.getItem = () => {
+      throw new Error('SecurityError');
+    };
     const { reload, firePreloadError } = createTarget(storage);
 
     firePreloadError();

@@ -1,11 +1,24 @@
 import { describe, it, expect } from 'vitest';
-import { BottleImportConfirm, BottleImportPayload, MAX_IMPORT_BOTTLES, MAX_IMPORT_ROWS } from './bottleImport';
+import {
+  BottleImportConfirm,
+  BottleImportPayload,
+  MAX_IMPORT_BOTTLES,
+  MAX_IMPORT_ROWS,
+} from './bottleImport';
 
 // A row as POST /bottles/import/preview returns it
 const row = {
-  name: 'Havana', categoryName: 'Rum', capacityMl: 700, remainingPercent: 100,
-  alcoholPercentage: 40, purchasePrice: 0, location: null, openedAt: '2026-10-01',
-  isApero: false, isDigestif: true, quantity: 2,
+  name: 'Havana',
+  categoryName: 'Rum',
+  capacityMl: 700,
+  remainingPercent: 100,
+  alcoholPercentage: 40,
+  purchasePrice: 0,
+  location: null,
+  openedAt: '2026-10-01',
+  isApero: false,
+  isDigestif: true,
+  quantity: 2,
 };
 
 function payloadWith(bottles: unknown[]) {
@@ -24,8 +37,15 @@ describe('BottleImportPayload', () => {
   });
 
   it('fills the defaults of a sparse row', () => {
-    const parsed = BottleImportPayload.parse(payloadWith([{ name: 'Havana', categoryName: '', capacityMl: 700 }]));
-    expect(parsed.bottles[0]).toMatchObject({ remainingPercent: 100, quantity: 1, purchasePrice: null, isApero: false });
+    const parsed = BottleImportPayload.parse(
+      payloadWith([{ name: 'Havana', categoryName: '', capacityMl: 700 }]),
+    );
+    expect(parsed.bottles[0]).toMatchObject({
+      remainingPercent: 100,
+      quantity: 1,
+      purchasePrice: null,
+      isApero: false,
+    });
   });
 
   it.each([
@@ -36,7 +56,9 @@ describe('BottleImportPayload', () => {
     ['openedAt', 'someday'],
     ['quantity', 51],
   ])('rejects %s = %s', (field, value) => {
-    expect(issuePaths(BottleImportPayload.safeParse(payloadWith([{ ...row, [field]: value }])))).toEqual([`bottles.0.${field}`]);
+    expect(
+      issuePaths(BottleImportPayload.safeParse(payloadWith([{ ...row, [field]: value }]))),
+    ).toEqual([`bottles.0.${field}`]);
   });
 
   it(`accepts ${MAX_IMPORT_ROWS} rows and rejects one more`, () => {
@@ -57,7 +79,9 @@ describe('BottleImportPayload', () => {
   });
 
   it('accepts version 1 only', () => {
-    expect(issuePaths(BottleImportPayload.safeParse({ version: 2, bottles: [] }))).toEqual(['version']);
+    expect(issuePaths(BottleImportPayload.safeParse({ version: 2, bottles: [] }))).toEqual([
+      'version',
+    ]);
   });
 });
 

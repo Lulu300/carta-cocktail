@@ -19,7 +19,12 @@ const VARIANT_CLASSES: Record<IconButtonVariant, string> = {
 };
 
 export default function IconButton({
-  icon, label, variant = 'default', type = 'button', className, ...rest
+  icon,
+  label,
+  variant = 'default',
+  type = 'button',
+  className,
+  ...rest
 }: IconButtonProps) {
   return (
     <button

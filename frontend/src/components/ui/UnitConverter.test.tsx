@@ -11,7 +11,11 @@ function unit(id: number, abbreviation: string, conversionFactorToMl: number | n
 }
 
 beforeEach(() => {
-  mockApiResponse('get', '/api/public/units', [unit(1, 'cl', 10), unit(2, 'ml', 1), unit(3, 'oz', 29.57)]);
+  mockApiResponse('get', '/api/public/units', [
+    unit(1, 'cl', 10),
+    unit(2, 'ml', 1),
+    unit(3, 'oz', 29.57),
+  ]);
 });
 
 describe('UnitConverter', () => {
@@ -74,19 +78,26 @@ describe('UnitConverter', () => {
   it.each([
     ['en', '1.5 cl', '3.33 cs', '0.51 oz'],
     ['fr', '1,5 cl', '3,33 cs', '0,51 oz'],
-  ])('writes the quantities in %s and converts back to the original', async (language, original, spoons, ounces) => {
-    await i18n.changeLanguage(language);
-    mockApiResponse('get', '/api/public/units', [unit(1, 'cl', 10), unit(2, 'cs', 4.5), unit(3, 'oz', 29.5735)]);
-    const user = userEvent.setup();
-    render(<UnitConverter quantity={1.5} unit="cl" />);
-    await user.click(await screen.findByRole('button', { name: original }));
-    expect(screen.getByRole('button', { name: ounces })).toBeInTheDocument();
+  ])(
+    'writes the quantities in %s and converts back to the original',
+    async (language, original, spoons, ounces) => {
+      await i18n.changeLanguage(language);
+      mockApiResponse('get', '/api/public/units', [
+        unit(1, 'cl', 10),
+        unit(2, 'cs', 4.5),
+        unit(3, 'oz', 29.5735),
+      ]);
+      const user = userEvent.setup();
+      render(<UnitConverter quantity={1.5} unit="cl" />);
+      await user.click(await screen.findByRole('button', { name: original }));
+      expect(screen.getByRole('button', { name: ounces })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: spoons }));
-    const trigger = screen.getByRole('button', { name: spoons });
-    await user.click(trigger);
-    await user.click(screen.getByRole('button', { name: original }));
+      await user.click(screen.getByRole('button', { name: spoons }));
+      const trigger = screen.getByRole('button', { name: spoons });
+      await user.click(trigger);
+      await user.click(screen.getByRole('button', { name: original }));
 
-    expect(screen.getByRole('button', { name: original, expanded: false })).toBeInTheDocument();
-  });
+      expect(screen.getByRole('button', { name: original, expanded: false })).toBeInTheDocument();
+    },
+  );
 });

@@ -41,7 +41,9 @@ export default function NewIngredientField({ onDone }: { onDone: () => void }) {
         placeholder={t('ingredients.name')}
         className="flex-1 px-3 py-1.5 text-sm"
       />
-      <Button size="sm" onClick={create} loading={createIngredient.isPending}>{t('common.create')}</Button>
+      <Button size="sm" onClick={create} loading={createIngredient.isPending}>
+        {t('common.create')}
+      </Button>
     </div>
   );
 }

@@ -11,11 +11,7 @@ function Page({ parts }: { parts: (string | null | undefined)[] }) {
 }
 
 function renderPage(parts: (string | null | undefined)[], mounted = true) {
-  return (
-    <SiteSettingsProvider>
-      {mounted && <Page parts={parts} />}
-    </SiteSettingsProvider>
-  );
+  return <SiteSettingsProvider>{mounted && <Page parts={parts} />}</SiteSettingsProvider>;
 }
 
 describe('usePageTitle', () => {

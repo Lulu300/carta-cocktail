@@ -19,7 +19,11 @@ const TONE_CLASSES: Record<BadgeTone, string> = {
 export default function Badge({ tone = 'neutral', className, ...rest }: BadgeProps) {
   return (
     <span
-      className={cx('inline-flex items-center px-2 py-1 rounded text-xs font-medium', TONE_CLASSES[tone], className)}
+      className={cx(
+        'inline-flex items-center px-2 py-1 rounded text-xs font-medium',
+        TONE_CLASSES[tone],
+        className,
+      )}
       {...rest}
     />
   );

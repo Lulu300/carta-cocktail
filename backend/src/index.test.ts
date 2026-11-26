@@ -30,9 +30,15 @@ function startServer(port: number): ServerProcess {
     },
   });
   let output = '';
-  child.stdout?.on('data', (chunk) => { output += chunk; });
-  child.stderr?.on('data', (chunk) => { output += chunk; });
-  const exitCode = new Promise<number | null>((resolve) => child.on('exit', (code) => resolve(code)));
+  child.stdout?.on('data', (chunk) => {
+    output += chunk;
+  });
+  child.stderr?.on('data', (chunk) => {
+    output += chunk;
+  });
+  const exitCode = new Promise<number | null>((resolve) =>
+    child.on('exit', (code) => resolve(code)),
+  );
   return { child, output: () => output, exitCode };
 }
 

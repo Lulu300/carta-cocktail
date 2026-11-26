@@ -5,13 +5,23 @@ import { clearToasts, renderWithFeedback } from '../../test/feedback';
 import { axe } from '../../test/axe';
 import { buildUnit } from '../../test/factories';
 import {
-  captureRequest, mockApiError, mockApiPending, mockApiResponse, mockNetworkError, mockValidationError,
+  captureRequest,
+  mockApiError,
+  mockApiPending,
+  mockApiResponse,
+  mockNetworkError,
+  mockValidationError,
 } from '../../test/msw/utils';
 // Registers the admin messages, and with them the names of the fields a validation 400 refuses
 import '../../i18n/admin';
 import UnitsPage from './UnitsPage';
 
-const centiliter = buildUnit({ id: 1, name: 'Centiliter', abbreviation: 'cl', conversionFactorToMl: 10 });
+const centiliter = buildUnit({
+  id: 1,
+  name: 'Centiliter',
+  abbreviation: 'cl',
+  conversionFactorToMl: 10,
+});
 const piece = buildUnit({ id: 2, name: 'Piece', abbreviation: 'pc', conversionFactorToMl: null });
 
 function renderPage() {
@@ -27,7 +37,11 @@ function dialog() {
   return screen.getByRole('dialog');
 }
 
-async function fillCreateForm(user: ReturnType<typeof userEvent.setup>, name: string, abbreviation: string) {
+async function fillCreateForm(
+  user: ReturnType<typeof userEvent.setup>,
+  name: string,
+  abbreviation: string,
+) {
   await user.click(screen.getByRole('button', { name: 'Add Unit' }));
   await user.type(within(dialog()).getByLabelText(/Name/), name);
   await user.type(within(dialog()).getByLabelText(/Abbreviation/), abbreviation);
@@ -137,7 +151,9 @@ describe('UnitsPage', () => {
 
     await user.click(within(dialog()).getByRole('button', { name: 'Save' }));
 
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('This unit already exists'));
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('This unit already exists'),
+    );
     expect(dialog()).toBeInTheDocument();
   });
 
@@ -207,7 +223,9 @@ describe('UnitsPage', () => {
     const deleted = captureRequest('delete', '/api/units/:id');
 
     await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
-    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }),
+    );
 
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(deleted.count()).toBe(0);
@@ -215,14 +233,21 @@ describe('UnitsPage', () => {
 
   it('shows the backend message and the cocktails that use a unit it refuses to delete', async () => {
     const user = userEvent.setup();
-    mockApiResponse('delete', '/api/units/:id', {
-      error: 'This unit is used by cocktails',
-      details: { cocktails: [{ id: 5, name: 'Mojito', removedLines: 1 }], bottles: [] },
-    }, 409);
+    mockApiResponse(
+      'delete',
+      '/api/units/:id',
+      {
+        error: 'This unit is used by cocktails',
+        details: { cocktails: [{ id: 5, name: 'Mojito', removedLines: 1 }], bottles: [] },
+      },
+      409,
+    );
     await renderLoadedPage();
 
     await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
-    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }),
+    );
 
     const alert = await screen.findByText(/This unit is used by cocktails/);
     expect(alert).toHaveTextContent(/Used by these cocktails: .+\./);
@@ -265,7 +290,12 @@ describe('UnitsPage', () => {
   it('fills the translations of the unit being edited', async () => {
     const user = userEvent.setup();
     mockApiResponse('get', '/api/units', [
-      buildUnit({ name: 'Litre', abbreviation: 'l', conversionFactorToMl: 1000, nameTranslations: { fr: 'Litre', en: 'Liter' } }),
+      buildUnit({
+        name: 'Litre',
+        abbreviation: 'l',
+        conversionFactorToMl: 1000,
+        nameTranslations: { fr: 'Litre', en: 'Liter' },
+      }),
     ]);
     renderPage();
     // The list shows the name in the UI language

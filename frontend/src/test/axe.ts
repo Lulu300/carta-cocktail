@@ -9,7 +9,10 @@ expect.extend(matchers);
 // The type parameters must repeat vitest's own declaration, even unused.
 declare module 'vitest' {
   // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unused-vars
-  interface Matchers<R extends void | Promise<void> = void | Promise<void>, T = unknown> extends AxeMatchers {}
+  interface Matchers<
+    R extends void | Promise<void> = void | Promise<void>,
+    T = unknown,
+  > extends AxeMatchers {}
 }
 
 /**

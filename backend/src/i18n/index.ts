@@ -21,7 +21,9 @@ const SUPPORTED_LANGUAGES: readonly string[] = ['en', 'en-GB', 'fr'];
  */
 function toSupportedLanguage(code: string): string {
   const lowerCaseCode = code.toLowerCase();
-  const exactMatch = SUPPORTED_LANGUAGES.find((language) => language.toLowerCase() === lowerCaseCode);
+  const exactMatch = SUPPORTED_LANGUAGES.find(
+    (language) => language.toLowerCase() === lowerCaseCode,
+  );
   if (exactMatch) return exactMatch;
   const baseLanguage = lowerCaseCode.split(/[-_]/)[0];
   return SUPPORTED_LANGUAGES.includes(baseLanguage) ? baseLanguage : '';

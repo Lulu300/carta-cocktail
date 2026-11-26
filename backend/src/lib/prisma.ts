@@ -32,10 +32,16 @@ export function createPrismaClient<Options extends SqliteClientOptions = SqliteC
   options?: Options,
 ) {
   const adapter = withSerializedTransactions(
-    new PrismaBetterSqlite3({ url: resolveDatabasePath(databaseUrl) }, { timestampFormat: 'unixepoch-ms' }),
+    new PrismaBetterSqlite3(
+      { url: resolveDatabasePath(databaseUrl) },
+      { timestampFormat: 'unixepoch-ms' },
+    ),
   );
   type ClientOptions = Options & { adapter: PrismaBetterSqlite3 };
-  return new PrismaClient<ClientOptions>({ ...options, adapter } as Prisma.PrismaClientConstructorArgs<ClientOptions>);
+  return new PrismaClient<ClientOptions>({
+    ...options,
+    adapter,
+  } as Prisma.PrismaClientConstructorArgs<ClientOptions>);
 }
 
 /**
@@ -69,7 +75,9 @@ export async function configureSqlite(
   // SQLite keeps the old mode without an error when it cannot switch
   // (file system without WAL support, another connection still open)
   if (actualMode !== requestedMode) {
-    console.warn(`SQLite journal mode is ${actualMode}, not ${requestedMode} as requested (SQLITE_WAL)`);
+    console.warn(
+      `SQLite journal mode is ${actualMode}, not ${requestedMode} as requested (SQLITE_WAL)`,
+    );
   }
   return actualMode;
 }
@@ -83,7 +91,9 @@ export async function configureSqlite(
  * pending WAL page can be written over the restored file.
  */
 export async function checkpointWal(client: PrismaClient = prisma): Promise<void> {
-  const rows = await client.$queryRawUnsafe<{ busy: number | bigint }[]>('PRAGMA wal_checkpoint(TRUNCATE);');
+  const rows = await client.$queryRawUnsafe<{ busy: number | bigint }[]>(
+    'PRAGMA wal_checkpoint(TRUNCATE);',
+  );
   // busy = 1: a reader or writer blocked the checkpoint, so the .db file is incomplete
   if (Number(rows[0].busy) !== 0) {
     throw new Error('SQLite WAL checkpoint could not complete: the database is busy');

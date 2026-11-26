@@ -12,23 +12,33 @@ const doubleSpaced = buildCategoryType({ name: 'X  Y' });
 const SPACED_SPIRIT_LABEL = '␣SPIRIT␣ (with spaces)';
 
 function renderOptions(value: string, categoryTypes: CategoryType[]) {
-  render(<CategoryTypeSelect value={value} onChange={() => undefined} categoryTypes={categoryTypes} />);
-  return within(screen.getByRole('combobox')).getAllByRole('option').map((option) => option.textContent);
+  render(
+    <CategoryTypeSelect value={value} onChange={() => undefined} categoryTypes={categoryTypes} />,
+  );
+  return within(screen.getByRole('combobox'))
+    .getAllByRole('option')
+    .map((option) => option.textContent);
 }
 
 describe('CategoryTypeSelect', () => {
   it('tells the stored names apart, and labels the empty name', () => {
     expect(renderOptions('SPIRIT', [spacedSpirit, spirit, unnamed, doubleSpaced])).toEqual([
-      SPACED_SPIRIT_LABEL, 'SPIRIT', '(no name)', 'X␣␣Y (with spaces)',
+      SPACED_SPIRIT_LABEL,
+      'SPIRIT',
+      '(no name)',
+      'X␣␣Y (with spaces)',
     ]);
     expect(screen.getByRole('option', { name: SPACED_SPIRIT_LABEL })).toBeInTheDocument();
   });
 
   it('adds the stored name to a translation that would hide it', () => {
     const nameTranslations = { en: 'Spirits' };
-    expect(renderOptions('SPIRIT', [{ ...spacedSpirit, nameTranslations }, { ...spirit, nameTranslations }])).toEqual([
-      `Spirits – ${SPACED_SPIRIT_LABEL}`, 'Spirits',
-    ]);
+    expect(
+      renderOptions('SPIRIT', [
+        { ...spacedSpirit, nameTranslations },
+        { ...spirit, nameTranslations },
+      ]),
+    ).toEqual([`Spirits – ${SPACED_SPIRIT_LABEL}`, 'Spirits']);
   });
 
   it("marks the file's own type when it is not in the list", () => {
