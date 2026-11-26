@@ -404,7 +404,8 @@ export type BottleCategoryResolution =
     };
 
 export type BottleRowResolution =
-  | { action: 'import'; categoryName?: string }
+  // `categoryId`: an existing category, which takes precedence over `categoryName`
+  | { action: 'import'; categoryId?: number; categoryName?: string }
   | { action: 'skip' };
 
 export interface BottleImportResolutions {

@@ -123,7 +123,9 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
 
   const created = await prisma.$transaction(async (tx) => {
     const resolvedCategories = new Map<string, number>(); // lowercased name -> id
-    const existingCategories = new CaseInsensitiveIndex(await tx.category.findMany(), (category) => category.name);
+    const categories = await tx.category.findMany();
+    const existingCategories = new CaseInsensitiveIndex(categories, (category) => category.name);
+    const existingCategoryIds = new Set(categories.map((category) => category.id));
 
     // Apply explicit category resolutions
     for (const [key, resolution] of Object.entries(resolutions?.categories || {})) {
@@ -158,6 +160,15 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
     const categoryIdOf = (categoryName: string) => resolvedCategories.get(categoryName.toLowerCase())
       ?? existingCategories.findUnambiguous(categoryName, 'errors.ambiguousCategoryName')?.id;
 
+    // An existing category picked by its id, else the category of the row's name, else of the file's
+    const rowCategoryId = (fileCategory: string, resolution: { categoryId?: number; categoryName?: string }) => {
+      if (resolution.categoryId !== undefined) {
+        return existingCategoryIds.has(resolution.categoryId) ? resolution.categoryId : undefined;
+      }
+      const categoryName = (resolution.categoryName || fileCategory).trim();
+      return categoryName ? categoryIdOf(categoryName) : undefined;
+    };
+
     let skippedNoCategory = 0;
     let duplicatesCreated = 0;
     const rows: Prisma.BottleCreateManyInput[] = [];
@@ -177,12 +188,7 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
 
       if (resolution.action === 'skip') continue;
 
-      const finalCategoryName = (resolution.categoryName || b.categoryName).trim();
-      if (!finalCategoryName) {
-        skippedNoCategory++;
-        continue;
-      }
-      const categoryId = categoryIdOf(finalCategoryName);
+      const categoryId = rowCategoryId(b.categoryName, resolution);
       if (!categoryId) {
         skippedNoCategory++;
         continue;

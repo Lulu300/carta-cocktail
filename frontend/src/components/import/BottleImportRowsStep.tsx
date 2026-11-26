@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import type { BottleRowPreview, BottleRowResolution } from '../../types';
 import { cx } from '../ui/classNames';
 import Select from '../ui/Select';
-import { rowCategory, type RowCategories } from './bottleImportResolutions';
+import type { RowCategories } from './bottleImportResolutions';
 
 interface BottleImportRowsStepProps {
   rows: BottleRowPreview[];
@@ -15,6 +15,12 @@ interface BottleImportRowsStepProps {
 export default function BottleImportRowsStep({ rows, resolutions, categories, onChange }: BottleImportRowsStepProps) {
   const { t } = useTranslation();
 
+  // The options go by their position: two existing categories can have the same name
+  const pickCategory = (optionIndex: string): BottleRowResolution => {
+    const option = optionIndex === '' ? undefined : categories.options[Number(optionIndex)];
+    return { action: 'import', ...(option?.choice ?? { categoryName: '' }) };
+  };
+
   return (
     <section>
       <h3 className="text-sm font-semibold text-fg-muted uppercase tracking-wider mb-2">
@@ -25,10 +31,10 @@ export default function BottleImportRowsStep({ rows, resolutions, categories, on
           const key = String(index);
           const resolution = resolutions[key];
           const isSkipped = resolution?.action === 'skip';
-          const category = rowCategory(entry.ref.categoryName, resolution);
           // The category the confirmation uses, which may differ from the name the row sends
-          const shownCategory = categories.categoryOf(category);
-          const needsCategory = entry.needsCategory && !category;
+          const shownCategory = categories.categoryOf(entry.ref.categoryName, resolution);
+          const shownIndex = shownCategory ? categories.options.indexOf(shownCategory) : -1;
+          const needsCategory = entry.needsCategory && !shownCategory;
           return (
             <div
               key={key}
@@ -56,14 +62,14 @@ export default function BottleImportRowsStep({ rows, resolutions, categories, on
               <div className="flex items-center gap-2">
                 <Select
                   aria-label={t('bottles.category')}
-                  value={shownCategory?.name ?? ''}
-                  onChange={(e) => onChange(key, { action: 'import', categoryName: e.target.value })}
+                  value={shownIndex === -1 ? '' : String(shownIndex)}
+                  onChange={(e) => onChange(key, pickCategory(e.target.value))}
                   disabled={isSkipped}
                   className="flex-1"
                 >
                   <option value="">{t('bottles.importWizard.pickCategory')}</option>
-                  {categories.options.map((option) => (
-                    <option key={option.name} value={option.name}>
+                  {categories.options.map((option, optionIndex) => (
+                    <option key={optionIndex} value={String(optionIndex)}>
                       {option.name}{option.isNew ? ` (${t('bottles.importWizard.willCreate')})` : ''}
                     </option>
                   ))}
@@ -74,7 +80,7 @@ export default function BottleImportRowsStep({ rows, resolutions, categories, on
                   aria-label={isSkipped
                     ? t('bottles.importWizard.unskipRow', { name: entry.ref.name })
                     : t('bottles.importWizard.skipRow', { name: entry.ref.name })}
-                  onClick={() => onChange(key, isSkipped ? { action: 'import', categoryName: category } : { action: 'skip' })}
+                  onClick={() => onChange(key, isSkipped ? { action: 'import', categoryName: entry.ref.categoryName } : { action: 'skip' })}
                   className={cx(
                     'text-xs px-3 py-1.5 rounded-lg transition-colors border',
                     isSkipped ? 'bg-gray-400/10 text-gray-300 border-gray-500' : 'text-fg-muted border-gray-700 hover:border-gray-500',
