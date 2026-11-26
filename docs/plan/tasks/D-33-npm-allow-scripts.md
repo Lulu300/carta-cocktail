@@ -11,7 +11,7 @@ depends_on: []
 touches: [backend/package.json, frontend/package.json, backend/Dockerfile, backend/AGENTS.md, frontend/AGENTS.md]
 sources: []
 branch: chore/D-33-npm-allow-scripts
-pr:
+pr: 254
 ---
 
 ## Contexte
