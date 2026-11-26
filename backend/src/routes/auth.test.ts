@@ -114,6 +114,12 @@ describe('GET /api/auth/me', () => {
     expect(res.body).toEqual({ error: 'Unauthorized' });
   });
 
+  it('should answer the 401 without token in French', async () => {
+    const res = await request.get('/api/auth/me').set('Accept-Language', 'fr');
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ error: 'Non autorisé' });
+  });
+
   it('should return 401 with invalid token', async () => {
     const res = await request.get('/api/auth/me').set('Authorization', 'Bearer invalid-token');
     expect(res.status).toBe(401);

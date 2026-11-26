@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-12]
 touches: [backend/src/routes/auth.test.ts, backend/src/i18n/, backend/src/test/messages.ts]
 sources: []
-branch:
-pr:
+branch: test/C-49-i18n-401-placeholder-guards
+pr: PRNUM
 ---
 
 ## Contexte
@@ -57,3 +57,4 @@ C-12 (PR #166) a traduit les 401 du middleware d'authentification (`Unauthorized
 ## Journal
 
 - 2026-11-12 : tâche créée par la PR docs de suivi du lot D-35/E-18/B-20/C-12 à partir de la relecture de la PR #166 (C-12). Faits vérifiés sur `develop` (9799168) : test anglais seul pour le 401 sans token (`auth.test.ts`), clé `errors.unauthorized` = « Non autorisé » en `fr` ; « NaN » reproduit avec i18next 25.10.10 (`{{max, number}}` sans valeur) ; aucune assertion sur le `max` de `tooManyBottles`.
+- 2026-11-26 : faite. Depuis la création, trois autres messages à placeholder sont apparus (`malformedHeader`, `ambiguousCategoryName`, `ambiguousUnitAbbreviation`) : la table de `placeholders.test.ts` les couvre aussi (aperçu d'import de bouteilles, confirmation d'import de bouteilles, confirmation d'import de cocktail). Sondes de sabotage faites : `tooManyBottles` sans `max` et `'Unauthorized'` en dur font échouer les tests. Aucun code de production modifié, pas de ligne « Notes de version ».
