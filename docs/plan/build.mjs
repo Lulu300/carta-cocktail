@@ -309,6 +309,15 @@ export function overlap(a, b) {
 }
 const conflictFiles = (a, b) => a.touches.filter((x) => b.touches.some((y) => overlap(x, y)));
 
+const LIST_FIELDS = ['depends_on', 'touches', 'sources'];
+
+// The header parser turns anything that is not a one-line bracketed list into a string; a silent wrap into a
+// one-item list would hide a broken `touches` from the conflict detection of --ready.
+export function listFieldErrors(file, data) {
+  return LIST_FIELDS.filter((k) => k in data && !Array.isArray(data[k]))
+    .map((k) => `${file} : champ « ${k} » : liste attendue entre crochets sur une seule ligne (\`[]\` s'il n'y a rien), reçu « ${data[k]} »`);
+}
+
 export function loadPlan() {
   const errors = [];
   const warnings = [];
@@ -335,7 +344,8 @@ export function loadPlan() {
     if (data.status && !STATUSES[data.status]) errors.push(`${file} : statut inconnu « ${data.status} »`);
     const owner = data.owner || 'agent';
     if (!OWNERS[owner]) errors.push(`${file} : owner inconnu « ${owner} »`);
-    const arr = (v) => (Array.isArray(v) ? v : v ? [v] : []);
+    errors.push(...listFieldErrors(file, data));
+    const arr = (v) => (Array.isArray(v) ? v : []);
     const unchecked = (body.match(/^\s*[-*] \[ \]/gm) || []).length;
     const checked = (body.match(/^\s*[-*] \[[xX]\]/gm) || []).length;
     if (!stripMd(body.replace(/^##.*$/gm, '').replace(/- \d{4}-\d{2}-\d{2} :.*$/gm, ''))) warnings.push(`${file} : corps vide`);
