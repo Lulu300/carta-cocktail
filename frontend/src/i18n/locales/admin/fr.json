@@ -594,5 +594,13 @@
     "teal": "Bleu canard",
     "indigo": "Indigo",
     "gray": "Gris"
+  },
+  "upgradeNotice": {
+    "title": "Mise à jour de v{{from}} vers v{{to}}",
+    "intro": "Actions obligatoires des versions installées depuis la dernière mise à jour validée, tirées des notes de version (en anglais). UPGRADING.md reste la référence.",
+    "before": "À faire avant la mise à jour : à vérifier maintenant",
+    "after": "À faire après la mise à jour",
+    "acknowledge": "J'ai fait ces actions",
+    "guideLink": "Guide de mise à jour (UPGRADING.md)"
   }
 }

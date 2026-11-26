@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { appVersion } from '../config';
 import { prisma } from '../lib/prisma';
 
 const router = Router();
@@ -14,8 +15,7 @@ router.get('/', async (_req, res) => {
     res.status(503).json({ status: 'unavailable' });
     return;
   }
-  // `||`, not `??`: an APP_VERSION set but empty also falls back to 'dev'
-  res.json({ status: 'ok', version: process.env.APP_VERSION || 'dev' });
+  res.json({ status: 'ok', version: appVersion() });
 });
 
 export default router;

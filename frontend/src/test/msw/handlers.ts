@@ -222,6 +222,12 @@ const settingsHandlers = [
   ),
 ];
 
+const systemHandlers = [
+  // No upgrade notice by default: a test that needs one says so.
+  http.get('/api/system/upgrade-notice', () => new HttpResponse(null, { status: 204 })),
+  http.post('/api/system/upgrade-notice/acknowledge', () => new HttpResponse(null, { status: 204 })),
+];
+
 export const handlers = [
   ...authHandlers,
   ...categoryTypeHandlers,
@@ -236,4 +242,5 @@ export const handlers = [
   ...publicHandlers,
   ...stockHandlers,
   ...settingsHandlers,
+  ...systemHandlers,
 ];

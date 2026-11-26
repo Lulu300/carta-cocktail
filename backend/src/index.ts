@@ -1,10 +1,11 @@
 import app from './app';
-import { config } from './config';
+import { appVersion, config } from './config';
 import { configureSqlite, prisma } from './lib/prisma';
 import { reportUploadsCheck } from './services/uploadsCheck';
 import { resolveDatabasePath } from './lib/databasePath';
 import { applySessionFloor } from './services/sessionFloor';
 import { configureServerTimeouts } from './serverTimeouts';
+import { reportStartupVersion } from './services/upgradeNoticeService';
 
 // In-flight requests get this long to finish before the process is killed
 const SHUTDOWN_TIMEOUT_MS = 10_000;
@@ -16,6 +17,8 @@ async function main(): Promise<void> {
   await applySessionFloor(resolveDatabasePath());
   // Before listening, so the warnings sit next to the other startup lines. Never throws.
   await reportUploadsCheck(prisma, { uploadDir: config.uploadDir });
+  // After the migrations (AppState exists by now) and before listening. Never throws.
+  await reportStartupVersion(prisma, appVersion(), config.releasesDir);
 
   // Express 5 hands listen errors (EADDRINUSE, EACCES) to this callback
   const server = app.listen(config.port, (err?: Error) => {

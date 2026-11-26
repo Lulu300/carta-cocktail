@@ -594,5 +594,13 @@
     "teal": "Teal",
     "indigo": "Indigo",
     "gray": "Gray"
+  },
+  "upgradeNotice": {
+    "title": "Upgrade from v{{from}} to v{{to}}",
+    "intro": "Required actions of the versions since the last upgrade you confirmed, from the release notes. UPGRADING.md stays the reference.",
+    "before": "To do before the upgrade: check them now",
+    "after": "To do after the upgrade",
+    "acknowledge": "I have done these actions",
+    "guideLink": "Upgrade guide (UPGRADING.md)"
   }
 }

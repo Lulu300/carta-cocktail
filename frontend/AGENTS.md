@@ -201,6 +201,8 @@ Safari and iOS 16.0+, Chrome and Edge 107+, Firefox 104+ (`build.target` in `vit
 **Runtime**: react 19, react-dom 19, react-router-dom 7, @tanstack/react-query 5, react-hook-form 7, @hookform/resolvers, zod 4, i18next 27, react-i18next 18, i18next-browser-languagedetector 8, jszip 3
 **Dev**: vite 8, @vitejs/plugin-react 6, tailwindcss 4, @tailwindcss/vite, typescript 5.9, eslint 10, eslint-plugin-i18next, prettier 3, vitest, jsdom, @testing-library/*, msw, vitest-axe
 
+**Install scripts**: npm 12 skips the install scripts of dependencies that `allowScripts` in `package.json` does not list (npm 11.19 only warns). None is needed here: `fsevents` (optional, macOS) is denied because its binary ships prebuilt in the package. A new dependency whose script is needed must be added to `allowScripts` (`npm install-scripts approve <pkg> --no-allow-scripts-pin`, no version so that a Dependabot bump keeps working), otherwise denied (`npm install-scripts deny <pkg>`), so that `npm ci` prints no `install-scripts` warning.
+
 ## Styling Conventions
 
 - Dark theme: backgrounds `#0f0f1a`, `#1a1a2e`, `#2a2a3e`

@@ -164,6 +164,7 @@ MenuBottle              # Bottles in menus (position, visibility)
 MenuBottleExclusion     # Bottles the admin removed from a system menu (never synced back)
 MenuSection             # Menu groupings
 SiteSettings            # Site name + favicon emoji
+AppState                # Instance state: version that ran last, pending upgrade notice (kept live by a restore)
 ```
 
 ## Key Architectural Decisions

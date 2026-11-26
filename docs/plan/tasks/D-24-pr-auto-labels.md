@@ -5,13 +5,13 @@ phase: D
 lane: ci
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: mixed
 depends_on: [D-07]
 touches: [.github/labeler.yml, .github/workflows/labeler.yml]
 sources: ["07-devops-history.md §1.3"]
-branch:
-pr:
+branch: chore/D-24-pr-auto-labels
+pr: 248
 ---
 
 ## Contexte
@@ -33,9 +33,9 @@ D-07 a ajouté `.github/release.yml` : la liste des PR des notes de release (job
 
 ## Critères d'acceptation
 
-- [ ] Une PR depuis `fix/X-00-…` reçoit le label `fix` à l'ouverture, une PR depuis `feature/…` reçoit `feature`, une PR depuis `docs/…` reçoit `docs`.
-- [ ] Le workflow n'exécute aucun code de la PR (pas de checkout de `head`).
-- [ ] `gh api repos/Lulu300/carta-cocktail/releases/generate-notes -f tag_name=vtest -f target_commitish=develop -f previous_tag_name=<dernier tag>` classe les PR labellisées dans leurs catégories (appel sans effet de bord, rien n'est publié).
+- [x] Une PR depuis `fix/X-00-…` reçoit le label `fix` à l'ouverture, une PR depuis `feature/…` reçoit `feature`, une PR depuis `docs/…` reçoit `docs`.
+- [x] Le workflow n'exécute aucun code de la PR (pas de checkout de `head`).
+- [x] `gh api repos/Lulu300/carta-cocktail/releases/generate-notes -f tag_name=vtest -f target_commitish=develop -f previous_tag_name=<dernier tag>` classe les PR labellisées dans leurs catégories (appel sans effet de bord, rien n'est publié).
 
 ## Tests à ajouter ou adapter
 
@@ -52,3 +52,4 @@ D-07 a ajouté `.github/release.yml` : la liste des PR des notes de release (job
 
 - 2026-10-12 : tâche créée par D-07 : `.github/release.yml` classe les PR par label, mais aucune PR du plan n'en porte.
 - 2026-10-12 : revue de la PR #97 (D-07) : le contrôle du labeler se fait après le merge de D-24 (`pull_request_target`) ; la branche disparaît par suppression automatique, pas par squash (merge commit retenu partout).
+- 2026-11-26 : fait. `.github/labeler.yml` (`fix/`, `feature/`, `docs/` d'après la branche, plus `ci` d'après les fichiers de `.github/workflows/`) et `.github/workflows/labeler.yml` (`actions/labeler` v7.0.0 épinglée, permissions vides au niveau du workflow puis `contents: read` et `pull-requests: write` sur le seul job, aucun checkout, `sync-labels: false` : un label posé à la main n'est jamais retiré). Les labels `breaking`, `feature`, `fix`, `docs`, `skip-changelog` existent déjà (D-07) : aucune action humaine. `chore/` et `dependencies` : label manuel, ou posé par Dependabot. Contrôle après merge : PR brouillon depuis une branche `fix/` vers `develop`, vérifier le label `fix`, puis la fermer (`pull_request_target` ne tourne pas sur cette PR). Notes de version : aucune, rien de visible pour les utilisateurs.

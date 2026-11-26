@@ -232,3 +232,15 @@ model SiteSettings {
   siteName String @default("Carta Cocktail")
   siteIcon String @default("")
 }
+
+// State of the instance itself, not of its content: a single row (id = 1). A
+// backup restore keeps the live row (backupService.ts).
+model AppState {
+  id                   Int       @id @default(1)
+  // APP_VERSION of the last start ("X.Y.Z" or "X.Y.Z-rc.N"), null until a released version has run
+  lastRunVersion       String?
+  // Upgrade whose required actions the admin has not confirmed yet (in-app upgrade guide)
+  pendingNoticeFrom    String?
+  pendingNoticeTo      String?
+  noticeAcknowledgedAt DateTime?
+}

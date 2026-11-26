@@ -66,6 +66,13 @@ export async function assertBottlesAllowed(db: Db, menu: { type: string }, bottl
   if (!allAvailable) throw new BadRequestError('errors.bottleNotAllowedInMenu');
 }
 
+/** Refuses cocktails in a menu of bottles: only a COCKTAILS menu holds them. */
+export function assertCocktailsAllowed(menu: { type: string }, cocktailIds: unknown[]): void {
+  // An empty list only clears the menu, which any menu allows
+  if (cocktailIds.length === 0) return;
+  if (isBottleMenuType(menu.type)) throw new BadRequestError('errors.cocktailNotAllowedInMenu');
+}
+
 async function findMenu(db: Db, menuId: number): Promise<MenuIdentity> {
   const menu = await db.menu.findUnique({ where: { id: menuId }, select: { id: true, slug: true, type: true } });
   if (!menu) throw new NotFoundError();
