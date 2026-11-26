@@ -21,7 +21,7 @@ import ViewModeToggle, { type ViewMode } from '../../components/admin/cocktails/
 import { useCocktailFilters } from '../../components/admin/cocktails/useCocktailFilters';
 import { useSelection } from '../../components/admin/cocktails/useSelection';
 import { useCocktails, useCocktailsAvailability, useDeleteCocktail } from '../../queries/cocktails';
-import { useInvalidateQueries } from '../../queries/crud';
+import { useInvalidateQueries } from '../../queries/invalidate';
 import { qk } from '../../queries/keys';
 
 // An import may create units, categories, bottles and ingredients, which the other

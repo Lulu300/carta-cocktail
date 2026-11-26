@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useMutation } from '@tanstack/react-query';
 import { cocktails as api } from '../../services/api';
 import type { CocktailExportFormat } from '../../types';
-import { useInvalidateQueries } from '../../queries/crud';
+import { useInvalidateQueries } from '../../queries/invalidate';
 import { refusalDetails } from '../../utils/refusalDetails';
 import Spinner from '../ui/Spinner';
 import WizardModal from './WizardModal';

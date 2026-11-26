@@ -60,7 +60,7 @@ export default function MenusPage() {
   const { create, remove } = useCrudMutations<MenuInput, Menu>({
     key: qk.menus,
     api: menusApi,
-    messages: { created: 'menus.created', updated: 'menus.updated', deleted: 'menus.deleted' },
+    messages: { created: 'menus.created', deleted: 'menus.deleted' },
   });
   const menuForm = useEntityForm<Menu, MenuForm>(() => EMPTY_MENU_FORM);
   const { form, setField } = menuForm;
