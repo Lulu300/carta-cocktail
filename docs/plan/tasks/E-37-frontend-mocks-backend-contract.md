@@ -11,7 +11,7 @@ depends_on: [C-12]
 touches: [frontend/src/services/api.ts, frontend/src/services/api.test.ts, frontend/src/test/msw/handlers.ts, frontend/src/pages/admin/CategoriesPage.test.tsx, frontend/src/contexts/AuthContext.test.tsx]
 sources: []
 branch: test/E-37-mocks-backend-contract
-pr: "#PRNUM"
+pr: "#275"
 ---
 
 ## Contexte
