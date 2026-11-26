@@ -1555,10 +1555,14 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
       .attach('file', Buffer.from(JSON.stringify(file)), 'bottles.json');
   }
 
-  function confirm(bottles: Record<string, unknown>[], categories: Record<string, unknown> = {}) {
+  function confirm(
+    bottles: Record<string, unknown>[],
+    categories: Record<string, unknown> = {},
+    rows: Record<string, unknown> = {},
+  ) {
     const payload = { version: 1, categories: [], bottles: bottles.map(importRow) };
     return request.post('/api/bottles/import/confirm').set(authHeader())
-      .send({ payload, resolutions: { categories } });
+      .send({ payload, resolutions: { categories, bottles: rows } });
   }
 
   async function bottleCategoryIds() {
@@ -1745,6 +1749,47 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
 
     expect(res.status).toBe(201);
     expect(res.body.duplicatesCreated).toBe(duplicates);
+  });
+
+  // A row's name meets the resolution of the file's category of that name first: only an id can
+  // put it in the existing category that resolution leads away from (C-68)
+  it('should put a row picked by id in a category another one of that name ignoring case is resolved away from', async () => {
+    const rhum = await seedCategory({ name: 'Rhum' });
+    const upperRhum = await seedCategory({ name: 'RHUM' });
+
+    const res = await confirm(
+      [{ categoryName: 'rhum' }, { categoryName: 'rhum' }],
+      { rhum: { action: 'use_existing', existingId: upperRhum.id } },
+      { 0: { action: 'import', categoryId: rhum.id }, 1: { action: 'import', categoryName: 'rhum' } },
+    );
+
+    expect(res.status).toBe(201);
+    expect(await bottleCategoryIds()).toEqual([rhum.id, upperRhum.id]);
+  });
+
+  it('should put a row picked by id in the existing category of the name the file creates under another one', async () => {
+    const rhum = await seedCategory({ name: 'Rhum' });
+
+    const res = await confirm(
+      [{ categoryName: 'Rhum' }, { categoryName: 'Rhum' }],
+      { rhum: { action: 'create', data: { name: 'Rhum agricole' } } },
+      // The id wins over the name the row also sends
+      { 0: { action: 'import', categoryId: rhum.id, categoryName: 'Rhum' } },
+    );
+
+    expect(res.status).toBe(201);
+    const created = await prisma.category.findUniqueOrThrow({ where: { name: 'Rhum agricole' } });
+    expect(await bottleCategoryIds()).toEqual([rhum.id, created.id]);
+  });
+
+  it('should leave out a row picked by the id of no category', async () => {
+    const rhum = await seedCategory({ name: 'Rhum' });
+
+    const res = await confirm([{ categoryName: 'Rhum' }], {}, { 0: { action: 'import', categoryId: rhum.id + 1 } });
+
+    expect(res.status).toBe(201);
+    expect(res.body.skippedNoCategory).toBe(1);
+    expect(await prisma.bottle.count()).toBe(0);
   });
 
   it('should put a row in the exact category when others are equal to it ignoring case', async () => {

@@ -393,7 +393,7 @@ describe('ImportBottlesWizard', () => {
     await screen.findByText('bottles.importWizard.successCount');
     expect(await confirmed.body).toEqual({
       payload: samplePreview.payload,
-      resolutions: { categories: { rhum: { action: 'use_existing', existingId: 4 } }, bottles: { 0: { action: 'import', categoryName: 'Rhum ambré' } } },
+      resolutions: { categories: { rhum: { action: 'use_existing', existingId: 4 } }, bottles: { 0: { action: 'import', categoryId: 5 } } },
     });
     expect(screen.getByText('bottles.importWizard.duplicatesCreatedRecap')).toBeInTheDocument();
     expect(screen.getByText('bottles.importWizard.skippedRecap')).toBeInTheDocument();
@@ -509,6 +509,28 @@ describe('ImportBottlesWizard - categories equal ignoring case', () => {
     expect(await confirmed.body).toMatchObject({ resolutions: { categories: { rhum: { action: 'use_existing', existingId: 2 } } } });
   });
 
+  // A row naming `Rhum` would go in `RHUM`, resolved for the file's `rhum`: the row sends the id (C-68)
+  it('puts a row in the match the file category is not resolved to, by its id', async () => {
+    const confirmed = captureRequest('post', '/api/bottles/import/confirm');
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    const user = await previewWith(ambiguousPreview);
+    await user.selectOptions(screen.getByLabelText('importMatches.existingEntry'), 'RHUM');
+
+    const rowCategory = screen.getByLabelText('bottles.category');
+    expect(within(rowCategory).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'bottles.importWizard.pickCategory',
+      'Rhum',
+      'RHUM',
+    ]);
+    await user.selectOptions(rowCategory, 'Rhum');
+    expect(rowCategory).toHaveDisplayValue('Rhum');
+    await user.click(nextButton());
+    await user.click(screen.getByText('bottles.importWizard.confirmImport'));
+
+    await screen.findByText('bottles.importWizard.successCount');
+    expect(await confirmed.body).toMatchObject({ resolutions: { bottles: { 0: { action: 'import', categoryId: 1 } } } });
+  });
+
   it('creates it only under a name the matches do not hold', async () => {
     const confirmed = captureRequest('post', '/api/bottles/import/confirm');
     render(<ImportBottlesWizard onClose={() => undefined} />);
@@ -580,7 +602,63 @@ describe('ImportBottlesWizard - categories equal ignoring case', () => {
     expect(rowCategory).toHaveDisplayValue('Rhum agricole (bottles.importWizard.willCreate)');
     expect(within(rowCategory).getAllByRole('option').map((option) => option.textContent)).toEqual([
       'bottles.importWizard.pickCategory',
+      'Rhum',
       'Rhum agricole (bottles.importWizard.willCreate)',
     ]);
+  });
+
+  it('puts a row in the existing category of the name the file category is created away from', async () => {
+    mockApiResponse('get', '/api/categories', [rhum]);
+    const confirmed = captureRequest('post', '/api/bottles/import/confirm');
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    const user = await previewWith({
+      ...ambiguousPreview,
+      categories: [{ ref: fileCategory, existingMatch: { id: 1, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 }, status: 'matched' }],
+      bottles: [ambiguousPreview.bottles[0], ambiguousPreview.bottles[0]],
+    });
+    await user.click(screen.getByText('bottles.importWizard.createNew'));
+    const name = screen.getByLabelText('categories.name');
+    await user.clear(name);
+    await user.type(name, 'Rhum agricole');
+
+    const [movedRow, keptRow] = screen.getAllByLabelText('bottles.category');
+    await user.selectOptions(movedRow, 'Rhum');
+    expect(movedRow).toHaveDisplayValue('Rhum');
+    expect(keptRow).toHaveDisplayValue('Rhum agricole (bottles.importWizard.willCreate)');
+    await user.click(nextButton());
+    await user.click(screen.getByText('bottles.importWizard.confirmImport'));
+
+    await screen.findByText('bottles.importWizard.successCount');
+    expect(await confirmed.body).toMatchObject({
+      resolutions: { bottles: { 0: { action: 'import', categoryId: 1 }, 1: { action: 'import', categoryName: 'rhum' } } },
+    });
+  });
+
+  it('shows a row in the existing category its file category is created as, whose name another file category holds', async () => {
+    const gin = buildCategory({ id: 3, name: 'Gin' });
+    mockApiResponse('get', '/api/categories', [rhum, gin]);
+    const ginCategory = { ...fileCategory, name: 'gin' };
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    const user = await previewWith({
+      ...ambiguousPreview,
+      payload: { ...ambiguousPreview.payload, categories: [fileCategory, ginCategory] },
+      categories: [
+        { ref: fileCategory, existingMatch: { id: 1, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 }, status: 'matched' },
+        { ref: ginCategory, existingMatch: { id: 3, name: 'Gin', type: 'SPIRIT', desiredStock: 1 }, status: 'matched' },
+      ],
+      bottles: [{ ...ambiguousPreview.bottles[0], ref: { ...ambiguousPreview.bottles[0].ref, categoryName: 'gin' } }],
+    });
+
+    const [createRhum, createGin] = screen.getAllByText('bottles.importWizard.createNew');
+    await user.click(createRhum);
+    await user.click(createGin);
+    const [rhumName, ginName] = screen.getAllByLabelText('categories.name');
+    await user.clear(rhumName);
+    await user.type(rhumName, 'Rhum agricole');
+    await user.clear(ginName);
+    await user.type(ginName, 'Rhum');
+
+    // The confirmation finds `Rhum` for the `gin` category to create, and puts the row there
+    expect(screen.getByLabelText('bottles.category')).toHaveDisplayValue('Rhum');
   });
 });

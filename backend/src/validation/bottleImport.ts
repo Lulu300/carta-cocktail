@@ -68,7 +68,14 @@ const CategoryResolution = z.discriminatedUnion('action', [
 ]);
 
 const BottleResolution = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('import'), categoryName: z.string().optional() }),
+  z.object({
+    action: z.literal('import'),
+    // An existing category, by id: a name can lead elsewhere when a category of the file with that
+    // name, ignoring case, is resolved to another one. Takes precedence over `categoryName`.
+    categoryId: Id.optional(),
+    // A category created by the import, or any category by name (older clients)
+    categoryName: z.string().optional(),
+  }),
   z.object({ action: z.literal('skip') }),
 ]);
 

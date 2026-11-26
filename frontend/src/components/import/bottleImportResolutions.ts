@@ -59,8 +59,8 @@ export function buildAutoBottleImportResolutions(preview: BottleImportPreviewRes
   return { categories: buildAutoCategoryResolutions(preview), bottles: buildAutoBottleResolutions(preview) };
 }
 
-/** The category a row will be imported in: the admin's choice, else the file's. */
-export function rowCategory(fileCategory: string, resolution: BottleRowResolution | undefined): string {
+/** The category name a row sends: the admin's choice, else the file's. */
+function rowCategoryName(fileCategory: string, resolution: BottleRowResolution | undefined): string {
   return (resolution?.action === 'import' && resolution.categoryName) || fileCategory;
 }
 
@@ -72,7 +72,8 @@ function importedRows(preview: BottleImportPreviewResponse, resolutions: BottleI
 export function countRowsWithoutCategory(preview: BottleImportPreviewResponse, resolutions: BottleImportResolutions): number {
   return preview.bottles.filter((entry, index) => {
     const resolution = resolutions.bottles[String(index)];
-    return resolution?.action !== 'skip' && !rowCategory(entry.ref.categoryName, resolution);
+    if (resolution?.action === 'skip' || resolution?.categoryId !== undefined) return false;
+    return !rowCategoryName(entry.ref.categoryName, resolution);
   }).length;
 }
 
@@ -140,17 +141,21 @@ export function countBottlesToCreate(preview: BottleImportPreviewResponse, resol
   return importedRows(preview, resolutions).reduce((total, entry) => total + (entry.ref.quantity || 1), 0);
 }
 
+/** What a row sends to go in a category: the id of an existing one, else a name the confirmation resolves to it. */
+export type RowCategoryChoice = { categoryId: number } | { categoryName: string };
+
 /** A category a row can go in: an existing one, or one the confirmation creates. */
 export interface CategoryOption {
   name: string;
   isNew: boolean;
+  choice: RowCategoryChoice;
 }
 
 export interface RowCategories {
-  /** One option per category a row can be put in, under the name that puts a row there. */
+  /** Every category a row can be put in. */
   options: CategoryOption[];
-  /** The option of the category the confirmation puts a row naming `categoryName` in, if any. */
-  categoryOf: (categoryName: string) => CategoryOption | undefined;
+  /** The option of the category the confirmation puts a row in, if any. */
+  categoryOf: (fileCategory: string, resolution: BottleRowResolution | undefined) => CategoryOption | undefined;
 }
 
 /**
@@ -160,7 +165,10 @@ export interface RowCategories {
  * earlier in the import included, uses that one.
  */
 function applyCategoryResolutions(existing: Category[], resolutions: Record<string, BottleCategoryResolution>) {
-  const existingById = new Map(existing.map((category) => [category.id, { name: category.name, isNew: false }]));
+  const existingById = new Map(existing.map((category): [number, CategoryOption] => [
+    category.id,
+    { name: category.name, isNew: false, choice: { categoryId: category.id } },
+  ]));
   const categories: CategoryOption[] = [...existingById.values()];
   const resolvedByKey = new Map<string, CategoryOption>();
 
@@ -173,28 +181,30 @@ function applyCategoryResolutions(existing: Category[], resolutions: Record<stri
       const match = matchIgnoringCase(categories, name, (option) => option.name);
       if (match.status === 'found') category = match.row;
       if (match.status === 'none') {
-        category = { name, isNew: true };
+        // By the key that creates it: its name can be another key of the file, resolved elsewhere
+        category = { name, isNew: true, choice: { categoryName: key } };
         categories.push(category);
       }
       // An ambiguous name stays unresolved: the confirmation refuses it, and the wizard blocks it
     }
     if (category) resolvedByKey.set(key, category);
   }
-  return { categories, resolvedByKey };
+  return { categories, existingById, resolvedByKey };
 }
 
 /**
  * The categories of the rows, by the rules of the confirmation: once the category resolutions are
- * applied (`applyCategoryResolutions`), it puts each row in the category resolved for its name,
- * else in the category that holds that name.
+ * applied (`applyCategoryResolutions`), it puts a row in the existing category of its id, else in
+ * the category resolved for its name, else in the category that holds that name.
  *
- * An option a row cannot reach by its name is left out: a resolution of that name sends the row
- * elsewhere, such as `Rhum` when the file's `rhum` is resolved to `RHUM` or renamed.
+ * Each option puts a row in its category whatever the other resolutions: an existing one by its
+ * id, such as `Rhum` when the file's `rhum` is resolved to `RHUM` or renamed, one to create by the
+ * key that creates it.
  */
 export function rowCategories(existing: Category[], resolutions: Record<string, BottleCategoryResolution>): RowCategories {
-  const { categories, resolvedByKey } = applyCategoryResolutions(existing, resolutions);
+  const { categories, existingById, resolvedByKey } = applyCategoryResolutions(existing, resolutions);
 
-  const categoryOf = (categoryName: string) => {
+  const categoryOfName = (categoryName: string) => {
     // The backend trims the name of a row
     const name = categoryName.trim();
     if (!name) return undefined;
@@ -203,6 +213,9 @@ export function rowCategories(existing: Category[], resolutions: Record<string, 
     const match = matchIgnoringCase(categories, name, (option) => option.name);
     return match.status === 'found' ? match.row : undefined;
   };
-  const options = categories.filter((category) => categoryOf(category.name) === category);
-  return { options, categoryOf };
+  const categoryOf = (fileCategory: string, resolution: BottleRowResolution | undefined) => {
+    if (resolution?.action === 'import' && resolution.categoryId !== undefined) return existingById.get(resolution.categoryId);
+    return categoryOfName(rowCategoryName(fileCategory, resolution));
+  };
+  return { options: categories, categoryOf };
 }
