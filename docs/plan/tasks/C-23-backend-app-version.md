@@ -5,12 +5,12 @@ phase: C
 lane: backend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-05]
 touches: [backend/src/services/backupService.ts, backend/src/services/backupService.test.ts, backend/src/routes/backup.test.ts, backend/Dockerfile, .github/workflows/release.yml, backend/src/routes/health.ts, backend/src/routes/health.test.ts]
 sources: []
-branch:
+branch: fix/C-23-backend-app-version
 pr:
 ---
 
@@ -32,8 +32,8 @@ C-05 écrit `appVersion` dans le `metadata.json` des sauvegardes à partir de `b
 
 ## Critères d'acceptation
 
-- [ ] Une sauvegarde exportée par une image `vX.Y.Z` porte `appVersion: "X.Y.Z"`.
-- [ ] En dev, `appVersion` reste renseignée (repli).
+- [x] Une sauvegarde exportée par une image `vX.Y.Z` porte `appVersion: "X.Y.Z"`.
+- [x] En dev, `appVersion` reste renseignée (repli).
 
 ## Tests à ajouter ou adapter
 
@@ -49,3 +49,4 @@ C-05 écrit `appVersion` dans le `metadata.json` des sauvegardes à partir de `b
 - 2026-10-11 : tâche créée par C-05 (`appVersion` toujours à `1.0.0`).
 - 2026-10-12 : l'étape 1 est faite par D-05 (PR #118) : `release.yml` passe `APP_VERSION` aux deux images et `backend/Dockerfile` l'expose en variable d'environnement (`dev` par défaut hors release). Décision de l'humain pour D-05 : `APP_VERSION` fait foi, les `package.json` ne bougent pas (l'étape 3 est donc tranchée contre la synchronisation). Reste `buildMetadata` : lire `process.env.APP_VERSION`, avec `dev` en repli. L'idée de passer les deux `package.json` à `0.0.0`, pour que `1.0.0` ne passe pas pour une vraie version, est à trancher dans cette tâche.
 - 2026-10-12 : relecture de D-03 (PR #117) : `/api/health` lit déjà `process.env.APP_VERSION || 'dev'` (`backend/src/routes/health.ts`). Remplacer `readAppVersion()` (`backend/src/services/backupService.ts`) par une seule fonction de version, utilisée par `buildMetadata` et par la route health (fichiers ajoutés à `touches`).
+- 2026-11-26 : `appVersion()` (`backend/src/config.ts`, ajouté entre-temps) est la seule source : `/api/health`, F-09 et `buildMetadata` l'utilisent ; `readAppVersion()` et la lecture de `package.json` sont supprimés. Les `package.json` restent à `1.0.0` (D-05 : `APP_VERSION` fait foi). Test ajouté : un backup sans `appVersion` ou avec un `appVersion` non texte se restaure. Notes de version : une sauvegarde exportée par une image publiée porte désormais la version de l'image (`appVersion`), au lieu de `1.0.0` ; hors image elle porte `dev`.
