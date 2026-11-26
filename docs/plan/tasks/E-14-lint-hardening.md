@@ -11,7 +11,7 @@ depends_on: [B-05, E-05, E-06]
 touches: [frontend/eslint.config.js, frontend/tsconfig.app.json, frontend/package.json, frontend/src/]
 sources: ["05-frontend-archi.md §8", "05-frontend-archi.md §5"]
 branch: chore/E-14-lint-hardening
-pr:
+pr: 284
 ---
 
 ## Contexte
