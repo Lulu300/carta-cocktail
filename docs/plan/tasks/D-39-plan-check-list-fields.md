@@ -11,7 +11,7 @@ depends_on: []
 touches: [docs/plan/build.mjs, docs/plan/build.test.mjs, docs/plan/README.md, docs/plan/tasks/D-21-dependabot-npm-limit.md]
 sources: []
 branch: docs/D-39-plan-check-list-fields
-pr: PR_NUM
+pr: 232
 ---
 
 ## Décisions validées
