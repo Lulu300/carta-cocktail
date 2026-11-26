@@ -11,7 +11,7 @@ depends_on: [D-03]
 touches: [frontend/nginx.conf.template, docker-compose.yml, docker-compose.prod.yml, scripts/smoke/smoke.sh]
 sources: []
 branch: chore/D-25-healthcheck-access-log
-pr:
+pr: 234
 ---
 
 ## Contexte
