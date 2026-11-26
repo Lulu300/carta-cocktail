@@ -5,13 +5,13 @@ phase: C
 lane: frontend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-33, E-23]
 touches: [frontend/src/components/import/, frontend/src/components/admin/cocktails/, frontend/src/services/api.ts, frontend/src/i18n/locales/]
 sources: ["01-backend-routes.md §H4"]
-branch:
-pr:
+branch: fix/C-38-cocktail-import-refusal-details
+pr: https://github.com/Lulu300/carta-cocktail/pull/235
 ---
 
 ## Contexte
@@ -36,9 +36,9 @@ Trouvé pendant C-33. Le backend refuse maintenant en 400, avec un `details` pro
 
 ## Critères d'acceptation
 
-- [ ] Une confirmation d'import refusée avec `importUnresolved` liste chaque élément non résolu avec sa ligne et son nom.
-- [ ] Un enregistrement refusé avec `unknownReference` nomme la ligne et le champ.
-- [ ] Des `details` absents ou mal formés gardent le message actuel.
+- [x] Une confirmation d'import refusée avec `importUnresolved` liste chaque élément non résolu avec sa ligne et son nom.
+- [x] Un enregistrement refusé avec `unknownReference` nomme la ligne et le champ.
+- [x] Des `details` absents ou mal formés gardent le message actuel.
 
 ## Tests à ajouter ou adapter
 
@@ -53,3 +53,5 @@ Trouvé pendant C-33. Le backend refuse maintenant en 400, avec un `details` pro
 ## Journal
 
 - 2026-10-12 : tâche créée par C-33 : le frontend n'affiche pas les `details` des nouvelles 400 `importUnresolved` et `unknownReference`.
+- 2026-11-26 : PR #235. Vérifié contre le code actuel (après C-19, C-62, C-64, C-65) : contrats `UnresolvedReference` et `UnknownReference` inchangés, aucun refus de l'import de cocktails n'affichait encore ses `details`. `ApiError` lit les deux formes (`unresolvedReferences()`, `unknownReferences()`) à côté de `validationIssues()` d'E-23 (400 seulement, entrées mal formées écartées). `utils/refusalDetails.ts` en fait des phrases (ligne comptée à partir de 1, noms de champs `validation.fields.*` d'E-23) et y ajoute les problèmes de validation : l'écran d'erreur de l'assistant (confirmation et aperçu) les liste sous le message du backend. « Réessayer » ramenait déjà à l'étape de résolution avec les choix gardés : pas de second bouton « Retour ». Formulaire : le descripteur de toasts d'E-23 devient `refusalMessage`, qui nomme la première ligne et le champ d'une `unknownReference`. Frontend seul, bundle public 136,00 kB. Amélioration possible : nommer dans l'assistant l'élément du fichier d'une `unknownReference` (le `details` ne donne que l'id).
+- 2026-11-26 : Notes de version : quand l'import d'un cocktail est refusé parce qu'une unité, une catégorie, une bouteille ou un ingrédient n'est ni associé ni créé, l'écran d'erreur liste chacun avec sa ligne et son nom ; quand un cocktail enregistré désigne un élément supprimé entre-temps, le message d'erreur nomme la ligne et le champ. Aucune action requise.
