@@ -16,6 +16,20 @@ const localStorageMock = {
 };
 Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock, writable: true });
 
+// jsdom's Blob has no stream(). Node's fetch sizes a multipart body from the file but reads its
+// bytes through stream(): msw 3 then fails on the length mismatch when a handler reads an upload.
+if (!Blob.prototype.stream) {
+  Blob.prototype.stream = function stream(this: Blob) {
+    const bytes = this.arrayBuffer();
+    return new ReadableStream<Uint8Array<ArrayBuffer>>({
+      async start(controller) {
+        controller.enqueue(new Uint8Array(await bytes));
+        controller.close();
+      },
+    });
+  };
+}
+
 // Mock react-i18next
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -56,7 +70,7 @@ Object.defineProperty(window, 'matchMedia', {
 
 // Fake backend for every request of services/api.ts. A request with no handler
 // fails the test, so a page cannot silently call an endpoint the test ignores.
-// `onUnhandledRequest: 'error'` alone only logs and rejects the fetch, which a
+// `onUnhandledFrame: 'error'` alone only logs and rejects the fetch, which a
 // request nobody awaits (a reload after an invalidation) would hide: such
 // requests are collected and turned into an error after the test.
 const unhandledRequests: string[] = [];
@@ -64,7 +78,7 @@ server.events.on('request:unhandled', ({ request }) => {
   unhandledRequests.push(`${request.method} ${new URL(request.url).pathname}`);
 });
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeAll(() => server.listen({ onUnhandledFrame: 'error' }));
 afterEach(() => {
   server.resetHandlers();
   resetCreatedIds();
