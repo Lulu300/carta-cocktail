@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Cocktail, CocktailIngredient, CocktailIngredientInput, CocktailInput, Ingredient, Unit } from '../../../types';
-import { parseTags } from './parseTags';
+import { parseTags } from '../../../utils/parseTags';
 
 // Error messages are i18n keys, translated where the error is shown.
 // Rules follow the backend schema (backend/src/validation/cocktails.ts) until F-05 shares it.

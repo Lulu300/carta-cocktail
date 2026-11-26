@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useLocalizedName } from '../../../hooks/useLocalizedName';
 import type { Cocktail } from '../../../types';
 import { matchesCocktailSearch } from '../../../utils/cocktailSearch';
-import { parseTags } from './parseTags';
+import { parseTags } from '../../../utils/parseTags';
 
 interface TagOption {
   value: string;
