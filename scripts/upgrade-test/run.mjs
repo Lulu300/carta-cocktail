@@ -96,7 +96,10 @@ function resolveImages(steps, hookFiles) {
   for (const step of steps) {
     if (step.local) {
       console.log('Building the backend and frontend images from the checkout…');
-      buildImage(`${LOCAL_IMAGE}/backend:local`, path.join(REPO_ROOT, 'backend'));
+      // The backend image holds the release notes, outside its build context (backend/Dockerfile)
+      buildImage(`${LOCAL_IMAGE}/backend:local`, path.join(REPO_ROOT, 'backend'), {
+        releases: path.join(REPO_ROOT, 'docs', 'releases'),
+      });
       buildImage(`${LOCAL_IMAGE}/frontend:local`, path.join(REPO_ROOT, 'frontend'));
       images[step.label] = {
         backend: `${LOCAL_IMAGE}/backend:local`,

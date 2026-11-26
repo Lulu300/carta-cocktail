@@ -197,6 +197,8 @@ jobs:
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: ./${{ matrix.service }}
+          # The backend image holds the release notes (in-app upgrade guide)
+          build-contexts: ${{ matrix.service == 'backend' && 'releases=./docs/releases' || '' }}
           push: false
           # The image is not used afterwards: keep the result in the build cache only
           outputs: type=cacheonly

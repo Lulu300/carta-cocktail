@@ -105,8 +105,15 @@ RUN chmod +x docker-entrypoint.sh \
   && mkdir -p /app/data /app/uploads \
   && chown node:node /app/data /app/uploads
 
-# Compiled code runs from /app/dist, so the default upload path would miss the volume
-ENV UPLOAD_DIR=/app/uploads
+# Release notes, whose front matter the in-app upgrade guide reads. They sit
+# outside this build context (./backend): the build gets docs/releases as the
+# named context "releases" (docker-compose.yml, ci.yml, release.yml). A plain
+# `docker build ./backend` needs --build-context releases=./docs/releases.
+COPY --from=releases . ./releases
+
+# Compiled code runs from /app/dist, so the default paths would miss the volume and the notes
+ENV UPLOAD_DIR=/app/uploads \
+  RELEASES_DIR=/app/releases
 
 USER node
 

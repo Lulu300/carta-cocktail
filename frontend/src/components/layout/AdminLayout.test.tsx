@@ -225,3 +225,21 @@ describe('AdminLayout app version', () => {
     await waitForLayoutData();
   });
 });
+
+describe('AdminLayout upgrade notice', () => {
+  it('shows the notice above the page, and keeps it from one page to the next', async () => {
+    const user = userEvent.setup();
+    mockApiResponse('get', '/api/system/upgrade-notice', {
+      from: '1.5.0',
+      to: '1.6.0',
+      actions: [{ version: '1.6.0', when: 'after', action: 'Check the backend log.' }],
+    });
+    renderLayout();
+
+    expect(await screen.findByRole('heading', { name: 'upgradeNotice.title' })).toBeInTheDocument();
+    await user.click(screen.getByRole('link', { name: /nav\.units/ }));
+
+    expect(await screen.findByText('units page')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'upgradeNotice.title' })).toBeInTheDocument();
+  });
+});

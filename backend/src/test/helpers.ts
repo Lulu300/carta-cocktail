@@ -400,3 +400,14 @@ export async function findSystemMenu(slug: 'aperitifs' | 'digestifs') {
 export async function excludeBottleFromMenu(menuId: number, bottleId: number) {
   return prisma.menuBottleExclusion.create({ data: { menuId, bottleId } });
 }
+
+export interface AppStateData {
+  lastRunVersion: string;
+  pendingNoticeFrom?: string | null;
+  pendingNoticeTo?: string | null;
+}
+
+/** Sets the single AppState row, as the start of `lastRunVersion` left it (upgradeNoticeService). */
+export async function seedAppState(data: AppStateData) {
+  return prisma.appState.upsert({ where: { id: 1 }, create: { id: 1, ...data }, update: data });
+}

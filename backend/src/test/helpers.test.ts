@@ -5,7 +5,7 @@ import { PRISMA_DIR, resolveDatabasePath } from '../lib/databasePath';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData, prisma, schemaTables,
   seedCategory, seedBottle, seedIngredient, seedFullCocktail, seedMenu, seedMenuSection,
-  addCocktailToMenu, addBottleToMenu, excludeBottleFromMenu, findSystemMenu,
+  addCocktailToMenu, addBottleToMenu, excludeBottleFromMenu, findSystemMenu, seedAppState,
 } from './helpers';
 import { TEST_DATABASE_DIR } from './testDatabase';
 
@@ -39,6 +39,7 @@ async function seedEveryModel() {
   await addCocktailToMenu(menu.id, cocktail.id, { menuSectionId: section.id });
   await addBottleToMenu(menu.id, bottle.id, { menuSectionId: section.id });
   await excludeBottleFromMenu((await findSystemMenu('aperitifs')).id, bottle.id);
+  await seedAppState({ lastRunVersion: '1.17.0' });
 }
 
 describe('cleanDatabase', () => {

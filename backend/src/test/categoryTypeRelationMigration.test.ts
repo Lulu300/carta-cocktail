@@ -3,37 +3,20 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
+import { type Connection, migrationScript, migrationsBefore, selectRows } from './migrationReplay';
 
 /**
  * Replays the category_type_relation migration on a database at the schema of
  * the previous migrations, holding the rows an existing instance may have.
- * The script runs through the adapter's executeScript, as one SQLite script,
- * like `prisma migrate deploy` does.
  */
 
-const MIGRATIONS_DIR = path.resolve(__dirname, '../../prisma/migrations');
 const MIGRATION = '20261124120000_category_type_relation';
-
-type Connection = Awaited<ReturnType<PrismaBetterSqlite3['connect']>>;
-type Row = Record<string, unknown>;
 
 let dir: string;
 let db: Connection;
 
-function migrationScript(name: string): string {
-  return fs.readFileSync(path.join(MIGRATIONS_DIR, name, 'migration.sql'), 'utf8');
-}
-
-function migrationsBefore(name: string): string[] {
-  return fs.readdirSync(MIGRATIONS_DIR, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name < name)
-    .map((entry) => entry.name)
-    .sort();
-}
-
-async function select(sql: string): Promise<Row[]> {
-  const result = await db.queryRaw({ sql, args: [], argTypes: [] });
-  return result.rows.map((values) => Object.fromEntries(result.columnNames.map((column, i) => [column, values[i]])));
+function select(sql: string) {
+  return selectRows(db, sql);
 }
 
 // The adapter throws a failed script synchronously: an async function turns it into a rejection

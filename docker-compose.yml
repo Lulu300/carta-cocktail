@@ -3,6 +3,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      # Release notes for the in-app upgrade guide, outside ./backend (Compose 2.17 or later)
+      additional_contexts:
+        releases: ./docs/releases
     # Local build: the API stays reachable from this host only, for debugging.
     # The browser goes through nginx, on the frontend port.
     ports:

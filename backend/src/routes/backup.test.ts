@@ -9,7 +9,7 @@ import AdmZip from 'adm-zip';
 import type { PrismaClient } from '../generated/prisma/client';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData, seedIngredient, seedCocktail,
-  prisma, request, authHeader, getAuthToken, listenWithShortTimeouts,
+  prisma, request, authHeader, getAuthToken, listenWithShortTimeouts, seedAppState,
 } from '../test/helpers';
 import app from '../app';
 import { configureSqlite, createPrismaClient } from '../lib/prisma';
@@ -18,6 +18,7 @@ import { resolveDatabasePath } from '../lib/databasePath';
 import { config } from '../config';
 import { beginExport, latestAppMigration, restoreBackup } from '../services/backupService';
 import { applySessionFloor, hasTokenVersionColumn, sessionFloorPath } from '../services/sessionFloor';
+import { recordStartup } from '../services/upgradeNoticeService';
 
 const dbPath = resolveDatabasePath();
 const preRestoreDir = path.join(path.dirname(dbPath), 'backups');
@@ -1075,6 +1076,74 @@ describe('backup restore and sessions', () => {
       log.mockRestore();
       expect(await statusesForVersions(0, 1)).toEqual([401, 200]);
     });
+  });
+});
+
+describe('backup restore and the upgrade guide', () => {
+  const APP_STATE_MIGRATION = path.resolve(__dirname, '../../prisma/migrations/20261126120000_app_state/migration.sql');
+  // A required action for 1.7.0: a false upgrade from the backup's 1.5.0 would show it
+  const NOTES_1_7_0 = '---\nversion: 1.7.0\nrequired_actions:\n  - when: after\n    action: "Check the menus."\n---\n';
+  let notesDir: string;
+
+  function appState() {
+    return prisma.appState.findUnique({ where: { id: 1 } });
+  }
+
+  /** The next start: the version runs again and logs what it found. */
+  async function restartAs170(): Promise<{ actions: unknown[]; warnings: unknown[][] }> {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      return { actions: await recordStartup(prisma, '1.7.0', notesDir), warnings: warn.mock.calls };
+    } finally {
+      warn.mockRestore();
+    }
+  }
+
+  beforeEach(() => {
+    notesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'carta-releases-'));
+    fs.writeFileSync(path.join(notesDir, 'v1.7.0.md'), NOTES_1_7_0);
+  });
+
+  afterEach(async () => {
+    fs.rmSync(notesDir, { recursive: true, force: true });
+    // The next tests need the table, even when an assertion failed before the migration
+    const tables = await prisma.$queryRawUnsafe<{ name: string }[]>("SELECT name FROM sqlite_master WHERE name = 'AppState'");
+    if (tables.length === 0) await prisma.$executeRawUnsafe(fs.readFileSync(APP_STATE_MIGRATION, 'utf8'));
+  });
+
+  it('should keep the live state, not the one of the backup: no false notice at the next start', async () => {
+    await seedAppState({ lastRunVersion: '1.5.0' });
+    const backup = await exportBackup();
+    await seedAppState({ lastRunVersion: '1.7.0', pendingNoticeFrom: '1.6.0', pendingNoticeTo: '1.7.0' });
+    const liveState = await appState();
+
+    expect((await importBackup(backup)).status).toBe(200);
+
+    expect(await appState()).toEqual(liveState);
+    expect(await restartAs170()).toEqual({ actions: [], warnings: [] });
+    expect(await appState()).toEqual(liveState);
+  });
+
+  it('should keep no state when the live database has none', async () => {
+    await seedAppState({ lastRunVersion: '1.5.0' });
+    const backup = await exportBackup();
+    await prisma.appState.deleteMany();
+
+    expect((await importBackup(backup)).status).toBe(200);
+
+    expect(await appState()).toBeNull();
+  });
+
+  it('should record the running version without a notice after a backup made before the table existed', async () => {
+    await seedAppState({ lastRunVersion: '1.7.0' });
+    const backup = await withDatabaseChanged(await exportBackup(), ['DROP TABLE "AppState"']);
+
+    expect((await importBackup(backup)).status).toBe(200);
+
+    // Next start: the entrypoint migrates, then main() records the version
+    await prisma.$executeRawUnsafe(fs.readFileSync(APP_STATE_MIGRATION, 'utf8'));
+    expect(await restartAs170()).toEqual({ actions: [], warnings: [] });
+    expect(await appState()).toMatchObject({ lastRunVersion: '1.7.0', pendingNoticeFrom: null });
   });
 });
 

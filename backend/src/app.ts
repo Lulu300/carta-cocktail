@@ -23,6 +23,7 @@ import availabilityRoutes from './routes/availability';
 import settingsRoutes from './routes/settings';
 import backupRoutes from './routes/backup';
 import healthRoutes from './routes/health';
+import systemRoutes from './routes/system';
 
 const LOGIN_RATE_WINDOW_MS = 15 * 60_000;
 const API_RATE_WINDOW_MS = 60_000;
@@ -100,6 +101,7 @@ app.use('/api/menu-sections', authMiddleware, menuSectionRoutes);
 app.use('/api/shortages', authMiddleware, shortageRoutes);
 app.use('/api/availability', authMiddleware, availabilityRoutes);
 app.use('/api/settings', authMiddleware, settingsRoutes);
+app.use('/api/system', authMiddleware, systemRoutes);
 // The backup limit counts authenticated requests only: authMiddleware already
 // refuses a request without a token at little cost, and the API limit covers
 // floods without one. Counting them here would let anyone who shares the admin's
