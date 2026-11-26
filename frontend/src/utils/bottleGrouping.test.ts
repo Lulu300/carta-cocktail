@@ -27,7 +27,7 @@ describe('groupBottles', () => {
     const result = groupBottles([single]);
 
     expect(result).toEqual([single]);
-    expect(isGroup(result[0])).toBe(false);
+    expect(isGroup(result[0]!)).toBe(false);
   });
 
   it('groups the bottles of the same product, whatever the case of the name', () => {
@@ -38,8 +38,8 @@ describe('groupBottles', () => {
 
     expect(result).toHaveLength(1);
     const group = result[0];
-    expect(isGroup(group)).toBe(true);
-    if (!isGroup(group)) return;
+    expect(isGroup(group!)).toBe(true);
+    if (!isGroup(group!)) return;
     expect(group.name).toBe('Havana 3');
     expect(group.bottles).toEqual([first, second]);
   });
@@ -52,7 +52,7 @@ describe('groupBottles', () => {
     const result = groupBottles([rum, gin, secondRum]);
 
     expect(result).toHaveLength(2);
-    expect(isGroup(result[0])).toBe(true);
+    expect(isGroup(result[0]!)).toBe(true);
     expect(result[1]).toBe(gin);
   });
 });

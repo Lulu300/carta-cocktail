@@ -289,7 +289,7 @@ describe('CategoriesPage', () => {
       const user = userEvent.setup();
       await renderLoadedPage();
       const updated = captureRequest('put', '/api/categories/:id');
-      await user.click(screen.getAllByRole('button', { name: 'Edit' })[0]);
+      await user.click(screen.getAllByRole('button', { name: 'Edit' })[0]!);
 
       const name = within(categoryDialog()).getByDisplayValue('Vodka');
       await user.clear(name);
@@ -480,12 +480,12 @@ describe('CategoriesPage', () => {
       const user = userEvent.setup();
       await renderLoadedPage();
 
-      await user.click(screen.getAllByRole('button', { name: 'Edit' })[0]);
+      await user.click(screen.getAllByRole('button', { name: 'Edit' })[0]!);
       await user.click(within(categoryDialog()).getByRole('button', { name: 'Translations' }));
       expect(within(categoryDialog()).getByLabelText('Français')).toBeInTheDocument();
       await user.click(within(categoryDialog()).getByRole('button', { name: 'Cancel' }));
 
-      await user.click(screen.getAllByRole('button', { name: 'Edit' })[1]);
+      await user.click(screen.getAllByRole('button', { name: 'Edit' })[1]!);
 
       expect(within(categoryDialog()).getByDisplayValue('Grenadine')).toBeInTheDocument();
       expect(within(categoryDialog()).queryByLabelText('Français')).not.toBeInTheDocument();
@@ -494,7 +494,7 @@ describe('CategoriesPage', () => {
 
   describe('category deletion', () => {
     async function deleteFirstCategory(user: User) {
-      await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]);
+      await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
       const confirmation = screen.getByRole('alertdialog');
       expect(confirmation).toHaveAccessibleDescription('Delete this category?');
       await user.click(within(confirmation).getByRole('button', { name: 'Delete' }));
@@ -523,7 +523,7 @@ describe('CategoriesPage', () => {
       await renderLoadedPage();
       const deleted = captureRequest('delete', '/api/categories/:id');
 
-      await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]);
+      await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
       await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
 
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
@@ -634,7 +634,7 @@ describe('CategoriesPage', () => {
       const updated = captureRequest('put', '/api/category-types/:name');
       const manager = await openTypesManager(user);
 
-      await user.click(within(manager).getAllByRole('button', { name: 'Edit' })[0]);
+      await user.click(within(manager).getAllByRole('button', { name: 'Edit' })[0]!);
       expect(within(manager).getByText('Edit Type')).toBeInTheDocument();
       expect(within(manager).getByDisplayValue('SPIRIT')).toBeDisabled();
       await user.type(within(manager).getByLabelText('Français'), 'Spiritueux');
@@ -654,7 +654,7 @@ describe('CategoriesPage', () => {
       await renderLoadedPage();
       const manager = await openTypesManager(user);
 
-      await user.click(within(manager).getAllByRole('button', { name: 'Edit' })[0]);
+      await user.click(within(manager).getAllByRole('button', { name: 'Edit' })[0]!);
       await user.click(within(manager).getByRole('button', { name: 'Cancel' }));
 
       expect(within(manager).getByText('Add Type')).toBeInTheDocument();
@@ -696,7 +696,7 @@ describe('CategoriesPage', () => {
       await renderLoadedPage();
       const manager = await openTypesManager(user);
 
-      await user.click(within(manager).getAllByRole('button', { name: 'Edit' })[2]);
+      await user.click(within(manager).getAllByRole('button', { name: 'Edit' })[2]!);
       expect(within(manager).getByDisplayValue('GARNISH')).toBeDisabled();
       await user.click(within(manager).getByRole('button', { name: 'Delete' }));
       await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
@@ -710,7 +710,7 @@ describe('CategoriesPage', () => {
       await renderLoadedPage();
       const manager = await openTypesManager(user);
 
-      await user.click(within(manager).getAllByRole('button', { name: 'Edit' })[0]);
+      await user.click(within(manager).getAllByRole('button', { name: 'Edit' })[0]!);
       await user.click(within(manager).getByRole('button', { name: 'Delete' }));
       await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
 
@@ -805,7 +805,7 @@ describe('CategoriesPage', () => {
         const updated = captureRequest('put', '/api/category-types');
         const manager = await openTypesManager(user);
 
-        await user.click(within(manager).getAllByRole('button', { name: 'Edit' })[0]);
+        await user.click(within(manager).getAllByRole('button', { name: 'Edit' })[0]!);
         await user.click(within(manager).getByRole('button', { name: 'Red' }));
         await user.click(within(manager).getByRole('button', { name: 'Save' }));
 

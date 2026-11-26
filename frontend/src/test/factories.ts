@@ -9,6 +9,7 @@ import type {
   Menu,
   MenuBottle,
   MenuCocktail,
+  PublicMenuCocktail,
   MenuSection,
   Shortage,
   SiteSettings,
@@ -56,7 +57,7 @@ export function resetFactories(): void {
  * repeat with a number, so two built entities never share a name either.
  */
 function nameFor(pool: readonly string[], id: number): string {
-  const name = pool[(id - 1) % pool.length];
+  const name = pool[(id - 1) % pool.length]!;
   return id > pool.length ? `${name} ${id}` : name;
 }
 
@@ -90,7 +91,7 @@ export function buildCategoryType(overrides: Partial<CategoryType> = {}): Catego
   return {
     name: nameFor(CATEGORY_TYPE_NAMES, index),
     nameTranslations: null,
-    color: CATEGORY_TYPE_COLORS[(index - 1) % CATEGORY_TYPE_COLORS.length],
+    color: CATEGORY_TYPE_COLORS[(index - 1) % CATEGORY_TYPE_COLORS.length]!,
     ...overrides,
   };
 }
@@ -147,8 +148,8 @@ export function buildUnit(overrides: Partial<Unit> = {}): Unit {
   return {
     name: nameFor(UNIT_NAMES, id),
     nameTranslations: null,
-    abbreviation: unit.abbreviation,
-    conversionFactorToMl: unit.conversionFactorToMl,
+    abbreviation: unit!.abbreviation,
+    conversionFactorToMl: unit!.conversionFactorToMl,
     ...overrides,
     id,
   };
@@ -231,7 +232,7 @@ export function buildMenuSection(overrides: Partial<MenuSection> = {}): MenuSect
  */
 export function buildMenuCocktail(
   overrides: Partial<Omit<MenuCocktail, 'cocktail'>> & { cocktail?: Partial<Cocktail> } = {},
-): MenuCocktail {
+): PublicMenuCocktail {
   const { cocktail: cocktailOverrides, ...entryOverrides } = overrides;
   const id = entryOverrides.id ?? nextId('menuCocktail');
   const cocktail = buildCocktail({ id: entryOverrides.id ?? cocktailOverrides?.id, ...cocktailOverrides });

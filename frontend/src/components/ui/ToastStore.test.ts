@@ -112,7 +112,7 @@ describe('ToastStore', () => {
   it('keeps the action of a toast', () => {
     const onClick = vi.fn();
     toast.info('Deleted', { action: { label: 'Undo', onClick } });
-    expect(toastStore.getSnapshot()[0].action).toEqual({ label: 'Undo', onClick });
+    expect(toastStore.getSnapshot()[0]!.action).toEqual({ label: 'Undo', onClick });
   });
 
   it('pauses the countdown and resumes it with the time left', () => {

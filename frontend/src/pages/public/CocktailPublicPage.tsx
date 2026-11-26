@@ -58,7 +58,7 @@ function CocktailRecipe({ cocktail, menuPath }: { cocktail: Cocktail; menuPath: 
   const handleBack = (event: MouseEvent<HTMLAnchorElement>) => {
     if (!cameFromMenu || isModifiedClick(event)) return;
     event.preventDefault();
-    navigate(-1);
+    void navigate(-1);
   };
 
   const ingredientName = (ing: CocktailIngredient) => {

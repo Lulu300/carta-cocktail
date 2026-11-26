@@ -2,7 +2,7 @@ import { useDeferredValue, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
-import type { Menu, MenuBottle, MenuCocktail, MenuSection } from '../../types';
+import type { Menu, MenuBottle, MenuCocktail, MenuSection, PublicMenuCocktail } from '../../types';
 import {
   getBottleSearchText,
   getCocktailSearchText,
@@ -12,6 +12,7 @@ import {
 import { isBottleMenu } from '../../utils/menuType';
 
 type MenuItem = MenuCocktail | MenuBottle;
+
 
 /**
  * - `section`: a section defined by the admin;
@@ -40,7 +41,7 @@ export interface BottleGroupEntry {
 }
 
 export interface MenuFilterResult {
-  cocktailBlocks: MenuBlock<MenuCocktail>[];
+  cocktailBlocks: MenuBlock<PublicMenuCocktail>[];
   bottleBlocks: MenuBlock<BottleGroupEntry>[];
   /** Cocktails or bottle rows left once the search is applied. */
   resultCount: number;
@@ -49,7 +50,7 @@ export interface MenuFilterResult {
 }
 
 interface IndexedMenu {
-  cocktailBlocks: MenuBlock<MenuCocktail>[];
+  cocktailBlocks: MenuBlock<PublicMenuCocktail>[];
   bottleBlocks: MenuBlock<MenuBottle>[];
   /** Normalized searchable text of each menu item, by menu item id. */
   searchTexts: Map<number, string>;
@@ -109,8 +110,10 @@ function indexMenu(menu: Menu, localize: LocalizeName, t: TFunction): IndexedMen
     return { cocktailBlocks: [], bottleBlocks, searchTexts };
   }
 
-  const cocktails = (menu.cocktails ?? []).filter((item) => !item.isHidden && item.cocktail);
-  cocktails.forEach((item) => searchTexts.set(item.id, getCocktailSearchText(item.cocktail!, localize)));
+  const cocktails = (menu.cocktails ?? []).filter(
+    (item): item is PublicMenuCocktail => !item.isHidden && item.cocktail !== undefined,
+  );
+  cocktails.forEach((item) => searchTexts.set(item.id, getCocktailSearchText(item.cocktail, localize)));
   const cocktailBlocks = sections.length > 0
     ? splitBySection(cocktails, sections, t('public.withoutSection'))
     : [{ anchorId: 'section-all', title: '', kind: 'all' as const, items: cocktails }];

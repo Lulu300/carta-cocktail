@@ -49,7 +49,7 @@ export default function CocktailForm({ id }: CocktailFormProps) {
   }
   const failedLists = listQueries.filter(hasFailedWithoutData);
   if (failedLists.length > 0) {
-    return <LoadError onRetry={() => failedLists.forEach((query) => query.refetch())} />;
+    return <LoadError onRetry={() => failedLists.forEach((query) => void query.refetch())} />;
   }
   // The selects only show a stored id once their options exist: the form waits for every list.
   if ((isEdit && cocktailQuery.isPending) || listQueries.some((query) => query.isPending)) {

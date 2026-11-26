@@ -69,7 +69,7 @@ export default function CocktailEditor({ cocktail, availability, lists }: Cockta
   const openCreatedCocktail = (created: Cocktail) => {
     setCocktailData(created);
     const state: CocktailFormLocationState = { formKey };
-    navigate(`${LIST_PATH}/${created.id}`, { replace: true, state });
+    void navigate(`${LIST_PATH}/${created.id}`, { replace: true, state });
   };
 
   /** Saves the recipe, then the picked image. Each mutation shows its own error toast. */
@@ -82,7 +82,7 @@ export default function CocktailEditor({ cocktail, availability, lists }: Cockta
     }
     try {
       if (imageFile) await uploadImage.mutateAsync({ id: saved.id, file: imageFile });
-      navigate(LIST_PATH);
+      void navigate(LIST_PATH);
     } catch {
       if (!cocktail) openCreatedCocktail(saved);
     }

@@ -130,8 +130,9 @@ export function matchIgnoringCase<Row>(rows: Row[], value: string, valueOf: (row
   const candidates = rows.filter((row) => caseInsensitiveKey(valueOf(row)) === key);
   const exact = candidates.find((row) => valueOf(row) === value);
   if (exact) return { status: 'found', row: exact };
-  if (candidates.length === 1) return { status: 'found', row: candidates[0] };
-  return candidates.length === 0 ? { status: 'none' } : { status: 'ambiguous', rows: candidates };
+  const [first] = candidates;
+  if (first === undefined) return { status: 'none' };
+  return candidates.length === 1 ? { status: 'found', row: first } : { status: 'ambiguous', rows: candidates };
 }
 
 /** Existing rows the creation data is checked against. */

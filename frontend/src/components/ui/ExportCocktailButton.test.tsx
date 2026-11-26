@@ -59,7 +59,7 @@ describe('ExportCocktailButton', () => {
     await user.click(screen.getByTitle('Export'));
 
     await waitFor(() => expect(downloads).toHaveLength(1));
-    const saved = createObjectURL.mock.calls[0][0];
+    const saved = createObjectURL.mock.calls[0]![0]!;
     expect(saved).toBeInstanceOf(Blob);
     if (saved instanceof Blob) {
       expect(saved.type).toBe('application/json');

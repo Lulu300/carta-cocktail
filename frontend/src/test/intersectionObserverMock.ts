@@ -31,7 +31,7 @@ export class IntersectionObserverMock {
   }
 
   static latest(): IntersectionObserverMock {
-    return IntersectionObserverMock.instances[IntersectionObserverMock.instances.length - 1];
+    return IntersectionObserverMock.instances[IntersectionObserverMock.instances.length - 1]!;
   }
 }
 

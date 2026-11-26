@@ -29,8 +29,8 @@ describe('groupBySection', () => {
   it('counts an item of a deleted section as outside any section', () => {
     const groups = groupBySection([item('a', 99)], [starters]);
 
-    expect(groups[0].items.map((entry) => entry.name)).toEqual(['a']);
-    expect(groups[1].items).toEqual([]);
+    expect(groups[0]!.items.map((entry) => entry.name)).toEqual(['a']);
+    expect(groups[1]!.items).toEqual([]);
   });
 
   it('returns a single group when the menu has no section', () => {

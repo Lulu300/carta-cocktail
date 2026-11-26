@@ -159,7 +159,7 @@ describe('UnitsPage', () => {
     const user = userEvent.setup();
     await renderLoadedPage();
 
-    await user.click(screen.getAllByRole('button', { name: 'Edit' })[1]);
+    await user.click(screen.getAllByRole('button', { name: 'Edit' })[1]!);
 
     expect(screen.getByText('Edit Unit')).toBeInTheDocument();
     expect(within(dialog()).getByDisplayValue('Piece')).toBeInTheDocument();
@@ -170,7 +170,7 @@ describe('UnitsPage', () => {
     const user = userEvent.setup();
     await renderLoadedPage();
     const updated = captureRequest('put', '/api/units/:id');
-    await user.click(screen.getAllByRole('button', { name: 'Edit' })[0]);
+    await user.click(screen.getAllByRole('button', { name: 'Edit' })[0]!);
 
     const name = within(dialog()).getByDisplayValue('Centiliter');
     await user.clear(name);
@@ -192,7 +192,7 @@ describe('UnitsPage', () => {
     await renderLoadedPage();
     const deleted = captureRequest('delete', '/api/units/:id');
 
-    await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]);
+    await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
     const confirmation = screen.getByRole('alertdialog');
     expect(confirmation).toHaveAccessibleDescription('Delete this unit?');
     await user.click(within(confirmation).getByRole('button', { name: 'Delete' }));
@@ -206,7 +206,7 @@ describe('UnitsPage', () => {
     await renderLoadedPage();
     const deleted = captureRequest('delete', '/api/units/:id');
 
-    await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]);
+    await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
     await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
 
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
@@ -221,7 +221,7 @@ describe('UnitsPage', () => {
     }, 409);
     await renderLoadedPage();
 
-    await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]);
+    await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
     await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
 
     const alert = await screen.findByText(/This unit is used by cocktails/);
@@ -281,12 +281,12 @@ describe('UnitsPage', () => {
     const user = userEvent.setup();
     await renderLoadedPage();
 
-    await user.click(screen.getAllByRole('button', { name: 'Edit' })[0]);
+    await user.click(screen.getAllByRole('button', { name: 'Edit' })[0]!);
     await user.click(within(dialog()).getByRole('button', { name: 'Translations' }));
     expect(within(dialog()).getByLabelText('Français')).toBeInTheDocument();
     await user.click(within(dialog()).getByRole('button', { name: 'Cancel' }));
 
-    await user.click(screen.getAllByRole('button', { name: 'Edit' })[1]);
+    await user.click(screen.getAllByRole('button', { name: 'Edit' })[1]!);
 
     expect(within(dialog()).getByDisplayValue('Piece')).toBeInTheDocument();
     expect(within(dialog()).queryByLabelText('Français')).not.toBeInTheDocument();

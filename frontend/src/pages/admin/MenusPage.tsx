@@ -83,7 +83,7 @@ export default function MenusPage() {
     create.mutate(form, {
       onSuccess: (menu) => {
         menuForm.close();
-        navigate(menuEditorPath(menu));
+        void navigate(menuEditorPath(menu));
       },
     });
   };

@@ -59,7 +59,7 @@ describe('ImportStepUpload with a ZIP file', () => {
 
     await waitFor(() => expect(props.onLoaded).toHaveBeenCalled());
     expect(mockLoadAsync).toHaveBeenCalledWith(file);
-    const recipes = props.onLoaded.mock.calls[0][0];
+    const recipes = props.onLoaded.mock.calls[0]![0]!;
     expect(recipes.map((r: { cocktail: { name: string } }) => r.cocktail.name)).toEqual(['Mojito', 'Negroni']);
   });
 
@@ -71,8 +71,8 @@ describe('ImportStepUpload with a ZIP file', () => {
     uploadZip();
 
     await waitFor(() => expect(props.onLoaded).toHaveBeenCalled());
-    expect(props.onLoaded.mock.calls[0][0]).toHaveLength(1);
-    expect(props.onLoaded.mock.calls[0][0][0].cocktail.name).toBe('Mojito');
+    expect(props.onLoaded.mock.calls[0]![0]!).toHaveLength(1);
+    expect(props.onLoaded.mock.calls[0]![0][0]!.cocktail.name).toBe('Mojito');
   });
 
   it('reports an archive without JSON files', async () => {
@@ -109,7 +109,7 @@ describe('ImportStepUpload with a JSON file', () => {
     upload(new File([recipeJson('Mojito')], 'mojito.json', { type: 'application/json' }));
 
     await waitFor(() => expect(props.onLoaded).toHaveBeenCalled());
-    expect(props.onLoaded.mock.calls[0][0][0].cocktail.name).toBe('Mojito');
+    expect(props.onLoaded.mock.calls[0]![0][0]!.cocktail.name).toBe('Mojito');
   });
 
   it.each([

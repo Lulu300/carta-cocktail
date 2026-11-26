@@ -62,12 +62,12 @@ export default function ImportStepUpload({ recipes, onLoaded, onNext }: ImportSt
       // Loaded on demand: only ZIP imports need it
       const { default: JSZip } = await import('jszip');
       const zip = await JSZip.loadAsync(file);
-      const jsonNames = Object.keys(zip.files).filter((name) => name.endsWith('.json') && !zip.files[name].dir);
-      if (jsonNames.length === 0) {
+      const jsonFiles = Object.entries(zip.files).filter(([name, entry]) => name.endsWith('.json') && !entry.dir);
+      if (jsonFiles.length === 0) {
         setError(t('cocktails.importWizard.zipNoRecipes'));
         return;
       }
-      const texts = await Promise.all(jsonNames.map((name) => zip.files[name].async('text')));
+      const texts = await Promise.all(jsonFiles.map(([, entry]) => entry.async('text')));
       // Invalid files of the archive are left out; the others are imported
       const validRecipes = texts.map(parseRecipe).filter((recipe) => recipe !== null);
       if (validRecipes.length === 0) setError(t('cocktails.importWizard.zipNoValidRecipes'));
@@ -85,8 +85,8 @@ export default function ImportStepUpload({ recipes, onLoaded, onNext }: ImportSt
 
   const handleFile = (file: File) => {
     setError(null);
-    if (file.name.toLowerCase().endsWith('.zip')) loadZip(file);
-    else loadJson(file);
+    if (file.name.toLowerCase().endsWith('.zip')) void loadZip(file);
+    else void loadJson(file);
   };
 
   const handleReject = () => {

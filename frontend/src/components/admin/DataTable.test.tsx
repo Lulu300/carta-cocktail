@@ -117,7 +117,9 @@ describe('DataTable', () => {
     });
 
     function liveRegion() {
-      act(() => vi.advanceTimersByTime(1000));
+      act(() => {
+      vi.advanceTimersByTime(1000);
+    });
       return document.querySelector('[aria-live="polite"]');
     }
 

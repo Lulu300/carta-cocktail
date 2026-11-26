@@ -138,7 +138,7 @@ export function useMenuMutation<Variables, Data = unknown>({
       const queue = queueOf();
       queue.pending = queue.pending.filter((pending) => pending !== change);
       // The menus list counts the items of each menu: refreshed when next shown.
-      queryClient.invalidateQueries({ queryKey: qk.menus, exact: true, refetchType: 'none' });
+      void queryClient.invalidateQueries({ queryKey: qk.menus, exact: true, refetchType: 'none' });
       if (queue.pending.length > 0) {
         writeState(queryClient, menuId, shownState(queue));
         return;

@@ -45,7 +45,7 @@ describe('useMenuFilter on a bottle menu', () => {
       ['category', 'Amer', 'section-category-1'],
       ['category', 'Gin', 'section-category-2'],
     ]);
-    expect(bottleBlocks[0].items.map((row) => row.name)).toEqual(['Suze', 'Picon']);
+    expect(bottleBlocks[0]!.items.map((row) => row.name)).toEqual(['Suze', 'Picon']);
     expect(resultCount).toBe(3);
     expect(hasItems).toBe(true);
   });
@@ -60,7 +60,7 @@ describe('useMenuFilter on a bottle menu', () => {
     const { bottleBlocks } = filter(menu);
 
     expect(bottleBlocks.map((block) => block.title)).toEqual(['Gin', 'Amer']);
-    expect(bottleBlocks[0].items.map((row) => row.name)).toEqual(['Tanqueray', 'Hendrick\'s']);
+    expect(bottleBlocks[0]!.items.map((row) => row.name)).toEqual(['Tanqueray', 'Hendrick\'s']);
   });
 
   it('puts bottles without a category under "other"', () => {
@@ -76,7 +76,7 @@ describe('useMenuFilter on a bottle menu', () => {
       menuBottle(3, { name: 'Zubrowka' }),
     ]);
 
-    const rows = filter(menu).bottleBlocks[0].items;
+    const rows = filter(menu).bottleBlocks[0]!.items;
 
     expect(rows.map((row) => [row.name, row.count])).toEqual([['Zubrowka', 2], ['Aperol', 1]]);
   });
@@ -89,7 +89,7 @@ describe('useMenuFilter on a bottle menu', () => {
 
     const { bottleBlocks, resultCount } = filter(menu, 'apero');
 
-    expect(bottleBlocks[0].items.map((row) => row.name)).toEqual(['Apéro maison']);
+    expect(bottleBlocks[0]!.items.map((row) => row.name)).toEqual(['Apéro maison']);
     expect(resultCount).toBe(1);
   });
 
@@ -111,7 +111,7 @@ describe('useMenuFilter on a cocktail menu', () => {
 
     expect(cocktailBlocks).toHaveLength(1);
     expect(cocktailBlocks[0]).toMatchObject({ kind: 'all', title: '', anchorId: 'section-all' });
-    expect(cocktailBlocks[0].items).toHaveLength(2);
+    expect(cocktailBlocks[0]!.items).toHaveLength(2);
   });
 
   it('lists unsectioned cocktails first, then each section, and drops empty sections', () => {
@@ -151,7 +151,7 @@ describe('useMenuFilter on a cocktail menu', () => {
 
     const { cocktailBlocks, resultCount, hasItems } = filter(menu, 'petillant');
 
-    expect(cocktailBlocks[0].items.map((item) => item.cocktail?.name)).toEqual(['Mojito']);
+    expect(cocktailBlocks[0]!.items.map((item) => item.cocktail?.name)).toEqual(['Mojito']);
     expect(resultCount).toBe(1);
     expect(hasItems).toBe(true);
   });
@@ -168,7 +168,7 @@ describe('groupMenuBottles', () => {
 
     expect(groups).toHaveLength(2);
     expect(groups[0]).toMatchObject({ name: 'Suze', count: 3 });
-    expect(groups[0].locations).toEqual([{ name: 'Bar', count: 2 }, { name: 'Cave', count: 1 }]);
+    expect(groups[0]!.locations).toEqual([{ name: 'Bar', count: 2 }, { name: 'Cave', count: 1 }]);
     expect(groups[1]).toMatchObject({ capacityMl: 350, count: 1, locations: [] });
   });
 });

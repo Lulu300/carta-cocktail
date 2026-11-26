@@ -16,7 +16,7 @@ const messageFiles = import.meta.glob<string>('./locales/*/*.json', {
 });
 
 function readMessages(bundle: 'public' | 'admin', language: 'en' | 'fr'): Messages {
-  return JSON.parse(messageFiles[`./locales/${bundle}/${language}.json`]);
+  return JSON.parse(messageFiles[`./locales/${bundle}/${language}.json`]!);
 }
 
 /** Dotted path of every message: { a: { b: 'x' } } gives { 'a.b': 'x' }. */
@@ -78,7 +78,7 @@ function initialLoadFiles(): string[] {
     if (reached.has(path)) continue;
     reached.add(path);
     for (const [, specifier] of sources.get(path)!.matchAll(STATIC_IMPORT)) {
-      const imported = resolveImport(path, specifier);
+      const imported = resolveImport(path, specifier!);
       if (imported) pending.push(imported);
     }
   }
@@ -98,7 +98,7 @@ const publicKeys = new Set(Object.keys(BUNDLES.public.en).map(callableKey));
 
 function keysUsedBy(files: string[]): Set<string> {
   const literals = files.flatMap((path) =>
-    [...sources.get(path)!.matchAll(KEY_LITERAL)].map((match) => match[1]),
+    [...sources.get(path)!.matchAll(KEY_LITERAL)].map((match) => match[1]!),
   );
   return new Set(literals.filter((literal) => allKeys.has(literal)));
 }
@@ -229,12 +229,12 @@ describe('messages', () => {
 describe('translation keys used in the code', () => {
   /** Every t('literal.key') call: unlike KEY_LITERAL, it also catches a key missing from both bundles. */
   function literalKeys(source: string): string[] {
-    return [...source.matchAll(/\bt\(\s*'([^']+)'/g)].map((match) => match[1]);
+    return [...source.matchAll(/\bt\(\s*'([^']+)'/g)].map((match) => match[1]!);
   }
 
   /** Every t(`template.${value}`) call, as the text between the backticks. */
   function keyTemplates(source: string): string[] {
-    return [...source.matchAll(/\bt\(\s*`([^`]*)`/g)].map((match) => match[1]);
+    return [...source.matchAll(/\bt\(\s*`([^`]*)`/g)].map((match) => match[1]!);
   }
 
   // Keys built at runtime from a value the code controls (a nav item, a color, an entity type...).

@@ -23,7 +23,7 @@ function dialog() {
 }
 
 async function confirmDeletion(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]);
+  await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
   await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
 }
 
@@ -196,7 +196,7 @@ describe('IngredientsPage', () => {
     const user = userEvent.setup();
     await renderLoadedPage();
     const updated = captureRequest('put', '/api/ingredients/:id');
-    await user.click(screen.getAllByRole('button', { name: 'Edit' })[1]);
+    await user.click(screen.getAllByRole('button', { name: 'Edit' })[1]!);
 
     const name = within(dialog()).getByDisplayValue('Sugar');
     await user.clear(name);
@@ -235,7 +235,7 @@ describe('IngredientsPage', () => {
     await renderLoadedPage();
     const deleted = captureRequest('delete', '/api/ingredients/:id');
 
-    await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]);
+    await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
     await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
 
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
@@ -279,12 +279,12 @@ describe('IngredientsPage', () => {
     const user = userEvent.setup();
     await renderLoadedPage();
 
-    await user.click(screen.getAllByRole('button', { name: 'Edit' })[1]);
+    await user.click(screen.getAllByRole('button', { name: 'Edit' })[1]!);
     await user.click(within(dialog()).getByRole('button', { name: 'Translations' }));
     expect(within(dialog()).getByLabelText('Français')).toHaveValue('Sucre');
     await user.click(within(dialog()).getByRole('button', { name: 'Cancel' }));
 
-    await user.click(screen.getAllByRole('button', { name: 'Edit' })[0]);
+    await user.click(screen.getAllByRole('button', { name: 'Edit' })[0]!);
 
     expect(within(dialog()).queryByLabelText('Français')).not.toBeInTheDocument();
   });

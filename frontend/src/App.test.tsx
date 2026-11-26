@@ -289,7 +289,7 @@ describe('admin messages', () => {
 
     const adminChunks = [...appSource.matchAll(/import\('([^']+)'\)/g)]
       .map((match) => match[1])
-      .filter((path) => /^\.\/pages\/(admin|auth)\/|\/AdminLayout$/.test(path));
+      .filter((path) => /^\.\/pages\/(admin|auth)\/|\/AdminLayout$/.test(path!));
     expect(adminChunks).toEqual(
       expect.arrayContaining(['./components/layout/AdminLayout', './pages/auth/LoginPage']),
     );

@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings=0",
     "format:check": "prettier --check . --ignore-path .gitignore --ignore-path ../.prettierignore",
     "preview": "vite preview",
     "test": "vitest run",

@@ -53,11 +53,11 @@ async function renderLoadedPage() {
 }
 
 function siteSaveButton() {
-  return screen.getAllByText('Save')[0];
+  return screen.getAllByText('Save')[0]!;
 }
 
 function profileSaveButton() {
-  return screen.getAllByText('Save')[1];
+  return screen.getAllByText('Save')[1]!;
 }
 
 // MAX_BACKUP_UPLOAD_BYTES of backend/src/services/backupService.ts, the largest archive it accepts

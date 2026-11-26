@@ -24,7 +24,7 @@ describe('openSignInAfterRestore', () => {
     openSignInAfterRestore();
 
     expect(assign).toHaveBeenCalledOnce();
-    const [url] = assign.mock.calls[0];
+    const [url] = assign.mock.calls[0]!;
     expect(new URL(url, 'http://localhost').pathname).toBe('/login');
     expect(isSignInAfterRestore(new URL(url, 'http://localhost').search)).toBe(true);
   });
@@ -36,7 +36,7 @@ describe('openSignInAfterLogoutEverywhere', () => {
 
     openSignInAfterLogoutEverywhere();
 
-    const [url] = assign.mock.calls[0];
+    const [url] = assign.mock.calls[0]!;
     const { pathname, search } = new URL(url, 'http://localhost');
     expect(pathname).toBe('/login');
     expect(isSignInAfterLogoutEverywhere(search)).toBe(true);

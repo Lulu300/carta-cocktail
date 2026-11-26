@@ -98,7 +98,7 @@ function rowOf(name: string): HTMLElement {
 }
 
 function sentCocktails(call = 0) {
-  return received.updates[call].cocktails ?? [];
+  return received.updates[call]!.cocktails ?? [];
 }
 
 function sentCocktailIds(call = 0) {
@@ -216,7 +216,7 @@ describe('MenuEditPage', () => {
     expect(within(rowOf('Mojito')).getByRole('button', { name: /^Show .+$/ })).toBeInTheDocument();
     await waitFor(() => expect(received.updates).toHaveLength(1));
 
-    answers[0].reject('Boom');
+    answers[0]!.reject('Boom');
     await waitFor(() => expect(received.updates).toHaveLength(2));
     // Without the refused Mojito change, and without the Spritz change still waiting.
     expect(hiddenFlags(1)).toEqual([false, true, false]);
@@ -226,10 +226,10 @@ describe('MenuEditPage', () => {
     expect(within(rowOf('Spritz')).getByRole('button', { name: /^Show .+$/ })).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('Boom');
 
-    answers[1].resolve();
+    answers[1]!.resolve();
     await waitFor(() => expect(received.updates).toHaveLength(3));
     expect(hiddenFlags(2)).toEqual([false, true, true]);
-    answers[2].resolve();
+    answers[2]!.resolve();
 
     await waitFor(() => expect(received.menuReads).toHaveLength(2));
     expect(storedMenu.cocktails?.map((item) => item.isHidden)).toEqual([false, true, true]);

@@ -18,7 +18,10 @@ registerChunkReloadHandler();
 
 const queryClient = createQueryClient();
 
-createRoot(document.getElementById('root')!).render(
+const rootElement = document.getElementById('root');
+if (!rootElement) throw new Error('The #root element is missing from index.html');
+
+createRoot(rootElement).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>

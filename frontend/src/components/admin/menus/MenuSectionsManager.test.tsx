@@ -70,7 +70,7 @@ describe('MenuSectionsManager', () => {
 
     expect((await renamed.url).pathname).toBe('/api/menu-sections/sections/1');
     expect(await renamed.body).toEqual({ name: 'Openers' });
-    await waitFor(() => expect(queryClient.getQueryData<Menu>(qk.menu(3))?.sections?.[0].name).toBe('Openers'));
+    await waitFor(() => expect(queryClient.getQueryData<Menu>(qk.menu(3))?.sections?.[0]!.name).toBe('Openers'));
   });
 
   it('leaves the name unchanged when the rename is cancelled', async () => {
@@ -99,7 +99,7 @@ describe('MenuSectionsManager', () => {
     await waitFor(() => expect(queryClient.getQueryData<Menu>(qk.menu(3))?.sections).toHaveLength(1));
     const cached = queryClient.getQueryData<Menu>(qk.menu(3));
     expect(cached?.sections?.map((section) => section.id)).toEqual([2]);
-    expect(cached?.cocktails?.[0].menuSectionId).toBeNull();
+    expect(cached?.cocktails?.[0]!.menuSectionId).toBeNull();
   });
 
   it('keeps a section when the deletion is cancelled', async () => {

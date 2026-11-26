@@ -89,7 +89,9 @@ export default function SettingsPage() {
   const [siteError, setSiteError] = useState('');
 
   // Profile settings
-  const [email, setEmail] = useState('');
+  // What the admin typed; null while the field shows the email of the session.
+  const [typedEmail, setTypedEmail] = useState<string | null>(null);
+  const email = typedEmail ?? user?.email ?? '';
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -123,11 +125,6 @@ export default function SettingsPage() {
     }).catch(() => setSiteLoading(false));
   }, []);
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (user) setEmail(user.email);
-  }, [user]);
-
   const handleSiteSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSiteMessage('');
@@ -160,6 +157,7 @@ export default function SettingsPage() {
       const { token, ...updatedUser } = await settingsApi.updateProfile(data);
       updateSession(updatedUser, token);
       setProfileMessage(t('settings.profileUpdated'));
+      setTypedEmail(null);
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -338,7 +336,7 @@ export default function SettingsPage() {
 
         <div className="space-y-4">
           <Field label={t('settings.email')} required>
-            <Input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <Input type="email" autoComplete="username" value={email} onChange={(e) => setTypedEmail(e.target.value)} />
           </Field>
 
           <hr className="border-line" />

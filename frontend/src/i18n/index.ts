@@ -42,7 +42,7 @@ i18n.on('languageChanged', (language) => {
   document.documentElement.lang = language || FALLBACK_LANGUAGE;
 });
 
-i18n
+void i18n
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({

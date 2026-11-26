@@ -206,9 +206,9 @@ describe('ImportBottlesWizard', () => {
   it('flags bottles missing a category with categoryRequired warning', async () => {
     const user = userEvent.setup();
     mockPreview({
-      payload: { version: 1, categories: [], bottles: [{ ...samplePreview.payload.bottles[0], categoryName: '' }] },
+      payload: { version: 1, categories: [], bottles: [{ ...samplePreview.payload.bottles[0]!, categoryName: '' }] },
       categories: [],
-      bottles: [{ ref: { ...samplePreview.bottles[0].ref, categoryName: '' }, needsCategory: true, potentialDuplicates: [] }],
+      bottles: [{ ref: { ...samplePreview.bottles[0]!.ref, categoryName: '' }, needsCategory: true, potentialDuplicates: [] }],
       errors: [],
     });
     render(<ImportBottlesWizard onClose={() => undefined} />);
@@ -225,7 +225,7 @@ describe('ImportBottlesWizard', () => {
     mockPreview({
       ...samplePreview,
       bottles: [{
-        ...samplePreview.bottles[0],
+        ...samplePreview.bottles[0]!,
         potentialDuplicates: [
           { id: 99, name: 'Havana 7', capacityMl: 700, categoryName: 'Rhum', remainingPercent: 50 },
         ],
@@ -267,7 +267,7 @@ describe('ImportBottlesWizard', () => {
     await waitFor(() => expect(screen.getByText('Rhum')).toBeInTheDocument());
     // The two Next buttons in the wizard share the same label; click the visible one in the footer
     const nextButtons = screen.getAllByText('Next');
-    await user.click(nextButtons[nextButtons.length - 1]);
+    await user.click(nextButtons[nextButtons.length - 1]!);
 
     // confirm step
     await waitFor(() => expect(screen.getByText('Import summary')).toBeInTheDocument());
@@ -403,7 +403,7 @@ describe('ImportBottlesWizard', () => {
     render(<ImportBottlesWizard onClose={() => undefined} />);
     const user = await previewWith({
       ...samplePreview,
-      categories: [{ ...samplePreview.categories[0], ref: { ...samplePreview.categories[0].ref, type: invisibleType } }],
+      categories: [{ ...samplePreview.categories[0]!, ref: { ...samplePreview.categories[0]!.ref, type: invisibleType } }],
     });
     const next = screen.getAllByText('Next').at(-1)!.closest('button')!;
     const typeSelect = screen.getByLabelText('Type');
@@ -427,7 +427,7 @@ describe('ImportBottlesWizard', () => {
     render(<ImportBottlesWizard onClose={() => undefined} />, { queryClient });
     const user = await previewWith({
       ...samplePreview,
-      categories: [{ ...samplePreview.categories[0], ref: { ...samplePreview.categories[0].ref, type: invisibleType } }],
+      categories: [{ ...samplePreview.categories[0]!, ref: { ...samplePreview.categories[0]!.ref, type: invisibleType } }],
     });
     await waitFor(() => expect(screen.getByLabelText('Type')).not.toHaveAttribute('aria-invalid'));
     await user.click(screen.getAllByText('Next').at(-1)!);
@@ -449,7 +449,7 @@ describe('ImportBottlesWizard', () => {
     render(<ImportBottlesWizard onClose={() => undefined} />);
     const user = await previewWith({
       ...samplePreview,
-      categories: [{ ...samplePreview.categories[0], existingMatch: { id: 4, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 }, status: 'matched' }],
+      categories: [{ ...samplePreview.categories[0]!, existingMatch: { id: 4, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 }, status: 'matched' }],
     });
 
     await user.click(screen.getByText('Create'));
@@ -475,9 +475,9 @@ describe('ImportBottlesWizard', () => {
     const user = await previewWith({
       ...samplePreview,
       bottles: [
-        { ref: { ...samplePreview.bottles[0].ref, categoryName: '' }, needsCategory: true, potentialDuplicates: [] },
+        { ref: { ...samplePreview.bottles[0]!.ref, categoryName: '' }, needsCategory: true, potentialDuplicates: [] },
         {
-          ...samplePreview.bottles[0],
+          ...samplePreview.bottles[0]!,
           potentialDuplicates: [{ id: 99, name: 'Havana 7', capacityMl: 700, categoryName: 'Rhum', remainingPercent: 50 }],
         },
       ],
@@ -487,7 +487,7 @@ describe('ImportBottlesWizard', () => {
     expect(next).toBeDisabled();
 
     // Skipping the row without a category unblocks the import
-    await user.click(screen.getAllByText('Skip')[0]);
+    await user.click(screen.getAllByText('Skip')[0]!);
     await user.click(next);
 
     expect(screen.getByText('Import summary')).toBeInTheDocument();
@@ -534,7 +534,7 @@ describe('ImportBottlesWizard', () => {
 describe('ImportBottlesWizard - categories equal ignoring case', () => {
   const rhum = buildCategory({ id: 1, name: 'Rhum' });
   const upperRhum = buildCategory({ id: 2, name: 'RHUM' });
-  const fileCategory = { ...samplePreview.categories[0].ref, name: 'rhum' };
+  const fileCategory = { ...samplePreview.categories[0]!.ref, name: 'rhum' };
   const ambiguousPreview: BottleImportPreviewResponse = {
     ...samplePreview,
     payload: { ...samplePreview.payload, categories: [fileCategory] },
@@ -544,7 +544,7 @@ describe('ImportBottlesWizard - categories equal ignoring case', () => {
       status: 'ambiguous',
       ambiguousMatches: [{ id: 1, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 }, { id: 2, name: 'RHUM', type: 'SPIRIT', desiredStock: 1 }],
     }],
-    bottles: [{ ...samplePreview.bottles[0], ref: { ...samplePreview.bottles[0].ref, categoryName: 'rhum' } }],
+    bottles: [{ ...samplePreview.bottles[0]!, ref: { ...samplePreview.bottles[0]!.ref, categoryName: 'rhum' } }],
   };
 
   beforeEach(() => {
@@ -685,7 +685,7 @@ describe('ImportBottlesWizard - categories equal ignoring case', () => {
     const user = await previewWith({
       ...ambiguousPreview,
       categories: [{ ref: fileCategory, existingMatch: { id: 1, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 }, status: 'matched' }],
-      bottles: [ambiguousPreview.bottles[0], ambiguousPreview.bottles[0]],
+      bottles: [ambiguousPreview.bottles[0]!, ambiguousPreview.bottles[0]!],
     });
     await user.click(screen.getByText('Create'));
     const name = screen.getByLabelText('Name');
@@ -693,7 +693,7 @@ describe('ImportBottlesWizard - categories equal ignoring case', () => {
     await user.type(name, 'Rhum agricole');
 
     const [movedRow, keptRow] = screen.getAllByLabelText('Category');
-    await user.selectOptions(movedRow, 'Rhum');
+    await user.selectOptions(movedRow!, 'Rhum');
     expect(movedRow).toHaveDisplayValue('Rhum');
     expect(keptRow).toHaveDisplayValue('Rhum agricole (will be created)');
     await user.click(nextButton());
@@ -717,17 +717,17 @@ describe('ImportBottlesWizard - categories equal ignoring case', () => {
         { ref: fileCategory, existingMatch: { id: 1, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 }, status: 'matched' },
         { ref: ginCategory, existingMatch: { id: 3, name: 'Gin', type: 'SPIRIT', desiredStock: 1 }, status: 'matched' },
       ],
-      bottles: [{ ...ambiguousPreview.bottles[0], ref: { ...ambiguousPreview.bottles[0].ref, categoryName: 'gin' } }],
+      bottles: [{ ...ambiguousPreview.bottles[0]!, ref: { ...ambiguousPreview.bottles[0]!.ref, categoryName: 'gin' } }],
     });
 
     const [createRhum, createGin] = screen.getAllByText('Create');
-    await user.click(createRhum);
-    await user.click(createGin);
+    await user.click(createRhum!);
+    await user.click(createGin!);
     const [rhumName, ginName] = screen.getAllByLabelText('Name');
-    await user.clear(rhumName);
-    await user.type(rhumName, 'Rhum agricole');
-    await user.clear(ginName);
-    await user.type(ginName, 'Rhum');
+    await user.clear(rhumName!);
+    await user.type(rhumName!, 'Rhum agricole');
+    await user.clear(ginName!);
+    await user.type(ginName!, 'Rhum');
 
     // The confirmation finds `Rhum` for the `gin` category to create, and puts the row there
     expect(screen.getByLabelText('Category')).toHaveDisplayValue('Rhum');

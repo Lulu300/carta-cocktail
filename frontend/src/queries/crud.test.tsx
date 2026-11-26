@@ -97,7 +97,7 @@ describe('useCrudMutations', () => {
     act(() => result.current.remove.mutate(4));
 
     await waitFor(() => expect(result.current.remove.isError).toBe(true));
-    const shown = vi.mocked(toast.error).mock.calls[0][0] as Error;
+    const shown = vi.mocked(toast.error).mock.calls[0]![0]! as Error;
     expect(shown.message).toBe('Still in use Used by these cocktails: Mojito.');
   });
 });

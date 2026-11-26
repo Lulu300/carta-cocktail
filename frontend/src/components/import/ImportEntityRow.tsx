@@ -97,7 +97,7 @@ export default function ImportEntityRow({
   const choose = (next: ResolutionChoice) => {
     // The button is disabled when `options` is empty. Of several matches, none is picked for the admin.
     if (next === 'use_existing') {
-      onChange({ action: 'use_existing', existingId: isAmbiguous ? undefined : entity.existingMatch?.id ?? options[0].id });
+      onChange({ action: 'use_existing', existingId: isAmbiguous ? undefined : entity.existingMatch?.id ?? options[0]?.id });
     } else if (next === 'create') {
       onChange({ action: 'create', data: defaultCreateData(type, entity.ref) });
     } else {

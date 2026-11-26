@@ -1,4 +1,5 @@
 import { cocktails as cocktailsApi, type CocktailExportFile } from './api';
+import { downloadBlob } from '../utils/downloadBlob';
 
 /**
  * Most cocktails the backend exports in one request (MAX_EXPORT_BATCH in
@@ -44,12 +45,5 @@ export async function exportCocktailsAsZip(ids: number[]): Promise<void> {
 
   const blob = await zip.generateAsync({ type: 'blob' });
   const date = new Date().toISOString().slice(0, 10);
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `cocktails-export-${date}.zip`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  downloadBlob(blob, `cocktails-export-${date}.zip`);
 }

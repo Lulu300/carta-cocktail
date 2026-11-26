@@ -180,13 +180,13 @@ describe('ImportCocktailWizard', () => {
 
     expect(await screen.findByText('Cocktail imported successfully!')).toBeInTheDocument();
     // JSON turns a NaN into null: every number of the resolutions must come out as sent
-    expect(confirmations[0].resolutions.bottles).toEqual({
+    expect(confirmations[0]!.resolutions.bottles).toEqual({
       'havana 3': {
         action: 'create',
         data: { name: 'Havana 3', categoryName: 'Rhum', capacityMl: 750, remainingPercent: 100 },
       },
     });
-    expect(JSON.stringify(confirmations[0].resolutions)).not.toContain('null');
+    expect(JSON.stringify(confirmations[0]!.resolutions)).not.toContain('null');
     expect(screen.getByRole('link', { name: 'Edit cocktail' })).toHaveAttribute('href', '/admin/cocktails/100');
   });
 
@@ -232,7 +232,7 @@ describe('ImportCocktailWizard', () => {
     await confirmImport();
 
     expect(await screen.findByText('Cocktail imported successfully!')).toBeInTheDocument();
-    expect(confirmations[0].resolutions.categories).toEqual({
+    expect(confirmations[0]!.resolutions.categories).toEqual({
       sirop: { action: 'create', data: { name: 'Sirop', type: '   ', desiredStock: 1, nameTranslations: null } },
     });
   });
@@ -263,7 +263,7 @@ describe('ImportCocktailWizard', () => {
     await confirmImport();
 
     expect(await screen.findByText('Cocktail imported successfully!')).toBeInTheDocument();
-    expect(confirmations[0].resolutions.categories).toEqual({ rhum: { action: 'use_existing', existingId: 11 } });
+    expect(confirmations[0]!.resolutions.categories).toEqual({ rhum: { action: 'use_existing', existingId: 11 } });
   });
 
   it('shows a category to create that exists ignoring case as used, not created', async () => {
@@ -292,7 +292,7 @@ describe('ImportCocktailWizard', () => {
     await confirmImport();
 
     const bottlesRead = listReads[LIST_PATHS.indexOf('/api/bottles')];
-    await waitFor(() => expect(bottlesRead.count()).toBe(2));
+    await waitFor(() => expect(bottlesRead!.count()).toBe(2));
   });
 
   it('imports a batch where the second recipe fails once: one line per recipe, all imported', async () => {
