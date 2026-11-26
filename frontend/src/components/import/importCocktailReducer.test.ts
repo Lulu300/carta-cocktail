@@ -109,6 +109,14 @@ describe('importCocktailReducer', () => {
     ]);
   });
 
+  it('keeps the details of a refused confirmation until the retry', () => {
+    const details = ['Row 2: unit "cl" is neither matched nor created'];
+    const failed = run(loaded('Mojito'), ...toConfirm, { type: 'CONFIRM_FAILED', message: 'Unresolved', details });
+    expect(failed).toMatchObject({ step: 'error', error: 'Unresolved', errorDetails: details });
+
+    expect(run(failed, { type: 'RETRY' })).toMatchObject({ step: 'resolve', error: null, errorDetails: [] });
+  });
+
   it('shows an error screen when the preview of a recipe in the batch fails', () => {
     const state = run(loaded('Mojito', 'Negroni'), ...toConfirm, { type: 'CONFIRM_OK', cocktail: { id: 1, name: 'Mojito' } },
       { type: 'PREVIEW_FAILED', message: 'Invalid recipe' });

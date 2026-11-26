@@ -14,6 +14,8 @@ import {
   type CapturedRequest,
 } from '../../test/msw/utils';
 import type { CocktailExportFormat, EntityResolutionAction, ImportPreviewResponse } from '../../types';
+// Registers the admin messages the details of a refused confirmation are written with
+import '../../i18n/admin';
 import ImportCocktailWizard from './ImportCocktailWizard';
 
 const mockLoadAsync = vi.fn();
@@ -405,6 +407,56 @@ describe('ImportCocktailWizard', () => {
     await user.click(await screen.findByRole('button', { name: 'cocktails.importWizard.next' }));
 
     expect(await screen.findByText('cocktails.importWizard.listsLoadError')).toBeInTheDocument();
+  });
+
+  it('lists each reference a refused confirmation names, then goes back to the choices', async () => {
+    const unresolved = [{ line: 1, kind: 'unit', name: 'cl' }, { line: 0, kind: 'bottle', name: 'Havana 3' }];
+    answerConfirm = () => HttpResponse.json({ error: 'The recipe cannot be imported', details: unresolved }, { status: 400 });
+    render(<ImportCocktailWizard onClose={vi.fn()} />);
+
+    uploadJson(recipe('Daiquiri'));
+    await goToConfirmation();
+    await confirmImport();
+
+    const alert = await screen.findByRole('alert');
+    expect(within(alert).getByText('The recipe cannot be imported')).toBeInTheDocument();
+    expect(within(alert).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'Row 2: unit "cl" is neither matched nor created',
+      'Row 1: bottle "Havana 3" is neither matched nor created, or has no category',
+    ]);
+
+    await user.click(screen.getByRole('button', { name: 'cocktails.importWizard.tryAgain' }));
+    expect(await screen.findByRole('button', { name: 'cocktails.importWizard.next' })).toBeInTheDocument();
+  });
+
+  it('names the row of an existing item deleted before the confirmation', async () => {
+    answerConfirm = () => HttpResponse.json(
+      { error: 'A recipe line names a unit that does not exist', details: [{ line: 0, field: 'categoryId', id: 10 }] },
+      { status: 400 },
+    );
+    render(<ImportCocktailWizard onClose={vi.fn()} />);
+
+    uploadJson(recipe('Daiquiri'));
+    await goToConfirmation();
+    await confirmImport();
+
+    expect(await screen.findByText('Row 1, Category: this item no longer exists, choose another one')).toBeInTheDocument();
+  });
+
+  it('keeps the message alone when the details of a refusal are malformed', async () => {
+    answerConfirm = () => HttpResponse.json(
+      { error: 'The recipe cannot be imported', details: [{ line: 'one', kind: 'unit', name: 'cl' }] },
+      { status: 400 },
+    );
+    render(<ImportCocktailWizard onClose={vi.fn()} />);
+
+    uploadJson(recipe('Daiquiri'));
+    await goToConfirmation();
+    await confirmImport();
+
+    const alert = await screen.findByRole('alert');
+    expect(within(alert).getByText('The recipe cannot be imported')).toBeInTheDocument();
+    expect(within(alert).queryByRole('list')).not.toBeInTheDocument();
   });
 
   it('closes from the error screen of a single recipe', async () => {

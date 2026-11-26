@@ -517,6 +517,14 @@
     "issue": "{{field}} : {{rule}}",
     "issueInRow": "Ligne {{row}}, {{field}} : {{rule}}",
     "issueInCategoryRow": "Catégorie {{row}}, {{field}} : {{rule}}",
+    "unknownReference": "Ligne {{row}}, {{field}} : cet élément n'existe plus, choisissez-en un autre",
+    "unresolved": {
+      "unit": "Ligne {{row}} : unité « {{name}} » ni associée ni créée",
+      "noUnit": "Ligne {{row}} : aucune unité",
+      "category": "Ligne {{row}} : catégorie « {{name}} » ni associée ni créée",
+      "bottle": "Ligne {{row}} : bouteille « {{name}} » ni associée ni créée, ou sans catégorie",
+      "ingredient": "Ligne {{row}} : ingrédient « {{name}} » ni associé ni créé"
+    },
     "fields": {
       "name": "Nom",
       "slug": "Slug URL",

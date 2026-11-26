@@ -68,7 +68,10 @@ interface ImportFailureProps {
   onClose: () => void;
 }
 
-/** A failed preview or confirmation: the admin retries, skips the recipe or stops. */
+/**
+ * A failed preview or confirmation, with the rows its refusal names: the admin retries
+ * (a failed confirmation goes back to the choices, kept), skips the recipe or stops.
+ */
 export function ImportFailure({ state, onBack, onSkip, onRetry, onClose }: ImportFailureProps) {
   const { t } = useTranslation();
   const batch = isBatch(state);
@@ -92,7 +95,13 @@ export function ImportFailure({ state, onBack, onSkip, onRetry, onClose }: Impor
           <Button onClick={onRetry}>{t('cocktails.importWizard.tryAgain')}</Button>
         </>
       }
-    />
+    >
+      {state.errorDetails.length > 0 && (
+        <ul className="text-left max-w-md mx-auto space-y-1 text-sm text-danger list-disc list-inside">
+          {state.errorDetails.map((detail) => <li key={detail}>{detail}</li>)}
+        </ul>
+      )}
+    </WizardResult>
   );
 }
 
