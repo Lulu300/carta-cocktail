@@ -5,13 +5,13 @@ phase: E
 lane: frontend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [E-10]
 touches: [frontend/src/utils/unitConverter.ts, frontend/src/utils/unitConverter.test.ts, frontend/src/components/ui/UnitConverter.tsx, frontend/src/components/ui/UnitConverter.test.tsx]
 sources: []
-branch:
-pr:
+branch: fix/E-32-unit-converter-number-format
+pr: 0
 ---
 
 ## Contexte
@@ -48,3 +48,5 @@ La fiche cocktail publique (`CocktailPublicPage`) affiche chaque quantité avec 
 ## Journal
 
 - 2026-10-13 : tâche créée par E-10, à partir de la relecture de la PR #134.
+- 2026-11-26 : faite. `getAllConversions` renvoie le nombre arrondi (`roundQuantity`), `formatQuantity(quantité, langue)` formate avec `Intl.NumberFormat` à l'affichage, sans nouvelle clé i18n. Les deux lignes de stderr des tests venaient des `console.warn` de `toMilliliters` et `fromMilliliters` (unité non convertible) : les tests les espionnent et vérifient l'appel. Paquet public : 136,94 kB gzip (budget 140). Un « dash » à 3,0 s'affiche désormais « 3 ».
+- 2026-11-26 : Notes de version : les quantités du convertisseur d'unités de la fiche cocktail publique suivent le format numérique de la langue (« 3,33 cs » en français). Aucune action requise.
