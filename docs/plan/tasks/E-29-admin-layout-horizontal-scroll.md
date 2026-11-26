@@ -11,7 +11,7 @@ depends_on: [E-09]
 touches: [frontend/src/components/layout/AdminLayout.tsx, frontend/src/components/layout/AdminLayout.test.tsx, frontend/src/components/admin/DataTable.tsx, frontend/src/components/admin/DataTable.test.tsx, frontend/src/components/admin/bottles/BottleHistoryTable.tsx, frontend/src/components/ui/ScrollableTable.tsx, frontend/src/pages/admin/CocktailsPage.tsx, frontend/src/pages/admin/IngredientsPage.tsx]
 sources: ["06-frontend-ux-perf.md §3"]
 branch: fix/E-29-admin-horizontal-scroll
-pr:
+pr: 273
 ---
 
 ## Contexte
