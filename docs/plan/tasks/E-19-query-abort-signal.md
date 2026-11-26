@@ -11,7 +11,7 @@ depends_on: [E-02]
 touches: [frontend/src/services/api.ts, frontend/src/services/api.test.ts, frontend/src/queries/]
 sources: ["05-frontend-archi.md §3.1"]
 branch: fix/E-19-query-abort-signal
-pr: 0
+pr: 276
 ---
 
 ## Contexte
