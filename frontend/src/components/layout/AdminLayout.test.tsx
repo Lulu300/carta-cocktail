@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { lazy, Suspense } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { render, screen, waitFor, within } from '../../test/test-utils';
@@ -25,6 +26,28 @@ function renderLayout() {
           <Route path="units" element={<p>units page</p>} />
         </Route>
         <Route path="/login" element={<p>login page</p>} />
+      </Routes>
+    </AppProviders>,
+  );
+}
+
+function BrokenPage(): never {
+  throw new Error('render failed');
+}
+
+// A page whose chunk cannot be loaded, behind a Suspense like the one of App.tsx
+const MissingChunkPage = lazy(() => Promise.reject(new Error('chunk missing')));
+
+function renderLayoutWithBrokenPages() {
+  return render(
+    <AppProviders>
+      <Routes>
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<p>dashboard page</p>} />
+          <Route path="units" element={<p>units page</p>} />
+          <Route path="categories" element={<BrokenPage />} />
+          <Route path="bottles" element={<Suspense fallback={null}><MissingChunkPage /></Suspense>} />
+        </Route>
       </Routes>
     </AppProviders>,
   );
@@ -252,5 +275,53 @@ describe('AdminLayout width', () => {
 
     expect(screen.getByRole('navigation', { name: 'nav.admin' }).closest('aside')).toHaveClass('lg:shrink-0');
     expect(screen.getByRole('main').parentElement).toHaveClass('min-w-0');
+  });
+});
+
+describe('AdminLayout page error', () => {
+  beforeEach(() => {
+    // React reports every error a boundary catches on the console
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  it.each([
+    ['throws while rendering', '/admin/categories'],
+    ['cannot be loaded', '/admin/bottles'],
+  ])('keeps the sidebar and the header when a page %s', async (_case, path) => {
+    window.history.pushState({}, '', path);
+    const { container } = renderLayoutWithBrokenPages();
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('errors.pageLoadFailed');
+    expect(alert).toHaveFocus();
+    expect(screen.getByRole('navigation', { name: 'nav.admin' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'nav.logout' })).toBeInTheDocument();
+    expect(screen.getByRole('main')).toContainElement(alert);
+    expect(within(screen.getByRole('main')).getByRole('link', { name: 'nav.dashboard' })).toHaveAttribute('href', '/admin');
+    // The site name of the sidebar is empty until the settings arrive
+    await screen.findByRole('link', { name: /Chez Lulu/ });
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('goes on with another page from the sidebar, without reloading', async () => {
+    window.history.pushState({}, '', '/admin/categories');
+    renderLayoutWithBrokenPages();
+    await screen.findByRole('alert');
+
+    await userEvent.click(within(screen.getByRole('navigation', { name: 'nav.admin' })).getByRole('link', { name: /nav\.units/ }));
+
+    expect(await screen.findByText('units page')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('returns to the dashboard with the link of the error screen', async () => {
+    window.history.pushState({}, '', '/admin/categories');
+    renderLayoutWithBrokenPages();
+    await screen.findByRole('alert');
+
+    await userEvent.click(within(screen.getByRole('main')).getByRole('link', { name: 'nav.dashboard' }));
+
+    expect(await screen.findByText('dashboard page')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

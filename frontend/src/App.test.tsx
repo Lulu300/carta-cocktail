@@ -129,7 +129,8 @@ describe('ProtectedRoute', () => {
 
       const alert = await screen.findByRole('alert');
       expect(alert).toHaveTextContent('auth.sessionCheckFailed');
-      expect(alert).toHaveTextContent('Too many requests: try again in a few minutes');
+      expect(alert).not.toHaveTextContent('Retry');
+      expect(screen.getByText('Too many requests: try again in a few minutes')).toBeInTheDocument();
       expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
       expect(screen.queryByTestId('admin-layout')).not.toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
@@ -183,8 +184,8 @@ describe('ProtectedRoute', () => {
 
       const alert = await screen.findByRole('alert');
       expect(alert).toHaveTextContent('auth.sessionCheckFailed');
-      expect(alert).toHaveTextContent('public.loadErrorHint');
-      expect(alert).not.toHaveTextContent('Failed to fetch');
+      expect(screen.getByText('public.loadErrorHint')).toBeInTheDocument();
+      expect(screen.queryByText('Failed to fetch')).not.toBeInTheDocument();
     });
 
     it('renders the admin layout when the admin signed in after a failed check', async () => {

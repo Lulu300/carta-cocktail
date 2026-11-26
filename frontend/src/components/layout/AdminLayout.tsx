@@ -9,6 +9,8 @@ import { cx } from '../ui/classNames';
 import LanguageSelector from '../ui/LanguageSelector';
 import { useDisclosure } from '../ui/useDisclosure';
 import AppVersion from './AppVersion';
+import BackHomeLink from './BackHomeLink';
+import RouteErrorBoundary from './RouteErrorBoundary';
 import SiteName from './SiteName';
 import SkipLink, { MAIN_CONTENT_ID } from './SkipLink';
 
@@ -155,7 +157,10 @@ export default function AdminLayout() {
         <UpgradeNoticeBanner />
 
         <main id={MAIN_CONTENT_ID} tabIndex={-1} className="flex-1 p-6">
-          <Outlet />
+          {/* The sidebar and header stay when a page fails: the way out is the dashboard */}
+          <RouteErrorBoundary fullScreen={false} backLink={<BackHomeLink to="/admin" label={t('nav.dashboard')} />}>
+            <Outlet />
+          </RouteErrorBoundary>
         </main>
       </div>
     </div>

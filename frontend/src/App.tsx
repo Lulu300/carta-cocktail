@@ -65,7 +65,7 @@ function SessionCheckError({ error, onRetry, onSignInAgain }: SessionCheckErrorP
         icon="⚠️"
         title={t('auth.sessionCheckFailed')}
         description={error instanceof ApiError ? error.message : t('public.loadErrorHint')}
-        role="alert"
+        titleProps={{ role: 'alert' }}
         action={(
           <div className="flex flex-wrap items-center justify-center gap-4">
             <Button variant="secondary" onClick={onRetry}>{t('common.retry')}</Button>

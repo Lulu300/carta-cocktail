@@ -5,13 +5,13 @@ phase: E
 lane: frontend
 criticite: basse
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [E-18]
 touches: [frontend/src/App.tsx, frontend/src/App.test.tsx, frontend/src/components/layout/, frontend/src/components/ui/EmptyState.tsx, frontend/src/components/ui/EmptyState.test.tsx, frontend/src/pages/public/PublicErrorState.tsx, frontend/src/pages/public/PublicErrorState.test.tsx, frontend/src/i18n/locales/]
 sources: []
-branch:
-pr:
+branch: fix/E-38-admin-error-boundary
+pr: PRNUM
 ---
 
 ## Contexte
@@ -34,11 +34,11 @@ Relevé par la relecture de la PR #165 et vérifié sur `develop` (9799168) :
 
 ## Critères d'acceptation
 
-- [ ] Une page admin qui lève au rendu ou dont le chunk manque affiche l'écran d'erreur dans `AdminLayout` : barre latérale et en-tête restent, et le lien de retour mène à `/admin`.
-- [ ] Une erreur de la page d'accueil (`/`) ou du tableau de bord (`/admin`) s'efface avec le lien de retour, sans recharger.
-- [ ] À l'affichage de l'écran, le focus est sur son titre ; l'alerte annoncée ne contient que le titre.
-- [ ] `PublicErrorState` n'annonce plus ses boutons dans l'alerte.
-- [ ] Aucun texte en dur ; `bundles.test.ts` vert.
+- [x] Une page admin qui lève au rendu ou dont le chunk manque affiche l'écran d'erreur dans `AdminLayout` : barre latérale et en-tête restent, et le lien de retour mène à `/admin`.
+- [x] Une erreur de la page d'accueil (`/`) ou du tableau de bord (`/admin`) s'efface avec le lien de retour, sans recharger.
+- [x] À l'affichage de l'écran, le focus est sur son titre ; l'alerte annoncée ne contient que le titre.
+- [x] `PublicErrorState` n'annonce plus ses boutons dans l'alerte.
+- [x] Aucun texte en dur ; `bundles.test.ts` vert.
 
 ## Tests à ajouter ou adapter
 
@@ -61,3 +61,4 @@ Relevé par la relecture de la PR #165 et vérifié sur `develop` (9799168) :
 
 - 2026-11-12 : tâche créée par la PR docs de suivi du lot D-35/E-18/B-20/C-12 à partir de la relecture de la PR #165 (E-18). Faits vérifiés sur `develop` (9799168) : un seul `RouteErrorBoundary` (`App.tsx`), `<Outlet />` d'`AdminLayout` sans boundary, remise à zéro sur `pathname`, lien vers `/`, `role="alert"` passé à `EmptyState` (sur le conteneur entier, actions comprises) dans `RouteErrorBoundary` et `PublicErrorState`.
 - 2026-11-12 : E-39 (PR #175) a ajouté un troisième écran du même motif : `SessionCheckError` dans `App.tsx` (session non vérifiée au chargement, sur une erreur autre que 401), un `EmptyState` avec `role="alert"` sur tout le conteneur, actions comprises (« Réessayer », « Se reconnecter », « Retour à l'accueil »). E-38 l'aligne aussi : `role="alert"` sur le titre seulement. Le lien « Retour à l'accueil » est désormais le composant `components/layout/BackHomeLink.tsx`, partagé avec `RouteErrorBoundary`.
+- 2026-11-26 : faite. Le boundary de l'`Outlet` d'`AdminLayout` est le même `RouteErrorBoundary`, paramétré (`fullScreen`, `backLink`) ; son lien mène à `/admin` (clé `nav.dashboard`, déjà dans le paquet public). La remise à zéro se fait sur `location.key` : React Router donne une nouvelle clé à un lien vers l'emplacement courant, donc « Retour » efface aussi l'erreur de `/` ou `/admin`. `EmptyState` reçoit `titleProps` (attributs posés sur le titre) : `role="alert"` ne couvre plus que le titre pour l'écran du boundary (qui prend aussi le focus), `PublicErrorState`, `NotFoundState` (E-20) et `SessionCheckError`. Bundle public mesuré : 137,34 kB gzip (budget 140). Hors périmètre, non aligné : `role="alert"` sur le conteneur de `CocktailForm` et `MenuEditorLayout`. Notes de version : un écran d'erreur est désormais annoncé par les lecteurs d'écran sans ses boutons, et une page d'administration en erreur garde la barre latérale avec un lien vers le tableau de bord. Aucune action requise. `breaking: false`.
