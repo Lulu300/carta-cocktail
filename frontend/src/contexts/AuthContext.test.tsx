@@ -48,7 +48,7 @@ describe('AuthContext', () => {
 
   it('should clear token if validation fails', async () => {
     localStorage.setItem('token', 'invalid-token');
-    mockApiError('get', '/api/auth/me', 401, 'Invalid token');
+    mockApiError('get', '/api/auth/me', 401, 'Your session has expired or is no longer valid: sign in again');
 
     const { result } = renderHook(() => useAuth(), { wrapper });
 

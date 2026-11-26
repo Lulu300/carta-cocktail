@@ -4,6 +4,9 @@ import i18n from '../i18n';
 // We test the request helper behavior by importing the module and mocking fetch
 const mockFetch = vi.fn();
 
+// What the backend answers on a 401 for a token that is present but invalid (backend/src/i18n/en.json, errors.invalidToken)
+const INVALID_TOKEN_MESSAGE = 'Your session has expired or is no longer valid: sign in again';
+
 beforeEach(() => {
   localStorage.clear();
   mockFetch.mockReset();
@@ -74,7 +77,7 @@ describe('API request helper', () => {
 
   it('should remove token and call the unauthorized handler on 401 response', async () => {
     localStorage.setItem('token', 'expired-token');
-    mockError(401, { error: 'Session expired' });
+    mockError(401, { error: INVALID_TOKEN_MESSAGE });
     const api = await getApi();
     const onUnauthorized = vi.fn();
     api.setUnauthorizedHandler(onUnauthorized);
@@ -82,7 +85,7 @@ describe('API request helper', () => {
     const error = await api.categories.list().catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(api.ApiError);
-    expect(error).toMatchObject({ status: 401, message: 'Session expired' });
+    expect(error).toMatchObject({ status: 401, message: INVALID_TOKEN_MESSAGE });
     expect(localStorage.getItem('token')).toBeNull();
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
   });
@@ -98,9 +101,9 @@ describe('API request helper', () => {
     const pending = api.categories.list().catch((e: unknown) => e);
     // The admin signs in again while the old request is still in flight
     localStorage.setItem('token', 'new-token');
-    resolveFetch({ ok: false, status: 401, json: () => Promise.resolve({ error: 'Session expired' }) });
+    resolveFetch({ ok: false, status: 401, json: () => Promise.resolve({ error: INVALID_TOKEN_MESSAGE }) });
 
-    expect(await pending).toMatchObject({ status: 401, message: 'Session expired' });
+    expect(await pending).toMatchObject({ status: 401, message: INVALID_TOKEN_MESSAGE });
     expect(localStorage.getItem('token')).toBe('new-token');
     expect(onUnauthorized).not.toHaveBeenCalled();
   });
@@ -592,7 +595,7 @@ describe('bottles.exportFile', () => {
 
   it('triggers the unauthorized handler on 401', async () => {
     localStorage.setItem('token', 'expired-token');
-    mockError(401, { error: 'Unauthorized' });
+    mockError(401, { error: INVALID_TOKEN_MESSAGE });
     const api = await getApi();
     const onUnauthorized = vi.fn();
     api.setUnauthorizedHandler(onUnauthorized);
@@ -617,7 +620,7 @@ describe('ingredients API', () => {
     await api.ingredients.update(1, { name: 'Lemon' });
     mockOk({ message: 'ok' });
     await api.ingredients.delete(1);
-    mockOk({ updated: 5 });
+    mockOk({ message: 'OK', updated: 5 });
     await api.ingredients.bulkAvailability({ available: true });
     expect(mockFetch.mock.calls[5][0]).toBe('/api/ingredients/bulk-availability');
     expect(mockFetch.mock.calls[5][1].method).toBe('POST');
@@ -1069,7 +1072,7 @@ describe('backup API', () => {
 
   it('exportBackup triggers the unauthorized handler on 401', async () => {
     localStorage.setItem('token', 'expired-token');
-    mockError(401, { error: 'Unauthorized' });
+    mockError(401, { error: INVALID_TOKEN_MESSAGE });
     const api = await getApi();
     const onUnauthorized = vi.fn();
     api.setUnauthorizedHandler(onUnauthorized);
@@ -1081,7 +1084,7 @@ describe('backup API', () => {
 
   it('importBackup triggers the unauthorized handler on 401', async () => {
     localStorage.setItem('token', 'expired-token');
-    mockError(401, { error: 'Unauthorized' });
+    mockError(401, { error: INVALID_TOKEN_MESSAGE });
     const api = await getApi();
     const onUnauthorized = vi.fn();
     api.setUnauthorizedHandler(onUnauthorized);

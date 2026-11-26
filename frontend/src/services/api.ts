@@ -330,7 +330,7 @@ export const ingredients = {
   delete: (id: number, options: DeleteOptions = {}) =>
     request<DeletionResponse>(deletionUrl(`/ingredients/${id}`, options), { method: 'DELETE' }),
   bulkAvailability: (data: { available: boolean }) =>
-    request<{ updated: number }>('/ingredients/bulk-availability', { method: 'POST', body: JSON.stringify(data) }),
+    request<{ message: string; updated: number }>('/ingredients/bulk-availability', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // Units

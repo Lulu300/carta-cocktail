@@ -834,14 +834,14 @@ describe('CategoriesPage', () => {
 
     it('shows the backend message in a toast when a type cannot be deleted', async () => {
       const user = userEvent.setup();
-      mockApiError('delete', '/api/category-types/:name', 400, 'Type is in use by categories');
+      mockApiError('delete', '/api/category-types/:name', 409, 'Cannot delete: categories still use this type');
       await renderLoadedPage();
       const manager = await openTypesManager(user);
 
       await user.click(within(manager).getByRole('button', { name: 'common.delete' }));
       await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.delete' }));
 
-      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Type is in use by categories'));
+      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Cannot delete: categories still use this type'));
     });
 
     it('disables the deletion of a type used by categories', async () => {
