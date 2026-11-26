@@ -181,6 +181,8 @@ async function send(url: string, init: RequestInit = {}): Promise<Response> {
   if (res.ok) return res;
 
   const body = await readErrorBody(res);
+  // A request abandoned while its error body was read is not a rejected session, and not an error to show.
+  if (init.signal?.aborted) throw init.signal.reason;
   if (res.status === 401) {
     handleUnauthorized(url, token);
   }
@@ -248,7 +250,7 @@ function categoryTypeUrl(name: string): string {
 
 // Category Types
 export const categoryTypes = {
-  list: () => request<CategoryType[]>('/category-types'),
+  list: (signal?: AbortSignal) => request<CategoryType[]>('/category-types', { signal }),
   create: (data: { name: string; nameTranslations?: Record<string, string> | null; color?: string }) =>
     request<CategoryType>('/category-types', { method: 'POST', body: JSON.stringify(data) }),
   update: (name: string, data: { nameTranslations?: Record<string, string> | null; color?: string }) =>
@@ -259,7 +261,7 @@ export const categoryTypes = {
 
 // Categories
 export const categories = {
-  list: () => request<Category[]>('/categories'),
+  list: (signal?: AbortSignal) => request<Category[]>('/categories', { signal }),
   get: (id: number) => request<Category>(`/categories/${id}`),
   create: (data: Partial<Category>) =>
     request<Category>('/categories', { method: 'POST', body: JSON.stringify(data) }),
@@ -271,12 +273,12 @@ export const categories = {
 
 // Bottles
 export const bottles = {
-  list: (params?: { categoryId?: number; type?: string }) => {
+  list: (params?: { categoryId?: number; type?: string }, signal?: AbortSignal) => {
     const searchParams = new URLSearchParams();
     if (params?.categoryId) searchParams.set('categoryId', String(params.categoryId));
     if (params?.type) searchParams.set('type', params.type);
     const query = searchParams.toString();
-    return request<Bottle[]>(`/bottles${query ? `?${query}` : ''}`);
+    return request<Bottle[]>(`/bottles${query ? `?${query}` : ''}`, { signal });
   },
   get: (id: number) => request<Bottle>(`/bottles/${id}`),
   create: (data: Partial<Bottle> & { quantity?: number }) =>
@@ -321,7 +323,7 @@ export const bottles = {
 
 // Ingredients
 export const ingredients = {
-  list: () => request<Ingredient[]>('/ingredients'),
+  list: (signal?: AbortSignal) => request<Ingredient[]>('/ingredients', { signal }),
   get: (id: number) => request<Ingredient>(`/ingredients/${id}`),
   create: (data: { name: string; icon?: string | null; nameTranslations?: Record<string, string> | null }) =>
     request<Ingredient>('/ingredients', { method: 'POST', body: JSON.stringify(data) }),
@@ -335,7 +337,7 @@ export const ingredients = {
 
 // Units
 export const units = {
-  list: () => request<Unit[]>('/units'),
+  list: (signal?: AbortSignal) => request<Unit[]>('/units', { signal }),
   get: (id: number) => request<Unit>(`/units/${id}`),
   create: (data: { name: string; abbreviation: string; conversionFactorToMl?: number | null; nameTranslations?: Record<string, string> | null }) =>
     request<Unit>('/units', { method: 'POST', body: JSON.stringify(data) }),
@@ -347,8 +349,8 @@ export const units = {
 
 // Cocktails
 export const cocktails = {
-  list: () => request<Cocktail[]>('/cocktails'),
-  get: (id: number) => request<Cocktail>(`/cocktails/${id}`),
+  list: (signal?: AbortSignal) => request<Cocktail[]>('/cocktails', { signal }),
+  get: (id: number, signal?: AbortSignal) => request<Cocktail>(`/cocktails/${id}`, { signal }),
   create: (data: CocktailInput) =>
     request<Cocktail>('/cocktails', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: CocktailInput) =>
@@ -381,8 +383,8 @@ export const cocktails = {
 
 // Menus
 export const menus = {
-  list: () => request<Menu[]>('/menus'),
-  get: (id: number) => request<Menu>(`/menus/${id}`),
+  list: (signal?: AbortSignal) => request<Menu[]>('/menus', { signal }),
+  get: (id: number, signal?: AbortSignal) => request<Menu>(`/menus/${id}`, { signal }),
   create: (data: MenuInput) =>
     request<Menu>('/menus', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: Partial<MenuInput>) =>
@@ -465,9 +467,9 @@ export const menuSections = {
 
 // Public
 export const publicApi = {
-  listMenus: () => request<Menu[]>('/public/menus'),
-  getMenu: (slug: string) => request<Menu>(`/public/menus/${slug}`),
-  getCocktail: (id: number) => request<Cocktail>(`/public/cocktails/${id}`),
+  listMenus: (signal?: AbortSignal) => request<Menu[]>('/public/menus', { signal }),
+  getMenu: (slug: string, signal?: AbortSignal) => request<Menu>(`/public/menus/${slug}`, { signal }),
+  getCocktail: (id: number, signal?: AbortSignal) => request<Cocktail>(`/public/cocktails/${id}`, { signal }),
   exportCocktail: (id: number) => requestCocktailExport(`/public/cocktails/${id}/export`, id),
   getSettings: () => request<SiteSettings>('/public/settings'),
   listUnits: () => request<Unit[]>('/public/units'),
@@ -475,13 +477,14 @@ export const publicApi = {
 
 // Shortages
 export const shortages = {
-  list: () => request<Shortage[]>('/shortages'),
+  list: (signal?: AbortSignal) => request<Shortage[]>('/shortages', { signal }),
 };
 
 // Availability
 export const availability = {
   getCocktail: (id: number) => request<CocktailAvailability>(`/availability/cocktails/${id}`),
-  getAllCocktails: () => request<Record<number, CocktailAvailability>>('/availability/cocktails'),
+  getAllCocktails: (signal?: AbortSignal) =>
+    request<Record<number, CocktailAvailability>>('/availability/cocktails', { signal }),
 };
 
 // Settings (admin)
@@ -512,7 +515,8 @@ export interface UpgradeNotice {
 
 export const system = {
   /** null when there is no notice to show (204). */
-  getUpgradeNotice: async () => (await request<UpgradeNotice | undefined>('/system/upgrade-notice')) ?? null,
+  getUpgradeNotice: async (signal?: AbortSignal) =>
+    (await request<UpgradeNotice | undefined>('/system/upgrade-notice', { signal })) ?? null,
   acknowledgeUpgradeNotice: () => request<void>('/system/upgrade-notice/acknowledge', { method: 'POST' }),
 };
 

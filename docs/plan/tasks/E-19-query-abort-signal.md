@@ -5,13 +5,13 @@ phase: E
 lane: frontend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [E-02]
 touches: [frontend/src/services/api.ts, frontend/src/services/api.test.ts, frontend/src/queries/]
 sources: ["05-frontend-archi.md §3.1"]
-branch:
-pr:
+branch: fix/E-19-query-abort-signal
+pr: 0
 ---
 
 ## Contexte
@@ -51,3 +51,4 @@ E-02 a posé TanStack Query : chaque hook de lecture (`frontend/src/queries/*.ts
 ## Journal
 
 - 2026-10-10 : tâche créée pendant E-02 (point d'attention « `request()` ignore le `signal` » de la tâche E-02).
+- 2026-11-26 : fait. Les lectures (`list`, `get`, `getAllCocktails`, lectures publiques, avis de mise à jour) acceptent un `signal` transmis à `fetch`. `send()` relance la raison d'abandon si la requête est annulée pendant la lecture d'un corps d'erreur, pour ne pas finir la session sur un 401 abandonné. Mutations et téléchargements inchangés.

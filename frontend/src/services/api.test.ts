@@ -442,6 +442,64 @@ describe('API request helper', () => {
   });
 });
 
+describe('request cancellation', () => {
+  it('should hand the signal of a read to fetch', async () => {
+    mockOk([]);
+    const api = await getApi();
+    const { signal } = new AbortController();
+
+    await api.bottles.list(undefined, signal);
+
+    expect(mockFetch.mock.calls[0][1].signal).toBe(signal);
+  });
+
+  it('should reject an abandoned request with the abort error, not an ApiError', async () => {
+    const controller = new AbortController();
+    mockFetch.mockImplementationOnce((_url: string, init: RequestInit) => new Promise((_resolve, reject) => {
+      init.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+    }));
+    const api = await getApi();
+
+    const pending = api.units.list(controller.signal).catch((e: unknown) => e);
+    controller.abort();
+
+    const error = await pending;
+    expect(error).toMatchObject({ name: 'AbortError' });
+    expect(error).not.toBeInstanceOf(api.ApiError);
+  });
+
+  it('should not end the session when the request is abandoned while its 401 body is read', async () => {
+    localStorage.setItem('token', 'my-token');
+    const controller = new AbortController();
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: () => {
+        controller.abort();
+        return Promise.reject(controller.signal.reason);
+      },
+    });
+    const api = await getApi();
+    const onUnauthorized = vi.fn();
+    api.setUnauthorizedHandler(onUnauthorized);
+
+    const error = await api.units.list(controller.signal).catch((e: unknown) => e);
+
+    expect(error).toMatchObject({ name: 'AbortError' });
+    expect(localStorage.getItem('token')).toBe('my-token');
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
+  it('should send reads without a signal as before', async () => {
+    mockOk([]);
+    const api = await getApi();
+
+    await api.units.list();
+
+    expect(mockFetch.mock.calls[0][1].signal).toBeUndefined();
+  });
+});
+
 describe('auth API', () => {
   it('should call POST /auth/login', async () => {
     mockOk({ token: 'jwt', user: { id: 1, email: 'a@b.c' } });

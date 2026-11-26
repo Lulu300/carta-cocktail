@@ -34,7 +34,7 @@ export function usePublicMenus(): UseQueryResult<Menu[], Error> {
   const viewer = usePublicViewer();
   return useQuery({
     queryKey: qk.publicMenus,
-    queryFn: () => publicApi.listMenus(),
+    queryFn: ({ signal }) => publicApi.listMenus(signal),
     staleTime: staleTimeFor(viewer),
   });
 }
@@ -43,7 +43,7 @@ export function usePublicMenu(slug: string): UseQueryResult<Menu, Error> {
   const viewer = usePublicViewer();
   return useQuery({
     queryKey: qk.publicMenu(slug, viewer),
-    queryFn: () => publicApi.getMenu(slug),
+    queryFn: ({ signal }) => publicApi.getMenu(slug, signal),
     staleTime: staleTimeFor(viewer),
   });
 }
@@ -52,7 +52,7 @@ export function usePublicCocktail(id: number): UseQueryResult<Cocktail, Error> {
   const viewer = usePublicViewer();
   return useQuery({
     queryKey: qk.publicCocktail(id, viewer),
-    queryFn: () => publicApi.getCocktail(id),
+    queryFn: ({ signal }) => publicApi.getCocktail(id, signal),
     staleTime: staleTimeFor(viewer),
   });
 }
