@@ -14,11 +14,25 @@ This guide lists the actions required to upgrade an existing instance, version b
 
 Pre-releases (`vX.Y.Z-rc.N`) are not listed: they use the section of their target version `vX.Y.Z`. The detailed changes of each version are in its [GitHub Release](https://github.com/Lulu300/carta-cocktail/releases) and in [`docs/releases/`](docs/releases/).
 
-We recommend pinning the images to a version (`:1.16.0`, or `:1.16` to follow its patch releases; these `:X.Y` tags exist from v1.12.0 on) instead of `:latest`, so that an upgrade only happens when you have read this guide.
+We recommend pinning the images to a version (`:1.17.0`, or `:1.17` to follow its patch releases; these `:X.Y` tags exist from v1.12.0 on) instead of `:latest`, so that an upgrade only happens when you have read this guide.
 
 To restore a backup made by an older version, see [Restoring a backup from an older version](#restoring-a-backup-from-an-older-version), at the end of this guide.
 
 The commands below assume the default `docker-compose.prod.yml`, run from its folder. Adapt the file name and the service name `carta-cocktail-backend` if yours differ.
+
+## v1.17.0
+
+No required action. `docker-compose.prod.yml` has not changed since v1.16.0. Pin both images to `:1.17.0`, or `:1.17` to follow the 1.17.x patch releases (`:1.16` does not move to 1.17.0), then pull and restart. At the first start, the backend copies the database to `backups/pre-migrate-<date>.db` and applies one migration, `20261126120000_app_state`, which adds an empty one-row table: no existing row changes. This release adds an upgrade guide to the admin. From the next upgrade on, a banner lists the required actions of the versions you skipped; this guide stays the reference. Release notes: [`docs/releases/v1.17.0.md`](docs/releases/v1.17.0.md).
+
+Instances older than v1.12.0: upgrade to v1.12.0 first, following the [v1.12.0 section](#v1120) (and the sections before it), check that it works, then apply this one.
+
+**Testing a pre-release**: use `:1.17.0-rc.N` instead of `:1.17.0`.
+
+Worth checking after the upgrade:
+
+- **If you build the backend image yourself** (custom compose file or `docker build`), add the `releases` build context: `additional_contexts: { releases: ./docs/releases }` under `build:` (Docker Compose 2.17 or later), or `--build-context releases=./docs/releases`. Otherwise the build fails. The published images need nothing.
+- **If the backend does not start**, its log names the failed migration and the `pre-migrate` copy to restore: follow [README › "Recovering from a failed migration"](README.md#recovering-from-a-failed-migration).
+- **Rolling back to v1.16.x.** Restore the `pre-migrate` copy made at the upgrade, then pin the images back to `:1.16`: [`docs/operations.md`](docs/operations.md#retour-arrière) ("Retour arrière") or [README › "Restoring a pre-migration backup"](README.md#restoring-a-pre-migration-backup). What was entered since the upgrade is lost, and the copy brings back its sessions: set a new `JWT_SECRET` afterwards, as in [Signing in after a restore](#signing-in-after-a-restore).
 
 ## v1.16.0
 
