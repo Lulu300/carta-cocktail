@@ -5,13 +5,13 @@ phase: E
 lane: frontend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [E-10, E-30]
 touches: [frontend/src/i18n/locales/admin/, frontend/src/i18n/bundles.test.ts, frontend/src/components/import/]
 sources: ["06-frontend-ux-perf.md §2"]
-branch:
-pr:
+branch: fix/E-31-i18n-plural-forms
+pr: 271
 ---
 
 ## Contexte
@@ -72,3 +72,4 @@ Toutes ces clés reçoivent déjà `count`, sauf `batchSummaryCount` : `ImportCo
 
 - 2026-10-12 : tâche créée par E-10, sur décision de l'humain : le budget du chargement public était dépassé de 90 octets, E-30 scinde d'abord les locales, les pluriels écrits dans le texte passent dans cette tâche.
 - 2026-10-13 : relecture de la PR #134 (E-10) : les contrôles prévus dans `locales.test.ts` sont dans `bundles.test.ts` ; renvois corrigés, point d'attention sur E-30 retiré (mergée, les 14 clés sont dans `locales/admin/`).
+- 2026-11-26 : fait. 17 clés converties en `_one` / `_other` en et fr (les 14 de la tâche, plus `categoriesWithoutType`, `categoriesToResolve` et `rowWarnings.title`, ajoutées depuis par C-62, C-64 et C-66). `batchSummaryCount` reçoit `count`. i18next range 0 dans `_one` en français (vérifié par test : « 0 bouteille importée »). `bundles.test.ts` vérifie que chaque `_one` a son `_other` et qu'aucun `(s)` écrit ne revient. Sondes de sabotage : un `(s)` remis, `count` retiré : un test échoue. Notes de version : les messages d'import et de sélection de l'admin s'accordent en nombre (« 1 bouteille importée », « 2 bouteilles importées »).
