@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { FAILED_MIGRATION_REFUSAL, UNWRITABLE_REFUSAL } from '../lib/checks.mjs';
 import { judgeDatabaseCopy, plannedMountsToChown, runAction } from '../lib/actions.mjs';
 
 const SERVICE = 'carta-cocktail-backend';
@@ -32,18 +33,30 @@ test('plannedMountsToChown reads the service asked only', () => {
 
 const START_LOGS = ['SQLite journal mode: wal', 'Carta Cocktail API running on port 3001'];
 
-test('judgeDatabaseCopy: a copy that does not start is refused', () => {
-  const result = judgeDatabaseCopy({ started: false, exitCode: 1, logs: '' }, START_LOGS, () => assert.fail('copy not running'));
-  assert.deepEqual(result, {
-    status: 'failed', refused: true, detail: 'the copy was refused (exit code 1): the notes say not to upgrade',
-  });
+const REFUSALS = [UNWRITABLE_REFUSAL, FAILED_MIGRATION_REFUSAL];
+const notRunning = () => assert.fail('copy not running');
+
+test('judgeDatabaseCopy: a refused copy names the refusal found in its logs', () => {
+  const cases = [
+    ['Migration 8_schema_integrity failed. The backend will not start.', FAILED_MIGRATION_REFUSAL, '"failed. The backend will not start."'],
+    ['ERROR: /app/data: cannot write to /app/data', UNWRITABLE_REFUSAL, '"cannot write to"'],
+    ['something else went wrong', null, 'no known refusal message'],
+  ];
+  for (const [logs, refusal, named] of cases) {
+    assert.deepEqual(judgeDatabaseCopy({ started: false, exitCode: 1, logs }, START_LOGS, notRunning, REFUSALS), {
+      status: 'failed',
+      refused: true,
+      refusal,
+      detail: `the copy was refused (exit code 1, ${named}): the notes say not to upgrade`,
+    });
+  }
 });
 
 test('judgeDatabaseCopy: a copy that started is never refused, even when it fails', () => {
   const logs = START_LOGS.join('\n');
-  assert.deepEqual(judgeDatabaseCopy({ started: true, logs }, START_LOGS, () => 'Database schema is up to date!'),
+  assert.deepEqual(judgeDatabaseCopy({ started: true, logs }, START_LOGS, () => 'Database schema is up to date!', REFUSALS),
     { status: 'done', detail: 'copy started, 2/2 expected log lines, migrate status up to date' });
-  assert.deepEqual(judgeDatabaseCopy({ started: true, logs: START_LOGS[1] }, START_LOGS, () => 'Following migration have not yet been applied'),
+  assert.deepEqual(judgeDatabaseCopy({ started: true, logs: START_LOGS[1] }, START_LOGS, () => 'Following migration have not yet been applied', REFUSALS),
     { status: 'failed', detail: 'copy started, 1/2 expected log lines, migrate status NOT up to date' });
 });
 
