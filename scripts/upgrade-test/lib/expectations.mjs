@@ -122,13 +122,18 @@ export function allowedActionFailures({ profile, injectedDuplicate = false }) {
 }
 
 /**
- * Marks the refused actions (`refused: true`) that `allowed` (from allowedActionFailures) expects.
- * Any other failure stays unexpected: a database copy that started, but without the expected log
- * lines or migration status, means that the copy was not refused.
+ * Marks the refused actions (`refused: true`) that `allowed` (from allowedActionFailures) expects,
+ * when the refusal found in their logs is the failed migration: a copy refused before the
+ * migrations, or for an unknown reason, has not tested the duplicate. Any other failure stays
+ * unexpected: a database copy that started, but without the expected log lines or migration
+ * status, means that the copy was not refused.
  */
 export function markExpectedActions(actions, allowed) {
   for (const result of actions) {
-    if (result.status === 'failed' && result.refused && allowed[result.action]) result.expected = allowed[result.action];
+    const refusedByMigration = result.refusal?.log === FAILED_MIGRATION_REFUSAL.log;
+    if (result.status === 'failed' && result.refused && refusedByMigration && allowed[result.action]) {
+      result.expected = allowed[result.action];
+    }
   }
   return actions;
 }

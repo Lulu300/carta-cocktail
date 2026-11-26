@@ -5,13 +5,13 @@ phase: D
 lane: ci
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-46]
 touches: [scripts/upgrade-test/]
 sources: []
-branch:
-pr:
+branch: test/D-38-bench-database-copy-refusal
+pr: 265
 ---
 
 ## Contexte
@@ -38,10 +38,10 @@ Vérifié sur `develop` (923c4ed) :
 
 ## Critères d'acceptation
 
-- [ ] Avec `--inject-duplicate`, une copie refusée pour « cannot write » n'est plus comptée comme le refus attendu du doublon ; une copie refusée par la migration en échec l'est toujours.
-- [ ] Le détail de l'action nomme le refus trouvé dans les logs de la copie.
-- [ ] `--layout official --path 1.4.0,<version ≥ 1.12.0> --mode both --inject-duplicate` et le layout `friend` donnent le même résultat qu'avant sous Docker Desktop.
-- [ ] Tests `node --test scripts/upgrade-test/test/*.test.mjs` ajoutés et verts.
+- [x] Avec `--inject-duplicate`, une copie refusée pour « cannot write » n'est plus comptée comme le refus attendu du doublon ; une copie refusée par la migration en échec l'est toujours.
+- [x] Le détail de l'action nomme le refus trouvé dans les logs de la copie.
+- [x] `--layout official --path 1.4.0,<version ≥ 1.12.0> --mode both --inject-duplicate` et le layout `friend` donnent le même résultat qu'avant sous Docker Desktop.
+- [x] Tests `node --test scripts/upgrade-test/test/*.test.mjs` ajoutés et verts.
 
 ## Tests à ajouter ou adapter
 
@@ -58,3 +58,4 @@ Vérifié sur `develop` (923c4ed) :
 ## Journal
 
 - 2026-11-12 : tâche créée par la PR docs de suivi du lot C-47/C-48/B-21/C-46, d'après la relecture de la PR #171 (points non bloquants 1 et 2). Vérifié sur `develop` (923c4ed) : `judgeDatabaseCopy` ne lit pas les logs d'une copie refusée, `allowedActionFailures` et `markExpectedActions` attendent tout refus de `checkDatabaseCopy` avec `--inject-duplicate`, `chownMounts` ne traite que les montages de l'instance, et `checkDatabaseCopy` démarre l'image cible (`ctx.target.images.backend`) sur un dossier de l'hôte. Le cas sans `--inject-duplicate` (échec inattendu sur un hôte Linux dont l'utilisateur n'est pas uid 1000) est ajouté par la PR docs, il n'était pas dans la relecture.
+- 2026-11-26 : faite. `judgeDatabaseCopy` cherche le refus dans les logs de la copie (`findRefusal`, `profile.refusals`), le renvoie dans `refusal` et le nomme dans le détail. `markExpectedActions` n'attend la copie refusée que pour `FAILED_MIGRATION_REFUSAL` ; un refus avant les migrations ou inconnu reste un échec inattendu de l'action (choix : la copie n'a pas testé le doublon, et le conserver visible évite un faux « attendu »). Le dossier de la copie est donné à uid 1000 avant le démarrage (conteneur d'aide, comme `chownMounts`), donc la copie n'est plus refusée pour « cannot write » sur un hôte Linux. README du banc mis à jour.

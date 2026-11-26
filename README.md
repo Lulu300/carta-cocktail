@@ -426,7 +426,7 @@ This project uses a **feature branch** workflow:
 - **Frontend**: audit of the production dependencies, TypeScript (`tsc -b`), ESLint, build, size budget of the public menu, CSS readable by Safari 16, tests with coverage, delta coverage on PRs
 - **Docker build (backend)** and **Docker build (frontend)**: both images are built (`linux/amd64`, not pushed)
 
-**Smoke** (`.github/workflows/smoke.yml`) runs on every PR to `main`/`develop`: it starts `docker-compose.yml` and checks login, photo upload, persistence after a backend recreation and backup export, then runs the backend under another uid.
+**Smoke** (`.github/workflows/smoke.yml`) runs on every PR to `main`/`develop`, and in the Release workflow: it starts `docker-compose.yml` and checks login, photo upload, persistence after a backend recreation and backup export, then runs the backend under another uid.
 
 These checks are required to merge into `main` and `develop`; a PR to `main` also needs CodeQL results.
 
@@ -439,7 +439,7 @@ The **Release** workflow (`.github/workflows/release.yml`) runs on version tags 
 | `vX.Y.Z-rc.N` (pre-release) | a commit of `develop` | `:X.Y.Z-rc.N` only, `latest` does not move | marked as pre-release |
 | `vX.Y.Z` (final) | a commit of `main` | `:X.Y.Z`, `:X.Y`, `:X` and `latest`, each one only if this version is the highest of its minor, its major, or overall | normal release, marked as latest only if this version is the highest |
 
-Before pushing any image, the workflow runs the whole CI on the tagged commit (`ci.yml`). Images are built for `linux/amd64` and `linux/arm64` (the CI builds `amd64` only, so the `arm64` build is first tested here), with SBOM and provenance attestations, and carry their version (`APP_VERSION`, shown in the admin and by `/api/health`; `dev` in any other build).
+Before pushing any image, the workflow runs the whole CI (`ci.yml`) and the compose smoke (`smoke.yml`) on the tagged commit, in parallel. The smoke builds the stack for `linux/amd64` from the tagged code: it stops the publication of a stack that does not start, but does not test the multi-architecture images pushed afterwards. Images are built for `linux/amd64` and `linux/arm64` (the CI builds `amd64` only, so the `arm64` build is first tested here), with SBOM and provenance attestations, and carry their version (`APP_VERSION`, shown in the admin and by `/api/health`; `dev` in any other build).
 
 1. **Notes first.** On `develop`, copy `docs/releases/TEMPLATE.md` to `docs/releases/vX.Y.Z.md` (summary, detailed changes, required actions before and after the upgrade, `breaking`), and add the version's section to `UPGRADING.md`. A pre-release uses the notes of its target version, unless `docs/releases/vX.Y.Z-rc.N.md` exists.
 2. **Pre-release.** Push `develop`, then tag it: `git tag vX.Y.Z-rc.N origin/develop && git push origin vX.Y.Z-rc.N`.
@@ -449,7 +449,7 @@ A fix of an older line does not move the tags of a newer one. After `v1.16.0`, t
 
 **Push the branch before the tag.** The workflow checks that a final tag is reachable from `origin/main` and a pre-release from `origin/develop`. A tag on another commit, or a tag without its notes file, fails before any image is pushed.
 
-- A tag refused by the `verify` job, or whose `ci` job failed, published nothing: delete it (locally and on GitHub), fix the problem, then push it again. When the `ci` job failed on a flaky step, "Re-run failed jobs" in the Release run is enough.
+- A tag refused by the `verify` job, or whose `ci` or `smoke` job failed, published nothing: delete it (locally and on GitHub), fix the problem, then push it again. When the `ci` or `smoke` job failed on a flaky step, "Re-run failed jobs" in the Release run is enough.
 - A tag that published an image is never moved or pushed again. If the release fails after an image push, fix the problem and tag the next pre-release (`-rc.N+1`) for a pre-release, or the next version (for example `v1.5.1`) for a final release.
 
 The GitHub Release contains the notes file (without its front matter), the list of merged pull requests since the previous tag (previous final release for a final tag, previous tag of any kind for a pre-release) and the `docker pull` commands.

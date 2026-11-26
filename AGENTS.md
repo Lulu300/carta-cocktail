@@ -110,7 +110,7 @@ Coverage is enforced automatically by CI. Run `npm test -- --coverage` in either
 - **Docker build (backend)** and **Docker build (frontend)**: build each image for `linux/amd64`, without pushing it. The `linux/arm64` build only runs at release
 - The Node jobs run on Node 24, the version used by the Docker images (`.nvmrc`); `engines` in both `package.json` require Node >= 24
 
-**Smoke** (`.github/workflows/smoke.yml`) — runs on PRs to `main`/`develop` and on demand:
+**Smoke** (`.github/workflows/smoke.yml`) — runs on PRs to `main`/`develop`, on demand, and as the `smoke` job of the release workflow:
 - Builds and starts `docker-compose.yml`, then runs `scripts/smoke/smoke.sh` through nginx: login, 2.4 MB photo upload, photo still served after the backend container is recreated, backup export, link preview of a public menu for a messaging robot. Then `scripts/smoke/custom-uid.sh` recreates the backend with `CARTA_UID`/`CARTA_GID`: refused on volumes of uid 1000, then started after a `chown`, and `smoke.sh` again
 - Locally, always in a dedicated compose project: `export COMPOSE_PROJECT_NAME=carta-smoke JWT_SECRET=$(openssl rand -hex 32) ADMIN_PASSWORD=$(openssl rand -hex 16)`, then `docker compose -p carta-smoke up -d --build --wait && ./scripts/smoke/smoke.sh`, then `docker compose -p carta-smoke down -v --remove-orphans --rmi local`, all in the same shell call (`smoke.sh` reads `COMPOSE_PROJECT_NAME` to recreate the backend). The default project is your local stack: `down -v` would delete its data (see the header of `smoke.sh`)
 
@@ -118,10 +118,10 @@ Coverage is enforced automatically by CI. Run `npm test -- --coverage` in either
 
 **Release** (`.github/workflows/release.yml`) — runs on tag push `v*`:
 - `verify` refuses, before anything is built, a tag that is not `vX.Y.Z` or `vX.Y.Z-rc.N`, a final tag not reachable from `origin/main` or a pre-release not reachable from `origin/develop`, and a missing or invalid notes file (`docs/releases/`)
-- `ci` runs the whole CI above on the tagged commit: no image is pushed unless it passes
+- `ci` runs the whole CI above and `smoke` the compose smoke (amd64 only), both on the tagged commit: no image is pushed unless both pass
 - Builds the backend and frontend images for `linux/amd64` and `linux/arm64`, with SBOM and provenance attestations, and `APP_VERSION` set to the version (`dev` in any other build). A final release pushes `:X.Y.Z`, `:X.Y`, `:X` and `latest` to `ghcr.io/lulu300/carta-cocktail/{backend,frontend}`; a pre-release pushes `:X.Y.Z-rc.N` only
 - Creates the GitHub Release: the notes file, the merged PRs since the previous tag, grouped by label, and the `docker pull` commands. A pre-release is marked as such
-- A tag that published nothing (refused by `verify`, or failed in `ci`) can be deleted and pushed again once fixed; a failed `ci` caused by a flaky step can also be re-run with "Re-run failed jobs" in the Release run. A tag that pushed an image is never moved: tag the next version instead (`README.md`, "Release")
+- A tag that published nothing (refused by `verify`, or failed in `ci` or `smoke`) can be deleted and pushed again once fixed; a failed `ci` or `smoke` caused by a flaky step can also be re-run with "Re-run failed jobs" in the Release run. A tag that pushed an image is never moved: tag the next version instead (`README.md`, "Release")
 
 ## Directory Structure
 

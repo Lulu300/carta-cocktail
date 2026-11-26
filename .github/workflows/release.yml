@@ -7,7 +7,7 @@ name: Release
 #   :latest images and a normal GitHub Release. A version lower than a
 #   published one only moves the tags it is the highest of (release-tags.mjs).
 # Images are built for linux/amd64 and linux/arm64, with SBOM and provenance,
-# only after the full CI of the tagged commit has passed.
+# only after the full CI and the compose smoke of the tagged commit have passed.
 # Push the branch before the tag: the branch rule reads origin/<branch>.
 
 on:
@@ -170,9 +170,18 @@ jobs:
     needs: verify
     uses: ./.github/workflows/ci.yml
 
+  # The compose stack of the tagged commit must work before any image is pushed.
+  # It runs in parallel with ci. It tests the code of the tag with amd64 images
+  # built locally, not the multi-architecture images pushed below: it blocks the
+  # publication of a stack that does not start, it does not test the pushed images.
+  smoke:
+    name: Smoke
+    needs: verify
+    uses: ./.github/workflows/smoke.yml
+
   images:
     name: Build and push ${{ matrix.service }} image
-    needs: [verify, ci]
+    needs: [verify, ci, smoke]
     runs-on: ubuntu-latest
     # buildx pushes the SBOM and provenance attestations with the image: no
     # id-token or attestations permission is needed.
