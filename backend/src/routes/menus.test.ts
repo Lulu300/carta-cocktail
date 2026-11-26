@@ -274,6 +274,15 @@ describe('PUT /api/menus/:id - system menus', () => {
     expect(res.body.slug).toBe('aperitifs');
   });
 
+  it('should return 400 when cocktails are sent for the aperitifs system menu', async () => {
+    const menu = await aperitifsMenu();
+    const cocktail = await seedCocktail();
+    const res = await request.put(`/api/menus/${menu.id}`).set(authHeader())
+      .send({ cocktails: [{ cocktailId: cocktail.id }] });
+    expect(res.status).toBe(400);
+    expect(await prisma.menuCocktail.count({ where: { menuId: menu.id } })).toBe(0);
+  });
+
   it('should return 400 and keep the bottles when bottles are sent for aperitifs', async () => {
     const menu = await aperitifsMenu();
     const kept = await seedBottle({ isApero: true });
@@ -330,6 +339,43 @@ describe('Personal bottle menus', () => {
     expect(res.status).toBe(400);
     const entries = await prisma.menuBottle.findMany({ where: { menuId: menu.id } });
     expect(entries.map((entry) => entry.bottleId)).toEqual([cognac.id]);
+  });
+
+  it.each(['APEROS', 'DIGESTIFS'] as const)('should return 400 and keep the composition when cocktails are sent for a %s menu', async (type) => {
+    const menu = await seedMenu({ type });
+    const cocktail = await seedCocktail();
+
+    const res = await request.put(`/api/menus/${menu.id}`).set(authHeader())
+      .send({ name: 'Renamed', cocktails: [{ cocktailId: cocktail.id }] });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/only a cocktail menu can hold cocktails/);
+    expect(await prisma.menuCocktail.count({ where: { menuId: menu.id } })).toBe(0);
+    expect((await prisma.menu.findUniqueOrThrow({ where: { id: menu.id } })).name).not.toBe('Renamed');
+  });
+
+  it('should accept an empty cocktails list for a bottle menu', async () => {
+    const menu = await seedMenu({ type: 'DIGESTIFS' });
+    const res = await request.put(`/api/menus/${menu.id}`).set(authHeader()).send({ cocktails: [] });
+    expect(res.status).toBe(200);
+  });
+
+  it('should return 400 when bottles are sent for a cocktail menu', async () => {
+    const menu = await seedMenu({ type: 'COCKTAILS' });
+    const bottle = await seedBottle({ isApero: true });
+    const res = await request.put(`/api/menus/${menu.id}`).set(authHeader())
+      .send({ bottles: [{ bottleId: bottle.id }] });
+    expect(res.status).toBe(400);
+    expect(await prisma.menuBottle.count({ where: { menuId: menu.id } })).toBe(0);
+  });
+
+  it('should still accept cocktails for a cocktail menu', async () => {
+    const menu = await seedMenu({ type: 'COCKTAILS' });
+    const cocktail = await seedCocktail();
+    const res = await request.put(`/api/menus/${menu.id}`).set(authHeader())
+      .send({ cocktails: [{ cocktailId: cocktail.id }] });
+    expect(res.status).toBe(200);
+    expect(res.body.cocktails).toHaveLength(1);
   });
 
   it.each([

@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-06]
 touches: [backend/src/routes/menus.ts, backend/src/routes/menus.test.ts, backend/src/i18n/]
 sources: []
-branch:
-pr:
+branch: fix/C-32-menu-content-matches-type
+pr: 250
 ---
 
 ## Contexte
@@ -33,8 +33,8 @@ C-06 a figé le type d'une carte non système après sa création (décision « 
 
 ## Critères d'acceptation
 
-- [ ] Une carte `APEROS` ou `DIGESTIFS` ne peut pas recevoir de cocktails par `PUT /menus/:id` (400, composition inchangée).
-- [ ] Une carte `COCKTAILS` se comporte comme avant.
+- [x] Une carte `APEROS` ou `DIGESTIFS` ne peut pas recevoir de cocktails par `PUT /menus/:id` (400, composition inchangée).
+- [x] Une carte `COCKTAILS` se comporte comme avant.
 
 ## Tests à ajouter ou adapter
 
@@ -48,3 +48,5 @@ C-06 a figé le type d'une carte non système après sa création (décision « 
 
 - 2026-10-12 : tâche créée à partir de la revue de la PR #99 (C-06, point 7).
 - 2026-10-12 : revue de la PR #107 (E-07) : côté frontend, `MenuEditPage` s'ouvre aussi sur une carte de bouteilles (`/admin/menus/1`) et y enverrait `cocktails`. Avec le refus backend de cette tâche, rediriger selon `menu.type` vers l'éditeur de bouteilles (ou le faire dans F-08).
+- 2026-11-26 : PR #250 vers `develop`. Seule route qui ajoute des cocktails à une carte : `PUT /menus/:id` (`menuCocktail` n'est écrit nulle part ailleurs). Les bouteilles passent toutes par `assertBottlesAllowed` (`PUT /menus/:id`, `POST /menu-bottles`, `addBottles`), qui refuse déjà une carte `COCKTAILS` : rien à changer. Ajout de `assertCocktailsAllowed` à côté, clé `errors.cocktailNotAllowedInMenu` (en/fr), 400 avant toute écriture, liste vide acceptée. Le frontend n'envoie plus `cocktails` à une carte de bouteilles depuis F-08 (`isBottleMenu` redirige vers l'éditeur de bouteilles). Mesure sur le jeu d'essai de l'ami : 0 cocktail dans une carte de bouteilles, 0 bouteille dans une carte de cocktails, donc aucune donnée à retirer. Une base existante qui en contiendrait n'est pas réécrite : ces lignes restent jusqu'à la prochaine sauvegarde de la carte par `PUT`, qui refuse alors `cocktails` non vide.
+- 2026-11-26 : Notes de version : `PUT /api/menus/:id` répond 400 (`errors.cocktailNotAllowedInMenu`) quand `cocktails` est non vide sur une carte `APEROS` ou `DIGESTIFS`, système ou personnelle ; `cocktails: []` reste accepté. Aucune action requise ; `breaking: false` pour l'interface (l'admin n'envoie jamais ce cas).
