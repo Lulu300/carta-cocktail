@@ -2,6 +2,7 @@ import type { MouseEvent } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePublicCocktail } from '../../queries/public';
 import type { Cocktail, CocktailIngredient } from '../../types';
@@ -24,6 +25,7 @@ export default function CocktailPublicPage() {
   const { t } = useTranslation();
   const { id, slug } = useParams();
   const { data: cocktail, error, refetch, isFetching } = usePublicCocktail(Number(id));
+  usePageTitle(cocktail?.name);
   useScrollRestoration(Boolean(cocktail));
 
   const menuPath = slug ? `/menu/${slug}` : '/';

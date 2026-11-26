@@ -52,10 +52,10 @@ afterEach(() => {
 });
 
 describe('SiteSettingsContext', () => {
-  it('should have default settings until the saved ones arrive', async () => {
+  it('should have no name until the saved settings arrive', async () => {
     mockSettings('My Bar', '🍸');
     const { result } = renderHook(() => useSiteSettings(), { wrapper });
-    expect(result.current.siteSettings.siteName).toBe('Carta Cocktail');
+    expect(result.current.siteSettings.siteName).toBe('');
     expect(result.current.siteSettings.siteIcon).toBe('');
 
     await waitFor(() => expect(result.current.siteSettings.siteName).toBe('My Bar'));
@@ -94,7 +94,7 @@ describe('SiteSettingsContext', () => {
     await act(async () => {});
 
     // Defaults should be kept
-    expect(result.current.siteSettings.siteName).toBe('Carta Cocktail');
+    expect(result.current.siteSettings.siteName).toBe('');
     expect(result.current.siteSettings.siteIcon).toBe('');
   });
 
@@ -109,15 +109,60 @@ describe('SiteSettingsContext', () => {
     });
   });
 
-  it('should reset favicon to /vite.svg when siteIcon is empty', async () => {
+  it('should use the cocktail emoji as favicon when siteIcon is empty', async () => {
     mockSettings('My Bar');
 
     renderHook(() => useSiteSettings(), { wrapper });
 
     await waitFor(() => {
       const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-      expect(link?.href).toContain('vite.svg');
+      expect(decodeURIComponent(link?.href ?? '')).toContain('🍸');
     });
+  });
+
+  describe('copy kept by the previous visit', () => {
+    it('should show it at once, then replace it with the server answer and keep that one', async () => {
+      localStorage.setItem('siteSettings', JSON.stringify({ siteName: 'Cached Bar', siteIcon: '🍷' }));
+      mockSettings('Fresh Bar', '🍸');
+
+      const { result } = renderHook(() => useSiteSettings(), { wrapper });
+      expect(result.current.siteSettings).toEqual({ siteName: 'Cached Bar', siteIcon: '🍷' });
+
+      await waitFor(() => expect(result.current.siteSettings.siteName).toBe('Fresh Bar'));
+      expect(JSON.parse(localStorage.getItem('siteSettings') ?? '')).toEqual({ siteName: 'Fresh Bar', siteIcon: '🍸' });
+    });
+
+    it('should ignore a copy that is not valid settings', () => {
+      localStorage.setItem('siteSettings', '{"siteName":42}');
+      mockSettings('Bar');
+
+      const { result } = renderHook(() => useSiteSettings(), { wrapper });
+
+      expect(result.current.siteSettings.siteName).toBe('');
+    });
+
+    it('should work when the storage throws', async () => {
+      vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('full'); });
+      mockSettings('Bar');
+
+      const { result } = renderHook(() => useSiteSettings(), { wrapper });
+
+      await waitFor(() => expect(result.current.siteSettings.siteName).toBe('Bar'));
+      vi.restoreAllMocks();
+    });
+  });
+
+  it('should put the page title before the site name, and take it back', async () => {
+    mockSettings('My Bar');
+    const { result } = renderHook(() => useSiteSettings(), { wrapper });
+    await waitFor(() => expect(document.title).toBe('My Bar'));
+
+    act(() => result.current.setPageTitle('Mojito'));
+    expect(document.title).toBe('Mojito · My Bar');
+
+    act(() => result.current.setPageTitle(''));
+    expect(document.title).toBe('My Bar');
   });
 
   it('should call refresh and re-fetch settings', async () => {
@@ -211,7 +256,7 @@ describe('SiteSettingsContext', () => {
       const retried = captureRequest('get', '/api/public/settings');
       await act(() => vi.advanceTimersByTimeAsync(55_000));
       expect(retried.count()).toBe(0);
-      expect(result.current.siteSettings.siteName).toBe('Carta Cocktail');
+      expect(result.current.siteSettings.siteName).toBe('');
 
       await act(() => vi.advanceTimersByTimeAsync(5_000));
 
@@ -251,7 +296,7 @@ describe('SiteSettingsContext', () => {
       await act(() => vi.advanceTimersByTimeAsync(10 * 60_000));
 
       expect(request.count()).toBe(4);
-      expect(result.current.siteSettings.siteName).toBe('Carta Cocktail');
+      expect(result.current.siteSettings.siteName).toBe('');
     });
 
     it('should not retry once unmounted when a refusal arrives after the unmount', async () => {
