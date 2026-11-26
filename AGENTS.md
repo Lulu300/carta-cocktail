@@ -80,7 +80,7 @@ For every change:
 2. Make changes
 3. **Add or update tests** for any new or modified feature (see Testing section below)
 4. Ensure lint and tests pass: `cd frontend && npm run lint && npm test` / `cd backend && npm run lint && npm test`. Formatting follows the root `.editorconfig` and `.prettierrc`; `npm run format:check` exists in both packages but still fails until the one-off repository reformat is done, so do not reformat files outside your change
-5. Ensure TypeScript compiles: `cd frontend && npx tsc -b` / `cd backend && npx tsc --noEmit`. In `frontend/`, `tsc --noEmit` checks nothing: `tsconfig.json` only holds project references
+5. Ensure TypeScript compiles: `cd frontend && npx tsc -b` / `cd backend && npm run typecheck`. In `frontend/`, `tsc --noEmit` checks nothing: `tsconfig.json` only holds project references
 6. **Verify coverage thresholds are met** (see Testing section below)
 7. Commit (Conventional Commits, in English) and push the branch
 8. Open a PR to `develop`. `gh pr create --body-file` ignores `.github/pull_request_template.md`: start the body from that file. Add the label that files the PR in the release notes: `breaking`, `feature`, `fix`, `dependencies`, `ci` or `docs`, or `skip-changelog` for a PR that brings nothing new to a release, such as the `develop` → `main` merge (`.github/release.yml`). CI runs automatically
@@ -105,7 +105,7 @@ Coverage is enforced automatically by CI. Run `npm test -- --coverage` in either
 ## CI/CD (GitHub Actions)
 
 **CI** (`.github/workflows/ci.yml`) — runs on PRs and pushes to `main`/`develop`, and is called by the release workflow (`workflow_call`). Four jobs run in parallel:
-- **Backend**: `npm ci` (postinstall: `prisma generate`) → `npm audit --omit=dev --audit-level=high` → `npm run db:check` (migrations match `schema.prisma`) → `tsc --noEmit` → `npm run lint` → `npm run build` → tests of `.github/scripts` → `npm run test:coverage` → delta coverage (80%, PRs only)
+- **Backend**: `npm ci` (postinstall: `prisma generate`) → `npm audit --omit=dev --audit-level=high` → `npm run db:check` (migrations match `schema.prisma`) → `npm run typecheck` → `npm run lint` → `npm run build` → tests of `.github/scripts` → `npm run test:coverage` → delta coverage (80%, PRs only)
 - **Frontend**: `npm ci` → `npm audit --omit=dev --audit-level=high` → `tsc -b` → `npm run lint` → `npm run build` → bundle budget of the public menu (`.github/scripts/bundle-budget.mjs`, 140 kB gzip) → CSS media queries readable by Safari 16 → `npm run test:coverage` → delta coverage (80%, PRs only)
 - **Docker build (backend)** and **Docker build (frontend)**: build each image for `linux/amd64`, without pushing it. The `linux/arm64` build only runs at release
 - The Node jobs run on Node 24, the version used by the Docker images (`.nvmrc`); `engines` in both `package.json` require Node >= 24
