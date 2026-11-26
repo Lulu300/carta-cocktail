@@ -1,10 +1,10 @@
-// Copied alone into the Docker image, where the Prisma CLI loads it through
-// prisma.config.ts: import Node built-ins only, never other files of src/.
+// Bundled into the Prisma CLI config of the Docker image (prisma.config.ts, see the
+// Dockerfile): import Node built-ins only, never other files of src/.
 import fs from 'fs';
 import path from 'path';
 
 /**
- * Folder of schema.prisma, the same from src/lib and dist/lib. Prisma 6 resolved
+ * Folder of schema.prisma, the same from src/lib and dist/lib (where the bundled CLI config sits too). Prisma 6 resolved
  * a relative SQLite path from there: keeping that base lets existing setups
  * (`file:./carta_cocktail.db` in backend/.env) open the same file.
  */

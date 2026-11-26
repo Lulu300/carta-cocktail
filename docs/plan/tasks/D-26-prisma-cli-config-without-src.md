@@ -5,12 +5,12 @@ phase: D
 lane: infra
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [D-01]
 touches: [backend/prisma.config.ts, backend/src/lib/databasePath.ts, backend/Dockerfile]
 sources: []
-branch:
+branch: chore/D-26-prisma-cli-config-without-src
 pr:
 ---
 
@@ -31,10 +31,10 @@ D-01 (PR #108) ne met dans l'image backend que `dist/`, `prisma/`, `package.json
 
 ## Critères d'acceptation
 
-- [ ] `docker run --rm --entrypoint ls <image> /app` ne montre pas `src`.
-- [ ] Une seule implémentation de la conversion `DATABASE_URL` → chemin.
-- [ ] Dans l'image, l'entrypoint applique les migrations avec une `DATABASE_URL` absolue. Une `DATABASE_URL` relative y reste refusée par le contrôle d'écriture (`/app/prisma` appartient à root).
-- [ ] Depuis un checkout, la CLI résout une `DATABASE_URL` relative comme l'application (même fichier dans `prisma/`).
+- [x] `docker run --rm --entrypoint ls <image> /app` ne montre pas `src`.
+- [x] Une seule implémentation de la conversion `DATABASE_URL` → chemin.
+- [x] Dans l'image, l'entrypoint applique les migrations avec une `DATABASE_URL` absolue. Une `DATABASE_URL` relative y reste refusée par le contrôle d'écriture (`/app/prisma` appartient à root).
+- [x] Depuis un checkout, la CLI résout une `DATABASE_URL` relative comme l'application (même fichier dans `prisma/`).
 
 ## Tests à ajouter ou adapter
 
@@ -49,3 +49,4 @@ D-01 (PR #108) ne met dans l'image backend que `dist/`, `prisma/`, `package.json
 
 - 2026-10-12 : tâche créée pendant D-01 (PR #108), sur décision de l'humain (question 3 de la PR).
 - 2026-10-13 : relecture de B-11 (PR #130), pour mémoire : traité par D-30 (décision de l'humain : seules les dépendances utiles restent dans l'image de production). La CLI Prisma, en `dependencies` depuis D-01, apporte dans l'image d'exécution `@prisma/studio-core` et, avec lui, `react`, `react-dom`, `scheduler` et `@radix-ui/*`. C'était déjà le cas avant B-11. Depuis B-11, `mysql2` ≥ 3.17.5 y ajoute aussi `@types/node` et `undici-types` (un pair obligatoire, environ 3 Mo sur disque). `npm prune --omit=peer` n'est pas une solution : il retire `react` mais garde `@types/node`.
+- 2026-11-26 : fait. Le Dockerfile regroupe `prisma.config.ts` et `src/lib/databasePath.ts` en un seul fichier `dist/lib/prisma.config.js` (esbuild, déjà présent via tsx), que `docker/prisma.config.js` charge depuis `/app` : plus de `src/` dans l'image, une seule implémentation du chemin, rien à changer en développement. Le bundle reste dans `dist/lib/` pour que `PRISMA_DIR` (`../../prisma`) soit le même qu'en développement. Test `prismaConfigBundle.test.ts` (même bundle, dossier sans `src/`). Pas d'effet visible : pas de note de version.

@@ -16,6 +16,12 @@ COPY tsconfig.json ./
 COPY src ./src
 # Also compiles src/scripts/ (seed, integrity check): the image has no tsx
 RUN npm run build
+# The Prisma CLI config, bundled with its one local import (src/lib/databasePath.ts)
+# into dist/lib/, the folder that file expects to sit in: the runtime image needs
+# no src/ and no TypeScript loader. docker/prisma.config.js loads it from /app.
+COPY prisma.config.ts ./
+RUN node_modules/.bin/esbuild prisma.config.ts --bundle --platform=node --packages=external \
+    --outfile=dist/lib/prisma.config.js
 
 # Runtime dependencies only, installed for the target platform: they hold the
 # native better-sqlite3 binary and the Prisma schema engine. The first steps
@@ -70,10 +76,8 @@ ENV NPM_CONFIG_UPDATE_NOTIFIER=false \
 WORKDIR /app
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
-COPY package.json prisma.config.ts ./
-# The Prisma CLI config resolves the database path with this file (loaded as
-# TypeScript by the CLI): the rest of src/ stays out of the image
-COPY src/lib/databasePath.ts ./src/lib/
+COPY package.json ./
+COPY docker/prisma.config.js ./
 COPY prisma ./prisma
 COPY docker-entrypoint.sh ./
 # The executable bit can be lost on checkouts that do not keep file modes.
