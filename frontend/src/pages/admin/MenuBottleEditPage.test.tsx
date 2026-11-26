@@ -370,14 +370,14 @@ describe('MenuBottleEditPage', () => {
     expect(within(rowOf('Lillet')).getByRole('button', { name: /^Show .+$/ })).toBeInTheDocument();
     // The second change waits for the first one: only the two Hendricks bottles are sent, together.
     await waitFor(() => expect(received.entryUpdates).toEqual([{ ids: [10, 11], changes: { isHidden: true } }]));
-    answers[0]();
+    answers[0]!();
     await waitFor(() => expect(received.entryUpdates).toHaveLength(2));
     expect(received.entryUpdates[1]).toEqual({ ids: [12], changes: { isHidden: true } });
     // No refetch between the two changes: it would show Lillet visible again.
     expect(received.menuReads).toHaveLength(1);
     expect(within(rowOf('Hendricks')).getByRole('button', { name: /^Show .+$/ })).toBeInTheDocument();
     expect(within(rowOf('Lillet')).getByRole('button', { name: /^Show .+$/ })).toBeInTheDocument();
-    answers[1]();
+    answers[1]!();
 
     await waitFor(() => expect(received.menuReads).toHaveLength(2));
     expect(storedEntries().every((entry) => entry.isHidden)).toBe(true);
@@ -592,7 +592,7 @@ describe('MenuBottleEditPage', () => {
     await waitFor(() => expect(received.entryUpdates).toHaveLength(1));
     expect(received.menuUpdates).toEqual([]);
 
-    answers[0]();
+    answers[0]!();
     await waitFor(() => expect(received.menuUpdates).toHaveLength(1));
     await waitFor(() => expect(received.menuReads).toHaveLength(2));
     expect(within(rowOf('Lillet')).getByRole('button', { name: /^Show .+$/ })).toBeInTheDocument();

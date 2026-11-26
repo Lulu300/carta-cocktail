@@ -130,7 +130,7 @@ function MenuBottles({ menu }: { menu: BottleMenu }) {
 
   // A system menu keeps a removed bottle as an exclusion; a personal menu just lets it go.
   const remove = (group: MenuBottleGroup) => {
-    if (isSystem) exclude(group);
+    if (isSystem) void exclude(group);
     else mutations.remove.mutate(group.entries);
   };
 

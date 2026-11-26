@@ -55,7 +55,8 @@ export function useComboboxKeyboard<T>({
       moveHighlight(event.key === 'ArrowDown' ? 1 : -1);
     } else if (event.key === 'Enter' && activeIndex >= 0) {
       event.preventDefault();
-      onSelect(options[activeIndex]);
+      const option = options[activeIndex];
+      if (option !== undefined) onSelect(option);
     } else if (event.key === 'Escape' && isOpen) {
       // Only the list closes: an enclosing modal stays open.
       event.preventDefault();

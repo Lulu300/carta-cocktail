@@ -23,7 +23,7 @@ export const LANGUAGE_NAMES = {
  * Reduce a BCP 47 locale (e.g. "fr-FR") to its base language code ("fr").
  */
 export function getBaseLanguage(locale: string): string {
-  return locale.split('-')[0];
+  return locale.split('-')[0] ?? locale;
 }
 
 /**

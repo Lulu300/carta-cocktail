@@ -19,30 +19,42 @@ describe('LiveResultCount', () => {
     render(<LiveResultCount count={3} />);
     expect(liveRegion()).toBeEmptyDOMElement();
 
-    act(() => vi.advanceTimersByTime(500));
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
 
     expect(screen.getByText('3 results')).toBe(liveRegion());
   });
 
   it('announces only the last count while the user is typing', () => {
     const { rerender } = render(<LiveResultCount count={12} />);
-    act(() => vi.advanceTimersByTime(200));
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
     rerender(<LiveResultCount count={4} />);
-    act(() => vi.advanceTimersByTime(200));
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
     rerender(<LiveResultCount count={1} />);
     expect(liveRegion()).toBeEmptyDOMElement();
 
-    act(() => vi.advanceTimersByTime(500));
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
 
     expect(liveRegion()).toHaveTextContent('1 result');
   });
 
   it('empties the region when there is nothing to announce', () => {
     const { rerender } = render(<LiveResultCount count={2} />);
-    act(() => vi.advanceTimersByTime(500));
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
 
     rerender(<LiveResultCount count={null} />);
-    act(() => vi.advanceTimersByTime(500));
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
 
     expect(liveRegion()).toBeEmptyDOMElement();
   });

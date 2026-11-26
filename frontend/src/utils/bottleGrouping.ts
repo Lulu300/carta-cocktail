@@ -46,7 +46,10 @@ export function groupBottles<B extends Bottle>(bottles: B[]): (B | BottleGroup<B
     group.bottles.push(bottle);
   }
 
-  return [...groups.values()].map((group) => (group.bottles.length === 1 ? group.bottles[0] : group));
+  return [...groups.values()].map((group) => {
+    const [only] = group.bottles;
+    return only !== undefined && group.bottles.length === 1 ? only : group;
+  });
 }
 
 export function isGroup<B extends Bottle>(item: B | BottleGroup<B>): item is BottleGroup<B> {

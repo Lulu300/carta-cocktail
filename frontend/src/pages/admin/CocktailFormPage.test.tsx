@@ -183,11 +183,11 @@ describe('CocktailFormPage, creation', () => {
     await setQuantity(user, await addIngredientRow(user), '2');
     await setQuantity(user, await addIngredientRow(user), '7');
 
-    await user.click(within(ingredientRows()[1]).getByRole('button', { name: 'Delete' }));
+    await user.click(within(ingredientRows()[1]!).getByRole('button', { name: 'Delete' }));
 
     const rows = ingredientRows();
     expect(rows).toHaveLength(2);
-    expect(within(rows[1]).getByRole('spinbutton', { name: 'Qty' })).toHaveValue(7);
+    expect(within(rows[1]!).getByRole('spinbutton', { name: 'Qty' })).toHaveValue(7);
   });
 
   it('resets the source fields when the source changes, and sends the preferred bottles of a category', async () => {
@@ -221,9 +221,9 @@ describe('CocktailFormPage, creation', () => {
     const steps = screen.getAllByRole('textbox', { name: /^Step .+$/ });
     expect(steps).toHaveLength(2);
 
-    const stepsList = steps[0].closest('ol');
+    const stepsList = steps[0]!.closest('ol');
     if (!(stepsList instanceof HTMLElement)) throw new Error('No steps list');
-    await user.click(within(stepsList).getAllByRole('button', { name: 'Delete' })[0]);
+    await user.click(within(stepsList).getAllByRole('button', { name: 'Delete' })[0]!);
 
     expect(screen.getAllByRole('textbox', { name: /^Step .+$/ })).toHaveLength(1);
   });
@@ -385,7 +385,7 @@ describe('CocktailFormPage, edition', () => {
     await user.click(emptyPreferred);
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
-    expect((await updated.recipe()).ingredients?.[0].preferredBottleIds).toEqual([]);
+    expect((await updated.recipe()).ingredients?.[0]!.preferredBottleIds).toEqual([]);
   });
 
   it('goes back to the list on cancel, without saving', async () => {
@@ -595,11 +595,11 @@ describe('CocktailFormPage, lines stored with a defect (C-21)', () => {
     renderAt('/admin/cocktails/42');
     await renameTo(user, 'Old mojito');
     const orphanRow = ingredientRows()[0];
-    await setQuantity(user, orphanRow, '5');
+    await setQuantity(user, orphanRow!, '5');
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
-    expect(await within(orphanRow).findByText('Choose an item')).toBeInTheDocument();
-    expect(within(orphanRow).queryByText('This line was saved incomplete by an earlier version (deleted source or quantity 0). It is kept as is: fix or remove it when you can.')).not.toBeInTheDocument();
+    expect(await within(orphanRow!).findByText('Choose an item')).toBeInTheDocument();
+    expect(within(orphanRow!).queryByText('This line was saved incomplete by an earlier version (deleted source or quantity 0). It is kept as is: fix or remove it when you can.')).not.toBeInTheDocument();
     expect(updated.count()).toBe(0);
   });
 

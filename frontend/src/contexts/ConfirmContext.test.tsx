@@ -145,7 +145,7 @@ describe('ConfirmProvider and useConfirm', () => {
     expect(screen.getByRole('button', { name: 'Confirm' })).toBeEnabled();
 
     act(() => {
-      result.current({ title: 'Second', acknowledgeLabel });
+      void result.current({ title: 'Second', acknowledgeLabel });
     });
 
     await expect(first).resolves.toBe(false);

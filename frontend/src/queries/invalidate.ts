@@ -4,6 +4,6 @@ import { useQueryClient, type QueryKey } from '@tanstack/react-query';
 export function useInvalidateQueries(): (keys: QueryKey[]) => void {
   const queryClient = useQueryClient();
   return (keys) => {
-    for (const queryKey of keys) queryClient.invalidateQueries({ queryKey });
+    for (const queryKey of keys) void queryClient.invalidateQueries({ queryKey });
   };
 }

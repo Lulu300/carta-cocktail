@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { cocktails as cocktailsApi, publicApi } from '../../services/api';
 import { toast } from './ToastStore';
+import { downloadBlob } from '../../utils/downloadBlob';
 
 interface ExportCocktailButtonProps {
   cocktailId: number;
@@ -21,14 +22,7 @@ export default function ExportCocktailButton({ cocktailId, isPublic, className }
 
       const json = JSON.stringify(data, null, 2);
       const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, filename);
     } catch (error) {
       toast.error(error);
     }

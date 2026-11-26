@@ -54,6 +54,7 @@ const buttonLabels: Record<string, string> = {
 };
 
 const languages = Object.entries(LANGUAGE_NAMES).map(([code, name]) => ({ code, name }));
+const FALLBACK_LANGUAGE_ENTRY = { code: FALLBACK_LANGUAGE, name: LANGUAGE_NAMES[FALLBACK_LANGUAGE] };
 
 /** Moves the focus to the next or previous menu item, wrapping around the ends. */
 function focusSiblingItem(menu: HTMLElement, step: 1 | -1) {
@@ -74,7 +75,7 @@ export default function LanguageSelector() {
   const currentLanguage =
     languages.find(lang => lang.code === languageCode) ??
     languages.find(lang => lang.code === getBaseLanguage(languageCode)) ??
-    languages.find(lang => lang.code === FALLBACK_LANGUAGE)!;
+    FALLBACK_LANGUAGE_ENTRY;
 
   // Menu button pattern: the open menu takes the focus, on the current language.
   useEffect(() => {
@@ -84,7 +85,7 @@ export default function LanguageSelector() {
   const handleLanguageChange = (langCode: string) => {
     // Only a picked language is stored: a detected one follows the browser (see languageChoice).
     storeLanguageChoice(langCode);
-    i18n.changeLanguage(langCode);
+    void i18n.changeLanguage(langCode);
     // Menu button pattern: the chosen item disappears, the focus goes back to the button.
     closeAndFocusTrigger();
   };

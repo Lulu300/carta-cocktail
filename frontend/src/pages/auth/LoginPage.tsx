@@ -55,7 +55,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      navigate(getRedirectPath(location.state), { replace: true });
+      void navigate(getRedirectPath(location.state), { replace: true });
     } catch (err) {
       setError(getLoginErrorMessage(err, t));
     } finally {

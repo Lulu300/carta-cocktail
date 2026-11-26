@@ -5,13 +5,13 @@ phase: E
 lane: frontend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [B-05, E-05, E-06]
 touches: [frontend/eslint.config.js, frontend/tsconfig.app.json, frontend/package.json, frontend/src/]
 sources: ["05-frontend-archi.md §8", "05-frontend-archi.md §5"]
-branch:
-pr:
+branch: chore/E-14-lint-hardening
+pr: 284
 ---
 
 ## Contexte
@@ -86,3 +86,4 @@ La plupart des bugs relevés par la revue frontend (promesses rejetées sans `ca
 - 2026-10-12 : relecture d'E-09 (PR #128) : `index.css` pose un contour `:focus-visible` global (couche base). `focusRingClasses` (`components/ui/classNames.ts`, utilisé dans 15 fichiers : `grep -rln focusRingClasses frontend/src`) donne le même contour et fait doublon : à retirer, en vérifiant que le rendu du focus ne change pas. Aucun fichier n'a `outline-none` ni `outline-hidden` : le retrait ne masque aucun focus.
 - 2026-10-13 : E-10 a supprimé les clés mortes `cocktails.importWizard.invalidVersion` et `cocktails.importWizard.summary` (avec 16 autres) : plus rien à faire sur ce point.
 - 2026-10-13 : relecture d'E-10 (PR #134). La règle `i18next/no-literal-string` est en `jsx-text-only`, comme E-10 le demandait. Elle ne voit donc ni les attributs (`label`, `placeholder`, `aria-label`, `title`, `hint`), ni les chaînes rangées dans des objets (en-têtes de colonnes, `TYPE_BADGES`). C'est pourtant là qu'étaient la plupart des textes corrigés par E-10 (`<Field label="Alcool % (vol.)">`, `header: 'Alcool'`). À étudier : `jsx-attributes.include` limité à ces attributs. De même, le test des clés utilisées (`frontend/src/i18n/bundles.test.ts`) ne contrôle que les `t('…')` littéraux. Une clé rangée dans une constante (`labelKey`) n'est filtrée que par `allKeys`, si bien qu'une faute de frappe passe sans être vue.
+- 2026-11-26 : faite. État avant activation : 27 erreurs ESLint (21 `no-floating-promises`, 5 `no-non-null-assertion` hors tests, 1 `no-misused-promises`) et 199 erreurs `tsc` avec `noUncheckedIndexedAccess` (presque toutes dans les tests, corrigées par `!` là où `no-non-null-assertion` est désactivé). `exhaustive-deps` en `error` ne signale rien. Lint : 4,3 s avant, 6,2 s après (lint typé). Le bundle public reste à 137,30 kB gzip. La directive de `SettingsPage` est supprimée : l'e-mail saisi est un état dérivé de `user`. Aucun `[#hex]` restant dans `src` : règle `no-restricted-syntax` ajoutée. Point 8 : `downloadBlob` partagé par les 4 sites de téléchargement (`request()` renvoyait déjà `undefined` sur un 204). Aucune règle ne dépasse 50 fichiers de style : rien à reporter après B-14. `PublicMenuCocktail` (type) remplace les `cocktail!` du menu public.

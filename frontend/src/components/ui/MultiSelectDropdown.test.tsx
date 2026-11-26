@@ -90,7 +90,7 @@ describe('MultiSelectDropdown', () => {
     );
     // Use getAllByRole since tags also render buttons; first button is the main toggle
     const buttons = screen.getAllByRole('button');
-    await user.click(buttons[0]);
+    await user.click(buttons[0]!);
     const checkbox = screen.getByRole('checkbox', { name: 'Alpha' });
     await user.click(checkbox);
     expect(onChange).toHaveBeenCalledWith(['b']);
@@ -118,7 +118,7 @@ describe('MultiSelectDropdown', () => {
     // We click the second button (first tag's X)
     const allButtons = screen.getAllByRole('button');
     // allButtons[0] = main toggle, allButtons[1] = X for 'a', allButtons[2] = X for 'b'
-    await user.click(allButtons[1]);
+    await user.click(allButtons[1]!);
     expect(onChange).toHaveBeenCalledWith(['b']);
   });
 

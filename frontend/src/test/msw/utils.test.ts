@@ -32,7 +32,7 @@ describe('fake backend', () => {
   it('serves the response a test sets, then the default one again in the next test', async () => {
     mockApiResponse('get', '/api/units', [buildUnit({ name: 'Once' })]);
 
-    expect((await units.list())[0].name).toBe('Once');
+    expect((await units.list())[0]!.name).toBe('Once');
   });
 
   it('refuses to delete an item in use unless the deletion is forced', async () => {
@@ -94,7 +94,7 @@ describe('fake backend', () => {
 
     release();
 
-    expect((await list)[0].name).toBe('Held');
+    expect((await list)[0]!.name).toBe('Held');
   });
 
   it('makes the next fetch reject with any value, then lets the next ones through', async () => {

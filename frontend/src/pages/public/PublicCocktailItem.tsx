@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
-import type { CocktailAvailability, CocktailIngredient, MenuCocktail } from '../../types';
+import type { CocktailAvailability, CocktailIngredient, PublicMenuCocktail } from '../../types';
 import { getUploadUrl } from '../../utils/uploads';
 import { cx } from '../../components/ui/classNames';
 import { parseTags } from '../../utils/parseTags';
@@ -16,7 +16,7 @@ export interface CocktailLinkState {
 }
 
 interface PublicCocktailItemProps {
-  menuCocktail: MenuCocktail;
+  menuCocktail: PublicMenuCocktail;
   menuSlug: string;
   viewMode: 'grid' | 'list';
   availability?: CocktailAvailability;
@@ -32,7 +32,7 @@ function PublicCocktailItem({
 }: PublicCocktailItemProps) {
   const { t } = useTranslation();
   const localize = useLocalizedName();
-  const cocktail = menuCocktail.cocktail!;
+  const cocktail = menuCocktail.cocktail;
   // `available` combines the admin's manual switch and the stock (computed by the server)
   const isUnavailable = cocktail.available === false;
   const isList = viewMode === 'list';

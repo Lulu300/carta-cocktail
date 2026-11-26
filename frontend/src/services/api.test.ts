@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import i18n from '../i18n';
+import { mockDownload } from '../test/download';
 
 // We test the request helper behavior by importing the module and mocking fetch
 const mockFetch = vi.fn();
@@ -62,7 +63,7 @@ describe('API request helper', () => {
     mockOk([]);
     const api = await getApi();
     await api.categories.list();
-    const [, options] = mockFetch.mock.calls[0];
+    const [, options] = mockFetch.mock.calls[0]!;
     expect(options.headers['Authorization']).toBe('Bearer my-token');
   });
 
@@ -71,7 +72,7 @@ describe('API request helper', () => {
     mockOk([]);
     const api = await getApi();
     await api.categories.list();
-    const [, options] = mockFetch.mock.calls[0];
+    const [, options] = mockFetch.mock.calls[0]!;
     expect(options.headers['Content-Type']).toBe('application/json');
   });
 
@@ -262,8 +263,8 @@ describe('API request helper', () => {
     await i18n.changeLanguage('fr');
     await api.publicApi.listMenus();
 
-    expect(mockFetch.mock.calls[0][1].headers['Accept-Language']).toBe('en');
-    expect(mockFetch.mock.calls[1][1].headers['Accept-Language']).toBe('fr');
+    expect(mockFetch.mock.calls[0]![1]!.headers['Accept-Language']).toBe('en');
+    expect(mockFetch.mock.calls[1]![1]!.headers['Accept-Language']).toBe('fr');
   });
 
   // English (UK) has no messages of its own (resolvedLanguage is "en"), but the import reads its
@@ -276,7 +277,7 @@ describe('API request helper', () => {
     await api.publicApi.listMenus();
 
     expect(i18n.resolvedLanguage).toBe('en');
-    expect(mockFetch.mock.calls[0][1].headers['Accept-Language']).toBe('en-GB');
+    expect(mockFetch.mock.calls[0]![1]!.headers['Accept-Language']).toBe('en-GB');
   });
 
   it('should return undefined on a 204 response', async () => {
@@ -440,7 +441,7 @@ describe('API request helper', () => {
     mockOk([]);
     const api = await getApi();
     await api.publicApi.listMenus();
-    const [, options] = mockFetch.mock.calls[0];
+    const [, options] = mockFetch.mock.calls[0]!;
     expect(options.headers['Authorization']).toBeUndefined();
   });
 });
@@ -453,7 +454,7 @@ describe('request cancellation', () => {
 
     await api.bottles.list(undefined, signal);
 
-    expect(mockFetch.mock.calls[0][1].signal).toBe(signal);
+    expect(mockFetch.mock.calls[0]![1]!.signal).toBe(signal);
   });
 
   it('should reject an abandoned request with the abort error, not an ApiError', async () => {
@@ -499,7 +500,7 @@ describe('request cancellation', () => {
 
     await api.units.list();
 
-    expect(mockFetch.mock.calls[0][1].signal).toBeUndefined();
+    expect(mockFetch.mock.calls[0]![1]!.signal).toBeUndefined();
   });
 });
 
@@ -508,7 +509,7 @@ describe('auth API', () => {
     mockOk({ token: 'jwt', user: { id: 1, email: 'a@b.c' } });
     const api = await getApi();
     await api.auth.login('a@b.c', 'pass');
-    const [url, opts] = mockFetch.mock.calls[0];
+    const [url, opts] = mockFetch.mock.calls[0]!;
     expect(url).toBe('/api/auth/login');
     expect(opts.method).toBe('POST');
     expect(JSON.parse(opts.body)).toEqual({ email: 'a@b.c', password: 'pass' });
@@ -519,7 +520,7 @@ describe('auth API', () => {
     mockOk({ id: 1, email: 'a@b.c' });
     const api = await getApi();
     await api.auth.me();
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/auth/me');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/auth/me');
   });
 });
 
@@ -529,23 +530,19 @@ describe('categories API', () => {
 
     mockOk([]);
     await api.categories.list();
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/categories');
-
-    mockOk({});
-    await api.categories.get(1);
-    expect(mockFetch.mock.calls[1][0]).toBe('/api/categories/1');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/categories');
 
     mockOk({});
     await api.categories.create({ name: 'Vodka' });
-    expect(mockFetch.mock.calls[2][1].method).toBe('POST');
+    expect(mockFetch.mock.calls[1]![1]!.method).toBe('POST');
 
     mockOk({});
     await api.categories.update(1, { name: 'Gin' });
-    expect(mockFetch.mock.calls[3][1].method).toBe('PUT');
+    expect(mockFetch.mock.calls[2]![1]!.method).toBe('PUT');
 
     mockOk({ message: 'ok' });
     await api.categories.delete(1);
-    expect(mockFetch.mock.calls[4][1].method).toBe('DELETE');
+    expect(mockFetch.mock.calls[3]![1]!.method).toBe('DELETE');
   });
 });
 
@@ -570,40 +567,36 @@ describe('bottles API', () => {
     mockOk([]);
     const api = await getApi();
     await api.bottles.list();
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/bottles');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/bottles');
   });
 
   it('should list with type filter', async () => {
     mockOk([]);
     const api = await getApi();
     await api.bottles.list({ type: 'SPIRIT' });
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/bottles?type=SPIRIT');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/bottles?type=SPIRIT');
   });
 
   it('should list with categoryId filter', async () => {
     mockOk([]);
     const api = await getApi();
     await api.bottles.list({ categoryId: 5 });
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/bottles?categoryId=5');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/bottles?categoryId=5');
   });
 
   it('should call CRUD endpoints', async () => {
     const api = await getApi();
     mockOk({});
-    await api.bottles.get(1);
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/bottles/1');
-
-    mockOk({});
     await api.bottles.create({ name: 'Test' });
-    expect(mockFetch.mock.calls[1][1].method).toBe('POST');
+    expect(mockFetch.mock.calls[0]![1]!.method).toBe('POST');
 
     mockOk({});
     await api.bottles.update(1, { name: 'Updated' });
-    expect(mockFetch.mock.calls[2][1].method).toBe('PUT');
+    expect(mockFetch.mock.calls[1]![1]!.method).toBe('PUT');
 
     mockOk({ message: 'ok' });
     await api.bottles.delete(1);
-    expect(mockFetch.mock.calls[3][1].method).toBe('DELETE');
+    expect(mockFetch.mock.calls[2]![1]!.method).toBe('DELETE');
   });
 });
 
@@ -617,19 +610,15 @@ describe('bottles.exportFile', () => {
       blob: () => Promise.resolve(fakeBlob),
       headers: { get: () => 'attachment; filename="bottles.json"' },
     });
-    const mockAnchor = { click: vi.fn(), href: '', download: '' };
-    vi.spyOn(document, 'createElement').mockReturnValue(mockAnchor as unknown as HTMLElement);
-    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fake-url');
-    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    const downloads = mockDownload();
 
     const api = await getApi();
     await api.bottles.exportFile('json', { categoryId: 2, type: 'SPIRIT', search: 'rum', location: 'bar' });
 
-    const [url, opts] = mockFetch.mock.calls[0];
+    const [url, opts] = mockFetch.mock.calls[0]!;
     expect(url).toBe('/api/bottles/export?format=json&categoryId=2&type=SPIRIT&search=rum&location=bar');
     expect(opts.headers['Authorization']).toBe('Bearer tok');
-    expect(mockAnchor.download).toBe('bottles.json');
-    expect(mockAnchor.click).toHaveBeenCalled();
+    expect(downloads).toEqual(['bottles.json']);
   });
 
   it('saves the CSV export as received, byte order mark included', async () => {
@@ -640,14 +629,13 @@ describe('bottles.exportFile', () => {
       blob: () => Promise.resolve(csv),
       headers: { get: () => 'attachment; filename="bottles.csv"' },
     });
-    vi.spyOn(document, 'createElement').mockReturnValue({ click: vi.fn() } as unknown as HTMLElement);
-    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fake-url');
-    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    mockDownload();
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL');
 
     const api = await getApi();
     await api.bottles.exportFile('csv');
 
-    const saved = createObjectURL.mock.calls[0][0] as Blob;
+    const saved = createObjectURL.mock.calls[0]![0]! as Blob;
     expect([...new Uint8Array(await saved.arrayBuffer()).slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
   });
 
@@ -668,10 +656,8 @@ describe('ingredients API', () => {
     const api = await getApi();
     mockOk([]);
     await api.ingredients.list();
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/ingredients');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/ingredients');
 
-    mockOk({});
-    await api.ingredients.get(1);
     mockOk({});
     await api.ingredients.create({ name: 'Lime' });
     mockOk({});
@@ -680,8 +666,8 @@ describe('ingredients API', () => {
     await api.ingredients.delete(1);
     mockOk({ message: 'OK', updated: 5 });
     await api.ingredients.bulkAvailability({ available: true });
-    expect(mockFetch.mock.calls[5][0]).toBe('/api/ingredients/bulk-availability');
-    expect(mockFetch.mock.calls[5][1].method).toBe('POST');
+    expect(mockFetch.mock.calls[4]![0]!).toBe('/api/ingredients/bulk-availability');
+    expect(mockFetch.mock.calls[4]![1]!.method).toBe('POST');
   });
 });
 
@@ -691,14 +677,12 @@ describe('units API', () => {
     mockOk([]);
     await api.units.list();
     mockOk({});
-    await api.units.get(1);
-    mockOk({});
     await api.units.create({ name: 'cl', abbreviation: 'cl' });
     mockOk({});
     await api.units.update(1, { name: 'ml' });
     mockOk({ message: 'ok' });
     await api.units.delete(1);
-    expect(mockFetch).toHaveBeenCalledTimes(5);
+    expect(mockFetch).toHaveBeenCalledTimes(4);
   });
 });
 
@@ -717,7 +701,7 @@ describe('cocktails API', () => {
     await api.cocktails.delete(1);
     mockAttachment({ version: 1 }, 'attachment; filename="cocktail-mojito.json"');
     await api.cocktails.exportRecipe(1);
-    expect(mockFetch.mock.calls[5][0]).toBe('/api/cocktails/1/export');
+    expect(mockFetch.mock.calls[5]![0]!).toBe('/api/cocktails/1/export');
   });
 
   it('should return the export with the file name chosen by the server', async () => {
@@ -745,7 +729,7 @@ describe('cocktails API', () => {
 
     expect(await api.cocktails.exportRecipes([3, 1])).toEqual(files);
 
-    const [url, init] = mockFetch.mock.calls[0];
+    const [url, init] = mockFetch.mock.calls[0]!;
     expect(url).toBe('/api/cocktails/export');
     expect(init.method).toBe('POST');
     expect(JSON.parse(init.body)).toEqual({ ids: [3, 1] });
@@ -756,7 +740,7 @@ describe('cocktails API', () => {
     const api = await getApi();
     const file = new File(['img'], 'test.jpg', { type: 'image/jpeg' });
     await api.cocktails.uploadImage(1, file);
-    const [url, opts] = mockFetch.mock.calls[0];
+    const [url, opts] = mockFetch.mock.calls[0]!;
     expect(url).toBe('/api/cocktails/1/image');
     expect(opts.method).toBe('POST');
     expect(opts.body).toBeInstanceOf(FormData);
@@ -768,11 +752,11 @@ describe('cocktails API', () => {
     const api = await getApi();
     mockOk({});
     await api.cocktails.importPreview({ version: 1, exportedAt: '', cocktail: { name: 'X', description: null, notes: null, tags: [], ingredients: [], instructions: [] } });
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/cocktails/import/preview');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/cocktails/import/preview');
 
     mockOk({});
     await api.cocktails.importConfirm({ recipe: { version: 1, exportedAt: '', cocktail: { name: 'X', description: null, notes: null, tags: [], ingredients: [], instructions: [] } }, resolutions: {} });
-    expect(mockFetch.mock.calls[1][0]).toBe('/api/cocktails/import/confirm');
+    expect(mockFetch.mock.calls[1]![0]!).toBe('/api/cocktails/import/confirm');
   });
 });
 
@@ -796,19 +780,11 @@ describe('menus API', () => {
 describe('menuBottles API', () => {
   it('should call all endpoints', async () => {
     const api = await getApi();
-    mockOk([]);
-    await api.menuBottles.listByMenu(1);
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/menu-bottles/menu/1');
-
-    mockOk({});
-    await api.menuBottles.create({ menuId: 1, bottleId: 2 });
     mockOk({});
     await api.menuBottles.update(1, { position: 0 });
-    mockOk({ message: 'ok' });
-    await api.menuBottles.delete(1);
     mockOk({ message: 'ok', added: 1, removed: 0 });
     await api.menuBottles.sync(1);
-    expect(mockFetch.mock.calls[4][0]).toBe('/api/menu-bottles/menu/1/sync');
+    expect(mockFetch.mock.calls[1]![0]!).toBe('/api/menu-bottles/menu/1/sync');
   });
 
   it('should reorder every entry of a menu in one request', async () => {
@@ -816,7 +792,7 @@ describe('menuBottles API', () => {
     mockOk({ message: 'ok' });
     await api.menuBottles.reorder(5, [12, 7, 9]);
 
-    const [url, init] = mockFetch.mock.calls[0];
+    const [url, init] = mockFetch.mock.calls[0]!;
     expect(url).toBe('/api/menu-bottles/menu/5/reorder');
     expect(init.method).toBe('POST');
     expect(JSON.parse(init.body)).toEqual({ ids: [12, 7, 9] });
@@ -826,18 +802,18 @@ describe('menuBottles API', () => {
     const api = await getApi();
     mockOk([]);
     await api.menuBottles.exclusions(5);
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/menu-bottles/menu/5/exclusions');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/menu-bottles/menu/5/exclusions');
 
     mockOk({ message: 'ok' });
     await api.menuBottles.exclude(5, [3, 4]);
-    const [excludeUrl, excludeInit] = mockFetch.mock.calls[1];
+    const [excludeUrl, excludeInit] = mockFetch.mock.calls[1]!;
     expect(excludeUrl).toBe('/api/menu-bottles/menu/5/exclusions');
     expect(excludeInit.method).toBe('POST');
     expect(JSON.parse(excludeInit.body)).toEqual({ bottleIds: [3, 4] });
 
     mockOk({ message: 'ok' });
     await api.menuBottles.restore(5, [3, 4]);
-    const [restoreUrl, restoreInit] = mockFetch.mock.calls[2];
+    const [restoreUrl, restoreInit] = mockFetch.mock.calls[2]!;
     expect(restoreUrl).toBe('/api/menu-bottles/menu/5/exclusions/restore');
     expect(restoreInit.method).toBe('POST');
     expect(JSON.parse(restoreInit.body)).toEqual({ bottleIds: [3, 4] });
@@ -848,7 +824,7 @@ describe('menuBottles API', () => {
     mockOk({ message: 'ok' });
     await api.menuBottles.updateEntries(5, [12, 7], { menuSectionId: null });
 
-    const [url, init] = mockFetch.mock.calls[0];
+    const [url, init] = mockFetch.mock.calls[0]!;
     expect(url).toBe('/api/menu-bottles/menu/5/entries');
     expect(init.method).toBe('PUT');
     expect(JSON.parse(init.body)).toEqual({ ids: [12, 7], menuSectionId: null });
@@ -858,14 +834,14 @@ describe('menuBottles API', () => {
     const api = await getApi();
     mockOk({ message: 'ok' });
     await api.menuBottles.addBottles(5, [3, 4]);
-    const [addUrl, addInit] = mockFetch.mock.calls[0];
+    const [addUrl, addInit] = mockFetch.mock.calls[0]!;
     expect(addUrl).toBe('/api/menu-bottles/menu/5/entries');
     expect(addInit.method).toBe('POST');
     expect(JSON.parse(addInit.body)).toEqual({ bottleIds: [3, 4] });
 
     mockOk({ message: 'ok' });
     await api.menuBottles.removeEntries(5, [12, 7]);
-    const [removeUrl, removeInit] = mockFetch.mock.calls[1];
+    const [removeUrl, removeInit] = mockFetch.mock.calls[1]!;
     expect(removeUrl).toBe('/api/menu-bottles/menu/5/entries/remove');
     expect(removeInit.method).toBe('POST');
     expect(JSON.parse(removeInit.body)).toEqual({ ids: [12, 7] });
@@ -875,21 +851,17 @@ describe('menuBottles API', () => {
 describe('menuSections API', () => {
   it('should call all endpoints', async () => {
     const api = await getApi();
-    mockOk([]);
-    await api.menuSections.listByMenu(1);
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/menu-sections/menu/1/sections');
-
     mockOk({});
     await api.menuSections.create(1, { name: 'Section' });
     mockOk({});
     await api.menuSections.update(1, { name: 'Updated' });
     mockOk({ message: 'ok' });
     await api.menuSections.delete(1);
-    expect(mockFetch.mock.calls[3][0]).toBe('/api/menu-sections/sections/1');
+    expect(mockFetch.mock.calls[2]![0]!).toBe('/api/menu-sections/sections/1');
 
     mockOk({ message: 'ok' });
     await api.menuSections.reorder(1, [1, 2, 3]);
-    expect(mockFetch.mock.calls[4][0]).toBe('/api/menu-sections/menu/1/sections/reorder');
+    expect(mockFetch.mock.calls[3]![0]!).toBe('/api/menu-sections/menu/1/sections/reorder');
   });
 });
 
@@ -900,18 +872,18 @@ describe('public API', () => {
     await api.publicApi.listMenus();
     mockOk({});
     await api.publicApi.getMenu('summer');
-    expect(mockFetch.mock.calls[1][0]).toBe('/api/public/menus/summer');
+    expect(mockFetch.mock.calls[1]![0]!).toBe('/api/public/menus/summer');
 
     mockOk({});
     await api.publicApi.getCocktail(1);
     mockAttachment({}, 'attachment; filename="cocktail-negroni.json"');
     const file = await api.publicApi.exportCocktail(1);
-    expect(mockFetch.mock.calls[3][0]).toBe('/api/public/cocktails/1/export');
+    expect(mockFetch.mock.calls[3]![0]!).toBe('/api/public/cocktails/1/export');
     expect(file.filename).toBe('cocktail-negroni.json');
 
     mockOk({});
     await api.publicApi.getSettings();
-    expect(mockFetch.mock.calls[4][0]).toBe('/api/public/settings');
+    expect(mockFetch.mock.calls[4]![0]!).toBe('/api/public/settings');
   });
 });
 
@@ -920,20 +892,16 @@ describe('shortages API', () => {
     mockOk([]);
     const api = await getApi();
     await api.shortages.list();
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/shortages');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/shortages');
   });
 });
 
 describe('availability API', () => {
-  it('should call both endpoints', async () => {
+  it('should call the endpoint', async () => {
     const api = await getApi();
     mockOk({});
-    await api.availability.getCocktail(1);
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/availability/cocktails/1');
-
-    mockOk({});
     await api.availability.getAllCocktails();
-    expect(mockFetch.mock.calls[1][0]).toBe('/api/availability/cocktails');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/availability/cocktails');
   });
 });
 
@@ -942,15 +910,15 @@ describe('settings API', () => {
     const api = await getApi();
     mockOk({ siteName: 'Bar', siteIcon: '' });
     await api.settings.get();
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/settings');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/settings');
 
     mockOk({});
     await api.settings.update({ siteName: 'New', siteIcon: '🍸' });
-    expect(mockFetch.mock.calls[1][1].method).toBe('PUT');
+    expect(mockFetch.mock.calls[1]![1]!.method).toBe('PUT');
 
     mockOk({ id: 1, email: 'a@b.c' });
     await api.settings.updateProfile({ email: 'new@b.c' });
-    expect(mockFetch.mock.calls[2][0]).toBe('/api/settings/profile');
+    expect(mockFetch.mock.calls[2]![0]!).toBe('/api/settings/profile');
   });
 });
 
@@ -959,30 +927,30 @@ describe('categoryTypes API', () => {
     const api = await getApi();
     mockOk([]);
     await api.categoryTypes.list();
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/category-types');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/category-types');
 
     mockOk({});
     await api.categoryTypes.create({ name: 'SPIRIT' });
-    expect(mockFetch.mock.calls[1][1].method).toBe('POST');
+    expect(mockFetch.mock.calls[1]![1]!.method).toBe('POST');
 
     mockOk({});
     await api.categoryTypes.update('SPIRIT', { color: 'blue' });
-    expect(mockFetch.mock.calls[2][0]).toBe('/api/category-types/SPIRIT');
+    expect(mockFetch.mock.calls[2]![0]!).toBe('/api/category-types/SPIRIT');
 
     mockOk({ message: 'ok' });
     await api.categoryTypes.delete('SPIRIT');
-    expect(mockFetch.mock.calls[3][1].method).toBe('DELETE');
+    expect(mockFetch.mock.calls[3]![1]!.method).toBe('DELETE');
   });
 
   it('should send a name with surrounding spaces as it is, encoded in the path', async () => {
     const api = await getApi();
     mockOk({});
     await api.categoryTypes.update(' SPIRIT ', { color: 'blue' });
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/category-types/%20SPIRIT%20');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/category-types/%20SPIRIT%20');
 
     mockOk({ message: 'ok' });
     await api.categoryTypes.delete(' SPIRIT ');
-    expect(mockFetch.mock.calls[1][0]).toBe('/api/category-types/%20SPIRIT%20');
+    expect(mockFetch.mock.calls[1]![0]!).toBe('/api/category-types/%20SPIRIT%20');
   });
 
   // An empty path segment cannot be addressed: the empty name goes in the query.
@@ -990,13 +958,13 @@ describe('categoryTypes API', () => {
     const api = await getApi();
     mockOk({});
     await api.categoryTypes.update('', { color: 'blue' });
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/category-types?name=');
-    expect(mockFetch.mock.calls[0][1].method).toBe('PUT');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/category-types?name=');
+    expect(mockFetch.mock.calls[0]![1]!.method).toBe('PUT');
 
     mockOk({ message: 'ok' });
     await api.categoryTypes.delete('');
-    expect(mockFetch.mock.calls[1][0]).toBe('/api/category-types?name=');
-    expect(mockFetch.mock.calls[1][1].method).toBe('DELETE');
+    expect(mockFetch.mock.calls[1]![0]!).toBe('/api/category-types?name=');
+    expect(mockFetch.mock.calls[1]![1]!.method).toBe('DELETE');
   });
 
   // The browser resolves the dot segments: '/category-types/..' would become '/'.
@@ -1004,18 +972,18 @@ describe('categoryTypes API', () => {
     const api = await getApi();
     mockOk({});
     await api.categoryTypes.update(name, { color: 'blue' });
-    expect(mockFetch.mock.calls[0][0]).toBe(`/api/category-types?name=${name}`);
+    expect(mockFetch.mock.calls[0]![0]!).toBe(`/api/category-types?name=${name}`);
 
     mockOk({ message: 'ok' });
     await api.categoryTypes.delete(name);
-    expect(mockFetch.mock.calls[1][0]).toBe(`/api/category-types?name=${name}`);
+    expect(mockFetch.mock.calls[1]![0]!).toBe(`/api/category-types?name=${name}`);
   });
 
   it('should keep in the path a name that only contains dots', async () => {
     const api = await getApi();
     mockOk({});
     await api.categoryTypes.update('...', { color: 'blue' });
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/category-types/...');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/category-types/...');
   });
 });
 
@@ -1032,21 +1000,15 @@ describe('backup API', () => {
       },
     });
 
-    const mockClick = vi.fn();
-    const mockAnchor = { click: mockClick, href: '', download: '' };
-    vi.spyOn(document, 'createElement').mockReturnValue(mockAnchor as unknown as HTMLElement);
-    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fake-url');
-    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    const downloads = mockDownload();
 
     const api = await getApi();
     await api.backup.exportBackup();
 
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/backup/export');
-    expect(mockFetch.mock.calls[0][1].headers['Authorization']).toBe('Bearer tok');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/backup/export');
+    expect(mockFetch.mock.calls[0]![1]!.headers['Authorization']).toBe('Bearer tok');
     expect(URL.createObjectURL).toHaveBeenCalledWith(fakeBlob);
-    expect(mockAnchor.download).toBe('backup-2024-01-01.zip');
-    expect(mockClick).toHaveBeenCalled();
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:fake-url');
+    expect(downloads).toEqual(['backup-2024-01-01.zip']);
   });
 
   it('exportBackup uses fallback filename when no Content-Disposition header', async () => {
@@ -1057,18 +1019,14 @@ describe('backup API', () => {
       headers: { get: () => null },
     });
 
-    const mockClick = vi.fn();
-    const mockAnchor = { click: mockClick, href: '', download: '' };
-    vi.spyOn(document, 'createElement').mockReturnValue(mockAnchor as unknown as HTMLElement);
-    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fake-url');
-    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    const downloads = mockDownload();
 
     const api = await getApi();
     await api.backup.exportBackup();
 
     // Fallback filename matches pattern backup-YYYY-MM-DD.zip
-    expect(mockAnchor.download).toMatch(/^backup-\d{4}-\d{2}-\d{2}\.zip$/);
-    expect(mockClick).toHaveBeenCalled();
+    expect(downloads).toHaveLength(1);
+    expect(downloads[0]).toMatch(/^backup-\d{4}-\d{2}-\d{2}\.zip$/);
   });
 
   it('exportBackup throws error when response is not ok', async () => {
@@ -1107,8 +1065,8 @@ describe('backup API', () => {
     const file = new File(['backup-content'], 'backup.zip', { type: 'application/zip' });
     const result = await api.backup.importBackup(file);
 
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/backup/import');
-    const [, opts] = mockFetch.mock.calls[0];
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/backup/import');
+    const [, opts] = mockFetch.mock.calls[0]!;
     expect(opts.method).toBe('POST');
     expect(opts.body).toBeInstanceOf(FormData);
     expect(opts.headers['Authorization']).toBe('Bearer tok');

@@ -121,6 +121,9 @@ export interface MenuCocktail {
   isHidden: boolean;
 }
 
+/** A cocktail of a public menu, with its recipe: the menu endpoint always sends it. */
+export type PublicMenuCocktail = MenuCocktail & { cocktail: Cocktail };
+
 export interface MenuBottle {
   id: number;
   menuId: number;

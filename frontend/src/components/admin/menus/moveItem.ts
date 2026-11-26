@@ -6,8 +6,7 @@ export function moveItem<T>(list: T[], from: number, to: number): T[] {
   const result = [...list];
   if (!isIndexOf(result, from) || !isIndexOf(result, to)) return result;
 
-  const [moved] = result.splice(from, 1);
-  result.splice(to, 0, moved);
+  result.splice(to, 0, ...result.splice(from, 1));
   return result;
 }
 

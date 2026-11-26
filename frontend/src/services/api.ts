@@ -8,6 +8,7 @@ import type {
 
 import i18n from '../i18n';
 import { FALLBACK_LANGUAGE } from '../utils/localization';
+import { downloadBlob } from '../utils/downloadBlob';
 
 const API_BASE = '/api';
 const LOGIN_URL = '/auth/login';
@@ -200,7 +201,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 function attachmentFilename(res: Response, fallback: string): string {
   const disposition = res.headers.get('Content-Disposition') ?? '';
   const match = disposition.match(/filename="?([^";]+)"?/);
-  return match ? match[1] : fallback;
+  return match?.[1] ?? fallback;
 }
 
 /** A cocktail export with the file name chosen by the server. */
@@ -262,7 +263,6 @@ export const categoryTypes = {
 // Categories
 export const categories = {
   list: (signal?: AbortSignal) => request<Category[]>('/categories', { signal }),
-  get: (id: number) => request<Category>(`/categories/${id}`),
   create: (data: Partial<Category>) =>
     request<Category>('/categories', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: Partial<Category>) =>
@@ -280,7 +280,6 @@ export const bottles = {
     const query = searchParams.toString();
     return request<Bottle[]>(`/bottles${query ? `?${query}` : ''}`, { signal });
   },
-  get: (id: number) => request<Bottle>(`/bottles/${id}`),
   create: (data: Partial<Bottle> & { quantity?: number }) =>
     request<Bottle | Bottle[]>('/bottles', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: Partial<Bottle>) =>
@@ -298,13 +297,7 @@ export const bottles = {
     if (filters?.location) searchParams.set('location', filters.location);
     const res = await send(`/bottles/export?${searchParams.toString()}`);
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const filename = attachmentFilename(res, `bottles-${new Date().toISOString().slice(0, 10)}.${format}`);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, attachmentFilename(res, `bottles-${new Date().toISOString().slice(0, 10)}.${format}`));
   },
   importPreview: (file: File) => {
     const formData = new FormData();
@@ -324,7 +317,6 @@ export const bottles = {
 // Ingredients
 export const ingredients = {
   list: (signal?: AbortSignal) => request<Ingredient[]>('/ingredients', { signal }),
-  get: (id: number) => request<Ingredient>(`/ingredients/${id}`),
   create: (data: { name: string; icon?: string | null; nameTranslations?: Record<string, string> | null }) =>
     request<Ingredient>('/ingredients', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: { name?: string; icon?: string | null; isAvailable?: boolean; nameTranslations?: Record<string, string> | null }) =>
@@ -338,7 +330,6 @@ export const ingredients = {
 // Units
 export const units = {
   list: (signal?: AbortSignal) => request<Unit[]>('/units', { signal }),
-  get: (id: number) => request<Unit>(`/units/${id}`),
   create: (data: { name: string; abbreviation: string; conversionFactorToMl?: number | null; nameTranslations?: Record<string, string> | null }) =>
     request<Unit>('/units', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: Partial<Unit>) =>
@@ -403,9 +394,6 @@ export interface MenuBottleExclusion {
 
 // Menu Bottles
 export const menuBottles = {
-  listByMenu: (menuId: number) => request<MenuBottle[]>(`/menu-bottles/menu/${menuId}`),
-  create: (data: { menuId: number; bottleId: number; position?: number; isHidden?: boolean }) =>
-    request<MenuBottle>('/menu-bottles', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: { position?: number; isHidden?: boolean; menuSectionId?: number | null }) =>
     request<MenuBottle>(`/menu-bottles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   /** Applies the same change to these entries (`MenuBottle.id`) of the menu, all of them or none. */
@@ -414,8 +402,6 @@ export const menuBottles = {
       method: 'PUT',
       body: JSON.stringify({ ids, ...changes }),
     }),
-  delete: (id: number) =>
-    request<{ message: string }>(`/menu-bottles/${id}`, { method: 'DELETE' }),
   /** Adds these bottles at the end of a personal menu, in this order, all of them or none. */
   addBottles: (menuId: number, bottleIds: number[]) =>
     request<{ message: string }>(`/menu-bottles/menu/${menuId}/entries`, {
@@ -451,7 +437,6 @@ export const menuBottles = {
 
 // Menu Sections
 export const menuSections = {
-  listByMenu: (menuId: number) => request<MenuSection[]>(`/menu-sections/menu/${menuId}/sections`),
   create: (menuId: number, data: { name: string }) =>
     request<MenuSection>(`/menu-sections/menu/${menuId}/sections`, { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: { name?: string; position?: number }) =>
@@ -482,7 +467,6 @@ export const shortages = {
 
 // Availability
 export const availability = {
-  getCocktail: (id: number) => request<CocktailAvailability>(`/availability/cocktails/${id}`),
   getAllCocktails: (signal?: AbortSignal) =>
     request<Record<number, CocktailAvailability>>('/availability/cocktails', { signal }),
 };
@@ -533,13 +517,7 @@ export const backup = {
   exportBackup: async () => {
     const res = await send('/backup/export');
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const filename = attachmentFilename(res, `backup-${new Date().toISOString().slice(0, 10)}.zip`);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, attachmentFilename(res, `backup-${new Date().toISOString().slice(0, 10)}.zip`));
   },
   importBackup: (file: File) => {
     const formData = new FormData();

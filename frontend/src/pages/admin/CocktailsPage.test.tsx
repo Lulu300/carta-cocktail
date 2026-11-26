@@ -303,11 +303,11 @@ describe('CocktailsPage', () => {
     const deleted = captureRequest('delete', '/api/cocktails/:id');
     const reloaded = captureRequest('get', '/api/cocktails');
 
-    await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]);
+    await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
     await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
     expect(deleted.count()).toBe(0);
 
-    await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]);
+    await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
     await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
 
     expect(await screen.findByText('Cocktail deleted')).toBeInTheDocument();

@@ -75,7 +75,7 @@ function nameInput() {
 }
 
 async function confirmDeletion(user: User, index = 0) {
-  await user.click(screen.getAllByRole('button', { name: 'Delete' })[index]);
+  await user.click(screen.getAllByRole('button', { name: 'Delete' })[index]!);
   const confirmation = screen.getByRole('alertdialog');
   expect(confirmation).toHaveAccessibleDescription('Delete this bottle?');
   await user.click(within(confirmation).getByRole('button', { name: 'Delete' }));
@@ -431,7 +431,7 @@ describe('BottlesPage', () => {
       const user = userEvent.setup();
       await renderLoadedPage();
 
-      await user.click(screen.getAllByRole('button', { name: 'Edit' })[1]);
+      await user.click(screen.getAllByRole('button', { name: 'Edit' })[1]!);
 
       expect(screen.getByText('Edit Bottle')).toBeInTheDocument();
       expect(nameInput()).toHaveValue('Hendricks');
@@ -445,7 +445,7 @@ describe('BottlesPage', () => {
       const user = userEvent.setup();
       await renderLoadedPage();
       const updated = captureRequest('put', '/api/bottles/:id');
-      await user.click(screen.getAllByRole('button', { name: 'Edit' })[0]);
+      await user.click(screen.getAllByRole('button', { name: 'Edit' })[0]!);
 
       await user.clear(nameInput());
       await user.type(nameInput(), 'Absolut Elyx');
@@ -471,7 +471,7 @@ describe('BottlesPage', () => {
       mockApiResponse('get', '/api/shortages', [buildShortage({ category: { id: 1 } })]);
       const shortagesReloaded = captureRequest('get', '/api/shortages');
 
-      await user.click(screen.getAllByRole('button', { name: 'Edit' })[0]);
+      await user.click(screen.getAllByRole('button', { name: 'Edit' })[0]!);
       await user.click(within(dialog()).getByRole('button', { name: 'Save' }));
 
       await waitFor(() => expect(screen.getByTestId('shortages-badge')).toHaveTextContent('1'));
@@ -513,7 +513,7 @@ describe('BottlesPage', () => {
       await renderLoadedPage();
       const deleted = captureRequest('delete', '/api/bottles/:id');
 
-      await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]);
+      await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
       await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
 
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();

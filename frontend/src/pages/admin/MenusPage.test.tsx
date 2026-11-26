@@ -75,7 +75,7 @@ describe('MenusPage', () => {
     expect(screen.getAllByText('(default)')).toHaveLength(2);
     const rows = screen.getAllByRole('row').slice(1);
     const deletable = rows.filter((row) => within(row).queryByRole('button', { name: 'Delete' }));
-    expect(deletable.map((row) => within(row).getAllByRole('link')[0].textContent)).toEqual(['Summer Menu', 'Summer Aperos']);
+    expect(deletable.map((row) => within(row).getAllByRole('link')[0]!.textContent)).toEqual(['Summer Menu', 'Summer Aperos']);
   });
 
   it('never shows "no results" while the menus are loading', () => {
@@ -189,7 +189,7 @@ describe('MenusPage', () => {
     await renderLoadedPage();
     const deleted = captureRequest('delete', '/api/menus/:id');
 
-    await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]);
+    await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
     const confirmation = screen.getByRole('alertdialog');
     expect(confirmation).toHaveAccessibleDescription('Delete this menu?');
     await user.click(within(confirmation).getByRole('button', { name: 'Delete' }));
@@ -203,7 +203,7 @@ describe('MenusPage', () => {
     await renderLoadedPage();
     const deleted = captureRequest('delete', '/api/menus/:id');
 
-    await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]);
+    await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
     await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
 
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
