@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePublicMenu } from '../../queries/public';
 import { useCocktailsAvailability } from '../../queries/cocktails';
@@ -26,6 +27,7 @@ export default function MenuPublicPage() {
   const { t } = useTranslation();
   const { slug = '' } = useParams();
   const { data: menu, error, refetch, isFetching } = usePublicMenu(slug);
+  usePageTitle(menu?.name);
   useScrollRestoration(Boolean(menu));
 
   if (menu) return <MenuContent key={slug} menu={menu} slug={slug} />;

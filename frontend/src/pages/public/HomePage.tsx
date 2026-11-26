@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import SiteName from '../../components/layout/SiteName';
 import { useSiteSettings } from '../../contexts/SiteSettingsContext';
 import { usePublicMenus } from '../../queries/public';
 import type { Menu } from '../../types';
@@ -45,7 +46,7 @@ export default function HomePage() {
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold font-serif text-accent mb-3">
           {siteSettings.siteIcon && <span className="mr-2">{siteSettings.siteIcon}</span>}
-          {siteSettings.siteName}
+          <SiteName />
         </h1>
         <p className="text-fg-muted text-lg">{t('home.subtitle')}</p>
       </div>

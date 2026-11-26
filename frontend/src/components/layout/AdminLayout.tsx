@@ -9,6 +9,7 @@ import { cx } from '../ui/classNames';
 import LanguageSelector from '../ui/LanguageSelector';
 import { useDisclosure } from '../ui/useDisclosure';
 import AppVersion from './AppVersion';
+import SiteName from './SiteName';
 import SkipLink, { MAIN_CONTENT_ID } from './SkipLink';
 
 const navItems = [
@@ -73,7 +74,7 @@ export default function AdminLayout() {
         <div className="p-6 border-b border-line">
           <Link to="/admin" className="text-xl font-bold text-accent font-serif">
             {siteSettings.siteIcon && <span aria-hidden="true" className="mr-1">{siteSettings.siteIcon}</span>}
-            {siteSettings.siteName}
+            <SiteName />
           </Link>
         </div>
         <nav aria-label={t('nav.admin')} className="p-4 space-y-1">

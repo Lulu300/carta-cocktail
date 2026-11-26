@@ -1,15 +1,23 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { ApiError, publicApi } from '../services/api';
 import type { SiteSettings } from '../types';
+import { joinTitle } from '../utils/pageTitle';
 
 interface SiteSettingsContextType {
   siteSettings: SiteSettings;
+  /** The page's own part of the tab title, shown before the site name (see usePageTitle). */
+  setPageTitle: (title: string) => void;
   refresh: () => Promise<void>;
   /** Loads the settings again if they never arrived; does nothing once they have. */
   retryFailedLoad: () => void;
 }
 
-const defaultSettings: SiteSettings = { siteName: 'Carta Cocktail', siteIcon: '' };
+// Empty until known: showing a default name would flash before the real one replaces it.
+const emptySettings: SiteSettings = { siteName: '', siteIcon: '' };
+const FALLBACK_TITLE = 'Carta Cocktail';
+const DEFAULT_ICON = '🍸';
+// The previous visit's settings: the first render shows the real name and icon at once.
+const CACHE_KEY = 'siteSettings';
 
 // A failed first load (rate limit, network, restart) is retried a few times, slowly
 // enough not to add to a 429. After that, only the guest's "Retry" loads them again.
@@ -24,20 +32,48 @@ function retryDelayMs(error: unknown): number {
   return DEFAULT_RETRY_DELAY_MS;
 }
 
+function readCachedSettings(): SiteSettings | null {
+  try {
+    const cached: unknown = JSON.parse(localStorage.getItem(CACHE_KEY) ?? 'null');
+    if (typeof cached !== 'object' || cached === null) return null;
+    const { siteName, siteIcon } = cached as Partial<SiteSettings>;
+    return typeof siteName === 'string' && typeof siteIcon === 'string' ? { siteName, siteIcon } : null;
+  } catch {
+    return null;
+  }
+}
+
+function cacheSettings(settings: SiteSettings) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ siteName: settings.siteName, siteIcon: settings.siteIcon }));
+  } catch {
+    // Storage is blocked or full: the next visit simply starts without a copy.
+  }
+}
+
+function emojiFavicon(emoji: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">${emoji}</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
 const SiteSettingsContext = createContext<SiteSettingsContextType>({
-  siteSettings: defaultSettings,
+  siteSettings: emptySettings,
+  setPageTitle: () => {},
   refresh: async () => {},
   retryFailedLoad: () => {},
 });
 
 export function SiteSettingsProvider({ children }: { children: React.ReactNode }) {
-  const [siteSettings, setSiteSettings] = useState<SiteSettings>(defaultSettings);
-  // Until the saved settings arrive, the header and the tab show the default name and icon.
+  const [cached] = useState(readCachedSettings);
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>(cached ?? emptySettings);
+  // The copy of the previous visit shows at once but does not count: the server's answer replaces it.
   const [loaded, setLoaded] = useState(false);
+  const [pageTitle, setPageTitle] = useState('');
 
   const showSettings = useCallback((settings: SiteSettings) => {
     setSiteSettings(settings);
     setLoaded(true);
+    cacheSettings(settings);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -75,25 +111,19 @@ export function SiteSettingsProvider({ children }: { children: React.ReactNode }
     };
   }, [loaded, showSettings]);
 
-  // Update document title and favicon when settings change
+  // The tab title and icon follow the settings (a page may then set its own title, see usePageTitle)
   useEffect(() => {
-    document.title = siteSettings.siteName || 'Carta Cocktail';
+    document.title = joinTitle(pageTitle, siteSettings.siteName || FALLBACK_TITLE);
 
     const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
     if (link) {
-      if (siteSettings.siteIcon) {
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">${siteSettings.siteIcon}</text></svg>`;
-        link.href = `data:image/svg+xml,${encodeURIComponent(svg)}`;
-        link.type = 'image/svg+xml';
-      } else {
-        link.href = '/vite.svg';
-        link.type = 'image/svg+xml';
-      }
+      link.href = emojiFavicon(siteSettings.siteIcon || DEFAULT_ICON);
+      link.type = 'image/svg+xml';
     }
-  }, [siteSettings.siteName, siteSettings.siteIcon]);
+  }, [pageTitle, siteSettings.siteName, siteSettings.siteIcon]);
 
   return (
-    <SiteSettingsContext.Provider value={{ siteSettings, refresh, retryFailedLoad }}>
+    <SiteSettingsContext.Provider value={{ siteSettings, setPageTitle, refresh, retryFailedLoad }}>
       {children}
     </SiteSettingsContext.Provider>
   );
