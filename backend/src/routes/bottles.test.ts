@@ -611,6 +611,48 @@ describe('GET /api/bottles/export', () => {
     expect(confirm.status).toBe(201);
     expect(await bottleSnapshot()).toEqual(exported);
   });
+
+  // The forms are single-line, but the API and the imports accept line breaks (C-63)
+  describe('values on several lines', () => {
+    async function seedMultiLineValues() {
+      const gin = await seedCategory({ name: 'Gin' });
+      const rhum = await seedCategory({ name: 'Rhum\nagricole' });
+      await seedBottle({ name: 'Gin\nOld Tom', categoryId: gin.id, location: 'Shelf\r\nleft' });
+      await seedBottle({ name: 'Havana', categoryId: rhum.id });
+    }
+
+    async function exportedFile(format: 'csv' | 'json'): Promise<[Buffer, string]> {
+      if (format === 'csv') return [await exportCsvBytes(), 'bottles.csv'];
+      const res = await request.get('/api/bottles/export').set(authHeader());
+      return [Buffer.from(JSON.stringify(res.body)), 'bottles.json'];
+    }
+
+    const lineBreak = (source: string, line: number, field: string) => ({ source, line, field, code: 'lineBreak' });
+
+    it.each([
+      // The CSV names the line each record starts on: the first one spans lines 2 to 4
+      ['csv', [lineBreak('bottles', 2, 'name'), lineBreak('bottles', 2, 'location'), lineBreak('bottles', 5, 'categoryName')]],
+      ['json', [
+        lineBreak('categories', 2, 'name'),
+        lineBreak('bottles', 1, 'name'), lineBreak('bottles', 1, 'location'), lineBreak('bottles', 2, 'categoryName'),
+      ]],
+    ] as const)('should import back a %s export with warnings and no error', async (format, warnings) => {
+      await seedMultiLineValues();
+      const exported = await bottleSnapshot();
+      const [file, filename] = await exportedFile(format);
+
+      const preview = await request.post('/api/bottles/import/preview').set(authHeader()).attach('file', file, filename);
+      await prisma.bottle.deleteMany();
+      const confirm = await request.post('/api/bottles/import/confirm').set(authHeader())
+        .send({ payload: preview.body.payload, resolutions: {} });
+
+      expect(preview.body.errors).toEqual([]);
+      expect(preview.body.warnings).toEqual(warnings);
+      expect(preview.body.payload).not.toHaveProperty('warnings');
+      expect(confirm.status).toBe(201);
+      expect(await bottleSnapshot()).toEqual(exported);
+    });
+  });
 });
 
 describe('POST /api/bottles/import/preview', () => {

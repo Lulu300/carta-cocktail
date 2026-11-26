@@ -15,7 +15,7 @@ import Button from '../ui/Button';
 import WizardModal from './WizardModal';
 import WizardResult from './WizardResult';
 import FileDropzone from './FileDropzone';
-import BottleImportRowErrors from './BottleImportRowErrors';
+import BottleImportRowErrors, { BottleImportRowWarnings } from './BottleImportRowErrors';
 import BottleImportCategoryStep from './BottleImportCategoryStep';
 import BottleImportRowsStep from './BottleImportRowsStep';
 import BottleImportConfirmStep from './BottleImportConfirmStep';
@@ -172,6 +172,7 @@ export default function ImportBottlesWizard({ onClose, onImported }: ImportBottl
               <span>{t('bottles.importWizard.summaryBottles', { count: preview.bottles.length })}</span>
             </div>
             <BottleImportRowErrors errors={preview.errors} />
+            <BottleImportRowWarnings warnings={preview.warnings ?? []} />
             <BottleImportCategoryStep
               categories={preview.categories}
               resolutions={resolutions.categories}

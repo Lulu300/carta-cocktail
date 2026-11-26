@@ -160,6 +160,14 @@
           "malformedQuotes": "{{field}} has a misplaced quotation mark",
           "unknown": "{{field}} is invalid"
         }
+      },
+      "rowWarnings": {
+        "title": "{{count}} value(s) to check, imported as they are",
+        "hint": "A misplaced quotation mark in the file can merge several lines into one value.",
+        "code": {
+          "lineBreak": "{{field}} spans several lines",
+          "unknown": "{{field}} to check"
+        }
       }
     },
     "search": "Search bottles",

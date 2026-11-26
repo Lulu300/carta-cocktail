@@ -59,11 +59,29 @@ export interface ImportRowError {
   code: ImportRowErrorCode;
 }
 
+export type ImportRowWarningCode = 'lineBreak';
+
+/**
+ * A value of a kept row the import takes as it is, but that the admin should check. Located
+ * like an `ImportRowError`: a CSV record is named by the line it starts on.
+ *
+ * `lineBreak`: a line break in a single-line text column. The app's own export writes such
+ * values, so they are kept; but a quote the file misplaces can also merge the lines that follow
+ * it into one valid quoted cell (`"Bourbon,700` closed lines later by `C 3",700`).
+ */
+export interface ImportRowWarning {
+  source: ImportRowSource;
+  line: number;
+  field: string;
+  code: ImportRowWarningCode;
+}
+
 export interface NormalizedImportPayload {
   version: number;
   categories: ImportCategoryRecord[];
   bottles: ImportBottleRecord[];
   errors: ImportRowError[];
+  warnings: ImportRowWarning[];
 }
 
 export type ImportParseErrorCode =
@@ -398,9 +416,17 @@ function toText(value: unknown): string {
   return typeof value === 'string' || typeof value === 'number' ? String(value).trim() : '';
 }
 
-/** Reads the fields of one row and records the first reason to leave it out. */
+function hasLineBreak(text: string): boolean {
+  return text.includes('\n') || text.includes('\r');
+}
+
+/**
+ * Reads the fields of one row, and records the first reason to leave it out and the values
+ * to check. Every text field of the format is a single-line one: names, types, location.
+ */
 class RowReader {
   error: ImportRowError | null = null;
+  readonly warnings: ImportRowWarning[] = [];
 
   constructor(
     private readonly row: NumberedRow,
@@ -411,8 +437,15 @@ class RowReader {
     this.error ??= { source: this.source, line: this.row.line, field, code };
   }
 
+  private warn(field: string, code: ImportRowWarningCode): void {
+    this.warnings.push({ source: this.source, line: this.row.line, field, code });
+  }
+
+  /** A single-line text, kept with its line breaks (see `ImportRowWarning`). */
   text(field: string): string {
-    return toText(this.row.values[field]);
+    const value = toText(this.row.values[field]);
+    if (hasLineBreak(value)) this.warn(field, 'lineBreak');
+    return value;
   }
 
   requiredText(field: string): string {
@@ -478,11 +511,23 @@ class RowReader {
     const translations = typeof value === 'string' ? parseJsonOrNull(value) : value;
     // The confirmation's rule: a language it would refuse (e.g. `de`) drops the translations
     const result = Translations.safeParse(translations);
-    return result.success ? result.data : null;
+    if (!result.success) return null;
+    // Each translation is a name, on a single line like the name itself
+    if (Object.values(result.data ?? {}).some(hasLineBreak)) this.warn(field, 'lineBreak');
+    return result.data;
   }
 }
 
-function readBottle(row: NumberedRow, language: string): { bottle: ImportBottleRecord; error: ImportRowError | null } {
+interface ReadRow {
+  error: ImportRowError | null;
+  warnings: ImportRowWarning[];
+}
+
+/**
+ * A bottle row. `categoryType` is the type of its category, used when no list and no earlier
+ * row gives that category (see `withRowCategories`).
+ */
+function readBottle(row: NumberedRow, language: string): ReadRow & { bottle: ImportBottleRecord; categoryType: string } {
   const reader = new RowReader(row, 'bottles');
   const bottle: ImportBottleRecord = {
     name: reader.requiredText('name'),
@@ -497,10 +542,11 @@ function readBottle(row: NumberedRow, language: string): { bottle: ImportBottleR
     isDigestif: reader.bool('isDigestif'),
     quantity: reader.quantity('quantity'),
   };
-  return { bottle, error: reader.error };
+  const categoryType = reader.text('categoryType');
+  return { bottle, categoryType, error: reader.error, warnings: reader.warnings };
 }
 
-function readCategory(row: NumberedRow): { category: ImportCategoryRecord; error: ImportRowError | null } {
+function readCategory(row: NumberedRow): ReadRow & { category: ImportCategoryRecord } {
   const reader = new RowReader(row, 'categories');
   const category: ImportCategoryRecord = {
     name: reader.text('name'),
@@ -509,7 +555,7 @@ function readCategory(row: NumberedRow): { category: ImportCategoryRecord; error
     minimumPercent: reader.number('minimumPercent', Percent, 30),
     nameTranslations: reader.nameTranslations('nameTranslations'),
   };
-  return { category, error: reader.error };
+  return { category, error: reader.error, warnings: reader.warnings };
 }
 
 function assertRowCount(count: number): void {
@@ -518,17 +564,32 @@ function assertRowCount(count: number): void {
 
 interface KeptBottle {
   bottle: ImportBottleRecord;
-  row: NumberedRow;
+  categoryType: string;
 }
 
-/** Keeps the valid bottles with their row; each invalid row is listed in `errors`. */
-function readBottles(rows: NumberedRow[], errors: ImportRowError[], language: string): KeptBottle[] {
+/**
+ * What the reading of a file reports: each invalid row in `errors`, and the values to check
+ * of the rows kept in `warnings` (a row left out is not imported: nothing of it to check).
+ */
+type RowReport = Pick<NormalizedImportPayload, 'errors' | 'warnings'>;
+
+/** Adds the row to `report`; true when the row is kept. */
+function reportRow(row: ReadRow, report: RowReport): boolean {
+  if (row.error) {
+    report.errors.push(row.error);
+    return false;
+  }
+  report.warnings.push(...row.warnings);
+  return true;
+}
+
+/** Keeps the valid bottles with the type of their category. */
+function readBottles(rows: NumberedRow[], report: RowReport, language: string): KeptBottle[] {
   assertRowCount(rows.length);
   const kept: KeptBottle[] = [];
   for (const row of rows) {
-    const { bottle, error } = readBottle(row, language);
-    if (error) errors.push(error);
-    else kept.push({ bottle, row });
+    const read = readBottle(row, language);
+    if (reportRow(read, report)) kept.push({ bottle: read.bottle, categoryType: read.categoryType });
   }
   if (totalQuantity(kept.map(({ bottle }) => bottle)) > MAX_IMPORT_BOTTLES) {
     throw new ImportParseError('tooManyBottles', { max: MAX_IMPORT_BOTTLES });
@@ -536,14 +597,15 @@ function readBottles(rows: NumberedRow[], errors: ImportRowError[], language: st
   return kept;
 }
 
-/** Keeps the valid categories with a name; each invalid row is listed in `errors`. */
-function readCategories(rows: NumberedRow[], errors: ImportRowError[]): ImportCategoryRecord[] {
+/** Keeps the valid categories with a name. */
+function readCategories(rows: NumberedRow[], report: RowReport): ImportCategoryRecord[] {
   assertRowCount(rows.length);
   const categories: ImportCategoryRecord[] = [];
   for (const row of rows) {
-    const { category, error } = readCategory(row);
-    if (error) errors.push(error);
-    else if (category.name) categories.push(category);
+    const read = readCategory(row);
+    // A valid row without a name is dropped without a message, its values unchecked
+    if (!read.error && !read.category.name) continue;
+    if (reportRow(read, report)) categories.push(read.category);
   }
   return categories;
 }
@@ -557,12 +619,13 @@ const REQUIRED_CSV_COLUMNS = ['name', 'capacityMl'];
 export function parseCsvBottles(csv: string, language: string): NormalizedImportPayload {
   const { headers, rows, errors } = readCsvRows(csv, 'bottles');
   if (headers.length === 0) {
-    return { version: BOTTLE_IMPORT_VERSION, categories: [], bottles: [], errors };
+    return { version: BOTTLE_IMPORT_VERSION, categories: [], bottles: [], errors, warnings: [] };
   }
   const missing = REQUIRED_CSV_COLUMNS.find((column) => !headers.includes(column));
   if (missing) throw new ImportParseError('missingColumn', { column: missing });
 
-  const kept = readBottles(rows, errors, language);
+  const report: RowReport = { errors, warnings: [] };
+  const kept = readBottles(rows, report, language);
 
   // A CSV has no category list
   return {
@@ -570,6 +633,8 @@ export function parseCsvBottles(csv: string, language: string): NormalizedImport
     categories: withRowCategories([], kept),
     bottles: kept.map(({ bottle }) => bottle),
     errors: byLine(errors),
+    // Rows are read in the order of the file
+    warnings: report.warnings,
   };
 }
 
@@ -581,13 +646,13 @@ export function parseCsvBottles(csv: string, language: string): NormalizedImport
 function withRowCategories(listed: ImportCategoryRecord[], kept: KeptBottle[]): ImportCategoryRecord[] {
   const known = new Set(listed.map((category) => category.name.toLowerCase()));
   const named: ImportCategoryRecord[] = [];
-  for (const { bottle, row } of kept) {
+  for (const { bottle, categoryType } of kept) {
     const key = bottle.categoryName.toLowerCase();
     if (!bottle.categoryName || known.has(key)) continue;
     known.add(key);
     named.push({
       name: bottle.categoryName,
-      type: toText(row.values.categoryType) || 'SPIRIT',
+      type: categoryType || 'SPIRIT',
       desiredStock: 1,
       minimumPercent: 30,
       nameTranslations: null,
@@ -607,23 +672,26 @@ export function parseJsonBottles(json: unknown, language: string): NormalizedImp
   }
   if (!Array.isArray(json.bottles)) throw new ImportParseError('bottlesRequired');
 
-  const errors: ImportRowError[] = [];
-  const listed = readCategories(numberJsonRows(Array.isArray(json.categories) ? json.categories : []), errors);
-  const kept = readBottles(numberJsonRows(json.bottles), errors, language);
+  const report: RowReport = { errors: [], warnings: [] };
+  const listed = readCategories(numberJsonRows(Array.isArray(json.categories) ? json.categories : []), report);
+  const kept = readBottles(numberJsonRows(json.bottles), report, language);
   // A hand-made file may leave out of its list a category its rows name, as a CSV always does
   return {
     version: BOTTLE_IMPORT_VERSION,
     categories: withRowCategories(listed, kept),
     bottles: kept.map(({ bottle }) => bottle),
-    errors,
+    ...report,
   };
 }
 
-function parseCategoriesCsv(csv: string, errors: ImportRowError[]): ImportCategoryRecord[] {
-  const { headers, rows, errors: csvErrors } = readCsvRows(csv, 'categories');
+/** The categories of `categories.csv`; its rows are reported after those of the bottles. */
+function parseCategoriesCsv(csv: string, report: RowReport): ImportCategoryRecord[] {
+  const { headers, rows, errors } = readCsvRows(csv, 'categories');
   if (!headers.includes('name')) return [];
-  const categories = readCategories(rows, csvErrors);
-  errors.push(...byLine(csvErrors));
+  const csvReport: RowReport = { errors, warnings: [] };
+  const categories = readCategories(rows, csvReport);
+  report.errors.push(...byLine(csvReport.errors));
+  report.warnings.push(...csvReport.warnings);
   return categories;
 }
 
@@ -661,7 +729,7 @@ export function parseZipBottles(buffer: Buffer, language: string): NormalizedImp
 
   const categoriesEntry = entries.find((e) => e.entryName === 'categories.csv');
   if (categoriesEntry) {
-    const explicitCategories = parseCategoriesCsv(decodeCsvBytes(readZipEntryBytes(categoriesEntry)), payload.errors);
+    const explicitCategories = parseCategoriesCsv(decodeCsvBytes(readZipEntryBytes(categoriesEntry)), payload);
     const merged = new Map<string, ImportCategoryRecord>();
     for (const c of payload.categories) merged.set(c.name.toLowerCase(), c);
     for (const c of explicitCategories) merged.set(c.name.toLowerCase(), c);

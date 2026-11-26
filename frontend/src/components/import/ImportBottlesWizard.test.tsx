@@ -272,6 +272,28 @@ describe('ImportBottlesWizard', () => {
     await previewWith(samplePreview);
 
     expect(screen.queryByText('bottles.importWizard.rowErrors.title')).not.toBeInTheDocument();
+    expect(screen.queryByText('bottles.importWizard.rowWarnings.title')).not.toBeInTheDocument();
+  });
+
+  it('lists the values on several lines without blocking the import, and sends the payload unchanged', async () => {
+    const confirmed = captureRequest('post', '/api/bottles/import/confirm');
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    const user = await previewWith({
+      ...samplePreview,
+      warnings: [
+        { source: 'bottles', line: 2, field: 'name', code: 'lineBreak' },
+        { source: 'bottles', line: 2, field: 'location', code: 'lineBreak' },
+      ],
+    });
+
+    const warnings = screen.getByRole('status');
+    expect(within(warnings).getByText('bottles.importWizard.rowWarnings.title')).toBeInTheDocument();
+    expect(within(warnings).getAllByText('bottles.importWizard.rowWarnings.code.lineBreak')).toHaveLength(2);
+    await user.click(screen.getAllByText('bottles.importWizard.next').at(-1)!);
+    await user.click(screen.getByText('bottles.importWizard.confirmImport'));
+
+    await screen.findByText('bottles.importWizard.successCount');
+    expect(await confirmed.body).toMatchObject({ payload: samplePreview.payload });
   });
 
   it('edits a category to create, with the types in the interface language', async () => {
