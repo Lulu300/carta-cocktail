@@ -274,6 +274,16 @@ describe('CocktailFormPage, creation', () => {
     expect(screen.queryByText('cocktail list')).not.toBeInTheDocument();
   });
 
+  it('keeps the message of an unknown reference whose details are malformed', async () => {
+    const user = userEvent.setup();
+    const message = 'A recipe line names a unit, bottle, category or ingredient that does not exist';
+    mockApiResponse('post', '/api/cocktails', { error: message, details: [{ line: 1, field: 'ingredientId' }] }, 400);
+    await user.type(await renderNewForm(), 'Mojito');
+    await user.click(screen.getByRole('button', { name: 'common.save' }));
+
+    expect(await screen.findByText(message)).toBeInTheDocument();
+  });
+
   it('opens the created cocktail with the picked image when the upload fails, so the next save only updates it', async () => {
     const user = userEvent.setup();
     const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:preview');
@@ -539,6 +549,22 @@ describe('CocktailFormPage, lines stored with a defect (C-21)', () => {
 
     expect(await screen.findByText('Row 2, Quantity: value too small')).toBeInTheDocument();
     expect(screen.queryByText('Validation error')).not.toBeInTheDocument();
+    expect(screen.queryByText('cocktail list')).not.toBeInTheDocument();
+  });
+
+  // An item picked in the form was deleted, in another tab for instance, before the save.
+  it('names the line and the field in the error toast when the recipe names a deleted item', async () => {
+    const user = userEvent.setup();
+    mockApiResponse('put', '/api/cocktails/:id', {
+      error: 'A recipe line names a unit, bottle, category or ingredient that does not exist',
+      details: [{ line: 1, field: 'ingredientId', id: 7 }],
+    }, 400);
+    renderAt('/admin/cocktails/42');
+    await renameTo(user, 'Old mojito');
+
+    await user.click(screen.getByRole('button', { name: 'common.save' }));
+
+    expect(await screen.findByText('Row 2, Ingredient: this item no longer exists, choose another one')).toBeInTheDocument();
     expect(screen.queryByText('cocktail list')).not.toBeInTheDocument();
   });
 

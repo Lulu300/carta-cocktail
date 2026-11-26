@@ -517,6 +517,14 @@
     "issue": "{{field}}: {{rule}}",
     "issueInRow": "Row {{row}}, {{field}}: {{rule}}",
     "issueInCategoryRow": "Category {{row}}, {{field}}: {{rule}}",
+    "unknownReference": "Row {{row}}, {{field}}: this item no longer exists, choose another one",
+    "unresolved": {
+      "unit": "Row {{row}}: unit \"{{name}}\" is neither matched nor created",
+      "noUnit": "Row {{row}}: no unit",
+      "category": "Row {{row}}: category \"{{name}}\" is neither matched nor created",
+      "bottle": "Row {{row}}: bottle \"{{name}}\" is neither matched nor created, or has no category",
+      "ingredient": "Row {{row}}: ingredient \"{{name}}\" is neither matched nor created"
+    },
     "fields": {
       "name": "Name",
       "slug": "URL slug",
