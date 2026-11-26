@@ -11,7 +11,7 @@ depends_on: [B-12]
 touches: [backend/.dockerignore, backend/.gitignore]
 sources: []
 branch: chore/D-32-backend-dockerignore-test-leftovers
-pr:
+pr: 233
 ---
 
 ## Contexte
