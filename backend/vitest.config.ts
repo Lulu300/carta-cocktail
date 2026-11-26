@@ -3,6 +3,9 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     globals: true,
+    // Vitest defaults to the `minimal` reporter under an AI agent, which hides the
+    // console of passing tests. Pin it so the output is the same everywhere.
+    reporters: ['default', ...(process.env.GITHUB_ACTIONS === 'true' ? ['github-actions'] : [])],
     environment: 'node',
     root: '.',
     include: ['src/**/*.test.ts'],

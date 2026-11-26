@@ -36,6 +36,7 @@ CI runs automatically on PRs (`Backend` job of `.github/workflows/ci.yml`): `npm
 - Tests run against a real SQLite test DB (`prisma/test/test.db`, defined in `src/test/testDatabase.ts` only), not mocks. It has a folder of its own, so that the copies a restore keeps in `backups/` never mix with those of the developer database in `prisma/backups/`. `src/test/globalSetup.ts` empties and creates this folder once per run and deletes it entirely at the end; `cleanDatabase()` empties every table of the schema
 - The test database is shared by every test file of a run: a test that alters the schema (trigger, index, extra table) must restore it in `finally` (or `afterEach`/`afterAll`)
 - Run with coverage locally: `npm test -- --coverage`
+- `vitest.config.ts` pins the reporter, so the console of passing tests shows the same under an AI agent as in a terminal or in CI (Vitest would otherwise pick its `minimal` reporter under an agent)
 
 ## Structure
 
