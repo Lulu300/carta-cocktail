@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
+import path from 'path';
 import sharp, { type Metadata } from 'sharp';
 import { config } from '../../config';
 import { BadRequestError } from '../../errors';
@@ -41,6 +42,21 @@ function uploadDirContent(): string[] {
 
 function storedMetadata(fileName: string): Promise<Metadata> {
   return sharp(uploadedFile(fileName)).metadata();
+}
+
+/** A photo in the parent of the upload folder, as a crafted backup could name it. */
+async function writePhotoOutsideUploads() {
+  const dir = path.dirname(config.uploadDir);
+  const stem = `carta-outside-${process.pid}`;
+  const name = `${stem}.jpg`;
+  fs.writeFileSync(path.join(dir, name), await testImage());
+  // The photo and the copies a faulty backfill would write next to it
+  const remove = () => {
+    for (const file of [name, ...derivedVariantNames(name)]) {
+      fs.rmSync(path.join(dir, file), { force: true });
+    }
+  };
+  return { dir, stem, name, remove };
 }
 
 function filesOf(imagePath: string): string[] {
@@ -147,9 +163,13 @@ describe('previewImageName', () => {
   });
 
   it('should leave a name that is not a bare file name as it is', async () => {
-    await writeStoredPhoto('outside-og.jpg');
-
-    expect(previewImageName('../outside.jpg')).toBe('../outside.jpg');
+    const outside = await writePhotoOutsideUploads();
+    fs.writeFileSync(path.join(outside.dir, `${outside.stem}-og.jpg`), 'preview');
+    try {
+      expect(previewImageName(`../${outside.name}`)).toBe(`../${outside.name}`);
+    } finally {
+      outside.remove();
+    }
   });
 });
 
@@ -200,14 +220,26 @@ describe('backfillImageVariants', () => {
     expect(await backfillImageVariants(prisma)).toEqual({ created: 3, failed: 0 });
   });
 
-  it('should skip missing photos and names that are not bare file names', async () => {
-    await writeStoredPhoto('outside.jpg');
+  it('should skip missing photos', async () => {
     await seedCocktail({ name: 'Gone', imagePath: 'gone.jpg' });
-    await seedCocktail({ name: 'Crafted', imagePath: '../outside.jpg' });
     await seedCocktail({ name: 'Plain' });
 
     expect(await backfillImageVariants(prisma)).toEqual({ created: 0, failed: 0 });
-    expect(uploadDirContent()).toEqual(['outside.jpg']);
+    expect(uploadDirContent()).toEqual([]);
+  });
+
+  it('should never write next to a photo outside the upload folder', async () => {
+    const outside = await writePhotoOutsideUploads();
+    try {
+      await seedCocktail({ name: 'Crafted', imagePath: `../${outside.name}` });
+
+      expect(await backfillImageVariants(prisma)).toEqual({ created: 0, failed: 0 });
+      expect(fs.readdirSync(outside.dir).filter((name) => name.startsWith(outside.stem))).toEqual([
+        outside.name,
+      ]);
+    } finally {
+      outside.remove();
+    }
   });
 
   it('should log an unreadable photo, leave it without copies and go on with the others', async () => {
