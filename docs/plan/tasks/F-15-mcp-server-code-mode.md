@@ -7,7 +7,7 @@ criticite: basse
 effort: L
 status: todo
 owner: mixed
-depends_on: [F-14]
+depends_on: [F-14, F-16]
 touches: [mcp/, backend/src/app.ts, backend/src/routes/, backend/package.json, backend/package-lock.json, README.md, docs/operations.md, .github/workflows/ci.yml, .github/workflows/release.yml]
 sources: []
 branch:
@@ -16,7 +16,7 @@ pr:
 
 ## Décisions à valider avant de commencer
 
-L'humain a demandé cette tâche le 2026-11-26 : « un MCP qu'on puisse paramétrer pour faire la majorité des actions dont on a besoin, prévu pour être le plus compatible possible avec Code Mode ». Elle vient après F-14 (API documentée, OpenAPI et jetons d'API).
+L'humain a demandé cette tâche le 2026-11-26 : « un MCP qu'on puisse paramétrer pour faire la majorité des actions dont on a besoin, prévu pour être le plus compatible possible avec Code Mode ». Elle vient après F-14 (API documentée, OpenAPI) et F-16 (jetons d'API).
 
 **Code Mode** (Cloudflare) : au lieu d'exposer un outil MCP par opération, le serveur expose l'API comme du code. Le modèle écrit un court programme qui appelle l'API, et ce programme tourne dans un bac à sable. Le serveur MCP de l'API Cloudflare n'expose que deux outils, `search` et `execute`, pour environ 1 000 tokens, quelle que soit la taille de l'API :
 - `search` exécute du JavaScript écrit par le modèle sur la spécification OpenAPI, sans faire entrer toute la spécification dans le contexte du modèle ;
@@ -33,7 +33,7 @@ Choix à faire par l'humain (`owner: mixed`) :
 
    Recommandation : (c). On commence par (a) et on ajoute (b) derrière un réglage.
 2. **Où tourne le serveur.**
-   - (a) Une route HTTP du backend, `POST /mcp` en transport Streamable HTTP, protégée par un jeton d'API de F-14.
+   - (a) Une route HTTP du backend, `POST /mcp` en transport Streamable HTTP, protégée par un jeton d'API de F-16.
    - (b) Un paquet séparé lancé par le client en stdio (`npx @carta/mcp`), qui appelle l'API d'une instance avec un jeton.
    - (c) Les deux, avec le même code d'outils.
 
@@ -44,7 +44,7 @@ Choix à faire par l'humain (`owner: mixed`) :
 
 ## Contexte
 
-- F-14 fournit une spécification OpenAPI 3.1 générée depuis les schémas zod, ainsi que des jetons d'API révocables avec une portée.
+- F-14 fournit une spécification OpenAPI 3.1 générée depuis les schémas zod. F-16 fournit des jetons d'API révocables avec une portée.
 - Le MCP (Model Context Protocol) permet à un agent IA (Claude, un client compatible, un agent Cloudflare…) d'appeler des outils décrits par des schémas JSON.
 
 ## Ce qu'il faut faire
@@ -86,6 +86,12 @@ Choix à faire par l'humain (`owner: mixed`) :
 - Sécurité avant tout. Un MCP connecté donne à un agent les droits du jeton. La portée par défaut est en lecture seule, et la doc le dit.
 - Exécuter du code venu d'un modèle est le risque principal du Code Mode côté serveur. Ne pas le livrer sans bac à sable éprouvé : `vm` de Node n'est pas un bac à sable.
 - Le SDK MCP et le SDK Cloudflare évoluent vite : vérifier les versions et la spécification MCP au moment de commencer.
+- Détails Cloudflare relevés le 2026-11-26 (à revérifier) :
+  - `codemode.request()` est le nom du SDK Agents ; le serveur de l'API Cloudflare l'appelle `cloudflare.request()`.
+  - `codeMcpServer()` expose un seul outil `code`, et non le couple `search`/`execute` d'`openApiMcpServer()`.
+  - Code Mode est marqué expérimental. Les deux fonctions renvoient un serveur du SDK MCP v1, servi par `createLegacyMcpHandler` : à prendre en compte pour l'option Streamable HTTP sur `/mcp`.
+  - Les réponses sont tronquées vers 6 000 tokens.
+  - Le `DynamicWorkerExecutor` du SDK ne tourne que sur Workers : un serveur auto-hébergé doit fournir son propre exécuteur (bac à sable).
 - Sources :
   - <https://blog.cloudflare.com/code-mode-mcp/>
   - <https://developers.cloudflare.com/agents/model-context-protocol/codemode/>
@@ -93,4 +99,4 @@ Choix à faire par l'humain (`owner: mixed`) :
 
 ## Journal
 
-- 2026-11-26 : tâche créée à la demande de l'humain (MCP compatible Code Mode), à faire après F-14 et les autres tâches du plan.
+- 2026-11-26 : tâche créée à la demande de l'humain (MCP compatible Code Mode), à faire après F-14, F-16 et les autres tâches du plan. Relecture de #289 : détails Cloudflare ajoutés aux points d'attention.

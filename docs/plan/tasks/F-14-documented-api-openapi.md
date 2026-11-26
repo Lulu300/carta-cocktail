@@ -20,13 +20,8 @@ Demandée par l'humain le 2026-11-26 : « une API bien documentée pour tout le 
 
 Choix à faire par l'humain (`owner: mixed`) :
 
-1. **Authentification des clients d'API et du MCP.** Aujourd'hui, seul le JWT de session de l'admin existe : `Authorization: Bearer`, validité `JWT_EXPIRES_IN`, révoqué par « Se déconnecter partout ». Trois options :
-   - (a) Garder le JWT tel quel. Un script doit se connecter avec l'email et le mot de passe.
-   - (b) Ajouter des **jetons d'API** créés dans Paramètres. Ils seraient nommés, révocables un par un, avec une date d'expiration et une portée lecture seule ou lecture et écriture, et seul leur hash serait stocké. Cela demande une migration.
-   - (c) Faire (b) plus tard, dans une tâche à part.
-
-   Recommandation : (b), indispensable pour un MCP branché en permanence.
-2. **Visibilité de la documentation.**
+1. **Authentification.** Les jetons d'API (pour les scripts et le MCP) sont traités à part, dans F-16. Ici, le bouton « Essayer » de la documentation utilise la session de l'admin connecté.
+2. **Visibilité de la documentation.** Ce choix fixe le périmètre du premier critère d'acceptation.
    - (a) Réservée à l'admin connecté : la page vit dans l'admin.
    - (b) Spécification publique à `/api/openapi.json`, pages admin incluses, mais sans données.
    - (c) Spécification publique pour les routes `/api/public/*` seulement, spécification complète pour l'admin connecté.
@@ -60,33 +55,25 @@ Choix à faire par l'humain (`owner: mixed`) :
 4. **Documentation intégrée** : une page « API » dans l'admin.
    - Elle rend la spécification avec un lecteur OpenAPI auto-hébergé, par exemple Scalar ou Redoc. Aucun CDN : la CSP n'est pas élargie.
    - Elle est chargée en différé : aucun impact sur le bundle public (140 kB).
-   - Elle offre un bouton « Essayer » qui utilise la session courante, ou un jeton d'API si la décision 1 le retient.
+   - Elle offre un bouton « Essayer » qui utilise la session courante.
    - Ses textes d'interface sont en i18n (en/fr). La spécification elle-même reste en anglais.
-5. **Jetons d'API**, si la décision 1 retient (b) :
-   - modèle `ApiToken` (nom, hash, portée, dernière utilisation, expiration) ;
-   - écran dans Paramètres : créer, voir une seule fois, révoquer ;
-   - `authMiddleware` accepte `Authorization: Bearer carta_…` ;
-   - une portée lecture seule refuse les méthodes d'écriture (403) ;
-   - « Se déconnecter partout » ne révoque pas les jetons d'API, et l'écran le dit.
-6. **Garde-fou en CI.** Un test échoue si une route Express n'est pas dans la spécification, ou si la spécification décrit une route qui n'existe plus. Un second test valide quelques réponses réelles contre leur schéma de sortie (repris de F-05).
-7. **Documentation.**
+5. **Garde-fou en CI.** Un test échoue si une route Express n'est pas dans la spécification, ou si la spécification décrit une route qui n'existe plus. Un second test valide quelques réponses réelles contre leur schéma de sortie (repris de F-05).
+6. **Documentation.**
    - Le README (section API) pointe vers la page et vers `/api/openapi.json`.
    - `docs/operations.md` explique comment créer un jeton et appeler l'API avec `curl`.
    - Les notes de release citent les changements d'API, détectés par un diff de la spécification entre deux tags. Ce diff est une option à évaluer.
 
 ## Critères d'acceptation
 
-- [ ] `GET /api/openapi.json` renvoie une spécification OpenAPI 3.1 valide (vérifiée par un validateur en CI). Elle couvre 100 % des routes `/api`, avec leurs entrées, leurs sorties et leurs erreurs.
+- [ ] La spécification complète, servie à l'admin connecté, est une OpenAPI 3.1 valide (vérifiée par un validateur en CI). Elle couvre 100 % des routes `/api`, avec leurs entrées, leurs sorties et leurs erreurs. Ce qui est servi sans authentification à `/api/openapi.json` suit la décision 2 : rien (a), tout (b) ou les routes `/api/public/*` seulement (c).
 - [ ] La page « API » de l'admin affiche la documentation, hors ligne, sans ressource externe. La CSP et le bundle public ne changent pas.
 - [ ] Une route ajoutée sans déclaration dans la spécification fait échouer la CI.
-- [ ] Si la décision 1 retient les jetons : un jeton lecture seule lit mais n'écrit pas, un jeton révoqué reçoit 401, et le jeton n'est stocké qu'en hash.
 
 ## Tests à ajouter ou adapter
 
 - Couverture des routes : la liste des routes Express doit être égale à la liste des chemins de la spécification.
 - Validation de la spécification (validateur OpenAPI 3.1).
 - Contrats de réponse : au moins une route par fichier de routes.
-- Jetons : création, portée, révocation, expiration, hash.
 - Frontend : la page API se charge en différé, est traduite, et affiche un état d'erreur.
 
 ## Points d'attention
@@ -95,8 +82,8 @@ Choix à faire par l'humain (`owner: mixed`) :
 - Ne pas dupliquer les schémas : la spécification lit ceux de `validation/` et de F-05.
 - Les routes de fichiers (photo, import, sauvegarde) se décrivent en `multipart/form-data` ou en flux binaire, avec leurs limites d'E-59.
 - Les routes publiques des aperçus de F-03 (servies aux robots par nginx) sont hors `/api` : à documenter à part, ou à exclure explicitement.
-- Si les jetons sont retenus, prévoir une migration (copie `pre-migrate`) et une release avec banc.
+- Pas de migration dans cette tâche : les jetons d'API (migration) sont dans F-16.
 
 ## Journal
 
-- 2026-11-26 : tâche créée à la demande de l'humain (API documentée, doc intégrée), à faire après les autres tâches du plan. F-15 (serveur MCP compatible Code Mode) en dépend.
+- 2026-11-26 : tâche créée à la demande de l'humain (API documentée, doc intégrée), à faire après les autres tâches du plan. F-15 (serveur MCP compatible Code Mode) en dépend. 2026-11-26 : relecture de #289, jetons d'API sortis dans F-16 (tâche L trop large), critère 1 aligné sur la décision 2.
