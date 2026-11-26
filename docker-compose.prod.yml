@@ -25,6 +25,7 @@ services:
       - API_RATE_LIMIT=${API_RATE_LIMIT:-}
       - TRUST_PROXY=${TRUST_PROXY:-}
       - CORS_ORIGIN=${CORS_ORIGIN:-}
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
       - PORT=3001
       - UPLOAD_DIR=/app/uploads
     volumes:

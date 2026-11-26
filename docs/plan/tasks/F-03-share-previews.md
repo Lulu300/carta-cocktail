@@ -5,13 +5,13 @@ phase: F
 lane: infra
 criticite: basse
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [A-05]
 touches: [frontend/nginx.conf.template, backend/src/routes/public.ts]
 sources: ["06-frontend-ux-perf.md §4"]
-branch:
-pr:
+branch: feature/F-03-share-previews
+pr: 266
 ---
 
 ## Contexte
@@ -40,11 +40,11 @@ Choix à valider avant de commencer :
 
 ## Critères d'acceptation
 
-- [ ] `curl -A "WhatsApp/2.23" http://localhost/menu/<slug>` renvoie les balises `og:*` de la carte.
-- [ ] `curl http://localhost/menu/<slug>` (navigateur) renvoie toujours la SPA.
-- [ ] Un menu non public ou un slug inconnu renvoie 404 aux robots.
-- [ ] Un nom de cocktail contenant `<script>` ressort échappé.
-- [ ] L'outil de debug de partage de Facebook ou l'aperçu WhatsApp affiche titre et image.
+- [x] `curl -A "WhatsApp/2.23" http://localhost/menu/<slug>` renvoie les balises `og:*` de la carte.
+- [x] `curl http://localhost/menu/<slug>` (navigateur) renvoie toujours la SPA.
+- [x] Un menu non public ou un slug inconnu renvoie 404 aux robots.
+- [x] Un nom de cocktail contenant `<script>` ressort échappé.
+- [ ] L'outil de debug de partage de Facebook ou l'aperçu WhatsApp affiche titre et image. (Demande une URL publique : à vérifier sur une instance en ligne.)
 
 ## Tests à ajouter ou adapter
 
@@ -62,3 +62,5 @@ Choix à valider avant de commencer :
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-11-26 : PR #266. Option A : `map` des robots d'aperçu dans `nginx.conf.template` (`rewrite ... last` vers `/api/public/share/menu/...`), routes `GET /api/public/share/menu/:slug` et `/share/menu/:slug/cocktail/:id` (`services/sharePreview.ts`, `utils/html.ts`), règles invité seulement (404 pour carte non publiée, élément masqué, cocktail hors de cette carte), image = photo du cocktail ou du premier cocktail illustré visible de la carte. URL absolues : `PUBLIC_BASE_URL`, sinon `X-Forwarded-Proto` + `X-Forwarded-Host` (nouveau, `$http_host`, garde le port). Applebot laissé hors liste (robot de recherche ; iMessage envoie `facebookexternalhit`). Vérifié dans le projet compose `carta-f-03` (smoke étendu, `curl` avec les User-Agent WhatsApp et iMessage, Chrome sans interface sur la SPA). Amélioration possible : variante JPEG pour `og:image` si F-01 ne garde que du WebP.
+- 2026-11-26 : Notes de version : un lien de carte ou de cocktail partagé dans une messagerie (WhatsApp, iMessage, Slack, Telegram, Discord…) affiche un aperçu avec le titre, la description et la photo. Aucune action requise. Derrière un reverse proxy HTTPS, renseigner la nouvelle variable facultative `PUBLIC_BASE_URL=https://<domaine>` dans `.env` (les compose de v1.17.0 et avant ne la transmettent pas : nouveau fichier, ou ligne `- PUBLIC_BASE_URL=…` dans `environment` du backend) ; une valeur qui n'est pas une adresse `http` ou `https` empêche le backend de démarrer. `breaking: false`.

@@ -8,6 +8,8 @@ import { calculateAvailabilities } from '../services/availabilityService';
 import { buildPublicCocktailSelect, CATEGORY_PUBLIC_SELECT } from '../services/cocktail/includes';
 import { exportCocktail } from '../services/cocktail/cocktailExport';
 import { getOrCreateSettings } from '../services/settingsService';
+import { renderSharePage } from '../services/sharePreview';
+import { config } from '../config';
 
 const router = Router();
 
@@ -151,6 +153,75 @@ router.get('/cocktails/:id', async (req: AuthRequest, res: Response) => {
 
   const [publicCocktail] = await withPublicAvailability([cocktail]);
   res.json(parseNameTranslations(publicCocktail));
+});
+
+/** What a link preview shows of a menu or a cocktail. */
+interface SharedPage {
+  name: string;
+  description: string | null;
+  imagePath: string | null;
+}
+
+/**
+ * Absolute URLs are required by Open Graph. nginx forwards the host the client
+ * asked for (X-Forwarded-Host), but `http` behind a TLS reverse proxy:
+ * PUBLIC_BASE_URL gives the real address.
+ */
+function publicBaseUrl(req: Request): string {
+  return config.publicBaseUrl ?? `${req.protocol}://${req.host}`;
+}
+
+async function sendSharePage(req: Request, res: Response, page: SharedPage, pagePath: string) {
+  const { siteName } = await getOrCreateSettings();
+  const baseUrl = publicBaseUrl(req);
+  const html = renderSharePage({
+    pageName: page.name,
+    siteName,
+    description: page.description,
+    pageUrl: `${baseUrl}${pagePath}`,
+    imageUrl: page.imagePath ? `${baseUrl}/uploads/${encodeURIComponent(page.imagePath)}` : null,
+  });
+  // nginx answers the same URL with the SPA to every other client: a cache must not mix them up
+  res.set({ 'Cache-Control': 'no-cache', Vary: 'User-Agent' }).type('html').send(html);
+}
+
+// Link previews of /menu/:slug and /menu/:slug/cocktail/:id. nginx sends the preview robots of
+// messaging apps here (frontend/nginx.conf.template). Guest rules only, even with an admin
+// token: an unpublished menu, a hidden item or a cocktail outside the menu answers 404.
+router.get('/share/menu/:slug', async (req: Request, res: Response) => {
+  const slug = String(req.params.slug);
+  const menu = await prisma.menu.findFirst({
+    where: { slug, isPublic: true },
+    select: {
+      name: true,
+      description: true,
+      // The photo of the first illustrated cocktail stands for the menu
+      cocktails: {
+        where: { ...VISIBLE_MENU_COCKTAIL_WHERE, cocktail: { imagePath: { not: null } } },
+        orderBy: { position: 'asc' },
+        take: 1,
+        select: { cocktail: { select: { imagePath: true } } },
+      },
+    },
+  });
+  if (!menu) throw new NotFoundError();
+
+  const imagePath = menu.cocktails[0]?.cocktail.imagePath ?? null;
+  await sendSharePage(req, res, { ...menu, imagePath }, `/menu/${encodeURIComponent(slug)}`);
+});
+
+router.get('/share/menu/:slug/cocktail/:id', async (req: Request, res: Response) => {
+  const id = parseCocktailId(req.params.id);
+  if (id === null) throw new NotFoundError();
+
+  const slug = String(req.params.slug);
+  const menuCocktail = await prisma.menuCocktail.findFirst({
+    where: { ...VISIBLE_MENU_COCKTAIL_WHERE, cocktailId: id, menu: { slug, isPublic: true } },
+    select: { cocktail: { select: { name: true, description: true, imagePath: true } } },
+  });
+  if (!menuCocktail) throw new NotFoundError();
+
+  await sendSharePage(req, res, menuCocktail.cocktail, `/menu/${encodeURIComponent(slug)}/cocktail/${id}`);
 });
 
 export default router;

@@ -259,6 +259,7 @@ carte.monbar.fr {
 ```
 
 - **En-têtes `X-Forwarded-*`** : le proxy doit transmettre `X-Forwarded-For` (Caddy, Traefik et SWAG le font par défaut). L'API s'en sert pour compter les limites de débit par client. Un proxy sur l'hôte ou sur un réseau privé n'a besoin d'aucun réglage ; dans les autres cas (Docker rootless, Podman, Docker Desktop…), voir `TRUST_PROXY` dans [README › "Login limit behind a reverse proxy"](../README.md#login-limit-behind-a-reverse-proxy).
+- **Aperçus de liens** : renseignez `PUBLIC_BASE_URL=https://carte.monbar.fr` dans `.env`, puis recréez le backend. Les aperçus d'une carte partagée dans une messagerie (titre, description, photo) ont besoin d'adresses absolues, et derrière le proxy le backend ne voit que `http`.
 - **HSTS** s'active sur le proxy, ou dans le conteneur (ligne `Strict-Transport-Security` en commentaire de `frontend/security-headers.conf`) une fois HTTPS en place devant lui, jamais quand le site est servi en HTTP. Une fois activé, les navigateurs refusent le HTTP pour ce domaine pendant toute la durée de `max-age` : activez-le quand HTTPS fonctionne.
 - Ne publiez pas le port 3001 du backend : nginx l'atteint par le réseau compose (`docker-compose.prod.yml` ne le publie pas).
 
