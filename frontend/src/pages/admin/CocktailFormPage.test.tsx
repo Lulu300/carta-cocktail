@@ -466,9 +466,9 @@ describe('CocktailFormPage, edition', () => {
   it('warns when no preferred bottle of a category line is available', async () => {
     mockApiResponse('get', '/api/availability/cocktails', {
       42: {
-        cocktailId: 42, isAvailable: true, maxServings: 4, missingIngredients: [], lowStockWarnings: [],
+        cocktailId: 42, isAvailable: true, maxServings: 4, lowStock: [],
         ingredients: [{
-          cocktailIngredientId: 7, sourceType: 'CATEGORY', name: 'Rum', icon: null, quantity: 5, unit: 'cl',
+          cocktailIngredientId: 7, sourceType: 'CATEGORY', name: 'Rum', nameTranslations: null, orphan: false, icon: null, quantity: 5, unit: 'cl',
           isAvailable: true, availableCount: 4, preferredAvailable: false,
         }],
       },

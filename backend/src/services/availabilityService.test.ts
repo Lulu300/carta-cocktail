@@ -24,9 +24,9 @@ const CUP = { abbreviation: 'tasse', conversionFactorToMl: 250 };
 const GRAM = { abbreviation: 'g', conversionFactorToMl: null };
 const SLICE = { abbreviation: 'rondelle', conversionFactorToMl: null };
 
-const RUM = { id: 1, name: 'Rum' };
-const GIN = { id: 2, name: 'Gin' };
-const LIME = { id: 1, name: 'Lime', icon: '🍋', isAvailable: true };
+const RUM = { id: 1, name: 'Rum', nameTranslations: { fr: 'Rhum' } };
+const GIN = { id: 2, name: 'Gin', nameTranslations: null };
+const LIME = { id: 1, name: 'Lime', nameTranslations: { fr: 'Citron vert' }, icon: '🍋', isAvailable: true };
 
 function bottle(id: number, overrides: Partial<StockBottle> = {}): StockBottle {
   return { id, name: `Bottle ${id}`, categoryId: RUM.id, capacityMl: 700, remainingPercent: 100, ...overrides };
@@ -35,6 +35,10 @@ function bottle(id: number, overrides: Partial<StockBottle> = {}): StockBottle {
 /** Stock built by hand: the computeAvailability tests need no database. */
 function stock(bottles: StockBottle[], ingredients: StockIngredient[] = [LIME]): StockSnapshot {
   return buildStockSnapshot(bottles, [RUM, GIN], ingredients);
+}
+
+function missingOf(result: { ingredients: { name: string; isAvailable: boolean }[] }): string[] {
+  return result.ingredients.filter((ingredient) => !ingredient.isAvailable).map((ingredient) => ingredient.name);
 }
 
 let nextLineId = 1;
@@ -70,8 +74,8 @@ describe('computeAvailability', () => {
 
     expect(result.isAvailable).toBe(false);
     expect(result.maxServings).toBe(0);
-    expect(result.ingredients[0]).toMatchObject({ isAvailable: false, availableCount: 0, reason: 'Bottle is empty' });
-    expect(result.missingIngredients).toEqual(['Bottle 1']);
+    expect(result.ingredients[0]).toMatchObject({ isAvailable: false, availableCount: 0 });
+    expect(missingOf(result)).toEqual(['Bottle 1']);
   });
 
   it('uses the unit factor of the database: one cup takes 250 ml', () => {
@@ -129,9 +133,9 @@ describe('computeAvailability', () => {
     const empty = stock([bottle(1, { remainingPercent: 0 })]);
 
     expect(computeAvailability(1, [categoryLine(RUM.id, 4, CL)], empty).ingredients[0])
-      .toMatchObject({ isAvailable: false, availableCount: 0, reason: 'Insufficient Rum in stock' });
+      .toMatchObject({ isAvailable: false, availableCount: 0 });
     expect(computeAvailability(1, [categoryLine(RUM.id, 1, SLICE)], empty).ingredients[0])
-      .toMatchObject({ isAvailable: false, availableCount: 0, reason: 'No Rum bottles available' });
+      .toMatchObject({ isAvailable: false, availableCount: 0 });
   });
 
   it('reports a bottle with too little left', () => {
@@ -139,7 +143,7 @@ describe('computeAvailability', () => {
 
     expect(result.maxServings).toBe(0);
     expect(result.ingredients[0]).toMatchObject({
-      isAvailable: false, availableCount: 0, reason: 'Bottle has insufficient quantity',
+      isAvailable: false, availableCount: 0,
     });
   });
 
@@ -166,21 +170,23 @@ describe('computeAvailability', () => {
 
   // Orphan lines: the source was deleted before v1.8.0 (key set to NULL) or no longer exists
   it.each([
-    ['a BOTTLE line without bottle', () => line({ sourceType: 'BOTTLE', bottleId: null }), 'Invalid ingredient configuration'],
-    ['a CATEGORY line without category', () => line({ sourceType: 'CATEGORY', categoryId: null }), 'Invalid ingredient configuration'],
-    ['an INGREDIENT line without ingredient', () => line({ sourceType: 'INGREDIENT', ingredientId: null }), 'Invalid ingredient configuration'],
-    ['an orphan line with quantity 0', () => line({ sourceType: 'BOTTLE', bottleId: null, quantity: 0 }), 'Invalid ingredient configuration'],
-    ['a BOTTLE line without bottle but with a category key', () => line({ sourceType: 'BOTTLE', bottleId: null, categoryId: RUM.id }), 'Invalid ingredient configuration'],
-    ['a line on a missing bottle', () => bottleLine(99, 40), 'Bottle not found'],
-    ['a line on a missing category', () => categoryLine(99, 40), 'Category not found'],
-    ['a line on a missing ingredient', () => line({ sourceType: 'INGREDIENT', ingredientId: 99 }), 'Ingredient not found'],
-  ])('flags %s but keeps the cocktail available from the rest of the stock', (_label, buildLine, reason) => {
+    ['a BOTTLE line without bottle', () => line({ sourceType: 'BOTTLE', bottleId: null })],
+    ['a CATEGORY line without category', () => line({ sourceType: 'CATEGORY', categoryId: null })],
+    ['an INGREDIENT line without ingredient', () => line({ sourceType: 'INGREDIENT', ingredientId: null })],
+    ['an orphan line with quantity 0', () => line({ sourceType: 'BOTTLE', bottleId: null, quantity: 0 })],
+    ['a BOTTLE line without bottle but with a category key', () => line({ sourceType: 'BOTTLE', bottleId: null, categoryId: RUM.id })],
+    ['a line on a missing bottle', () => bottleLine(99, 40)],
+    ['a line on a missing category', () => categoryLine(99, 40)],
+    ['a line on a missing ingredient', () => line({ sourceType: 'INGREDIENT', ingredientId: 99 })],
+  ])('flags %s but keeps the cocktail available from the rest of the stock', (_label, buildLine) => {
     const result = computeAvailability(1, [bottleLine(1, 350), buildLine()], stock([bottle(1)]));
 
     expect(result.isAvailable).toBe(true);
     expect(result.maxServings).toBe(2);
-    expect(result.ingredients[1]).toMatchObject({ name: 'Unknown', isAvailable: false, availableCount: null, reason });
-    expect(result.missingIngredients).toEqual(['Unknown']);
+    expect(result.ingredients[1]).toMatchObject({
+      name: '', nameTranslations: null, orphan: true, isAvailable: false, availableCount: null,
+    });
+    expect(result.ingredients[0].orphan).toBe(false);
   });
 
   it('shows unlimited servings when every line is an orphan', () => {
@@ -196,7 +202,7 @@ describe('computeAvailability', () => {
 
     expect(result.isAvailable).toBe(false);
     expect(result.maxServings).toBe(0);
-    expect(result.missingIngredients).toEqual(['Bottle 1', 'Unknown']);
+    expect(missingOf(result)).toEqual(['Bottle 1', '']);
   });
 
   it('makes a line with an unknown source type, and its cocktail, unavailable', () => {
@@ -205,13 +211,12 @@ describe('computeAvailability', () => {
     expect(result.isAvailable).toBe(false);
     expect(result.maxServings).toBe(0);
     expect(result.ingredients[0]).toMatchObject({
-      name: 'Unknown', isAvailable: false, availableCount: null, reason: 'Invalid ingredient configuration',
+      name: '', orphan: true, isAvailable: false, availableCount: null,
     });
-    expect(result.missingIngredients).toEqual(['Unknown']);
   });
 
   it('makes the cocktail unavailable when a free ingredient is marked unavailable, even next to an orphan line', () => {
-    const mint = { id: 2, name: 'Mint', icon: null, isAvailable: false };
+    const mint = { id: 2, name: 'Mint', nameTranslations: null, icon: null, isAvailable: false };
     const lines = [
       bottleLine(1, 40), line({ sourceType: 'INGREDIENT', ingredientId: 2 }), line({ sourceType: 'BOTTLE', bottleId: null }),
     ];
@@ -220,7 +225,7 @@ describe('computeAvailability', () => {
     expect(result.isAvailable).toBe(false);
     expect(result.maxServings).toBe(0);
     expect(result.ingredients[1]).toMatchObject({
-      name: 'Mint', isAvailable: false, availableCount: 0, reason: 'Ingredient marked as unavailable',
+      name: 'Mint', isAvailable: false, availableCount: 0,
     });
   });
 
@@ -266,7 +271,7 @@ describe('computeAvailability', () => {
     ];
     const result = computeAvailability(1, lines, stock(bottles));
 
-    expect(result.lowStockWarnings).toEqual([`Bottle 1: only ${LOW_STOCK_THRESHOLD} servings left`]);
+    expect(result.lowStock).toEqual([{ name: 'Bottle 1', nameTranslations: null, servings: LOW_STOCK_THRESHOLD }]);
   });
 });
 
@@ -417,7 +422,7 @@ describe('calculateCocktailAvailability', () => {
     const result = await calculateCocktailAvailability(cocktail.id);
     expect(result.isAvailable).toBe(false);
     expect(result.maxServings).toBe(0);
-    expect(result.missingIngredients).toContain('Fresh Mint');
+    expect(missingOf(result)).toContain('Fresh Mint');
   });
 
   it('should generate low stock warning for <= 3 servings', async () => {
@@ -437,8 +442,7 @@ describe('calculateCocktailAvailability', () => {
     const result = await calculateCocktailAvailability(cocktail.id);
     expect(result.isAvailable).toBe(true);
     expect(result.maxServings).toBe(1);
-    expect(result.lowStockWarnings.length).toBeGreaterThan(0);
-    expect(result.lowStockWarnings[0]).toContain('1 servings');
+    expect(result.lowStock).toEqual([{ name: bottle.name, nameTranslations: null, servings: 1 }]);
   });
 });
 
@@ -456,5 +460,30 @@ describe('calculateAllCocktailsAvailability', () => {
     expect(result[c1.id]).toBeDefined();
     expect(result[c2.id]).toBeDefined();
     expect(result[c1.id].cocktailId).toBe(c1.id);
+  });
+});
+
+describe('translated names', () => {
+  it('returns the parsed nameTranslations of categories and ingredients, and null for bottles', async () => {
+    const unit = await seedUnit({ abbreviation: 'cl', conversionFactorToMl: 10 });
+    const cat = await seedCategory({ name: 'Sugar syrup', nameTranslations: JSON.stringify({ fr: 'Sirop de sucre' }) });
+    await seedBottle({ categoryId: cat.id, capacityMl: 700, remainingPercent: 10 });
+    const bitters = await seedIngredient({
+      name: 'Bitters', nameTranslations: JSON.stringify({ fr: 'Amer' }), isAvailable: false,
+    });
+
+    const cocktail = await prisma.cocktail.create({ data: { name: 'Translated' } });
+    await prisma.cocktailIngredient.createMany({
+      data: [
+        { cocktailId: cocktail.id, sourceType: 'CATEGORY', categoryId: cat.id, unitId: unit.id, quantity: 4, position: 0 },
+        { cocktailId: cocktail.id, sourceType: 'INGREDIENT', ingredientId: bitters.id, unitId: unit.id, quantity: 1, position: 1 },
+      ],
+    });
+
+    const result = await calculateCocktailAvailability(cocktail.id);
+    expect(result.lowStock).toEqual([
+      { name: 'Sugar syrup', nameTranslations: { fr: 'Sirop de sucre' }, servings: 1 },
+    ]);
+    expect(result.ingredients[1]).toMatchObject({ name: 'Bitters', nameTranslations: { fr: 'Amer' }, orphan: false });
   });
 });

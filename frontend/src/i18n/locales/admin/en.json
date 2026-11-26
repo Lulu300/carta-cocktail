@@ -313,6 +313,9 @@
     "doses_one": "{{servings}} serving",
     "doses_other": "{{servings}} servings",
     "lowStock": "Low stock",
+    "lowStockItem_one": "{{name}}: only {{count}} serving left",
+    "lowStockItem_other": "{{name}}: only {{count}} servings left",
+    "unknownSource": "Unknown source",
     "missing": "Missing",
     "moreMissing_one": "+{{count}} more",
     "moreMissing_other": "+{{count}} more"

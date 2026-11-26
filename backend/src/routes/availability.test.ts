@@ -97,7 +97,7 @@ describe('GET /api/availability/cocktails/:id', () => {
     expect(res.status).toBe(200);
     expect(res.body.isAvailable).toBe(false);
     expect(res.body.maxServings).toBe(0);
-    expect(res.body.missingIngredients).toContain('Mint');
+    expect(res.body.ingredients[0]).toMatchObject({ name: 'Mint', isAvailable: false, orphan: false });
   });
 
   it('should report low stock warnings for <= 3 servings', async () => {
@@ -117,7 +117,7 @@ describe('GET /api/availability/cocktails/:id', () => {
     const res = await request.get(`/api/availability/cocktails/${cocktail.id}`).set(authHeader());
     expect(res.status).toBe(200);
     expect(res.body.isAvailable).toBe(true);
-    expect(res.body.lowStockWarnings.length).toBeGreaterThan(0);
+    expect(res.body.lowStock).toEqual([{ name: bottle.name, nameTranslations: null, servings: 2 }]);
   });
 
   it('should convert a cup with the factor of its unit (250 ml)', async () => {
