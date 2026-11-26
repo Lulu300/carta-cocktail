@@ -11,7 +11,7 @@ depends_on: [E-10]
 touches: [frontend/src/utils/unitConverter.ts, frontend/src/utils/unitConverter.test.ts, frontend/src/components/ui/UnitConverter.tsx, frontend/src/components/ui/UnitConverter.test.tsx]
 sources: []
 branch: fix/E-32-unit-converter-number-format
-pr: 0
+pr: 278
 ---
 
 ## Contexte
