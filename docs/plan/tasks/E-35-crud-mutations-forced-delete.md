@@ -5,12 +5,12 @@ phase: E
 lane: frontend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [E-15]
-touches: [frontend/src/queries/crud.ts, frontend/src/queries/crud.test.tsx, frontend/src/components/admin/useForcedDelete.tsx, frontend/src/pages/admin/BottlesPage.tsx, frontend/src/pages/admin/CategoriesPage.tsx, frontend/src/pages/admin/IngredientsPage.tsx, frontend/src/pages/admin/MenusPage.tsx]
+touches: [frontend/src/queries/crud.ts, frontend/src/queries/invalidate.ts, frontend/src/components/admin/useForcedDelete.tsx, frontend/src/components/admin/useForcedDelete.test.tsx, frontend/src/pages/admin/BottlesPage.tsx, frontend/src/pages/admin/CategoriesPage.tsx, frontend/src/pages/admin/IngredientsPage.tsx, frontend/src/pages/admin/MenusPage.tsx]
 sources: ["05-frontend-archi.md §H2"]
-branch:
+branch: refactor/E-35-crud-forced-delete
 pr:
 ---
 
@@ -52,3 +52,4 @@ Constaté sur `develop` après le merge de B-19 (c770de0), branche d'E-15 rebas�
 ## Journal
 
 - 2026-11-05 : tâche créée lors de la correction de la PR #148 (E-15), remarque non bloquante 2 de la relecture.
+- 2026-11-26 : fait. `useForcedDeleteCrudMutations` (dans `useForcedDelete.tsx`, pas dans `crud.ts` qui est dans le bundle public) déclare clé, requêtes et messages une fois ; `useInvalidateQueries` déplacé dans `queries/invalidate.ts` pour éviter un cycle ; `updated` devient facultatif pour `MenusPage`.

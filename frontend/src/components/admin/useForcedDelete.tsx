@@ -2,7 +2,12 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { QueryKey } from '@tanstack/react-query';
 import { useConfirm } from '../../contexts/ConfirmContext';
-import { useInvalidateQueries } from '../../queries/crud';
+import {
+  useCreateUpdateMutations,
+  type CreateUpdateMutations,
+  type CrudMutationsOptions,
+} from '../../queries/crud';
+import { useInvalidateQueries } from '../../queries/invalidate';
 import { describeMutationError, readDeletionImpact } from '../../queries/deletionImpact';
 import { qk } from '../../queries/keys';
 import type { DeleteOptions, DeletionImpact, DeletionResponse } from '../../types';
@@ -91,4 +96,29 @@ export function useForcedDelete({ deleteItem, invalidates, deletedMessage }: For
       }
     }
   };
+}
+
+interface ForcedDeleteCrudOptions<Input, Entity> extends CrudMutationsOptions<Input, Entity> {
+  api: CrudMutationsOptions<Input, Entity>['api'] & { delete(id: number, options: DeleteOptions): Promise<DeletionResponse> };
+  /** i18n keys of the success toasts. */
+  messages: { created: string; updated: string; deleted: string };
+}
+
+/**
+ * Like `useCrudMutations`, but `remove` lists what uses the item and offers to
+ * delete anyway (see `useForcedDelete`). The same queries are refreshed by
+ * every mutation, so a page declares them once.
+ */
+export function useForcedDeleteCrudMutations<Input, Entity = unknown>(
+  options: ForcedDeleteCrudOptions<Input, Entity>,
+): CreateUpdateMutations<Input, Entity> & { remove: (id: number) => Promise<void> } {
+  const { api, messages } = options;
+  const { create, update } = useCreateUpdateMutations(options, messages);
+  const remove = useForcedDelete({
+    deleteItem: api.delete,
+    invalidates: [options.key, ...(options.invalidates ?? [])],
+    deletedMessage: messages.deleted,
+  });
+
+  return { create, update, remove };
 }

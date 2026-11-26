@@ -9,7 +9,7 @@ import type { Category } from '../../types';
 import { qk } from '../../queries/keys';
 import { useCategories } from '../../queries/categories';
 import { useCategoryTypes } from '../../queries/categoryTypes';
-import { useCrudMutations } from '../../queries/crud';
+import { useForcedDeleteCrudMutations } from '../../components/admin/useForcedDelete';
 import { getBadgeClasses } from '../../utils/colors';
 import Button from '../../components/ui/Button';
 import IconButton from '../../components/ui/IconButton';
@@ -17,7 +17,6 @@ import SearchInput from '../../components/ui/SearchInput';
 import { cx } from '../../components/ui/classNames';
 import DataTable, { type Column } from '../../components/admin/DataTable';
 import { useConfirmDelete } from '../../components/admin/useConfirmDelete';
-import { useForcedDelete } from '../../components/admin/useForcedDelete';
 import { useEntityForm } from '../../components/admin/useEntityForm';
 import CategoryFormModal from '../../components/admin/categories/CategoryFormModal';
 import CategoryTypesManager from '../../components/admin/categories/CategoryTypesManager';
@@ -32,16 +31,11 @@ export default function CategoriesPage() {
   const categoryTypes = useCategoryTypes().data ?? [];
   // Bottles, shortages and availability all depend on the category of a bottle.
   const refreshedKeys = [qk.categoryTypes, qk.bottles, qk.shortages, qk.availability];
-  const { create, update } = useCrudMutations<CategoryInput>({
+  const { create, update, remove: deleteCategory } = useForcedDeleteCrudMutations<CategoryInput>({
     key: qk.categories,
     api: categoriesApi,
     invalidates: refreshedKeys,
     messages: { created: 'categories.created', updated: 'categories.updated', deleted: 'categories.deleted' },
-  });
-  const deleteCategory = useForcedDelete({
-    deleteItem: categoriesApi.delete,
-    invalidates: [qk.categories, ...refreshedKeys],
-    deletedMessage: 'categories.deleted',
   });
   const categoryForm = useEntityForm((category?: Category) => toCategoryForm(categoryTypes, category));
   const [showTypesManager, setShowTypesManager] = useState(false);

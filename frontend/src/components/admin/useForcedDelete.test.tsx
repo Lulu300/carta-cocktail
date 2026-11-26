@@ -7,7 +7,7 @@ import { mockApiError, mockApiResponse, mockItemInUse } from '../../test/msw/uti
 import { qk } from '../../queries/keys';
 import { categories as categoriesApi } from '../../services/api';
 import type { DeletionImpact } from '../../types';
-import { useForcedDelete } from './useForcedDelete';
+import { useForcedDelete, useForcedDeleteCrudMutations } from './useForcedDelete';
 
 vi.mock('react-i18next', async (importOriginal) => {
   const { translateWithValues } = await import('../../test/translateWithValues');
@@ -193,5 +193,29 @@ describe('useForcedDelete', () => {
     await user.click(deleteAnywayButton());
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Database is locked'));
+  });
+});
+
+describe('useForcedDeleteCrudMutations', () => {
+  function CrudDeleteButton() {
+    const { remove } = useForcedDeleteCrudMutations({
+      key: qk.categories,
+      api: categoriesApi,
+      invalidates: [qk.availability],
+      messages: { created: 'categories.created', updated: 'categories.updated', deleted: 'categories.deleted' },
+    });
+    return <button onClick={() => remove(3)}>delete-category</button>;
+  }
+
+  it('refreshes the entity list and the extra keys declared once, and shows the deleted toast', async () => {
+    mockApiResponse('delete', CATEGORY_PATH, { impact: { cocktails: [], bottles: [] } });
+    const queryClient = createTestQueryClient();
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+    renderWithFeedback(<CrudDeleteButton />, { queryClient });
+
+    await requestDeletion(userEvent.setup());
+
+    expect(await screen.findByText('categories.deleted')).toBeInTheDocument();
+    expect(invalidate.mock.calls.map(([filters]) => filters?.queryKey)).toEqual([qk.categories, qk.availability]);
   });
 });

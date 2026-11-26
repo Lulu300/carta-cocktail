@@ -7,7 +7,8 @@ import { ingredients as ingredientsApi } from '../../services/api';
 import type { Ingredient } from '../../types';
 import { qk } from '../../queries/keys';
 import { useIngredients } from '../../queries/ingredients';
-import { useCrudMutations, useEntityMutation } from '../../queries/crud';
+import { useEntityMutation } from '../../queries/crud';
+import { useForcedDeleteCrudMutations } from '../../components/admin/useForcedDelete';
 import { buildNameTranslations, toTranslationForm, type TranslationForm } from '../../utils/translations';
 import Button from '../../components/ui/Button';
 import Field from '../../components/ui/Field';
@@ -23,7 +24,6 @@ import { cx } from '../../components/ui/classNames';
 import LoadError from '../../components/admin/LoadError';
 import TranslationFields from '../../components/admin/TranslationFields';
 import { useConfirmDelete } from '../../components/admin/useConfirmDelete';
-import { useForcedDelete } from '../../components/admin/useForcedDelete';
 import { useEntityForm } from '../../components/admin/useEntityForm';
 
 type AvailabilityFilter = 'all' | 'available' | 'unavailable';
@@ -72,16 +72,11 @@ export default function IngredientsPage() {
   const confirmDelete = useConfirmDelete();
   const ingredientsQuery = useIngredients();
   const ingredients = ingredientsQuery.data;
-  const { create, update } = useCrudMutations<IngredientInput>({
+  const { create, update, remove: deleteIngredient } = useForcedDeleteCrudMutations<IngredientInput>({
     key: qk.ingredients,
     api: ingredientsApi,
     invalidates: [qk.availability],
     messages: { created: 'ingredients.created', updated: 'ingredients.updated', deleted: 'ingredients.deleted' },
-  });
-  const deleteIngredient = useForcedDelete({
-    deleteItem: ingredientsApi.delete,
-    invalidates: REFRESHED_KEYS,
-    deletedMessage: 'ingredients.deleted',
   });
   const toggleAvailability = useEntityMutation<Ingredient>({
     mutationFn: (ingredient) => ingredientsApi.update(ingredient.id, { isAvailable: !ingredient.isAvailable }),
