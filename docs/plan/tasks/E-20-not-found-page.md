@@ -11,7 +11,7 @@ depends_on: [E-11]
 touches: [frontend/src/App.tsx, frontend/src/App.test.tsx, frontend/src/pages/public/, frontend/src/i18n/locales/]
 sources: ["06-frontend-ux-perf.md §2"]
 branch: feature/E-20-not-found-page
-pr:
+pr: 272
 ---
 
 ## Contexte
