@@ -129,6 +129,20 @@ describe('LoginPage', () => {
     expect(await axe(container)).toHaveNoViolations();
   });
 
+  it('says that every session ended when opened after "Sign out everywhere"', async () => {
+    const { container } = renderAtUrl('/login?reason=logged-out-everywhere');
+
+    expect(screen.getByText('auth.loggedOutEverywhere')).toBeInTheDocument();
+    expect(screen.queryByText('auth.backupRestored')).not.toBeInTheDocument();
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('does not say that every session ended without that reason', () => {
+    renderAtUrl('/login?reason=backup-restored');
+
+    expect(screen.queryByText('auth.loggedOutEverywhere')).not.toBeInTheDocument();
+  });
+
   it.each([
     ['without a reason', '/login'],
     ['with another reason', '/login?reason=expired'],
