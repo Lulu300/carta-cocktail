@@ -16,6 +16,12 @@ COPY tsconfig.json ./
 COPY src ./src
 # Also compiles src/scripts/ (seed, integrity check): the image has no tsx
 RUN npm run build
+# The Prisma CLI config, bundled with its one local import (src/lib/databasePath.ts)
+# into dist/lib/, the folder that file expects to sit in: the runtime image needs
+# no src/ and no TypeScript loader. docker/prisma.config.js loads it from /app.
+COPY prisma.config.ts ./
+RUN node_modules/.bin/esbuild prisma.config.ts --bundle --platform=node --packages=external \
+    --outfile=dist/lib/prisma.config.js
 
 # Runtime dependencies only, installed for the target platform: they hold the
 # native better-sqlite3 binary and the Prisma schema engine. The first steps
@@ -52,10 +58,29 @@ RUN node /tmp/prune-unused-deps.mjs \
     prisma:mysql2 \
     prisma:postgres \
     better-sqlite3:prebuild-install
+# Files of the kept packages that nothing loads at runtime. Each path is removed
+# without -f and the maps are searched first, so the build stops when an update
+# renames or drops one of them and this list is stale.
+# - @prisma/studio-core/dist/ui: the web interface, served by `prisma studio` only
+#   (the CLI imports it from build/studio.js, which no kept command loads);
+# - @prisma/studio-core/dist/metafile-*.json: esbuild bundle reports, never read;
+# - better-sqlite3/deps: the SQLite sources, compiled only by `npm ci` when no
+#   prebuilt binary exists (the binary stays in build/Release);
+# - *.map: read only under --enable-source-maps, which neither the entrypoint nor
+#   this image sets (NODE_OPTIONS is empty).
+RUN set -eu; \
+    studio=node_modules/@prisma/studio-core/dist; \
+    test -n "$(find node_modules -name '*.map' -print -quit)"; \
+    rm -r "$studio/ui" $studio/metafile-*.json node_modules/better-sqlite3/deps; \
+    find node_modules -name '*.map' -delete
 # Fails the build, on every platform, when a Prisma update makes the CLI load at
 # startup a package cut above: otherwise only the first container start would show it.
 # Without network, as in a container that cannot reach the registry.
 RUN --network=none CHECKPOINT_DISABLE=1 node_modules/.bin/prisma --version
+# Fails the build when npm skipped the install script of better-sqlite3 (npm 12
+# blocks the scripts missing from allowScripts in package.json): otherwise the
+# image builds and only fails at the first database access.
+RUN node -e "new (require('better-sqlite3'))(':memory:').close()"
 
 FROM node:24.22-alpine AS runtime
 # tini forwards SIGTERM to the entrypoint, then to Node once the entrypoint has exec'd it
@@ -70,10 +95,8 @@ ENV NPM_CONFIG_UPDATE_NOTIFIER=false \
 WORKDIR /app
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
-COPY package.json prisma.config.ts ./
-# The Prisma CLI config resolves the database path with this file (loaded as
-# TypeScript by the CLI): the rest of src/ stays out of the image
-COPY src/lib/databasePath.ts ./src/lib/
+COPY package.json ./
+COPY docker/prisma.config.js ./
 COPY prisma ./prisma
 COPY docker-entrypoint.sh ./
 # The executable bit can be lost on checkouts that do not keep file modes.
