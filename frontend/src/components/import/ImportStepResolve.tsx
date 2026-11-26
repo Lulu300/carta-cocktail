@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { EntityResolutionAction, ImportPreviewResponse } from '../../types';
 import Button from '../ui/Button';
-import { cx } from '../ui/classNames';
 import ImportEntityRow from './ImportEntityRow';
 import {
   IMPORT_ENTITY_TYPES,
@@ -11,6 +10,7 @@ import {
   type ImportResolutions,
 } from './importResolutions';
 import type { ImportReferenceLists } from './useImportReferenceLists';
+import Alert from '../ui/Alert';
 
 interface ImportStepResolveProps {
   preview: ImportPreviewResponse;
@@ -70,25 +70,14 @@ export default function ImportStepResolve({ preview, resolutions, onChange, list
   return (
     <div className="space-y-6">
       {preview.cocktail.alreadyExists && (
-        <div className="bg-orange-500/10 border border-orange-500/30 text-orange-400 rounded-lg p-3 text-sm">
-          {t('cocktails.importWizard.cocktailExists')}
-        </div>
+        <Alert tone="warning">{t('cocktails.importWizard.cocktailExists')}</Alert>
       )}
 
       {lists.hasError && (
-        <div role="alert" className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg p-3 text-sm">
-          {t('cocktails.importWizard.listsLoadError')}
-        </div>
+        <Alert tone="danger">{t('cocktails.importWizard.listsLoadError')}</Alert>
       )}
 
-      <div className={cx(
-        'rounded-lg p-3 text-sm border',
-        incompleteCount === 0
-          ? 'bg-green-500/10 border-green-500/30 text-green-400'
-          : 'bg-amber-500/10 border-amber-500/30 text-amber-400',
-      )}>
-        {statusMessage()}
-      </div>
+      <Alert tone={incompleteCount === 0 ? 'success' : 'warning'}>{statusMessage()}</Alert>
 
       <div className="space-y-6 max-h-[50vh] overflow-y-auto pr-1">
         {IMPORT_ENTITY_TYPES.map(renderSection)}

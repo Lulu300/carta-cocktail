@@ -3,6 +3,7 @@ import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { useCategoryTypeName } from '../../hooks/useCategoryTypeName';
 import { useShortages } from '../../queries/shortages';
 import { getBadgeClasses } from '../../utils/colors';
+import Alert from '../../components/ui/Alert';
 
 export default function ShortagesPage() {
   const { t } = useTranslation();
@@ -17,7 +18,7 @@ export default function ShortagesPage() {
     }
     if (isError) {
       return (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-6 py-8 rounded-xl text-center space-y-4">
+        <Alert tone="danger" size="banner">
           <p className="text-lg">{t('common.error')}</p>
           <button
             onClick={() => refetch()}
@@ -25,14 +26,12 @@ export default function ShortagesPage() {
           >
             {t('common.retry')}
           </button>
-        </div>
+        </Alert>
       );
     }
     if (items.length === 0) {
       return (
-        <div className="bg-green-500/10 border border-green-500/30 text-green-400 px-6 py-8 rounded-xl text-center text-lg">
-          {t('shortages.noShortages')}
-        </div>
+        <Alert tone="success" size="banner" className="text-lg">{t('shortages.noShortages')}</Alert>
       );
     }
     return (
