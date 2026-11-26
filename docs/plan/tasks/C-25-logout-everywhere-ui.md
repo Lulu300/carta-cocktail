@@ -11,7 +11,7 @@ depends_on: [C-11]
 touches: [frontend/src/contexts/AuthContext.tsx, frontend/src/services/api.ts, frontend/src/pages/admin/SettingsPage.tsx, frontend/src/pages/auth/LoginPage.tsx, frontend/src/utils/signInAfterRestore.ts, frontend/src/i18n/locales/]
 sources: ["03-security.md §7"]
 branch: feature/C-25-logout-everywhere
-pr:
+pr: 258
 ---
 
 ## Contexte
