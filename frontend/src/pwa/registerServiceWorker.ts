@@ -1,4 +1,6 @@
 import { registerSW } from 'virtual:pwa-register';
+import { ADMIN_PAGES } from './adminPages';
+import { announceUpdate } from './updateAvailable';
 
 // The answers the service worker keeps at run time: the guest's menu data and the photos.
 // Keep in line with runtimeCaching in vite.config.ts, which cannot import this list.
@@ -55,10 +57,19 @@ export function warmRuntimeCachesOnFirstControl(target: WarmUpTarget = browserTa
 }
 
 /**
+ * Once a new version has taken over: a public page reloads at once to show it, an admin page
+ * offers it in a banner instead, so that a form in progress is not lost.
+ */
+export function showNewVersion(location: Pick<Location, 'pathname' | 'reload'> = window.location) {
+  if (ADMIN_PAGES.test(location.pathname)) announceUpdate();
+  else location.reload();
+}
+
+/**
  * Registers the service worker of vite-plugin-pwa (sw.js). In autoUpdate mode, a new version
- * activates at once and the page reloads to show it.
+ * activates at once, also when another tab installed it, then showNewVersion runs.
  */
 export function registerServiceWorker(): void {
   warmRuntimeCachesOnFirstControl();
-  registerSW({ immediate: true });
+  registerSW({ immediate: true, onNeedReload: () => showNewVersion() });
 }

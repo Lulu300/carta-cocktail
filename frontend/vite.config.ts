@@ -2,6 +2,7 @@ import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { ADMIN_PAGES } from './src/pwa/adminPages';
 
 // The browsers of v1.11 (Vite 7's default target), down from Vite 8's Safari 16.4: tablets
 // stuck on iPadOS 16.0 to 16.3 still serve as menu displays and for the admin. With Safari
@@ -57,8 +58,8 @@ export default defineConfig({
     tailwindcss(),
     shell.plugin,
     VitePWA({
-      // A new deployment installs a new service worker, which takes over at once and reloads
-      // the page (src/pwa/registerServiceWorker.ts): nobody stays on an old version.
+      // A new deployment installs a new service worker, which takes over at once: a public page
+      // reloads, an admin page offers the new version (src/pwa/registerServiceWorker.ts).
       registerType: 'autoUpdate',
       // Registered by src/main.tsx, not by a script tag that index.html would wait for.
       injectRegister: false,
@@ -103,7 +104,7 @@ export default defineConfig({
         ],
         navigateFallback: 'index.html',
         // The admin side always loads from the network, as do the API and the photos.
-        navigateFallbackDenylist: [/^\/api\//, /^\/uploads\//, /^\/admin(\/|$)/, /^\/login(\/|$)/],
+        navigateFallbackDenylist: [/^\/api\//, /^\/uploads\//, ADMIN_PAGES],
         // Only the guest's menu data and photos are kept: no other /api/ route is cached, and
         // the admin's requests, which carry a token, never read or fill the cache. These
         // functions are copied into sw.js: they cannot use the constants of this file.
@@ -113,7 +114,9 @@ export default defineConfig({
             urlPattern: ({ url, request, sameOrigin }) =>
               sameOrigin &&
               url.pathname.startsWith('/api/public/') &&
-              !request.headers.has('Authorization'),
+              !request.headers.has('Authorization') &&
+              // The link preview pages of /api/public/share/ are documents, not menu data
+              request.mode !== 'navigate',
             // Fresh data whenever the network answers within 3 s (human decision, 2026-11-26)
             handler: 'NetworkFirst',
             options: {

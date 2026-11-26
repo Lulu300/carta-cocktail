@@ -13,6 +13,7 @@ import {
   isSignInAfterRestore,
 } from '../../utils/signInAfterRestore';
 import Alert from '../../components/ui/Alert';
+import UpdateAvailableBanner from '../../components/admin/UpdateAvailableBanner';
 
 const ADMIN_HOME = '/admin';
 
@@ -69,6 +70,7 @@ export default function LoginPage() {
   return (
     <main className="min-h-screen bg-canvas text-fg flex items-center justify-center px-4">
       <div className="w-full max-w-md">
+        <UpdateAvailableBanner className="mb-6" />
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-accent font-serif mb-2">{t('app.name')}</h1>
           <p className="text-fg-muted">{t('auth.welcome')}</p>

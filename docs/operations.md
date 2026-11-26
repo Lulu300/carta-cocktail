@@ -270,7 +270,7 @@ Le frontend installe un service worker (`/sw.js`) dans le navigateur des invité
 
 - **HTTPS obligatoire.** Les navigateurs n'activent un service worker qu'en HTTPS, ou sur `localhost`. Une instance servie en HTTP sur une adresse du réseau local (`http://192.168.1.10`) fonctionne comme avant, sans mode hors ligne ni installation : voir [HTTPS](#https).
 - **Données à jour.** Les réponses de `/api/public/` viennent du réseau quand il répond en moins de 3 secondes, du cache sinon. Aucune autre route `/api/` n'est gardée, et l'admin connecté lit toujours le serveur : ses requêtes portent son jeton, que le service worker laisse passer sans les garder. Les pages `/admin` et `/login` se chargent toujours depuis le serveur.
-- **Mise à jour.** Après une mise à jour de l'instance, le navigateur trouve le nouveau `/sw.js` au chargement suivant d'une page : le nouveau service worker prend la main et la page se recharge d'elle-même sur la nouvelle version. nginx sert `/sw.js` avec `Cache-Control: no-cache` pour qu'aucun cache ne garde l'ancien.
+- **Mise à jour.** Après une mise à jour de l'instance, le navigateur trouve le nouveau `/sw.js` au chargement suivant d'une page : le nouveau service worker prend la main, dans tous les onglets du site. Une page publique se recharge d'elle-même sur la nouvelle version. Une page de l'admin ou de connexion ne se recharge pas, pour ne pas perdre une saisie en cours : elle affiche « Une nouvelle version est disponible » avec un bouton « Recharger ». nginx sert `/sw.js` avec `Cache-Control: no-cache` pour qu'aucun cache ne garde l'ancien.
 
 ### Désinscrire un service worker bloqué
 

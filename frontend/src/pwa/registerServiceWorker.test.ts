@@ -3,8 +3,10 @@ import { registerSW } from 'virtual:pwa-register';
 import {
   registerServiceWorker,
   runtimeCachedUrls,
+  showNewVersion,
   warmRuntimeCachesOnFirstControl,
 } from './registerServiceWorker';
+import { isUpdateAvailable, subscribeToUpdate } from './updateAvailable';
 
 const ORIGIN = 'https://menu.example';
 
@@ -98,7 +100,54 @@ describe('registerServiceWorker', () => {
     registerServiceWorker();
     events.dispatchEvent(new Event('controllerchange'));
 
-    expect(registerSW).toHaveBeenCalledWith({ immediate: true });
+    expect(registerSW).toHaveBeenCalledWith(expect.objectContaining({ immediate: true }));
     expect(fetch).toHaveBeenCalledWith(`${window.location.origin}/uploads/mojito.jpg`);
   });
+
+  it('hands a new version to showNewVersion: an open admin page gets the banner', () => {
+    const reload = vi.fn();
+    vi.stubGlobal('location', { ...window.location, pathname: '/admin/cocktails', reload });
+    vi.stubGlobal('navigator', {
+      serviceWorker: { controller: {}, addEventListener: vi.fn() },
+    });
+    registerServiceWorker();
+
+    const options = vi.mocked(registerSW).mock.lastCall?.[0];
+    options?.onNeedReload?.();
+
+    expect(reload).not.toHaveBeenCalled();
+    expect(isUpdateAvailable()).toBe(true);
+  });
+});
+
+describe('showNewVersion', () => {
+  it.each(['/', '/menu/summer', '/menu/summer/cocktail/3', '/administrateur'])(
+    'reloads the public page %s at once',
+    (pathname) => {
+      const announced = vi.fn();
+      const unsubscribe = subscribeToUpdate(announced);
+      const reload = vi.fn();
+
+      showNewVersion({ pathname, reload });
+      unsubscribe();
+
+      expect(reload).toHaveBeenCalledOnce();
+      expect(announced).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['/admin', '/admin/cocktails/3', '/login'])(
+    'keeps the admin page %s and announces the new version instead',
+    (pathname) => {
+      const announced = vi.fn();
+      const unsubscribe = subscribeToUpdate(announced);
+      const reload = vi.fn();
+
+      showNewVersion({ pathname, reload });
+      unsubscribe();
+
+      expect(reload).not.toHaveBeenCalled();
+      expect(announced).toHaveBeenCalledOnce();
+    },
+  );
 });
