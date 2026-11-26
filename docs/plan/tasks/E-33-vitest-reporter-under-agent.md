@@ -11,7 +11,7 @@ depends_on: []
 touches: [frontend/vitest.config.ts, frontend/AGENTS.md, backend/vitest.config.ts, backend/AGENTS.md]
 sources: []
 branch: test/E-33-vitest-reporter
-pr:
+pr: 282
 ---
 
 ## Contexte
