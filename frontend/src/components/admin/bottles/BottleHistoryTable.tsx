@@ -4,6 +4,7 @@ import { useLocalizedName } from '../../../hooks/useLocalizedName';
 import type { Bottle } from '../../../types';
 import { formatPrice } from '../../../utils/formatPrice';
 import { cx } from '../../ui/classNames';
+import ScrollableTable from '../../ui/ScrollableTable';
 import { BottleRowActions, type BottleActions } from './BottleRow';
 
 interface BottleHistoryTableProps extends BottleActions {
@@ -38,6 +39,7 @@ export default function BottleHistoryTable({ bottles, onEdit, onDelete }: Bottle
       </button>
       {isOpen && (
         <div className="bg-surface border border-line rounded-xl overflow-hidden opacity-60">
+          <ScrollableTable>
           <table className="w-full">
             <thead className="bg-canvas">
               <tr>
@@ -62,6 +64,7 @@ export default function BottleHistoryTable({ bottles, onEdit, onDelete }: Bottle
               ))}
             </tbody>
           </table>
+          </ScrollableTable>
         </div>
       )}
     </div>

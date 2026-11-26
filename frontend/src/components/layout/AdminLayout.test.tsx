@@ -243,3 +243,14 @@ describe('AdminLayout upgrade notice', () => {
     expect(screen.getByRole('heading', { name: 'upgradeNotice.title' })).toBeInTheDocument();
   });
 });
+
+// jsdom computes no layout: these classes keep a wide table from stretching the page (checked in a browser)
+describe('AdminLayout width', () => {
+  it('keeps the sidebar at its width and lets the content column shrink below its content', async () => {
+    renderLayout();
+    await waitForLayoutData();
+
+    expect(screen.getByRole('navigation', { name: 'nav.admin' }).closest('aside')).toHaveClass('lg:shrink-0');
+    expect(screen.getByRole('main').parentElement).toHaveClass('min-w-0');
+  });
+});

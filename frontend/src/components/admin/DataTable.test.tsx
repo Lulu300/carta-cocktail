@@ -131,4 +131,13 @@ describe('DataTable', () => {
       expect(liveRegion()).toBeEmptyDOMElement();
     });
   });
+
+  // jsdom computes no layout: the wrapper is what lets a wide table scroll on its own (checked in a browser)
+  it('scrolls the table alone, not the messages under it', () => {
+    renderTable({ rows: [] });
+
+    const scroller = screen.getByRole('table').parentElement;
+    expect(scroller).toHaveClass('overflow-x-auto');
+    expect(scroller).not.toContainElement(screen.getByText('Nothing here'));
+  });
 });

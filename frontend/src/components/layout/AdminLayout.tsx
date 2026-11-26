@@ -61,7 +61,7 @@ export default function AdminLayout() {
         ref={sidebarRef}
         id={sidebarId}
         className={cx(
-          'fixed inset-y-0 left-0 z-30 w-64 flex flex-col bg-surface border-r border-line',
+          'fixed inset-y-0 left-0 z-30 w-64 lg:shrink-0 flex flex-col bg-surface border-r border-line',
           'motion-reduce:transition-none lg:translate-x-0 lg:static',
           // A closed drawer is only moved off screen: invisible keeps its links out of the tab order.
           // Opening shows it at once, or focus() would land on a still hidden element;
@@ -117,9 +117,10 @@ export default function AdminLayout() {
       )}
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col min-h-screen">
+      {/* min-w-0: a flex item is as wide as its content by default, so a wide table would stretch the page */}
+      <div className="flex-1 min-w-0 flex flex-col min-h-screen">
         {/* Top bar */}
-        <header className="bg-surface border-b border-line px-6 py-4 flex items-center justify-between">
+        <header className="bg-surface border-b border-line px-4 sm:px-6 py-4 flex items-center justify-between">
           <button
             {...menuButtonProps}
             aria-label={t('nav.menu')}
@@ -130,7 +131,7 @@ export default function AdminLayout() {
             </svg>
           </button>
 
-          <div className="flex items-center gap-4 ml-auto">
+          <div className="flex items-center gap-2 sm:gap-4 ml-auto">
             {shortageCount > 0 && (
               <Link
                 to="/admin/shortages"
