@@ -5,12 +5,12 @@ phase: D
 lane: infra
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [B-12]
 touches: [backend/.dockerignore, backend/.gitignore]
 sources: []
-branch:
+branch: chore/D-32-backend-dockerignore-test-leftovers
 pr:
 ---
 
@@ -35,9 +35,9 @@ Relevé par la relecture de la PR #136 (point 3, non bloquant, antérieur à B-1
 
 ## Critères d'acceptation
 
-- [ ] Avec des fichiers factices `prisma/test/test.db-wal`, `prisma/carta_cocktail.db-shm`, `prisma/carta_cocktail.db.restore-x` et `prisma/carta_cocktail.db.session-floor`, `docker build` puis `docker run --rm --entrypoint ls <image> -R prisma` ne les montre pas.
-- [ ] `git status` ne montre pas `prisma/carta_cocktail.db.restore-x`.
-- [ ] Check Smoke vert ; l'image contient toujours le schéma et les migrations.
+- [x] Avec des fichiers factices `prisma/test/test.db-wal`, `prisma/carta_cocktail.db-shm`, `prisma/carta_cocktail.db.restore-x` et `prisma/carta_cocktail.db.session-floor`, `docker build` puis `docker run --rm --entrypoint ls <image> -R prisma` ne les montre pas.
+- [x] `git status` ne montre pas `prisma/carta_cocktail.db.restore-x`.
+- [x] Check Smoke vert ; l'image contient toujours le schéma et les migrations.
 
 ## Tests à ajouter ou adapter
 
@@ -50,3 +50,4 @@ Relevé par la relecture de la PR #136 (point 3, non bloquant, antérieur à B-1
 ## Journal
 
 - 2026-10-13 : tâche créée par la PR docs de suivi du lot E-13/B-12/C-41/D-30, à partir de la relecture de la PR #136 (B-12, point 3).
+- 2026-11-26 : faits relus, tâche toujours valable. Image construite avant/après avec 8 fichiers factices (`prisma/test/test.db-{wal,shm}`, `.restore-x`, `prisma/carta_cocktail.db-{wal,shm}`, `.restore-x`, `.session-floor`, `.session-floor.tmp`) : seuls ces 8 fichiers disparaissent de `/app` (hors `node_modules`), `prisma/schema.prisma` et `prisma/migrations/` restent, le conteneur démarre et `/api/health` répond. Taille de l'image inchangée (626 MB) : pas de ligne « Notes de version ».

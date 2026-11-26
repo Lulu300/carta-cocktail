@@ -7,3 +7,7 @@ node_modules
 
 # Test database folder (src/test/testDatabase.ts): leftovers of an interrupted run
 /prisma/test/
+
+# Copy of the database a restore writes before swapping it in: left behind by an
+# interrupted restore (the root .gitignore holds the other *.db* patterns)
+*.db.restore-*
