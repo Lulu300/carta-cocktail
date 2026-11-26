@@ -5,13 +5,13 @@ phase: D
 lane: docs
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: []
-touches: [docs/plan/build.mjs, docs/plan/build.test.mjs, docs/plan/README.md]
+touches: [docs/plan/build.mjs, docs/plan/build.test.mjs, docs/plan/README.md, docs/plan/tasks/D-21-dependabot-npm-limit.md]
 sources: []
-branch:
-pr:
+branch: docs/D-39-plan-check-list-fields
+pr: PR_NUM
 ---
 
 ## Décisions validées
@@ -42,9 +42,9 @@ Les 160 tâches actuelles écrivent les trois champs entre crochets (`[]` compri
 
 ## Critères d'acceptation
 
-- [ ] `--check` sort en erreur, avec le fichier et le champ, pour un `depends_on`, `touches` ou `sources` scalaire, vide, ou dont le crochet fermant manque.
-- [ ] `--check` passe sur les tâches actuelles, et `--ready` donne les mêmes lots qu'avant.
-- [ ] Le tableau des champs du README décrit le format des trois champs.
+- [x] `--check` sort en erreur, avec le fichier et le champ, pour un `depends_on`, `touches` ou `sources` scalaire, vide, ou dont le crochet fermant manque.
+- [x] `--check` passe sur les tâches actuelles, et `--ready` donne les mêmes lots qu'avant.
+- [x] Le tableau des champs du README décrit le format des trois champs.
 
 ## Tests à ajouter ou adapter
 
@@ -63,3 +63,4 @@ Au choix de l'agent, noté au Journal :
 ## Journal
 
 - 2026-11-12 : tâche créée par la PR docs de suivi du lot C-47/C-48/B-21/C-46 (PR #173), sur décision du coordinateur (point 3 de la relecture de la PR #173). Vérifié sur `develop` (923c4ed) : `arr()` vers la ligne 338 de `build.mjs`, sonde `touches: scripts/upgrade-test/, [backend/]` acceptée par `--check` (160 tâches valides) et lue comme un seul chemin par `--json` ; les 160 tâches écrivent `depends_on`, `touches` et `sources` entre crochets ; aucun workflow de `.github/` ne lance `build.mjs`.
+- 2026-11-26 : `listFieldErrors` dans `build.mjs` refuse un `depends_on`, `touches` ou `sources` présent qui n'est pas une liste entre crochets (scalaire, vide, crochet fermant manquant, liste YAML sur plusieurs lignes). Un champ absent reste accepté comme liste vide (choix : ne pas l'imposer, aucune tâche n'y gagne). `arr()` ne sert plus qu'au champ absent. Les 201 tâches passent sans correction et `--ready` donne la même sortie qu'avant. Test : `docs/plan/build.test.mjs` (`node --test docs/plan/build.test.mjs`), sur des en-têtes en mémoire. README : tableau des champs et format sur une ligne. `D-21-dependabot-npm-limit.md` ajouté à `touches` pour la ligne de Journal sur la décision de l'humain (étape 4).

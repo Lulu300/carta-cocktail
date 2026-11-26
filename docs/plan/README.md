@@ -40,8 +40,10 @@ Le script n'a aucune dépendance : Node 20 ou plus suffit.
 | `owner` | `agent`, `human`, `mixed` | `human`/`mixed` : une partie demande une action manuelle (réglages GitHub, décision produit) |
 | `depends_on` | liste d'`id` | Tâches à terminer avant de commencer |
 | `touches` | liste de chemins ou dossiers (`dossier/`) | Fichiers modifiés. Sert à détecter les conflits entre tâches lancées en parallèle |
-| `sources` | `"0X-rapport.md §section"` | Passages des rapports de revue qui justifient la tâche |
+| `sources` | liste de `"0X-rapport.md §section"` | Passages des rapports de revue qui justifient la tâche |
 | `branch`, `pr` | texte | Renseignés par l'agent qui traite la tâche |
+
+`depends_on`, `touches` et `sources` s'écrivent entre crochets, sur une seule ligne (`[]` s'il n'y a rien). `node docs/plan/build.mjs --check` refuse une valeur scalaire, vide, sans crochet fermant ou écrite en liste YAML sur plusieurs lignes.
 
 Le corps suit toujours les mêmes sections : **Contexte**, **Problème constaté**, **Ce qu'il faut faire**, **Critères d'acceptation** (cases à cocher), **Tests à ajouter ou adapter**, **Points d'attention**, **Journal**.
 
