@@ -1,0 +1,30 @@
+name: Labeler
+
+# Labels a pull request for the release notes (.github/release.yml) from its
+# branch prefix and changed files (.github/labeler.yml).
+#
+# SECURITY: pull_request_target runs with the rights of the base branch, also
+# for a fork. This workflow must therefore never check out or run anything
+# from the pull request: the action only reads .github/labeler.yml of the base
+# branch and the list of changed files through the API.
+#
+# Not a required check: a missing label must never block a merge. Labels are
+# only added (no sync-labels), so a label set by hand is never removed.
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions: {}
+
+jobs:
+  label:
+    name: Label pull request
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7.0.0
+        with:
+          sync-labels: false
