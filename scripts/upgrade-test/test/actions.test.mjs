@@ -1,23 +1,33 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { judgeDatabaseCopy, mountsToChown, runAction } from '../lib/actions.mjs';
+import { judgeDatabaseCopy, plannedMountsToChown, runAction } from '../lib/actions.mjs';
 
-const VOLUME = { Type: 'volume', Name: 'carta-ut-1_db-data', Source: '/var/lib/docker/volumes/carta-ut-1_db-data/_data', Destination: '/app/data' };
-const BIND = { Type: 'bind', Source: '/tmp/carta-upgrade-test/run/uploads', Destination: '/app/uploads' };
-const OTHER = { Type: 'bind', Source: '/etc/localtime', Destination: '/etc/localtime' };
+const SERVICE = 'carta-cocktail-backend';
+const DATA_BIND = { type: 'bind', source: '/tmp/carta-ut-1/instance/data', target: '/app/data' };
+const UPLOADS_BIND = { type: 'bind', source: '/tmp/carta-ut-1/instance/uploads', target: '/app/uploads' };
+const OLD_UPLOADS_BIND = { type: 'bind', source: '/tmp/carta-ut-1/instance/uploads', target: '/uploads' };
+const DATA_VOLUME = { type: 'volume', source: 'db-data', target: '/app/data' };
+const volumes = { 'db-data': { name: 'carta-ut-1_db-data' } };
+const configOf = (...mounts) => ({ services: { [SERVICE]: { volumes: mounts }, other: { volumes: [UPLOADS_BIND] } }, volumes });
 
-test('mountsToChown gives the volume name and the host folder, in the order asked', () => {
-  assert.deepEqual(mountsToChown([BIND, OTHER, VOLUME], ['/app/data', '/app/uploads']), [
+test('plannedMountsToChown gives the volume name and the host folder, in the order asked', () => {
+  assert.deepEqual(plannedMountsToChown(configOf(UPLOADS_BIND, DATA_VOLUME), SERVICE, ['/app/data', '/app/uploads']), [
     { destination: '/app/data', type: 'volume', source: 'carta-ut-1_db-data' },
-    { destination: '/app/uploads', type: 'bind', source: '/tmp/carta-upgrade-test/run/uploads' },
+    { destination: '/app/uploads', type: 'bind', source: '/tmp/carta-ut-1/instance/uploads' },
   ]);
 });
 
-test('mountsToChown leaves out a destination without a mount', () => {
-  assert.deepEqual(mountsToChown([VOLUME], ['/app/data', '/app/uploads']), [
+test('plannedMountsToChown leaves out a destination without a mount', () => {
+  assert.deepEqual(plannedMountsToChown(configOf(DATA_VOLUME), SERVICE, ['/app/data', '/app/uploads']), [
     { destination: '/app/data', type: 'volume', source: 'carta-ut-1_db-data' },
   ]);
-  assert.deepEqual(mountsToChown([OTHER], ['/app/data']), []);
+  assert.deepEqual(plannedMountsToChown(configOf(OLD_UPLOADS_BIND), SERVICE, ['/app/uploads']), []);
+  assert.deepEqual(plannedMountsToChown({ services: { [SERVICE]: {} } }, SERVICE, ['/app/data']), []);
+});
+
+test('plannedMountsToChown reads the service asked only', () => {
+  const config = { services: { [SERVICE]: { volumes: [DATA_BIND] }, other: { volumes: [UPLOADS_BIND] } } };
+  assert.deepEqual(plannedMountsToChown(config, SERVICE, ['/app/data', '/app/uploads']).map((mount) => mount.destination), ['/app/data']);
 });
 
 const START_LOGS = ['SQLite journal mode: wal', 'Carta Cocktail API running on port 3001'];
