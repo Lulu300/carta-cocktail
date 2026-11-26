@@ -17,7 +17,7 @@ Before committing any change:
 7. **Verify coverage thresholds are met**: `npm test -- --coverage`
 8. Commit, push, open PR to `develop`
 
-CI runs automatically on PRs (`Frontend` job of `.github/workflows/ci.yml`): `npm audit --omit=dev --audit-level=high` → `tsc -b` → lint → build → bundle budget (140 kB gzip for the first load of the public menu, `.github/scripts/bundle-budget.mjs`) → CSS media queries readable by Safari 16 → tests with coverage → delta coverage (80%). The `Docker build (frontend)` job builds the nginx image, and the `Smoke` workflow starts it with the backend (see the root `AGENTS.md`).
+CI runs automatically on PRs (`Frontend` job of `.github/workflows/ci.yml`): `npm audit --omit=dev --audit-level=high` → `tsc -b` → lint → build → bundle budget (140 kB gzip for the first load of the public menu, and no admin code in the service worker precache, `.github/scripts/bundle-budget.mjs`) → CSS media queries readable by Safari 16 → tests with coverage → delta coverage (80%). The `Docker build (frontend)` job builds the nginx image, and the `Smoke` workflow starts it with the backend (see the root `AGENTS.md`).
 
 ## Testing Requirements
 
@@ -81,6 +81,7 @@ frontend/
 │   │   ├── useLocalizedName.ts    # Get localized name from translation object
 │   │   ├── usePageTitle.ts        # Tab title: page parts before the site name
 │   │   └── useSort.ts
+│   ├── pwa/                    # Service worker registration, loaded after the page (see "Progressive web app")
 │   ├── queries/                # TanStack Query: query keys (keys.ts), query client, one file per resource
 │   ├── services/
 │   │   ├── api.ts                 # Centralized API client with typed endpoints
@@ -97,6 +98,8 @@ frontend/
 │           ├── public/           # en.json, fr.json: keys used by the first load (public pages, shared components)
 │           └── admin/            # en.json, fr.json: every other key (login page and admin)
 ├── index.html                    # Vite entry page
+├── public/                       # Copied as is to dist/: app icons of the web manifest, apple-touch-icon
+├── pwa-icons/                    # SVG sources of the app icons
 ├── package.json
 ├── tsconfig.json                 # Project references only: check types with `tsc -b`
 ├── tsconfig.app.json             # src/
@@ -180,6 +183,18 @@ Uses `@import "tailwindcss"` syntax (not `@tailwind` directives). Dark theme wit
 
 Safari and iOS 16.0+, Chrome and Edge 107+, Firefox 104+ (`build.target` in `vite.config.ts`, the targets of v1.11; Vite 8's default would require Safari 16.4). Old tablets serve as menu displays and for the admin. Do not remove the target: Tailwind writes its breakpoints as range media queries (`width>=40rem`), which Safari before 16.4 ignores, and only this target makes the minifier rewrite them as `min-width`. CI checks the built CSS with `.github/scripts/css-media-ranges.mjs`. The target lowers syntax, not APIs: guard a browser API newer than any of these targets (`URL.canParse`, `Object.groupBy`, `Promise.withResolvers`, or `Array.prototype.toSorted`: Chrome 110, Firefox 115…) or avoid it.
 
+### Progressive web app
+
+`vite-plugin-pwa` (`vite.config.ts`) writes `dist/manifest.webmanifest` and a Workbox service worker, `dist/sw.js`, in `autoUpdate` mode: a new deployment's worker takes over at once and `src/pwa/registerServiceWorker.ts` reloads the page. `main.tsx` imports that module after the `load` event, so the first load of the public menu carries none of it, and only in production (`npm run dev` has no service worker).
+
+- **Precache**: the public shell only, listed by the `publicShell` plugin of `vite.config.ts` from the chunk graph (the entry chunk and its static imports, the registration chunk, the Latin fonts, the icons). Chunks reached through `import()` (login, admin, jszip) stay out. `bundle-budget.mjs` fails the CI if the precache holds admin code or misses a chunk of the first load.
+- **Runtime caches**: `NetworkFirst` (3 s) on `/api/public/`, `CacheFirst` (200 entries, 30 days) on `/uploads/`, nothing else. A request with an `Authorization` header (the admin) is never cached nor answered from the cache. The first visit loads the menu before the worker exists: `registerServiceWorker.ts` requests those URLs again once the worker controls the page. Its list of cached paths repeats the one of `vite.config.ts`, whose matchers are copied into `sw.js` and cannot import it.
+- **Navigation**: offline, any page but `/admin`, `/login`, `/api/` and `/uploads/` gets the precached `index.html`.
+- **nginx**: `/sw.js` and `/manifest.webmanifest` are served with `Cache-Control: no-cache`, the manifest as `application/manifest+json` (`nginx.conf.template`); the smoke test checks both. The CSP needs nothing more: `worker-src` and `manifest-src` fall back to `default-src 'self'`.
+- **Tests**: Vitest does not load the plugin; `vitest.config.ts` points `virtual:pwa-register` to the stand-in `src/test/pwaRegister.ts`.
+- **Icons**: `pwa-icons/icon.svg` and `maskable.svg` (the glass inside the safe zone, 80% of the width), rendered at 512 px with headless Chrome, which cannot render a smaller window: `"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless --hide-scrollbars --window-size=512,512 --screenshot=../public/pwa-512.png icon.svg` from `pwa-icons/` (then `maskable.svg` to `pwa-maskable-512.png`). The 192 px icon and the 180 px `apple-touch-icon.png` are scaled down from `pwa-512.png` (`sips -z 192 192 pwa-512.png --out pwa-192.png` on macOS).
+- **Stuck worker**: `docs/operations.md` ("Carte hors ligne et installation") gives the steps to unregister it in each browser. A service worker needs HTTPS (or `localhost`).
+
 ### Import/Export
 
 - Single cocktail: JSON export/import with dependency resolution wizard
@@ -203,7 +218,7 @@ Safari and iOS 16.0+, Chrome and Edge 107+, Firefox 104+ (`build.target` in `vit
 ## Dependencies
 
 **Runtime**: react 19, react-dom 19, react-router-dom 7, @tanstack/react-query 5, react-hook-form 7, @hookform/resolvers, zod 4, i18next 27, react-i18next 18, i18next-browser-languagedetector 8, jszip 3
-**Dev**: vite 8, @vitejs/plugin-react 6, tailwindcss 4, @tailwindcss/vite, typescript 5.9, eslint 10, eslint-plugin-i18next, prettier 3, vitest, jsdom, @testing-library/*, msw, vitest-axe
+**Dev**: vite 8, @vitejs/plugin-react 6, vite-plugin-pwa 2 (Workbox 7), tailwindcss 4, @tailwindcss/vite, typescript 5.9, eslint 10, eslint-plugin-i18next, prettier 3, vitest, jsdom, @testing-library/*, msw, vitest-axe
 
 **Install scripts**: npm 12 skips the install scripts of dependencies that `allowScripts` in `package.json` does not list (npm 11.19 only warns). None is needed here: `fsevents` (optional, macOS) is denied because its binary ships prebuilt in the package. A new dependency whose script is needed must be added to `allowScripts` (`npm install-scripts approve <pkg> --no-allow-scripts-pin`, no version so that a Dependabot bump keeps working), otherwise denied (`npm install-scripts deny <pkg>`), so that `npm ci` prints no `install-scripts` warning.
 
