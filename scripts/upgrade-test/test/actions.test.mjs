@@ -1,39 +1,62 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { judgeDatabaseCopy, mountsToChown, runAction } from '../lib/actions.mjs';
+import { FAILED_MIGRATION_REFUSAL, UNWRITABLE_REFUSAL } from '../lib/checks.mjs';
+import { judgeDatabaseCopy, plannedMountsToChown, runAction } from '../lib/actions.mjs';
 
-const VOLUME = { Type: 'volume', Name: 'carta-ut-1_db-data', Source: '/var/lib/docker/volumes/carta-ut-1_db-data/_data', Destination: '/app/data' };
-const BIND = { Type: 'bind', Source: '/tmp/carta-upgrade-test/run/uploads', Destination: '/app/uploads' };
-const OTHER = { Type: 'bind', Source: '/etc/localtime', Destination: '/etc/localtime' };
+const SERVICE = 'carta-cocktail-backend';
+const DATA_BIND = { type: 'bind', source: '/tmp/carta-ut-1/instance/data', target: '/app/data' };
+const UPLOADS_BIND = { type: 'bind', source: '/tmp/carta-ut-1/instance/uploads', target: '/app/uploads' };
+const OLD_UPLOADS_BIND = { type: 'bind', source: '/tmp/carta-ut-1/instance/uploads', target: '/uploads' };
+const DATA_VOLUME = { type: 'volume', source: 'db-data', target: '/app/data' };
+const volumes = { 'db-data': { name: 'carta-ut-1_db-data' } };
+const configOf = (...mounts) => ({ services: { [SERVICE]: { volumes: mounts }, other: { volumes: [UPLOADS_BIND] } }, volumes });
 
-test('mountsToChown gives the volume name and the host folder, in the order asked', () => {
-  assert.deepEqual(mountsToChown([BIND, OTHER, VOLUME], ['/app/data', '/app/uploads']), [
+test('plannedMountsToChown gives the volume name and the host folder, in the order asked', () => {
+  assert.deepEqual(plannedMountsToChown(configOf(UPLOADS_BIND, DATA_VOLUME), SERVICE, ['/app/data', '/app/uploads']), [
     { destination: '/app/data', type: 'volume', source: 'carta-ut-1_db-data' },
-    { destination: '/app/uploads', type: 'bind', source: '/tmp/carta-upgrade-test/run/uploads' },
+    { destination: '/app/uploads', type: 'bind', source: '/tmp/carta-ut-1/instance/uploads' },
   ]);
 });
 
-test('mountsToChown leaves out a destination without a mount', () => {
-  assert.deepEqual(mountsToChown([VOLUME], ['/app/data', '/app/uploads']), [
+test('plannedMountsToChown leaves out a destination without a mount', () => {
+  assert.deepEqual(plannedMountsToChown(configOf(DATA_VOLUME), SERVICE, ['/app/data', '/app/uploads']), [
     { destination: '/app/data', type: 'volume', source: 'carta-ut-1_db-data' },
   ]);
-  assert.deepEqual(mountsToChown([OTHER], ['/app/data']), []);
+  assert.deepEqual(plannedMountsToChown(configOf(OLD_UPLOADS_BIND), SERVICE, ['/app/uploads']), []);
+  assert.deepEqual(plannedMountsToChown({ services: { [SERVICE]: {} } }, SERVICE, ['/app/data']), []);
+});
+
+test('plannedMountsToChown reads the service asked only', () => {
+  const config = { services: { [SERVICE]: { volumes: [DATA_BIND] }, other: { volumes: [UPLOADS_BIND] } } };
+  assert.deepEqual(plannedMountsToChown(config, SERVICE, ['/app/data', '/app/uploads']).map((mount) => mount.destination), ['/app/data']);
 });
 
 const START_LOGS = ['SQLite journal mode: wal', 'Carta Cocktail API running on port 3001'];
 
-test('judgeDatabaseCopy: a copy that does not start is refused', () => {
-  const result = judgeDatabaseCopy({ started: false, exitCode: 1, logs: '' }, START_LOGS, () => assert.fail('copy not running'));
-  assert.deepEqual(result, {
-    status: 'failed', refused: true, detail: 'the copy was refused (exit code 1): the notes say not to upgrade',
-  });
+const REFUSALS = [UNWRITABLE_REFUSAL, FAILED_MIGRATION_REFUSAL];
+const notRunning = () => assert.fail('copy not running');
+
+test('judgeDatabaseCopy: a refused copy names the refusal found in its logs', () => {
+  const cases = [
+    ['Migration 8_schema_integrity failed. The backend will not start.', FAILED_MIGRATION_REFUSAL, '"failed. The backend will not start."'],
+    ['ERROR: /app/data: cannot write to /app/data', UNWRITABLE_REFUSAL, '"cannot write to"'],
+    ['something else went wrong', null, 'no known refusal message'],
+  ];
+  for (const [logs, refusal, named] of cases) {
+    assert.deepEqual(judgeDatabaseCopy({ started: false, exitCode: 1, logs }, START_LOGS, notRunning, REFUSALS), {
+      status: 'failed',
+      refused: true,
+      refusal,
+      detail: `the copy was refused (exit code 1, ${named}): the notes say not to upgrade`,
+    });
+  }
 });
 
 test('judgeDatabaseCopy: a copy that started is never refused, even when it fails', () => {
   const logs = START_LOGS.join('\n');
-  assert.deepEqual(judgeDatabaseCopy({ started: true, logs }, START_LOGS, () => 'Database schema is up to date!'),
+  assert.deepEqual(judgeDatabaseCopy({ started: true, logs }, START_LOGS, () => 'Database schema is up to date!', REFUSALS),
     { status: 'done', detail: 'copy started, 2/2 expected log lines, migrate status up to date' });
-  assert.deepEqual(judgeDatabaseCopy({ started: true, logs: START_LOGS[1] }, START_LOGS, () => 'Following migration have not yet been applied'),
+  assert.deepEqual(judgeDatabaseCopy({ started: true, logs: START_LOGS[1] }, START_LOGS, () => 'Following migration have not yet been applied', REFUSALS),
     { status: 'failed', detail: 'copy started, 1/2 expected log lines, migrate status NOT up to date' });
 });
 

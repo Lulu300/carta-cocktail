@@ -284,10 +284,13 @@ describe('backup export', () => {
     expect(entryNames).toEqual(expect.arrayContaining([
       'metadata.json', 'database.db', 'uploads/export-test.jpg', 'uploads/cocktails/nested.png',
     ]));
+    vi.stubEnv('APP_VERSION', '1.17.0');
+    const released = new AdmZip(await exportBackup());
+    vi.unstubAllEnvs();
+    expect(JSON.parse(released.getEntry('metadata.json')!.getData().toString('utf8')).appVersion).toBe('1.17.0');
     const metadata = JSON.parse(zip.getEntry('metadata.json')!.getData().toString('utf8'));
-    const { version: appVersion } = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../package.json'), 'utf8'));
     expect(metadata).toEqual({
-      version: 1, createdAt: expect.any(String), appVersion, schemaVersion: null,
+      version: 1, createdAt: expect.any(String), appVersion: 'dev', schemaVersion: null,
     });
     expect(zip.getEntry('database.db')!.getData().subarray(0, 16).toString('latin1')).toBe('SQLite format 3\0');
     expect(zip.getEntry('uploads/export-test.jpg')!.getData().toString('utf8')).toBe('image bytes');
@@ -389,6 +392,21 @@ describe('backup restore', () => {
     expect(list.status).toBe(200);
     expect(preRestoreCopies().length).toBe(copiesBefore.length + 1);
     expect(restoreLeftovers()).toEqual([]);
+  });
+
+  it.each([
+    ['without appVersion', { version: 1, createdAt: '2025-01-01T00:00:00.000Z' }],
+    ['with an appVersion that is not a string', { version: 1, appVersion: 12, schemaVersion: null }],
+  ])('should restore a backup of an older version, %s', async (_label, metadata) => {
+    const cocktail = await seedCocktail({ name: 'Mojito' });
+    const zip = new AdmZip(await exportBackup());
+    zip.updateFile('metadata.json', Buffer.from(JSON.stringify(metadata)));
+    await prisma.cocktail.delete({ where: { id: cocktail.id } });
+
+    const res = await importBackup(zip.toBuffer());
+
+    expect(res.status).toBe(200);
+    expect(await cocktailNames()).toEqual(['Mojito']);
   });
 
   it('should keep a copy of the replaced database', async () => {

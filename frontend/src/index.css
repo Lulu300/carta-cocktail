@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap');
 @import "tailwindcss";
 
 /*
@@ -7,8 +6,8 @@
  * Each color token generates the matching utilities (bg-*, text-*, border-*…).
  */
 @theme {
-  --font-sans: 'Inter', sans-serif;
-  --font-serif: 'Playfair Display', serif;
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Playfair Display Variable', ui-serif, Georgia, serif;
 
   --color-canvas: #0f0f1a;                     /* page background: bg-canvas */
   --color-surface: #1a1a2e;                    /* cards, modals, header: bg-surface */

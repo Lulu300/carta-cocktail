@@ -5,13 +5,13 @@ phase: D
 lane: ci
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [D-05, D-08]
 touches: [.github/workflows/release.yml, .github/workflows/smoke.yml]
 sources: ["07-devops-history.md §3.3", "07-devops-history.md §3.4"]
-branch:
-pr:
+branch: chore/D-29-release-smoke-gate
+pr: 264
 ---
 
 ## Décisions validées (2026-10-12)
@@ -57,3 +57,4 @@ Relevé par la relecture de la PR #122, précisé par celle de la PR #129.
 ## Journal
 
 - 2026-10-12 : tâche créée après la relecture de la PR #122 (D-08) : le smoke ne fait pas partie du gate de la release. Décision humaine à la relecture de la PR #129 : garder la tâche (smoke dans la release), plutôt qu'un smoke sur `push` ou l'abandon.
+- 2026-11-26 : `smoke.yml` gagne `workflow_call` et `cancel-in-progress` limité aux PR ; `release.yml` ajoute le job `smoke` (`needs: verify`), dont `images` dépend. `actionlint` propre. Preuve par un run Release à faire sur la prochaine pré-version.

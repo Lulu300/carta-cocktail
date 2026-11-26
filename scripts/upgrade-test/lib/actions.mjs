@@ -4,7 +4,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { changeAdminPassword, checkLogLines } from './checks.mjs';
+import { changeAdminPassword, checkLogLines, findRefusal } from './checks.mjs';
 import { copyDatabaseFiles, DB_FILE_NAME } from './database.mjs';
 import { containerMounts, docker, runHelper } from './docker.mjs';
 import { isRequirementMet } from './expectations.mjs';
@@ -17,6 +17,8 @@ const DEFAULT_ADMIN_PASSWORD = 'admin123';
 // v1.5.0 refuses a shorter ADMIN_PASSWORD to create or reset the admin.
 const MIN_ADMIN_PASSWORD_LENGTH = 12;
 const NEW_ADMIN_PASSWORD_LENGTH = 16;
+// User of the backend image from v1.12.0 (CARTA_UID/CARTA_GID defaults).
+const IMAGE_OWNER = '1000:1000';
 export const MIGRATE_STATUS_OK = 'Database schema is up to date!';
 
 export function randomSecret(length) {
@@ -134,15 +136,19 @@ function copyDatabase(ctx) {
 }
 
 /**
- * Result of the database copy check: refused (`refused: true`), or started with every expected log
- * line and an up-to-date migration status. `readMigrateStatus` is only called on a started copy.
+ * Result of the database copy check: refused (`refused: true`, with the `refusal` found in the logs
+ * among `refusals`, or null), or started with every expected log line and an up-to-date migration
+ * status. `readMigrateStatus` is only called on a started copy.
  */
-export function judgeDatabaseCopy(outcome, expectedStartLogs, readMigrateStatus) {
+export function judgeDatabaseCopy(outcome, expectedStartLogs, readMigrateStatus, refusals) {
   if (!outcome.started) {
+    const refusal = findRefusal(refusals, outcome.logs);
+    const found = refusal ? `"${refusal.log}"` : 'no known refusal message';
     return {
       status: 'failed',
       refused: true,
-      detail: `the copy was refused (exit code ${outcome.exitCode ?? 'none'}): the notes say not to upgrade`,
+      refusal,
+      detail: `the copy was refused (exit code ${outcome.exitCode ?? 'none'}, ${found}): the notes say not to upgrade`,
     };
   }
   const lines = checkLogLines(outcome.logs, expectedStartLogs);
@@ -158,6 +164,9 @@ export function judgeDatabaseCopy(outcome, expectedStartLogs, readMigrateStatus)
 async function checkDatabaseCopy(ctx) {
   const checkDir = path.join(ctx.workDir, `db-check-${ctx.target.label}`);
   fs.cpSync(databaseCopyDir(ctx), checkDir, { recursive: true });
+  // The image runs as uid 1000 from v1.12.0 and refuses a data folder it cannot write to, which
+  // would hide the refusal under test. The copy belongs to the host user, so give it to the image.
+  runHelper([`${checkDir}:/target`], `chown -R ${IMAGE_OWNER} /target`);
   const name = `${ctx.instance.project}-check`;
   docker(['run', '--detach', '--name', name, '--platform', ctx.target.images.platform,
     '-v', `${checkDir}:/app/data`,
@@ -166,7 +175,8 @@ async function checkDatabaseCopy(ctx) {
   try {
     const outcome = await waitForStart(name, ctx.timeoutMs);
     return judgeDatabaseCopy(outcome, ctx.expectedStartLogs,
-      () => docker(['exec', name, 'npx', 'prisma', 'migrate', 'status'], { allowFailure: true }).stdout);
+      () => docker(['exec', name, 'npx', 'prisma', 'migrate', 'status'], { allowFailure: true }).stdout,
+      ctx.profile.refusals);
   } finally {
     docker(['rm', '--force', '--volumes', name], { allowFailure: true });
   }
@@ -194,24 +204,31 @@ async function changeWeakAdminPassword(ctx, hook) {
 }
 
 /**
- * Mounts of the container on `destinations`, in that order, with their `-v` source: the volume
- * name, or the host folder of a bind mount. Destinations without a mount are left out.
+ * Mounts of a service on `destinations`, in that order, from the output of `docker compose config
+ * --format json`, with their `-v` source: the volume name, or the host folder of a bind mount.
+ * Destinations without a mount are left out.
  */
-export function mountsToChown(mounts, destinations) {
+export function plannedMountsToChown(config, service, destinations) {
+  const mounts = config.services[service].volumes ?? [];
   return destinations
-    .map((destination) => mounts.find((mount) => mount.Destination === destination))
+    .map((destination) => mounts.find((mount) => mount.target === destination))
     .filter(Boolean)
-    .map((mount) => ({ destination: mount.Destination, type: mount.Type, source: mount.Type === 'volume' ? mount.Name : mount.Source }));
+    .map((mount) => ({
+      destination: mount.target,
+      type: mount.type,
+      source: mount.type === 'volume' ? config.volumes[mount.source].name : mount.source,
+    }));
 }
 
 /**
  * The backend image runs as a non-root user: the volumes and host folders mounted on
  * `destinations` are given to `owner` with a helper container, as the notes do with an alpine
- * container. Runs before the jump, on the mounts of the stopped container.
+ * container. Runs before the jump, on the mounts of the compose file the jump will use: the
+ * stopped container may still come from an older generation, whose mounts differ.
  */
 function chownMounts(ctx, { destinations, owner }) {
-  const container = ctx.instance.containerId(BACKEND_SERVICE);
-  const mounts = mountsToChown(containerMounts(container), destinations);
+  const config = ctx.instance.plannedConfig(ctx.adminEmail);
+  const mounts = plannedMountsToChown(config, BACKEND_SERVICE, destinations);
   if (mounts.length === 0) return { status: 'skipped', detail: `no mount on ${destinations.join(', ')}` };
   for (const mount of mounts) runHelper([`${mount.source}:/target`], `chown -R ${owner} /target`);
   const list = mounts.map((mount) => `${mount.destination} (${mount.type})`).join(', ');

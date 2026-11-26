@@ -1,6 +1,6 @@
 # Guide d'exploitation
 
-Ce guide décrit l'exploitation de Carta Cocktail v1.17 avec les images publiées (`docker-compose.prod.yml`) : installation, sauvegardes, mises à jour, retour arrière, secrets et HTTPS. Les commandes se lancent depuis le dossier qui contient `docker-compose.prod.yml` et `.env`.
+Ce guide décrit l'exploitation de Carta Cocktail v1.18 avec les images publiées (`docker-compose.prod.yml`) : installation, sauvegardes, mises à jour, retour arrière, secrets et HTTPS. Les commandes se lancent depuis le dossier qui contient `docker-compose.prod.yml` et `.env`.
 
 Références :
 
@@ -22,14 +22,14 @@ Références :
 
    ```bash
    mkdir carta-cocktail && cd carta-cocktail
-   curl -fsSLO https://raw.githubusercontent.com/Lulu300/carta-cocktail/v1.17.0/docker-compose.prod.yml
+   curl -fsSLO https://raw.githubusercontent.com/Lulu300/carta-cocktail/v1.18.0/docker-compose.prod.yml
    ```
 
-2. Épingler la version : dans `docker-compose.prod.yml`, remplacer `:latest` par `:1.17` sur les deux lignes `image:`. `:1.17` suit les correctifs 1.17.x ; `:1.17.0` ne bouge jamais. Avec `:latest`, un `pull` peut installer une version dont vous n'avez pas lu les actions obligatoires.
+2. Épingler la version : dans `docker-compose.prod.yml`, remplacer `:latest` par `:1.18` sur les deux lignes `image:`. `:1.18` suit les correctifs 1.18.x ; `:1.18.0` ne bouge jamais. Avec `:latest`, un `pull` peut installer une version dont vous n'avez pas lu les actions obligatoires.
 
    ```yaml
-   image: ghcr.io/lulu300/carta-cocktail/backend:1.17
-   image: ghcr.io/lulu300/carta-cocktail/frontend:1.17
+   image: ghcr.io/lulu300/carta-cocktail/backend:1.18
+   image: ghcr.io/lulu300/carta-cocktail/frontend:1.18
    ```
 
 3. Créer `.env` à côté du fichier compose. `JWT_SECRET` (32 caractères au moins) et `ADMIN_PASSWORD` (12 caractères au moins) sont obligatoires : `docker compose` refuse de démarrer sans `JWT_SECRET`, et le backend refuse un secret trop court ou connu.
@@ -58,7 +58,7 @@ Références :
    curl -s http://localhost/api/health
    ```
 
-   Réponse attendue : `{"status":"ok","version":"1.17.0"}`. Le site répond sur le port 80 de l'hôte. Pour un autre port, changer `"80:8080"` en `"<port>:8080"` dans le service `carta-cocktail-frontend` : nginx écoute sur 8080 dans le conteneur.
+   Réponse attendue : `{"status":"ok","version":"1.18.0"}`. Le site répond sur le port 80 de l'hôte. Pour un autre port, changer `"80:8080"` en `"<port>:8080"` dans le service `carta-cocktail-frontend` : nginx écoute sur 8080 dans le conteneur.
 
 Le backend tourne sous l'uid 1000, le frontend (nginx) sous l'uid 101. Les volumes nommés n'ont besoin de rien. Pour des dossiers de l'hôte ou un partage réseau (SMB/NFS) à la place des volumes, voir [README › "Data folders and the node user"](../README.md#data-folders-and-the-node-user) et `SQLITE_WAL=false` dans [README › "Database files and network shares"](../README.md#database-files-and-network-shares).
 
@@ -166,7 +166,7 @@ Pensez à mettre à jour `CARTA_PASSWORD` quand vous changez le mot de passe adm
 
 1. Lire les sections d'[`UPGRADING.md`](../UPGRADING.md) de toutes les versions entre la vôtre et la nouvelle, et faire leurs actions « Before upgrading ». Ce guide ne les recopie pas.
 2. Sauvegarder : export depuis l'admin, ou [sauvegarde à froid](#sauvegarde-à-froid-des-volumes).
-3. Changer le tag des deux lignes `image:` de `docker-compose.prod.yml` (par exemple `:1.16` → `:1.17`). Avec un tag `:X.Y`, les correctifs de la même mineure arrivent par un simple `pull`. Si la version demande un nouveau fichier compose, téléchargez celui de son tag et remettez-y vos modifications (port, volumes). Les variables facultatives (`SQLITE_WAL`, `TRUST_PROXY`, limites de débit…) restent dans `.env` : si vous les aviez ajoutées à la liste `environment` d'un fichier compose de la v1.15.0 ou plus ancien, mettez-les dans `.env` au lieu de les remettre dans le nouveau fichier.
+3. Changer le tag des deux lignes `image:` de `docker-compose.prod.yml` (par exemple `:1.17` → `:1.18`). Avec un tag `:X.Y`, les correctifs de la même mineure arrivent par un simple `pull`. Si la version demande un nouveau fichier compose, téléchargez celui de son tag et remettez-y vos modifications (port, volumes). Les variables facultatives (`SQLITE_WAL`, `TRUST_PROXY`, limites de débit…) restent dans `.env` : si vous les aviez ajoutées à la liste `environment` d'un fichier compose de la v1.15.0 ou plus ancien, mettez-les dans `.env` au lieu de les remettre dans le nouveau fichier.
 4. Télécharger et redémarrer :
 
    ```bash
@@ -259,6 +259,7 @@ carte.monbar.fr {
 ```
 
 - **En-têtes `X-Forwarded-*`** : le proxy doit transmettre `X-Forwarded-For` (Caddy, Traefik et SWAG le font par défaut). L'API s'en sert pour compter les limites de débit par client. Un proxy sur l'hôte ou sur un réseau privé n'a besoin d'aucun réglage ; dans les autres cas (Docker rootless, Podman, Docker Desktop…), voir `TRUST_PROXY` dans [README › "Login limit behind a reverse proxy"](../README.md#login-limit-behind-a-reverse-proxy).
+- **Aperçus de liens** : renseignez `PUBLIC_BASE_URL=https://carte.monbar.fr` dans `.env`, puis recréez le backend. Les aperçus d'une carte partagée dans une messagerie (titre, description, photo) ont besoin d'adresses absolues, et derrière le proxy le backend ne voit que `http`.
 - **HSTS** s'active sur le proxy, ou dans le conteneur (ligne `Strict-Transport-Security` en commentaire de `frontend/security-headers.conf`) une fois HTTPS en place devant lui, jamais quand le site est servi en HTTP. Une fois activé, les navigateurs refusent le HTTP pour ce domaine pendant toute la durée de `max-age` : activez-le quand HTTPS fonctionne.
 - Ne publiez pas le port 3001 du backend : nginx l'atteint par le réseau compose (`docker-compose.prod.yml` ne le publie pas).
 

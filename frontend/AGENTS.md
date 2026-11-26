@@ -78,7 +78,7 @@ frontend/
 │   │   ├── useCategoryTypeName.ts # Category type names admin screens can tell apart (admin messages only)
 │   │   ├── useClickOutside.ts
 │   │   ├── useLocalizedName.ts    # Get localized name from translation object
-│   │   ├── usePagination.ts
+│   │   ├── usePageTitle.ts        # Tab title: page parts before the site name
 │   │   └── useSort.ts
 │   ├── queries/                # TanStack Query: query keys (keys.ts), query client, one file per resource
 │   ├── services/
@@ -99,11 +99,11 @@ frontend/
 ├── package.json
 ├── tsconfig.json                 # Project references only: check types with `tsc -b`
 ├── tsconfig.app.json             # src/
-├── tsconfig.node.json            # vite.config.ts
+├── tsconfig.node.json            # vite.config.ts, vitest.config.ts
 ├── vite.config.ts
 ├── vitest.config.ts
 ├── eslint.config.js
-├── nginx.conf.template           # Production: nginx server, proxies /api and /uploads to the backend (BACKEND_HOST)
+├── nginx.conf.template           # Production: nginx server, proxies /api and /uploads to the backend (BACKEND_HOST); link preview robots on /menu/ get the backend's Open Graph page
 ├── security-headers.conf         # Security headers included by nginx.conf.template
 └── Dockerfile                    # Vite build, then nginx (non-root, uid 101, port 8080)
 ```

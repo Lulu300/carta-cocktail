@@ -208,12 +208,14 @@ export interface IngredientAvailability {
   cocktailIngredientId: number;
   sourceType: string;
   name: string;
+  nameTranslations: Record<string, string> | null;
+  /** The source is gone or unreadable: `name` is empty. */
+  orphan: boolean;
   icon: string | null;
   quantity: number;
   unit: string;
   isAvailable: boolean;
   availableCount: number | null;
-  reason?: string;
   /** CATEGORY lines with preferred bottles only: at least one preferred bottle is not empty. */
   preferredAvailable?: boolean;
 }
@@ -300,8 +302,13 @@ export interface CocktailAvailability {
   isAvailable: boolean;
   maxServings: number;
   ingredients: IngredientAvailability[];
-  missingIngredients: string[];
-  lowStockWarnings: string[];
+  lowStock: LowStockResource[];
+}
+
+export interface LowStockResource {
+  name: string;
+  nameTranslations: Record<string, string> | null;
+  servings: number;
 }
 
 // Bottle import/export types

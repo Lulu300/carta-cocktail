@@ -4,7 +4,7 @@ import path from 'path';
 import { randomUUID } from 'crypto';
 import AdmZip from 'adm-zip';
 import type { AppState, PrismaClient } from '../generated/prisma/client';
-import { config } from '../config';
+import { appVersion, config } from '../config';
 import { PRISMA_DIR, resolveDatabasePath } from '../lib/databasePath';
 import { checkpointWal, configureSqlite, createPrismaClient, prisma } from '../lib/prisma';
 import { BadRequestError, ConflictError } from '../errors';
@@ -33,7 +33,6 @@ const REQUIRED_TABLES = ['User', 'Cocktail', 'Bottle', 'Menu'];
 const RESTORABLE_UPLOAD_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
 
 const MIGRATIONS_DIR = path.join(PRISMA_DIR, 'migrations');
-const PACKAGE_JSON = path.resolve(__dirname, '../../package.json');
 
 const SQLITE_SIDE_FILE_SUFFIXES = ['-wal', '-shm', '-journal'];
 
@@ -101,15 +100,11 @@ export function latestAppMigration(migrationsDir: string = MIGRATIONS_DIR): stri
   return migrations[migrations.length - 1] ?? null;
 }
 
-function readAppVersion(): string {
-  return JSON.parse(fs.readFileSync(PACKAGE_JSON, 'utf8')).version;
-}
-
 export async function buildMetadata(client: PrismaClient = prisma): Promise<BackupMetadata> {
   return {
     version: BACKUP_FORMAT_VERSION,
     createdAt: new Date().toISOString(),
-    appVersion: readAppVersion(),
+    appVersion: appVersion(),
     schemaVersion: await readSchemaVersion(client),
   };
 }

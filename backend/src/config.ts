@@ -132,6 +132,22 @@ export function parseTrustProxy(value: string | undefined): number | string {
   return trustProxy;
 }
 
+/**
+ * Public address of the site (PUBLIC_BASE_URL), such as `https://carte.example.com`, without a
+ * trailing slash; null when it is not set. Link previews need absolute URLs, and behind a TLS
+ * reverse proxy the backend only sees `http` from nginx. Any other scheme fails at startup.
+ */
+export function parsePublicBaseUrl(value: string | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  const url = URL.parse(value);
+  if (!url || (url.protocol !== 'http:' && url.protocol !== 'https:')) {
+    throw new Error(`PUBLIC_BASE_URL must be an http or https address such as https://carte.example.com, got '${value}'`);
+  }
+  return `${url.origin}${url.pathname}`.replace(/\/+$/, '');
+}
+
 export const config = {
   port: parseInt(process.env.PORT || '3001', 10),
   jwtSecret: assertJwtSecret(process.env.JWT_SECRET, process.env.NODE_ENV),
@@ -142,6 +158,7 @@ export const config = {
   // Empty: no cross-origin access. The SPA calls the API on its own origin,
   // through nginx in production and the Vite proxy in development.
   corsOrigin: process.env.CORS_ORIGIN || '',
+  publicBaseUrl: parsePublicBaseUrl(process.env.PUBLIC_BASE_URL),
   uploadDir: resolveUploadDir(),
   releasesDir: resolveReleasesDir(),
 };

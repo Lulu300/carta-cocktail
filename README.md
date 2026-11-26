@@ -102,11 +102,11 @@ docker build --build-context releases=./docs/releases -t carta-cocktail-backend 
 
 Use `docker-compose.prod.yml` to deploy with pre-built images from GitHub Container Registry. The operations guide, [`docs/operations.md`](docs/operations.md) (in French), covers installation, backups, upgrades, rollback, secret rotation and HTTPS step by step.
 
-1. **Pin a version.** In `docker-compose.prod.yml`, replace `:latest` with a version, so that an upgrade only happens after you have read [`UPGRADING.md`](UPGRADING.md). `:<major>.<minor>` (from v1.12.0, such as `:1.17`) follows the patch releases of that minor version; `:<major>.<minor>.<patch>` never moves:
+1. **Pin a version.** In `docker-compose.prod.yml`, replace `:latest` with a version, so that an upgrade only happens after you have read [`UPGRADING.md`](UPGRADING.md). `:<major>.<minor>` (from v1.12.0, such as `:1.18`) follows the patch releases of that minor version; `:<major>.<minor>.<patch>` never moves:
 
    ```yaml
-   image: ghcr.io/lulu300/carta-cocktail/backend:1.17
-   image: ghcr.io/lulu300/carta-cocktail/frontend:1.17
+   image: ghcr.io/lulu300/carta-cocktail/backend:1.18
+   image: ghcr.io/lulu300/carta-cocktail/frontend:1.18
    ```
 
 2. **Create a `.env` file** alongside the compose file, before the first start:
@@ -369,6 +369,7 @@ carta-cocktail/
 | `API_RATE_LIMIT` | API requests allowed per client IP address (per /64 network for IPv6) in one minute, public menu included; beyond that, the API answers 429 (Too Many Requests). Clients that share an address, such as guests behind a bar's Internet connection, share this count: raise it if they get "Too many requests". The Docker healthcheck does not count. Backup export and import have a fixed limit of their own: 10 requests per 15 minutes from the signed-in admin. A positive integer, otherwise the backend refuses to start | `600` |
 | `TRUST_PROXY` | Proxies whose `X-Forwarded-For` header the API believes, to find the client IP address that the rate limits count (`API_RATE_LIMIT`, `LOGIN_RATE_LIMIT` and the backup limit): a number of proxies in front of the API, or a comma-separated list of addresses, subnets or names that Express understands (`loopback`, `linklocal`, `uniquelocal`). The backend refuses to start with a value it cannot read. See [Login limit behind a reverse proxy](#login-limit-behind-a-reverse-proxy) | `loopback, linklocal, uniquelocal` |
 | `CORS_ORIGIN` | Origin allowed to call the API from another site, such as `https://example.com` (a single origin, without a trailing slash). Empty: no other origin is allowed. The app does not need one: nginx, and the Vite proxy in development, serve the frontend and the API on the same origin | empty |
+| `PUBLIC_BASE_URL` | Public address of the site, such as `https://carte.example.com`, used for the absolute URLs of the link previews that messaging apps show for a shared menu or cocktail. Set it behind an HTTPS reverse proxy: otherwise the address comes from the request, and nginx only sees `http` there. The compose files of v1.17.0 and older do not pass it from `.env`: add `- PUBLIC_BASE_URL=https://…` to the `environment` list of `carta-cocktail-backend`. The backend refuses to start with a value that is not an `http` or `https` address | empty |
 | `PORT` | Backend port | `3001` |
 | `UPLOAD_DIR` | Folder of the cocktail photos | `<repo>/uploads` outside Docker; `/app/uploads` in the image and the compose files (`uploads` volume) |
 | `RELEASES_DIR` | Folder of the release notes read by the upgrade guide of the admin | `<repo>/docs/releases` outside Docker; `/app/releases` in the image |
@@ -425,7 +426,7 @@ This project uses a **feature branch** workflow:
 - **Frontend**: audit of the production dependencies, TypeScript (`tsc -b`), ESLint, build, size budget of the public menu, CSS readable by Safari 16, tests with coverage, delta coverage on PRs
 - **Docker build (backend)** and **Docker build (frontend)**: both images are built (`linux/amd64`, not pushed)
 
-**Smoke** (`.github/workflows/smoke.yml`) runs on every PR to `main`/`develop`: it starts `docker-compose.yml` and checks login, photo upload, persistence after a backend recreation and backup export, then runs the backend under another uid.
+**Smoke** (`.github/workflows/smoke.yml`) runs on every PR to `main`/`develop`, and in the Release workflow: it starts `docker-compose.yml` and checks login, photo upload, persistence after a backend recreation and backup export, then runs the backend under another uid.
 
 These checks are required to merge into `main` and `develop`; a PR to `main` also needs CodeQL results.
 
@@ -438,7 +439,7 @@ The **Release** workflow (`.github/workflows/release.yml`) runs on version tags 
 | `vX.Y.Z-rc.N` (pre-release) | a commit of `develop` | `:X.Y.Z-rc.N` only, `latest` does not move | marked as pre-release |
 | `vX.Y.Z` (final) | a commit of `main` | `:X.Y.Z`, `:X.Y`, `:X` and `latest`, each one only if this version is the highest of its minor, its major, or overall | normal release, marked as latest only if this version is the highest |
 
-Before pushing any image, the workflow runs the whole CI on the tagged commit (`ci.yml`). Images are built for `linux/amd64` and `linux/arm64` (the CI builds `amd64` only, so the `arm64` build is first tested here), with SBOM and provenance attestations, and carry their version (`APP_VERSION`, shown in the admin and by `/api/health`; `dev` in any other build).
+Before pushing any image, the workflow runs the whole CI (`ci.yml`) and the compose smoke (`smoke.yml`) on the tagged commit, in parallel. The smoke builds the stack for `linux/amd64` from the tagged code: it stops the publication of a stack that does not start, but does not test the multi-architecture images pushed afterwards. Images are built for `linux/amd64` and `linux/arm64` (the CI builds `amd64` only, so the `arm64` build is first tested here), with SBOM and provenance attestations, and carry their version (`APP_VERSION`, shown in the admin and by `/api/health`; `dev` in any other build).
 
 1. **Notes first.** On `develop`, copy `docs/releases/TEMPLATE.md` to `docs/releases/vX.Y.Z.md` (summary, detailed changes, required actions before and after the upgrade, `breaking`), and add the version's section to `UPGRADING.md`. A pre-release uses the notes of its target version, unless `docs/releases/vX.Y.Z-rc.N.md` exists.
 2. **Pre-release.** Push `develop`, then tag it: `git tag vX.Y.Z-rc.N origin/develop && git push origin vX.Y.Z-rc.N`.
@@ -448,7 +449,7 @@ A fix of an older line does not move the tags of a newer one. After `v1.16.0`, t
 
 **Push the branch before the tag.** The workflow checks that a final tag is reachable from `origin/main` and a pre-release from `origin/develop`. A tag on another commit, or a tag without its notes file, fails before any image is pushed.
 
-- A tag refused by the `verify` job, or whose `ci` job failed, published nothing: delete it (locally and on GitHub), fix the problem, then push it again. When the `ci` job failed on a flaky step, "Re-run failed jobs" in the Release run is enough.
+- A tag refused by the `verify` job, or whose `ci` or `smoke` job failed, published nothing: delete it (locally and on GitHub), fix the problem, then push it again. When the `ci` or `smoke` job failed on a flaky step, "Re-run failed jobs" in the Release run is enough.
 - A tag that published an image is never moved or pushed again. If the release fails after an image push, fix the problem and tag the next pre-release (`-rc.N+1`) for a pre-release, or the next version (for example `v1.5.1`) for a final release.
 
 The GitHub Release contains the notes file (without its front matter), the list of merged pull requests since the previous tag (previous final release for a final tag, previous tag of any kind for a pre-release) and the `docker pull` commands.
@@ -458,8 +459,8 @@ The GitHub Release contains the notes file (without its front matter), the list 
 Prefer `:<major>.<minor>`, which follows the patch releases (see [Docker (production with pre-built images)](#docker-production-with-pre-built-images)):
 
 ```bash
-docker pull ghcr.io/lulu300/carta-cocktail/backend:1.17
-docker pull ghcr.io/lulu300/carta-cocktail/frontend:1.17
+docker pull ghcr.io/lulu300/carta-cocktail/backend:1.18
+docker pull ghcr.io/lulu300/carta-cocktail/frontend:1.18
 ```
 
 ## API Overview

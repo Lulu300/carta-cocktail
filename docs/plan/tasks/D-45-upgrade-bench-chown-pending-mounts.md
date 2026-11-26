@@ -5,13 +5,13 @@ phase: D
 lane: ci
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [D-20]
 touches: [scripts/upgrade-test/lib/actions.mjs, scripts/upgrade-test/README.md]
 sources: []
-branch:
-pr:
+branch: fix/D-45-bench-chown-pending-mounts
+pr: 267
 ---
 
 ## Contexte
@@ -35,8 +35,8 @@ Relevé par D-20 le 2026-11-24 (layout `friend`, `--path 1.12.0,1.14.0`, mode co
 
 ## Critères d'acceptation
 
-- [ ] `--layout friend --path 1.4.0,1.12.0` en mode conforme : le rapport donne `/app/data` et `/app/uploads` donnés à `1000:1000`.
-- [ ] Les passages `1.4.0`, `1.8.0` et `1.12.0` vers la dernière version, layouts `friend` et `official`, restent sans échec inattendu.
+- [x] `--layout friend --path 1.4.0,1.12.0` en mode conforme : le rapport donne `/app/data` et `/app/uploads` donnés à `1000:1000`.
+- [x] Les passages `1.4.0`, `1.8.0` et `1.12.0` vers la dernière version, layouts `friend` et `official`, restent sans échec inattendu.
 
 ## Tests à ajouter ou adapter
 
@@ -49,3 +49,4 @@ Relevé par D-20 le 2026-11-24 (layout `friend`, `--path 1.12.0,1.14.0`, mode co
 ## Journal
 
 - 2026-11-24 : tâche créée par D-20 (hors périmètre du premier démarrage).
+- 2026-11-26 : `chownMounts` lit les montages de `docker compose config` sur le fichier de la génération en cours (rendu à côté du vrai, `Instance.plannedConfig`), plus ceux du conteneur arrêté. Vérifié : `friend 1.4.0,1.12.0` conforme donne `/app/data` et `/app/uploads` à 1000:1000.

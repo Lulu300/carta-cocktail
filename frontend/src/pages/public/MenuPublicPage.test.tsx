@@ -13,10 +13,12 @@ import {
   buildMenuBottle,
   buildMenuCocktail,
   buildMenuSection,
+  buildSiteSettings,
 } from '../../test/factories';
 import { captureRequest, mockApiError, mockApiPending, mockApiResponse, mockNetworkError } from '../../test/msw/utils';
 import type { Bottle, Menu, MenuBottle, MenuCocktail } from '../../types';
 import { axe } from '../../test/axe';
+import { SiteSettingsProvider } from '../../contexts/SiteSettingsContext';
 import MenuPublicPage from './MenuPublicPage';
 
 vi.mock('../../contexts/AuthContext', () => ({
@@ -143,6 +145,23 @@ describe('MenuPublicPage', () => {
       expect(await screen.findByText('Mojito')).toBeInTheDocument();
       expect((await retried.url).pathname).toBe('/api/public/menus/cocktails');
     });
+  });
+
+  it('puts the menu name before the site name in the tab title', async () => {
+    mockMenu(mojitoMenu);
+    mockApiResponse('get', '/api/public/settings', buildSiteSettings({ siteName: 'Chez Lulu' }));
+
+    render(
+      <QueryClientProvider client={createTestQueryClient()}>
+        <MemoryRouter initialEntries={['/menu/cocktails']}>
+          <SiteSettingsProvider>
+            <Routes><Route path="/menu/:slug" element={<MenuPublicPage />} /></Routes>
+          </SiteSettingsProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(document.title).toBe(`${mojitoMenu.name} · Chez Lulu`));
   });
 
   describe('bottle menus', () => {

@@ -14,11 +14,24 @@ This guide lists the actions required to upgrade an existing instance, version b
 
 Pre-releases (`vX.Y.Z-rc.N`) are not listed: they use the section of their target version `vX.Y.Z`. The detailed changes of each version are in its [GitHub Release](https://github.com/Lulu300/carta-cocktail/releases) and in [`docs/releases/`](docs/releases/).
 
-We recommend pinning the images to a version (`:1.17.0`, or `:1.17` to follow its patch releases; these `:X.Y` tags exist from v1.12.0 on) instead of `:latest`, so that an upgrade only happens when you have read this guide.
+We recommend pinning the images to a version (`:1.18.0`, or `:1.18` to follow its patch releases; these `:X.Y` tags exist from v1.12.0 on) instead of `:latest`, so that an upgrade only happens when you have read this guide.
 
 To restore a backup made by an older version, see [Restoring a backup from an older version](#restoring-a-backup-from-an-older-version), at the end of this guide.
 
 The commands below assume the default `docker-compose.prod.yml`, run from its folder. Adapt the file name and the service name `carta-cocktail-backend` if yours differ.
+
+## v1.18.0
+
+No required action, no migration. Pin both images to `:1.18.0`, or `:1.18` to follow the 1.18.x patch releases (`:1.17` does not move to 1.18.0), then pull and restart. This release adds link previews for shared menus and cocktails, a "Sign out everywhere" button, self-hosted fonts and translated stock warnings. Release notes: [`docs/releases/v1.18.0.md`](docs/releases/v1.18.0.md).
+
+Instances older than v1.12.0: upgrade to v1.12.0 first, following the [v1.12.0 section](#v1120) (and the sections before it), check that it works, then apply this one.
+
+**Testing a pre-release**: use `:1.18.0-rc.N` instead of `:1.18.0`.
+
+Worth checking after the upgrade:
+
+- **Behind an HTTPS reverse proxy** (optional): set `PUBLIC_BASE_URL=https://<your domain>` in `.env`, so that link previews use the right address (see [README › "Environment Variables"](README.md#environment-variables)). The `docker-compose.prod.yml` of v1.17.0 and older does not pass it: download the new file, or add `- PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}` at the end of the `environment` list of `carta-cocktail-backend`. The backend refuses to start with a value that is not an `http` or `https` address.
+- **Rolling back to v1.17.x.** Pin the images back to `:1.17`. There is no migration, so the database needs no restore.
 
 ## v1.17.0
 

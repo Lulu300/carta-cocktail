@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import jwt from 'jsonwebtoken';
 import {
-  appVersion, assertJwtSecret, parseJwtExpiresIn, parsePositiveInteger, parseTrustProxy, resolveReleasesDir,
+  appVersion, assertJwtSecret, parseJwtExpiresIn, parsePositiveInteger, parsePublicBaseUrl, parseTrustProxy, resolveReleasesDir,
   resolveUploadDir,
 } from './config';
 
@@ -152,5 +152,20 @@ describe('parseTrustProxy', () => {
     expect(() => parseTrustProxy(value)).toThrow(
       `TRUST_PROXY must be a number of proxies or a list of addresses or subnets, got '${value}'`,
     );
+  });
+});
+
+describe('parsePublicBaseUrl', () => {
+  it.each([undefined, ''])('should give null for %j', (value) => {
+    expect(parsePublicBaseUrl(value)).toBeNull();
+  });
+
+  it('should keep an https address without its trailing slash', () => {
+    expect(parsePublicBaseUrl('https://carte.example.com/')).toBe('https://carte.example.com');
+    expect(parsePublicBaseUrl('http://192.168.1.10:8080')).toBe('http://192.168.1.10:8080');
+  });
+
+  it.each(['carte.example.com', 'ftp://carte.example.com', 'javascript:alert(1)'])('should reject %s', (value) => {
+    expect(() => parsePublicBaseUrl(value)).toThrow(`PUBLIC_BASE_URL must be an http or https address`);
   });
 });

@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { isSignInAfterRestore, openSignInAfterRestore } from './signInAfterRestore';
+import {
+  isSignInAfterLogoutEverywhere,
+  isSignInAfterRestore,
+  openSignInAfterLogoutEverywhere,
+  openSignInAfterRestore,
+} from './signInAfterRestore';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -22,6 +27,20 @@ describe('openSignInAfterRestore', () => {
     const [url] = assign.mock.calls[0];
     expect(new URL(url, 'http://localhost').pathname).toBe('/login');
     expect(isSignInAfterRestore(new URL(url, 'http://localhost').search)).toBe(true);
+  });
+});
+
+describe('openSignInAfterLogoutEverywhere', () => {
+  it('loads the sign-in page in full, with its own reason', () => {
+    const assign = stubLocationAssign();
+
+    openSignInAfterLogoutEverywhere();
+
+    const [url] = assign.mock.calls[0];
+    const { pathname, search } = new URL(url, 'http://localhost');
+    expect(pathname).toBe('/login');
+    expect(isSignInAfterLogoutEverywhere(search)).toBe(true);
+    expect(isSignInAfterRestore(search)).toBe(false);
   });
 });
 
