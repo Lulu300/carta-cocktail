@@ -176,6 +176,32 @@ expect_status 200
 expect_content_type 'application/zip*'
 [[ -s "$BODY" ]] || fail "the archive is empty"
 
+step "A public menu with the cocktail"
+# The cocktail id makes the slug unique: custom-uid.sh runs this script again on the same database
+menu_slug="smoke-$cocktail_id"
+request POST /api/menus "${auth[@]}" -H 'Content-Type: application/json' \
+  --data "{\"name\":\"Smoke menu\",\"slug\":\"$menu_slug\",\"isPublic\":true}"
+expect_status 201
+menu_id="$(json_field .id)"
+request PUT "/api/menus/$menu_id" "${auth[@]}" -H 'Content-Type: application/json' \
+  --data "{\"cocktails\":[{\"cocktailId\":$cocktail_id}]}"
+expect_status 200
+
+step "A link preview robot gets the Open Graph tags of /menu/$menu_slug"
+request GET "/menu/$menu_slug" -A 'WhatsApp/2.23.20.0'
+expect_status 200
+expect_content_type 'text/html*'
+grep -q '<meta property="og:title" content="Smoke menu · ' "$BODY" || fail "no og:title: $(body_excerpt)"
+grep -q "<meta property=\"og:image\" content=\"[^\"]*/uploads/$image_path\">" "$BODY" \
+  || fail "no og:image of the photo: $(body_excerpt)"
+request GET /menu/smoke-unknown-menu -A 'WhatsApp/2.23.20.0'
+expect_status 404
+
+step "A browser still gets the single-page app at /menu/$menu_slug"
+request GET "/menu/$menu_slug"
+expect_status 200
+grep -q '/assets/' "$BODY" || fail "the menu page is not the single-page app: $(body_excerpt)"
+
 step "nginx runs as uid 101, not as root"
 # USER 101 in frontend/Dockerfile is the only thing that keeps nginx non-root (rootless Docker,
 # Podman): without it, the master process runs as root and every request above still works.
