@@ -120,7 +120,7 @@ const bottleHandlers = [
 const ingredientHandlers = [
   http.get('/api/ingredients', () => HttpResponse.json([buildIngredient({ id: 1 }), buildIngredient({ id: 2 })])),
   http.get('/api/ingredients/:id', ({ params }) => HttpResponse.json(buildIngredient({ id: Number(params.id) }))),
-  http.post('/api/ingredients/bulk-availability', () => HttpResponse.json({ updated: 0 })),
+  http.post('/api/ingredients/bulk-availability', () => HttpResponse.json({ message: 'OK', updated: 0 })),
   http.post('/api/ingredients', echoCreated),
   http.put('/api/ingredients/:id', echoUpdated),
   http.delete('/api/ingredients/:id', deletedUnused),

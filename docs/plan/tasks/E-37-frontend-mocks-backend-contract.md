@@ -5,13 +5,13 @@ phase: E
 lane: frontend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-12]
 touches: [frontend/src/services/api.ts, frontend/src/services/api.test.ts, frontend/src/test/msw/handlers.ts, frontend/src/pages/admin/CategoriesPage.test.tsx, frontend/src/contexts/AuthContext.test.tsx]
 sources: []
-branch:
-pr:
+branch: test/E-37-mocks-backend-contract
+pr: "#PRNUM"
 ---
 
 ## Contexte
@@ -66,3 +66,4 @@ Pas de nouveau test : les tests listés plus haut sont adaptés et doivent reste
 
 - 2026-11-12 : tâche créée par la PR docs de suivi du lot D-35/E-18/B-20/C-12 à partir de la relecture de la PR #166 (C-12). Les emplacements sont vérifiés sur `develop` (9799168) ; `services/api.test.ts:385` s'ajoute aux quatre que citait la relecture, et `services/api.test.ts:360`, `:747`, `:759` (401 avec un token présent) ont été ajoutés après la relecture de la PR #167.
 - 2026-11-13 : hors périmètre, relevé à la relecture de la PR #182 (E-47). `AuthContext.test.tsx` (vers les lignes 105 à 110) construit à la main la page HTML de 502 de nginx ; il pourrait utiliser `mockProxyError` (`frontend/src/test/msw/utils.ts`). À faire quand ce fichier est touché.
+- 2026-11-26 : faite. Étape 6 : les mocks `'Session expired'` de `api.test.ts` (token présent) rejoignent la liste, et le fichier garde une constante `INVALID_TOKEN_MESSAGE`. Formes changées depuis la création (disponibilité C-40, `nameTranslations` de C-14, notice de mise à jour F-09, aperçus d'import `ambiguous` de C-19 et C-64) : types et mocks déjà conformes aux schémas et routes du backend, rien à changer.
