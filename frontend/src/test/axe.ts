@@ -8,11 +8,12 @@ expect.extend(matchers);
 // vitest-axe 0.1 declares its matcher on the old global `Vi` namespace: declare it on vitest's types.
 // The type parameters must repeat vitest's own declaration, even unused.
 declare module 'vitest' {
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unused-vars
+  /* eslint-disable @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unused-vars */
   interface Matchers<
     R extends void | Promise<void> = void | Promise<void>,
     T = unknown,
   > extends AxeMatchers {}
+  /* eslint-enable @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unused-vars */
 }
 
 /**
