@@ -4,7 +4,12 @@ import { http, HttpResponse } from 'msw';
 import userEvent from '@testing-library/user-event';
 import { fireEvent, screen, waitFor, within } from '../../test/test-utils';
 import { clearToasts, renderWithFeedback } from '../../test/feedback';
-import { buildCocktail, buildMenu, buildMenuCocktail, buildMenuSection } from '../../test/factories';
+import {
+  buildCocktail,
+  buildMenu,
+  buildMenuCocktail,
+  buildMenuSection,
+} from '../../test/factories';
 import { server } from '../../test/msw/server';
 import { errorResponse, mockApiResponse, pendingResponse } from '../../test/msw/utils';
 import MenuEditPage from './MenuEditPage';
@@ -12,7 +17,11 @@ import type { Cocktail, Menu, MenuCocktail, MenuInput, MenuSection } from '../..
 
 const classics = buildMenuSection({ id: 7, menuId: 3, name: 'Classics', position: 0 });
 
-function makeEntry(cocktail: Cocktail, position: number, menuSectionId: number | null = null): MenuCocktail {
+function makeEntry(
+  cocktail: Cocktail,
+  position: number,
+  menuSectionId: number | null = null,
+): MenuCocktail {
   return buildMenuCocktail({ id: 100 + cocktail.id, menuId: 3, cocktail, menuSectionId, position });
 }
 
@@ -43,9 +52,12 @@ let answerRead: () => Promise<Response>;
 function storeCocktails(items: NonNullable<Partial<MenuInput>['cocktails']>) {
   storedMenu = {
     ...storedMenu,
-    cocktails: items.flatMap((item, index) => ALL_COCKTAILS
-      .filter((cocktail) => cocktail.id === item.cocktailId)
-      .map((cocktail) => ({ ...makeEntry(cocktail, index, item.menuSectionId ?? null), isHidden: item.isHidden ?? false }))),
+    cocktails: items.flatMap((item, index) =>
+      ALL_COCKTAILS.filter((cocktail) => cocktail.id === item.cocktailId).map((cocktail) => ({
+        ...makeEntry(cocktail, index, item.menuSectionId ?? null),
+        isHidden: item.isHidden ?? false,
+      })),
+    ),
   };
 }
 
@@ -79,7 +91,8 @@ function installFakeBackend() {
 
 /** The first load answers; every refetch then waits forever, so only the editor itself can fix the screen. */
 function serveOnlyFirstLoad() {
-  answerRead = async () => (received.menuReads.length === 1 ? HttpResponse.json(storedMenu) : pendingResponse());
+  answerRead = async () =>
+    received.menuReads.length === 1 ? HttpResponse.json(storedMenu) : pendingResponse();
 }
 
 function renderPage() {
@@ -121,7 +134,10 @@ describe('MenuEditPage', () => {
     expect(received.menuReads).toEqual([3]);
     expect(screen.getByDisplayValue('Summer')).toBeInTheDocument();
     expect(screen.getByDisplayValue('summer')).not.toHaveAttribute('readonly');
-    expect(screen.getByRole('link', { name: /Back to the list/ })).toHaveAttribute('href', '/admin/menus');
+    expect(screen.getByRole('link', { name: /Back to the list/ })).toHaveAttribute(
+      'href',
+      '/admin/menus',
+    );
   });
 
   it('saves the section of a cocktail at once, with every cocktail of the menu', async () => {
@@ -129,7 +145,10 @@ describe('MenuEditPage', () => {
     renderPage();
     await screen.findByText('Mojito');
 
-    await user.selectOptions(within(rowOf('Negroni')).getByRole('combobox', { name: /^Section of .+$/ }), '7');
+    await user.selectOptions(
+      within(rowOf('Negroni')).getByRole('combobox', { name: /^Section of .+$/ }),
+      '7',
+    );
 
     await waitFor(() => expect(received.updates).toHaveLength(1));
     expect(sentCocktails()).toEqual([
@@ -161,13 +180,19 @@ describe('MenuEditPage', () => {
     renderPage();
     await screen.findByText('Mojito');
 
-    await user.click(within(rowOf('Mojito')).getByRole('button', { name: /^Remove .+ from the menu$/ }));
+    await user.click(
+      within(rowOf('Mojito')).getByRole('button', { name: /^Remove .+ from the menu$/ }),
+    );
     await waitFor(() => expect(screen.queryByText('Mojito')).not.toBeInTheDocument());
     await user.click(within(rowOf('Negroni')).getByRole('button', { name: /^Hide .+$/ }));
 
     await waitFor(() => expect(received.updates).toHaveLength(2));
-    expect(sentCocktails(0)).toEqual([{ cocktailId: 2, position: 0, isHidden: false, menuSectionId: null }]);
-    expect(sentCocktails(1)).toEqual([{ cocktailId: 2, position: 0, isHidden: true, menuSectionId: null }]);
+    expect(sentCocktails(0)).toEqual([
+      { cocktailId: 2, position: 0, isHidden: false, menuSectionId: null },
+    ]);
+    expect(sentCocktails(1)).toEqual([
+      { cocktailId: 2, position: 0, isHidden: true, menuSectionId: null },
+    ]);
   });
 
   it('moves a cocktail down inside its section', async () => {
@@ -189,7 +214,9 @@ describe('MenuEditPage', () => {
     renderPage();
     await screen.findByText('Mojito');
 
-    await user.click(within(rowOf('Mojito')).getByRole('button', { name: /^Remove .+ from the menu$/ }));
+    await user.click(
+      within(rowOf('Mojito')).getByRole('button', { name: /^Remove .+ from the menu$/ }),
+    );
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Unknown section'));
     // The refetch never answers: the editor put the cocktail back by itself.
@@ -200,12 +227,13 @@ describe('MenuEditPage', () => {
     const user = userEvent.setup();
     storedMenu = makeMenu([makeEntry(mojito, 0), makeEntry(negroni, 1), makeEntry(spritz, 2)]);
     const answers: { resolve: () => void; reject: (message: string) => void }[] = [];
-    answerUpdate = (data) => new Promise((resolve) => {
-      answers.push({
-        resolve: () => resolve(storeUpdate(data)),
-        reject: (message) => resolve(errorResponse(500, message)),
+    answerUpdate = (data) =>
+      new Promise((resolve) => {
+        answers.push({
+          resolve: () => resolve(storeUpdate(data)),
+          reject: (message) => resolve(errorResponse(500, message)),
+        });
       });
-    });
     const hiddenFlags = (call: number) => sentCocktails(call).map((item) => item.isHidden);
     renderPage();
     await screen.findByText('Mojito');
@@ -253,9 +281,16 @@ describe('MenuEditPage', () => {
     expect(received.updates).toEqual([]);
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
-    await waitFor(() => expect(received.updates).toEqual([{
-      name: 'Winter', slug: 'winter-menu', description: 'Hot drinks', isPublic: true,
-    }]));
+    await waitFor(() =>
+      expect(received.updates).toEqual([
+        {
+          name: 'Winter',
+          slug: 'winter-menu',
+          description: 'Hot drinks',
+          isPublic: true,
+        },
+      ]),
+    );
   });
 
   it('saves the menu info once on a double click', async () => {
@@ -275,7 +310,10 @@ describe('MenuEditPage', () => {
     storedMenu = { ...storedMenu, isPublic: true };
     renderPage();
 
-    expect(await screen.findByRole('link', { name: '/menu/summer' })).toHaveAttribute('href', '/menu/summer');
+    expect(await screen.findByRole('link', { name: '/menu/summer' })).toHaveAttribute(
+      'href',
+      '/menu/summer',
+    );
   });
 
   it('shows an error with a way back when the menu does not exist', async () => {
@@ -292,6 +330,8 @@ describe('MenuEditPage', () => {
     renderPage();
 
     expect(await screen.findByText('No cocktails in this menu yet')).toBeInTheDocument();
-    expect(screen.getByText('No custom section. Cocktails are shown without grouping.')).toBeInTheDocument();
+    expect(
+      screen.getByText('No custom section. Cocktails are shown without grouping.'),
+    ).toBeInTheDocument();
   });
 });

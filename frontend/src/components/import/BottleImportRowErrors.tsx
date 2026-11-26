@@ -5,7 +5,13 @@ import Alert from '../ui/Alert';
 
 // Codes and sources this version can name. A newer backend may send others:
 // they get a generic reason, or the raw source, rather than an i18n key.
-const KNOWN_ERROR_CODES: readonly string[] = ['required', 'outOfRange', 'invalidDate', 'invalidNumber', 'malformedQuotes'];
+const KNOWN_ERROR_CODES: readonly string[] = [
+  'required',
+  'outOfRange',
+  'invalidDate',
+  'invalidNumber',
+  'malformedQuotes',
+];
 const KNOWN_WARNING_CODES: readonly string[] = ['lineBreak'];
 const KNOWN_SOURCES: readonly string[] = ['bottles', 'categories'];
 
@@ -49,7 +55,10 @@ function RowIssues({ issues, tone, title, hint, reason }: RowIssuesProps) {
         {issues.map((issue) => (
           <li key={`${issue.source}-${issue.line}-${issue.field}-${issue.column ?? ''}`}>
             <span className="font-medium">
-              {t('bottles.importWizard.rowErrors.position', { source: sourceLabel(issue.source), line: issue.line })}
+              {t('bottles.importWizard.rowErrors.position', {
+                source: sourceLabel(issue.source),
+                line: issue.line,
+              })}
             </span>{' '}
             <span>{reason(issue, fieldLabel(issue))}</span>
           </li>

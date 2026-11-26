@@ -10,12 +10,22 @@ export { errorResponse, pendingResponse, rateLimitedResponse, readJsonObject } f
 export type ApiMethod = 'get' | 'post' | 'put' | 'delete';
 
 /** Makes the backend answer `body` (status 200 by default) to every `method path` request of the test. */
-export function mockApiResponse(method: ApiMethod, path: string, body: JsonBodyType, status = 200): void {
+export function mockApiResponse(
+  method: ApiMethod,
+  path: string,
+  body: JsonBodyType,
+  status = 200,
+): void {
   server.use(http[method](path, () => HttpResponse.json(body, { status })));
 }
 
 /** Makes the backend reject `method path` with `status` and the `{ error }` body the real API sends. */
-export function mockApiError(method: ApiMethod, path: string, status: number, message: string): void {
+export function mockApiError(
+  method: ApiMethod,
+  path: string,
+  status: number,
+  message: string,
+): void {
   server.use(http[method](path, () => errorResponse(status, message)));
 }
 
@@ -23,9 +33,20 @@ export function mockApiError(method: ApiMethod, path: string, status: number, me
  * Makes `method path` fail like the backend's `validate()` middleware: a 400 whose `details`
  * lists the refused inputs, e.g. `{ path: 'body.name', code: 'too_small' }`.
  */
-export function mockValidationError(method: ApiMethod, path: string, issues: { path: string; code: string }[]): void {
-  const details = issues.map((issue) => ({ ...issue, message: 'English message of zod, never shown' }));
-  server.use(http[method](path, () => HttpResponse.json({ error: 'Validation error', details }, { status: 400 })));
+export function mockValidationError(
+  method: ApiMethod,
+  path: string,
+  issues: { path: string; code: string }[],
+): void {
+  const details = issues.map((issue) => ({
+    ...issue,
+    message: 'English message of zod, never shown',
+  }));
+  server.use(
+    http[method](path, () =>
+      HttpResponse.json({ error: 'Validation error', details }, { status: 400 }),
+    ),
+  );
 }
 
 /** Makes `method path` answer like the backend's rate limiter: a 429 that asks to wait `retryAfterSeconds`. */
@@ -38,7 +59,11 @@ export function mockRateLimited(method: ApiMethod, path: string, retryAfterSecon
  * API's JSON. nginx sends a 502 while the backend is down and a 504 when it does not answer in time.
  */
 export function mockProxyError(method: ApiMethod, path: string, status: number): void {
-  server.use(http[method](path, () => HttpResponse.html(`<html><body><h1>${status}</h1></body></html>`, { status })));
+  server.use(
+    http[method](path, () =>
+      HttpResponse.html(`<html><body><h1>${status}</h1></body></html>`, { status }),
+    ),
+  );
 }
 
 /** Makes `method path` hang: the page stays in its loading state for the whole test. */
@@ -50,9 +75,16 @@ export function mockApiPending(method: ApiMethod, path: string): void {
  * Makes `method path` answer `body` (status 200 by default) only once the returned
  * function is called, to check what the page shows while the request is in flight.
  */
-export function holdApiResponse(method: ApiMethod, path: string, body: JsonBodyType, status = 200): () => void {
+export function holdApiResponse(
+  method: ApiMethod,
+  path: string,
+  body: JsonBodyType,
+  status = 200,
+): () => void {
   let release: () => void = () => {};
-  const released = new Promise<void>((resolve) => { release = resolve; });
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
   server.use(
     http[method](path, async () => {
       await released;
@@ -67,7 +99,11 @@ export function holdApiResponse(method: ApiMethod, path: string, body: JsonBodyT
  * lists `impact`, unless the request asks `?force=true`, which deletes and
  * answers with the same impact. Returns the URLs received, in order.
  */
-export function mockItemInUse(path: string, impact: DeletionImpact, message = 'This item is used by cocktails'): URL[] {
+export function mockItemInUse(
+  path: string,
+  impact: DeletionImpact,
+  message = 'This item is used by cocktails',
+): URL[] {
   const urls: URL[] = [];
   server.use(
     http.delete(path, ({ request }) => {
@@ -125,8 +161,12 @@ export function captureRequest(method: ApiMethod, path: string): CapturedRequest
   let received = 0;
   let resolveBody: (body: unknown) => void = () => {};
   let resolveUrl: (url: URL) => void = () => {};
-  const body = new Promise<unknown>((resolve) => { resolveBody = resolve; });
-  const url = new Promise<URL>((resolve) => { resolveUrl = resolve; });
+  const body = new Promise<unknown>((resolve) => {
+    resolveBody = resolve;
+  });
+  const url = new Promise<URL>((resolve) => {
+    resolveUrl = resolve;
+  });
 
   server.use(
     http[method](path, async ({ request }) => {

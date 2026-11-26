@@ -7,11 +7,18 @@ import { describeMutationError, readDeletionImpact } from './deletionImpact';
 const t: TFunction = i18n.t.bind(i18n);
 
 function conflict(details: unknown) {
-  return new ApiError(409, 'This category still has bottles', { error: 'This category still has bottles', details });
+  return new ApiError(409, 'This category still has bottles', {
+    error: 'This category still has bottles',
+    details,
+  });
 }
 
 function named(count: number, prefix: string) {
-  return Array.from({ length: count }, (_, index) => ({ id: index + 1, name: `${prefix} ${index + 1}`, removedLines: 1 }));
+  return Array.from({ length: count }, (_, index) => ({
+    id: index + 1,
+    name: `${prefix} ${index + 1}`,
+    removedLines: 1,
+  }));
 }
 
 describe('readDeletionImpact', () => {
@@ -26,7 +33,11 @@ describe('readDeletionImpact', () => {
   });
 
   it('ignores any other error', () => {
-    expect(readDeletionImpact(new ApiError(400, 'Bad request', { details: { cocktails: [], bottles: [] } }))).toBeNull();
+    expect(
+      readDeletionImpact(
+        new ApiError(400, 'Bad request', { details: { cocktails: [], bottles: [] } }),
+      ),
+    ).toBeNull();
     expect(readDeletionImpact(new Error('Failed to fetch'))).toBeNull();
   });
 });
@@ -38,7 +49,10 @@ describe('describeMutationError', () => {
   });
 
   it('adds the cocktails and bottles that use the item to the backend message', () => {
-    const error = conflict({ cocktails: named(2, 'Mojito'), bottles: [{ id: 3, name: 'Havana 3' }] });
+    const error = conflict({
+      cocktails: named(2, 'Mojito'),
+      bottles: [{ id: 3, name: 'Havana 3' }],
+    });
 
     const described = describeMutationError(error, t) as Error;
 
@@ -52,7 +66,9 @@ describe('describeMutationError', () => {
 
     const described = describeMutationError(error, t, 'Change the unit first.') as Error;
 
-    expect(described.message).toBe('This category still has bottles Used by these cocktails: Mojito 1. Change the unit first.');
+    expect(described.message).toBe(
+      'This category still has bottles Used by these cocktails: Mojito 1. Change the unit first.',
+    );
   });
 
   it('lists five names and counts the others', () => {

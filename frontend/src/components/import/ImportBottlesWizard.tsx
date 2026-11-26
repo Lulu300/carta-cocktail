@@ -43,7 +43,10 @@ export default function ImportBottlesWizard({ onClose, onImported }: ImportBottl
   const [step, setStep] = useState<Step>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<BottleImportPreviewResponse | null>(null);
-  const [resolutions, setResolutions] = useState<BottleImportResolutions>({ categories: {}, bottles: {} });
+  const [resolutions, setResolutions] = useState<BottleImportResolutions>({
+    categories: {},
+    bottles: {},
+  });
   const [result, setResult] = useState<BottleImportConfirmResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -86,7 +89,10 @@ export default function ImportBottlesWizard({ onClose, onImported }: ImportBottl
       onImported?.();
     } catch (err) {
       // A row refused by the validation is named, with its field, rather than the generic message
-      setError(validationErrorMessage(err) ?? (err instanceof Error ? err.message : t('bottles.importWizard.error')));
+      setError(
+        validationErrorMessage(err) ??
+          (err instanceof Error ? err.message : t('bottles.importWizard.error')),
+      );
       setStep('error');
     } finally {
       setIsLoading(false);
@@ -103,22 +109,37 @@ export default function ImportBottlesWizard({ onClose, onImported }: ImportBottl
 
   const rowsWithoutCategory = preview ? countRowsWithoutCategory(preview, resolutions) : 0;
   const categoriesWithoutType = countCategoriesWithoutType(resolutions, categoryTypes);
-  const categoriesToResolve = preview ? countCategoriesToResolve(preview, resolutions, existingCategories) : 0;
-  const isIncomplete = rowsWithoutCategory > 0 || categoriesWithoutType > 0 || categoriesToResolve > 0;
+  const categoriesToResolve = preview
+    ? countCategoriesToResolve(preview, resolutions, existingCategories)
+    : 0;
+  const isIncomplete =
+    rowsWithoutCategory > 0 || categoriesWithoutType > 0 || categoriesToResolve > 0;
 
   // Says why "Next" or "Import" is disabled: the flagged category can be out of sight
   const blockingReasons: string[] = [];
-  if (categoriesToResolve > 0) blockingReasons.push(t('bottles.importWizard.categoriesToResolve', { count: categoriesToResolve }));
-  if (categoriesWithoutType > 0) blockingReasons.push(t('bottles.importWizard.categoriesWithoutType', { count: categoriesWithoutType }));
+  if (categoriesToResolve > 0)
+    blockingReasons.push(
+      t('bottles.importWizard.categoriesToResolve', { count: categoriesToResolve }),
+    );
+  if (categoriesWithoutType > 0)
+    blockingReasons.push(
+      t('bottles.importWizard.categoriesWithoutType', { count: categoriesWithoutType }),
+    );
   const blockingWarning = blockingReasons.length > 0 && (
     <Alert tone="warning">
-      {blockingReasons.map((reason) => <p key={reason}>{reason}</p>)}
+      {blockingReasons.map((reason) => (
+        <p key={reason}>{reason}</p>
+      ))}
     </Alert>
   );
 
   const footer = (step === 'resolve' || step === 'confirm') && (
     <>
-      <Button variant="ghost" className="mr-auto" onClick={() => setStep(step === 'confirm' ? 'resolve' : 'upload')}>
+      <Button
+        variant="ghost"
+        className="mr-auto"
+        onClick={() => setStep(step === 'confirm' ? 'resolve' : 'upload')}
+      >
         {t('bottles.importWizard.back')}
       </Button>
       {step === 'resolve' ? (
@@ -127,7 +148,9 @@ export default function ImportBottlesWizard({ onClose, onImported }: ImportBottl
         </Button>
       ) : (
         <Button onClick={onConfirm} loading={isLoading} disabled={isIncomplete}>
-          {isLoading ? t('bottles.importWizard.importing') : t('bottles.importWizard.confirmImport')}
+          {isLoading
+            ? t('bottles.importWizard.importing')
+            : t('bottles.importWizard.confirmImport')}
         </Button>
       )}
     </>
@@ -142,7 +165,11 @@ export default function ImportBottlesWizard({ onClose, onImported }: ImportBottl
   return (
     <WizardModal
       title={t('bottles.importWizard.title')}
-      steps={[t('bottles.importWizard.steps.upload'), t('bottles.importWizard.steps.resolve'), t('bottles.importWizard.steps.confirm')]}
+      steps={[
+        t('bottles.importWizard.steps.upload'),
+        t('bottles.importWizard.steps.resolve'),
+        t('bottles.importWizard.steps.confirm'),
+      ]}
       currentStep={STEP_INDICATOR_INDEX[step] ?? null}
       onClose={onClose}
       footer={footer || undefined}
@@ -156,9 +183,7 @@ export default function ImportBottlesWizard({ onClose, onImported }: ImportBottl
             label={t('bottles.importWizard.dropzone')}
             fileName={file?.name}
           />
-          {error && (
-            <Alert tone="danger">{error}</Alert>
-          )}
+          {error && <Alert tone="danger">{error}</Alert>}
           {file && (
             <div className="flex justify-end">
               <Button onClick={onPreview} loading={isLoading}>
@@ -175,8 +200,12 @@ export default function ImportBottlesWizard({ onClose, onImported }: ImportBottl
           {blockingWarning}
           <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-1">
             <div className="bg-canvas border border-gray-700 rounded-lg p-3 text-sm flex gap-6 text-fg-muted">
-              <span>{t('bottles.importWizard.summaryCategories', { count: preview.categories.length })}</span>
-              <span>{t('bottles.importWizard.summaryBottles', { count: preview.bottles.length })}</span>
+              <span>
+                {t('bottles.importWizard.summaryCategories', { count: preview.categories.length })}
+              </span>
+              <span>
+                {t('bottles.importWizard.summaryBottles', { count: preview.bottles.length })}
+              </span>
             </div>
             <BottleImportRowErrors errors={preview.errors} />
             <BottleImportRowWarnings warnings={preview.warnings ?? []} />
@@ -200,23 +229,42 @@ export default function ImportBottlesWizard({ onClose, onImported }: ImportBottl
       {step === 'confirm' && preview && (
         <div className="space-y-4">
           {blockingWarning}
-          <BottleImportConfirmStep preview={preview} resolutions={resolutions} existingCategories={existingCategories} />
+          <BottleImportConfirmStep
+            preview={preview}
+            resolutions={resolutions}
+            existingCategories={existingCategories}
+          />
         </div>
       )}
 
       {step === 'success' && result && (
-        <WizardResult variant="success" title={t('bottles.importWizard.successCount', { count: result.created.bottles })} actions={closeButton}>
+        <WizardResult
+          variant="success"
+          title={t('bottles.importWizard.successCount', { count: result.created.bottles })}
+          actions={closeButton}
+        >
           {result.duplicatesCreated > 0 && (
-            <p className="text-sm text-orange-400">{t('bottles.importWizard.duplicatesCreatedRecap', { count: result.duplicatesCreated })}</p>
+            <p className="text-sm text-orange-400">
+              {t('bottles.importWizard.duplicatesCreatedRecap', {
+                count: result.duplicatesCreated,
+              })}
+            </p>
           )}
           {result.skippedNoCategory > 0 && (
-            <p className="text-sm text-fg-muted">{t('bottles.importWizard.skippedRecap', { count: result.skippedNoCategory })}</p>
+            <p className="text-sm text-fg-muted">
+              {t('bottles.importWizard.skippedRecap', { count: result.skippedNoCategory })}
+            </p>
           )}
         </WizardResult>
       )}
 
       {step === 'error' && (
-        <WizardResult variant="error" title={t('bottles.importWizard.error')} message={error ?? undefined} actions={closeButton} />
+        <WizardResult
+          variant="error"
+          title={t('bottles.importWizard.error')}
+          message={error ?? undefined}
+          actions={closeButton}
+        />
       )}
     </WizardModal>
   );

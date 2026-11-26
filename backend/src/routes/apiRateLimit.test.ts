@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
-  setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData, request, authHeader,
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+  request,
+  authHeader,
 } from '../test/helpers';
 import { resetRateLimits } from '../middleware/rateLimit';
 
@@ -13,8 +18,12 @@ const API_LIMIT = vi.hoisted(() => {
 });
 const BACKUP_LIMIT = 10;
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
 beforeEach(async () => {
   await cleanDatabase();
   await seedRequiredData();
@@ -38,7 +47,10 @@ function getUnits(clientIp: string) {
 }
 
 /** Sends `count` requests one after the other and returns their statuses. */
-async function statusesOf(count: number, send: () => PromiseLike<{ status: number }>): Promise<number[]> {
+async function statusesOf(
+  count: number,
+  send: () => PromiseLike<{ status: number }>,
+): Promise<number[]> {
   const statuses: number[] = [];
   for (let sent = 0; sent < count; sent++) {
     statuses.push((await send()).status);
@@ -48,7 +60,9 @@ async function statusesOf(count: number, send: () => PromiseLike<{ status: numbe
 
 describe(`API rate limit (API_RATE_LIMIT=${API_LIMIT})`, () => {
   it('answers a translated 429 JSON with Retry-After on a public route', async () => {
-    expect(await statusesOf(API_LIMIT, () => getPublicSettings('203.0.113.1'))).toEqual(Array(API_LIMIT).fill(200));
+    expect(await statusesOf(API_LIMIT, () => getPublicSettings('203.0.113.1'))).toEqual(
+      Array(API_LIMIT).fill(200),
+    );
 
     const blocked = await getPublicSettings('203.0.113.1');
     expect(blocked.status).toBe(429);
@@ -76,7 +90,8 @@ describe(`API rate limit (API_RATE_LIMIT=${API_LIMIT})`, () => {
   it('refuses a request beyond the limit before reading its body', async () => {
     await statusesOf(API_LIMIT, () => getUnits('203.0.113.4'));
 
-    const res = await request.post('/api/units')
+    const res = await request
+      .post('/api/units')
       .set('X-Forwarded-For', '203.0.113.4')
       .set(authHeader())
       .set('Content-Type', 'application/json')
@@ -119,8 +134,9 @@ describe(`Backup rate limit (${BACKUP_LIMIT} authenticated requests per 15 minut
   }
 
   it('answers 429 beyond the backup limit, before the API limit', async () => {
-    expect(await statusesOf(BACKUP_LIMIT, () => importWithoutFile('203.0.113.10')))
-      .toEqual(Array(BACKUP_LIMIT).fill(400));
+    expect(await statusesOf(BACKUP_LIMIT, () => importWithoutFile('203.0.113.10'))).toEqual(
+      Array(BACKUP_LIMIT).fill(400),
+    );
 
     const blocked = await importWithoutFile('203.0.113.10');
     expect(blocked.status).toBe(429);
@@ -132,8 +148,11 @@ describe(`Backup rate limit (${BACKUP_LIMIT} authenticated requests per 15 minut
   });
 
   it('does not count requests without a token, which only the API limit counts', async () => {
-    const withoutToken = () => request.post('/api/backup/import').set('X-Forwarded-For', '203.0.113.11');
-    expect(await statusesOf(BACKUP_LIMIT + 2, withoutToken)).toEqual(Array(BACKUP_LIMIT + 2).fill(401));
+    const withoutToken = () =>
+      request.post('/api/backup/import').set('X-Forwarded-For', '203.0.113.11');
+    expect(await statusesOf(BACKUP_LIMIT + 2, withoutToken)).toEqual(
+      Array(BACKUP_LIMIT + 2).fill(401),
+    );
 
     // The admin behind the same address can still back up
     expect((await importWithoutFile('203.0.113.11')).status).toBe(400);

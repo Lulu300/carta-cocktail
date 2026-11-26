@@ -45,7 +45,9 @@ function mockAttachment(data: unknown, disposition: string | null) {
     ok: true,
     status: 200,
     json: () => Promise.resolve(data),
-    headers: { get: (key: string) => (key.toLowerCase() === 'content-disposition' ? disposition : null) },
+    headers: {
+      get: (key: string) => (key.toLowerCase() === 'content-disposition' ? disposition : null),
+    },
   });
 }
 
@@ -94,7 +96,11 @@ describe('API request helper', () => {
   it('should keep a newer token when a 401 arrives for a request sent with an older one', async () => {
     localStorage.setItem('token', 'old-token');
     let resolveFetch: (response: unknown) => void = () => {};
-    mockFetch.mockReturnValueOnce(new Promise((resolve) => { resolveFetch = resolve; }));
+    mockFetch.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveFetch = resolve;
+      }),
+    );
     const api = await getApi();
     const onUnauthorized = vi.fn();
     api.setUnauthorizedHandler(onUnauthorized);
@@ -102,7 +108,11 @@ describe('API request helper', () => {
     const pending = api.categories.list().catch((e: unknown) => e);
     // The admin signs in again while the old request is still in flight
     localStorage.setItem('token', 'new-token');
-    resolveFetch({ ok: false, status: 401, json: () => Promise.resolve({ error: INVALID_TOKEN_MESSAGE }) });
+    resolveFetch({
+      ok: false,
+      status: 401,
+      json: () => Promise.resolve({ error: INVALID_TOKEN_MESSAGE }),
+    });
 
     expect(await pending).toMatchObject({ status: 401, message: INVALID_TOKEN_MESSAGE });
     expect(localStorage.getItem('token')).toBe('new-token');
@@ -124,7 +134,11 @@ describe('API request helper', () => {
 
     const error = await api.publicApi.getSettings().catch((e: unknown) => e);
 
-    expect(error).toMatchObject({ status: 429, message: 'Too many requests', retryAfterSeconds: seconds });
+    expect(error).toMatchObject({
+      status: 429,
+      message: 'Too many requests',
+      retryAfterSeconds: seconds,
+    });
   });
 
   it('should not call the unauthorized handler on a 401 from auth.login', async () => {
@@ -174,7 +188,11 @@ describe('API request helper', () => {
       const error = await failedRequest(400, {
         error: 'Validation error',
         details: [
-          { path: 'body.ingredients.1.quantity', code: 'too_small', message: 'Too small: expected number to be >0' },
+          {
+            path: 'body.ingredients.1.quantity',
+            code: 'too_small',
+            message: 'Too small: expected number to be >0',
+          },
           { path: 'body.name', code: 'too_small', message: 'Too small' },
         ],
       });
@@ -194,27 +212,42 @@ describe('API request helper', () => {
     it('leaves out details of another shape, such as the unresolved references of an import', async () => {
       const error = await failedRequest(400, {
         error: 'Unknown references',
-        details: [{ line: 2, kind: 'bottle', name: 'Rum' }, 'body.name', null, { path: 'body.name', code: 3 }],
+        details: [
+          { line: 2, kind: 'bottle', name: 'Rum' },
+          'body.name',
+          null,
+          { path: 'body.name', code: 3 },
+        ],
       });
       expect(error.validationIssues()).toEqual([]);
     });
 
     it('is empty when details is not a list, such as the code of an import parse error', async () => {
-      const error = await failedRequest(400, { error: 'Too many rows', details: { code: 'tooManyRows', max: 2000 } });
+      const error = await failedRequest(400, {
+        error: 'Too many rows',
+        details: { code: 'tooManyRows', max: 2000 },
+      });
       expect(error.validationIssues()).toEqual([]);
     });
 
     it('is empty for a 400 whose body is not JSON', async () => {
-      mockFetch.mockResolvedValueOnce(new Response('<html>400 Bad Request</html>', { status: 400 }));
+      mockFetch.mockResolvedValueOnce(
+        new Response('<html>400 Bad Request</html>', { status: 400 }),
+      );
       const api = await getApi();
-      const error = (await api.units.list().catch((e: unknown) => e)) as InstanceType<typeof api.ApiError>;
+      const error = (await api.units.list().catch((e: unknown) => e)) as InstanceType<
+        typeof api.ApiError
+      >;
 
       expect(error.status).toBe(400);
       expect(error.validationIssues()).toEqual([]);
     });
 
     it('is empty for another status, even with details', async () => {
-      const error = await failedRequest(409, { error: 'In use', details: [{ path: 'body.name', code: 'custom' }] });
+      const error = await failedRequest(409, {
+        error: 'In use',
+        details: [{ path: 'body.name', code: 'custom' }],
+      });
       expect(error.validationIssues()).toEqual([]);
     });
 
@@ -242,13 +275,20 @@ describe('API request helper', () => {
     it('lists the unknown references of a recipe, and leaves out a malformed one', async () => {
       const error = await failedRequest(400, {
         error: 'A recipe line names a unit that does not exist',
-        details: [{ line: 2, field: 'ingredientId', id: 7 }, { line: '2', field: 'unitId', id: 4 }, { line: 0, field: 'unitId' }],
+        details: [
+          { line: 2, field: 'ingredientId', id: 7 },
+          { line: '2', field: 'unitId', id: 4 },
+          { line: 0, field: 'unitId' },
+        ],
       });
       expect(error.unknownReferences()).toEqual([{ line: 2, field: 'ingredientId', id: 7 }]);
     });
 
     it('reads no references for another status', async () => {
-      const error = await failedRequest(409, { error: 'In use', details: [{ line: 0, field: 'unitId', id: 4 }] });
+      const error = await failedRequest(409, {
+        error: 'In use',
+        details: [{ line: 0, field: 'unitId', id: 4 }],
+      });
       expect(error.unknownReferences()).toEqual([]);
       expect(error.unresolvedReferences()).toEqual([]);
     });
@@ -306,50 +346,73 @@ describe('API request helper', () => {
 
     /** An answer of nginx or of another proxy in front of the backend: its own page, not JSON. */
     function mockProxyAnswer(status: number, body: string, contentType: string) {
-      mockFetch.mockResolvedValueOnce(new Response(body, { status, headers: { 'Content-Type': contentType } }));
+      mockFetch.mockResolvedValueOnce(
+        new Response(body, { status, headers: { 'Content-Type': contentType } }),
+      );
     }
 
     it.each([
-      ['502 HTML page of nginx while the backend is down', 502, '<html><body><h1>502 Bad Gateway</h1></body></html>', 'text/html'],
+      [
+        '502 HTML page of nginx while the backend is down',
+        502,
+        '<html><body><h1>502 Bad Gateway</h1></body></html>',
+        'text/html',
+      ],
       ['empty 502 of the Vite dev proxy while the backend is down', 502, '', 'text/plain'],
       ['503 plain text page of a proxy', 503, 'Service Unavailable', 'text/plain'],
-      ['504 HTML page of nginx when the backend does not answer in time', 504, '<html><body><h1>504 Gateway Time-out</h1></body></html>', 'text/html'],
+      [
+        '504 HTML page of nginx when the backend does not answer in time',
+        504,
+        '<html><body><h1>504 Gateway Time-out</h1></body></html>',
+        'text/html',
+      ],
       ['500 with no body, which is not JSON', 500, '', 'text/plain'],
-    ])('says the server is not responding after a %s, and keeps the status', async (_case, status, body, contentType) => {
-      localStorage.setItem('token', 'my-token');
-      mockProxyAnswer(status, body, contentType);
-      const api = await getApi();
-      const onUnauthorized = vi.fn();
-      api.setUnauthorizedHandler(onUnauthorized);
+    ])(
+      'says the server is not responding after a %s, and keeps the status',
+      async (_case, status, body, contentType) => {
+        localStorage.setItem('token', 'my-token');
+        mockProxyAnswer(status, body, contentType);
+        const api = await getApi();
+        const onUnauthorized = vi.fn();
+        api.setUnauthorizedHandler(onUnauthorized);
 
-      const error = await api.auth.me().catch((e: unknown) => e);
+        const error = await api.auth.me().catch((e: unknown) => e);
 
-      expect(error).toBeInstanceOf(api.ApiError);
-      expect(error).toMatchObject({ status, message: SERVER_UNAVAILABLE });
-      expect(localStorage.getItem('token')).toBe('my-token');
-      expect(onUnauthorized).not.toHaveBeenCalled();
-    });
+        expect(error).toBeInstanceOf(api.ApiError);
+        expect(error).toMatchObject({ status, message: SERVER_UNAVAILABLE });
+        expect(localStorage.getItem('token')).toBe('my-token');
+        expect(onUnauthorized).not.toHaveBeenCalled();
+      },
+    );
 
     it('says it in the language chosen in the UI', async () => {
       await i18n.changeLanguage('fr');
       mockProxyAnswer(502, '<html><body><h1>502 Bad Gateway</h1></body></html>', 'text/html');
       const api = await getApi();
 
-      await expect(api.categories.list()).rejects.toThrow('Le serveur ne répond pas, réessayez dans un instant.');
+      await expect(api.categories.list()).rejects.toThrow(
+        'Le serveur ne répond pas, réessayez dans un instant.',
+      );
     });
 
     it('says it for a JSON answer of a 5xx without an error field', async () => {
       mockError(503, { status: 'unavailable' });
       const api = await getApi();
 
-      await expect(api.categories.list()).rejects.toMatchObject({ status: 503, message: SERVER_UNAVAILABLE });
+      await expect(api.categories.list()).rejects.toMatchObject({
+        status: 503,
+        message: SERVER_UNAVAILABLE,
+      });
     });
 
     it('keeps the message the backend sent, whatever the status', async () => {
       mockError(502, { error: 'Backup restore in progress' });
       const api = await getApi();
 
-      await expect(api.categories.list()).rejects.toMatchObject({ status: 502, message: 'Backup restore in progress' });
+      await expect(api.categories.list()).rejects.toMatchObject({
+        status: 502,
+        message: 'Backup restore in progress',
+      });
     });
 
     describe('413 of nginx for a body over client_max_body_size', () => {
@@ -373,7 +436,9 @@ describe('API request helper', () => {
         mockProxyAnswer(413, NGINX_413, 'text/html');
         const api = await getApi();
 
-        await expect(api.categories.list()).rejects.toThrow('Le fichier ou la requête est trop volumineux');
+        await expect(api.categories.list()).rejects.toThrow(
+          'Le fichier ou la requête est trop volumineux',
+        );
       });
 
       it('keeps the message of the 413 the backend translated', async () => {
@@ -389,34 +454,67 @@ describe('API request helper', () => {
     });
 
     it.each([
-      ['400 HTML page of nginx for headers too large', 400, '<html><body><h1>400 Request Header Or Cookie Too Large</h1></body></html>', 'text/html'],
-      ['403 HTML page of a proxy in front', 403, '<html><body><h1>403 Forbidden</h1></body></html>', 'text/html'],
+      [
+        '400 HTML page of nginx for headers too large',
+        400,
+        '<html><body><h1>400 Request Header Or Cookie Too Large</h1></body></html>',
+        'text/html',
+      ],
+      [
+        '403 HTML page of a proxy in front',
+        403,
+        '<html><body><h1>403 Forbidden</h1></body></html>',
+        'text/html',
+      ],
       ['404 plain text page of a proxy with no route', 404, '404 page not found', 'text/plain'],
-      ['405 HTML page of a proxy in front', 405, '<html><body><h1>405 Not Allowed</h1></body></html>', 'text/html'],
+      [
+        '405 HTML page of a proxy in front',
+        405,
+        '<html><body><h1>405 Not Allowed</h1></body></html>',
+        'text/html',
+      ],
       ['empty 408 of Node when the body takes too long', 408, '', 'text/plain'],
-      ['414 HTML page of nginx for a URL too long', 414, '<html><body><h1>414 Request-URI Too Large</h1></body></html>', 'text/html'],
+      [
+        '414 HTML page of nginx for a URL too long',
+        414,
+        '<html><body><h1>414 Request-URI Too Large</h1></body></html>',
+        'text/html',
+      ],
       ['empty 431 of Node for headers too large', 431, '', 'text/plain'],
-    ])('says the request could not be completed after a %s, with the status', async (_case, status, body, contentType) => {
-      mockProxyAnswer(status, body, contentType);
-      const api = await getApi();
+    ])(
+      'says the request could not be completed after a %s, with the status',
+      async (_case, status, body, contentType) => {
+        mockProxyAnswer(status, body, contentType);
+        const api = await getApi();
 
-      await expect(api.categories.list()).rejects.toMatchObject({
-        status,
-        message: `The request could not be completed (error ${status}).`,
-      });
-    });
+        await expect(api.categories.list()).rejects.toMatchObject({
+          status,
+          message: `The request could not be completed (error ${status}).`,
+        });
+      },
+    );
 
     it('says a 4xx is incomplete in the language chosen in the UI', async () => {
       await i18n.changeLanguage('fr');
-      mockProxyAnswer(414, '<html><body><h1>414 Request-URI Too Large</h1></body></html>', 'text/html');
+      mockProxyAnswer(
+        414,
+        '<html><body><h1>414 Request-URI Too Large</h1></body></html>',
+        'text/html',
+      );
       const api = await getApi();
 
-      await expect(api.categories.list()).rejects.toThrow("La requête n'a pas abouti (erreur 414).");
+      await expect(api.categories.list()).rejects.toThrow(
+        "La requête n'a pas abouti (erreur 414).",
+      );
     });
 
     it('still ends the session on a 401 that is not JSON', async () => {
       localStorage.setItem('token', 'my-token');
-      mockProxyAnswer(401, '<html><body><h1>401 Authorization Required</h1></body></html>', 'text/html');
+      mockProxyAnswer(
+        401,
+        '<html><body><h1>401 Authorization Required</h1></body></html>',
+        'text/html',
+      );
       const api = await getApi();
       const onUnauthorized = vi.fn();
       api.setUnauthorizedHandler(onUnauthorized);
@@ -459,9 +557,12 @@ describe('request cancellation', () => {
 
   it('should reject an abandoned request with the abort error, not an ApiError', async () => {
     const controller = new AbortController();
-    mockFetch.mockImplementationOnce((_url: string, init: RequestInit) => new Promise((_resolve, reject) => {
-      init.signal?.addEventListener('abort', () => reject(init.signal?.reason));
-    }));
+    mockFetch.mockImplementationOnce(
+      (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+        }),
+    );
     const api = await getApi();
 
     const pending = api.units.list(controller.signal).catch((e: unknown) => e);
@@ -547,19 +648,22 @@ describe('categories API', () => {
 });
 
 describe('forced deletion', () => {
-  it.each(['bottles', 'categories', 'ingredients'] as const)('adds ?force=true to a forced %s deletion only', async (resource) => {
-    const api = await getApi();
+  it.each(['bottles', 'categories', 'ingredients'] as const)(
+    'adds ?force=true to a forced %s deletion only',
+    async (resource) => {
+      const api = await getApi();
 
-    mockOk({ message: 'ok', deleted: true, impact: { cocktails: [], bottles: [] } });
-    await api[resource].delete(3);
-    mockOk({ message: 'ok', deleted: true, impact: { cocktails: [], bottles: [] } });
-    await api[resource].delete(3, { force: true });
+      mockOk({ message: 'ok', deleted: true, impact: { cocktails: [], bottles: [] } });
+      await api[resource].delete(3);
+      mockOk({ message: 'ok', deleted: true, impact: { cocktails: [], bottles: [] } });
+      await api[resource].delete(3, { force: true });
 
-    expect(mockFetch.mock.calls.map(([url, init]) => `${init.method} ${url}`)).toEqual([
-      `DELETE /api/${resource}/3`,
-      `DELETE /api/${resource}/3?force=true`,
-    ]);
-  });
+      expect(mockFetch.mock.calls.map(([url, init]) => `${init.method} ${url}`)).toEqual([
+        `DELETE /api/${resource}/3`,
+        `DELETE /api/${resource}/3?force=true`,
+      ]);
+    },
+  );
 });
 
 describe('bottles API', () => {
@@ -613,16 +717,25 @@ describe('bottles.exportFile', () => {
     const downloads = mockDownload();
 
     const api = await getApi();
-    await api.bottles.exportFile('json', { categoryId: 2, type: 'SPIRIT', search: 'rum', location: 'bar' });
+    await api.bottles.exportFile('json', {
+      categoryId: 2,
+      type: 'SPIRIT',
+      search: 'rum',
+      location: 'bar',
+    });
 
     const [url, opts] = mockFetch.mock.calls[0]!;
-    expect(url).toBe('/api/bottles/export?format=json&categoryId=2&type=SPIRIT&search=rum&location=bar');
+    expect(url).toBe(
+      '/api/bottles/export?format=json&categoryId=2&type=SPIRIT&search=rum&location=bar',
+    );
     expect(opts.headers['Authorization']).toBe('Bearer tok');
     expect(downloads).toEqual(['bottles.json']);
   });
 
   it('saves the CSV export as received, byte order mark included', async () => {
-    const csv = new Blob([new Uint8Array([0xef, 0xbb, 0xbf]), 'name,categoryName\n'], { type: 'text/csv' });
+    const csv = new Blob([new Uint8Array([0xef, 0xbb, 0xbf]), 'name,categoryName\n'], {
+      type: 'text/csv',
+    });
     mockFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -751,11 +864,36 @@ describe('cocktails API', () => {
   it('should call import preview and confirm', async () => {
     const api = await getApi();
     mockOk({});
-    await api.cocktails.importPreview({ version: 1, exportedAt: '', cocktail: { name: 'X', description: null, notes: null, tags: [], ingredients: [], instructions: [] } });
+    await api.cocktails.importPreview({
+      version: 1,
+      exportedAt: '',
+      cocktail: {
+        name: 'X',
+        description: null,
+        notes: null,
+        tags: [],
+        ingredients: [],
+        instructions: [],
+      },
+    });
     expect(mockFetch.mock.calls[0]![0]!).toBe('/api/cocktails/import/preview');
 
     mockOk({});
-    await api.cocktails.importConfirm({ recipe: { version: 1, exportedAt: '', cocktail: { name: 'X', description: null, notes: null, tags: [], ingredients: [], instructions: [] } }, resolutions: {} });
+    await api.cocktails.importConfirm({
+      recipe: {
+        version: 1,
+        exportedAt: '',
+        cocktail: {
+          name: 'X',
+          description: null,
+          notes: null,
+          tags: [],
+          ingredients: [],
+          instructions: [],
+        },
+      },
+      resolutions: {},
+    });
     expect(mockFetch.mock.calls[1]![0]!).toBe('/api/cocktails/import/confirm');
   });
 });
@@ -991,7 +1129,9 @@ describe('backup API', () => {
   it('exportBackup triggers download on success with Content-Disposition filename', async () => {
     localStorage.setItem('token', 'tok');
     const fakeBlob = new Blob(['zip-data'], { type: 'application/zip' });
-    const mockHeaders = new Map([['content-disposition', 'attachment; filename=backup-2024-01-01.zip']]);
+    const mockHeaders = new Map([
+      ['content-disposition', 'attachment; filename=backup-2024-01-01.zip'],
+    ]);
     mockFetch.mockResolvedValueOnce({
       ok: true,
       blob: () => Promise.resolve(fakeBlob),

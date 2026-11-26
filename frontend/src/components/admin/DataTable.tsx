@@ -67,7 +67,17 @@ function alignClass(align: Column<unknown>['align']) {
 
 /** Sortable, paginated admin table that never shows its empty label before the data is there. */
 export default function DataTable<T>({
-  columns, rows, getRowKey, sort, pagination, renderRow, isLoading, isError, onRetry, emptyLabel, isFiltered,
+  columns,
+  rows,
+  getRowKey,
+  sort,
+  pagination,
+  renderRow,
+  isLoading,
+  isError,
+  onRetry,
+  emptyLabel,
+  isFiltered,
 }: DataTableProps<T>) {
   const { t } = useTranslation();
   const isEmpty = !isLoading && !isError && rows.length === 0;
@@ -76,7 +86,10 @@ export default function DataTable<T>({
   const renderCells = (row: T) => (
     <tr className="hover:bg-line/50">
       {columns.map((column) => (
-        <td key={column.key} className={cx('px-6 py-4', alignClass(column.align), column.className)}>
+        <td
+          key={column.key}
+          className={cx('px-6 py-4', alignClass(column.align), column.className)}
+        >
           {column.render?.(row)}
         </td>
       ))}
@@ -86,39 +99,55 @@ export default function DataTable<T>({
   return (
     <div className="bg-surface border border-line rounded-xl overflow-hidden">
       <ScrollableTable>
-      <table className="w-full">
-        <thead className="bg-canvas">
-          <tr>
-            {columns.map((column) => (column.sortable ? (
-              <SortableHeader
-                key={column.key}
-                label={column.header}
-                sortKey={column.key}
-                currentSortKey={sort.sortKey}
-                sortDirection={sort.sortDirection}
-                onSort={sort.toggleSort}
-              />
-            ) : (
-              <th key={column.key} className={cx('px-6 py-3 text-sm text-fg-muted font-medium', alignClass(column.align))}>
-                {column.header}
-              </th>
-            )))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-line">
-          {isLoading
-            ? Array.from({ length: SKELETON_ROWS }, (_, index) => (
-              <tr key={index}>
-                {columns.map((column) => (
-                  <td key={column.key} className="px-6 py-4"><Skeleton className="h-4" /></td>
+        <table className="w-full">
+          <thead className="bg-canvas">
+            <tr>
+              {columns.map((column) =>
+                column.sortable ? (
+                  <SortableHeader
+                    key={column.key}
+                    label={column.header}
+                    sortKey={column.key}
+                    currentSortKey={sort.sortKey}
+                    sortDirection={sort.sortDirection}
+                    onSort={sort.toggleSort}
+                  />
+                ) : (
+                  <th
+                    key={column.key}
+                    className={cx(
+                      'px-6 py-3 text-sm text-fg-muted font-medium',
+                      alignClass(column.align),
+                    )}
+                  >
+                    {column.header}
+                  </th>
+                ),
+              )}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {isLoading
+              ? Array.from({ length: SKELETON_ROWS }, (_, index) => (
+                  <tr key={index}>
+                    {columns.map((column) => (
+                      <td key={column.key} className="px-6 py-4">
+                        <Skeleton className="h-4" />
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              : rows.map((row) => (
+                  <Fragment key={getRowKey(row)}>{(renderRow ?? renderCells)(row)}</Fragment>
                 ))}
-              </tr>
-            ))
-            : rows.map((row) => <Fragment key={getRowKey(row)}>{(renderRow ?? renderCells)(row)}</Fragment>)}
-        </tbody>
-      </table>
+          </tbody>
+        </table>
       </ScrollableTable>
-      {isLoading && <p role="status" className="sr-only">{t('common.loading')}</p>}
+      {isLoading && (
+        <p role="status" className="sr-only">
+          {t('common.loading')}
+        </p>
+      )}
       {isError && <LoadError onRetry={onRetry} />}
       {isEmpty && <div className="text-center py-8 text-fg-muted">{emptyLabel}</div>}
       <LiveResultCount count={announcedCount} />

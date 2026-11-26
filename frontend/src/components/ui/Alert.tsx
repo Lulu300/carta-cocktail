@@ -29,7 +29,15 @@ const SIZE_CLASSES: Record<AlertSize, string> = {
  * A colored message block. Only an error interrupts the reader (`alert`); the other
  * tones are announced politely (`status`).
  */
-export default function Alert({ tone, title, size = 'sm', role, className, children, ...rest }: AlertProps) {
+export default function Alert({
+  tone,
+  title,
+  size = 'sm',
+  role,
+  className,
+  children,
+  ...rest
+}: AlertProps) {
   return (
     <div
       role={role ?? (tone === 'danger' ? 'alert' : 'status')}

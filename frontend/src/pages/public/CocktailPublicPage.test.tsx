@@ -10,7 +10,12 @@ import {
   buildSiteSettings,
   buildUnit,
 } from '../../test/factories';
-import { captureRequest, mockApiError, mockApiPending, mockApiResponse } from '../../test/msw/utils';
+import {
+  captureRequest,
+  mockApiError,
+  mockApiPending,
+  mockApiResponse,
+} from '../../test/msw/utils';
 import { SiteSettingsProvider } from '../../contexts/SiteSettingsContext';
 import CocktailPublicPage from './CocktailPublicPage';
 
@@ -56,14 +61,17 @@ const negroni = buildCocktail({
           id: 8,
           cocktailIngredientId: 1,
           bottleId: 100,
-          bottle: buildBottle({ id: 100, name: 'Cocchi Vermouth di Torino', category: vermouth, capacityMl: 750 }),
+          bottle: buildBottle({
+            id: 100,
+            name: 'Cocchi Vermouth di Torino',
+            category: vermouth,
+            capacityMl: 750,
+          }),
         },
       ],
     }),
   ],
-  instructions: [
-    { id: 1, cocktailId: 42, stepNumber: 1, text: 'Stir with ice.' },
-  ],
+  instructions: [{ id: 1, cocktailId: 42, stepNumber: 1, text: 'Stir with ice.' }],
 });
 
 describe('CocktailPublicPage', () => {
@@ -90,7 +98,11 @@ describe('CocktailPublicPage', () => {
     mockUseAuth.mockReturnValue({ user: null });
     mockApiResponse('get', '/api/public/settings', buildSiteSettings({ siteName: 'Chez Lulu' }));
 
-    render(<SiteSettingsProvider><CocktailPublicPage /></SiteSettingsProvider>);
+    render(
+      <SiteSettingsProvider>
+        <CocktailPublicPage />
+      </SiteSettingsProvider>,
+    );
 
     await waitFor(() => expect(document.title).toBe('Negroni · Chez Lulu'));
   });
@@ -130,7 +142,11 @@ describe('CocktailPublicPage', () => {
 
     // BrowserRouter reads the location state from history.state.usr.
     function openFrom(state: unknown) {
-      window.history.replaceState({ usr: state, key: 'cocktail', idx: 1 }, '', '/menu/summer-menu/cocktail/42');
+      window.history.replaceState(
+        { usr: state, key: 'cocktail', idx: 1 },
+        '',
+        '/menu/summer-menu/cocktail/42',
+      );
     }
 
     it('is a real link to the menu, so it can open in a new tab', async () => {
@@ -194,7 +210,10 @@ describe('CocktailPublicPage', () => {
       render(<CocktailPublicPage />);
 
       expect(await screen.findByRole('alert')).toHaveTextContent('Cocktail not found');
-      expect(screen.getByRole('link', { name: 'Back to menu' })).toHaveAttribute('href', '/menu/summer-menu');
+      expect(screen.getByRole('link', { name: 'Back to menu' })).toHaveAttribute(
+        'href',
+        '/menu/summer-menu',
+      );
       expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
     });
 

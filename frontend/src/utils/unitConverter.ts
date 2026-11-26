@@ -65,7 +65,7 @@ export function formatQuantity(quantity: number, language: string): string {
 export function getAllConversions(
   quantity: number,
   fromUnit: Unit,
-  allUnits: Unit[]
+  allUnits: Unit[],
 ): Array<{ unit: Unit; quantity: number }> {
   if (!isConvertible(fromUnit)) {
     return [];
@@ -74,8 +74,8 @@ export function getAllConversions(
   const ml = toMilliliters(quantity, fromUnit);
 
   return allUnits
-    .filter(unit => isConvertible(unit) && unit.id !== fromUnit.id)
-    .map(unit => {
+    .filter((unit) => isConvertible(unit) && unit.id !== fromUnit.id)
+    .map((unit) => {
       return { unit, quantity: roundQuantity(fromMilliliters(ml, unit), unit) };
     });
 }

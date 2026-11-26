@@ -8,9 +8,7 @@ export interface UniqueValueRow {
 
 /** How a value compares with the rows of a `CaseInsensitiveIndex`. */
 export type CaseInsensitiveMatch<Row> =
-  | { status: 'none' }
-  | { status: 'found'; row: Row }
-  | { status: 'ambiguous'; rows: Row[] };
+  { status: 'none' } | { status: 'found'; row: Row } | { status: 'ambiguous'; rows: Row[] };
 
 /**
  * Rows of a small reference table (categories, units) by the value that must be unique
@@ -24,7 +22,10 @@ export type CaseInsensitiveMatch<Row> =
 export class CaseInsensitiveIndex<Row> {
   private readonly rowsByKey = new Map<string, Row[]>();
 
-  constructor(rows: Row[], private readonly valueOf: (row: Row) => string) {
+  constructor(
+    rows: Row[],
+    private readonly valueOf: (row: Row) => string,
+  ) {
     rows.forEach((row) => this.add(row));
   }
 
@@ -96,20 +97,32 @@ export class CaseInsensitiveIndex<Row> {
  * What an import preview says of a match: the row found (`matched`), nothing (`missing`), or,
  * for an ambiguous value, no match and the rows it could mean, for the admin to pick one.
  */
-export function previewMatch<Row, Preview>(match: CaseInsensitiveMatch<Row>, toPreview: (row: Row) => Preview) {
+export function previewMatch<Row, Preview>(
+  match: CaseInsensitiveMatch<Row>,
+  toPreview: (row: Row) => Preview,
+) {
   switch (match.status) {
     case 'found':
       return { existingMatch: toPreview(match.row), status: 'matched' as const };
     case 'none':
       return { existingMatch: null, status: 'missing' as const };
     case 'ambiguous':
-      return { existingMatch: null, status: 'ambiguous' as const, ambiguousMatches: match.rows.map(toPreview) };
+      return {
+        existingMatch: null,
+        status: 'ambiguous' as const,
+        ambiguousMatches: match.rows.map(toPreview),
+      };
   }
 }
 
 /** Throws a 409 when another row already holds `value`, ignoring case. */
-export function assertUniqueIgnoringCase(rows: UniqueValueRow[], value: string, ownId?: number): void {
+export function assertUniqueIgnoringCase(
+  rows: UniqueValueRow[],
+  value: string,
+  ownId?: number,
+): void {
   const otherRows = rows.filter((row) => row.id !== ownId);
-  const isTaken = new CaseInsensitiveIndex(otherRows, (row) => row.value).match(value).status !== 'none';
+  const isTaken =
+    new CaseInsensitiveIndex(otherRows, (row) => row.value).match(value).status !== 'none';
   if (isTaken) throw new ConflictError();
 }

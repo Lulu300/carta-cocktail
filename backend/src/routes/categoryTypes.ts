@@ -7,7 +7,10 @@ import { parseNameTranslations, serializeTranslations } from '../utils/translati
 import { translationsToStore } from '../utils/storedNames';
 import { valid, validate } from '../validation/validate';
 import {
-  CategoryTypeCreate, CategoryTypeParams, CategoryTypeQuery, CategoryTypeUpdate,
+  CategoryTypeCreate,
+  CategoryTypeParams,
+  CategoryTypeQuery,
+  CategoryTypeUpdate,
 } from '../validation/categoryTypes';
 import { requireNewCategoryTypeName } from '../services/categoryTypeService';
 
@@ -43,13 +46,18 @@ router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Respons
 
 type CategoryTypeChanges = z.output<typeof CategoryTypeUpdate>;
 
-async function updateCategoryType(typeName: string, { nameTranslations, color }: CategoryTypeChanges) {
+async function updateCategoryType(
+  typeName: string,
+  { nameTranslations, color }: CategoryTypeChanges,
+) {
   const existing = await prisma.categoryType.findUnique({ where: { name: typeName } });
   if (!existing) throw new NotFoundError();
   const updated = await prisma.categoryType.update({
     where: { name: typeName },
     data: {
-      nameTranslations: serializeTranslations(translationsToStore(nameTranslations, existing.nameTranslations)),
+      nameTranslations: serializeTranslations(
+        translationsToStore(nameTranslations, existing.nameTranslations),
+      ),
       ...(color !== undefined && { color }),
     },
   });

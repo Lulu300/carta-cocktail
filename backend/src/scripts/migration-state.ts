@@ -18,7 +18,8 @@ async function main(): Promise<number> {
   }
   // Loaded after the check: the shared client resolves DATABASE_URL when it is imported.
   const { prisma } = await import('../lib/prisma');
-  const { formatMigrationState, readMigrationState, summarizeError } = await import('../bootstrap/migrationState');
+  const { formatMigrationState, readMigrationState, summarizeError } =
+    await import('../bootstrap/migrationState');
   try {
     const state = await readMigrationState(prisma, path.join(PRISMA_DIR, 'migrations'));
     console.log(formatMigrationState(state));

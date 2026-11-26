@@ -8,7 +8,9 @@ export default function LoadError({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
       <p className="text-danger">{t('common.error')}</p>
-      <Button variant="secondary" size="sm" onClick={onRetry}>{t('common.retry')}</Button>
+      <Button variant="secondary" size="sm" onClick={onRetry}>
+        {t('common.retry')}
+      </Button>
     </div>
   );
 }

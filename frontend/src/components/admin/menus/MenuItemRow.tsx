@@ -34,12 +34,27 @@ interface MenuItemRowProps {
 
 /** One item (a cocktail or a group of bottles) of a menu, with its actions. */
 export default function MenuItemRow({
-  label, children, details, isHidden, onToggleHidden, sections, sectionId, onSectionChange, move, onRemove, disabled = false,
+  label,
+  children,
+  details,
+  isHidden,
+  onToggleHidden,
+  sections,
+  sectionId,
+  onSectionChange,
+  move,
+  onRemove,
+  disabled = false,
 }: MenuItemRowProps) {
   const { t } = useTranslation();
 
   return (
-    <li className={cx('flex items-center gap-3 p-3 rounded-lg border border-line-strong bg-canvas', isHidden && 'opacity-50')}>
+    <li
+      className={cx(
+        'flex items-center gap-3 p-3 rounded-lg border border-line-strong bg-canvas',
+        isHidden && 'opacity-50',
+      )}
+    >
       <ReorderButtons
         label={label}
         onUp={move.onUp}
@@ -49,7 +64,13 @@ export default function MenuItemRow({
       />
       <div className="flex-1 min-w-0">{children}</div>
       {sections.length > 0 && (
-        <SectionSelect value={sectionId} sections={sections} onChange={onSectionChange} label={label} disabled={disabled} />
+        <SectionSelect
+          value={sectionId}
+          sections={sections}
+          onChange={onSectionChange}
+          label={label}
+          disabled={disabled}
+        />
       )}
       {details}
       <button

@@ -5,20 +5,50 @@ import { ApiError, type ValidationIssue } from '../services/api';
 // share those schemas). An issue on another field gets the backend's generic message, and so
 // does any issue outside the body (path or query string): the admin could not fix it from the form.
 export const KNOWN_FIELDS: readonly string[] = [
-  'name', 'slug', 'abbreviation', 'type', 'description', 'color', 'instructions',
-  'capacityMl', 'remainingPercent', 'alcoholPercentage', 'purchasePrice', 'openedAt', 'location', 'quantity',
-  'categoryName', 'categoryId', 'bottleId', 'ingredientId', 'unitId', 'preferredBottleIds',
-  'desiredStock', 'minimumPercent', 'conversionFactorToMl',
+  'name',
+  'slug',
+  'abbreviation',
+  'type',
+  'description',
+  'color',
+  'instructions',
+  'capacityMl',
+  'remainingPercent',
+  'alcoholPercentage',
+  'purchasePrice',
+  'openedAt',
+  'location',
+  'quantity',
+  'categoryName',
+  'categoryId',
+  'bottleId',
+  'ingredientId',
+  'unitId',
+  'preferredBottleIds',
+  'desiredStock',
+  'minimumPercent',
+  'conversionFactorToMl',
 ];
 
 // zod codes this version can name; a newer backend may send others.
 export const KNOWN_CODES: readonly string[] = [
-  'invalid_type', 'too_small', 'too_big', 'invalid_value', 'invalid_format', 'custom',
+  'invalid_type',
+  'too_small',
+  'too_big',
+  'invalid_value',
+  'invalid_format',
+  'custom',
 ];
 
 // Required texts are trimmed then checked with min(1): a blank one fails with too_small,
 // which reads better as "required".
-const REQUIRED_TEXT_FIELDS: readonly string[] = ['name', 'slug', 'abbreviation', 'type', 'instructions'];
+const REQUIRED_TEXT_FIELDS: readonly string[] = [
+  'name',
+  'slug',
+  'abbreviation',
+  'type',
+  'instructions',
+];
 
 function isIndex(segment: string): boolean {
   return /^\d+$/.test(segment);
@@ -57,7 +87,8 @@ function messageKey({ row, list }: IssueLocation): string {
 }
 
 function ruleText(field: string, code: string): string {
-  if (code === 'too_small' && REQUIRED_TEXT_FIELDS.includes(field)) return i18n.t('validation.blank');
+  if (code === 'too_small' && REQUIRED_TEXT_FIELDS.includes(field))
+    return i18n.t('validation.blank');
   return i18n.t(`validation.codes.${code}`);
 }
 
@@ -66,8 +97,13 @@ export function describeValidationIssue(issue: ValidationIssue): string | null {
   if (!issue.path.startsWith(BODY_PREFIX)) return null;
   const location = locateIssue(issue.path);
   const { field, row } = location;
-  if (field === undefined || !KNOWN_FIELDS.includes(field) || !KNOWN_CODES.includes(issue.code)) return null;
-  const values = { field: i18n.t(`validation.fields.${field}`), rule: ruleText(field, issue.code), row };
+  if (field === undefined || !KNOWN_FIELDS.includes(field) || !KNOWN_CODES.includes(issue.code))
+    return null;
+  const values = {
+    field: i18n.t(`validation.fields.${field}`),
+    rule: ruleText(field, issue.code),
+    row,
+  };
   return i18n.t(messageKey(location), values);
 }
 

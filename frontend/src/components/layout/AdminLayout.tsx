@@ -75,15 +75,20 @@ export default function AdminLayout() {
       >
         <div className="p-6 border-b border-line">
           <Link to="/admin" className="text-xl font-bold text-accent font-serif">
-            {siteSettings.siteIcon && <span aria-hidden="true" className="mr-1">{siteSettings.siteIcon}</span>}
+            {siteSettings.siteIcon && (
+              <span aria-hidden="true" className="mr-1">
+                {siteSettings.siteIcon}
+              </span>
+            )}
             <SiteName />
           </Link>
         </div>
         <nav aria-label={t('nav.admin')} className="p-4 space-y-1">
           {navItems.map((item) => {
-            const isActive = item.path === '/admin'
-              ? location.pathname === '/admin'
-              : location.pathname.startsWith(item.path);
+            const isActive =
+              item.path === '/admin'
+                ? location.pathname === '/admin'
+                : location.pathname.startsWith(item.path);
             return (
               <Link
                 key={item.path}
@@ -92,7 +97,9 @@ export default function AdminLayout() {
                 aria-current={isActive ? 'page' : undefined}
                 className={cx(
                   'flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors',
-                  isActive ? 'bg-accent/10 text-accent' : 'text-fg-muted hover:bg-line hover:text-fg',
+                  isActive
+                    ? 'bg-accent/10 text-accent'
+                    : 'text-fg-muted hover:bg-line hover:text-fg',
                 )}
               >
                 <span aria-hidden="true">{item.icon}</span>
@@ -128,8 +135,19 @@ export default function AdminLayout() {
             aria-label={t('nav.menu')}
             className="lg:hidden p-2 -m-2 rounded-lg text-fg-muted hover:text-fg"
           >
-            <svg aria-hidden="true" className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            <svg
+              aria-hidden="true"
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 6h16M4 12h16M4 18h16"
+              />
             </svg>
           </button>
 
@@ -158,7 +176,10 @@ export default function AdminLayout() {
 
         <main id={MAIN_CONTENT_ID} tabIndex={-1} className="flex-1 p-6">
           {/* The sidebar and header stay when a page fails: the way out is the dashboard */}
-          <RouteErrorBoundary fullScreen={false} backLink={<BackHomeLink to="/admin" label={t('nav.dashboard')} />}>
+          <RouteErrorBoundary
+            fullScreen={false}
+            backLink={<BackHomeLink to="/admin" label={t('nav.dashboard')} />}
+          >
             <Outlet />
           </RouteErrorBoundary>
         </main>

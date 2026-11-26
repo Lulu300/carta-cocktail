@@ -15,7 +15,12 @@ export default function TagList({ tags, className }: TagListProps) {
     <div className={cx('flex flex-wrap gap-1', className)}>
       {tagList.map((tag, index) => (
         // The same tag may be typed twice: the index keeps the keys unique.
-        <span key={`${index}-${tag}`} className="bg-accent/10 text-accent text-xs px-2 py-0.5 rounded-full">{tag}</span>
+        <span
+          key={`${index}-${tag}`}
+          className="bg-accent/10 text-accent text-xs px-2 py-0.5 rounded-full"
+        >
+          {tag}
+        </span>
       ))}
     </div>
   );

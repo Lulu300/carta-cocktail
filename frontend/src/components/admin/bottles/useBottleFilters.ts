@@ -23,25 +23,37 @@ export function useBottleFilters(bottles: Bottle[] | undefined) {
   const [location, setLocation] = useState('');
 
   const listedBottles = useMemo<ListedBottle[]>(
-    () => (bottles ?? []).map((bottle) => ({
-      ...bottle,
-      categoryName: bottle.category ? localize(bottle.category) : '',
-    })),
+    () =>
+      (bottles ?? []).map((bottle) => ({
+        ...bottle,
+        categoryName: bottle.category ? localize(bottle.category) : '',
+      })),
     [bottles, localize],
   );
 
   const locations = useMemo(
-    () => [...new Set(listedBottles.map((bottle) => bottle.location).filter((value): value is string => !!value))].sort(),
+    () =>
+      [
+        ...new Set(
+          listedBottles
+            .map((bottle) => bottle.location)
+            .filter((value): value is string => !!value),
+        ),
+      ].sort(),
     [listedBottles],
   );
 
   const { activeBottles, emptyBottles } = useMemo(() => {
     // A category picked in the list matches by id; a typed one by name.
-    const matchesCategory = (bottle: ListedBottle) => (categoryId !== null
-      ? bottle.categoryId === categoryId
-      : includesText(bottle.categoryName, categoryText));
-    const matching = listedBottles.filter((bottle) =>
-      includesText(bottle.name, search) && matchesCategory(bottle) && includesText(bottle.location, location),
+    const matchesCategory = (bottle: ListedBottle) =>
+      categoryId !== null
+        ? bottle.categoryId === categoryId
+        : includesText(bottle.categoryName, categoryText);
+    const matching = listedBottles.filter(
+      (bottle) =>
+        includesText(bottle.name, search) &&
+        matchesCategory(bottle) &&
+        includesText(bottle.location, location),
     );
     return {
       activeBottles: matching.filter((bottle) => bottle.remainingPercent > 0),
@@ -63,9 +75,17 @@ export function useBottleFilters(bottles: Bottle[] | undefined) {
   const isFiltered = [search, categoryText, location].some((value) => value.trim() !== '');
 
   return {
-    search, setSearch,
-    categoryText, categoryId, setCategory,
-    location, setLocation,
-    locations, activeBottles, emptyBottles, exportFilters, isFiltered,
+    search,
+    setSearch,
+    categoryText,
+    categoryId,
+    setCategory,
+    location,
+    setLocation,
+    locations,
+    activeBottles,
+    emptyBottles,
+    exportFilters,
+    isFiltered,
   };
 }

@@ -23,7 +23,11 @@ function decodeToken(token: string): { userId: number; tokenVersion: number } | 
   try {
     // Pinning the algorithm prevents accepting tokens signed with an unexpected one
     const decoded = jwt.verify(token, config.jwtSecret, { algorithms: [ALGORITHM] });
-    if (typeof decoded !== 'object' || typeof decoded.userId !== 'number' || typeof decoded.tv !== 'number') {
+    if (
+      typeof decoded !== 'object' ||
+      typeof decoded.userId !== 'number' ||
+      typeof decoded.tv !== 'number'
+    ) {
       return null;
     }
     return { userId: decoded.userId, tokenVersion: decoded.tv };
@@ -61,7 +65,11 @@ function extractBearerToken(req: Request): string | null {
 }
 
 /** Rejects the request with a 401, answered by errorHandler, unless it carries a valid admin token. */
-export async function authMiddleware(req: AuthRequest, _res: Response, next: NextFunction): Promise<void> {
+export async function authMiddleware(
+  req: AuthRequest,
+  _res: Response,
+  next: NextFunction,
+): Promise<void> {
   const token = extractBearerToken(req);
   if (!token) throw new UnauthorizedError();
 
@@ -76,7 +84,11 @@ export async function authMiddleware(req: AuthRequest, _res: Response, next: Nex
  * Sets req.userId when a valid admin token is sent, and never rejects the request.
  * Guests holding a stale token in localStorage must still see the public menu.
  */
-export async function optionalAuth(req: AuthRequest, _res: Response, next: NextFunction): Promise<void> {
+export async function optionalAuth(
+  req: AuthRequest,
+  _res: Response,
+  next: NextFunction,
+): Promise<void> {
   const token = extractBearerToken(req);
   const userId = token ? await verifyToken(token) : null;
   if (userId !== null) {

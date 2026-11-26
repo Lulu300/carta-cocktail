@@ -27,12 +27,12 @@ function RouteErrorScreen({ fullScreen, backLink }: RouteErrorDisplay) {
         icon="⚠️"
         title={t('errors.pageLoadFailed')}
         titleProps={{ role: 'alert', tabIndex: -1, ref: titleRef, className: 'outline-none' }}
-        action={(
+        action={
           <div className="flex flex-wrap items-center justify-center gap-4">
             <Button onClick={() => window.location.reload()}>{t('errors.reload')}</Button>
             {backLink}
           </div>
-        )}
+        }
       />
     </div>
   );
@@ -66,7 +66,11 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
   render() {
     const { fullScreen, backLink, children } = this.props;
-    return this.state.hasError ? <RouteErrorScreen fullScreen={fullScreen} backLink={backLink} /> : children;
+    return this.state.hasError ? (
+      <RouteErrorScreen fullScreen={fullScreen} backLink={backLink} />
+    ) : (
+      children
+    );
   }
 }
 
@@ -86,5 +90,9 @@ export default function RouteErrorBoundary({
   children,
 }: RouteErrorBoundaryProps) {
   const { key } = useLocation();
-  return <ErrorBoundary resetKey={key} fullScreen={fullScreen} backLink={backLink}>{children}</ErrorBoundary>;
+  return (
+    <ErrorBoundary resetKey={key} fullScreen={fullScreen} backLink={backLink}>
+      {children}
+    </ErrorBoundary>
+  );
 }

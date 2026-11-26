@@ -1,12 +1,25 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
-  setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
-  request, authHeader, prisma, seedCategory,
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+  request,
+  authHeader,
+  prisma,
+  seedCategory,
 } from '../test/helpers';
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
-beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
+beforeEach(async () => {
+  await cleanDatabase();
+  await seedRequiredData();
+});
 
 /** The fields of GET /api/category-types these tests read. */
 interface CategoryTypeUsage {
@@ -42,7 +55,9 @@ describe('GET /api/category-types', () => {
     await seedCategory({ name: 'Gin', type: 'SPIRIT' });
     await seedCategory({ name: 'Grenadine', type: 'SYRUP' });
     const res = await request.get('/api/category-types').set(authHeader());
-    const counts = Object.fromEntries((res.body as CategoryTypeUsage[]).map((t) => [t.name, t._count.categories]));
+    const counts = Object.fromEntries(
+      (res.body as CategoryTypeUsage[]).map((t) => [t.name, t._count.categories]),
+    );
     expect(counts).toEqual({ SOFT: 0, SPIRIT: 2, SYRUP: 1 });
   });
 });
@@ -54,13 +69,20 @@ describe('POST /api/category-types', () => {
   });
 
   it('should answer a missing name in French', async () => {
-    const res = await request.post('/api/category-types').set(authHeader()).set('Accept-Language', 'fr').send({});
+    const res = await request
+      .post('/api/category-types')
+      .set(authHeader())
+      .set('Accept-Language', 'fr')
+      .send({});
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('Erreur de validation');
   });
 
   it('should return 409 if type already exists', async () => {
-    const res = await request.post('/api/category-types').set(authHeader()).set('Accept-Language', 'fr')
+    const res = await request
+      .post('/api/category-types')
+      .set(authHeader())
+      .set('Accept-Language', 'fr')
       .send({ name: 'spirit' });
     expect(res.status).toBe(409);
     expect(res.body).toEqual({ error: 'Cette entrée existe déjà' });
@@ -75,7 +97,10 @@ describe('POST /api/category-types', () => {
 
   // HTML shows 'X  Y' exactly like 'X Y': a new type never keeps a run of spaces
   it('should collapse the inner spaces of a new type', async () => {
-    const res = await request.post('/api/category-types').set(authHeader()).send({ name: ' fruit \t  juice ' });
+    const res = await request
+      .post('/api/category-types')
+      .set(authHeader())
+      .send({ name: ' fruit \t  juice ' });
     expect(res.status).toBe(201);
     expect(res.body.name).toBe('FRUIT JUICE');
     expect(await prisma.categoryType.findUnique({ where: { name: 'FRUIT JUICE' } })).not.toBeNull();
@@ -93,12 +118,17 @@ describe('POST /api/category-types', () => {
     const res = await request.post('/api/category-types').set(authHeader()).send({ name: 'x  y' });
     expect(res.status).toBe(201);
     expect(res.body.name).toBe('X Y');
-    expect(await prisma.categoryType.findUnique({ where: { name: 'X  Y' } })).toMatchObject({ color: 'red' });
+    expect(await prisma.categoryType.findUnique({ where: { name: 'X  Y' } })).toMatchObject({
+      color: 'red',
+    });
   });
 
   // HTML shows 'X\u200BY' exactly like 'XY': a new type never keeps a character drawn as nothing
   it('should remove the invisible characters of a new type', async () => {
-    const res = await request.post('/api/category-types').set(authHeader()).send({ name: '\u200Bfruit\u00AD juice\u2060' });
+    const res = await request
+      .post('/api/category-types')
+      .set(authHeader())
+      .send({ name: '\u200Bfruit\u00AD juice\u2060' });
     expect(res.status).toBe(201);
     expect(res.body.name).toBe('FRUIT JUICE');
     expect(await prisma.categoryType.findUnique({ where: { name: 'FRUIT JUICE' } })).not.toBeNull();
@@ -106,14 +136,20 @@ describe('POST /api/category-types', () => {
 
   it('should return 409 for a name that only differs from an existing type by invisible characters', async () => {
     await request.post('/api/category-types').set(authHeader()).send({ name: 'xy' });
-    const res = await request.post('/api/category-types').set(authHeader()).send({ name: 'x\u200By' });
+    const res = await request
+      .post('/api/category-types')
+      .set(authHeader())
+      .send({ name: 'x\u200By' });
     expect(res.status).toBe(409);
     expect(await prisma.categoryType.count({ where: { name: { startsWith: 'X' } } })).toBe(1);
   });
 
   // HTML shows 'E\u0300' exactly like 'È': a new type is stored composed
   it('should compose a new decomposed type', async () => {
-    const res = await request.post('/api/category-types').set(authHeader()).send({ name: 'cre\u0300me' });
+    const res = await request
+      .post('/api/category-types')
+      .set(authHeader())
+      .send({ name: 'cre\u0300me' });
     expect(res.status).toBe(201);
     expect(res.body.name).toBe('CR\u00C8ME');
     expect(await prisma.categoryType.findUnique({ where: { name: 'CRE\u0300ME' } })).toBeNull();
@@ -121,36 +157,55 @@ describe('POST /api/category-types', () => {
 
   it('should return 409 for a name that only differs from an existing type by its decomposed letters', async () => {
     await request.post('/api/category-types').set(authHeader()).send({ name: 'cr\u00E8me' });
-    const res = await request.post('/api/category-types').set(authHeader()).send({ name: 'cre\u0300me' });
+    const res = await request
+      .post('/api/category-types')
+      .set(authHeader())
+      .send({ name: 'cre\u0300me' });
     expect(res.status).toBe(409);
     expect(await prisma.categoryType.count({ where: { name: { startsWith: 'CR' } } })).toBe(1);
   });
 
   it('should create the composed type next to an older decomposed one', async () => {
     await prisma.categoryType.create({ data: { name: 'CRE\u0300ME', color: 'red' } });
-    const res = await request.post('/api/category-types').set(authHeader()).send({ name: 'cr\u00E8me' });
+    const res = await request
+      .post('/api/category-types')
+      .set(authHeader())
+      .send({ name: 'cr\u00E8me' });
     expect(res.status).toBe(201);
     expect(res.body.name).toBe('CR\u00C8ME');
-    expect(await prisma.categoryType.findUnique({ where: { name: 'CRE\u0300ME' } })).toMatchObject({ color: 'red' });
+    expect(await prisma.categoryType.findUnique({ where: { name: 'CRE\u0300ME' } })).toMatchObject({
+      color: 'red',
+    });
   });
 
   // Upper case decomposes 'ΐ' into 'Ι\u0308\u0301': the name is composed after it
   it('should store a new type composed after its upper case', async () => {
-    const res = await request.post('/api/category-types').set(authHeader()).send({ name: '\u0390' });
+    const res = await request
+      .post('/api/category-types')
+      .set(authHeader())
+      .send({ name: '\u0390' });
     expect(res.status).toBe(201);
     expect(res.body.name).toBe('\u03AA\u0301');
   });
 
   it('should return 400 for a name of invisible characters, and create nothing', async () => {
     const typeCount = await prisma.categoryType.count();
-    const res = await request.post('/api/category-types').set(authHeader()).send({ name: '\u200B \u2800\u00AD' });
+    const res = await request
+      .post('/api/category-types')
+      .set(authHeader())
+      .send({ name: '\u200B \u2800\u00AD' });
     expect(res.status).toBe(400);
-    expect(res.body).toMatchObject({ error: 'Validation error', details: [{ path: 'body.name', code: 'too_small' }] });
+    expect(res.body).toMatchObject({
+      error: 'Validation error',
+      details: [{ path: 'body.name', code: 'too_small' }],
+    });
     expect(await prisma.categoryType.count()).toBe(typeCount);
   });
 
   it('should store nameTranslations', async () => {
-    const res = await request.post('/api/category-types').set(authHeader())
+    const res = await request
+      .post('/api/category-types')
+      .set(authHeader())
       .send({ name: 'BITTERS', nameTranslations: { fr: 'Amers' }, color: 'red' });
     expect(res.status).toBe(201);
     expect(res.body.nameTranslations).toEqual({ fr: 'Amers' });
@@ -160,19 +215,27 @@ describe('POST /api/category-types', () => {
 
 describe('PUT /api/category-types/:name', () => {
   it('should return 404 for non-existent type', async () => {
-    const res = await request.put('/api/category-types/NONEXISTENT').set(authHeader()).send({ color: 'red' });
+    const res = await request
+      .put('/api/category-types/NONEXISTENT')
+      .set(authHeader())
+      .send({ color: 'red' });
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ error: 'Resource not found' });
   });
 
   it('should update color', async () => {
-    const res = await request.put('/api/category-types/SPIRIT').set(authHeader()).send({ color: 'red' });
+    const res = await request
+      .put('/api/category-types/SPIRIT')
+      .set(authHeader())
+      .send({ color: 'red' });
     expect(res.status).toBe(200);
     expect(res.body.color).toBe('red');
   });
 
   it('should update nameTranslations', async () => {
-    const res = await request.put('/api/category-types/SPIRIT').set(authHeader())
+    const res = await request
+      .put('/api/category-types/SPIRIT')
+      .set(authHeader())
       .send({ nameTranslations: { fr: 'Spiritueux' } });
     expect(res.status).toBe(200);
     expect(res.body.nameTranslations).toEqual({ fr: 'Spiritueux' });
@@ -180,13 +243,23 @@ describe('PUT /api/category-types/:name', () => {
 
   // Like the type names (C-61) and the names of categories, units and ingredients (C-65)
   it('should compose the translations the admin changes, and keep the ones sent back as they are', async () => {
-    await prisma.categoryType.create({ data: { name: 'CREAM', color: 'red', nameTranslations: JSON.stringify({ fr: 'Cre\u0300me' }) } });
-    const res = await request.put('/api/category-types/CREAM').set(authHeader())
+    await prisma.categoryType.create({
+      data: {
+        name: 'CREAM',
+        color: 'red',
+        nameTranslations: JSON.stringify({ fr: 'Cre\u0300me' }),
+      },
+    });
+    const res = await request
+      .put('/api/category-types/CREAM')
+      .set(authHeader())
       .send({ nameTranslations: { fr: 'Cre\u0300me', en: 'Cre\u0300am' } });
     expect(res.status).toBe(200);
     expect(res.body.nameTranslations).toEqual({ fr: 'Cre\u0300me', en: 'Cr\u00E8am' });
 
-    const created = await request.post('/api/category-types').set(authHeader())
+    const created = await request
+      .post('/api/category-types')
+      .set(authHeader())
       .send({ name: 'LIQUEUR', nameTranslations: { fr: 'Liqueur a\u0300 la cre\u0300me' } });
     expect(created.body.nameTranslations).toEqual({ fr: 'Liqueur \u00E0 la cr\u00E8me' });
   });
@@ -211,12 +284,17 @@ describe('A category type whose name has surrounding spaces', () => {
   }
 
   it('should be edited without touching the type without spaces', async () => {
-    const res = await request.put(SPACED_PATH).set(authHeader())
+    const res = await request
+      .put(SPACED_PATH)
+      .set(authHeader())
       .send({ color: 'red', nameTranslations: { fr: 'Alcool' } });
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ name: SPACED, color: 'red', nameTranslations: { fr: 'Alcool' } });
-    expect(await findType(SPACED)).toMatchObject({ color: 'red', nameTranslations: JSON.stringify({ fr: 'Alcool' }) });
+    expect(await findType(SPACED)).toMatchObject({
+      color: 'red',
+      nameTranslations: JSON.stringify({ fr: 'Alcool' }),
+    });
     expect(await findType('SPIRIT')).toMatchObject({
       color: 'blue',
       nameTranslations: JSON.stringify({ fr: 'Spiritueux', en: 'Spirits' }),
@@ -231,7 +309,9 @@ describe('A category type whose name has surrounding spaces', () => {
     expect(res.status).toBe(200);
     expect(await prisma.categoryType.findUnique({ where: { name: SPACED } })).toBeNull();
     expect(await findType('SPIRIT')).toMatchObject({ color: 'blue' });
-    expect(await prisma.category.findUniqueOrThrow({ where: { id: rum.id } })).toMatchObject({ type: 'SPIRIT' });
+    expect(await prisma.category.findUniqueOrThrow({ where: { id: rum.id } })).toMatchObject({
+      type: 'SPIRIT',
+    });
   });
 
   it('should delete the unused type without spaces and keep the spaced one', async () => {
@@ -268,12 +348,16 @@ describe('A category type named in the query', () => {
   it('should edit the type with an empty name', async () => {
     await prisma.categoryType.create({ data: { name: '', color: 'gray' } });
 
-    const res = await request.put('/api/category-types?name=').set(authHeader())
+    const res = await request
+      .put('/api/category-types?name=')
+      .set(authHeader())
       .send({ color: 'red', nameTranslations: { fr: 'Autre' } });
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ name: '', color: 'red', nameTranslations: { fr: 'Autre' } });
-    expect(await prisma.categoryType.findUniqueOrThrow({ where: { name: 'SPIRIT' } })).toMatchObject({ color: 'blue' });
+    expect(
+      await prisma.categoryType.findUniqueOrThrow({ where: { name: 'SPIRIT' } }),
+    ).toMatchObject({ color: 'blue' });
   });
 
   it('should delete the unused type with an empty name, and only it', async () => {
@@ -283,7 +367,11 @@ describe('A category type named in the query', () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ message: 'Type deleted successfully' });
-    expect((await prisma.categoryType.findMany()).map((type) => type.name).sort()).toEqual(['SOFT', 'SPIRIT', 'SYRUP']);
+    expect((await prisma.categoryType.findMany()).map((type) => type.name).sort()).toEqual([
+      'SOFT',
+      'SPIRIT',
+      'SYRUP',
+    ]);
   });
 
   it('should refuse to delete the type with an empty name while categories use it', async () => {
@@ -299,28 +387,46 @@ describe('A category type named in the query', () => {
   it('should keep the name as sent, without trimming it', async () => {
     await prisma.categoryType.create({ data: { name: ' SPIRIT ', color: 'gray' } });
 
-    const res = await request.put('/api/category-types?name=%20SPIRIT%20').set(authHeader()).send({ color: 'red' });
+    const res = await request
+      .put('/api/category-types?name=%20SPIRIT%20')
+      .set(authHeader())
+      .send({ color: 'red' });
 
     expect(res.status).toBe(200);
     expect(res.body.name).toBe(' SPIRIT ');
-    expect(await prisma.categoryType.findUniqueOrThrow({ where: { name: 'SPIRIT' } })).toMatchObject({ color: 'blue' });
+    expect(
+      await prisma.categoryType.findUniqueOrThrow({ where: { name: 'SPIRIT' } }),
+    ).toMatchObject({ color: 'blue' });
   });
 
   // The browser resolves '/category-types/..' to '/': the frontend names these types in the query.
-  it.each(['.', '..'])('should edit and then delete the type named %s, and only it', async (name) => {
-    await prisma.categoryType.create({ data: { name, color: 'gray' } });
+  it.each(['.', '..'])(
+    'should edit and then delete the type named %s, and only it',
+    async (name) => {
+      await prisma.categoryType.create({ data: { name, color: 'gray' } });
 
-    const updated = await request.put(`/api/category-types?name=${name}`).set(authHeader()).send({ color: 'red' });
-    expect(updated.status).toBe(200);
-    expect(updated.body).toEqual({ name, color: 'red', nameTranslations: null });
+      const updated = await request
+        .put(`/api/category-types?name=${name}`)
+        .set(authHeader())
+        .send({ color: 'red' });
+      expect(updated.status).toBe(200);
+      expect(updated.body).toEqual({ name, color: 'red', nameTranslations: null });
 
-    const deleted = await request.delete(`/api/category-types?name=${name}`).set(authHeader());
-    expect(deleted.status).toBe(200);
-    expect((await prisma.categoryType.findMany()).map((type) => type.name).sort()).toEqual(['SOFT', 'SPIRIT', 'SYRUP']);
-  });
+      const deleted = await request.delete(`/api/category-types?name=${name}`).set(authHeader());
+      expect(deleted.status).toBe(200);
+      expect((await prisma.categoryType.findMany()).map((type) => type.name).sort()).toEqual([
+        'SOFT',
+        'SPIRIT',
+        'SYRUP',
+      ]);
+    },
+  );
 
   it('should answer 404 for a name that does not exist', async () => {
-    const res = await request.put('/api/category-types?name=').set(authHeader()).send({ color: 'red' });
+    const res = await request
+      .put('/api/category-types?name=')
+      .set(authHeader())
+      .send({ color: 'red' });
     expect(res.status).toBe(404);
   });
 
@@ -351,23 +457,34 @@ describe('Renaming a category type', () => {
 
     await prisma.categoryType.update({ where: { name: 'SPIRIT' }, data: { name: 'LIQUOR' } });
 
-    expect(await prisma.category.findUniqueOrThrow({ where: { id: rum.id } })).toMatchObject({ type: 'LIQUOR' });
-    expect(await prisma.category.findUniqueOrThrow({ where: { id: grenadine.id } })).toMatchObject({ type: 'SYRUP' });
+    expect(await prisma.category.findUniqueOrThrow({ where: { id: rum.id } })).toMatchObject({
+      type: 'LIQUOR',
+    });
+    expect(await prisma.category.findUniqueOrThrow({ where: { id: grenadine.id } })).toMatchObject({
+      type: 'SYRUP',
+    });
   });
 });
 
 describe('DELETE /api/category-types/:name', () => {
   it('should return a translated 409 if type is in use', async () => {
     await seedCategory({ type: 'SPIRIT' });
-    const res = await request.delete('/api/category-types/SPIRIT').set(authHeader()).set('Accept-Language', 'fr');
+    const res = await request
+      .delete('/api/category-types/SPIRIT')
+      .set(authHeader())
+      .set('Accept-Language', 'fr');
     expect(res.status).toBe(409);
-    expect(res.body).toEqual({ error: 'Impossible de supprimer : des catégories utilisent encore ce type' });
+    expect(res.body).toEqual({
+      error: 'Impossible de supprimer : des catégories utilisent encore ce type',
+    });
     expect(await prisma.categoryType.findUnique({ where: { name: 'SPIRIT' } })).not.toBeNull();
   });
 
   it('should be refused by the database too when the route check is bypassed', async () => {
     await seedCategory({ type: 'SPIRIT' });
-    await expect(prisma.categoryType.delete({ where: { name: 'SPIRIT' } })).rejects.toMatchObject({ code: 'P2003' });
+    await expect(prisma.categoryType.delete({ where: { name: 'SPIRIT' } })).rejects.toMatchObject({
+      code: 'P2003',
+    });
   });
 
   it('should delete unused type', async () => {

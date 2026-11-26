@@ -15,7 +15,10 @@ describe('toTranslationForm', () => {
 
 describe('buildNameTranslations', () => {
   it('keeps the filled languages, trimmed', () => {
-    expect(buildNameTranslations({ fr: ' Citron ', en: 'Lemon' })).toEqual({ fr: 'Citron', en: 'Lemon' });
+    expect(buildNameTranslations({ fr: ' Citron ', en: 'Lemon' })).toEqual({
+      fr: 'Citron',
+      en: 'Lemon',
+    });
   });
 
   it('leaves blank languages out', () => {

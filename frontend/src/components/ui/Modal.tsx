@@ -19,7 +19,8 @@ import IconButton from './IconButton';
 type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
 
 // The modal owns the dialog's open state and its click, pointer and Escape handling.
-type OwnedDialogProps = 'open' | 'onClose' | 'onCancel' | 'onClick' | 'onPointerDown' | 'title' | 'children';
+type OwnedDialogProps =
+  'open' | 'onClose' | 'onCancel' | 'onClick' | 'onPointerDown' | 'title' | 'children';
 
 interface ModalProps extends Omit<ComponentPropsWithRef<'dialog'>, OwnedDialogProps> {
   open: boolean;
@@ -68,8 +69,12 @@ function assignRef<T>(ref: Ref<T> | undefined, value: T | null) {
 function isOnBackdrop(dialog: HTMLDialogElement | null, event: MouseEvent<HTMLDialogElement>) {
   if (!dialog || event.target !== dialog) return false;
   const box = dialog.getBoundingClientRect();
-  return event.clientX < box.left || event.clientX > box.right
-    || event.clientY < box.top || event.clientY > box.bottom;
+  return (
+    event.clientX < box.left ||
+    event.clientX > box.right ||
+    event.clientY < box.top ||
+    event.clientY > box.bottom
+  );
 }
 
 /**
@@ -99,10 +104,13 @@ export default function Modal({
   // when the body asks for no autoFocus.
   const [isShown, setIsShown] = useState(false);
 
-  const setDialogRef = useCallback((node: HTMLDialogElement | null) => {
-    dialogRef.current = node;
-    assignRef(ref, node);
-  }, [ref]);
+  const setDialogRef = useCallback(
+    (node: HTMLDialogElement | null) => {
+      dialogRef.current = node;
+      assignRef(ref, node);
+    },
+    [ref],
+  );
 
   useLayoutEffect(() => {
     const dialog = dialogRef.current;
@@ -161,8 +169,16 @@ export default function Modal({
       {open && (
         <>
           <div className="flex items-start justify-between gap-4 px-6 pt-6">
-            <h2 id={titleId} className="text-lg font-semibold">{title}</h2>
-            <IconButton icon="close" label={t('common.close')} variant="neutral" onClick={onClose} className="-mr-2 -mt-2" />
+            <h2 id={titleId} className="text-lg font-semibold">
+              {title}
+            </h2>
+            <IconButton
+              icon="close"
+              label={t('common.close')}
+              variant="neutral"
+              onClick={onClose}
+              className="-mr-2 -mt-2"
+            />
           </div>
           {isShown && (
             <>

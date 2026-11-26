@@ -20,7 +20,14 @@ describe('TranslationFields', () => {
   });
 
   it('starts expanded when asked, with the base name as placeholder', () => {
-    render(<TranslationFields value={{ fr: 'Citron', en: '' }} onChange={vi.fn()} placeholder="Lemon" defaultOpen />);
+    render(
+      <TranslationFields
+        value={{ fr: 'Citron', en: '' }}
+        onChange={vi.fn()}
+        placeholder="Lemon"
+        defaultOpen
+      />,
+    );
 
     expect(screen.getByLabelText('Français')).toHaveValue('Citron');
     expect(screen.getByLabelText('English')).toHaveAttribute('placeholder', 'Lemon');

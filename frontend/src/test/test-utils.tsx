@@ -1,5 +1,10 @@
 /* eslint-disable react-refresh/only-export-components */
-import { render, renderHook, type RenderHookOptions, type RenderOptions } from '@testing-library/react';
+import {
+  render,
+  renderHook,
+  type RenderHookOptions,
+  type RenderOptions,
+} from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement, ReactNode } from 'react';
@@ -31,7 +36,10 @@ function createProviders(queryClient: QueryClient) {
   };
 }
 
-function customRender(ui: ReactElement, options: Omit<RenderOptions, 'wrapper'> & QueryClientOption = {}) {
+function customRender(
+  ui: ReactElement,
+  options: Omit<RenderOptions, 'wrapper'> & QueryClientOption = {},
+) {
   const { queryClient = createTestQueryClient(), ...renderOptions } = options;
   return render(ui, { wrapper: createProviders(queryClient), ...renderOptions });
 }

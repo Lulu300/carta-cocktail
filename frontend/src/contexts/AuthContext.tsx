@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import { ApiError, auth as authApi, setUnauthorizedHandler } from '../services/api';
 import type { User } from '../types';
 
@@ -43,7 +51,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Only the token found at mount needs validating: login() already returns the user.
   const validateStoredToken = useCallback(() => {
-    authApi.me()
+    authApi
+      .me()
       .then(setUser)
       .catch((error: Error) => {
         // A 401 has already ended the session through the unauthorized handler. Any other
@@ -74,17 +83,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(newToken);
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const data = await authApi.login(email, password);
-    storeToken(data.token);
-    setUser(data.user);
-  }, [storeToken]);
+  const login = useCallback(
+    async (email: string, password: string) => {
+      const data = await authApi.login(email, password);
+      storeToken(data.token);
+      setUser(data.user);
+    },
+    [storeToken],
+  );
 
   // A password change revokes the previous token: keeping the new one keeps the admin logged in.
-  const updateSession = useCallback((updatedUser: User, newToken?: string) => {
-    if (newToken) storeToken(newToken);
-    setUser(updatedUser);
-  }, [storeToken]);
+  const updateSession = useCallback(
+    (updatedUser: User, newToken?: string) => {
+      if (newToken) storeToken(newToken);
+      setUser(updatedUser);
+    },
+    [storeToken],
+  );
 
   const value = useMemo(
     () => ({ user, token, login, logout, updateSession, isLoading, sessionError, retrySession }),

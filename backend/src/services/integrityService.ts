@@ -59,15 +59,19 @@ function duplicateGroups(rows: { value: string }[]): DuplicateGroup[] {
     const key = caseInsensitiveKey(value);
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
-  return Array.from(counts, ([value, count]) => ({ value, count }))
-    .filter((group) => group.count > 1)
-    // The keys are distinct: no two groups compare equal
-    .sort((a, b) => (a.value < b.value ? -1 : 1));
+  return (
+    Array.from(counts, ([value, count]) => ({ value, count }))
+      .filter((group) => group.count > 1)
+      // The keys are distinct: no two groups compare equal
+      .sort((a, b) => (a.value < b.value ? -1 : 1))
+  );
 }
 
 export async function findIntegrityIssues(db: IntegrityDb): Promise<IntegrityIssues> {
   const categoryNames = await db.$queryRaw<{ value: string }[]>`SELECT name AS value FROM Category`;
-  const unitAbbreviations = await db.$queryRaw<{ value: string }[]>`SELECT abbreviation AS value FROM Unit`;
+  const unitAbbreviations = await db.$queryRaw<
+    { value: string }[]
+  >`SELECT abbreviation AS value FROM Unit`;
   const cocktailNames = await db.$queryRaw<{ value: string }[]>`SELECT name AS value FROM Cocktail`;
   const invalidIngredientLines = await db.$queryRaw<InvalidIngredientLine[]>`
     SELECT id, cocktailId, sourceType FROM CocktailIngredient
@@ -135,6 +139,8 @@ export function formatIntegrityReport(issues: IntegrityIssues, countsOnly = fals
       lines.push(`  - ${JSON.stringify(item)}`);
     }
   }
-  lines.push(hasBlockingIssues(issues) ? 'Result: BLOCKING issues found' : 'Result: no blocking issue');
+  lines.push(
+    hasBlockingIssues(issues) ? 'Result: BLOCKING issues found' : 'Result: no blocking issue',
+  );
   return lines.join('\n');
 }

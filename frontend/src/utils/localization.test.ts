@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { SUPPORTED_LANGUAGES, TRANSLATED_LANGUAGES } from '../i18n';
-import { CONTENT_LANGUAGE_NAMES, LANGUAGE_NAMES, getBaseLanguage, getLocalizedName } from './localization';
+import {
+  CONTENT_LANGUAGE_NAMES,
+  LANGUAGE_NAMES,
+  getBaseLanguage,
+  getLocalizedName,
+} from './localization';
 
 describe('getBaseLanguage', () => {
   it('should strip the region from a regional locale', () => {
@@ -69,7 +74,10 @@ describe('getLocalizedName', () => {
   });
 
   it('should handle non-object translations', () => {
-    const entity = { name: 'Vodka', nameTranslations: 'invalid' as unknown as Record<string, string> };
+    const entity = {
+      name: 'Vodka',
+      nameTranslations: 'invalid' as unknown as Record<string, string>,
+    };
     expect(getLocalizedName(entity, 'fr')).toBe('Vodka');
   });
 });

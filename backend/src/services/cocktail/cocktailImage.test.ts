@@ -4,7 +4,9 @@ import path from 'path';
 import { config } from '../../config';
 import { removeImageFile, safeUploadPath } from './cocktailImage';
 
-afterEach(() => { vi.restoreAllMocks(); });
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('safeUploadPath', () => {
   it('should keep a plain file name in the upload folder', () => {
@@ -18,9 +20,12 @@ describe('safeUploadPath', () => {
     },
   );
 
-  it.each(['', '.', '..', '/'])('should refuse %j, which names a folder, not a file', (imagePath) => {
-    expect(safeUploadPath(imagePath)).toBeNull();
-  });
+  it.each(['', '.', '..', '/'])(
+    'should refuse %j, which names a folder, not a file',
+    (imagePath) => {
+      expect(safeUploadPath(imagePath)).toBeNull();
+    },
+  );
 });
 
 describe('removeImageFile', () => {

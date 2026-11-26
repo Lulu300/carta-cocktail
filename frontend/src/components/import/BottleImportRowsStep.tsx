@@ -12,7 +12,12 @@ interface BottleImportRowsStepProps {
 }
 
 /** Bottles of the file: pick each one's category, or skip it. */
-export default function BottleImportRowsStep({ rows, resolutions, categories, onChange }: BottleImportRowsStepProps) {
+export default function BottleImportRowsStep({
+  rows,
+  resolutions,
+  categories,
+  onChange,
+}: BottleImportRowsStepProps) {
   const { t } = useTranslation();
 
   // The options go by their position: two existing categories can have the same name
@@ -46,7 +51,9 @@ export default function BottleImportRowsStep({ rows, resolutions, categories, on
             >
               <div className="flex items-center gap-2">
                 <span className="flex-1 text-sm font-medium">{entry.ref.name}</span>
-                <span className="text-xs text-fg-muted">{t('units.ml', { value: entry.ref.capacityMl })}</span>
+                <span className="text-xs text-fg-muted">
+                  {t('units.ml', { value: entry.ref.capacityMl })}
+                </span>
                 {entry.ref.quantity > 1 && (
                   <span className="bg-accent/20 text-accent text-xs font-bold px-2 py-0.5 rounded-full">
                     ×{entry.ref.quantity}
@@ -54,7 +61,9 @@ export default function BottleImportRowsStep({ rows, resolutions, categories, on
                 )}
                 {entry.potentialDuplicates.length > 0 && !isSkipped && (
                   <span className="bg-orange-500/10 text-orange-400 text-xs px-2 py-0.5 rounded">
-                    {t('bottles.importWizard.duplicateFlag', { count: entry.potentialDuplicates.length })}
+                    {t('bottles.importWizard.duplicateFlag', {
+                      count: entry.potentialDuplicates.length,
+                    })}
                   </span>
                 )}
               </div>
@@ -70,20 +79,32 @@ export default function BottleImportRowsStep({ rows, resolutions, categories, on
                   <option value="">{t('bottles.importWizard.pickCategory')}</option>
                   {categories.options.map((option, optionIndex) => (
                     <option key={optionIndex} value={String(optionIndex)}>
-                      {option.name}{option.isNew ? ` (${t('bottles.importWizard.willCreate')})` : ''}
+                      {option.name}
+                      {option.isNew ? ` (${t('bottles.importWizard.willCreate')})` : ''}
                     </option>
                   ))}
                 </Select>
                 <button
                   type="button"
                   aria-pressed={isSkipped}
-                  aria-label={isSkipped
-                    ? t('bottles.importWizard.unskipRow', { name: entry.ref.name })
-                    : t('bottles.importWizard.skipRow', { name: entry.ref.name })}
-                  onClick={() => onChange(key, isSkipped ? { action: 'import', categoryName: entry.ref.categoryName } : { action: 'skip' })}
+                  aria-label={
+                    isSkipped
+                      ? t('bottles.importWizard.unskipRow', { name: entry.ref.name })
+                      : t('bottles.importWizard.skipRow', { name: entry.ref.name })
+                  }
+                  onClick={() =>
+                    onChange(
+                      key,
+                      isSkipped
+                        ? { action: 'import', categoryName: entry.ref.categoryName }
+                        : { action: 'skip' },
+                    )
+                  }
                   className={cx(
                     'text-xs px-3 py-1.5 rounded-lg transition-colors border',
-                    isSkipped ? 'bg-gray-400/10 text-gray-300 border-gray-500' : 'text-fg-muted border-gray-700 hover:border-gray-500',
+                    isSkipped
+                      ? 'bg-gray-400/10 text-gray-300 border-gray-500'
+                      : 'text-fg-muted border-gray-700 hover:border-gray-500',
                   )}
                 >
                   {isSkipped ? t('bottles.importWizard.unskip') : t('bottles.importWizard.skip')}
@@ -91,7 +112,9 @@ export default function BottleImportRowsStep({ rows, resolutions, categories, on
               </div>
 
               {needsCategory && !isSkipped && (
-                <p className="text-xs text-orange-400">{t('bottles.importWizard.categoryRequired')}</p>
+                <p className="text-xs text-orange-400">
+                  {t('bottles.importWizard.categoryRequired')}
+                </p>
               )}
             </div>
           );

@@ -16,7 +16,16 @@ interface FieldProps extends Omit<ComponentPropsWithRef<'div'>, 'children'> {
  * Wraps a form control with its label, hint and error message. The control
  * (`Input`, `Select`, `Textarea`) reads the generated ids from context.
  */
-export default function Field({ label, hideLabel = false, hint, error, required = false, children, className, ...rest }: FieldProps) {
+export default function Field({
+  label,
+  hideLabel = false,
+  hint,
+  error,
+  required = false,
+  children,
+  className,
+  ...rest
+}: FieldProps) {
   const id = useId();
   const hintId = hint ? `${id}-hint` : undefined;
   const errorId = error ? `${id}-error` : undefined;
@@ -26,13 +35,26 @@ export default function Field({ label, hideLabel = false, hint, error, required 
     <div className={className} {...rest}>
       <label htmlFor={id} className={hideLabel ? 'sr-only' : 'block text-sm text-fg-muted mb-1'}>
         {label}
-        {required && <span aria-hidden="true" className="text-danger"> *</span>}
+        {required && (
+          <span aria-hidden="true" className="text-danger">
+            {' '}
+            *
+          </span>
+        )}
       </label>
       <FieldContext value={{ id, describedBy, invalid: Boolean(error), required }}>
         {children}
       </FieldContext>
-      {hint && <p id={hintId} className="mt-1 text-xs text-fg-muted">{hint}</p>}
-      {error && <p id={errorId} className="mt-1 text-xs text-danger">{error}</p>}
+      {hint && (
+        <p id={hintId} className="mt-1 text-xs text-fg-muted">
+          {hint}
+        </p>
+      )}
+      {error && (
+        <p id={errorId} className="mt-1 text-xs text-danger">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

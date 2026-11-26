@@ -17,12 +17,17 @@ const TONE_CLASSES: Record<ToastTone, string> = {
  * not fall back to the start of the page.
  */
 function moveFocusOutOfToast(toastElement: HTMLElement, previous: HTMLElement | null) {
-  const canGoBack = previous && previous !== document.body && previous.isConnected && !toastElement.contains(previous);
+  const canGoBack =
+    previous &&
+    previous !== document.body &&
+    previous.isConnected &&
+    !toastElement.contains(previous);
   if (canGoBack) {
     previous.focus();
     return;
   }
-  const otherToastButtons = toastElement.closest('[data-toaster]')?.querySelectorAll<HTMLElement>('button') ?? [];
+  const otherToastButtons =
+    toastElement.closest('[data-toaster]')?.querySelectorAll<HTMLElement>('button') ?? [];
   [...otherToastButtons].find((button) => !toastElement.contains(button))?.focus();
 }
 
@@ -41,7 +46,8 @@ function ToastItem({ item }: { item: Toast }) {
 
   const handleFocus = (event: FocusEvent<HTMLDivElement>) => {
     if (!event.currentTarget.contains(event.relatedTarget)) {
-      focusBeforeToast.current = event.relatedTarget instanceof HTMLElement ? event.relatedTarget : null;
+      focusBeforeToast.current =
+        event.relatedTarget instanceof HTMLElement ? event.relatedTarget : null;
     }
     setFocused(true);
   };
@@ -79,7 +85,9 @@ function ToastItem({ item }: { item: Toast }) {
     >
       <p className="flex-1 text-sm">{item.message}</p>
       {item.action && (
-        <Button variant="ghost" size="sm" onClick={handleAction}>{item.action.label}</Button>
+        <Button variant="ghost" size="sm" onClick={handleAction}>
+          {item.action.label}
+        </Button>
       )}
       <IconButton icon="close" label={t('common.close')} variant="neutral" onClick={close} />
     </div>
@@ -100,12 +108,19 @@ export default function Toaster() {
   const notices = toasts.filter((item) => item.tone !== 'error');
 
   return (
-    <div data-toaster className="pointer-events-none fixed inset-x-4 bottom-4 z-50 flex flex-col gap-2 sm:left-auto sm:right-4 sm:w-96">
+    <div
+      data-toaster
+      className="pointer-events-none fixed inset-x-4 bottom-4 z-50 flex flex-col gap-2 sm:left-auto sm:right-4 sm:w-96"
+    >
       <div role="alert" aria-atomic="false" className={REGION_CLASSES}>
-        {errors.map((item) => <ToastItem key={item.id} item={item} />)}
+        {errors.map((item) => (
+          <ToastItem key={item.id} item={item} />
+        ))}
       </div>
       <div role="status" aria-live="polite" aria-atomic="false" className={REGION_CLASSES}>
-        {notices.map((item) => <ToastItem key={item.id} item={item} />)}
+        {notices.map((item) => (
+          <ToastItem key={item.id} item={item} />
+        ))}
       </div>
     </div>
   );

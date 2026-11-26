@@ -25,7 +25,8 @@ function renderCrud() {
   const queryClient = createTestQueryClient();
   const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
   const { result } = renderHook(
-    () => useCrudMutations<UnitInput>({ key: qk.units, api, invalidates: [qk.availability], messages }),
+    () =>
+      useCrudMutations<UnitInput>({ key: qk.units, api, invalidates: [qk.availability], messages }),
     { queryClient },
   );
   return { result, invalidate };
@@ -88,10 +89,12 @@ describe('useCrudMutations', () => {
   });
 
   it('names what uses an item whose deletion is refused', async () => {
-    api.delete.mockRejectedValue(new ApiError(409, 'Still in use', {
-      error: 'Still in use',
-      details: { cocktails: [{ id: 1, name: 'Mojito', removedLines: 1 }], bottles: [] },
-    }));
+    api.delete.mockRejectedValue(
+      new ApiError(409, 'Still in use', {
+        error: 'Still in use',
+        details: { cocktails: [{ id: 1, name: 'Mojito', removedLines: 1 }], bottles: [] },
+      }),
+    );
     const { result } = renderCrud();
 
     act(() => result.current.remove.mutate(4));
@@ -105,10 +108,19 @@ describe('useCrudMutations', () => {
 describe('useEntityMutation', () => {
   it('ignores a second call while the first one is in flight, then accepts a new one', async () => {
     let finish: (value: unknown) => void = () => {};
-    const mutationFn = vi.fn(() => new Promise((resolve) => { finish = resolve; }));
-    const { result } = renderHook(() => useEntityMutation<number>({
-      mutationFn, invalidates: [qk.units], ignoreWhilePending: true,
-    }));
+    const mutationFn = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const { result } = renderHook(() =>
+      useEntityMutation<number>({
+        mutationFn,
+        invalidates: [qk.units],
+        ignoreWhilePending: true,
+      }),
+    );
 
     await act(async () => {
       result.current.mutate(1);
@@ -125,7 +137,9 @@ describe('useEntityMutation', () => {
 
   it('runs overlapping calls by default, e.g. toggles on several items', async () => {
     const mutationFn = vi.fn(() => new Promise(() => {}));
-    const { result } = renderHook(() => useEntityMutation<number>({ mutationFn, invalidates: [qk.units] }));
+    const { result } = renderHook(() =>
+      useEntityMutation<number>({ mutationFn, invalidates: [qk.units] }),
+    );
 
     await act(async () => {
       result.current.mutate(1);
@@ -137,7 +151,9 @@ describe('useEntityMutation', () => {
 
   it('shows no success toast without a success message', async () => {
     const mutationFn = vi.fn().mockResolvedValue(undefined);
-    const { result } = renderHook(() => useEntityMutation<number>({ mutationFn, invalidates: [qk.units] }));
+    const { result } = renderHook(() =>
+      useEntityMutation<number>({ mutationFn, invalidates: [qk.units] }),
+    );
 
     act(() => result.current.mutate(1));
 

@@ -22,7 +22,11 @@ interface EntityMutationOptions<Variables, Result> {
 }
 
 /** `Result` is what the request returns, e.g. the created entity. */
-export type EntityMutation<Variables, Result = unknown> = UseMutationResult<Result, Error, Variables>;
+export type EntityMutation<Variables, Result = unknown> = UseMutationResult<
+  Result,
+  Error,
+  Variables
+>;
 
 /**
  * A mutation that refreshes the given queries and reports its outcome in a toast.

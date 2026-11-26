@@ -15,7 +15,13 @@ import {
   buildMenuSection,
   buildSiteSettings,
 } from '../../test/factories';
-import { captureRequest, mockApiError, mockApiPending, mockApiResponse, mockNetworkError } from '../../test/msw/utils';
+import {
+  captureRequest,
+  mockApiError,
+  mockApiPending,
+  mockApiResponse,
+  mockNetworkError,
+} from '../../test/msw/utils';
 import type { Bottle, Menu, MenuBottle, MenuCocktail } from '../../types';
 import { axe } from '../../test/axe';
 import { SiteSettingsProvider } from '../../contexts/SiteSettingsContext';
@@ -123,7 +129,7 @@ describe('MenuPublicPage', () => {
       expect(await screen.findByRole('alert')).toHaveTextContent('Carte introuvable');
       expect(screen.queryByRole('button', { name: 'Réessayer' })).not.toBeInTheDocument();
 
-      await user.click(screen.getByRole('link', { name: 'Retour à l\'accueil' }));
+      await user.click(screen.getByRole('link', { name: "Retour à l'accueil" }));
       expect(screen.getByText('home page')).toBeInTheDocument();
     });
 
@@ -152,7 +158,9 @@ describe('MenuPublicPage', () => {
       <QueryClientProvider client={createTestQueryClient()}>
         <MemoryRouter initialEntries={['/menu/cocktails']}>
           <SiteSettingsProvider>
-            <Routes><Route path="/menu/:slug" element={<MenuPublicPage />} /></Routes>
+            <Routes>
+              <Route path="/menu/:slug" element={<MenuPublicPage />} />
+            </Routes>
           </SiteSettingsProvider>
         </MemoryRouter>
       </QueryClientProvider>,
@@ -183,36 +191,46 @@ describe('MenuPublicPage', () => {
     });
 
     it('shows a personal digestifs menu as a bottle menu, like the system ones', async () => {
-      mockMenu(buildMenu({
-        id: 3, name: 'After dinner', slug: 'after-dinner', type: 'DIGESTIFS',
-        bottles: [menuBottle(1, { name: 'Chartreuse', isApero: false, isDigestif: true })],
-      }));
+      mockMenu(
+        buildMenu({
+          id: 3,
+          name: 'After dinner',
+          slug: 'after-dinner',
+          type: 'DIGESTIFS',
+          bottles: [menuBottle(1, { name: 'Chartreuse', isApero: false, isDigestif: true })],
+        }),
+      );
       renderMenu('after-dinner');
 
-      expect(await screen.findByRole('heading', { level: 3, name: 'Chartreuse' })).toBeInTheDocument();
+      expect(
+        await screen.findByRole('heading', { level: 3, name: 'Chartreuse' }),
+      ).toBeInTheDocument();
       expect(screen.getByPlaceholderText('Rechercher une bouteille...')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Vue liste' })).not.toBeInTheDocument();
     });
 
     it('keeps the order of the bottles set in the admin', async () => {
-      mockMenu(bottleMenu([
-        menuBottle(1, { name: 'Zubrowka' }),
-        menuBottle(2, { name: 'Aperol' }),
-        menuBottle(3, { name: 'Lillet' }),
-      ]));
+      mockMenu(
+        bottleMenu([
+          menuBottle(1, { name: 'Zubrowka' }),
+          menuBottle(2, { name: 'Aperol' }),
+          menuBottle(3, { name: 'Lillet' }),
+        ]),
+      );
       renderMenu('aperitifs');
 
       await screen.findByText('Zubrowka');
-      const rows = screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent);
+      const rows = screen
+        .getAllByRole('heading', { level: 3 })
+        .map((heading) => heading.textContent);
       expect(rows).toEqual(['Zubrowka', 'Aperol', 'Lillet']);
     });
 
     it('finds "Apéro" when typing "apero"', async () => {
       const user = userEvent.setup();
-      mockMenu(bottleMenu([
-        menuBottle(1, { name: 'Apéro maison' }),
-        menuBottle(2, { name: 'Lillet' }),
-      ]));
+      mockMenu(
+        bottleMenu([menuBottle(1, { name: 'Apéro maison' }), menuBottle(2, { name: 'Lillet' })]),
+      );
       renderMenu('aperitifs');
 
       await user.type(await screen.findByPlaceholderText('Rechercher une bouteille...'), 'apero');
@@ -223,9 +241,13 @@ describe('MenuPublicPage', () => {
 
     it('lists every location of a bottle in a dialog', async () => {
       const user = userEvent.setup();
-      mockMenu(bottleMenu(
-        ['Cave', 'Bar', 'Salon', 'Garage'].map((location, index) => menuBottle(index + 1, { location })),
-      ));
+      mockMenu(
+        bottleMenu(
+          ['Cave', 'Bar', 'Salon', 'Garage'].map((location, index) =>
+            menuBottle(index + 1, { location }),
+          ),
+        ),
+      );
       renderMenu('aperitifs');
 
       await user.click(await screen.findByRole('button', { name: 'Voir les 4 emplacements' }));
@@ -255,7 +277,10 @@ describe('MenuPublicPage', () => {
       mockMenu(mojitoMenu);
       renderMenu('cocktails');
 
-      await user.type(await screen.findByPlaceholderText('Rechercher dans les recettes...'), 'rhum citron shaker');
+      await user.type(
+        await screen.findByPlaceholderText('Rechercher dans les recettes...'),
+        'rhum citron shaker',
+      );
 
       await waitFor(() => expect(screen.queryByText('Negroni')).not.toBeInTheDocument());
       expect(screen.getByText('Mojito')).toBeInTheDocument();
@@ -267,7 +292,10 @@ describe('MenuPublicPage', () => {
       mockMenu(mojitoMenu);
       renderMenu('cocktails');
 
-      await user.type(await screen.findByPlaceholderText('Rechercher dans les recettes...'), 'whisky');
+      await user.type(
+        await screen.findByPlaceholderText('Rechercher dans les recettes...'),
+        'whisky',
+      );
 
       expect(await screen.findByText('Aucun résultat pour « whisky »')).toBeInTheDocument();
       expect(await screen.findByText('0 résultat')).toBeInTheDocument();
@@ -300,26 +328,42 @@ describe('MenuPublicPage', () => {
     });
 
     it('shows the section navigation from two sections on', async () => {
-      mockMenu(cocktailMenu(
-        [
-          buildMenuCocktail({ id: 1, menuSectionId: 10 }),
-          buildMenuCocktail({ id: 2, cocktail: { name: 'Negroni' }, menuSectionId: 20 }),
-          buildMenuCocktail({ id: 3, cocktail: { name: 'Spritz' }, menuSectionId: 30 }),
-        ],
-        { sections: [buildMenuSection({ id: 10, name: 'Classics' }), buildMenuSection({ id: 20, name: 'Signatures' }), buildMenuSection({ id: 30, name: 'Mocktails' })] },
-      ));
+      mockMenu(
+        cocktailMenu(
+          [
+            buildMenuCocktail({ id: 1, menuSectionId: 10 }),
+            buildMenuCocktail({ id: 2, cocktail: { name: 'Negroni' }, menuSectionId: 20 }),
+            buildMenuCocktail({ id: 3, cocktail: { name: 'Spritz' }, menuSectionId: 30 }),
+          ],
+          {
+            sections: [
+              buildMenuSection({ id: 10, name: 'Classics' }),
+              buildMenuSection({ id: 20, name: 'Signatures' }),
+              buildMenuSection({ id: 30, name: 'Mocktails' }),
+            ],
+          },
+        ),
+      );
       renderMenu('cocktails');
 
       const nav = await screen.findByRole('navigation', { name: 'Sections de la carte' });
-      expect(within(nav).getAllByRole('button').map((chip) => chip.textContent)).toEqual(['Classics', 'Signatures', 'Mocktails']);
+      expect(
+        within(nav)
+          .getAllByRole('button')
+          .map((chip) => chip.textContent),
+      ).toEqual(['Classics', 'Signatures', 'Mocktails']);
       expect(document.getElementById('section-20')).toHaveTextContent('Negroni');
     });
 
     it('has no section navigation with a single section', async () => {
-      mockMenu(cocktailMenu(
-        [buildMenuCocktail({ id: 1, menuSectionId: 10 })],
-        { sections: [buildMenuSection({ id: 10, name: 'Classics' }), buildMenuSection({ id: 20, name: 'Empty' })] },
-      ));
+      mockMenu(
+        cocktailMenu([buildMenuCocktail({ id: 1, menuSectionId: 10 })], {
+          sections: [
+            buildMenuSection({ id: 10, name: 'Classics' }),
+            buildMenuSection({ id: 20, name: 'Empty' }),
+          ],
+        }),
+      );
       renderMenu('cocktails');
 
       expect(await screen.findByText('Classics')).toBeInTheDocument();
@@ -328,7 +372,9 @@ describe('MenuPublicPage', () => {
 
     it('shows the stock of each cocktail to a signed-in admin only', async () => {
       signIn(true);
-      mockApiResponse('get', '/api/availability/cocktails', { 1: buildAvailability({ cocktailId: 1, maxServings: 4 }) });
+      mockApiResponse('get', '/api/availability/cocktails', {
+        1: buildAvailability({ cocktailId: 1, maxServings: 4 }),
+      });
       mockMenu(mojitoMenu);
       renderMenu('cocktails');
 
@@ -359,7 +405,13 @@ describe('MenuPublicPage accessibility', () => {
   it('has no serious accessibility violation on a cocktail menu, search in progress', async () => {
     const user = userEvent.setup();
     mockMenu(
-      cocktailMenu([...mojitoMenu.cocktails!, buildMenuCocktail({ id: 3, cocktail: { name: 'Daiquiri', isAvailable: true, available: false } })]),
+      cocktailMenu([
+        ...mojitoMenu.cocktails!,
+        buildMenuCocktail({
+          id: 3,
+          cocktail: { name: 'Daiquiri', isAvailable: true, available: false },
+        }),
+      ]),
     );
     const { container } = renderMenu('cocktails');
     await user.type(await screen.findByPlaceholderText('Rechercher dans les recettes...'), 'i');

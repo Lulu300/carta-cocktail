@@ -3,7 +3,11 @@ import userEvent from '@testing-library/user-event';
 import { render, screen, within } from '../../test/test-utils';
 import Pagination from './Pagination';
 
-function renderPagination(page: number, totalPages = 10, handlers = { onPageChange: vi.fn(), onPageSizeChange: vi.fn() }) {
+function renderPagination(
+  page: number,
+  totalPages = 10,
+  handlers = { onPageChange: vi.fn(), onPageSizeChange: vi.fn() },
+) {
   render(
     <Pagination
       page={page}
@@ -20,7 +24,14 @@ function renderPagination(page: number, totalPages = 10, handlers = { onPageChan
 describe('Pagination', () => {
   it('renders nothing for an empty list', () => {
     const { container } = render(
-      <Pagination page={1} totalPages={0} pageSize={10} totalItems={0} onPageChange={vi.fn()} onPageSizeChange={vi.fn()} />,
+      <Pagination
+        page={1}
+        totalPages={0}
+        pageSize={10}
+        totalItems={0}
+        onPageChange={vi.fn()}
+        onPageSizeChange={vi.fn()}
+      />,
     );
     expect(container).toBeEmptyDOMElement();
   });
@@ -70,7 +81,8 @@ describe('Pagination', () => {
 
   it('hides the ellipses from screen readers', () => {
     renderPagination(5);
-    for (const ellipsis of screen.getAllByText('...')) expect(ellipsis).toHaveAttribute('aria-hidden', 'true');
+    for (const ellipsis of screen.getAllByText('...'))
+      expect(ellipsis).toHaveAttribute('aria-hidden', 'true');
   });
 
   it('changes the page size with a labelled select', async () => {

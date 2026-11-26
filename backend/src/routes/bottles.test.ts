@@ -1,23 +1,45 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import AdmZip from 'adm-zip';
 import {
-  setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
-  request, authHeader, prisma, seedCategory, seedBottle, seedUnit, seedCocktailUsing,
-  seedMenu, seedMenuSection, addBottleToMenu, excludeBottleFromMenu, findSystemMenu,
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+  request,
+  authHeader,
+  prisma,
+  seedCategory,
+  seedBottle,
+  seedUnit,
+  seedCocktailUsing,
+  seedMenu,
+  seedMenuSection,
+  addBottleToMenu,
+  excludeBottleFromMenu,
+  findSystemMenu,
 } from '../test/helpers';
 import type { BottlesExportPayload } from '../utils/bottlesExport';
 import { MAX_BOTTLE_IMPORT_BYTES, type ImportCategoryRecord } from '../utils/bottlesImport';
 import { windows1252Bytes } from '../test/windows1252';
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
-beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
+beforeEach(async () => {
+  await cleanDatabase();
+  await seedRequiredData();
+});
 
 const UTF8_BOM_BYTES = Buffer.from([0xef, 0xbb, 0xbf]);
 
 /** The CSV export as sent: decoding it as text would drop the byte order mark. */
 async function exportCsvBytes(): Promise<Buffer> {
-  const res = await request.get('/api/bottles/export?format=csv').set(authHeader())
+  const res = await request
+    .get('/api/bottles/export?format=csv')
+    .set(authHeader())
     .buffer(true)
     .parse((response, done) => {
       const chunks: Buffer[] = [];
@@ -31,8 +53,16 @@ async function exportCsvBytes(): Promise<Buffer> {
 async function bottleSnapshot() {
   return prisma.bottle.findMany({
     select: {
-      name: true, capacityMl: true, remainingPercent: true, alcoholPercentage: true, purchasePrice: true,
-      location: true, openedAt: true, isApero: true, isDigestif: true, category: { select: { name: true } },
+      name: true,
+      capacityMl: true,
+      remainingPercent: true,
+      alcoholPercentage: true,
+      purchasePrice: true,
+      location: true,
+      openedAt: true,
+      isApero: true,
+      isDigestif: true,
+      category: { select: { name: true } },
     },
     orderBy: [{ name: 'asc' }, { id: 'asc' }],
   });
@@ -41,9 +71,18 @@ async function bottleSnapshot() {
 /** A complete import row, as /import/preview returns it. */
 function importRow(fields: Record<string, unknown> = {}) {
   return {
-    name: 'Havana', categoryName: 'Rhum', capacityMl: 700, remainingPercent: 100,
-    alcoholPercentage: 40, purchasePrice: 25, location: 'Bar, top shelf', openedAt: null,
-    isApero: false, isDigestif: false, quantity: 1, ...fields,
+    name: 'Havana',
+    categoryName: 'Rhum',
+    capacityMl: 700,
+    remainingPercent: 100,
+    alcoholPercentage: 40,
+    purchasePrice: 25,
+    location: 'Bar, top shelf',
+    openedAt: null,
+    isApero: false,
+    isDigestif: false,
+    quantity: 1,
+    ...fields,
   };
 }
 
@@ -119,21 +158,27 @@ describe('GET /api/bottles/:id', () => {
 describe('POST /api/bottles', () => {
   it('should return 400 if name is missing', async () => {
     const cat = await seedCategory();
-    const res = await request.post('/api/bottles').set(authHeader())
+    const res = await request
+      .post('/api/bottles')
+      .set(authHeader())
       .send({ categoryId: cat.id, capacityMl: 700 });
     expect(res.status).toBe(400);
   });
 
   it('should return 400 if capacityMl is missing', async () => {
     const cat = await seedCategory();
-    const res = await request.post('/api/bottles').set(authHeader())
+    const res = await request
+      .post('/api/bottles')
+      .set(authHeader())
       .send({ name: 'Test', categoryId: cat.id });
     expect(res.status).toBe(400);
   });
 
   it('should create with defaults', async () => {
     const cat = await seedCategory();
-    const res = await request.post('/api/bottles').set(authHeader())
+    const res = await request
+      .post('/api/bottles')
+      .set(authHeader())
       .send({ name: 'Absolut', categoryId: cat.id, capacityMl: 700 });
     expect(res.status).toBe(201);
     expect(res.body.remainingPercent).toBe(100);
@@ -143,8 +188,13 @@ describe('POST /api/bottles', () => {
 
   it('should keep a purchase price and an alcohol percentage of 0', async () => {
     const cat = await seedCategory();
-    const res = await request.post('/api/bottles').set(authHeader())
-      .send({ name: 'Gift', categoryId: cat.id, capacityMl: 700, purchasePrice: 0, alcoholPercentage: 0 });
+    const res = await request.post('/api/bottles').set(authHeader()).send({
+      name: 'Gift',
+      categoryId: cat.id,
+      capacityMl: 700,
+      purchasePrice: 0,
+      alcoholPercentage: 0,
+    });
     expect(res.status).toBe(201);
     const inDb = await prisma.bottle.findUniqueOrThrow({ where: { id: res.body.id } });
     expect(inDb.purchasePrice).toBe(0);
@@ -153,7 +203,9 @@ describe('POST /api/bottles', () => {
 
   it('should store the opening date sent by the date input', async () => {
     const cat = await seedCategory();
-    const res = await request.post('/api/bottles').set(authHeader())
+    const res = await request
+      .post('/api/bottles')
+      .set(authHeader())
       .send({ name: 'Opened', categoryId: cat.id, capacityMl: 700, openedAt: '2026-10-01' });
     expect(res.status).toBe(201);
     expect(res.body.openedAt).toBe('2026-10-01T00:00:00.000Z');
@@ -168,7 +220,9 @@ describe('POST /api/bottles', () => {
     ['categoryId', { categoryId: '1' }],
   ])('should return 400 for an invalid %s', async (field, invalid) => {
     const cat = await seedCategory();
-    const res = await request.post('/api/bottles').set(authHeader())
+    const res = await request
+      .post('/api/bottles')
+      .set(authHeader())
       .send({ name: 'Bad', categoryId: cat.id, capacityMl: 700, ...invalid });
     expect(res.status).toBe(400);
     expect(res.body.details.map((d: { path: string }) => d.path)).toContain(`body.${field}`);
@@ -177,7 +231,9 @@ describe('POST /api/bottles', () => {
 
   it('should auto-add to aperitifs menu when isApero=true', async () => {
     const cat = await seedCategory();
-    const res = await request.post('/api/bottles').set(authHeader())
+    const res = await request
+      .post('/api/bottles')
+      .set(authHeader())
       .send({ name: 'Campari', categoryId: cat.id, capacityMl: 700, isApero: true });
     expect(res.status).toBe(201);
 
@@ -190,7 +246,9 @@ describe('POST /api/bottles', () => {
 
   it('should auto-add to digestifs menu when isDigestif=true', async () => {
     const cat = await seedCategory();
-    const res = await request.post('/api/bottles').set(authHeader())
+    const res = await request
+      .post('/api/bottles')
+      .set(authHeader())
       .send({ name: 'Cognac', categoryId: cat.id, capacityMl: 700, isDigestif: true });
     expect(res.status).toBe(201);
 
@@ -205,7 +263,9 @@ describe('POST /api/bottles', () => {
 describe('POST /api/bottles (batch)', () => {
   it('should create multiple bottles when quantity > 1', async () => {
     const cat = await seedCategory();
-    const res = await request.post('/api/bottles').set(authHeader())
+    const res = await request
+      .post('/api/bottles')
+      .set(authHeader())
       .send({ name: 'Beer', categoryId: cat.id, capacityMl: 330, quantity: 3 });
     expect(res.status).toBe(201);
     expect(res.body).toHaveLength(3);
@@ -216,7 +276,9 @@ describe('POST /api/bottles (batch)', () => {
 
   it('should return single bottle (not array) when quantity is 1', async () => {
     const cat = await seedCategory();
-    const res = await request.post('/api/bottles').set(authHeader())
+    const res = await request
+      .post('/api/bottles')
+      .set(authHeader())
       .send({ name: 'Wine', categoryId: cat.id, capacityMl: 750, quantity: 1 });
     expect(res.status).toBe(201);
     expect(res.body.name).toBe('Wine');
@@ -225,7 +287,9 @@ describe('POST /api/bottles (batch)', () => {
 
   it('should create up to 50 bottles at once', async () => {
     const cat = await seedCategory();
-    const res = await request.post('/api/bottles').set(authHeader())
+    const res = await request
+      .post('/api/bottles')
+      .set(authHeader())
       .send({ name: 'Shot', categoryId: cat.id, capacityMl: 50, quantity: 50 });
     expect(res.status).toBe(201);
     expect(res.body).toHaveLength(50);
@@ -233,7 +297,9 @@ describe('POST /api/bottles (batch)', () => {
 
   it('should reject a quantity above 50 instead of capping it', async () => {
     const cat = await seedCategory();
-    const res = await request.post('/api/bottles').set(authHeader())
+    const res = await request
+      .post('/api/bottles')
+      .set(authHeader())
       .send({ name: 'Shot', categoryId: cat.id, capacityMl: 50, quantity: 100 });
     expect(res.status).toBe(400);
     expect(res.body.details[0].path).toBe('body.quantity');
@@ -241,7 +307,9 @@ describe('POST /api/bottles (batch)', () => {
   });
 
   it('should create nothing when the batch fails', async () => {
-    const res = await request.post('/api/bottles').set(authHeader())
+    const res = await request
+      .post('/api/bottles')
+      .set(authHeader())
       .send({ name: 'Ghost', categoryId: 999_999, capacityMl: 700, quantity: 3 });
     expect(res.status).toBe(400);
     expect(await prisma.bottle.count()).toBe(0);
@@ -249,7 +317,9 @@ describe('POST /api/bottles (batch)', () => {
 
   it('should auto-sync menus for all batch-created bottles', async () => {
     const cat = await seedCategory();
-    const res = await request.post('/api/bottles').set(authHeader())
+    const res = await request
+      .post('/api/bottles')
+      .set(authHeader())
       .send({ name: 'Aperol', categoryId: cat.id, capacityMl: 700, isApero: true, quantity: 3 });
     expect(res.status).toBe(201);
 
@@ -264,7 +334,9 @@ describe('POST /api/bottles (batch)', () => {
 describe('PUT /api/bottles/:id', () => {
   it('should return 400 for remainingPercent above 100 and leave the bottle unchanged', async () => {
     const bottle = await seedBottle({ remainingPercent: 80 });
-    const res = await request.put(`/api/bottles/${bottle.id}`).set(authHeader())
+    const res = await request
+      .put(`/api/bottles/${bottle.id}`)
+      .set(authHeader())
       .send({ remainingPercent: 150 });
     expect(res.status).toBe(400);
     expect(res.body.details[0]).toMatchObject({ path: 'body.remainingPercent', code: 'too_big' });
@@ -274,8 +346,13 @@ describe('PUT /api/bottles/:id', () => {
 
   it('should set a purchase price of 0 and clear the opening date', async () => {
     const bottle = await seedBottle({ purchasePrice: 25 });
-    await prisma.bottle.update({ where: { id: bottle.id }, data: { openedAt: new Date('2026-01-01') } });
-    const res = await request.put(`/api/bottles/${bottle.id}`).set(authHeader())
+    await prisma.bottle.update({
+      where: { id: bottle.id },
+      data: { openedAt: new Date('2026-01-01') },
+    });
+    const res = await request
+      .put(`/api/bottles/${bottle.id}`)
+      .set(authHeader())
       .send({ purchasePrice: 0, openedAt: null, location: '' });
     expect(res.status).toBe(200);
     expect(res.body.purchasePrice).toBe(0);
@@ -285,7 +362,9 @@ describe('PUT /api/bottles/:id', () => {
 
   it('should update bottle fields', async () => {
     const bottle = await seedBottle({ name: 'Old Name' });
-    const res = await request.put(`/api/bottles/${bottle.id}`).set(authHeader())
+    const res = await request
+      .put(`/api/bottles/${bottle.id}`)
+      .set(authHeader())
       .send({ name: 'New Name', remainingPercent: 50 });
     expect(res.status).toBe(200);
     expect(res.body.name).toBe('New Name');
@@ -294,8 +373,7 @@ describe('PUT /api/bottles/:id', () => {
 
   it('should sync to aperitifs menu when isApero changes to true', async () => {
     const bottle = await seedBottle({ isApero: false });
-    await request.put(`/api/bottles/${bottle.id}`).set(authHeader())
-      .send({ isApero: true });
+    await request.put(`/api/bottles/${bottle.id}`).set(authHeader()).send({ isApero: true });
 
     const aperoMenu = await prisma.menu.findUnique({ where: { slug: 'aperitifs' } });
     const mb = await prisma.menuBottle.findFirst({
@@ -307,13 +385,14 @@ describe('PUT /api/bottles/:id', () => {
   it('should remove from aperitifs menu when isApero changes to false', async () => {
     const cat = await seedCategory();
     // Create bottle with isApero=true
-    const createRes = await request.post('/api/bottles').set(authHeader())
+    const createRes = await request
+      .post('/api/bottles')
+      .set(authHeader())
       .send({ name: 'Campari', categoryId: cat.id, capacityMl: 700, isApero: true });
     const bottleId = createRes.body.id;
 
     // Now set isApero=false
-    await request.put(`/api/bottles/${bottleId}`).set(authHeader())
-      .send({ isApero: false });
+    await request.put(`/api/bottles/${bottleId}`).set(authHeader()).send({ isApero: false });
 
     const aperoMenu = await prisma.menu.findUnique({ where: { slug: 'aperitifs' } });
     const mb = await prisma.menuBottle.findFirst({
@@ -340,7 +419,9 @@ describe('DELETE /api/bottles/:id', () => {
   it('should refuse with 409 and the cocktails when a recipe uses the bottle', async () => {
     const unit = await seedUnit();
     const bottle = await seedBottle();
-    const cocktail = await seedCocktailUsing('Daiquiri', unit.id, [{ sourceType: 'BOTTLE', bottleId: bottle.id }]);
+    const cocktail = await seedCocktailUsing('Daiquiri', unit.id, [
+      { sourceType: 'BOTTLE', bottleId: bottle.id },
+    ]);
 
     const res = await request.delete(`/api/bottles/${bottle.id}`).set(authHeader());
 
@@ -374,7 +455,10 @@ describe('DELETE /api/bottles/:id', () => {
     const category = await seedCategory();
     const bottle = await seedBottle({ categoryId: category.id, isApero: true });
     await prisma.menuBottle.create({
-      data: { menuId: (await prisma.menu.findUniqueOrThrow({ where: { slug: 'aperitifs' } })).id, bottleId: bottle.id },
+      data: {
+        menuId: (await prisma.menu.findUniqueOrThrow({ where: { slug: 'aperitifs' } })).id,
+        bottleId: bottle.id,
+      },
     });
     const first = await seedCocktailUsing('First', unit.id, [
       { sourceType: 'BOTTLE', bottleId: bottle.id },
@@ -394,8 +478,9 @@ describe('DELETE /api/bottles/:id', () => {
       { id: second.id, name: 'Second', removedLines: 1 },
     ]);
     expect(await prisma.bottle.findUnique({ where: { id: bottle.id } })).toBeNull();
-    expect(await prisma.cocktailIngredient.findMany({ select: { sourceType: true } }))
-      .toEqual([{ sourceType: 'CATEGORY' }]);
+    expect(await prisma.cocktailIngredient.findMany({ select: { sourceType: true } })).toEqual([
+      { sourceType: 'CATEGORY' },
+    ]);
     expect(await prisma.cocktailPreferredBottle.count()).toBe(0);
     expect(await prisma.menuBottle.count()).toBe(0);
   });
@@ -447,28 +532,59 @@ describe('GET /api/bottles/export', () => {
   });
 
   it('should export a single bottle as JSON with its category', async () => {
-    const cat = await seedCategory({ name: 'Rhum', type: 'SPIRIT', desiredStock: 2, minimumPercent: 25 });
-    await seedBottle({ name: 'Havana Club 7', categoryId: cat.id, capacityMl: 700, remainingPercent: 80 });
+    const cat = await seedCategory({
+      name: 'Rhum',
+      type: 'SPIRIT',
+      desiredStock: 2,
+      minimumPercent: 25,
+    });
+    await seedBottle({
+      name: 'Havana Club 7',
+      categoryId: cat.id,
+      capacityMl: 700,
+      remainingPercent: 80,
+    });
 
     const res = await request.get('/api/bottles/export?format=json').set(authHeader());
     expect(res.status).toBe(200);
     expect(res.body.version).toBe(1);
     expect(res.body.categories).toHaveLength(1);
     expect(res.body.categories[0]).toMatchObject({
-      name: 'Rhum', type: 'SPIRIT', desiredStock: 2, minimumPercent: 25,
+      name: 'Rhum',
+      type: 'SPIRIT',
+      desiredStock: 2,
+      minimumPercent: 25,
     });
     expect(res.body.bottles).toHaveLength(1);
     expect(res.body.bottles[0]).toMatchObject({
-      name: 'Havana Club 7', categoryName: 'Rhum',
-      capacityMl: 700, remainingPercent: 80, quantity: 1,
+      name: 'Havana Club 7',
+      categoryName: 'Rhum',
+      capacityMl: 700,
+      remainingPercent: 80,
+      quantity: 1,
     });
   });
 
   it('should aggregate identical bottles into a single row with quantity', async () => {
     const cat = await seedCategory({ name: 'Beer' });
-    await seedBottle({ name: 'Heineken', categoryId: cat.id, capacityMl: 330, remainingPercent: 100 });
-    await seedBottle({ name: 'Heineken', categoryId: cat.id, capacityMl: 330, remainingPercent: 100 });
-    await seedBottle({ name: 'Heineken', categoryId: cat.id, capacityMl: 330, remainingPercent: 100 });
+    await seedBottle({
+      name: 'Heineken',
+      categoryId: cat.id,
+      capacityMl: 330,
+      remainingPercent: 100,
+    });
+    await seedBottle({
+      name: 'Heineken',
+      categoryId: cat.id,
+      capacityMl: 330,
+      remainingPercent: 100,
+    });
+    await seedBottle({
+      name: 'Heineken',
+      categoryId: cat.id,
+      capacityMl: 330,
+      remainingPercent: 100,
+    });
 
     const res = await request.get('/api/bottles/export').set(authHeader());
     expect(res.body.bottles).toHaveLength(1);
@@ -538,8 +654,11 @@ describe('GET /api/bottles/export', () => {
   it('should export as CSV with correct headers and content', async () => {
     const cat = await seedCategory({ name: 'Rhum', type: 'SPIRIT' });
     await seedBottle({
-      name: 'Havana', categoryId: cat.id, capacityMl: 700,
-      remainingPercent: 90, isApero: true,
+      name: 'Havana',
+      categoryId: cat.id,
+      capacityMl: 700,
+      remainingPercent: 90,
+      isApero: true,
     });
 
     const res = await request.get('/api/bottles/export?format=csv').set(authHeader());
@@ -551,7 +670,7 @@ describe('GET /api/bottles/export', () => {
     expect(csv.subarray(0, 3)).toEqual(UTF8_BOM_BYTES);
     const lines = csv.subarray(3).toString('utf8').trim().split('\n');
     expect(lines[0]).toBe(
-      'name,categoryName,categoryType,capacityMl,quantity,remainingPercent,alcoholPercentage,purchasePrice,location,openedAt,isApero,isDigestif'
+      'name,categoryName,categoryType,capacityMl,quantity,remainingPercent,alcoholPercentage,purchasePrice,location,openedAt,isApero,isDigestif',
     );
     expect(lines[1]).toContain('Havana,Rhum,SPIRIT,700,1,90');
     expect(lines[1]).toContain('true');
@@ -590,27 +709,53 @@ describe('GET /api/bottles/export', () => {
   });
 
   // The export writes ISO 8601: the dates come back the same whatever the importer's language
-  it.each(['fr', 'en'])('should import back the bottles of a CSV export, BOM and dates included, in %s', async (language) => {
-    const rhum = await seedCategory({ name: 'Rhum' });
-    const gin = await seedCategory({ name: 'Gin' });
-    await seedBottle({ name: '=1+1', categoryId: rhum.id, location: 'Cave, étagère 3', purchasePrice: 0 });
-    await seedBottle({ name: 'Diplomatico', categoryId: rhum.id, openedAt: new Date('2024-03-12T00:00:00.000Z') });
-    await seedBottle({ name: 'Château "Margaux"', categoryId: gin.id, alcoholPercentage: 40.5, isApero: true });
-    await seedBottle({ name: 'Château "Margaux"', categoryId: gin.id, alcoholPercentage: 40.5, isApero: true });
-    const exported = await bottleSnapshot();
-    const csv = await exportCsvBytes();
+  it.each(['fr', 'en'])(
+    'should import back the bottles of a CSV export, BOM and dates included, in %s',
+    async (language) => {
+      const rhum = await seedCategory({ name: 'Rhum' });
+      const gin = await seedCategory({ name: 'Gin' });
+      await seedBottle({
+        name: '=1+1',
+        categoryId: rhum.id,
+        location: 'Cave, étagère 3',
+        purchasePrice: 0,
+      });
+      await seedBottle({
+        name: 'Diplomatico',
+        categoryId: rhum.id,
+        openedAt: new Date('2024-03-12T00:00:00.000Z'),
+      });
+      await seedBottle({
+        name: 'Château "Margaux"',
+        categoryId: gin.id,
+        alcoholPercentage: 40.5,
+        isApero: true,
+      });
+      await seedBottle({
+        name: 'Château "Margaux"',
+        categoryId: gin.id,
+        alcoholPercentage: 40.5,
+        isApero: true,
+      });
+      const exported = await bottleSnapshot();
+      const csv = await exportCsvBytes();
 
-    const preview = await request.post('/api/bottles/import/preview').set(authHeader())
-      .set('Accept-Language', language)
-      .attach('file', csv, 'bottles.csv');
-    await prisma.bottle.deleteMany();
-    const confirm = await request.post('/api/bottles/import/confirm').set(authHeader())
-      .send({ payload: preview.body.payload, resolutions: {} });
+      const preview = await request
+        .post('/api/bottles/import/preview')
+        .set(authHeader())
+        .set('Accept-Language', language)
+        .attach('file', csv, 'bottles.csv');
+      await prisma.bottle.deleteMany();
+      const confirm = await request
+        .post('/api/bottles/import/confirm')
+        .set(authHeader())
+        .send({ payload: preview.body.payload, resolutions: {} });
 
-    expect(preview.body.errors).toEqual([]);
-    expect(confirm.status).toBe(201);
-    expect(await bottleSnapshot()).toEqual(exported);
-  });
+      expect(preview.body.errors).toEqual([]);
+      expect(confirm.status).toBe(201);
+      expect(await bottleSnapshot()).toEqual(exported);
+    },
+  );
 
   // The forms are single-line, but the API and the imports accept line breaks (C-63)
   describe('values on several lines', () => {
@@ -627,31 +772,56 @@ describe('GET /api/bottles/export', () => {
       return [Buffer.from(JSON.stringify(res.body)), 'bottles.json'];
     }
 
-    const lineBreak = (source: string, line: number, field: string) => ({ source, line, field, code: 'lineBreak' });
+    const lineBreak = (source: string, line: number, field: string) => ({
+      source,
+      line,
+      field,
+      code: 'lineBreak',
+    });
 
     it.each([
       // The CSV names the line each record starts on: the first one spans lines 2 to 4
-      ['csv', [lineBreak('bottles', 2, 'name'), lineBreak('bottles', 2, 'location'), lineBreak('bottles', 5, 'categoryName')]],
-      ['json', [
-        lineBreak('categories', 2, 'name'),
-        lineBreak('bottles', 1, 'name'), lineBreak('bottles', 1, 'location'), lineBreak('bottles', 2, 'categoryName'),
-      ]],
-    ] as const)('should import back a %s export with warnings and no error', async (format, warnings) => {
-      await seedMultiLineValues();
-      const exported = await bottleSnapshot();
-      const [file, filename] = await exportedFile(format);
+      [
+        'csv',
+        [
+          lineBreak('bottles', 2, 'name'),
+          lineBreak('bottles', 2, 'location'),
+          lineBreak('bottles', 5, 'categoryName'),
+        ],
+      ],
+      [
+        'json',
+        [
+          lineBreak('categories', 2, 'name'),
+          lineBreak('bottles', 1, 'name'),
+          lineBreak('bottles', 1, 'location'),
+          lineBreak('bottles', 2, 'categoryName'),
+        ],
+      ],
+    ] as const)(
+      'should import back a %s export with warnings and no error',
+      async (format, warnings) => {
+        await seedMultiLineValues();
+        const exported = await bottleSnapshot();
+        const [file, filename] = await exportedFile(format);
 
-      const preview = await request.post('/api/bottles/import/preview').set(authHeader()).attach('file', file, filename);
-      await prisma.bottle.deleteMany();
-      const confirm = await request.post('/api/bottles/import/confirm').set(authHeader())
-        .send({ payload: preview.body.payload, resolutions: {} });
+        const preview = await request
+          .post('/api/bottles/import/preview')
+          .set(authHeader())
+          .attach('file', file, filename);
+        await prisma.bottle.deleteMany();
+        const confirm = await request
+          .post('/api/bottles/import/confirm')
+          .set(authHeader())
+          .send({ payload: preview.body.payload, resolutions: {} });
 
-      expect(preview.body.errors).toEqual([]);
-      expect(preview.body.warnings).toEqual(warnings);
-      expect(preview.body.payload).not.toHaveProperty('warnings');
-      expect(confirm.status).toBe(201);
-      expect(await bottleSnapshot()).toEqual(exported);
-    });
+        expect(preview.body.errors).toEqual([]);
+        expect(preview.body.warnings).toEqual(warnings);
+        expect(preview.body.payload).not.toHaveProperty('warnings');
+        expect(confirm.status).toBe(201);
+        expect(await bottleSnapshot()).toEqual(exported);
+      },
+    );
   });
 });
 
@@ -667,7 +837,8 @@ describe('POST /api/bottles/import/preview', () => {
   });
 
   it('should return 400 for unsupported file format', async () => {
-    const res = await request.post('/api/bottles/import/preview')
+    const res = await request
+      .post('/api/bottles/import/preview')
       .set(authHeader())
       .attach('file', Buffer.from('whatever'), 'bottles.txt');
     expect(res.status).toBe(400);
@@ -676,14 +847,33 @@ describe('POST /api/bottles/import/preview', () => {
   it('should parse a JSON file and detect missing categories', async () => {
     const payload = {
       version: 1,
-      categories: [{ name: 'Rhum', type: 'SPIRIT', desiredStock: 2, minimumPercent: 30, nameTranslations: null }],
-      bottles: [{
-        name: 'Havana 7', categoryName: 'Rhum', capacityMl: 700,
-        remainingPercent: 80, alcoholPercentage: 40, purchasePrice: 28,
-        location: null, openedAt: null, isApero: false, isDigestif: false, quantity: 2,
-      }],
+      categories: [
+        {
+          name: 'Rhum',
+          type: 'SPIRIT',
+          desiredStock: 2,
+          minimumPercent: 30,
+          nameTranslations: null,
+        },
+      ],
+      bottles: [
+        {
+          name: 'Havana 7',
+          categoryName: 'Rhum',
+          capacityMl: 700,
+          remainingPercent: 80,
+          alcoholPercentage: 40,
+          purchasePrice: 28,
+          location: null,
+          openedAt: null,
+          isApero: false,
+          isDigestif: false,
+          quantity: 2,
+        },
+      ],
     };
-    const res = await request.post('/api/bottles/import/preview')
+    const res = await request
+      .post('/api/bottles/import/preview')
       .set(authHeader())
       .attach('file', Buffer.from(JSON.stringify(payload)), 'bottles.json');
 
@@ -698,10 +888,19 @@ describe('POST /api/bottles/import/preview', () => {
     await seedCategory({ name: 'Rhum', type: 'SPIRIT' });
     const payload = {
       version: 1,
-      categories: [{ name: 'Rhum', type: 'SPIRIT', desiredStock: 1, minimumPercent: 30, nameTranslations: null }],
+      categories: [
+        {
+          name: 'Rhum',
+          type: 'SPIRIT',
+          desiredStock: 1,
+          minimumPercent: 30,
+          nameTranslations: null,
+        },
+      ],
       bottles: [{ name: 'Havana', categoryName: 'Rhum', capacityMl: 700, quantity: 1 }],
     };
-    const res = await request.post('/api/bottles/import/preview')
+    const res = await request
+      .post('/api/bottles/import/preview')
       .set(authHeader())
       .attach('file', Buffer.from(JSON.stringify(payload)), 'bottles.json');
 
@@ -716,10 +915,19 @@ describe('POST /api/bottles/import/preview', () => {
 
     const payload = {
       version: 1,
-      categories: [{ name: 'Vodka', type: 'SPIRIT', desiredStock: 1, minimumPercent: 30, nameTranslations: null }],
+      categories: [
+        {
+          name: 'Vodka',
+          type: 'SPIRIT',
+          desiredStock: 1,
+          minimumPercent: 30,
+          nameTranslations: null,
+        },
+      ],
       bottles: [{ name: 'Absolut', categoryName: 'Vodka', capacityMl: 700, quantity: 1 }],
     };
-    const res = await request.post('/api/bottles/import/preview')
+    const res = await request
+      .post('/api/bottles/import/preview')
       .set(authHeader())
       .attach('file', Buffer.from(JSON.stringify(payload)), 'bottles.json');
 
@@ -732,7 +940,8 @@ describe('POST /api/bottles/import/preview', () => {
       version: 1,
       bottles: [{ name: 'Mystery bottle', categoryName: '', capacityMl: 700, quantity: 1 }],
     };
-    const res = await request.post('/api/bottles/import/preview')
+    const res = await request
+      .post('/api/bottles/import/preview')
       .set(authHeader())
       .attach('file', Buffer.from(JSON.stringify(payload)), 'bottles.json');
 
@@ -746,7 +955,8 @@ describe('POST /api/bottles/import/preview', () => {
       'Havana 7,Rhum,SPIRIT,700,2,90,40,25,,,false,false',
       'Bombay,Gin,SPIRIT,750,1,100,47,30,Étagère 1,,true,false',
     ].join('\n');
-    const res = await request.post('/api/bottles/import/preview')
+    const res = await request
+      .post('/api/bottles/import/preview')
       .set(authHeader())
       .attach('file', Buffer.from(csv), 'bottles.csv');
 
@@ -760,20 +970,24 @@ describe('POST /api/bottles/import/preview', () => {
   });
 
   it('reads the accents of a CSV saved by Excel in Windows-1252', async () => {
-    const csv = windows1252Bytes('name;categoryName;capacityMl;location\r\nCrème;Liqueur à l\'œuf;700;Cellier é 20 €\r\n');
-    const res = await request.post('/api/bottles/import/preview')
+    const csv = windows1252Bytes(
+      "name;categoryName;capacityMl;location\r\nCrème;Liqueur à l'œuf;700;Cellier é 20 €\r\n",
+    );
+    const res = await request
+      .post('/api/bottles/import/preview')
       .set(authHeader())
       .attach('file', csv, 'bottles.csv');
 
     expect(res.status).toBe(200);
     expect(res.body.payload.bottles).toMatchObject([
-      { name: 'Crème', categoryName: 'Liqueur à l\'œuf', location: 'Cellier é 20 €' },
+      { name: 'Crème', categoryName: "Liqueur à l'œuf", location: 'Cellier é 20 €' },
     ]);
   });
 
   it('should reject a CSV missing required columns', async () => {
     const csv = 'name,foo\nHavana,bar';
-    const res = await request.post('/api/bottles/import/preview')
+    const res = await request
+      .post('/api/bottles/import/preview')
       .set(authHeader())
       .attach('file', Buffer.from(csv), 'bottles.csv');
     expect(res.status).toBe(400);
@@ -783,7 +997,10 @@ describe('POST /api/bottles/import/preview', () => {
 
   // JSON ignores the trailing spaces that bring the file to the size under test
   function importFileOf(size: number): Buffer {
-    const payload = { version: 1, bottles: [{ name: 'Havana', categoryName: 'Rhum', capacityMl: 700, quantity: 1 }] };
+    const payload = {
+      version: 1,
+      bottles: [{ name: 'Havana', categoryName: 'Rhum', capacityMl: 700, quantity: 1 }],
+    };
     return Buffer.from(JSON.stringify(payload).padEnd(size, ' '));
   }
 
@@ -794,7 +1011,8 @@ describe('POST /api/bottles/import/preview', () => {
     const file = importFileOf(size);
     expect(file.length).toBe(size);
 
-    const res = await request.post('/api/bottles/import/preview')
+    const res = await request
+      .post('/api/bottles/import/preview')
       .set(authHeader())
       .attach('file', file, 'bottles.json');
 
@@ -803,7 +1021,8 @@ describe('POST /api/bottles/import/preview', () => {
   });
 
   it('should answer 413 JSON for a file one byte over the limit', async () => {
-    const res = await request.post('/api/bottles/import/preview')
+    const res = await request
+      .post('/api/bottles/import/preview')
       .set(authHeader())
       .attach('file', importFileOf(MAX_BOTTLE_IMPORT_BYTES + 1), 'bottles.json');
     expect(res.status).toBe(413);
@@ -811,13 +1030,16 @@ describe('POST /api/bottles/import/preview', () => {
   });
 
   it('should parse a ZIP containing bottles.csv and categories.csv', async () => {
-    const bottlesCsv = 'name,categoryName,categoryType,capacityMl,quantity\nHavana,Rhum,SPIRIT,700,1';
-    const categoriesCsv = 'name,type,desiredStock,minimumPercent\nRhum,SPIRIT,3,25\nGin,SPIRIT,2,30';
+    const bottlesCsv =
+      'name,categoryName,categoryType,capacityMl,quantity\nHavana,Rhum,SPIRIT,700,1';
+    const categoriesCsv =
+      'name,type,desiredStock,minimumPercent\nRhum,SPIRIT,3,25\nGin,SPIRIT,2,30';
     const zip = new AdmZip();
     zip.addFile('bottles.csv', Buffer.from(bottlesCsv));
     zip.addFile('categories.csv', Buffer.from(categoriesCsv));
 
-    const res = await request.post('/api/bottles/import/preview')
+    const res = await request
+      .post('/api/bottles/import/preview')
       .set(authHeader())
       .attach('file', zip.toBuffer(), 'bottles.zip');
 
@@ -833,7 +1055,8 @@ describe('POST /api/bottles/import/preview', () => {
   it('should reject a ZIP without bottles.csv or bottles.json', async () => {
     const zip = new AdmZip();
     zip.addFile('something_else.txt', Buffer.from('nope'));
-    const res = await request.post('/api/bottles/import/preview')
+    const res = await request
+      .post('/api/bottles/import/preview')
       .set(authHeader())
       .attach('file', zip.toBuffer(), 'bottles.zip');
     expect(res.status).toBe(400);
@@ -847,37 +1070,50 @@ describe('POST /api/bottles/import/preview', () => {
     const zip = new AdmZip();
     zip.addFile('bottles.csv', Buffer.from('name,capacityMl\nHavana,700'));
     zip.addFile('categories.csv', Buffer.from('"name,type\nRhum,SPIRIT'));
-    const res = await request.post('/api/bottles/import/preview')
+    const res = await request
+      .post('/api/bottles/import/preview')
       .set(authHeader())
       .set('Accept-Language', 'fr')
       .attach('file', zip.toBuffer(), 'bottles.zip');
 
     expect(res.status).toBe(400);
     expect(res.body).toEqual({
-      error: 'Les noms de colonnes de categories.csv (sa première ligne) contiennent un guillemet mal placé',
+      error:
+        'Les noms de colonnes de categories.csv (sa première ligne) contiennent un guillemet mal placé',
       details: { code: 'malformedHeader', file: 'categories.csv' },
     });
   });
 
   it('should parse a CSV saved by Excel: BOM and semicolons', async () => {
     const csv = '\uFEFFname;categoryName;capacityMl;purchasePrice\r\nHavana 7;Rhum;700;25,90\r\n';
-    const res = await request.post('/api/bottles/import/preview').set(authHeader())
+    const res = await request
+      .post('/api/bottles/import/preview')
+      .set(authHeader())
       .attach('file', Buffer.from(csv), 'bottles.csv');
 
     expect(res.status).toBe(200);
-    expect(res.body.payload.bottles).toEqual([importRow({
-      name: 'Havana 7', alcoholPercentage: null, purchasePrice: 25.9, location: null,
-    })]);
+    expect(res.body.payload.bottles).toEqual([
+      importRow({
+        name: 'Havana 7',
+        alcoholPercentage: null,
+        purchasePrice: 25.9,
+        location: null,
+      }),
+    ]);
     expect(res.body.errors).toEqual([]);
   });
 
   it('should leave out an invalid row, list it in errors and keep the others', async () => {
     const csv = 'name,categoryName,capacityMl\nNo capacity,Rhum,\nHavana,Rhum,700';
-    const res = await request.post('/api/bottles/import/preview').set(authHeader())
+    const res = await request
+      .post('/api/bottles/import/preview')
+      .set(authHeader())
       .attach('file', Buffer.from(csv), 'bottles.csv');
 
     expect(res.status).toBe(200);
-    expect(res.body.errors).toEqual([{ source: 'bottles', line: 2, field: 'capacityMl', code: 'required' }]);
+    expect(res.body.errors).toEqual([
+      { source: 'bottles', line: 2, field: 'capacityMl', code: 'required' },
+    ]);
     expect(res.body.payload.bottles.map((b: { name: string }) => b.name)).toEqual(['Havana']);
     // The errors are not part of the payload sent back to /import/confirm
     expect(res.body.payload.errors).toBeUndefined();
@@ -885,9 +1121,15 @@ describe('POST /api/bottles/import/preview', () => {
 
   it('should refuse a file of 2,001 rows with a translated 400', async () => {
     const rows = Array.from({ length: 2001 }, (_, i) => `Bottle ${i},Rhum,700`);
-    const res = await request.post('/api/bottles/import/preview').set(authHeader())
+    const res = await request
+      .post('/api/bottles/import/preview')
+      .set(authHeader())
       .set('Accept-Language', 'fr')
-      .attach('file', Buffer.from(['name,categoryName,capacityMl', ...rows].join('\n')), 'bottles.csv');
+      .attach(
+        'file',
+        Buffer.from(['name,categoryName,capacityMl', ...rows].join('\n')),
+        'bottles.csv',
+      );
 
     expect(res.status).toBe(400);
     expect(res.body).toEqual({
@@ -898,7 +1140,8 @@ describe('POST /api/bottles/import/preview', () => {
   });
 
   describe('opening dates typed in a spreadsheet', () => {
-    const csvDated = (openedAt: string) => Buffer.from(`name;categoryName;capacityMl;openedAt\nHavana;Rhum;700;${openedAt}`);
+    const csvDated = (openedAt: string) =>
+      Buffer.from(`name;categoryName;capacityMl;openedAt\nHavana;Rhum;700;${openedAt}`);
 
     it.each([
       ['fr', '2024-03-12'],
@@ -910,7 +1153,9 @@ describe('POST /api/bottles/import/preview', () => {
       // The language of the messages: the first one the app has
       ['de-DE, fr;q=0.5', '2024-03-12'],
     ])('should read 12/03/2024 with Accept-Language %s as %s', async (language, expected) => {
-      const res = await request.post('/api/bottles/import/preview').set(authHeader())
+      const res = await request
+        .post('/api/bottles/import/preview')
+        .set(authHeader())
         .set('Accept-Language', language)
         .attach('file', csvDated('12/03/2024'), 'bottles.csv');
 
@@ -920,26 +1165,36 @@ describe('POST /api/bottles/import/preview', () => {
     });
 
     it('should read the date as US English without Accept-Language', async () => {
-      const res = await request.post('/api/bottles/import/preview').set(authHeader())
+      const res = await request
+        .post('/api/bottles/import/preview')
+        .set(authHeader())
         .attach('file', csvDated('12/03/2024'), 'bottles.csv');
       expect(res.body.payload.bottles[0].openedAt).toBe('2024-12-03');
     });
 
     it('should list a date that does not exist in errors', async () => {
-      const res = await request.post('/api/bottles/import/preview').set(authHeader())
+      const res = await request
+        .post('/api/bottles/import/preview')
+        .set(authHeader())
         .set('Accept-Language', 'fr')
         .attach('file', csvDated('31/02/2024'), 'bottles.csv');
 
       expect(res.body.payload.bottles).toEqual([]);
-      expect(res.body.errors).toEqual([{ source: 'bottles', line: 2, field: 'openedAt', code: 'invalidDate' }]);
+      expect(res.body.errors).toEqual([
+        { source: 'bottles', line: 2, field: 'openedAt', code: 'invalidDate' },
+      ]);
     });
 
     it('should save the date read in French once confirmed', async () => {
       await seedCategory({ name: 'Rhum' });
-      const preview = await request.post('/api/bottles/import/preview').set(authHeader())
+      const preview = await request
+        .post('/api/bottles/import/preview')
+        .set(authHeader())
         .set('Accept-Language', 'fr')
         .attach('file', csvDated('25/03/2024'), 'bottles.csv');
-      const confirm = await request.post('/api/bottles/import/confirm').set(authHeader())
+      const confirm = await request
+        .post('/api/bottles/import/confirm')
+        .set(authHeader())
         .send({ payload: preview.body.payload, resolutions: {} });
 
       expect(confirm.status).toBe(201);
@@ -953,12 +1208,20 @@ describe('POST /api/bottles/import/preview', () => {
     await seedBottle({ name: 'HAVANA', categoryId: rhum.id, capacityMl: 700 });
     await seedBottle({ name: 'havana', categoryId: rhum.id, capacityMl: 700 });
     await seedBottle({ name: 'Havana', categoryId: rhum.id, capacityMl: 1000 });
-    const payload = { version: 1, bottles: [importRow({ categoryName: 'rhum' }), importRow({ name: 'Diplomatico' })] };
+    const payload = {
+      version: 1,
+      bottles: [importRow({ categoryName: 'rhum' }), importRow({ name: 'Diplomatico' })],
+    };
 
-    const res = await request.post('/api/bottles/import/preview').set(authHeader())
+    const res = await request
+      .post('/api/bottles/import/preview')
+      .set(authHeader())
       .attach('file', Buffer.from(JSON.stringify(payload)), 'bottles.json');
 
-    expect(res.body.bottles[0].potentialDuplicates.map((d: { name: string }) => d.name)).toEqual(['HAVANA', 'havana']);
+    expect(res.body.bottles[0].potentialDuplicates.map((d: { name: string }) => d.name)).toEqual([
+      'HAVANA',
+      'havana',
+    ]);
     expect(res.body.bottles[1].potentialDuplicates).toEqual([]);
   });
 
@@ -966,16 +1229,26 @@ describe('POST /api/bottles/import/preview', () => {
   it.each([
     ['decomposed, the existing one composed', 'CRE\u0300ME', 'Cr\u00E8me'],
     ['composed, the existing one decomposed', 'CR\u00C8ME', 'Cre\u0300me'],
-  ])('should list a duplicate whose category is written %s', async (_case, fileCategory, existingCategory) => {
-    const cream = await seedCategory({ name: existingCategory });
-    await seedBottle({ name: 'Lejay', categoryId: cream.id, capacityMl: 700 });
-    const payload = { version: 1, bottles: [importRow({ name: 'Lejay', categoryName: fileCategory })] };
+  ])(
+    'should list a duplicate whose category is written %s',
+    async (_case, fileCategory, existingCategory) => {
+      const cream = await seedCategory({ name: existingCategory });
+      await seedBottle({ name: 'Lejay', categoryId: cream.id, capacityMl: 700 });
+      const payload = {
+        version: 1,
+        bottles: [importRow({ name: 'Lejay', categoryName: fileCategory })],
+      };
 
-    const res = await request.post('/api/bottles/import/preview').set(authHeader())
-      .attach('file', Buffer.from(JSON.stringify(payload)), 'bottles.json');
+      const res = await request
+        .post('/api/bottles/import/preview')
+        .set(authHeader())
+        .attach('file', Buffer.from(JSON.stringify(payload)), 'bottles.json');
 
-    expect(res.body.bottles[0].potentialDuplicates.map((d: { name: string }) => d.name)).toEqual(['Lejay']);
-  });
+      expect(res.body.bottles[0].potentialDuplicates.map((d: { name: string }) => d.name)).toEqual([
+        'Lejay',
+      ]);
+    },
+  );
 });
 
 describe('POST /api/bottles/import/confirm', () => {
@@ -985,7 +1258,8 @@ describe('POST /api/bottles/import/confirm', () => {
   });
 
   it('should return 400 for invalid payload version', async () => {
-    const res = await request.post('/api/bottles/import/confirm')
+    const res = await request
+      .post('/api/bottles/import/confirm')
       .set(authHeader())
       .send({ payload: { version: 99, bottles: [] } });
     expect(res.status).toBe(400);
@@ -995,7 +1269,10 @@ describe('POST /api/bottles/import/confirm', () => {
     await seedCategory({ name: 'Rhum' });
     const payload = { version: 1, bottles: [importRow(), importRow({ openedAt: 'abc' })] };
 
-    const res = await request.post('/api/bottles/import/confirm').set(authHeader()).send({ payload });
+    const res = await request
+      .post('/api/bottles/import/confirm')
+      .set(authHeader())
+      .send({ payload });
 
     expect(res.status).toBe(400);
     expect(res.body.details[0].path).toBe('body.payload.bottles.1.openedAt');
@@ -1004,50 +1281,75 @@ describe('POST /api/bottles/import/confirm', () => {
 
   it('should refuse rows that would create more than 2,000 bottles', async () => {
     await seedCategory({ name: 'Rhum' });
-    const payload = { version: 1, bottles: Array.from({ length: 41 }, () => importRow({ quantity: 50 })) };
+    const payload = {
+      version: 1,
+      bottles: Array.from({ length: 41 }, () => importRow({ quantity: 50 })),
+    };
 
-    const res = await request.post('/api/bottles/import/confirm').set(authHeader()).send({ payload });
+    const res = await request
+      .post('/api/bottles/import/confirm')
+      .set(authHeader())
+      .send({ payload });
 
     expect(res.status).toBe(400);
     expect(res.body.details[0].path).toBe('body.payload.bottles');
     expect(await prisma.bottle.count()).toBe(0);
   });
 
-  it.each([1000, 2000])('should import %i bottles sent in a body over 100 kB, in under 5 s', async (count) => {
-    await seedCategory({ name: 'Rhum' });
-    const payload = {
-      version: 1,
-      bottles: Array.from({ length: count }, (_, i) => importRow({ name: `Bottle ${i}`, isApero: i % 2 === 0 })),
-    };
-    const body = JSON.stringify({ payload, resolutions: {} });
-    // Over the 100 kB of the global JSON parser: this request needs the route's own limit
-    expect(body.length).toBeGreaterThan(200 * 1024);
+  it.each([1000, 2000])(
+    'should import %i bottles sent in a body over 100 kB, in under 5 s',
+    async (count) => {
+      await seedCategory({ name: 'Rhum' });
+      const payload = {
+        version: 1,
+        bottles: Array.from({ length: count }, (_, i) =>
+          importRow({ name: `Bottle ${i}`, isApero: i % 2 === 0 }),
+        ),
+      };
+      const body = JSON.stringify({ payload, resolutions: {} });
+      // Over the 100 kB of the global JSON parser: this request needs the route's own limit
+      expect(body.length).toBeGreaterThan(200 * 1024);
 
-    const start = Date.now();
-    const res = await request.post('/api/bottles/import/confirm').set(authHeader())
-      .set('Content-Type', 'application/json').send(body);
-    const elapsedMs = Date.now() - start;
+      const start = Date.now();
+      const res = await request
+        .post('/api/bottles/import/confirm')
+        .set(authHeader())
+        .set('Content-Type', 'application/json')
+        .send(body);
+      const elapsedMs = Date.now() - start;
 
-    expect(res.status).toBe(201);
-    expect(res.body.created.bottles).toBe(count);
-    expect(elapsedMs).toBeLessThan(5000);
-    expect(await prisma.bottle.count()).toBe(count);
-    const aperitifs = await findSystemMenu('aperitifs');
-    expect(await prisma.menuBottle.count({ where: { menuId: aperitifs.id } })).toBe(count / 2);
-  });
+      expect(res.status).toBe(201);
+      expect(res.body.created.bottles).toBe(count);
+      expect(elapsedMs).toBeLessThan(5000);
+      expect(await prisma.bottle.count()).toBe(count);
+      const aperitifs = await findSystemMenu('aperitifs');
+      expect(await prisma.menuBottle.count({ where: { menuId: aperitifs.id } })).toBe(count / 2);
+    },
+  );
 
   it('should return 400 for remainingPercent above 100 and create nothing', async () => {
     await seedCategory({ name: 'Rhum' });
     const payload = {
       version: 1,
       categories: [],
-      bottles: [{
-        name: 'Havana', categoryName: 'Rhum', capacityMl: 700, remainingPercent: 150,
-        alcoholPercentage: 40, purchasePrice: null, location: null, openedAt: null,
-        isApero: false, isDigestif: false, quantity: 1,
-      }],
+      bottles: [
+        {
+          name: 'Havana',
+          categoryName: 'Rhum',
+          capacityMl: 700,
+          remainingPercent: 150,
+          alcoholPercentage: 40,
+          purchasePrice: null,
+          location: null,
+          openedAt: null,
+          isApero: false,
+          isDigestif: false,
+          quantity: 1,
+        },
+      ],
     };
-    const res = await request.post('/api/bottles/import/confirm')
+    const res = await request
+      .post('/api/bottles/import/confirm')
       .set(authHeader())
       .send({ payload, resolutions: {} });
 
@@ -1060,15 +1362,29 @@ describe('POST /api/bottles/import/confirm', () => {
     const payload = {
       version: 1,
       categories: [],
-      bottles: [{
-        name: 'Havana', categoryName: 'Rhum', capacityMl: 700, remainingPercent: 100,
-        alcoholPercentage: null, purchasePrice: null, location: null, openedAt: null,
-        isApero: false, isDigestif: false, quantity: 1,
-      }],
+      bottles: [
+        {
+          name: 'Havana',
+          categoryName: 'Rhum',
+          capacityMl: 700,
+          remainingPercent: 100,
+          alcoholPercentage: null,
+          purchasePrice: null,
+          location: null,
+          openedAt: null,
+          isApero: false,
+          isDigestif: false,
+          quantity: 1,
+        },
+      ],
     };
-    const res = await request.post('/api/bottles/import/confirm')
+    const res = await request
+      .post('/api/bottles/import/confirm')
       .set(authHeader())
-      .send({ payload, resolutions: { categories: { rhum: { action: 'create', data: { name: '' } } } } });
+      .send({
+        payload,
+        resolutions: { categories: { rhum: { action: 'create', data: { name: '' } } } },
+      });
 
     expect(res.status).toBe(201);
     expect(res.body.created.bottles).toBe(1);
@@ -1081,13 +1397,24 @@ describe('POST /api/bottles/import/confirm', () => {
     const payload = {
       version: 1,
       categories: [],
-      bottles: [{
-        name: 'Havana', categoryName: 'Rhum', capacityMl: 700, remainingPercent: 100,
-        alcoholPercentage: 40, purchasePrice: null, location: null, openedAt: null,
-        isApero: false, isDigestif: false, quantity: 1,
-      }],
+      bottles: [
+        {
+          name: 'Havana',
+          categoryName: 'Rhum',
+          capacityMl: 700,
+          remainingPercent: 100,
+          alcoholPercentage: 40,
+          purchasePrice: null,
+          location: null,
+          openedAt: null,
+          isApero: false,
+          isDigestif: false,
+          quantity: 1,
+        },
+      ],
     };
-    const res = await request.post('/api/bottles/import/confirm')
+    const res = await request
+      .post('/api/bottles/import/confirm')
       .set(authHeader())
       .send({ payload, resolutions: {} });
 
@@ -1101,12 +1428,30 @@ describe('POST /api/bottles/import/confirm', () => {
   it('should create a new category and then the bottle', async () => {
     const payload = {
       version: 1,
-      categories: [{ name: 'NewCat', type: 'SPIRIT', desiredStock: 2, minimumPercent: 20, nameTranslations: null }],
-      bottles: [{
-        name: 'NewBottle', categoryName: 'NewCat', capacityMl: 500, remainingPercent: 100,
-        alcoholPercentage: null, purchasePrice: null, location: null, openedAt: null,
-        isApero: false, isDigestif: false, quantity: 1,
-      }],
+      categories: [
+        {
+          name: 'NewCat',
+          type: 'SPIRIT',
+          desiredStock: 2,
+          minimumPercent: 20,
+          nameTranslations: null,
+        },
+      ],
+      bottles: [
+        {
+          name: 'NewBottle',
+          categoryName: 'NewCat',
+          capacityMl: 500,
+          remainingPercent: 100,
+          alcoholPercentage: null,
+          purchasePrice: null,
+          location: null,
+          openedAt: null,
+          isApero: false,
+          isDigestif: false,
+          quantity: 1,
+        },
+      ],
     };
     const resolutions = {
       categories: {
@@ -1116,7 +1461,8 @@ describe('POST /api/bottles/import/confirm', () => {
         },
       },
     };
-    const res = await request.post('/api/bottles/import/confirm')
+    const res = await request
+      .post('/api/bottles/import/confirm')
       .set(authHeader())
       .send({ payload, resolutions });
 
@@ -1134,13 +1480,24 @@ describe('POST /api/bottles/import/confirm', () => {
     const payload = {
       version: 1,
       categories: [],
-      bottles: [{
-        name: 'Heineken', categoryName: 'Beer', capacityMl: 330, remainingPercent: 100,
-        alcoholPercentage: 5, purchasePrice: null, location: null, openedAt: null,
-        isApero: false, isDigestif: false, quantity: 6,
-      }],
+      bottles: [
+        {
+          name: 'Heineken',
+          categoryName: 'Beer',
+          capacityMl: 330,
+          remainingPercent: 100,
+          alcoholPercentage: 5,
+          purchasePrice: null,
+          location: null,
+          openedAt: null,
+          isApero: false,
+          isDigestif: false,
+          quantity: 6,
+        },
+      ],
     };
-    const res = await request.post('/api/bottles/import/confirm')
+    const res = await request
+      .post('/api/bottles/import/confirm')
       .set(authHeader())
       .send({ payload, resolutions: {} });
 
@@ -1154,13 +1511,24 @@ describe('POST /api/bottles/import/confirm', () => {
     const payload = {
       version: 1,
       categories: [],
-      bottles: [{
-        name: 'Stout', categoryName: 'Beer', capacityMl: 330, remainingPercent: 100,
-        alcoholPercentage: null, purchasePrice: null, location: null, openedAt: null,
-        isApero: false, isDigestif: false, quantity: 999,
-      }],
+      bottles: [
+        {
+          name: 'Stout',
+          categoryName: 'Beer',
+          capacityMl: 330,
+          remainingPercent: 100,
+          alcoholPercentage: null,
+          purchasePrice: null,
+          location: null,
+          openedAt: null,
+          isApero: false,
+          isDigestif: false,
+          quantity: 999,
+        },
+      ],
     };
-    const res = await request.post('/api/bottles/import/confirm')
+    const res = await request
+      .post('/api/bottles/import/confirm')
       .set(authHeader())
       .send({ payload, resolutions: {} });
     expect(res.status).toBe(400);
@@ -1174,16 +1542,37 @@ describe('POST /api/bottles/import/confirm', () => {
       version: 1,
       categories: [],
       bottles: [
-        { name: 'Keep', categoryName: 'Rhum', capacityMl: 700, remainingPercent: 100,
-          alcoholPercentage: null, purchasePrice: null, location: null, openedAt: null,
-          isApero: false, isDigestif: false, quantity: 1 },
-        { name: 'Drop', categoryName: 'Rhum', capacityMl: 700, remainingPercent: 100,
-          alcoholPercentage: null, purchasePrice: null, location: null, openedAt: null,
-          isApero: false, isDigestif: false, quantity: 1 },
+        {
+          name: 'Keep',
+          categoryName: 'Rhum',
+          capacityMl: 700,
+          remainingPercent: 100,
+          alcoholPercentage: null,
+          purchasePrice: null,
+          location: null,
+          openedAt: null,
+          isApero: false,
+          isDigestif: false,
+          quantity: 1,
+        },
+        {
+          name: 'Drop',
+          categoryName: 'Rhum',
+          capacityMl: 700,
+          remainingPercent: 100,
+          alcoholPercentage: null,
+          purchasePrice: null,
+          location: null,
+          openedAt: null,
+          isApero: false,
+          isDigestif: false,
+          quantity: 1,
+        },
       ],
     };
     const resolutions = { bottles: { '1': { action: 'skip' } } };
-    const res = await request.post('/api/bottles/import/confirm')
+    const res = await request
+      .post('/api/bottles/import/confirm')
       .set(authHeader())
       .send({ payload, resolutions });
 
@@ -1197,14 +1586,25 @@ describe('POST /api/bottles/import/confirm', () => {
     const payload = {
       version: 1,
       categories: [],
-      bottles: [{
-        name: 'Orphan', categoryName: '', capacityMl: 700, remainingPercent: 100,
-        alcoholPercentage: null, purchasePrice: null, location: null, openedAt: null,
-        isApero: false, isDigestif: false, quantity: 1,
-      }],
+      bottles: [
+        {
+          name: 'Orphan',
+          categoryName: '',
+          capacityMl: 700,
+          remainingPercent: 100,
+          alcoholPercentage: null,
+          purchasePrice: null,
+          location: null,
+          openedAt: null,
+          isApero: false,
+          isDigestif: false,
+          quantity: 1,
+        },
+      ],
     };
     const resolutions = { bottles: { '0': { action: 'import', categoryName: 'Rhum' } } };
-    const res = await request.post('/api/bottles/import/confirm')
+    const res = await request
+      .post('/api/bottles/import/confirm')
       .set(authHeader())
       .send({ payload, resolutions });
 
@@ -1218,13 +1618,24 @@ describe('POST /api/bottles/import/confirm', () => {
     const payload = {
       version: 1,
       categories: [],
-      bottles: [{
-        name: 'Orphan', categoryName: '', capacityMl: 700, remainingPercent: 100,
-        alcoholPercentage: null, purchasePrice: null, location: null, openedAt: null,
-        isApero: false, isDigestif: false, quantity: 1,
-      }],
+      bottles: [
+        {
+          name: 'Orphan',
+          categoryName: '',
+          capacityMl: 700,
+          remainingPercent: 100,
+          alcoholPercentage: null,
+          purchasePrice: null,
+          location: null,
+          openedAt: null,
+          isApero: false,
+          isDigestif: false,
+          quantity: 1,
+        },
+      ],
     };
-    const res = await request.post('/api/bottles/import/confirm')
+    const res = await request
+      .post('/api/bottles/import/confirm')
       .set(authHeader())
       .send({ payload, resolutions: {} });
 
@@ -1239,13 +1650,24 @@ describe('POST /api/bottles/import/confirm', () => {
     const payload = {
       version: 1,
       categories: [],
-      bottles: [{
-        name: 'Absolut', categoryName: 'Vodka', capacityMl: 700, remainingPercent: 100,
-        alcoholPercentage: 40, purchasePrice: null, location: null, openedAt: null,
-        isApero: false, isDigestif: false, quantity: 2,
-      }],
+      bottles: [
+        {
+          name: 'Absolut',
+          categoryName: 'Vodka',
+          capacityMl: 700,
+          remainingPercent: 100,
+          alcoholPercentage: 40,
+          purchasePrice: null,
+          location: null,
+          openedAt: null,
+          isApero: false,
+          isDigestif: false,
+          quantity: 2,
+        },
+      ],
     };
-    const res = await request.post('/api/bottles/import/confirm')
+    const res = await request
+      .post('/api/bottles/import/confirm')
       .set(authHeader())
       .send({ payload, resolutions: {} });
 
@@ -1258,13 +1680,24 @@ describe('POST /api/bottles/import/confirm', () => {
     const payload = {
       version: 1,
       categories: [],
-      bottles: [{
-        name: 'Campari', categoryName: 'Apero', capacityMl: 700, remainingPercent: 100,
-        alcoholPercentage: 25, purchasePrice: null, location: null, openedAt: null,
-        isApero: true, isDigestif: false, quantity: 1,
-      }],
+      bottles: [
+        {
+          name: 'Campari',
+          categoryName: 'Apero',
+          capacityMl: 700,
+          remainingPercent: 100,
+          alcoholPercentage: 25,
+          purchasePrice: null,
+          location: null,
+          openedAt: null,
+          isApero: true,
+          isDigestif: false,
+          quantity: 1,
+        },
+      ],
     };
-    const res = await request.post('/api/bottles/import/confirm')
+    const res = await request
+      .post('/api/bottles/import/confirm')
       .set(authHeader())
       .send({ payload, resolutions: {} });
     expect(res.status).toBe(201);
@@ -1277,19 +1710,41 @@ describe('POST /api/bottles/import/confirm', () => {
   it('should auto-create a missing CategoryType when creating a category', async () => {
     const payload = {
       version: 1,
-      categories: [{ name: 'CustomCat', type: 'BITTER', desiredStock: 1, minimumPercent: 30, nameTranslations: null }],
-      bottles: [{
-        name: 'Angostura', categoryName: 'CustomCat', capacityMl: 200, remainingPercent: 100,
-        alcoholPercentage: 44, purchasePrice: null, location: null, openedAt: null,
-        isApero: false, isDigestif: false, quantity: 1,
-      }],
+      categories: [
+        {
+          name: 'CustomCat',
+          type: 'BITTER',
+          desiredStock: 1,
+          minimumPercent: 30,
+          nameTranslations: null,
+        },
+      ],
+      bottles: [
+        {
+          name: 'Angostura',
+          categoryName: 'CustomCat',
+          capacityMl: 200,
+          remainingPercent: 100,
+          alcoholPercentage: 44,
+          purchasePrice: null,
+          location: null,
+          openedAt: null,
+          isApero: false,
+          isDigestif: false,
+          quantity: 1,
+        },
+      ],
     };
     const resolutions = {
       categories: {
-        customcat: { action: 'create', data: { name: 'CustomCat', type: 'BITTER', desiredStock: 1, minimumPercent: 30 } },
+        customcat: {
+          action: 'create',
+          data: { name: 'CustomCat', type: 'BITTER', desiredStock: 1, minimumPercent: 30 },
+        },
       },
     };
-    const res = await request.post('/api/bottles/import/confirm')
+    const res = await request
+      .post('/api/bottles/import/confirm')
       .set(authHeader())
       .send({ payload, resolutions });
 
@@ -1305,14 +1760,21 @@ describe('POST /api/bottles/import/confirm', () => {
       bottles: [{ name: 'Angostura', categoryName: 'CustomCat', capacityMl: 200 }],
     };
     const resolutions = {
-      categories: { customcat: { action: 'create', data: { name: 'CustomCat', type: 'AROMATIC   BITTER' } } },
+      categories: {
+        customcat: { action: 'create', data: { name: 'CustomCat', type: 'AROMATIC   BITTER' } },
+      },
     };
-    const res = await request.post('/api/bottles/import/confirm').set(authHeader()).send({ payload, resolutions });
+    const res = await request
+      .post('/api/bottles/import/confirm')
+      .set(authHeader())
+      .send({ payload, resolutions });
 
     expect(res.status).toBe(201);
     const category = await prisma.category.findUniqueOrThrow({ where: { name: 'CustomCat' } });
     expect(category.type).toBe('AROMATIC BITTER');
-    expect(await prisma.categoryType.findUnique({ where: { name: 'AROMATIC   BITTER' } })).toBeNull();
+    expect(
+      await prisma.categoryType.findUnique({ where: { name: 'AROMATIC   BITTER' } }),
+    ).toBeNull();
   });
 
   // Data older than v1.9.0 can hold ' SPIRIT ' next to 'SPIRIT': the wizard lists both, and the
@@ -1323,12 +1785,20 @@ describe('POST /api/bottles/import/confirm', () => {
       const names = Object.keys(typesByCategory);
       const payload = {
         version: 1,
-        bottles: names.map((categoryName) => importRow({ name: `${categoryName} bottle`, categoryName })),
+        bottles: names.map((categoryName) =>
+          importRow({ name: `${categoryName} bottle`, categoryName }),
+        ),
       };
-      const categories = Object.fromEntries(names.map((name) => [
-        name.toLowerCase(), { action: 'create', data: { name, type: typesByCategory[name] } },
-      ]));
-      return request.post('/api/bottles/import/confirm').set(authHeader()).send({ payload, resolutions: { categories } });
+      const categories = Object.fromEntries(
+        names.map((name) => [
+          name.toLowerCase(),
+          { action: 'create', data: { name, type: typesByCategory[name] } },
+        ]),
+      );
+      return request
+        .post('/api/bottles/import/confirm')
+        .set(authHeader())
+        .send({ payload, resolutions: { categories } });
     }
 
     async function typeOf(categoryName: string) {
@@ -1363,8 +1833,11 @@ describe('POST /api/bottles/import/confirm', () => {
 
       expect(res.status).toBe(201);
       expect(await typeOf('Rhum')).toBe('rum x');
-      expect(await prisma.categoryType.findUnique({ where: { name: 'rum x' } }))
-        .toEqual({ name: 'rum x', nameTranslations: null, color: 'gray' });
+      expect(await prisma.categoryType.findUnique({ where: { name: 'rum x' } })).toEqual({
+        name: 'rum x',
+        nameTranslations: null,
+        color: 'gray',
+      });
     });
 
     it.each([
@@ -1373,25 +1846,33 @@ describe('POST /api/bottles/import/confirm', () => {
       ['a new type of blank characters', '\u2800 \u3164'],
       // A category needs a type, even when a type has the empty name: the category form refuses it too
       ['the empty name, even when a type has it', ''],
-    ])('should return 400 for %s, pointing at its resolution, and import nothing', async (_case, type) => {
-      // A blank new type is refused, and the empty name even when a type has it
-      await prisma.categoryType.create({ data: { name: '', color: 'red' } });
-      const typeCount = await prisma.categoryType.count();
+    ])(
+      'should return 400 for %s, pointing at its resolution, and import nothing',
+      async (_case, type) => {
+        // A blank new type is refused, and the empty name even when a type has it
+        await prisma.categoryType.create({ data: { name: '', color: 'red' } });
+        const typeCount = await prisma.categoryType.count();
 
-      const res = await importUnderTypes({ Rhum: type });
+        const res = await importUnderTypes({ Rhum: type });
 
-      expect(res.status).toBe(400);
-      expect(res.body.details).toMatchObject([{ path: 'body.resolutions.categories.rhum.data.type', code: 'too_small' }]);
-      expect(await prisma.category.count()).toBe(0);
-      expect(await prisma.bottle.count()).toBe(0);
-      expect(await prisma.categoryType.count()).toBe(typeCount);
-    });
+        expect(res.status).toBe(400);
+        expect(res.body.details).toMatchObject([
+          { path: 'body.resolutions.categories.rhum.data.type', code: 'too_small' },
+        ]);
+        expect(await prisma.category.count()).toBe(0);
+        expect(await prisma.bottle.count()).toBe(0);
+        expect(await prisma.categoryType.count()).toBe(typeCount);
+      },
+    );
   });
 });
 
 describe('bottle menus', () => {
   async function bottleIdsOf(menuId: number): Promise<number[]> {
-    const entries = await prisma.menuBottle.findMany({ where: { menuId }, orderBy: { position: 'asc' } });
+    const entries = await prisma.menuBottle.findMany({
+      where: { menuId },
+      orderBy: { position: 'asc' },
+    });
     return entries.map((entry) => entry.bottleId);
   }
 
@@ -1399,7 +1880,9 @@ describe('bottle menus', () => {
    * Sends a valid request while every insertion into a menu fails, as a failing sync would,
    * and checks that the request failed in the sync.
    */
-  async function sendWithFailingMenuSync(send: () => Promise<{ status: number; body: { details?: unknown } }>) {
+  async function sendWithFailingMenuSync(
+    send: () => Promise<{ status: number; body: { details?: unknown } }>,
+  ) {
     await prisma.$executeRawUnsafe(
       `CREATE TRIGGER fail_menu_sync BEFORE INSERT ON MenuBottle BEGIN SELECT RAISE(ABORT, 'simulated failure'); END`,
     );
@@ -1419,9 +1902,17 @@ describe('bottle menus', () => {
       version: 1,
       categories: [],
       bottles: bottles.map(({ name, isApero, quantity = 1 }) => ({
-        name, categoryName: 'Apero', capacityMl: 700, remainingPercent: 100,
-        alcoholPercentage: null, purchasePrice: null, location: null, openedAt: null,
-        isApero, isDigestif: false, quantity,
+        name,
+        categoryName: 'Apero',
+        capacityMl: 700,
+        remainingPercent: 100,
+        alcoholPercentage: null,
+        purchasePrice: null,
+        location: null,
+        openedAt: null,
+        isApero,
+        isDigestif: false,
+        quantity,
       })),
     };
   }
@@ -1433,7 +1924,10 @@ describe('bottle menus', () => {
     await addBottleToMenu(aperitifs.id, bottle.id);
     await addBottleToMenu(personal.id, bottle.id);
 
-    const res = await request.put(`/api/bottles/${bottle.id}`).set(authHeader()).send({ remainingPercent: 0 });
+    const res = await request
+      .put(`/api/bottles/${bottle.id}`)
+      .set(authHeader())
+      .send({ remainingPercent: 0 });
 
     expect(res.status).toBe(200);
     expect(await bottleIdsOf(aperitifs.id)).toEqual([bottle.id]);
@@ -1446,16 +1940,28 @@ describe('bottle menus', () => {
     const bottle = await seedBottle({ isApero: true });
     for (const menu of [aperitifs, personal]) {
       const section = await seedMenuSection(menu.id, { name: 'Bitters' });
-      await addBottleToMenu(menu.id, bottle.id, { position: 2, isHidden: true, menuSectionId: section.id });
+      await addBottleToMenu(menu.id, bottle.id, {
+        position: 2,
+        isHidden: true,
+        menuSectionId: section.id,
+      });
     }
-    const before = await prisma.menuBottle.findMany({ where: { bottleId: bottle.id }, orderBy: { menuId: 'asc' } });
+    const before = await prisma.menuBottle.findMany({
+      where: { bottleId: bottle.id },
+      orderBy: { menuId: 'asc' },
+    });
 
     for (const remainingPercent of [0, 100]) {
-      await request.put(`/api/bottles/${bottle.id}`).set(authHeader())
+      await request
+        .put(`/api/bottles/${bottle.id}`)
+        .set(authHeader())
         .send({ remainingPercent, isApero: true, isDigestif: false });
     }
 
-    const after = await prisma.menuBottle.findMany({ where: { bottleId: bottle.id }, orderBy: { menuId: 'asc' } });
+    const after = await prisma.menuBottle.findMany({
+      where: { bottleId: bottle.id },
+      orderBy: { menuId: 'asc' },
+    });
     expect(after).toEqual(before);
   });
 
@@ -1502,8 +2008,16 @@ describe('bottle menus', () => {
     const aperitifs = await findSystemMenu('aperitifs');
     const personal = await seedMenu({ type: 'APEROS' });
 
-    const res = await request.post('/api/bottles/import/confirm').set(authHeader())
-      .send({ payload: importPayload([{ name: 'Aperol', isApero: true, quantity: 2 }, { name: 'Lillet', isApero: true }]), resolutions: {} });
+    const res = await request
+      .post('/api/bottles/import/confirm')
+      .set(authHeader())
+      .send({
+        payload: importPayload([
+          { name: 'Aperol', isApero: true, quantity: 2 },
+          { name: 'Lillet', isApero: true },
+        ]),
+        resolutions: {},
+      });
 
     expect(res.status).toBe(201);
     expect(await bottleIdsOf(aperitifs.id)).toHaveLength(3);
@@ -1518,14 +2032,20 @@ describe('bottle menus', () => {
     const section = await seedMenuSection(aperitifs.id, { name: 'Bitters' });
     // Put in the menus by hand in v1.11, without the box checked
     const handAdded = await seedBottle({ name: 'Hand added' });
-    await addBottleToMenu(aperitifs.id, handAdded.id, { position: 0, isHidden: true, menuSectionId: section.id });
+    await addBottleToMenu(aperitifs.id, handAdded.id, {
+      position: 0,
+      isHidden: true,
+      menuSectionId: section.id,
+    });
     await addBottleToMenu(digestifs.id, handAdded.id);
     await addBottleToMenu(personal.id, handAdded.id);
     const excluded = await seedBottle({ name: 'Excluded', isApero: true });
     await excludeBottleFromMenu(aperitifs.id, excluded.id);
     const before = await prisma.menuBottle.findMany({ orderBy: { id: 'asc' } });
 
-    const res = await request.post('/api/bottles/import/confirm').set(authHeader())
+    const res = await request
+      .post('/api/bottles/import/confirm')
+      .set(authHeader())
       .send({ payload: importPayload([{ name: 'Aperol', isApero: true }]), resolutions: {} });
 
     expect(res.status).toBe(201);
@@ -1533,9 +2053,17 @@ describe('bottle menus', () => {
     expect(after.slice(0, before.length)).toEqual(before);
     const imported = await prisma.bottle.findFirstOrThrow({ where: { name: 'Aperol' } });
     expect(after.slice(before.length)).toEqual([
-      expect.objectContaining({ menuId: aperitifs.id, bottleId: imported.id, position: 1, menuSectionId: null, isHidden: false }),
+      expect.objectContaining({
+        menuId: aperitifs.id,
+        bottleId: imported.id,
+        position: 1,
+        menuSectionId: null,
+        isHidden: false,
+      }),
     ]);
-    expect(await prisma.menuBottleExclusion.findMany()).toEqual([expect.objectContaining({ bottleId: excluded.id })]);
+    expect(await prisma.menuBottleExclusion.findMany()).toEqual([
+      expect.objectContaining({ bottleId: excluded.id }),
+    ]);
   });
 
   it('should give the same menus whatever the route: POST, PUT, import or sync', async () => {
@@ -1544,16 +2072,28 @@ describe('bottle menus', () => {
     const excluded = await seedBottle({ name: 'Excluded', categoryId: category.id, isApero: true });
     await excludeBottleFromMenu(aperitifs.id, excluded.id);
 
-    const posted = await request.post('/api/bottles').set(authHeader())
-      .send({ name: 'Posted', categoryId: category.id, capacityMl: 700, remainingPercent: 0, isApero: true });
+    const posted = await request.post('/api/bottles').set(authHeader()).send({
+      name: 'Posted',
+      categoryId: category.id,
+      capacityMl: 700,
+      remainingPercent: 0,
+      isApero: true,
+    });
     const edited = await seedBottle({ name: 'Edited', categoryId: category.id });
-    await request.put(`/api/bottles/${edited.id}`).set(authHeader()).send({ isApero: true, remainingPercent: 0 });
-    await request.post('/api/bottles/import/confirm').set(authHeader())
+    await request
+      .put(`/api/bottles/${edited.id}`)
+      .set(authHeader())
+      .send({ isApero: true, remainingPercent: 0 });
+    await request
+      .post('/api/bottles/import/confirm')
+      .set(authHeader())
       .send({ payload: importPayload([{ name: 'Imported', isApero: true }]), resolutions: {} });
     await request.put(`/api/bottles/${excluded.id}`).set(authHeader()).send({ isApero: true });
     const viaRoutes = await bottleIdsOf(aperitifs.id);
 
-    const sync = await request.post(`/api/menu-bottles/menu/${aperitifs.id}/sync`).set(authHeader());
+    const sync = await request
+      .post(`/api/menu-bottles/menu/${aperitifs.id}/sync`)
+      .set(authHeader());
 
     expect(sync.body).toMatchObject({ added: 0, removed: 0 });
     expect(viaRoutes).toHaveLength(3);
@@ -1564,22 +2104,40 @@ describe('bottle menus', () => {
 
   it('should not create the bottle when the menu sync fails', async () => {
     const category = await seedCategory();
-    await sendWithFailingMenuSync(() => request.post('/api/bottles').set(authHeader())
-      .send({ name: 'Aperol', categoryId: category.id, capacityMl: 700, isApero: true, quantity: 2 }));
+    await sendWithFailingMenuSync(() =>
+      request.post('/api/bottles').set(authHeader()).send({
+        name: 'Aperol',
+        categoryId: category.id,
+        capacityMl: 700,
+        isApero: true,
+        quantity: 2,
+      }),
+    );
     expect(await prisma.bottle.count()).toBe(0);
   });
 
   it('should not update the bottle when the menu sync fails', async () => {
     const bottle = await seedBottle({ name: 'Old name' });
-    await sendWithFailingMenuSync(() => request.put(`/api/bottles/${bottle.id}`).set(authHeader())
-      .send({ name: 'New name', isApero: true }));
-    expect(await prisma.bottle.findUniqueOrThrow({ where: { id: bottle.id } })).toMatchObject({ name: 'Old name', isApero: false });
+    await sendWithFailingMenuSync(() =>
+      request
+        .put(`/api/bottles/${bottle.id}`)
+        .set(authHeader())
+        .send({ name: 'New name', isApero: true }),
+    );
+    expect(await prisma.bottle.findUniqueOrThrow({ where: { id: bottle.id } })).toMatchObject({
+      name: 'Old name',
+      isApero: false,
+    });
   });
 
   it('should import nothing when the menu sync fails', async () => {
     await seedCategory({ name: 'Apero' });
-    await sendWithFailingMenuSync(() => request.post('/api/bottles/import/confirm').set(authHeader())
-      .send({ payload: importPayload([{ name: 'Aperol', isApero: true }]), resolutions: {} }));
+    await sendWithFailingMenuSync(() =>
+      request
+        .post('/api/bottles/import/confirm')
+        .set(authHeader())
+        .send({ payload: importPayload([{ name: 'Aperol', isApero: true }]), resolutions: {} }),
+    );
     expect(await prisma.bottle.count()).toBe(0);
   });
 });
@@ -1590,10 +2148,20 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
   function previewOf(categoryName: string) {
     const file = {
       version: 1,
-      categories: [{ name: categoryName, type: 'SPIRIT', desiredStock: 1, minimumPercent: 30, nameTranslations: null }],
+      categories: [
+        {
+          name: categoryName,
+          type: 'SPIRIT',
+          desiredStock: 1,
+          minimumPercent: 30,
+          nameTranslations: null,
+        },
+      ],
       bottles: [{ name: 'Havana', categoryName, capacityMl: 700, quantity: 1 }],
     };
-    return request.post('/api/bottles/import/preview').set(authHeader())
+    return request
+      .post('/api/bottles/import/preview')
+      .set(authHeader())
       .attach('file', Buffer.from(JSON.stringify(file)), 'bottles.json');
   }
 
@@ -1603,12 +2171,16 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
     rows: Record<string, unknown> = {},
   ) {
     const payload = { version: 1, categories: [], bottles: bottles.map(importRow) };
-    return request.post('/api/bottles/import/confirm').set(authHeader())
+    return request
+      .post('/api/bottles/import/confirm')
+      .set(authHeader())
       .send({ payload, resolutions: { categories, bottles: rows } });
   }
 
   async function bottleCategoryIds() {
-    return (await prisma.bottle.findMany({ orderBy: { id: 'asc' } })).map((bottle) => bottle.categoryId);
+    return (await prisma.bottle.findMany({ orderBy: { id: 'asc' } })).map(
+      (bottle) => bottle.categoryId,
+    );
   }
 
   it('should match the exact category before the others equal ignoring case', async () => {
@@ -1617,7 +2189,10 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
 
     const res = await previewOf('rhum');
 
-    expect(res.body.categories[0]).toMatchObject({ status: 'matched', existingMatch: { id: lowerRhum.id, name: 'rhum' } });
+    expect(res.body.categories[0]).toMatchObject({
+      status: 'matched',
+      existingMatch: { id: lowerRhum.id, name: 'rhum' },
+    });
   });
 
   it('should list the categories a name could mean when several are equal ignoring case and none exactly', async () => {
@@ -1640,28 +2215,45 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
   it('should flag a category several hold ignoring case that only the rows of a JSON file name', async () => {
     await seedCategory({ name: 'Rhum' });
     await seedCategory({ name: 'RHUM' });
-    const file = { version: 1, bottles: [{ name: 'Havana', categoryName: 'rhum', capacityMl: 700 }] };
+    const file = {
+      version: 1,
+      bottles: [{ name: 'Havana', categoryName: 'rhum', capacityMl: 700 }],
+    };
 
-    const res = await request.post('/api/bottles/import/preview').set(authHeader())
+    const res = await request
+      .post('/api/bottles/import/preview')
+      .set(authHeader())
       .attach('file', Buffer.from(JSON.stringify(file)), 'bottles.json');
 
-    expect(res.body.categories).toEqual([expect.objectContaining({ ref: expect.objectContaining({ name: 'rhum' }), status: 'ambiguous' })]);
+    expect(res.body.categories).toEqual([
+      expect.objectContaining({
+        ref: expect.objectContaining({ name: 'rhum' }),
+        status: 'ambiguous',
+      }),
+    ]);
   });
 
   it.each([
     ['in another case', 'rhum'],
     ['exactly', 'Rhum'],
-  ])('should put the bottles in a category to create that exists %s, with its own type', async (_case, name) => {
-    const rhum = await seedCategory({ name: 'Rhum', type: 'SPIRIT' });
-    const typeCount = await prisma.categoryType.count();
+  ])(
+    'should put the bottles in a category to create that exists %s, with its own type',
+    async (_case, name) => {
+      const rhum = await seedCategory({ name: 'Rhum', type: 'SPIRIT' });
+      const typeCount = await prisma.categoryType.count();
 
-    const res = await confirm([{ categoryName: name }], { [name.toLowerCase()]: { action: 'create', data: { name, type: 'NEW TYPE' } } });
+      const res = await confirm([{ categoryName: name }], {
+        [name.toLowerCase()]: { action: 'create', data: { name, type: 'NEW TYPE' } },
+      });
 
-    expect(res.status).toBe(201);
-    expect(await bottleCategoryIds()).toEqual([rhum.id]);
-    expect(await prisma.category.findMany({ select: { name: true, type: true } })).toEqual([{ name: 'Rhum', type: 'SPIRIT' }]);
-    expect(await prisma.categoryType.count()).toBe(typeCount);
-  });
+      expect(res.status).toBe(201);
+      expect(await bottleCategoryIds()).toEqual([rhum.id]);
+      expect(await prisma.category.findMany({ select: { name: true, type: true } })).toEqual([
+        { name: 'Rhum', type: 'SPIRIT' },
+      ]);
+      expect(await prisma.categoryType.count()).toBe(typeCount);
+    },
+  );
 
   // A name pasted from a macOS file name can hold decomposed accents (C-65)
   it('should match a category whose name is stored in the other Unicode form', async () => {
@@ -1669,13 +2261,18 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
 
     const res = await previewOf('Cre\u0300me');
 
-    expect(res.body.categories[0]).toMatchObject({ status: 'matched', existingMatch: { id: cream.id } });
+    expect(res.body.categories[0]).toMatchObject({
+      status: 'matched',
+      existingMatch: { id: cream.id },
+    });
   });
 
   it('should put the bottles of a decomposed category to create in the composed one', async () => {
     const cream = await seedCategory({ name: 'Cr\u00E8me' });
 
-    const res = await confirm([{ categoryName: 'Cre\u0300me' }], { 'cre\u0300me': { action: 'create', data: { name: 'Cre\u0300me' } } });
+    const res = await confirm([{ categoryName: 'Cre\u0300me' }], {
+      'cre\u0300me': { action: 'create', data: { name: 'Cre\u0300me' } },
+    });
 
     expect(res.status).toBe(201);
     expect(await bottleCategoryIds()).toEqual([cream.id]);
@@ -1697,12 +2294,18 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
 
   it('should store a category it creates composed, translations included', async () => {
     const res = await confirm([{ categoryName: 'Cre\u0300me' }], {
-      'cre\u0300me': { action: 'create', data: { name: 'Cre\u0300me', nameTranslations: { fr: 'Cre\u0300me' } } },
+      'cre\u0300me': {
+        action: 'create',
+        data: { name: 'Cre\u0300me', nameTranslations: { fr: 'Cre\u0300me' } },
+      },
     });
 
     expect(res.status).toBe(201);
     const cream = await prisma.category.findFirstOrThrow();
-    expect(cream).toMatchObject({ name: 'Cr\u00E8me', nameTranslations: JSON.stringify({ fr: 'Cr\u00E8me' }) });
+    expect(cream).toMatchObject({
+      name: 'Cr\u00E8me',
+      nameTranslations: JSON.stringify({ fr: 'Cr\u00E8me' }),
+    });
     expect(await bottleCategoryIds()).toEqual([cream.id]);
   });
 
@@ -1722,22 +2325,31 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
   it.each([
     ['a blank', '   '],
     ['an invisible', '\u200B'],
-  ])('should refuse %s new type even when the category exists ignoring case, and write nothing', async (_case, type) => {
-    await seedCategory({ name: 'Rhum' });
-    const typeCount = await prisma.categoryType.count();
+  ])(
+    'should refuse %s new type even when the category exists ignoring case, and write nothing',
+    async (_case, type) => {
+      await seedCategory({ name: 'Rhum' });
+      const typeCount = await prisma.categoryType.count();
 
-    const res = await confirm([{ categoryName: 'rhum' }], { rhum: { action: 'create', data: { name: 'rhum', type } } });
+      const res = await confirm([{ categoryName: 'rhum' }], {
+        rhum: { action: 'create', data: { name: 'rhum', type } },
+      });
 
-    expect(res.status).toBe(400);
-    expect(res.body.details).toEqual([expect.objectContaining({ path: 'body.resolutions.categories.rhum.data.type' })]);
-    expect(await prisma.bottle.count()).toBe(0);
-    expect(await prisma.category.count()).toBe(1);
-    expect(await prisma.categoryType.count()).toBe(typeCount);
-  });
+      expect(res.status).toBe(400);
+      expect(res.body.details).toEqual([
+        expect.objectContaining({ path: 'body.resolutions.categories.rhum.data.type' }),
+      ]);
+      expect(await prisma.bottle.count()).toBe(0);
+      expect(await prisma.category.count()).toBe(1);
+      expect(await prisma.categoryType.count()).toBe(typeCount);
+    },
+  );
 
   // The wizard keeps each row on the file's category name: the category created for it holds them (C-64)
   it('should put the rows of a category created under another name in it', async () => {
-    const res = await confirm([{ categoryName: 'Rhum' }], { rhum: { action: 'create', data: { name: 'Rhum agricole' } } });
+    const res = await confirm([{ categoryName: 'Rhum' }], {
+      rhum: { action: 'create', data: { name: 'Rhum agricole' } },
+    });
 
     expect(res.status).toBe(201);
     expect(res.body.skippedNoCategory).toBe(0);
@@ -1746,7 +2358,9 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
   });
 
   it('should find a category created under another name for a row moved to that name', async () => {
-    const res = await confirm([{ categoryName: 'Rhum agricole' }], { rhum: { action: 'create', data: { name: 'Rhum agricole' } } });
+    const res = await confirm([{ categoryName: 'Rhum agricole' }], {
+      rhum: { action: 'create', data: { name: 'Rhum agricole' } },
+    });
 
     expect(res.status).toBe(201);
     const created = await prisma.category.findUniqueOrThrow({ where: { name: 'Rhum agricole' } });
@@ -1755,24 +2369,35 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
 
   it.each([
     ['one of them', 'RHUM', null],
-    ['a category created under another name', 'Rhum blanc', { action: 'create', data: { name: 'Rhum blanc' } }],
-  ])('should put the rows of a category several hold ignoring case in %s', async (_case, expected, resolution) => {
-    await seedCategory({ name: 'Rhum' });
-    const upperRhum = await seedCategory({ name: 'RHUM' });
+    [
+      'a category created under another name',
+      'Rhum blanc',
+      { action: 'create', data: { name: 'Rhum blanc' } },
+    ],
+  ])(
+    'should put the rows of a category several hold ignoring case in %s',
+    async (_case, expected, resolution) => {
+      await seedCategory({ name: 'Rhum' });
+      const upperRhum = await seedCategory({ name: 'RHUM' });
 
-    const res = await confirm([{ categoryName: 'rhum' }], { rhum: resolution ?? { action: 'use_existing', existingId: upperRhum.id } });
+      const res = await confirm([{ categoryName: 'rhum' }], {
+        rhum: resolution ?? { action: 'use_existing', existingId: upperRhum.id },
+      });
 
-    expect(res.status).toBe(201);
-    const target = await prisma.category.findUniqueOrThrow({ where: { name: expected } });
-    expect(await bottleCategoryIds()).toEqual([target.id]);
-  });
+      expect(res.status).toBe(201);
+      const target = await prisma.category.findUniqueOrThrow({ where: { name: expected } });
+      expect(await bottleCategoryIds()).toEqual([target.id]);
+    },
+  );
 
   // Duplicates are counted in the category a row goes in, not by the file's category name
   it('should count no duplicate for a row put in a category created under another name', async () => {
     const rhum = await seedCategory({ name: 'Rhum' });
     await seedBottle({ name: 'Havana', categoryId: rhum.id, capacityMl: 700 });
 
-    const res = await confirm([{ categoryName: 'Rhum' }], { rhum: { action: 'create', data: { name: 'Rhum agricole' } } });
+    const res = await confirm([{ categoryName: 'Rhum' }], {
+      rhum: { action: 'create', data: { name: 'Rhum agricole' } },
+    });
 
     expect(res.status).toBe(201);
     expect(res.body.duplicatesCreated).toBe(0);
@@ -1781,17 +2406,22 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
   it.each([
     ['the one that holds the same bottle', 'Rhum', 1],
     ['the other one', 'RHUM', 0],
-  ])('should count the duplicates of a row put in %s of two categories equal ignoring case', async (_case, picked, duplicates) => {
-    const rhum = await seedCategory({ name: 'Rhum' });
-    const upperRhum = await seedCategory({ name: 'RHUM' });
-    await seedBottle({ name: 'Havana', categoryId: rhum.id, capacityMl: 700 });
-    const existingId = picked === 'Rhum' ? rhum.id : upperRhum.id;
+  ])(
+    'should count the duplicates of a row put in %s of two categories equal ignoring case',
+    async (_case, picked, duplicates) => {
+      const rhum = await seedCategory({ name: 'Rhum' });
+      const upperRhum = await seedCategory({ name: 'RHUM' });
+      await seedBottle({ name: 'Havana', categoryId: rhum.id, capacityMl: 700 });
+      const existingId = picked === 'Rhum' ? rhum.id : upperRhum.id;
 
-    const res = await confirm([{ categoryName: 'rhum' }], { rhum: { action: 'use_existing', existingId } });
+      const res = await confirm([{ categoryName: 'rhum' }], {
+        rhum: { action: 'use_existing', existingId },
+      });
 
-    expect(res.status).toBe(201);
-    expect(res.body.duplicatesCreated).toBe(duplicates);
-  });
+      expect(res.status).toBe(201);
+      expect(res.body.duplicatesCreated).toBe(duplicates);
+    },
+  );
 
   // A row's name meets the resolution of the file's category of that name first: only an id can
   // put it in the existing category that resolution leads away from (C-68)
@@ -1802,7 +2432,10 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
     const res = await confirm(
       [{ categoryName: 'rhum' }, { categoryName: 'rhum' }],
       { rhum: { action: 'use_existing', existingId: upperRhum.id } },
-      { 0: { action: 'import', categoryId: rhum.id }, 1: { action: 'import', categoryName: 'rhum' } },
+      {
+        0: { action: 'import', categoryId: rhum.id },
+        1: { action: 'import', categoryName: 'rhum' },
+      },
     );
 
     expect(res.status).toBe(201);
@@ -1827,7 +2460,11 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
   it('should leave out a row picked by the id of no category', async () => {
     const rhum = await seedCategory({ name: 'Rhum' });
 
-    const res = await confirm([{ categoryName: 'Rhum' }], {}, { 0: { action: 'import', categoryId: rhum.id + 1 } });
+    const res = await confirm(
+      [{ categoryName: 'Rhum' }],
+      {},
+      { 0: { action: 'import', categoryId: rhum.id + 1 } },
+    );
 
     expect(res.status).toBe(201);
     expect(res.body.skippedNoCategory).toBe(1);
@@ -1845,20 +2482,27 @@ describe('POST /api/bottles/import - categories that exist ignoring case', () =>
   });
 
   it.each([
-    ['a category to create', [{ categoryName: 'rhum' }], { rhum: { action: 'create', data: { name: 'rhum' } } }],
+    [
+      'a category to create',
+      [{ categoryName: 'rhum' }],
+      { rhum: { action: 'create', data: { name: 'rhum' } } },
+    ],
     ['the category of a row', [{ categoryName: 'Gin' }, { categoryName: 'rhum' }], {}],
-  ])('should refuse %s that several categories hold ignoring case, naming them, and write nothing', async (_case, bottles, categories) => {
-    await seedCategory({ name: 'Gin' });
-    await seedCategory({ name: 'Rhum' });
-    await seedCategory({ name: 'RHUM' });
+  ])(
+    'should refuse %s that several categories hold ignoring case, naming them, and write nothing',
+    async (_case, bottles, categories) => {
+      await seedCategory({ name: 'Gin' });
+      await seedCategory({ name: 'Rhum' });
+      await seedCategory({ name: 'RHUM' });
 
-    const res = await confirm(bottles, categories).set('Accept-Language', 'fr');
+      const res = await confirm(bottles, categories).set('Accept-Language', 'fr');
 
-    expect(res.status).toBe(409);
-    expect(res.body.details).toEqual({ name: 'rhum', matches: 'Rhum, RHUM' });
-    expect(res.body.error).toContain('« rhum »');
-    expect(res.body.error).toContain('Rhum, RHUM');
-    expect(await prisma.category.count()).toBe(3);
-    expect(await prisma.bottle.count()).toBe(0);
-  });
+      expect(res.status).toBe(409);
+      expect(res.body.details).toEqual({ name: 'rhum', matches: 'Rhum, RHUM' });
+      expect(res.body.error).toContain('« rhum »');
+      expect(res.body.error).toContain('Rhum, RHUM');
+      expect(await prisma.category.count()).toBe(3);
+      expect(await prisma.bottle.count()).toBe(0);
+    },
+  );
 });

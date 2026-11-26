@@ -5,7 +5,11 @@ import Input from './Input';
 
 describe('Field', () => {
   it('associates the label with the control', () => {
-    render(<Field label="Nom"><Input /></Field>);
+    render(
+      <Field label="Nom">
+        <Input />
+      </Field>,
+    );
     const input = screen.getByLabelText('Nom');
     expect(input.tagName).toBe('INPUT');
     expect(input).not.toHaveAttribute('aria-invalid');
@@ -13,19 +17,31 @@ describe('Field', () => {
   });
 
   it('links the error to the control and marks it invalid', () => {
-    render(<Field label="Nom" error="Name is required"><Input /></Field>);
+    render(
+      <Field label="Nom" error="Name is required">
+        <Input />
+      </Field>,
+    );
     const input = screen.getByLabelText('Nom');
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(input).toHaveAccessibleDescription('Name is required');
   });
 
   it('describes the control with the hint and the error together', () => {
-    render(<Field label="Nom" hint="Shown on the menu" error="Too long"><Input /></Field>);
+    render(
+      <Field label="Nom" hint="Shown on the menu" error="Too long">
+        <Input />
+      </Field>,
+    );
     expect(screen.getByLabelText('Nom')).toHaveAccessibleDescription('Shown on the menu Too long');
   });
 
   it('marks the control required and shows a decorative asterisk', () => {
-    render(<Field label="Nom" required><Input /></Field>);
+    render(
+      <Field label="Nom" required>
+        <Input />
+      </Field>,
+    );
     expect(screen.getByRole('textbox', { name: /Nom/ })).toBeRequired();
     expect(screen.getByText('*')).toHaveAttribute('aria-hidden', 'true');
   });
@@ -46,7 +62,11 @@ describe('Field', () => {
   });
 
   it('hides the label from sight only', () => {
-    render(<Field label="Type" hideLabel error="Required"><Input /></Field>);
+    render(
+      <Field label="Type" hideLabel error="Required">
+        <Input />
+      </Field>,
+    );
     expect(screen.getByText('Type')).toHaveClass('sr-only');
     expect(screen.getByLabelText('Type')).toHaveAccessibleDescription('Required');
   });

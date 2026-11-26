@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { parseNameTranslations, parseTranslations, serializeTranslations } from './translations';
 
-afterEach(() => { vi.restoreAllMocks(); });
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('serializeTranslations', () => {
   it('should store the filled languages as JSON', () => {
@@ -144,8 +146,16 @@ describe('parseNameTranslations', () => {
     const unit = { name: 'cl', nameTranslations: '{"fr":"centilitre"}' };
     const input = { name: 'Line', nameTranslations: '{"fr":"Ligne"}', unit };
     const result = parseNameTranslations(input);
-    expect(result).toEqual({ name: 'Line', nameTranslations: { fr: 'Ligne' }, unit: { name: 'cl', nameTranslations: { fr: 'centilitre' } } });
-    expect(input).toEqual({ name: 'Line', nameTranslations: '{"fr":"Ligne"}', unit: { name: 'cl', nameTranslations: '{"fr":"centilitre"}' } });
+    expect(result).toEqual({
+      name: 'Line',
+      nameTranslations: { fr: 'Ligne' },
+      unit: { name: 'cl', nameTranslations: { fr: 'centilitre' } },
+    });
+    expect(input).toEqual({
+      name: 'Line',
+      nameTranslations: '{"fr":"Ligne"}',
+      unit: { name: 'cl', nameTranslations: '{"fr":"centilitre"}' },
+    });
     expect(input.unit).toBe(unit);
   });
 });

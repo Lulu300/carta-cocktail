@@ -13,7 +13,12 @@ interface ComboboxListboxProps<T> {
 
 /** Suggestions of a combobox: the option highlighted from the keyboard looks hovered. */
 export default function ComboboxListbox<T>({
-  combobox, options, getKey, getLabel, onSelect, className,
+  combobox,
+  options,
+  getKey,
+  getLabel,
+  onSelect,
+  className,
 }: ComboboxListboxProps<T>) {
   return (
     <ul

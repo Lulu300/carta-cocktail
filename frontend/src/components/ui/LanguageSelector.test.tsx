@@ -29,8 +29,14 @@ describe('LanguageSelector', () => {
     expect(flagColors(getLanguageButton())).toContain(UK_BLUE);
 
     await user.click(getLanguageButton());
-    expect(screen.getByRole('menuitemradio', { name: /English \(UK\)/ })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('menuitemradio', { name: /English \(US\)/ })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('menuitemradio', { name: /English \(UK\)/ })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(screen.getByRole('menuitemradio', { name: /English \(US\)/ })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
   });
 
   it('should render current language button', () => {
@@ -45,7 +51,9 @@ describe('LanguageSelector', () => {
 
     await user.click(getLanguageButton());
     expect(screen.getAllByRole('menuitemradio').map((item) => item.textContent)).toEqual([
-      'Français', 'English (US)✓', 'English (UK)',
+      'Français',
+      'English (US)✓',
+      'English (UK)',
     ]);
   });
 
@@ -149,9 +157,18 @@ describe('LanguageSelector', () => {
     expect(button).toHaveAttribute('aria-expanded', 'true');
     const menu = screen.getByRole('menu', { name: 'Language' });
     expect(button).toHaveAttribute('aria-controls', menu.id);
-    expect(screen.getByRole('menuitemradio', { name: /English \(US\)/ })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('menuitemradio', { name: /English \(UK\)/ })).toHaveAttribute('aria-checked', 'false');
-    expect(screen.getByRole('menuitemradio', { name: /Français/ })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('menuitemradio', { name: /English \(US\)/ })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(screen.getByRole('menuitemradio', { name: /English \(UK\)/ })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    expect(screen.getByRole('menuitemradio', { name: /Français/ })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
   });
 
   it('moves the focus into the menu, on the current language, and through it with the arrow keys', async () => {

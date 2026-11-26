@@ -3,20 +3,43 @@ import path from 'path';
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { PRISMA_DIR, resolveDatabasePath } from '../lib/databasePath';
 import {
-  setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData, prisma, schemaTables,
-  seedCategory, seedBottle, seedIngredient, seedFullCocktail, seedMenu, seedMenuSection,
-  addCocktailToMenu, addBottleToMenu, excludeBottleFromMenu, findSystemMenu, seedAppState,
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+  prisma,
+  schemaTables,
+  seedCategory,
+  seedBottle,
+  seedIngredient,
+  seedFullCocktail,
+  seedMenu,
+  seedMenuSection,
+  addCocktailToMenu,
+  addBottleToMenu,
+  excludeBottleFromMenu,
+  findSystemMenu,
+  seedAppState,
 } from './helpers';
 import { TEST_DATABASE_DIR } from './testDatabase';
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
-beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
+beforeEach(async () => {
+  await cleanDatabase();
+  await seedRequiredData();
+});
 
 async function rowCountByTable(): Promise<Record<string, number>> {
   const counts: Record<string, number> = {};
   for (const table of schemaTables()) {
-    const rows = await prisma.$queryRawUnsafe<{ count: bigint }[]>(`SELECT COUNT(*) AS count FROM "${table}"`);
+    const rows = await prisma.$queryRawUnsafe<{ count: bigint }[]>(
+      `SELECT COUNT(*) AS count FROM "${table}"`,
+    );
     counts[table] = Number(rows[0].count);
   }
   return counts;
@@ -91,9 +114,17 @@ describe('seedFullCocktail', () => {
 
     expect(cocktail).toMatchObject({ name: 'Daiquiri', tags: 'classic' });
     expect(cocktail.ingredients).toEqual([
-      expect.objectContaining({ ingredientId: lime.id, quantity: 2, unitId: first.ingredients[0].unitId, position: 0 }),
+      expect.objectContaining({
+        ingredientId: lime.id,
+        quantity: 2,
+        unitId: first.ingredients[0].unitId,
+        position: 0,
+      }),
     ]);
-    expect(cocktail.instructions.map((step) => [step.stepNumber, step.text])).toEqual([[1, 'Shake'], [2, 'Strain']]);
+    expect(cocktail.instructions.map((step) => [step.stepNumber, step.text])).toEqual([
+      [1, 'Shake'],
+      [2, 'Strain'],
+    ]);
     expect(await prisma.unit.count()).toBe(1);
   });
 });
@@ -111,10 +142,22 @@ describe('menu factories', () => {
     const menu = await seedMenu({ isPublic: true });
     const section = await seedMenuSection(menu.id, { name: 'Classics' });
 
-    const entry = await addCocktailToMenu(menu.id, cocktail.id, { menuSectionId: section.id, position: 3, isHidden: true });
+    const entry = await addCocktailToMenu(menu.id, cocktail.id, {
+      menuSectionId: section.id,
+      position: 3,
+      isHidden: true,
+    });
 
-    const stored = await prisma.menuCocktail.findUniqueOrThrow({ where: { id: entry.id }, include: { menuSection: true } });
-    expect(stored).toMatchObject({ menuId: menu.id, cocktailId: cocktail.id, position: 3, isHidden: true });
+    const stored = await prisma.menuCocktail.findUniqueOrThrow({
+      where: { id: entry.id },
+      include: { menuSection: true },
+    });
+    expect(stored).toMatchObject({
+      menuId: menu.id,
+      cocktailId: cocktail.id,
+      position: 3,
+      isHidden: true,
+    });
     expect(stored.menuSection?.name).toBe('Classics');
   });
 
@@ -124,7 +167,13 @@ describe('menu factories', () => {
 
     const entry = await addBottleToMenu(menu.id, bottle.id);
 
-    expect(entry).toMatchObject({ menuId: menu.id, bottleId: bottle.id, position: 0, isHidden: false, menuSectionId: null });
+    expect(entry).toMatchObject({
+      menuId: menu.id,
+      bottleId: bottle.id,
+      position: 0,
+      isHidden: false,
+      menuSectionId: null,
+    });
   });
 });
 

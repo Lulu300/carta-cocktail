@@ -187,7 +187,11 @@ function resolveLine(line: RecipeLine, stock: StockSnapshot): LineResolution {
   if (line.sourceType === 'CATEGORY') {
     const category = findSource(stock.categories, line.categoryId);
     if (!category) return { kind: 'orphan' };
-    return { kind: 'volume', resource: categoryResource(category, stock), requiredMl: requiredMlOf(line) };
+    return {
+      kind: 'volume',
+      resource: categoryResource(category, stock),
+      requiredMl: requiredMlOf(line),
+    };
   }
   return { kind: 'invalid' };
 }
@@ -245,7 +249,14 @@ function describeLine(
 
   if (resolution.kind === 'ingredient') {
     const { name, nameTranslations, icon, isAvailable } = resolution.ingredient;
-    return { ...base, name, nameTranslations, icon, isAvailable, availableCount: isAvailable ? null : 0 };
+    return {
+      ...base,
+      name,
+      nameTranslations,
+      icon,
+      isAvailable,
+      availableCount: isAvailable ? null : 0,
+    };
   }
 
   const { resource } = resolution;
@@ -253,7 +264,12 @@ function describeLine(
   const usage = usages.get(resource.key);
   // No line measures this resource: having some stock is enough
   if (!usage) {
-    return { ...base, ...named, isAvailable: resource.hasStock, availableCount: resource.hasStock ? null : 0 };
+    return {
+      ...base,
+      ...named,
+      isAvailable: resource.hasStock,
+      availableCount: resource.hasStock ? null : 0,
+    };
   }
   return { ...base, ...named, isAvailable: usage.servings > 0, availableCount: usage.servings };
 }
@@ -261,7 +277,11 @@ function describeLine(
 function lowStockResources(usages: Map<string, ResourceUsage>): LowStockResource[] {
   return [...usages.values()]
     .filter(({ servings }) => servings > 0 && servings <= LOW_STOCK_THRESHOLD)
-    .map(({ resource, servings }) => ({ name: resource.name, nameTranslations: resource.nameTranslations, servings }));
+    .map(({ resource, servings }) => ({
+      name: resource.name,
+      nameTranslations: resource.nameTranslations,
+      servings,
+    }));
 }
 
 /**
@@ -293,7 +313,8 @@ export function computeAvailability(
     (ingredient, index) => ingredient.isAvailable || resolutions[index].kind === 'orphan',
   );
   const resourceServings = [...usages.values()].map(({ servings }) => servings);
-  const stockServings = resourceServings.length > 0 ? Math.min(...resourceServings) : UNLIMITED_SERVINGS;
+  const stockServings =
+    resourceServings.length > 0 ? Math.min(...resourceServings) : UNLIMITED_SERVINGS;
 
   return {
     cocktailId,
@@ -329,21 +350,30 @@ export function buildStockSnapshot(
  * `cocktailIds` is omitted) in a fixed number of queries, whatever the number
  * of cocktails.
  */
-export async function loadStock(db: AvailabilityDb = prisma, cocktailIds?: number[]): Promise<AvailabilityData> {
+export async function loadStock(
+  db: AvailabilityDb = prisma,
+  cocktailIds?: number[],
+): Promise<AvailabilityData> {
   const [bottles, categories, ingredients, cocktails] = await Promise.all([
     db.bottle.findMany({
       select: { id: true, name: true, categoryId: true, capacityMl: true, remainingPercent: true },
     }),
     db.category.findMany({ select: { id: true, name: true, nameTranslations: true } }),
-    db.ingredient.findMany({ select: { id: true, name: true, nameTranslations: true, icon: true, isAvailable: true } }),
+    db.ingredient.findMany({
+      select: { id: true, name: true, nameTranslations: true, icon: true, isAvailable: true },
+    }),
     db.cocktail.findMany({
       where: cocktailIds === undefined ? {} : { id: { in: cocktailIds } },
       select: {
         id: true,
         ingredients: {
           select: {
-            id: true, sourceType: true, quantity: true,
-            bottleId: true, categoryId: true, ingredientId: true,
+            id: true,
+            sourceType: true,
+            quantity: true,
+            bottleId: true,
+            categoryId: true,
+            ingredientId: true,
             unit: { select: { abbreviation: true, conversionFactorToMl: true } },
             preferredBottles: { select: { bottleId: true } },
           },
@@ -353,18 +383,24 @@ export async function loadStock(db: AvailabilityDb = prisma, cocktailIds?: numbe
     }),
   ]);
 
-  const recipes = new Map(cocktails.map((cocktail) => [
-    cocktail.id,
-    cocktail.ingredients.map(({ preferredBottles, ...line }) => ({
-      ...line,
-      preferredBottleIds: preferredBottles.map(({ bottleId }) => bottleId),
-    })),
-  ]));
+  const recipes = new Map(
+    cocktails.map((cocktail) => [
+      cocktail.id,
+      cocktail.ingredients.map(({ preferredBottles, ...line }) => ({
+        ...line,
+        preferredBottleIds: preferredBottles.map(({ bottleId }) => bottleId),
+      })),
+    ]),
+  );
   const withParsedNames = <T extends { nameTranslations: string | null }>(row: T) => ({
     ...row,
     nameTranslations: parseTranslations(row.nameTranslations),
   });
-  const stock = buildStockSnapshot(bottles, categories.map(withParsedNames), ingredients.map(withParsedNames));
+  const stock = buildStockSnapshot(
+    bottles,
+    categories.map(withParsedNames),
+    ingredients.map(withParsedNames),
+  );
   return { recipes, stock };
 }
 

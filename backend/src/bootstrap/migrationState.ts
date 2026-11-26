@@ -56,7 +56,10 @@ async function failedMigrations(client: PrismaClient): Promise<string[]> {
  * A database without history (created by `db push`) has every migration to
  * apply. Read-only.
  */
-export async function readMigrationState(client: PrismaClient, migrationsDir: string): Promise<MigrationState> {
+export async function readMigrationState(
+  client: PrismaClient,
+  migrationsDir: string,
+): Promise<MigrationState> {
   const local = listLocalMigrations(migrationsDir);
   if (!(await hasMigrationHistory(client))) {
     return { unapplied: local, failed: [] };
@@ -74,7 +77,10 @@ export async function readMigrationState(client: PrismaClient, migrationsDir: st
  */
 export function summarizeError(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);
-  const lines = message.split('\n').map((line) => line.trim()).filter(Boolean);
+  const lines = message
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
   return lines.length > 0 ? lines[lines.length - 1] : 'unknown error';
 }
 

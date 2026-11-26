@@ -55,7 +55,7 @@ export default function ConfirmDialog({
       size="sm"
       role="alertdialog"
       aria-describedby={message ? messageId : undefined}
-      footer={(
+      footer={
         <>
           {/* A destructive action must not be one Enter key away. */}
           <Button variant="ghost" onClick={onCancel} autoFocus={isDanger}>
@@ -70,9 +70,13 @@ export default function ConfirmDialog({
             {confirmLabel ?? t('common.confirm')}
           </Button>
         </>
-      )}
+      }
     >
-      {message && <p id={messageId} className="text-sm text-fg-muted">{message}</p>}
+      {message && (
+        <p id={messageId} className="text-sm text-fg-muted">
+          {message}
+        </p>
+      )}
       {details && <div className="mt-3 text-sm">{details}</div>}
       {acknowledgeLabel && (
         <label className="mt-4 flex items-center gap-2 text-sm">

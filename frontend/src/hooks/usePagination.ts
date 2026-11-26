@@ -10,10 +10,7 @@ interface UsePaginationResult<T> {
   setPageSize: (size: number) => void;
 }
 
-export function usePagination<T>(
-  items: T[],
-  defaultPageSize = 25,
-): UsePaginationResult<T> {
+export function usePagination<T>(items: T[], defaultPageSize = 25): UsePaginationResult<T> {
   const [page, setPageRaw] = useState(1);
   const [pageSize, setPageSizeRaw] = useState(defaultPageSize);
 

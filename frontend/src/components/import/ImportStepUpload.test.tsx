@@ -48,25 +48,32 @@ beforeEach(() => {
 
 describe('ImportStepUpload with a ZIP file', () => {
   it('loads every valid recipe of the archive as a batch', async () => {
-    mockLoadAsync.mockResolvedValue(zipWith({
-      'mojito.json': { dir: false, content: recipeJson('Mojito') },
-      'negroni.json': { dir: false, content: recipeJson('Negroni') },
-      'broken.json': { dir: false, content: '{not json' },
-      'readme.txt': { dir: false, content: 'ignored' },
-    }));
+    mockLoadAsync.mockResolvedValue(
+      zipWith({
+        'mojito.json': { dir: false, content: recipeJson('Mojito') },
+        'negroni.json': { dir: false, content: recipeJson('Negroni') },
+        'broken.json': { dir: false, content: '{not json' },
+        'readme.txt': { dir: false, content: 'ignored' },
+      }),
+    );
 
     const file = uploadZip();
 
     await waitFor(() => expect(props.onLoaded).toHaveBeenCalled());
     expect(mockLoadAsync).toHaveBeenCalledWith(file);
     const recipes = props.onLoaded.mock.calls[0]![0]!;
-    expect(recipes.map((r: { cocktail: { name: string } }) => r.cocktail.name)).toEqual(['Mojito', 'Negroni']);
+    expect(recipes.map((r: { cocktail: { name: string } }) => r.cocktail.name)).toEqual([
+      'Mojito',
+      'Negroni',
+    ]);
   });
 
   it('loads a single recipe when the archive holds only one', async () => {
-    mockLoadAsync.mockResolvedValue(zipWith({
-      'mojito.json': { dir: false, content: recipeJson('Mojito') },
-    }));
+    mockLoadAsync.mockResolvedValue(
+      zipWith({
+        'mojito.json': { dir: false, content: recipeJson('Mojito') },
+      }),
+    );
 
     uploadZip();
 
@@ -76,9 +83,11 @@ describe('ImportStepUpload with a ZIP file', () => {
   });
 
   it('reports an archive without JSON files', async () => {
-    mockLoadAsync.mockResolvedValue(zipWith({
-      'recipes.json': { dir: true, content: '' },
-    }));
+    mockLoadAsync.mockResolvedValue(
+      zipWith({
+        'recipes.json': { dir: true, content: '' },
+      }),
+    );
 
     uploadZip();
 
@@ -86,9 +95,11 @@ describe('ImportStepUpload with a ZIP file', () => {
   });
 
   it('reports an archive without any valid recipe', async () => {
-    mockLoadAsync.mockResolvedValue(zipWith({
-      'other.json': { dir: false, content: JSON.stringify({ version: 2 }) },
-    }));
+    mockLoadAsync.mockResolvedValue(
+      zipWith({
+        'other.json': { dir: false, content: JSON.stringify({ version: 2 }) },
+      }),
+    );
 
     uploadZip();
 
@@ -115,7 +126,10 @@ describe('ImportStepUpload with a JSON file', () => {
   it.each([
     ['without ingredients', { version: 1, cocktail: { name: 'Mojito', instructions: [] } }],
     ['without instructions', { version: 1, cocktail: { name: 'Mojito', ingredients: [] } }],
-    ['with another version', { version: 2, cocktail: { name: 'Mojito', ingredients: [], instructions: [] } }],
+    [
+      'with another version',
+      { version: 2, cocktail: { name: 'Mojito', ingredients: [], instructions: [] } },
+    ],
     ['without a name', { version: 1, cocktail: { ingredients: [], instructions: [] } }],
   ])('refuses a recipe %s', async (_case, recipe) => {
     upload(new File([JSON.stringify(recipe)], 'recipe.json', { type: 'application/json' }));
@@ -131,7 +145,9 @@ describe('ImportStepUpload with a JSON file', () => {
   });
 
   it('reports a file the browser cannot read', async () => {
-    const readAsText = vi.spyOn(FileReader.prototype, 'readAsText').mockImplementation(function (this: FileReader) {
+    const readAsText = vi.spyOn(FileReader.prototype, 'readAsText').mockImplementation(function (
+      this: FileReader,
+    ) {
       this.onerror?.(new ProgressEvent('error') as ProgressEvent<FileReader>);
     });
 
@@ -146,10 +162,16 @@ describe('ImportStepUpload with a JSON file', () => {
     const { container } = render(<ImportStepUpload {...props} />);
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
 
-    fireEvent.change(input, { target: { files: [new File([recipeJson('Mojito')], 'mojito.json', { type: 'application/json' })] } });
+    fireEvent.change(input, {
+      target: {
+        files: [new File([recipeJson('Mojito')], 'mojito.json', { type: 'application/json' })],
+      },
+    });
     expect(await screen.findByText('mojito.json')).toBeInTheDocument();
 
-    fireEvent.change(input, { target: { files: [new File(['{not json'], 'broken.json', { type: 'application/json' })] } });
+    fireEvent.change(input, {
+      target: { files: [new File(['{not json'], 'broken.json', { type: 'application/json' })] },
+    });
     expect(await screen.findByText('Invalid JSON file')).toBeInTheDocument();
     expect(screen.getByText('mojito.json')).toBeInTheDocument();
     expect(screen.queryByText('broken.json')).not.toBeInTheDocument();
@@ -167,7 +189,18 @@ describe('ImportStepUpload preview', () => {
 
   it('shows a single recipe and asks for the next step', () => {
     const onNext = vi.fn();
-    render(<ImportStepUpload {...props} recipes={[{ ...recipe('Mojito'), cocktail: { ...recipe('Mojito').cocktail, tags: ['rum'], description: 'Fresh' } }]} onNext={onNext} />);
+    render(
+      <ImportStepUpload
+        {...props}
+        recipes={[
+          {
+            ...recipe('Mojito'),
+            cocktail: { ...recipe('Mojito').cocktail, tags: ['rum'], description: 'Fresh' },
+          },
+        ]}
+        onNext={onNext}
+      />,
+    );
 
     expect(screen.getByText('Mojito')).toBeInTheDocument();
     expect(screen.getByText('rum')).toBeInTheDocument();

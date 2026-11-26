@@ -12,7 +12,10 @@ interface FileDropzoneProps {
 }
 
 function acceptedExtensions(accept: string): string[] {
-  return accept.split(',').map((extension) => extension.trim().toLowerCase()).filter(Boolean);
+  return accept
+    .split(',')
+    .map((extension) => extension.trim().toLowerCase())
+    .filter(Boolean);
 }
 
 /**
@@ -25,7 +28,13 @@ function isAccepted(file: File, accept: string): boolean {
 }
 
 /** File picker that also takes a dropped file. A real button: it opens from the keyboard. */
-export default function FileDropzone({ accept, onFile, onReject, label, fileName }: FileDropzoneProps) {
+export default function FileDropzone({
+  accept,
+  onFile,
+  onReject,
+  label,
+  fileName,
+}: FileDropzoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
 

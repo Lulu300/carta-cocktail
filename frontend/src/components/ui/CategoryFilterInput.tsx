@@ -20,7 +20,13 @@ interface CategoryFilterInputProps {
 }
 
 export default function CategoryFilterInput({
-  categories, value, selectedId, onChange, label, placeholder, className = '',
+  categories,
+  value,
+  selectedId,
+  onChange,
+  label,
+  placeholder,
+  className = '',
 }: CategoryFilterInputProps) {
   const { t } = useTranslation();
   const localize = useLocalizedName();
@@ -65,7 +71,14 @@ export default function CategoryFilterInput({
         // The important flag (!) beats the field's default border colour.
         className={cx('text-sm pr-10', selectedId !== null && 'border-accent/50!')}
       />
-      {value && <ClearButton label={t('common.clear')} onClick={() => onChange('', null)} fieldRef={inputRef} className="right-1" />}
+      {value && (
+        <ClearButton
+          label={t('common.clear')}
+          onClick={() => onChange('', null)}
+          fieldRef={inputRef}
+          className="right-1"
+        />
+      )}
       {isListShown && (
         <ComboboxListbox
           combobox={combobox}

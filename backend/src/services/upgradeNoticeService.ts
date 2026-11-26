@@ -39,10 +39,12 @@ const VERSION_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-rc\.(0|[1-
 // The shape the release workflow checks (verify job), keys of the template's front matter
 const FrontMatter = z.object({
   version: z.string().regex(VERSION_PATTERN),
-  required_actions: z.array(z.object({
-    when: z.enum(['before', 'after']),
-    action: z.string().min(1),
-  })),
+  required_actions: z.array(
+    z.object({
+      when: z.enum(['before', 'after']),
+      action: z.string().min(1),
+    }),
+  ),
 });
 
 /** True for a released version; false for `dev`, an empty value or any other build. */
@@ -87,10 +89,13 @@ function readReleaseNote(filePath: string): ReleaseNote | null {
     const frontMatter = frontMatterOf(fs.readFileSync(filePath, 'utf8'));
     if (frontMatter === null) throw new Error('no front matter');
     const parsed = FrontMatter.safeParse(parseYaml(frontMatter));
-    if (!parsed.success) throw new Error('the front matter does not match docs/releases/TEMPLATE.md');
+    if (!parsed.success)
+      throw new Error('the front matter does not match docs/releases/TEMPLATE.md');
     return { version: parsed.data.version, requiredActions: parsed.data.required_actions };
   } catch (err) {
-    console.warn(`Release notes ${filePath} ignored by the upgrade guide: ${err instanceof Error ? err.message : err}`);
+    console.warn(
+      `Release notes ${filePath} ignored by the upgrade guide: ${err instanceof Error ? err.message : err}`,
+    );
     return null;
   }
 }
@@ -101,7 +106,9 @@ export function loadReleaseNotes(dir: string): ReleaseNote[] {
   try {
     names = fs.readdirSync(dir);
   } catch (err) {
-    console.warn(`Release notes folder ${dir} cannot be read, no upgrade guide: ${err instanceof Error ? err.message : err}`);
+    console.warn(
+      `Release notes folder ${dir} cannot be read, no upgrade guide: ${err instanceof Error ? err.message : err}`,
+    );
     return [];
   }
   return names
@@ -120,7 +127,11 @@ export function loadReleaseNotes(dir: string): ReleaseNote[] {
  * Of the files of one release, the newest version applies: the final file over
  * a pre-release file.
  */
-export function requiredActionsBetween(notes: ReleaseNote[], from: string, to: string): RequiredAction[] {
+export function requiredActionsBetween(
+  notes: ReleaseNote[],
+  from: string,
+  to: string,
+): RequiredAction[] {
   const fromRelease = releaseOf(from);
   const toRelease = releaseOf(to);
   const noteOfRelease = new Map<string, ReleaseNote>();
@@ -130,17 +141,26 @@ export function requiredActionsBetween(notes: ReleaseNote[], from: string, to: s
     if (!kept || compareVersions(note.version, kept.version) > 0) noteOfRelease.set(release, note);
   }
   return [...noteOfRelease.entries()]
-    .filter(([release]) => compareVersions(release, fromRelease) > 0 && compareVersions(release, toRelease) <= 0)
+    .filter(
+      ([release]) =>
+        compareVersions(release, fromRelease) > 0 && compareVersions(release, toRelease) <= 0,
+    )
     .sort(([a], [b]) => compareVersions(a, b))
-    .flatMap(([, note]) => note.requiredActions.map((action) => ({ version: note.version, ...action })));
+    .flatMap(([, note]) =>
+      note.requiredActions.map((action) => ({ version: note.version, ...action })),
+    );
 }
 
 type PendingState = AppState & { pendingNoticeFrom: string; pendingNoticeTo: string };
 
 /** An upgrade notice the admin has not confirmed yet. */
 function hasPendingNotice(state: AppState | null): state is PendingState {
-  return state !== null && isReleaseVersion(state.pendingNoticeFrom) && isReleaseVersion(state.pendingNoticeTo)
-    && state.noticeAcknowledgedAt === null;
+  return (
+    state !== null &&
+    isReleaseVersion(state.pendingNoticeFrom) &&
+    isReleaseVersion(state.pendingNoticeTo) &&
+    state.noticeAcknowledgedAt === null
+  );
 }
 
 /**
@@ -150,7 +170,11 @@ function hasPendingNotice(state: AppState | null): state is PendingState {
  * guide) has no notice: the version that ran before is unknown. A version
  * older than the recorded one only logs a warning.
  */
-export async function recordStartup(db: PrismaClient, currentVersion: string, dir: string): Promise<RequiredAction[]> {
+export async function recordStartup(
+  db: PrismaClient,
+  currentVersion: string,
+  dir: string,
+): Promise<RequiredAction[]> {
   if (!isReleaseVersion(currentVersion)) return [];
 
   const state = await db.appState.findUnique({ where: { id: APP_STATE_ID } });
@@ -168,8 +192,8 @@ export async function recordStartup(db: PrismaClient, currentVersion: string, di
   if (order === 0) return [];
   if (order < 0) {
     console.warn(
-      `Version ${currentVersion} is older than ${lastRunVersion}, the version that ran last: no upgrade guide, `
-      + `the recorded version stays ${lastRunVersion}. The database may hold changes this version does not know.`,
+      `Version ${currentVersion} is older than ${lastRunVersion}, the version that ran last: no upgrade guide, ` +
+        `the recorded version stays ${lastRunVersion}. The database may hold changes this version does not know.`,
     );
     return [];
   }
@@ -195,13 +219,17 @@ export async function recordStartup(db: PrismaClient, currentVersion: string, di
  * at startup, before the server listens. Never throws: the guide is a reminder,
  * it must not keep the backend from starting.
  */
-export async function reportStartupVersion(db: PrismaClient, currentVersion: string, dir: string): Promise<void> {
+export async function reportStartupVersion(
+  db: PrismaClient,
+  currentVersion: string,
+  dir: string,
+): Promise<void> {
   try {
     const actions = await recordStartup(db, currentVersion, dir);
     if (actions.length === 0) return;
     console.log(
-      `Upgraded to ${currentVersion}. Required actions of the versions since the last confirmed upgrade `
-      + '(UPGRADING.md is the reference; also shown in the admin until confirmed):',
+      `Upgraded to ${currentVersion}. Required actions of the versions since the last confirmed upgrade ` +
+        '(UPGRADING.md is the reference; also shown in the admin until confirmed):',
     );
     for (const { version, when, action } of actions) {
       console.log(`  v${version}, ${when} the upgrade: ${action}`);
@@ -216,10 +244,18 @@ export async function reportStartupVersion(db: PrismaClient, currentVersion: str
  * that recorded it shows it: after going back to an older version, or with a
  * `dev` build, there is none.
  */
-export async function pendingUpgradeNotice(db: PrismaClient, currentVersion: string, dir: string): Promise<UpgradeNotice | null> {
+export async function pendingUpgradeNotice(
+  db: PrismaClient,
+  currentVersion: string,
+  dir: string,
+): Promise<UpgradeNotice | null> {
   const state = await db.appState.findUnique({ where: { id: APP_STATE_ID } });
   if (!hasPendingNotice(state) || state.pendingNoticeTo !== currentVersion) return null;
-  const actions = requiredActionsBetween(loadReleaseNotes(dir), state.pendingNoticeFrom, state.pendingNoticeTo);
+  const actions = requiredActionsBetween(
+    loadReleaseNotes(dir),
+    state.pendingNoticeFrom,
+    state.pendingNoticeTo,
+  );
   if (actions.length === 0) return null;
   return { from: state.pendingNoticeFrom, to: state.pendingNoticeTo, actions };
 }

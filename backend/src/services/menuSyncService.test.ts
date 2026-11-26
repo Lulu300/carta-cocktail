@@ -1,27 +1,59 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
-  setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData, prisma,
-  seedBottle, seedCategory, seedMenu, seedMenuSection, addBottleToMenu, excludeBottleFromMenu, findSystemMenu,
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+  prisma,
+  seedBottle,
+  seedCategory,
+  seedMenu,
+  seedMenuSection,
+  addBottleToMenu,
+  excludeBottleFromMenu,
+  findSystemMenu,
 } from '../test/helpers';
 import {
-  assertBottlesAllowed, assertCocktailsAllowed, BottleMenuType, excludeBottles, isAvailableFor, isEligible, isSystemMenu,
-  restoreBottles, syncBottle, syncMenu, syncNewBottles,
+  assertBottlesAllowed,
+  assertCocktailsAllowed,
+  BottleMenuType,
+  excludeBottles,
+  isAvailableFor,
+  isEligible,
+  isSystemMenu,
+  restoreBottles,
+  syncBottle,
+  syncMenu,
+  syncNewBottles,
 } from './menuSyncService';
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
-beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
+beforeEach(async () => {
+  await cleanDatabase();
+  await seedRequiredData();
+});
 
 /** Thrown inside a transaction to roll it back after the code under test ran. */
 class Rollback extends Error {}
 
 async function bottleIdsOf(menuId: number): Promise<number[]> {
-  const entries = await prisma.menuBottle.findMany({ where: { menuId }, orderBy: { position: 'asc' } });
+  const entries = await prisma.menuBottle.findMany({
+    where: { menuId },
+    orderBy: { position: 'asc' },
+  });
   return entries.map((entry) => entry.bottleId);
 }
 
 async function excludedIdsOf(menuId: number): Promise<number[]> {
-  const exclusions = await prisma.menuBottleExclusion.findMany({ where: { menuId }, orderBy: { bottleId: 'asc' } });
+  const exclusions = await prisma.menuBottleExclusion.findMany({
+    where: { menuId },
+    orderBy: { bottleId: 'asc' },
+  });
   return exclusions.map((exclusion) => exclusion.bottleId);
 }
 
@@ -33,13 +65,16 @@ describe('isAvailableFor', () => {
     [false, true, 'DIGESTIFS', true],
     [true, false, 'DIGESTIFS', false],
     [true, true, 'DIGESTIFS', true],
-  ])('isApero=%s isDigestif=%s for %s → %s, full or empty', (isApero, isDigestif, type, expected) => {
-    // The remaining level is not part of the bottle the rule reads: empty or full, same answer
-    for (const remainingPercent of [0, 100]) {
-      const bottle = { id: 1, isApero, isDigestif, remainingPercent };
-      expect(isAvailableFor(bottle, type)).toBe(expected);
-    }
-  });
+  ])(
+    'isApero=%s isDigestif=%s for %s → %s, full or empty',
+    (isApero, isDigestif, type, expected) => {
+      // The remaining level is not part of the bottle the rule reads: empty or full, same answer
+      for (const remainingPercent of [0, 100]) {
+        const bottle = { id: 1, isApero, isDigestif, remainingPercent };
+        expect(isAvailableFor(bottle, type)).toBe(expected);
+      }
+    },
+  );
 });
 
 describe('isEligible', () => {
@@ -71,7 +106,9 @@ describe('isSystemMenu', () => {
 describe('assertCocktailsAllowed', () => {
   it('refuses cocktails in a bottle menu, but lets it be emptied', () => {
     for (const type of ['APEROS', 'DIGESTIFS']) {
-      expect(() => assertCocktailsAllowed({ type }, [1])).toThrow(expect.objectContaining({ i18nKey: 'errors.cocktailNotAllowedInMenu' }));
+      expect(() => assertCocktailsAllowed({ type }, [1])).toThrow(
+        expect.objectContaining({ i18nKey: 'errors.cocktailNotAllowedInMenu' }),
+      );
       expect(() => assertCocktailsAllowed({ type }, [])).not.toThrow();
     }
   });
@@ -85,23 +122,29 @@ describe('assertBottlesAllowed', () => {
   it('accepts bottles checked for the menu type, empty ones included', async () => {
     const full = await seedBottle({ isApero: true });
     const empty = await seedBottle({ isApero: true, remainingPercent: 0 });
-    await expect(assertBottlesAllowed(prisma, { type: 'APEROS' }, [full.id, empty.id])).resolves.toBeUndefined();
+    await expect(
+      assertBottlesAllowed(prisma, { type: 'APEROS' }, [full.id, empty.id]),
+    ).resolves.toBeUndefined();
   });
 
   it('refuses a bottle not checked for the menu type', async () => {
     const digestif = await seedBottle({ isDigestif: true });
-    await expect(assertBottlesAllowed(prisma, { type: 'APEROS' }, [digestif.id]))
-      .rejects.toMatchObject({ status: 400, i18nKey: 'errors.bottleNotAllowedInMenu' });
+    await expect(
+      assertBottlesAllowed(prisma, { type: 'APEROS' }, [digestif.id]),
+    ).rejects.toMatchObject({ status: 400, i18nKey: 'errors.bottleNotAllowedInMenu' });
   });
 
   it('refuses an unknown bottle', async () => {
-    await expect(assertBottlesAllowed(prisma, { type: 'APEROS' }, [9999])).rejects.toMatchObject({ status: 400 });
+    await expect(assertBottlesAllowed(prisma, { type: 'APEROS' }, [9999])).rejects.toMatchObject({
+      status: 400,
+    });
   });
 
   it('refuses any bottle in a cocktail menu, but lets it be emptied', async () => {
     const bottle = await seedBottle({ isApero: true });
-    await expect(assertBottlesAllowed(prisma, { type: 'COCKTAILS' }, [bottle.id]))
-      .rejects.toMatchObject({ i18nKey: 'errors.bottleNotAllowedInMenu' });
+    await expect(
+      assertBottlesAllowed(prisma, { type: 'COCKTAILS' }, [bottle.id]),
+    ).rejects.toMatchObject({ i18nKey: 'errors.bottleNotAllowedInMenu' });
     await expect(assertBottlesAllowed(prisma, { type: 'COCKTAILS' }, [])).resolves.toBeUndefined();
   });
 });
@@ -120,8 +163,14 @@ describe('syncMenu', () => {
     const result = await syncMenu(prisma, aperitifs.id);
 
     expect(result).toEqual({ added: 1, removed: 1 });
-    const entries = await prisma.menuBottle.findMany({ where: { menuId: aperitifs.id }, orderBy: { position: 'asc' } });
-    expect(entries.map((entry) => [entry.bottleId, entry.position])).toEqual([[kept.id, 4], [empty.id, 6]]);
+    const entries = await prisma.menuBottle.findMany({
+      where: { menuId: aperitifs.id },
+      orderBy: { position: 'asc' },
+    });
+    expect(entries.map((entry) => [entry.bottleId, entry.position])).toEqual([
+      [kept.id, 4],
+      [empty.id, 6],
+    ]);
   });
 
   it('is idempotent', async () => {
@@ -134,8 +183,12 @@ describe('syncMenu', () => {
   it('refuses a personal menu, a cocktail menu and an unknown menu', async () => {
     const personal = await seedMenu({ type: 'APEROS' });
     const cocktails = await seedMenu();
-    await expect(syncMenu(prisma, personal.id)).rejects.toMatchObject({ i18nKey: 'errors.cannotSyncPersonalMenu' });
-    await expect(syncMenu(prisma, cocktails.id)).rejects.toMatchObject({ i18nKey: 'errors.cannotSyncCocktailMenu' });
+    await expect(syncMenu(prisma, personal.id)).rejects.toMatchObject({
+      i18nKey: 'errors.cannotSyncPersonalMenu',
+    });
+    await expect(syncMenu(prisma, cocktails.id)).rejects.toMatchObject({
+      i18nKey: 'errors.cannotSyncCocktailMenu',
+    });
     await expect(syncMenu(prisma, 9999)).rejects.toMatchObject({ status: 404 });
   });
 });
@@ -163,9 +216,14 @@ describe('syncBottle', () => {
     await syncBottle(prisma, first.id);
     await syncBottle(prisma, second.id);
 
-    const entries = await prisma.menuBottle.findMany({ where: { menuId: aperitifs.id }, orderBy: { position: 'asc' } });
-    expect(entries.map((entry) => [entry.bottleId, entry.position, entry.isHidden]))
-      .toEqual([[first.id, 3, true], [second.id, 4, false]]);
+    const entries = await prisma.menuBottle.findMany({
+      where: { menuId: aperitifs.id },
+      orderBy: { position: 'asc' },
+    });
+    expect(entries.map((entry) => [entry.bottleId, entry.position, entry.isHidden])).toEqual([
+      [first.id, 3, true],
+      [second.id, 4, false],
+    ]);
   });
 
   it('removes an unchecked bottle from the system menu and the personal menus of the type', async () => {
@@ -202,10 +260,12 @@ describe('syncBottle', () => {
   it('writes nothing when the surrounding transaction fails', async () => {
     const bottle = await seedBottle({ isApero: true });
 
-    await expect(prisma.$transaction(async (tx) => {
-      await syncBottle(tx, bottle.id);
-      throw new Rollback();
-    })).rejects.toBeInstanceOf(Rollback);
+    await expect(
+      prisma.$transaction(async (tx) => {
+        await syncBottle(tx, bottle.id);
+        throw new Rollback();
+      }),
+    ).rejects.toBeInstanceOf(Rollback);
 
     expect(await prisma.menuBottle.count()).toBe(0);
   });
@@ -220,21 +280,35 @@ describe('syncNewBottles', () => {
     await addBottleToMenu(aperitifs.id, present.id, { position: 4, menuSectionId: section.id });
     const vermouth = await seedCategory({ name: 'Vermouth' });
     const bitter = await seedCategory({ name: 'Bitter' });
-    const lillet = await seedBottle({ name: 'Lillet', categoryId: vermouth.id, isApero: true, isDigestif: true });
+    const lillet = await seedBottle({
+      name: 'Lillet',
+      categoryId: vermouth.id,
+      isApero: true,
+      isDigestif: true,
+    });
     const campari = await seedBottle({ name: 'Campari', categoryId: bitter.id, isApero: true });
     const aperol = await seedBottle({ name: 'Aperol', categoryId: bitter.id, isApero: true });
     const unchecked = await seedBottle({ name: 'Water', categoryId: bitter.id });
 
     await syncNewBottles(prisma, [lillet.id, campari.id, aperol.id, unchecked.id]);
 
-    const entries = await prisma.menuBottle.findMany({ where: { menuId: aperitifs.id }, orderBy: { position: 'asc' } });
-    expect(entries.map(({ bottleId, position, menuSectionId, isHidden }) => ({ bottleId, position, menuSectionId, isHidden })))
-      .toEqual([
-        { bottleId: present.id, position: 4, menuSectionId: section.id, isHidden: false },
-        { bottleId: aperol.id, position: 5, menuSectionId: null, isHidden: false },
-        { bottleId: campari.id, position: 6, menuSectionId: null, isHidden: false },
-        { bottleId: lillet.id, position: 7, menuSectionId: null, isHidden: false },
-      ]);
+    const entries = await prisma.menuBottle.findMany({
+      where: { menuId: aperitifs.id },
+      orderBy: { position: 'asc' },
+    });
+    expect(
+      entries.map(({ bottleId, position, menuSectionId, isHidden }) => ({
+        bottleId,
+        position,
+        menuSectionId,
+        isHidden,
+      })),
+    ).toEqual([
+      { bottleId: present.id, position: 4, menuSectionId: section.id, isHidden: false },
+      { bottleId: aperol.id, position: 5, menuSectionId: null, isHidden: false },
+      { bottleId: campari.id, position: 6, menuSectionId: null, isHidden: false },
+      { bottleId: lillet.id, position: 7, menuSectionId: null, isHidden: false },
+    ]);
     expect(await bottleIdsOf(digestifs.id)).toEqual([lillet.id]);
   });
 
@@ -244,7 +318,11 @@ describe('syncNewBottles', () => {
     const section = await seedMenuSection(aperitifs.id);
     // Added by hand before C-06 checked the boxes: kept, with its section and hidden state
     const handAdded = await seedBottle();
-    await addBottleToMenu(aperitifs.id, handAdded.id, { position: 0, isHidden: true, menuSectionId: section.id });
+    await addBottleToMenu(aperitifs.id, handAdded.id, {
+      position: 0,
+      isHidden: true,
+      menuSectionId: section.id,
+    });
     await addBottleToMenu(personal.id, handAdded.id);
     // Checked but missing from the menu: only "Synchronize" adds it
     const missing = await seedBottle({ isApero: true });
@@ -295,7 +373,9 @@ describe('excludeBottles and restoreBottles', () => {
     expect(await bottleIdsOf(aperitifs.id)).toEqual([other.id]);
 
     await restoreBottles(prisma, aperitifs.id, [bottle.id]);
-    const restored = await prisma.menuBottle.findFirstOrThrow({ where: { menuId: aperitifs.id, bottleId: bottle.id } });
+    const restored = await prisma.menuBottle.findFirstOrThrow({
+      where: { menuId: aperitifs.id, bottleId: bottle.id },
+    });
     expect(restored).toMatchObject({ position: 2, menuSectionId: null, isHidden: false });
     expect(await excludedIdsOf(aperitifs.id)).toEqual([]);
   });
@@ -311,19 +391,32 @@ describe('excludeBottles and restoreBottles', () => {
 
   it('refuses a personal menu', async () => {
     const personal = await seedMenu({ type: 'APEROS' });
-    await expect(excludeBottles(prisma, personal.id, [1]))
-      .rejects.toMatchObject({ status: 400, i18nKey: 'errors.exclusionsSystemMenuOnly' });
+    await expect(excludeBottles(prisma, personal.id, [1])).rejects.toMatchObject({
+      status: 400,
+      i18nKey: 'errors.exclusionsSystemMenuOnly',
+    });
   });
 
   it('excludes nothing of the batch when the surrounding transaction fails', async () => {
     const aperitifs = await findSystemMenu('aperitifs');
-    const bottles = [await seedBottle({ isApero: true }), await seedBottle({ isApero: true }), await seedBottle({ isApero: true })];
-    for (const [position, bottle] of bottles.entries()) await addBottleToMenu(aperitifs.id, bottle.id, { position });
+    const bottles = [
+      await seedBottle({ isApero: true }),
+      await seedBottle({ isApero: true }),
+      await seedBottle({ isApero: true }),
+    ];
+    for (const [position, bottle] of bottles.entries())
+      await addBottleToMenu(aperitifs.id, bottle.id, { position });
 
-    await expect(prisma.$transaction(async (tx) => {
-      await excludeBottles(tx, aperitifs.id, bottles.map((bottle) => bottle.id));
-      throw new Rollback();
-    })).rejects.toBeInstanceOf(Rollback);
+    await expect(
+      prisma.$transaction(async (tx) => {
+        await excludeBottles(
+          tx,
+          aperitifs.id,
+          bottles.map((bottle) => bottle.id),
+        );
+        throw new Rollback();
+      }),
+    ).rejects.toBeInstanceOf(Rollback);
 
     expect(await excludedIdsOf(aperitifs.id)).toEqual([]);
     expect(await bottleIdsOf(aperitifs.id)).toEqual(bottles.map((bottle) => bottle.id));
@@ -342,13 +435,18 @@ describe('excludeBottles and restoreBottles', () => {
 
   it('fails with P2025, answered as a 404, for an unknown exclusion', async () => {
     const aperitifs = await findSystemMenu('aperitifs');
-    await expect(restoreBottles(prisma, aperitifs.id, [9999])).rejects.toMatchObject({ code: 'P2025' });
+    await expect(restoreBottles(prisma, aperitifs.id, [9999])).rejects.toMatchObject({
+      code: 'P2025',
+    });
   });
 
   it('puts several bottles back at the end, in the order given, once each', async () => {
     const aperitifs = await findSystemMenu('aperitifs');
     const listed = await seedBottle({ isApero: true });
-    const [first, second] = [await seedBottle({ isApero: true }), await seedBottle({ isApero: true })];
+    const [first, second] = [
+      await seedBottle({ isApero: true }),
+      await seedBottle({ isApero: true }),
+    ];
     await addBottleToMenu(aperitifs.id, listed.id, { position: 0 });
     await excludeBottleFromMenu(aperitifs.id, first.id);
     await excludeBottleFromMenu(aperitifs.id, second.id);
@@ -364,8 +462,9 @@ describe('excludeBottles and restoreBottles', () => {
     const excluded = await seedBottle({ isApero: true });
     await excludeBottleFromMenu(aperitifs.id, excluded.id);
 
-    await expect(prisma.$transaction((tx) => restoreBottles(tx, aperitifs.id, [excluded.id, 9999])))
-      .rejects.toMatchObject({ code: 'P2025' });
+    await expect(
+      prisma.$transaction((tx) => restoreBottles(tx, aperitifs.id, [excluded.id, 9999])),
+    ).rejects.toMatchObject({ code: 'P2025' });
 
     expect(await excludedIdsOf(aperitifs.id)).toEqual([excluded.id]);
     expect(await bottleIdsOf(aperitifs.id)).toEqual([]);

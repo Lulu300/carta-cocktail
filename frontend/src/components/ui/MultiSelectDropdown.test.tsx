@@ -17,7 +17,7 @@ describe('MultiSelectDropdown', () => {
         selected={[]}
         onChange={vi.fn()}
         placeholder="Pick one"
-      />
+      />,
     );
     expect(screen.getByText('Pick one')).toBeInTheDocument();
   });
@@ -29,7 +29,7 @@ describe('MultiSelectDropdown', () => {
         selected={['a', 'b']}
         onChange={vi.fn()}
         placeholder="Pick one"
-      />
+      />,
     );
     expect(screen.getByText('2 selected')).toBeInTheDocument();
     // Tags with labels are rendered
@@ -45,7 +45,7 @@ describe('MultiSelectDropdown', () => {
         selected={[]}
         onChange={vi.fn()}
         placeholder="Pick one"
-      />
+      />,
     );
     // Dropdown not visible initially
     expect(screen.queryByText('Alpha')).not.toBeInTheDocument();
@@ -69,7 +69,7 @@ describe('MultiSelectDropdown', () => {
         selected={[]}
         onChange={onChange}
         placeholder="Pick one"
-      />
+      />,
     );
     await user.click(screen.getByRole('button'));
     const checkbox = screen.getByRole('checkbox', { name: 'Alpha' });
@@ -86,7 +86,7 @@ describe('MultiSelectDropdown', () => {
         selected={['a', 'b']}
         onChange={onChange}
         placeholder="Pick one"
-      />
+      />,
     );
     // Use getAllByRole since tags also render buttons; first button is the main toggle
     const buttons = screen.getAllByRole('button');
@@ -105,13 +105,13 @@ describe('MultiSelectDropdown', () => {
         selected={['a', 'b']}
         onChange={onChange}
         placeholder="Pick one"
-      />
+      />,
     );
     // Tags are rendered; find the X buttons (svg buttons inside tags)
     // Each tag has one button child; there are 2 tags
-    screen.getAllByRole('button').filter(
-      (btn) => !btn.hasAttribute('type') || btn.getAttribute('type') === 'button'
-    );
+    screen
+      .getAllByRole('button')
+      .filter((btn) => !btn.hasAttribute('type') || btn.getAttribute('type') === 'button');
     // The first role="button" is the main toggle; tag X buttons follow
     // Find the X button inside the Alpha tag area
     // The tag section has buttons with onClick={() => toggle(val)}
@@ -125,12 +125,7 @@ describe('MultiSelectDropdown', () => {
   it('shows "No results" when options array is empty and dropdown is open', async () => {
     const user = userEvent.setup();
     render(
-      <MultiSelectDropdown
-        options={[]}
-        selected={[]}
-        onChange={vi.fn()}
-        placeholder="Pick one"
-      />
+      <MultiSelectDropdown options={[]} selected={[]} onChange={vi.fn()} placeholder="Pick one" />,
     );
     await user.click(screen.getByRole('button'));
     expect(screen.getByText('No results')).toBeInTheDocument();
@@ -143,7 +138,7 @@ describe('MultiSelectDropdown', () => {
         selected={['unknown-value']}
         onChange={vi.fn()}
         placeholder="Pick one"
-      />
+      />,
     );
     // Tag should display raw value as fallback (opt?.label ?? val)
     expect(screen.getByText('unknown-value')).toBeInTheDocument();
@@ -160,7 +155,7 @@ describe('MultiSelectDropdown', () => {
           placeholder="Pick one"
         />
         <div data-testid="outside">Outside</div>
-      </div>
+      </div>,
     );
 
     // Open dropdown
@@ -176,10 +171,17 @@ describe('MultiSelectDropdown', () => {
 describe('MultiSelectDropdown accessibility', () => {
   function renderDropdown(selected: string[] = []) {
     render(
-      <MultiSelectDropdown options={options} selected={selected} onChange={vi.fn()} placeholder="Pick one" />,
+      <MultiSelectDropdown
+        options={options}
+        selected={selected}
+        onChange={vi.fn()}
+        placeholder="Pick one"
+      />,
     );
     // Once options are chosen, the name keeps the placeholder in front of the count.
-    return screen.getByRole('button', { name: selected.length ? `Pick one ${selected.length} selected` : 'Pick one' });
+    return screen.getByRole('button', {
+      name: selected.length ? `Pick one ${selected.length} selected` : 'Pick one',
+    });
   }
 
   it('reports its expanded state and the panel it controls', async () => {

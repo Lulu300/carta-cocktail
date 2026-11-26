@@ -5,19 +5,33 @@ import { ensureAdmin } from './ensureAdmin';
 
 const STRONG_PASSWORD = 'correct-horse-battery';
 const PASSWORD_IN_RESET_FLAG = 'My-new-password-42';
-const PRODUCTION_ENV = { NODE_ENV: 'production', ADMIN_EMAIL: 'owner@bar.test', ADMIN_PASSWORD: STRONG_PASSWORD };
+const PRODUCTION_ENV = {
+  NODE_ENV: 'production',
+  ADMIN_EMAIL: 'owner@bar.test',
+  ADMIN_PASSWORD: STRONG_PASSWORD,
+};
 
-async function createExistingAdmin(password = 'changed-from-the-ui'): Promise<{ id: number; passwordHash: string }> {
+async function createExistingAdmin(
+  password = 'changed-from-the-ui',
+): Promise<{ id: number; passwordHash: string }> {
   return prisma.user.create({
     data: { email: 'changed@bar.test', passwordHash: await bcrypt.hash(password, 4) },
   });
 }
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
 // No seedRequiredData(): these tests control whether an admin exists
-beforeEach(async () => { await cleanDatabase(); });
-afterEach(() => { vi.restoreAllMocks(); });
+beforeEach(async () => {
+  await cleanDatabase();
+});
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('ensureAdmin without an existing admin', () => {
   it('should create the admin from the environment', async () => {
@@ -84,30 +98,35 @@ describe('ensureAdmin with an existing admin', () => {
     const admin = await prisma.user.findUniqueOrThrow({ where: { id: existing.id } });
     expect(admin.email).toBe('owner@bar.test');
     expect(await bcrypt.compare(STRONG_PASSWORD, admin.passwordHash)).toBe(true);
-    expect(log).toHaveBeenCalledWith('Admin credentials reset from environment (login email: owner@bar.test)');
+    expect(log).toHaveBeenCalledWith(
+      'Admin credentials reset from environment (login email: owner@bar.test)',
+    );
     expect(String(log.mock.calls)).not.toContain(STRONG_PASSWORD);
   });
 
-  it.each(['1', 'TRUE', 'yes', PASSWORD_IN_RESET_FLAG])('should ignore ADMIN_RESET_PASSWORD=%s and say so', async (flag) => {
-    const existing = await createExistingAdmin();
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  it.each(['1', 'TRUE', 'yes', PASSWORD_IN_RESET_FLAG])(
+    'should ignore ADMIN_RESET_PASSWORD=%s and say so',
+    async (flag) => {
+      const existing = await createExistingAdmin();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    const result = await ensureAdmin(prisma, { ...PRODUCTION_ENV, ADMIN_RESET_PASSWORD: flag });
+      const result = await ensureAdmin(prisma, { ...PRODUCTION_ENV, ADMIN_RESET_PASSWORD: flag });
 
-    expect(result).toBe('unchanged');
-    expect(warn).toHaveBeenCalledWith(
-      "ADMIN_RESET_PASSWORD is ignored: only the exact value 'true' resets the admin credentials " +
-      "(values such as 'TRUE' or '1' do not)",
-    );
-    const admin = await prisma.user.findUniqueOrThrow({ where: { id: existing.id } });
-    expect(admin.passwordHash).toBe(existing.passwordHash);
-  });
+      expect(result).toBe('unchanged');
+      expect(warn).toHaveBeenCalledWith(
+        "ADMIN_RESET_PASSWORD is ignored: only the exact value 'true' resets the admin credentials " +
+          "(values such as 'TRUE' or '1' do not)",
+      );
+      const admin = await prisma.user.findUniqueOrThrow({ where: { id: existing.id } });
+      expect(admin.passwordHash).toBe(existing.passwordHash);
+    },
+  );
 
   // The flag's name invites operators to put the new password there
   it('should not write a password put in ADMIN_RESET_PASSWORD to the logs', async () => {
     await createExistingAdmin();
-    const consoleSpies = (['warn', 'log', 'error', 'info'] as const).map(
-      (method) => vi.spyOn(console, method).mockImplementation(() => {}),
+    const consoleSpies = (['warn', 'log', 'error', 'info'] as const).map((method) =>
+      vi.spyOn(console, method).mockImplementation(() => {}),
     );
 
     await ensureAdmin(prisma, { ...PRODUCTION_ENV, ADMIN_RESET_PASSWORD: PASSWORD_IN_RESET_FLAG });
@@ -134,7 +153,9 @@ describe('ensureAdmin with an existing admin', () => {
     const result = await ensureAdmin(prisma, PRODUCTION_ENV);
 
     expect(result).toBe('unchanged');
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining("the admin password is still the old default 'admin123'"));
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("the admin password is still the old default 'admin123'"),
+    );
     const admin = await prisma.user.findUniqueOrThrow({ where: { id: existing.id } });
     expect(admin.passwordHash).toBe(existing.passwordHash);
   });
@@ -143,7 +164,11 @@ describe('ensureAdmin with an existing admin', () => {
     const existing = await createExistingAdmin();
 
     await expect(
-      ensureAdmin(prisma, { NODE_ENV: 'production', ADMIN_PASSWORD: 'admin123', ADMIN_RESET_PASSWORD: 'true' }),
+      ensureAdmin(prisma, {
+        NODE_ENV: 'production',
+        ADMIN_PASSWORD: 'admin123',
+        ADMIN_RESET_PASSWORD: 'true',
+      }),
     ).rejects.toThrow('ADMIN_PASSWORD must be set to at least 12 characters');
 
     const admin = await prisma.user.findUniqueOrThrow({ where: { id: existing.id } });

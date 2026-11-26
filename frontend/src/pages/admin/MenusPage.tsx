@@ -38,7 +38,13 @@ interface MenuForm {
   type: Menu['type'];
 }
 
-const EMPTY_MENU_FORM: MenuForm = { name: '', slug: '', description: '', isPublic: false, type: 'COCKTAILS' };
+const EMPTY_MENU_FORM: MenuForm = {
+  name: '',
+  slug: '',
+  description: '',
+  isPublic: false,
+  type: 'COCKTAILS',
+};
 
 const TYPE_BADGES: Record<Menu['type'], { labelKey: string; color: string }> = {
   COCKTAILS: { labelKey: 'menus.types.cocktails', color: 'purple' },
@@ -68,8 +74,8 @@ export default function MenusPage() {
 
   const filteredMenus = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return (menusQuery.data ?? []).filter((menu) =>
-      menu.name.toLowerCase().includes(query) || menu.slug.toLowerCase().includes(query),
+    return (menusQuery.data ?? []).filter(
+      (menu) => menu.name.toLowerCase().includes(query) || menu.slug.toLowerCase().includes(query),
     );
   }, [menusQuery.data, search]);
 
@@ -109,7 +115,9 @@ export default function MenusPage() {
           >
             {menu.name}
           </a>
-          {isSystemMenu(menu) && <span className="ml-2 text-xs text-fg-muted">{t('menus.default')}</span>}
+          {isSystemMenu(menu) && (
+            <span className="ml-2 text-xs text-fg-muted">{t('menus.default')}</span>
+          )}
         </>
       ),
     },
@@ -118,27 +126,42 @@ export default function MenusPage() {
       header: t('menus.type'),
       sortable: true,
       render: (menu) => (
-        <span className={cx('px-2 py-0.5 rounded text-xs font-medium', getBadgeClasses(TYPE_BADGES[menu.type].color))}>
+        <span
+          className={cx(
+            'px-2 py-0.5 rounded text-xs font-medium',
+            getBadgeClasses(TYPE_BADGES[menu.type].color),
+          )}
+        >
           {t(TYPE_BADGES[menu.type].labelKey)}
         </span>
       ),
     },
-    { key: 'slug', header: t('menus.slug'), sortable: true, className: 'text-fg-muted', render: (menu) => `/menu/${menu.slug}` },
+    {
+      key: 'slug',
+      header: t('menus.slug'),
+      sortable: true,
+      className: 'text-fg-muted',
+      render: (menu) => `/menu/${menu.slug}`,
+    },
     {
       key: 'isPublic',
       header: t('menus.isPublic'),
       sortable: true,
-      render: (menu) => (menu.isPublic
-        ? <Badge tone="success">{t('common.yes')}</Badge>
-        : <Badge>{t('common.no')}</Badge>),
+      render: (menu) =>
+        menu.isPublic ? (
+          <Badge tone="success">{t('common.yes')}</Badge>
+        ) : (
+          <Badge>{t('common.no')}</Badge>
+        ),
     },
     {
       key: 'content',
       header: t('menus.content'),
       className: 'text-fg-muted',
-      render: (menu) => (isBottleMenu(menu)
-        ? t('menus.bottleCount', { count: menu._count?.bottles ?? 0 })
-        : t('menus.cocktailCount', { count: menu._count?.cocktails ?? 0 })),
+      render: (menu) =>
+        isBottleMenu(menu)
+          ? t('menus.bottleCount', { count: menu._count?.bottles ?? 0 })
+          : t('menus.cocktailCount', { count: menu._count?.cocktails ?? 0 }),
     },
     {
       key: 'actions',
@@ -150,12 +173,20 @@ export default function MenusPage() {
             to={menuEditorPath(menu)}
             aria-label={t('common.edit')}
             title={t('common.edit')}
-            className={cx('inline-flex items-center justify-center min-w-10 min-h-10 rounded-lg text-accent hover:bg-accent/10', focusRingClasses)}
+            className={cx(
+              'inline-flex items-center justify-center min-w-10 min-h-10 rounded-lg text-accent hover:bg-accent/10',
+              focusRingClasses,
+            )}
           >
             <Icon name="edit" />
           </Link>
           {!isSystemMenu(menu) && (
-            <IconButton icon="delete" label={t('common.delete')} variant="danger" onClick={() => handleDelete(menu)} />
+            <IconButton
+              icon="delete"
+              label={t('common.delete')}
+              variant="danger"
+              onClick={() => handleDelete(menu)}
+            />
           )}
         </div>
       ),
@@ -168,7 +199,12 @@ export default function MenusPage() {
         <h1 className="text-2xl font-bold font-serif text-accent">{t('menus.title')}</h1>
         <Button onClick={() => menuForm.open()}>{t('menus.add')}</Button>
       </div>
-      <SearchInput value={search} onChange={setSearch} label={t('menus.search')} className="max-w-sm mb-4" />
+      <SearchInput
+        value={search}
+        onChange={setSearch}
+        label={t('menus.search')}
+        className="max-w-sm mb-4"
+      />
       <DataTable
         columns={columns}
         rows={pagination.paginatedItems}
@@ -187,7 +223,10 @@ export default function MenusPage() {
             <Input value={form.name} onChange={(event) => setField('name', event.target.value)} />
           </Field>
           <Field label={t('menus.slug')} required>
-            <Input value={form.slug} onChange={(event) => setField('slug', toSlug(event.target.value))} />
+            <Input
+              value={form.slug}
+              onChange={(event) => setField('slug', toSlug(event.target.value))}
+            />
           </Field>
           <Field label={t('menus.type')} hint={t('menus.typeHint')}>
             <Select
@@ -197,7 +236,9 @@ export default function MenusPage() {
               }}
             >
               {MENU_TYPES.map((type) => (
-                <option key={type} value={type}>{t(TYPE_BADGES[type].labelKey)}</option>
+                <option key={type} value={type}>
+                  {t(TYPE_BADGES[type].labelKey)}
+                </option>
               ))}
             </Select>
           </Field>
@@ -215,8 +256,12 @@ export default function MenusPage() {
             label={t('menus.isPublic')}
           />
           <div className="flex justify-end gap-3 pt-2">
-            <Button variant="ghost" onClick={menuForm.close}>{t('common.cancel')}</Button>
-            <Button type="submit" loading={create.isPending}>{t('common.save')}</Button>
+            <Button variant="ghost" onClick={menuForm.close}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="submit" loading={create.isPending}>
+              {t('common.save')}
+            </Button>
           </div>
         </form>
       </Modal>

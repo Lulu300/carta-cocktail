@@ -12,7 +12,14 @@ import ExportCocktailButton from './ExportCocktailButton';
 const piñaColada: CocktailExportFormat = {
   version: 1,
   exportedAt: '2024-01-01',
-  cocktail: { name: 'Piña Colada', description: null, notes: null, tags: [], ingredients: [], instructions: [] },
+  cocktail: {
+    name: 'Piña Colada',
+    description: null,
+    notes: null,
+    tags: [],
+    ingredients: [],
+    instructions: [],
+  },
 };
 
 /** The export endpoints name the file in Content-Disposition, accents removed. */
@@ -87,14 +94,17 @@ describe('ExportCocktailButton', () => {
   it.each([
     ['admin', false, '/api/cocktails/:id/export'],
     ['public', true, '/api/public/cocktails/:id/export'],
-  ])('reports a failed %s export in a toast and downloads nothing', async (_name, isPublic, path) => {
-    const user = userEvent.setup();
-    mockApiError('get', path, 404, 'Cocktail not found');
-    render(<ExportCocktailButton cocktailId={1} isPublic={isPublic} />);
+  ])(
+    'reports a failed %s export in a toast and downloads nothing',
+    async (_name, isPublic, path) => {
+      const user = userEvent.setup();
+      mockApiError('get', path, 404, 'Cocktail not found');
+      render(<ExportCocktailButton cocktailId={1} isPublic={isPublic} />);
 
-    await user.click(screen.getByTitle('Export'));
+      await user.click(screen.getByTitle('Export'));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/\S/);
-    expect(downloads).toEqual([]);
-  });
+      expect(await screen.findByRole('alert')).toHaveTextContent(/\S/);
+      expect(downloads).toEqual([]);
+    },
+  );
 });

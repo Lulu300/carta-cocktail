@@ -7,7 +7,12 @@ import { config } from '../config';
 import { AuthRequest } from '../middleware/auth';
 import { BadRequestError } from '../errors';
 import {
-  MAX_BACKUP_UPLOAD_BYTES, RESTORE_WORK_FOLDERS, beginExport, buildMetadata, createSnapshot, restoreBackup,
+  MAX_BACKUP_UPLOAD_BYTES,
+  RESTORE_WORK_FOLDERS,
+  beginExport,
+  buildMetadata,
+  createSnapshot,
+  restoreBackup,
 } from '../services/backupService';
 
 const router = Router();
@@ -57,7 +62,11 @@ router.get('/export', async (_req: AuthRequest, res: Response) => {
   archive.append(JSON.stringify(metadata), { name: 'metadata.json' });
   archive.file(snapshotPath, { name: 'database.db' });
   if (fs.existsSync(config.uploadDir)) {
-    archive.glob('**', { cwd: config.uploadDir, dot: true, skip: RESTORE_WORK_FOLDERS }, { prefix: 'uploads' });
+    archive.glob(
+      '**',
+      { cwd: config.uploadDir, dot: true, skip: RESTORE_WORK_FOLDERS },
+      { prefix: 'uploads' },
+    );
   }
 
   await archive.finalize();

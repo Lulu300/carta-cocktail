@@ -59,9 +59,16 @@ function buildSummary(
     for (const entity of preview[type]) {
       const key = resolutionKey(type, entity.ref);
       const resolution = resolutions[type][key];
-      const line = { key: `${type}-${key}`, type: typeLabel(type), name: referenceLabel(type, entity.ref) };
+      const line = {
+        key: `${type}-${key}`,
+        type: typeLabel(type),
+        name: referenceLabel(type, entity.ref),
+      };
       // A category or unit to create that exists ignoring case: the backend uses that row as it is
-      const existing = resolution?.action === 'create' && resolution.data ? existingRowFor(type, resolution.data, lists) : null;
+      const existing =
+        resolution?.action === 'create' && resolution.data
+          ? existingRowFor(type, resolution.data, lists)
+          : null;
       if (existing?.status === 'found') {
         summary.mapped.push({ ...line, mappedTo: existingOptionLabel(type, existing.row) });
       } else if (resolution?.action === 'create') {
@@ -69,14 +76,22 @@ function buildSummary(
       } else if (resolution?.action === 'skip') {
         summary.skipped.push(line);
       } else if (resolution?.action === 'use_existing') {
-        summary.mapped.push({ ...line, mappedTo: mappedName(type, entity, resolution.existingId, lists) });
+        summary.mapped.push({
+          ...line,
+          mappedTo: mappedName(type, entity, resolution.existingId, lists),
+        });
       }
     }
   }
   return summary;
 }
 
-function SummarySection({ title, lines, marker, className }: {
+function SummarySection({
+  title,
+  lines,
+  marker,
+  className,
+}: {
   title: string;
   lines: SummaryLine[];
   marker: string;
@@ -86,10 +101,15 @@ function SummarySection({ title, lines, marker, className }: {
   if (lines.length === 0) return null;
   return (
     <section>
-      <h3 className="text-sm font-semibold mb-2">{title} ({lines.length})</h3>
+      <h3 className="text-sm font-semibold mb-2">
+        {title} ({lines.length})
+      </h3>
       <ul className="space-y-1">
         {lines.map((line) => (
-          <li key={line.key} className={`flex items-center gap-2 text-sm rounded px-3 py-1.5 border ${className}`}>
+          <li
+            key={line.key}
+            className={`flex items-center gap-2 text-sm rounded px-3 py-1.5 border ${className}`}
+          >
             <span aria-hidden="true">{marker}</span>
             <span className="text-xs text-fg-muted w-20">{line.type}</span>
             <span>{line.name}</span>
@@ -107,9 +127,18 @@ function SummarySection({ title, lines, marker, className }: {
   );
 }
 
-export default function ImportStepConfirm({ preview, resolutions, lists, isLoading, onBack, onConfirm }: ImportStepConfirmProps) {
+export default function ImportStepConfirm({
+  preview,
+  resolutions,
+  lists,
+  isLoading,
+  onBack,
+  onConfirm,
+}: ImportStepConfirmProps) {
   const { t } = useTranslation();
-  const summary = buildSummary(preview, resolutions, lists, (type) => t(`cocktails.importWizard.${type}`));
+  const summary = buildSummary(preview, resolutions, lists, (type) =>
+    t(`cocktails.importWizard.${type}`),
+  );
 
   return (
     <div className="space-y-6">
@@ -140,9 +169,13 @@ export default function ImportStepConfirm({ preview, resolutions, lists, isLoadi
       />
 
       <div className="flex justify-between">
-        <Button variant="ghost" onClick={onBack} disabled={isLoading}>{t('cocktails.importWizard.back')}</Button>
+        <Button variant="ghost" onClick={onBack} disabled={isLoading}>
+          {t('cocktails.importWizard.back')}
+        </Button>
         <Button onClick={onConfirm} loading={isLoading}>
-          {isLoading ? t('cocktails.importWizard.importing') : t('cocktails.importWizard.confirmImport')}
+          {isLoading
+            ? t('cocktails.importWizard.importing')
+            : t('cocktails.importWizard.confirmImport')}
         </Button>
       </div>
     </div>

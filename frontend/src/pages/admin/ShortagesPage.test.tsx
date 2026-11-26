@@ -2,7 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { render, screen, within } from '../../test/test-utils';
 import userEvent from '@testing-library/user-event';
 import { buildShortage } from '../../test/factories';
-import { captureRequest, mockApiError, mockApiPending, mockApiResponse } from '../../test/msw/utils';
+import {
+  captureRequest,
+  mockApiError,
+  mockApiPending,
+  mockApiResponse,
+} from '../../test/msw/utils';
 import ShortagesPage from './ShortagesPage';
 
 const vodka = buildShortage({
@@ -47,12 +52,21 @@ describe('ShortagesPage', () => {
 
   describe('type badge of a category whose type name HTML would hide', () => {
     // Data older than v1.9.0 can hold ' SPIRIT ' next to 'SPIRIT', and a type with an empty name.
-    const shortageOfType = (name: string, type: string, nameTranslations?: Record<string, string>) => buildShortage({
-      category: { name, type, categoryType: { name: type, nameTranslations, color: 'gray' } },
-    });
+    const shortageOfType = (
+      name: string,
+      type: string,
+      nameTranslations?: Record<string, string>,
+    ) =>
+      buildShortage({
+        category: { name, type, categoryType: { name: type, nameTranslations, color: 'gray' } },
+      });
 
     it('tells the stored names apart, and labels the empty name', async () => {
-      mockShortages([shortageOfType('Rum', ' SPIRIT '), shortageOfType('Gin', 'SPIRIT'), shortageOfType('Water', '')]);
+      mockShortages([
+        shortageOfType('Rum', ' SPIRIT '),
+        shortageOfType('Gin', 'SPIRIT'),
+        shortageOfType('Water', ''),
+      ]);
       render(<ShortagesPage />);
 
       await screen.findByRole('heading', { name: 'Rum' });
@@ -63,16 +77,23 @@ describe('ShortagesPage', () => {
 
     it('adds the stored name to a translation that would hide it', async () => {
       const nameTranslations = { en: 'Spirits' };
-      mockShortages([shortageOfType('Rum', ' SPIRIT ', nameTranslations), shortageOfType('Gin', 'SPIRIT', nameTranslations)]);
+      mockShortages([
+        shortageOfType('Rum', ' SPIRIT ', nameTranslations),
+        shortageOfType('Gin', 'SPIRIT', nameTranslations),
+      ]);
       render(<ShortagesPage />);
 
       await screen.findByRole('heading', { name: 'Rum' });
-      expect(within(getCard('Rum')).getByText('Spirits – ␣SPIRIT␣ (with spaces)')).toBeInTheDocument();
+      expect(
+        within(getCard('Rum')).getByText('Spirits – ␣SPIRIT␣ (with spaces)'),
+      ).toBeInTheDocument();
       expect(within(getCard('Gin')).getByText('Spirits')).toBeInTheDocument();
     });
 
     it('marks the stored name of a category sent without its type', async () => {
-      mockShortages([buildShortage({ category: { name: 'Rum', type: 'X  Y', categoryType: null } })]);
+      mockShortages([
+        buildShortage({ category: { name: 'Rum', type: 'X  Y', categoryType: null } }),
+      ]);
       render(<ShortagesPage />);
 
       await screen.findByRole('heading', { name: 'Rum' });

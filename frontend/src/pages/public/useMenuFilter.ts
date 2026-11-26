@@ -13,7 +13,6 @@ import { isBottleMenu } from '../../utils/menuType';
 
 type MenuItem = MenuCocktail | MenuBottle;
 
-
 /**
  * - `section`: a section defined by the admin;
  * - `unsectioned`: items left out of every section;
@@ -82,14 +81,23 @@ function splitBySection<Item extends MenuItem>(
  * One block per category name. Bottles arrive in the admin's order (position),
  * so each block takes the place of its first bottle.
  */
-function splitByCategory(bottles: MenuBottle[], localize: LocalizeName, otherTitle: string): MenuBlock<MenuBottle>[] {
+function splitByCategory(
+  bottles: MenuBottle[],
+  localize: LocalizeName,
+  otherTitle: string,
+): MenuBlock<MenuBottle>[] {
   const blocks = new Map<string, MenuBlock<MenuBottle>>();
   for (const menuBottle of bottles) {
     const category = menuBottle.bottle?.category;
     const title = category ? localize(category) : otherTitle;
     let block = blocks.get(title);
     if (!block) {
-      block = { anchorId: `section-category-${category?.id ?? 'other'}`, title, kind: 'category', items: [] };
+      block = {
+        anchorId: `section-category-${category?.id ?? 'other'}`,
+        title,
+        kind: 'category',
+        items: [],
+      };
       blocks.set(title, block);
     }
     block.items.push(menuBottle);
@@ -104,19 +112,23 @@ function indexMenu(menu: Menu, localize: LocalizeName, t: TFunction): IndexedMen
   if (isBottleMenu(menu)) {
     const bottles = (menu.bottles ?? []).filter((item) => !item.isHidden && item.bottle);
     bottles.forEach((item) => searchTexts.set(item.id, getBottleSearchText(item.bottle, localize)));
-    const bottleBlocks = sections.length > 0
-      ? splitBySection(bottles, sections, t('public.withoutSection'))
-      : splitByCategory(bottles, localize, t('public.other'));
+    const bottleBlocks =
+      sections.length > 0
+        ? splitBySection(bottles, sections, t('public.withoutSection'))
+        : splitByCategory(bottles, localize, t('public.other'));
     return { cocktailBlocks: [], bottleBlocks, searchTexts };
   }
 
   const cocktails = (menu.cocktails ?? []).filter(
     (item): item is PublicMenuCocktail => !item.isHidden && item.cocktail !== undefined,
   );
-  cocktails.forEach((item) => searchTexts.set(item.id, getCocktailSearchText(item.cocktail, localize)));
-  const cocktailBlocks = sections.length > 0
-    ? splitBySection(cocktails, sections, t('public.withoutSection'))
-    : [{ anchorId: 'section-all', title: '', kind: 'all' as const, items: cocktails }];
+  cocktails.forEach((item) =>
+    searchTexts.set(item.id, getCocktailSearchText(item.cocktail, localize)),
+  );
+  const cocktailBlocks =
+    sections.length > 0
+      ? splitBySection(cocktails, sections, t('public.withoutSection'))
+      : [{ anchorId: 'section-all', title: '', kind: 'all' as const, items: cocktails }];
   return { cocktailBlocks, bottleBlocks: [], searchTexts };
 }
 
@@ -151,7 +163,9 @@ export function groupMenuBottles(bottles: MenuBottle[]): BottleGroupEntry[] {
 }
 
 function addLocation(group: BottleGroupEntry, location: string) {
-  const existing = group.locations.find((item) => item.name.toLowerCase() === location.toLowerCase());
+  const existing = group.locations.find(
+    (item) => item.name.toLowerCase() === location.toLowerCase(),
+  );
   if (existing) existing.count++;
   else group.locations.push({ name: location, count: 1 });
 }
@@ -166,11 +180,17 @@ function keepMatches<Item extends MenuItem>(
 }
 
 function filterMenu(indexed: IndexedMenu, query: string): MenuFilterResult {
-  const matches = (item: MenuItem) => matchesSearchText(indexed.searchTexts.get(item.id) ?? '', query);
+  const matches = (item: MenuItem) =>
+    matchesSearchText(indexed.searchTexts.get(item.id) ?? '', query);
   const cocktailBlocks = keepMatches(indexed.cocktailBlocks, matches);
-  const bottleBlocks = keepMatches(indexed.bottleBlocks, matches)
-    .map((block) => ({ ...block, items: groupMenuBottles(block.items) }));
-  const resultCount = [...cocktailBlocks, ...bottleBlocks].reduce((total, block) => total + block.items.length, 0);
+  const bottleBlocks = keepMatches(indexed.bottleBlocks, matches).map((block) => ({
+    ...block,
+    items: groupMenuBottles(block.items),
+  }));
+  const resultCount = [...cocktailBlocks, ...bottleBlocks].reduce(
+    (total, block) => total + block.items.length,
+    0,
+  );
   return { cocktailBlocks, bottleBlocks, resultCount, hasItems: indexed.searchTexts.size > 0 };
 }
 

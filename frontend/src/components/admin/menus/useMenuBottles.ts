@@ -5,7 +5,13 @@ import { qk } from '../../../queries/keys';
 import { isAvailableForMenu } from './bottleMenuType';
 import { isSavedEntry, type MenuBottleEntry } from './menuBottleGroups';
 import { orderByIds } from './moveItem';
-import { updateExclusions, updateMenu, useMenuMutation, type MenuMutation, type MenuState } from './useMenuMutation';
+import {
+  updateExclusions,
+  updateMenu,
+  useMenuMutation,
+  type MenuMutation,
+  type MenuState,
+} from './useMenuMutation';
 
 export type EntryChanges = Pick<MenuBottle, 'isHidden'> | Pick<MenuBottle, 'menuSectionId'>;
 
@@ -31,7 +37,10 @@ export interface MenuBottlesMutations {
 
 /** The bottles removed from a system menu. */
 export function useMenuExclusions(menuId: number): UseQueryResult<MenuBottleExclusion[], Error> {
-  return useQuery({ queryKey: qk.menuExclusions(menuId), queryFn: () => menuBottlesApi.exclusions(menuId) });
+  return useQuery({
+    queryKey: qk.menuExclusions(menuId),
+    queryFn: () => menuBottlesApi.exclusions(menuId),
+  });
 }
 
 function byBottleName(a: MenuBottleExclusion, b: MenuBottleExclusion): number {
@@ -52,7 +61,10 @@ function applyOrder(chosenIds: number[], entryIds: number[]): number[] {
 
 /** The order to send: applied to the entries the server holds, which all have a real id. */
 function orderForServer(chosenIds: number[], confirmed: MenuState): number[] {
-  return applyOrder(chosenIds, (confirmed.menu?.bottles ?? []).filter(isSavedEntry).map((entry) => entry.id));
+  return applyOrder(
+    chosenIds,
+    (confirmed.menu?.bottles ?? []).filter(isSavedEntry).map((entry) => entry.id),
+  );
 }
 
 /** Added or restored bottles, shown at the end of the menu with a temporary id until the server gives theirs. */
@@ -81,30 +93,51 @@ export function useMenuBottles(menuId: number): MenuBottlesMutations {
   const update = useMenuMutation<EntriesUpdate>({
     menuId,
     mutationFn: ({ entryIds, changes }) => menuBottlesApi.updateEntries(menuId, entryIds, changes),
-    applyOptimistic: (state, { entryIds, changes }) => updateMenu(state, (menu) => ({
-      ...menu,
-      bottles: menu.bottles?.map((entry) => (entryIds.includes(entry.id) ? { ...entry, ...changes } : entry)),
-    })),
+    applyOptimistic: (state, { entryIds, changes }) =>
+      updateMenu(state, (menu) => ({
+        ...menu,
+        bottles: menu.bottles?.map((entry) =>
+          entryIds.includes(entry.id) ? { ...entry, ...changes } : entry,
+        ),
+      })),
   });
 
   const reorder = useMenuMutation<number[]>({
     menuId,
     mutationFn: (ids, confirmed) => menuBottlesApi.reorder(menuId, orderForServer(ids, confirmed)),
-    applyOptimistic: (state, ids) => updateMenu(state, (menu) => {
-      const entries = menu.bottles ?? [];
-      return { ...menu, bottles: orderByIds(entries, applyOrder(ids, entries.map((entry) => entry.id))) };
-    }),
+    applyOptimistic: (state, ids) =>
+      updateMenu(state, (menu) => {
+        const entries = menu.bottles ?? [];
+        return {
+          ...menu,
+          bottles: orderByIds(
+            entries,
+            applyOrder(
+              ids,
+              entries.map((entry) => entry.id),
+            ),
+          ),
+        };
+      }),
   });
 
   const add = useMenuMutation<Bottle[]>({
     menuId,
-    mutationFn: (bottles) => menuBottlesApi.addBottles(menuId, bottles.map((bottle) => bottle.id)),
+    mutationFn: (bottles) =>
+      menuBottlesApi.addBottles(
+        menuId,
+        bottles.map((bottle) => bottle.id),
+      ),
     applyOptimistic: (state, bottles) => appendBottles(state, menuId, bottles),
   });
 
   const remove = useMenuMutation<MenuBottleEntry[]>({
     menuId,
-    mutationFn: (entries) => menuBottlesApi.removeEntries(menuId, entries.map((entry) => entry.id)),
+    mutationFn: (entries) =>
+      menuBottlesApi.removeEntries(
+        menuId,
+        entries.map((entry) => entry.id),
+      ),
     applyOptimistic: (state, entries) => {
       const entryIds = entries.map((entry) => entry.id);
       return filterEntries(state, (entry) => !entryIds.includes(entry.id));
@@ -113,10 +146,19 @@ export function useMenuBottles(menuId: number): MenuBottlesMutations {
 
   const exclude = useMenuMutation<MenuBottleEntry[]>({
     menuId,
-    mutationFn: (entries) => menuBottlesApi.exclude(menuId, entries.map((entry) => entry.bottleId)),
+    mutationFn: (entries) =>
+      menuBottlesApi.exclude(
+        menuId,
+        entries.map((entry) => entry.bottleId),
+      ),
     applyOptimistic: (state, entries) => {
       const bottleIds = entries.map((entry) => entry.bottleId);
-      const excluded = entries.map(({ bottleId, bottle }) => ({ menuId, bottleId, bottle, createdAt: new Date().toISOString() }));
+      const excluded = entries.map(({ bottleId, bottle }) => ({
+        menuId,
+        bottleId,
+        bottle,
+        createdAt: new Date().toISOString(),
+      }));
       const remaining = filterEntries(state, (entry) => !bottleIds.includes(entry.bottleId));
       return updateExclusions(remaining, (list) => [...list, ...excluded].sort(byBottleName));
     },
@@ -124,10 +166,16 @@ export function useMenuBottles(menuId: number): MenuBottlesMutations {
 
   const restore = useMenuMutation<MenuBottleExclusion[]>({
     menuId,
-    mutationFn: (exclusions) => menuBottlesApi.restore(menuId, exclusions.map(({ bottleId }) => bottleId)),
+    mutationFn: (exclusions) =>
+      menuBottlesApi.restore(
+        menuId,
+        exclusions.map(({ bottleId }) => bottleId),
+      ),
     applyOptimistic: (state, exclusions) => {
       const bottleIds = exclusions.map((exclusion) => exclusion.bottleId);
-      const withoutExclusions = updateExclusions(state, (list) => list.filter((item) => !bottleIds.includes(item.bottleId)));
+      const withoutExclusions = updateExclusions(state, (list) =>
+        list.filter((item) => !bottleIds.includes(item.bottleId)),
+      );
       // The server only puts back a bottle still checked for the menu's type: the others just leave the list.
       const { menu } = state;
       const bottles = exclusions.map((exclusion) => exclusion.bottle);

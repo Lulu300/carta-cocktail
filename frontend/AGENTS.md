@@ -111,25 +111,25 @@ frontend/
 
 ## Routing
 
-| Path | Component | Access |
-|------|-----------|--------|
-| `/` | HomePage | Public |
-| `/menu/:slug` | MenuPublicPage | Public |
-| `/menu/:slug/cocktail/:id` | CocktailPublicPage | Public |
-| `/login` | LoginPage | Public |
-| `/admin` | DashboardPage | Protected |
-| `/admin/categories` | CategoriesPage | Protected |
-| `/admin/bottles` | BottlesPage | Protected |
-| `/admin/ingredients` | IngredientsPage | Protected |
-| `/admin/units` | UnitsPage | Protected |
-| `/admin/cocktails` | CocktailsPage | Protected |
-| `/admin/cocktails/new` | CocktailFormPage | Protected |
-| `/admin/cocktails/:id` | CocktailFormPage | Protected |
-| `/admin/menus` | MenusPage | Protected |
-| `/admin/menus/:id` | MenuEditPage | Protected |
+| Path                       | Component          | Access    |
+| -------------------------- | ------------------ | --------- |
+| `/`                        | HomePage           | Public    |
+| `/menu/:slug`              | MenuPublicPage     | Public    |
+| `/menu/:slug/cocktail/:id` | CocktailPublicPage | Public    |
+| `/login`                   | LoginPage          | Public    |
+| `/admin`                   | DashboardPage      | Protected |
+| `/admin/categories`        | CategoriesPage     | Protected |
+| `/admin/bottles`           | BottlesPage        | Protected |
+| `/admin/ingredients`       | IngredientsPage    | Protected |
+| `/admin/units`             | UnitsPage          | Protected |
+| `/admin/cocktails`         | CocktailsPage      | Protected |
+| `/admin/cocktails/new`     | CocktailFormPage   | Protected |
+| `/admin/cocktails/:id`     | CocktailFormPage   | Protected |
+| `/admin/menus`             | MenusPage          | Protected |
+| `/admin/menus/:id`         | MenuEditPage       | Protected |
 | `/admin/menus/:id/bottles` | MenuBottleEditPage | Protected |
-| `/admin/shortages` | ShortagesPage | Protected |
-| `/admin/settings` | SettingsPage | Protected |
+| `/admin/shortages`         | ShortagesPage      | Protected |
+| `/admin/settings`          | SettingsPage       | Protected |
 
 Protected routes use `ProtectedRoute` wrapper in `App.tsx` which checks `AuthContext`.
 
@@ -149,6 +149,7 @@ Protected routes use `ProtectedRoute` wrapper in `App.tsx` which checks `AuthCon
 ### Translation Pattern
 
 Entity names are stored as JSON translation objects. The `useLocalizedName` hook resolves the correct language:
+
 ```tsx
 const getLocalizedName = useLocalizedName();
 const name = getLocalizedName(entity.name, entity.nameTranslations);
@@ -157,6 +158,7 @@ const name = getLocalizedName(entity.name, entity.nameTranslations);
 ### Page Pattern
 
 Admin pages are self-contained with inline forms and modals. Each page:
+
 1. Reads server data through the TanStack Query hooks of `src/queries/`, which call `services/api.ts`; query keys come from `queries/keys.ts` only
 2. Manages local UI state with `useState`
 3. Uses `useTranslation()` for all UI text
@@ -186,16 +188,17 @@ Safari and iOS 16.0+, Chrome and Edge 107+, Firefox 104+ (`build.target` in `vit
 
 ## Scripts
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Vite dev server (port 5173, proxies /api to :3001) |
-| `npm run build` | TypeScript check + Vite production build |
-| `npm run lint` | ESLint |
-| `npm run format:check` | Prettier check (fails until the repository reformat) |
-| `npm run preview` | Preview production build |
-| `npm test` | Tests (Vitest) |
-| `npm run test:watch` | Tests in watch mode |
-| `npm run test:coverage` | Tests with coverage |
+| Command                 | Description                                        |
+| ----------------------- | -------------------------------------------------- |
+| `npm run dev`           | Vite dev server (port 5173, proxies /api to :3001) |
+| `npm run build`         | TypeScript check + Vite production build           |
+| `npm run lint`          | ESLint                                             |
+| `npm run format`        | Prettier, rewrites the files                       |
+| `npm run format:check`  | Prettier check (must stay green, CI runs it)       |
+| `npm run preview`       | Preview production build                           |
+| `npm test`              | Tests (Vitest)                                     |
+| `npm run test:watch`    | Tests in watch mode                                |
+| `npm run test:coverage` | Tests with coverage                                |
 
 ## Dependencies
 

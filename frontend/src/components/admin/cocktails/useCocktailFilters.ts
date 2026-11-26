@@ -28,13 +28,24 @@ export function useCocktailFilters(cocktails: Cocktail[]) {
   }, [cocktails]);
 
   const filteredCocktails = useMemo(
-    () => cocktails.filter((cocktail) =>
-      matchesCocktailSearch(cocktail, search, localize, { includeNotes: true }) && matchesTags(cocktail, selectedTags),
-    ),
+    () =>
+      cocktails.filter(
+        (cocktail) =>
+          matchesCocktailSearch(cocktail, search, localize, { includeNotes: true }) &&
+          matchesTags(cocktail, selectedTags),
+      ),
     [cocktails, search, selectedTags, localize],
   );
 
   const isFiltered = search.trim() !== '' || selectedTags.length > 0;
 
-  return { search, setSearch, selectedTags, setSelectedTags, tagOptions, filteredCocktails, isFiltered };
+  return {
+    search,
+    setSearch,
+    selectedTags,
+    setSelectedTags,
+    tagOptions,
+    filteredCocktails,
+    isFiltered,
+  };
 }

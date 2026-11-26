@@ -5,7 +5,12 @@ import userEvent from '@testing-library/user-event';
 import CocktailsPage from './CocktailsPage';
 import { qk } from '../../queries/keys';
 import { buildAvailability, buildCocktail } from '../../test/factories';
-import { captureRequest, holdApiResponse, mockApiResponse, mockNetworkError } from '../../test/msw/utils';
+import {
+  captureRequest,
+  holdApiResponse,
+  mockApiResponse,
+  mockNetworkError,
+} from '../../test/msw/utils';
 import type { Cocktail, IngredientAvailability } from '../../types';
 
 // Builds a ZIP of every selected recipe: services/exportZip.test.ts covers it.
@@ -24,20 +29,37 @@ vi.mock('../../components/import/ImportCocktailWizard', () => ({
 
 import { exportCocktailsAsZip } from '../../services/exportZip';
 
-const mojito = buildCocktail({ id: 1, name: 'Mojito', description: 'Classic', notes: 'Jus de citron frais', tags: 'rum,lime' });
+const mojito = buildCocktail({
+  id: 1,
+  name: 'Mojito',
+  description: 'Classic',
+  notes: 'Jus de citron frais',
+  tags: 'rum,lime',
+});
 const negroni = buildCocktail({ id: 2, name: 'Negroni', imagePath: 'negroni.jpg' });
 
 function missingLine(id: number, name: string): IngredientAvailability {
   return {
-    cocktailIngredientId: id, sourceType: 'INGREDIENT', name, nameTranslations: null, orphan: false,
-    icon: null, quantity: 1, unit: 'cl', isAvailable: false, availableCount: 0,
+    cocktailIngredientId: id,
+    sourceType: 'INGREDIENT',
+    name,
+    nameTranslations: null,
+    orphan: false,
+    icon: null,
+    quantity: 1,
+    unit: 'cl',
+    isAvailable: false,
+    availableCount: 0,
   };
 }
 
 const mockAvailabilities = {
   1: buildAvailability({ cocktailId: 1, maxServings: 5 }),
   2: buildAvailability({
-    cocktailId: 2, isAvailable: false, maxServings: 0, ingredients: [missingLine(5, 'Campari')],
+    cocktailId: 2,
+    isAvailable: false,
+    maxServings: 0,
+    ingredients: [missingLine(5, 'Campari')],
   }),
 };
 
@@ -304,11 +326,15 @@ describe('CocktailsPage', () => {
     const reloaded = captureRequest('get', '/api/cocktails');
 
     await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
-    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }),
+    );
     expect(deleted.count()).toBe(0);
 
     await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
-    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }),
+    );
 
     expect(await screen.findByText('Cocktail deleted')).toBeInTheDocument();
     expect((await deleted.url).pathname).toBe('/api/cocktails/1');
@@ -364,12 +390,21 @@ describe('CocktailsPage', () => {
         ...mockAvailabilities[1],
         lowStock: [{ name: 'Rum', nameTranslations: null, servings: 2 }],
         ingredients: [
-          { ...missingLine(1, 'Mint'), },
+          { ...missingLine(1, 'Mint') },
           { ...missingLine(2, 'Lime') },
           { ...missingLine(3, 'Soda') },
           {
-            cocktailIngredientId: 4, sourceType: 'CATEGORY', name: 'White rum', nameTranslations: null, orphan: false,
-            icon: null, quantity: 5, unit: 'cl', isAvailable: true, availableCount: 5, preferredAvailable: false,
+            cocktailIngredientId: 4,
+            sourceType: 'CATEGORY',
+            name: 'White rum',
+            nameTranslations: null,
+            orphan: false,
+            icon: null,
+            quantity: 5,
+            unit: 'cl',
+            isAvailable: true,
+            availableCount: 5,
+            preferredAvailable: false,
           },
         ],
       },
@@ -385,7 +420,11 @@ describe('CocktailsPage', () => {
 
   it('filters the cocktails by tag, ignoring case', async () => {
     const user = userEvent.setup();
-    mockCocktails([mojito, { ...negroni, tags: 'Bitter, RUM' }, buildCocktail({ id: 3, name: 'Spritz', tags: 'bitter' })]);
+    mockCocktails([
+      mojito,
+      { ...negroni, tags: 'Bitter, RUM' },
+      buildCocktail({ id: 3, name: 'Spritz', tags: 'bitter' }),
+    ]);
     render(<CocktailsPage />);
     await screen.findByText('Spritz');
 

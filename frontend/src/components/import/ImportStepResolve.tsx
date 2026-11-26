@@ -22,15 +22,30 @@ interface ImportStepResolveProps {
   onNext: () => void;
 }
 
-export default function ImportStepResolve({ preview, resolutions, onChange, lists, canGoBack, onBack, onNext }: ImportStepResolveProps) {
+export default function ImportStepResolve({
+  preview,
+  resolutions,
+  onChange,
+  lists,
+  canGoBack,
+  onBack,
+  onNext,
+}: ImportStepResolveProps) {
   const { t } = useTranslation();
 
-  const updateResolution = (type: ImportEntityType, key: string, resolution: EntityResolutionAction) => {
+  const updateResolution = (
+    type: ImportEntityType,
+    key: string,
+    resolution: EntityResolutionAction,
+  ) => {
     onChange({ ...resolutions, [type]: { ...resolutions[type], [key]: resolution } });
   };
 
   const incompleteCount = countIncompleteResolutions(preview, resolutions, lists);
-  const totalEntities = IMPORT_ENTITY_TYPES.reduce((total, type) => total + preview[type].length, 0);
+  const totalEntities = IMPORT_ENTITY_TYPES.reduce(
+    (total, type) => total + preview[type].length,
+    0,
+  );
 
   const renderSection = (type: ImportEntityType) => {
     const entities = preview[type];
@@ -73,9 +88,7 @@ export default function ImportStepResolve({ preview, resolutions, onChange, list
         <Alert tone="warning">{t('cocktails.importWizard.cocktailExists')}</Alert>
       )}
 
-      {lists.hasError && (
-        <Alert tone="danger">{t('cocktails.importWizard.listsLoadError')}</Alert>
-      )}
+      {lists.hasError && <Alert tone="danger">{t('cocktails.importWizard.listsLoadError')}</Alert>}
 
       <Alert tone={incompleteCount === 0 ? 'success' : 'warning'}>{statusMessage()}</Alert>
 
@@ -84,7 +97,13 @@ export default function ImportStepResolve({ preview, resolutions, onChange, list
       </div>
 
       <div className="flex justify-between">
-        {canGoBack ? <Button variant="ghost" onClick={onBack}>{t('cocktails.importWizard.back')}</Button> : <span />}
+        {canGoBack ? (
+          <Button variant="ghost" onClick={onBack}>
+            {t('cocktails.importWizard.back')}
+          </Button>
+        ) : (
+          <span />
+        )}
         <Button onClick={onNext} disabled={incompleteCount > 0}>
           {t('cocktails.importWizard.next')}
         </Button>

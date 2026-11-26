@@ -15,7 +15,13 @@ function bottle(fields: Partial<ExportedBottle> = {}): ExportedBottle {
     openedAt: null,
     isApero: false,
     isDigestif: false,
-    category: { name: 'Rhum', type: 'SPIRIT', desiredStock: 1, minimumPercent: 30, nameTranslations: null },
+    category: {
+      name: 'Rhum',
+      type: 'SPIRIT',
+      desiredStock: 1,
+      minimumPercent: 30,
+      nameTranslations: null,
+    },
     ...fields,
   };
 }
@@ -25,13 +31,21 @@ function dataRows(csv: string): string[] {
 }
 
 describe('protectFormula', () => {
-  it.each(['=1+1', '+33 6', '-cellar', '@SUM(A1)', '\tTab', '\rReturn', "'=foo", "'+1", "''-x", "'@home"])(
-    'prefixes %j with an apostrophe, and unprotectFormula removes it',
-    (text) => {
-      expect(protectFormula(text)).toBe(`'${text}`);
-      expect(unprotectFormula(protectFormula(text))).toBe(text);
-    },
-  );
+  it.each([
+    '=1+1',
+    '+33 6',
+    '-cellar',
+    '@SUM(A1)',
+    '\tTab',
+    '\rReturn',
+    "'=foo",
+    "'+1",
+    "''-x",
+    "'@home",
+  ])('prefixes %j with an apostrophe, and unprotectFormula removes it', (text) => {
+    expect(protectFormula(text)).toBe(`'${text}`);
+    expect(unprotectFormula(protectFormula(text))).toBe(text);
+  });
 
   it('leaves other text alone, an apostrophe included', () => {
     expect(protectFormula('Havana 7')).toBe('Havana 7');
@@ -65,9 +79,22 @@ describe('buildCsvPayload', () => {
 
   it('imports back the same bottles', () => {
     const bottles = [
-      bottle({ name: '=1+1', location: '-1 cellar, left', alcoholPercentage: 40.5, purchasePrice: 0 }),
-      bottle({ name: 'Château "Margaux"', openedAt: new Date('2026-10-11T00:00:00.000Z'), isApero: true }),
-      bottle({ name: 'Château "Margaux"', openedAt: new Date('2026-10-11T00:00:00.000Z'), isApero: true }),
+      bottle({
+        name: '=1+1',
+        location: '-1 cellar, left',
+        alcoholPercentage: 40.5,
+        purchasePrice: 0,
+      }),
+      bottle({
+        name: 'Château "Margaux"',
+        openedAt: new Date('2026-10-11T00:00:00.000Z'),
+        isApero: true,
+      }),
+      bottle({
+        name: 'Château "Margaux"',
+        openedAt: new Date('2026-10-11T00:00:00.000Z'),
+        isApero: true,
+      }),
     ];
 
     const payload = parseCsvBottles(buildCsvPayload(bottles), 'en');
@@ -75,14 +102,30 @@ describe('buildCsvPayload', () => {
     expect(payload.errors).toEqual([]);
     expect(payload.bottles).toEqual([
       {
-        name: '=1+1', categoryName: 'Rhum', capacityMl: 700, remainingPercent: 100,
-        alcoholPercentage: 40.5, purchasePrice: 0, location: '-1 cellar, left', openedAt: null,
-        isApero: false, isDigestif: false, quantity: 1,
+        name: '=1+1',
+        categoryName: 'Rhum',
+        capacityMl: 700,
+        remainingPercent: 100,
+        alcoholPercentage: 40.5,
+        purchasePrice: 0,
+        location: '-1 cellar, left',
+        openedAt: null,
+        isApero: false,
+        isDigestif: false,
+        quantity: 1,
       },
       {
-        name: 'Château "Margaux"', categoryName: 'Rhum', capacityMl: 700, remainingPercent: 100,
-        alcoholPercentage: null, purchasePrice: null, location: null, openedAt: '2026-10-11T00:00:00.000Z',
-        isApero: true, isDigestif: false, quantity: 2,
+        name: 'Château "Margaux"',
+        categoryName: 'Rhum',
+        capacityMl: 700,
+        remainingPercent: 100,
+        alcoholPercentage: null,
+        purchasePrice: null,
+        location: null,
+        openedAt: '2026-10-11T00:00:00.000Z',
+        isApero: true,
+        isDigestif: false,
+        quantity: 2,
       },
     ]);
   });

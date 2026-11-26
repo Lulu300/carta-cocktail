@@ -45,24 +45,74 @@ const LETTER_OR_MARK = /[\p{L}\p{M}]/u;
 // Only scripts of Unicode 11 or older: a script name a browser does not know is a syntax error, and
 // the oldest supported browser (Safari 16.0) has to compile these patterns.
 function scriptsPattern(scripts: string[]): RegExp {
-  return new RegExp(`[${scripts.map((script) => String.raw`\p{Script_Extensions=${script}}`).join('')}]`, 'u');
+  return new RegExp(
+    `[${scripts.map((script) => String.raw`\p{Script_Extensions=${script}}`).join('')}]`,
+    'u',
+  );
 }
 
 // Cursive scripts: a joiner or non-joiner between two letters picks the joined or separate form
 // (Persian writes some words with a non-joiner).
 const CURSIVE_SCRIPTS = [
-  'Arabic', 'Syriac', 'Mongolian', 'Nko', 'Mandaic', 'Manichaean', 'Psalter_Pahlavi', 'Phags_Pa',
-  'Adlam', 'Hanifi_Rohingya', 'Sogdian',
+  'Arabic',
+  'Syriac',
+  'Mongolian',
+  'Nko',
+  'Mandaic',
+  'Manichaean',
+  'Psalter_Pahlavi',
+  'Phags_Pa',
+  'Adlam',
+  'Hanifi_Rohingya',
+  'Sogdian',
 ];
 // Brahmic scripts with a virama: a joiner or non-joiner after it picks a conjunct, a half form, a
 // chillu or a visible virama (Devanagari, Bengali, Malayalam…).
 const VIRAMA_SCRIPTS = [
-  'Devanagari', 'Bengali', 'Gurmukhi', 'Gujarati', 'Oriya', 'Tamil', 'Telugu', 'Kannada', 'Malayalam',
-  'Sinhala', 'Tibetan', 'Myanmar', 'Khmer', 'Tai_Tham', 'Balinese', 'Javanese', 'Sundanese', 'Batak',
-  'Tagalog', 'Hanunoo', 'Rejang', 'Kharoshthi', 'Brahmi', 'Kaithi', 'Chakma', 'Sharada', 'Khojki',
-  'Khudawadi', 'Grantha', 'Tirhuta', 'Siddham', 'Modi', 'Takri', 'Ahom', 'Newa', 'Bhaiksuki',
-  'Masaram_Gondi', 'Gunjala_Gondi', 'Dogra', 'Soyombo', 'Zanabazar_Square', 'Meetei_Mayek',
-  'Saurashtra', 'Syloti_Nagri',
+  'Devanagari',
+  'Bengali',
+  'Gurmukhi',
+  'Gujarati',
+  'Oriya',
+  'Tamil',
+  'Telugu',
+  'Kannada',
+  'Malayalam',
+  'Sinhala',
+  'Tibetan',
+  'Myanmar',
+  'Khmer',
+  'Tai_Tham',
+  'Balinese',
+  'Javanese',
+  'Sundanese',
+  'Batak',
+  'Tagalog',
+  'Hanunoo',
+  'Rejang',
+  'Kharoshthi',
+  'Brahmi',
+  'Kaithi',
+  'Chakma',
+  'Sharada',
+  'Khojki',
+  'Khudawadi',
+  'Grantha',
+  'Tirhuta',
+  'Siddham',
+  'Modi',
+  'Takri',
+  'Ahom',
+  'Newa',
+  'Bhaiksuki',
+  'Masaram_Gondi',
+  'Gunjala_Gondi',
+  'Dogra',
+  'Soyombo',
+  'Zanabazar_Square',
+  'Meetei_Mayek',
+  'Saurashtra',
+  'Syloti_Nagri',
 ];
 // Scripts whose glyph variants a variation selector picks: CJK ideographic variation sequences,
 // Mongolian free variation selectors, standardized variants of Phags-pa, Manichaean and Myanmar.
@@ -82,8 +132,11 @@ function isLetterOf(script: RegExp, char: Neighbour): boolean {
  * joined form whatever follows: a half form or a chillu can end a word.
  */
 function keepsJoiner(previous: Neighbour, next: Neighbour): boolean {
-  const joinsEmoji = previous !== undefined && EMOJI_BEFORE_JOINER.test(previous)
-    && next !== undefined && PICTOGRAPH.test(next);
+  const joinsEmoji =
+    previous !== undefined &&
+    EMOJI_BEFORE_JOINER.test(previous) &&
+    next !== undefined &&
+    PICTOGRAPH.test(next);
   return joinsEmoji || isLetterOf(JOINING_SCRIPT, previous);
 }
 
@@ -108,7 +161,8 @@ function isInvisible(char: string, previous: Neighbour, next: Neighbour): boolea
   if (BLANK.test(char) || !DEFAULT_IGNORABLE.test(char)) return false;
   if (VARIATION_SELECTOR.test(char)) return !keepsVariationSelector(char, previous, next);
   if (char === ZERO_WIDTH_JOINER) return !keepsJoiner(previous, next);
-  if (char === ZERO_WIDTH_NON_JOINER || char === MONGOLIAN_VOWEL_SEPARATOR) return !keepsSeparator(previous, next);
+  if (char === ZERO_WIDTH_NON_JOINER || char === MONGOLIAN_VOWEL_SEPARATOR)
+    return !keepsSeparator(previous, next);
   if (TAG.test(char)) return !keepsTag(previous);
   return true;
 }
@@ -118,7 +172,10 @@ function isInvisible(char: string, previous: Neighbour, next: Neighbour): boolea
  * selector or tag that changes how an emoji or a letter is drawn is not invisible, and is kept.
  * Each character is judged after the ones before it.
  */
-export function replaceInvisibleCharacters(text: string, replacement: (char: string) => string): string {
+export function replaceInvisibleCharacters(
+  text: string,
+  replacement: (char: string) => string,
+): string {
   const chars = Array.from(text);
   let previous: Neighbour;
   let result = '';

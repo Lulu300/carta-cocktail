@@ -40,12 +40,15 @@ afterEach(async () => {
 
 describe('configureSqlite', () => {
   // The compose files pass SQLITE_WAL empty when .env does not set it
-  it.each([undefined, ''])('should switch the database to WAL by default (SQLITE_WAL=%j)', async (value) => {
-    const client = openClient();
+  it.each([undefined, ''])(
+    'should switch the database to WAL by default (SQLITE_WAL=%j)',
+    async (value) => {
+      const client = openClient();
 
-    expect(await configureSqlite(client, { SQLITE_WAL: value })).toBe('wal');
-    expect(await readPragma(client, 'journal_mode')).toBe('wal');
-  });
+      expect(await configureSqlite(client, { SQLITE_WAL: value })).toBe('wal');
+      expect(await readPragma(client, 'journal_mode')).toBe('wal');
+    },
+  );
 
   it('should store WAL in the file so a new client sees it', async () => {
     await configureSqlite(openClient(), {});
@@ -117,7 +120,9 @@ describe('checkpointWal', () => {
 
 /** Path of the file a client has open, as SQLite reports it. */
 async function openFile(client: PrismaClient): Promise<string> {
-  const rows = await client.$queryRawUnsafe<{ file: string }[]>("SELECT file FROM pragma_database_list WHERE name = 'main';");
+  const rows = await client.$queryRawUnsafe<{ file: string }[]>(
+    "SELECT file FROM pragma_database_list WHERE name = 'main';",
+  );
   return fs.realpathSync(rows[0].file);
 }
 

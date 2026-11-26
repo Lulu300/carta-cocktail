@@ -103,8 +103,11 @@ describe('parseImportDate', () => {
       expect(parseImportDate('12/03/2024', language)).toBe(expected);
     });
 
-    it.each(['de', 'constructor', ''])('reads an unknown language (%j) as en, the fallback language', (language) => {
-      expect(parseImportDate('12/03/2024', language)).toBe('2024-12-03');
-    });
+    it.each(['de', 'constructor', ''])(
+      'reads an unknown language (%j) as en, the fallback language',
+      (language) => {
+        expect(parseImportDate('12/03/2024', language)).toBe('2024-12-03');
+      },
+    );
   });
 });

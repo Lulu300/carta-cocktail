@@ -39,7 +39,10 @@ const SettingsPage = lazyWithAdminMessages(() => import('./pages/admin/SettingsP
 function RouteFallback() {
   const { t } = useTranslation();
   return (
-    <div role="status" className="min-h-screen bg-canvas flex items-center justify-center text-fg-muted">
+    <div
+      role="status"
+      className="min-h-screen bg-canvas flex items-center justify-center text-fg-muted"
+    >
       {t('common.loading')}
     </div>
   );
@@ -66,13 +69,17 @@ function SessionCheckError({ error, onRetry, onSignInAgain }: SessionCheckErrorP
         title={t('auth.sessionCheckFailed')}
         description={error instanceof ApiError ? error.message : t('public.loadErrorHint')}
         titleProps={{ role: 'alert' }}
-        action={(
+        action={
           <div className="flex flex-wrap items-center justify-center gap-4">
-            <Button variant="secondary" onClick={onRetry}>{t('common.retry')}</Button>
-            <Button variant="ghost" onClick={onSignInAgain}>{t('auth.signInAgain')}</Button>
+            <Button variant="secondary" onClick={onRetry}>
+              {t('common.retry')}
+            </Button>
+            <Button variant="ghost" onClick={onSignInAgain}>
+              {t('auth.signInAgain')}
+            </Button>
             <BackHomeLink />
           </div>
-        )}
+        }
       />
     </main>
   );

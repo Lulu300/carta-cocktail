@@ -20,7 +20,9 @@ function AskButton({ options }: { options: ConfirmOptions }) {
 
   return (
     <>
-      <button type="button" onClick={ask}>Ask</button>
+      <button type="button" onClick={ask}>
+        Ask
+      </button>
       <output>{answers.join(',')}</output>
     </>
   );
@@ -40,7 +42,9 @@ function answers() {
 
 describe('ConfirmProvider and useConfirm', () => {
   beforeEach(() => {
-    vi.spyOn(HTMLDialogElement.prototype, 'getBoundingClientRect').mockReturnValue(DIALOG_BOX as DOMRect);
+    vi.spyOn(HTMLDialogElement.prototype, 'getBoundingClientRect').mockReturnValue(
+      DIALOG_BOX as DOMRect,
+    );
   });
 
   afterEach(() => {
@@ -49,7 +53,12 @@ describe('ConfirmProvider and useConfirm', () => {
 
   it('opens the dialog with the given options', async () => {
     const user = userEvent.setup();
-    renderAsk({ title: 'Delete the bottle?', message: 'It is used by 2 menus.', confirmLabel: 'Delete', tone: 'danger' });
+    renderAsk({
+      title: 'Delete the bottle?',
+      message: 'It is used by 2 menus.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
 
     await user.click(screen.getByText('Ask'));
 
@@ -156,6 +165,8 @@ describe('ConfirmProvider and useConfirm', () => {
 
   it('throws when used outside a ConfirmProvider', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    expect(() => renderHook(() => useConfirm())).toThrow('useConfirm must be used inside a ConfirmProvider');
+    expect(() => renderHook(() => useConfirm())).toThrow(
+      'useConfirm must be used inside a ConfirmProvider',
+    );
   });
 });

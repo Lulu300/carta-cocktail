@@ -364,7 +364,8 @@ export interface BottleRowPreview {
   potentialDuplicates: BottleDuplicateEntry[];
 }
 
-export type BottleImportRowErrorCode = 'required' | 'outOfRange' | 'invalidDate' | 'invalidNumber' | 'malformedQuotes';
+export type BottleImportRowErrorCode =
+  'required' | 'outOfRange' | 'invalidDate' | 'invalidNumber' | 'malformedQuotes';
 
 /**
  * A row of the file left out of the import. `line` is the CSV line (header = 1)
@@ -415,8 +416,7 @@ export type BottleCategoryResolution =
 
 export type BottleRowResolution =
   // `categoryId`: an existing category, which takes precedence over `categoryName`
-  | { action: 'import'; categoryId?: number; categoryName?: string }
-  | { action: 'skip' };
+  { action: 'import'; categoryId?: number; categoryName?: string } | { action: 'skip' };
 
 export interface BottleImportResolutions {
   categories: Record<string, BottleCategoryResolution>;

@@ -16,12 +16,8 @@ router.get('/', async (_req: AuthRequest, res: Response) => {
   const shortages = categories
     .map((category) => {
       // Sum all remaining percentages (each bottle = max 100%)
-      const totalPercent = category.bottles.reduce(
-        (sum, b) => sum + b.remainingPercent, 0
-      );
-      const totalUsable = category.bottles.filter(
-        (b) => b.remainingPercent > 0
-      ).length;
+      const totalPercent = category.bottles.reduce((sum, b) => sum + b.remainingPercent, 0);
+      const totalUsable = category.bottles.filter((b) => b.remainingPercent > 0).length;
       // Threshold: (desiredStock - 1) * 100 + minimumPercent
       const requiredPercent = (category.desiredStock - 1) * 100 + category.minimumPercent;
 

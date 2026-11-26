@@ -25,8 +25,18 @@ export default function MenuSearchBar({ value, onChange, placeholder }: MenuSear
         aria-label={placeholder}
         className="w-full bg-surface border border-line-strong rounded-lg pl-10 pr-10 py-3 text-fg placeholder:text-fg-muted focus:border-accent transition-colors [&::-webkit-search-cancel-button]:hidden"
       />
-      <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-fg-muted" />
-      {value && <ClearButton label={t('common.clearSearch')} onClick={() => onChange('')} fieldRef={inputRef} className="right-1.5" />}
+      <Icon
+        name="search"
+        className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-fg-muted"
+      />
+      {value && (
+        <ClearButton
+          label={t('common.clearSearch')}
+          onClick={() => onChange('')}
+          fieldRef={inputRef}
+          className="right-1.5"
+        />
+      )}
     </div>
   );
 }

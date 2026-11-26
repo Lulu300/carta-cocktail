@@ -24,8 +24,14 @@ describe('IconPicker', () => {
   it('marks the selected emoji as pressed', () => {
     render(<IconPicker value="🍋" onChange={vi.fn()} />);
 
-    expect(screen.getByRole('button', { name: 'Emoji 🍋' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Emoji 🍒' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Emoji 🍋' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Emoji 🍒' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
   });
 
   it('should show selected indicator when value is set', () => {

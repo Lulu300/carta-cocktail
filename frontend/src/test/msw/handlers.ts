@@ -45,7 +45,9 @@ function exportedCocktailFile(id: number): { filename: string; data: CocktailExp
 /** The single export of the default cocktail `id`, named in Content-Disposition as the backend does. */
 function exportAttachment(id: number): Response {
   const { filename, data } = exportedCocktailFile(id);
-  return HttpResponse.json(data, { headers: { 'Content-Disposition': `attachment; filename="${filename}"` } });
+  return HttpResponse.json(data, {
+    headers: { 'Content-Disposition': `attachment; filename="${filename}"` },
+  });
 }
 
 const FIRST_CREATED_ID = 1000;
@@ -63,13 +65,20 @@ async function echoCreated({ request }: { request: StrictRequest<DefaultBodyType
 }
 
 /** PUT on `/:id`: the server answers with what it received, under that id. */
-async function echoUpdated({ request, params }: { request: StrictRequest<DefaultBodyType>; params: PathParams }) {
+async function echoUpdated({
+  request,
+  params,
+}: {
+  request: StrictRequest<DefaultBodyType>;
+  params: PathParams;
+}) {
   return HttpResponse.json({ ...(await readJsonObject(request)), id: Number(params.id) });
 }
 
 const deleted = () => HttpResponse.json({ message: 'Deleted' });
 /** DELETE of an item recipes can use (C-07): nothing used it, so nothing else changed. */
-const deletedUnused = () => HttpResponse.json({ message: 'Deleted', deleted: true, impact: { cocktails: [], bottles: [] } });
+const deletedUnused = () =>
+  HttpResponse.json({ message: 'Deleted', deleted: true, impact: { cocktails: [], bottles: [] } });
 const done = () => HttpResponse.json({ message: 'OK' });
 
 const authHandlers = [
@@ -84,43 +93,62 @@ const categoryTypeHandlers = [
       buildCategoryType({ name: 'SYRUP', color: 'purple' }),
     ]),
   ),
-  http.post('/api/category-types', async ({ request }) => HttpResponse.json(await readJsonObject(request), { status: 201 })),
+  http.post('/api/category-types', async ({ request }) =>
+    HttpResponse.json(await readJsonObject(request), { status: 201 }),
+  ),
   http.put('/api/category-types/:name', async ({ request, params }) =>
     HttpResponse.json({ ...(await readJsonObject(request)), name: params.name }),
   ),
   http.delete('/api/category-types/:name', deleted),
   // The empty name of old data goes in the query (`?name=`), see categoryTypeUrl in services/api.ts.
   http.put('/api/category-types', async ({ request }) =>
-    HttpResponse.json({ ...(await readJsonObject(request)), name: new URL(request.url).searchParams.get('name') }),
+    HttpResponse.json({
+      ...(await readJsonObject(request)),
+      name: new URL(request.url).searchParams.get('name'),
+    }),
   ),
   http.delete('/api/category-types', deleted),
 ];
 
 const categoryHandlers = [
-  http.get('/api/categories', () => HttpResponse.json([buildCategory({ id: 1 }), buildCategory({ id: 2 })])),
-  http.get('/api/categories/:id', ({ params }) => HttpResponse.json(buildCategory({ id: Number(params.id) }))),
+  http.get('/api/categories', () =>
+    HttpResponse.json([buildCategory({ id: 1 }), buildCategory({ id: 2 })]),
+  ),
+  http.get('/api/categories/:id', ({ params }) =>
+    HttpResponse.json(buildCategory({ id: Number(params.id) })),
+  ),
   http.post('/api/categories', echoCreated),
   http.put('/api/categories/:id', echoUpdated),
   http.delete('/api/categories/:id', deletedUnused),
 ];
 
 const bottleHandlers = [
-  http.get('/api/bottles', () => HttpResponse.json([buildBottle({ id: 1 }), buildBottle({ id: 2 })])),
+  http.get('/api/bottles', () =>
+    HttpResponse.json([buildBottle({ id: 1 }), buildBottle({ id: 2 })]),
+  ),
   http.get('/api/bottles/export', () =>
     HttpResponse.text('name,category\n', {
       headers: { 'Content-Disposition': 'attachment; filename="bottles.csv"' },
     }),
   ),
-  http.get('/api/bottles/:id', ({ params }) => HttpResponse.json(buildBottle({ id: Number(params.id) }))),
+  http.get('/api/bottles/:id', ({ params }) =>
+    HttpResponse.json(buildBottle({ id: Number(params.id) })),
+  ),
   http.post('/api/bottles', echoCreated),
   http.put('/api/bottles/:id', echoUpdated),
   http.delete('/api/bottles/:id', deletedUnused),
 ];
 
 const ingredientHandlers = [
-  http.get('/api/ingredients', () => HttpResponse.json([buildIngredient({ id: 1 }), buildIngredient({ id: 2 })])),
-  http.get('/api/ingredients/:id', ({ params }) => HttpResponse.json(buildIngredient({ id: Number(params.id) }))),
-  http.post('/api/ingredients/bulk-availability', () => HttpResponse.json({ message: 'OK', updated: 0 })),
+  http.get('/api/ingredients', () =>
+    HttpResponse.json([buildIngredient({ id: 1 }), buildIngredient({ id: 2 })]),
+  ),
+  http.get('/api/ingredients/:id', ({ params }) =>
+    HttpResponse.json(buildIngredient({ id: Number(params.id) })),
+  ),
+  http.post('/api/ingredients/bulk-availability', () =>
+    HttpResponse.json({ message: 'OK', updated: 0 }),
+  ),
   http.post('/api/ingredients', echoCreated),
   http.put('/api/ingredients/:id', echoUpdated),
   http.delete('/api/ingredients/:id', deletedUnused),
@@ -128,31 +156,46 @@ const ingredientHandlers = [
 
 const unitHandlers = [
   http.get('/api/units', () => HttpResponse.json([buildUnit({ id: 1 }), buildUnit({ id: 2 })])),
-  http.get('/api/units/:id', ({ params }) => HttpResponse.json(buildUnit({ id: Number(params.id) }))),
+  http.get('/api/units/:id', ({ params }) =>
+    HttpResponse.json(buildUnit({ id: Number(params.id) })),
+  ),
   http.post('/api/units', echoCreated),
   http.put('/api/units/:id', echoUpdated),
   http.delete('/api/units/:id', deleted),
 ];
 
 const cocktailHandlers = [
-  http.get('/api/cocktails', () => HttpResponse.json([buildCocktail({ id: 1 }), buildCocktail({ id: 2 })])),
-  http.get('/api/cocktails/:id', ({ params }) => HttpResponse.json(buildCocktail({ id: Number(params.id) }))),
+  http.get('/api/cocktails', () =>
+    HttpResponse.json([buildCocktail({ id: 1 }), buildCocktail({ id: 2 })]),
+  ),
+  http.get('/api/cocktails/:id', ({ params }) =>
+    HttpResponse.json(buildCocktail({ id: Number(params.id) })),
+  ),
   http.get('/api/cocktails/:id/export', ({ params }) => exportAttachment(Number(params.id))),
   http.post('/api/cocktails/export', async ({ request }) => {
     const { ids } = await readJsonObject(request);
-    return HttpResponse.json(Array.isArray(ids) ? ids.map((id) => exportedCocktailFile(Number(id))) : []);
+    return HttpResponse.json(
+      Array.isArray(ids) ? ids.map((id) => exportedCocktailFile(Number(id))) : [],
+    );
   }),
   http.post('/api/cocktails', echoCreated),
   http.put('/api/cocktails/:id', echoUpdated),
   http.delete('/api/cocktails/:id', deleted),
   http.post('/api/cocktails/:id/image', ({ params }) =>
-    HttpResponse.json(buildCocktail({ id: Number(params.id), imagePath: `/uploads/cocktail-${String(params.id)}.jpg` })),
+    HttpResponse.json(
+      buildCocktail({
+        id: Number(params.id),
+        imagePath: `/uploads/cocktail-${String(params.id)}.jpg`,
+      }),
+    ),
   ),
 ];
 
 const menuHandlers = [
   http.get('/api/menus', () => HttpResponse.json([buildMenu({ id: 1 }), buildMenu({ id: 2 })])),
-  http.get('/api/menus/:id', ({ params }) => HttpResponse.json(buildMenu({ id: Number(params.id) }))),
+  http.get('/api/menus/:id', ({ params }) =>
+    HttpResponse.json(buildMenu({ id: Number(params.id) })),
+  ),
   http.post('/api/menus', echoCreated),
   http.put('/api/menus/:id', echoUpdated),
   http.delete('/api/menus/:id', deleted),
@@ -166,7 +209,9 @@ const menuBottleHandlers = [
   http.post('/api/menu-bottles/menu/:menuId/exclusions', done),
   http.post('/api/menu-bottles/menu/:menuId/exclusions/restore', done),
   http.delete('/api/menu-bottles/menu/:menuId/exclusions/:bottleId', done),
-  http.post('/api/menu-bottles/menu/:menuId/sync', () => HttpResponse.json({ message: 'OK', added: 0, removed: 0 })),
+  http.post('/api/menu-bottles/menu/:menuId/sync', () =>
+    HttpResponse.json({ message: 'OK', added: 0, removed: 0 }),
+  ),
   http.post('/api/menu-bottles/menu/:menuId/reorder', done),
   http.put('/api/menu-bottles/menu/:menuId/entries', done),
   http.post('/api/menu-bottles/menu/:menuId/entries', done),
@@ -188,20 +233,27 @@ const menuSectionHandlers = [
 
 const publicHandlers = [
   http.get('/api/public/menus', () => HttpResponse.json([buildMenu({ id: 1 })])),
-  http.get('/api/public/menus/:slug', ({ params }) => HttpResponse.json(buildMenu({ id: 1, slug: String(params.slug) }))),
+  http.get('/api/public/menus/:slug', ({ params }) =>
+    HttpResponse.json(buildMenu({ id: 1, slug: String(params.slug) })),
+  ),
   http.get('/api/public/cocktails/:id', ({ params }) =>
     HttpResponse.json(buildCocktail({ id: Number(params.id), available: true })),
   ),
   http.get('/api/public/cocktails/:id/export', ({ params }) => exportAttachment(Number(params.id))),
   http.get('/api/public/settings', () => HttpResponse.json(buildSiteSettings())),
-  http.get('/api/public/units', () => HttpResponse.json([buildUnit({ id: 1 }), buildUnit({ id: 2 })])),
+  http.get('/api/public/units', () =>
+    HttpResponse.json([buildUnit({ id: 1 }), buildUnit({ id: 2 })]),
+  ),
 ];
 
 const stockHandlers = [
   // No shortage by default: a test that needs one says so.
   http.get('/api/shortages', () => HttpResponse.json([])),
   http.get('/api/availability/cocktails', () =>
-    HttpResponse.json({ 1: buildAvailability({ cocktailId: 1 }), 2: buildAvailability({ cocktailId: 2 }) }),
+    HttpResponse.json({
+      1: buildAvailability({ cocktailId: 1 }),
+      2: buildAvailability({ cocktailId: 2 }),
+    }),
   ),
   http.get('/api/availability/cocktails/:id', ({ params }) =>
     HttpResponse.json(buildAvailability({ cocktailId: Number(params.id) })),
@@ -210,14 +262,22 @@ const stockHandlers = [
 
 const settingsHandlers = [
   http.get('/api/settings', () => HttpResponse.json(buildSiteSettings())),
-  http.put('/api/settings', async ({ request }) => HttpResponse.json({ ...(await readJsonObject(request)), id: 1 })),
+  http.put('/api/settings', async ({ request }) =>
+    HttpResponse.json({ ...(await readJsonObject(request)), id: 1 }),
+  ),
   http.put('/api/settings/profile', async ({ request }) => {
     const body = await readJsonObject(request);
-    return HttpResponse.json({ ...ADMIN_USER, ...(typeof body.email === 'string' ? { email: body.email } : {}) });
+    return HttpResponse.json({
+      ...ADMIN_USER,
+      ...(typeof body.email === 'string' ? { email: body.email } : {}),
+    });
   }),
   http.get('/api/backup/export', () =>
     HttpResponse.arrayBuffer(new ArrayBuffer(8), {
-      headers: { 'Content-Type': 'application/zip', 'Content-Disposition': 'attachment; filename="backup.zip"' },
+      headers: {
+        'Content-Type': 'application/zip',
+        'Content-Disposition': 'attachment; filename="backup.zip"',
+      },
     }),
   ),
 ];
@@ -225,7 +285,10 @@ const settingsHandlers = [
 const systemHandlers = [
   // No upgrade notice by default: a test that needs one says so.
   http.get('/api/system/upgrade-notice', () => new HttpResponse(null, { status: 204 })),
-  http.post('/api/system/upgrade-notice/acknowledge', () => new HttpResponse(null, { status: 204 })),
+  http.post(
+    '/api/system/upgrade-notice/acknowledge',
+    () => new HttpResponse(null, { status: 204 }),
+  ),
 ];
 
 export const handlers = [

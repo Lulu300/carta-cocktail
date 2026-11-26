@@ -51,7 +51,12 @@ export default function IngredientsFields({ lists, availability }: IngredientsFi
 
       <ul className="space-y-3">
         {fields.map((field, index) => (
-          <IngredientRowFields key={field.id} index={index} lists={lists} onRemove={() => remove(index)} />
+          <IngredientRowFields
+            key={field.id}
+            index={index}
+            lists={lists}
+            onRemove={() => remove(index)}
+          />
         ))}
       </ul>
     </Card>

@@ -10,9 +10,24 @@ import { MAX_BOTTLE_IMPORT_BYTES } from './utils/bottlesImport';
 const NGINX_TEMPLATE = path.resolve(__dirname, '../../frontend/nginx.conf.template');
 
 const UPLOADS = [
-  { name: 'cocktail photo', route: '/api/cocktails/1/image', field: 'image', maxBytes: MAX_IMAGE_BYTES },
-  { name: 'bottle import', route: '/api/bottles/import/preview', field: 'file', maxBytes: MAX_BOTTLE_IMPORT_BYTES },
-  { name: 'backup restore', route: '/api/backup/import', field: 'backup', maxBytes: MAX_BACKUP_UPLOAD_BYTES },
+  {
+    name: 'cocktail photo',
+    route: '/api/cocktails/1/image',
+    field: 'image',
+    maxBytes: MAX_IMAGE_BYTES,
+  },
+  {
+    name: 'bottle import',
+    route: '/api/bottles/import/preview',
+    field: 'file',
+    maxBytes: MAX_BOTTLE_IMPORT_BYTES,
+  },
+  {
+    name: 'backup restore',
+    route: '/api/backup/import',
+    field: 'backup',
+    maxBytes: MAX_BACKUP_UPLOAD_BYTES,
+  },
 ];
 
 // Longest name most file systems allow: the browser sends it in the multipart envelope
@@ -37,7 +52,10 @@ interface NginxLocation {
  * The server's client_max_body_size and its locations. Enough for this template, whose
  * locations are flat blocks: an exact (`=`) or prefix (none or `^~`) match, no regex.
  */
-function readNginxLimits(config: string): { serverMaxBodySize: string; locations: NginxLocation[] } {
+function readNginxLimits(config: string): {
+  serverMaxBodySize: string;
+  locations: NginxLocation[];
+} {
   const locations: NginxLocation[] = [];
   const locationBlock = /^\s*location\s+(=|\^~)?\s*(\S+)\s*\{([^}]*)\}/gm;
   for (const [, modifier, locationPath, body] of config.matchAll(locationBlock)) {
@@ -94,9 +112,12 @@ describe('upload limits and nginx', () => {
     expect(nginxLimitFor('/other', sample)).toBe(1024);
   });
 
-  it.each(UPLOADS)('lets a $name of exactly the backend limit through nginx', async ({ route, field, maxBytes }) => {
-    const bodyBytes = maxBytes + await multipartEnvelopeBytes(field);
+  it.each(UPLOADS)(
+    'lets a $name of exactly the backend limit through nginx',
+    async ({ route, field, maxBytes }) => {
+      const bodyBytes = maxBytes + (await multipartEnvelopeBytes(field));
 
-    expect(bodyBytes).toBeLessThanOrEqual(nginxLimitFor(route, config));
-  });
+      expect(bodyBytes).toBeLessThanOrEqual(nginxLimitFor(route, config));
+    },
+  );
 });

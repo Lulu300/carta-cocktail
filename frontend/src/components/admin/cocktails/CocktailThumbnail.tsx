@@ -19,15 +19,28 @@ const VARIANT_CLASSES: Record<ThumbnailVariant, string> = {
 };
 
 /** The cocktail photo, or a glass when it has none. `children` are laid over it, e.g. badges. */
-export default function CocktailThumbnail({ cocktail, variant, className, children }: CocktailThumbnailProps) {
+export default function CocktailThumbnail({
+  cocktail,
+  variant,
+  className,
+  children,
+}: CocktailThumbnailProps) {
   const imageUrl = getUploadUrl(cocktail.imagePath);
 
   return (
-    <div className={cx('bg-canvas flex items-center justify-center', VARIANT_CLASSES[variant], className)}>
+    <div
+      className={cx(
+        'bg-canvas flex items-center justify-center',
+        VARIANT_CLASSES[variant],
+        className,
+      )}
+    >
       {imageUrl ? (
         <img src={imageUrl} alt={cocktail.name} className="w-full h-full object-cover" />
       ) : (
-        <span aria-hidden="true" className={variant === 'cover' ? 'text-4xl' : 'text-3xl'}>🍸</span>
+        <span aria-hidden="true" className={variant === 'cover' ? 'text-4xl' : 'text-3xl'}>
+          🍸
+        </span>
       )}
       {children}
     </div>

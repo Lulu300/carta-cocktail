@@ -3,7 +3,11 @@ import { categoryTypes as categoryTypesApi } from '../../../services/api';
 import type { CategoryType } from '../../../types';
 import { qk } from '../../../queries/keys';
 import { useEntityMutation } from '../../../queries/crud';
-import { buildNameTranslations, toTranslationForm, type TranslationForm } from '../../../utils/translations';
+import {
+  buildNameTranslations,
+  toTranslationForm,
+  type TranslationForm,
+} from '../../../utils/translations';
 import { tidyName } from '../../../utils/invisibleCharacters';
 import { useEntityForm } from '../useEntityForm';
 
@@ -62,7 +66,10 @@ export function useCategoryTypeForm() {
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    const changes = { color: form.color, nameTranslations: buildNameTranslations(form.translations) };
+    const changes = {
+      color: form.color,
+      nameTranslations: buildNameTranslations(form.translations),
+    };
     if (editing) {
       update.mutate({ name: editing.name, ...changes }, { onSuccess: resetForm });
       return;
@@ -78,11 +85,12 @@ export function useCategoryTypeForm() {
     submit,
     resetForm,
     // A deleted type cannot stay in the form: saving it would fail.
-    remove: (name: string) => remove.mutate(name, {
-      onSuccess: () => {
-        if (editing?.name === name) resetForm();
-      },
-    }),
+    remove: (name: string) =>
+      remove.mutate(name, {
+        onSuccess: () => {
+          if (editing?.name === name) resetForm();
+        },
+      }),
     isSaving: create.isPending || update.isPending,
   };
 }

@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import {
-  setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData, request, authHeader,
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+  request,
+  authHeader,
 } from '../test/helpers';
 
 // A small stand-in for MAX_BACKUP_UPLOAD_BYTES: the tests check how the route applies the
@@ -8,16 +13,26 @@ import {
 const { UPLOAD_LIMIT } = vi.hoisted(() => ({ UPLOAD_LIMIT: 64 * 1024 }));
 
 vi.mock('../services/backupService', async (importOriginal) => ({
-  ...await importOriginal<typeof import('../services/backupService')>(),
+  ...(await importOriginal<typeof import('../services/backupService')>()),
   MAX_BACKUP_UPLOAD_BYTES: UPLOAD_LIMIT,
 }));
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
-beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
+beforeEach(async () => {
+  await cleanDatabase();
+  await seedRequiredData();
+});
 
 function importArchiveOf(size: number) {
-  return request.post('/api/backup/import').set(authHeader()).attach('backup', Buffer.alloc(size), 'backup.zip');
+  return request
+    .post('/api/backup/import')
+    .set(authHeader())
+    .attach('backup', Buffer.alloc(size), 'backup.zip');
 }
 
 describe('POST /api/backup/import - upload limit', () => {

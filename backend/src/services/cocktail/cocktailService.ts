@@ -65,11 +65,18 @@ function idsOf(line: IngredientLineValue, field: ReferenceField): number[] {
   return value == null ? [] : [value];
 }
 
-async function loadExistingIds(db: Db, lines: IngredientLineValue[]): Promise<Record<ReferencedTable, Set<number>>> {
-  const wanted = (table: ReferencedTable) => REFERENCE_FIELDS
-    .filter((field) => TABLE_OF_FIELD[field] === table)
-    .flatMap((field) => lines.flatMap((line) => idsOf(line, field)));
-  const where = (table: ReferencedTable) => ({ where: { id: { in: wanted(table) } }, select: { id: true } });
+async function loadExistingIds(
+  db: Db,
+  lines: IngredientLineValue[],
+): Promise<Record<ReferencedTable, Set<number>>> {
+  const wanted = (table: ReferencedTable) =>
+    REFERENCE_FIELDS.filter((field) => TABLE_OF_FIELD[field] === table).flatMap((field) =>
+      lines.flatMap((line) => idsOf(line, field)),
+    );
+  const where = (table: ReferencedTable) => ({
+    where: { id: { in: wanted(table) } },
+    select: { id: true },
+  });
   const toSet = (rows: { id: number }[]) => new Set(rows.map((row) => row.id));
   return {
     units: toSet(await db.unit.findMany(where('units'))),
@@ -170,6 +177,9 @@ export async function updateCocktail(id: number, changes: CocktailChanges) {
  * the cocktail keeps its photo. A missing cocktail ends in a 404 (Prisma P2025).
  */
 export async function removeCocktail(id: number): Promise<void> {
-  const { imagePath } = await prisma.cocktail.delete({ where: { id }, select: { imagePath: true } });
+  const { imagePath } = await prisma.cocktail.delete({
+    where: { id },
+    select: { imagePath: true },
+  });
   if (imagePath) await removeImageFile(imagePath);
 }

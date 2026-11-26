@@ -108,8 +108,16 @@ describe('LoginPage', () => {
   });
 
   it.each([
-    ['wrong credentials (401)', new ApiError(401, 'Invalid credentials'), 'Invalid email or password'],
-    ['the attempt limit (429)', new ApiError(429, 'Too many failed login attempts'), 'Too many failed login attempts'],
+    [
+      'wrong credentials (401)',
+      new ApiError(401, 'Invalid credentials'),
+      'Invalid email or password',
+    ],
+    [
+      'the attempt limit (429)',
+      new ApiError(429, 'Too many failed login attempts'),
+      'Too many failed login attempts',
+    ],
     ['a server error (500)', new ApiError(500, 'Internal server error'), 'Internal server error'],
     ['a network error', new TypeError('Failed to fetch'), 'An error occurred'],
     ['an API error without message', new ApiError(502, ''), 'An error occurred'],
@@ -125,22 +133,34 @@ describe('LoginPage', () => {
   it('says which account to use when opened after a backup restore', async () => {
     const { container } = renderAtUrl('/login?reason=backup-restored');
 
-    expect(screen.getByText('Backup restored. Sign in with the email and password that were in use when the backup was made.')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Backup restored. Sign in with the email and password that were in use when the backup was made.',
+      ),
+    ).toBeInTheDocument();
     expect(await axe(container)).toHaveNoViolations();
   });
 
   it('says that every session ended when opened after "Sign out everywhere"', async () => {
     const { container } = renderAtUrl('/login?reason=logged-out-everywhere');
 
-    expect(screen.getByText('Signed out of every device. Sign in again to continue.')).toBeInTheDocument();
-    expect(screen.queryByText('Backup restored. Sign in with the email and password that were in use when the backup was made.')).not.toBeInTheDocument();
+    expect(
+      screen.getByText('Signed out of every device. Sign in again to continue.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        'Backup restored. Sign in with the email and password that were in use when the backup was made.',
+      ),
+    ).not.toBeInTheDocument();
     expect(await axe(container)).toHaveNoViolations();
   });
 
   it('does not say that every session ended without that reason', () => {
     renderAtUrl('/login?reason=backup-restored');
 
-    expect(screen.queryByText('Signed out of every device. Sign in again to continue.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Signed out of every device. Sign in again to continue.'),
+    ).not.toBeInTheDocument();
   });
 
   it.each([
@@ -149,7 +169,11 @@ describe('LoginPage', () => {
   ])('says nothing about a restore when opened %s', (_label, url) => {
     renderAtUrl(url);
 
-    expect(screen.queryByText('Backup restored. Sign in with the email and password that were in use when the backup was made.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        'Backup restored. Sign in with the email and password that were in use when the backup was made.',
+      ),
+    ).not.toBeInTheDocument();
   });
 
   it('opens the admin home after signing in from the restore notice', async () => {
@@ -165,7 +189,12 @@ describe('LoginPage', () => {
 
   it('should show loading state during submission', async () => {
     let resolveLogin: () => void;
-    mockLogin.mockImplementation(() => new Promise<void>((resolve) => { resolveLogin = resolve; }));
+    mockLogin.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveLogin = resolve;
+        }),
+    );
     const user = userEvent.setup();
 
     render(<LoginPage />);

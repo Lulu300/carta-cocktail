@@ -62,7 +62,12 @@ function PublicCocktailItem({
       aria-disabled={isUnavailable || undefined}
       tabIndex={isUnavailable ? -1 : undefined}
     >
-      <div className={cx(isList ? 'w-28 sm:w-36 shrink-0' : 'aspect-video', 'bg-canvas flex items-center justify-center overflow-hidden')}>
+      <div
+        className={cx(
+          isList ? 'w-28 sm:w-36 shrink-0' : 'aspect-video',
+          'bg-canvas flex items-center justify-center overflow-hidden',
+        )}
+      >
         {/* Decorative: the cocktail's name in the heading already names the link. */}
         {cocktail.imagePath ? (
           <img
@@ -71,22 +76,30 @@ function PublicCocktailItem({
             className="w-full h-full object-cover motion-safe:group-hover:scale-105 transition-transform duration-300 motion-reduce:transition-none"
           />
         ) : (
-          <span aria-hidden="true" className={isList ? 'text-3xl' : 'text-5xl'}>🍸</span>
+          <span aria-hidden="true" className={isList ? 'text-3xl' : 'text-5xl'}>
+            🍸
+          </span>
         )}
       </div>
 
       <div className={isList ? 'p-4 flex-1 min-w-0' : 'p-5'}>
         <div className="flex items-start justify-between gap-3 mb-2">
-          <h2 className={`${isList ? 'text-lg' : 'text-xl'} font-serif font-bold text-fg group-hover:text-accent transition-colors`}>
+          <h2
+            className={`${isList ? 'text-lg' : 'text-xl'} font-serif font-bold text-fg group-hover:text-accent transition-colors`}
+          >
             {cocktail.name}
           </h2>
           <div className="flex items-center gap-2 shrink-0">
             {showAvailability && availability && (
-              <span className={`text-xs px-2 py-1 rounded font-medium ${
-                availability.maxServings === 0 ? 'bg-red-500/20 text-red-400' :
-                availability.maxServings < 3 ? 'bg-yellow-500/20 text-yellow-400' :
-                'bg-green-500/20 text-green-400'
-              }`}>
+              <span
+                className={`text-xs px-2 py-1 rounded font-medium ${
+                  availability.maxServings === 0
+                    ? 'bg-red-500/20 text-red-400'
+                    : availability.maxServings < 3
+                      ? 'bg-yellow-500/20 text-yellow-400'
+                      : 'bg-green-500/20 text-green-400'
+                }`}
+              >
                 {t('public.servings', { count: availability.maxServings })}
               </span>
             )}
@@ -107,7 +120,10 @@ function PublicCocktailItem({
         {tags.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {tags.map((tag, index) => (
-              <span key={index} className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded border border-accent/20">
+              <span
+                key={index}
+                className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded border border-accent/20"
+              >
                 #{tag}
               </span>
             ))}
@@ -117,14 +133,19 @@ function PublicCocktailItem({
         {ingredients.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {ingredients.slice(0, MAX_VISIBLE_INGREDIENTS).map((ingredient) => (
-              <span key={ingredient.id} className="text-xs bg-canvas text-fg-muted px-2 py-1 rounded">
+              <span
+                key={ingredient.id}
+                className="text-xs bg-canvas text-fg-muted px-2 py-1 rounded"
+              >
                 {ingredientName(ingredient)}
               </span>
             ))}
             {hiddenIngredientCount > 0 && (
               <span className="text-xs text-fg-muted px-2 py-1">
                 <span aria-hidden="true">+{hiddenIngredientCount}</span>
-                <span className="sr-only">{t('public.moreIngredients', { count: hiddenIngredientCount })}</span>
+                <span className="sr-only">
+                  {t('public.moreIngredients', { count: hiddenIngredientCount })}
+                </span>
               </span>
             )}
           </div>

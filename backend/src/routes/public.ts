@@ -15,7 +15,12 @@ const router = Router();
 
 // Bottles of a bottle menu: inventory fields stay on the server (see includes.ts)
 const MENU_BOTTLE_PUBLIC_SELECT = {
-  id: true, name: true, capacityMl: true, categoryId: true, alcoholPercentage: true, location: true,
+  id: true,
+  name: true,
+  capacityMl: true,
+  categoryId: true,
+  alcoholPercentage: true,
+  location: true,
   category: { select: CATEGORY_PUBLIC_SELECT },
 } satisfies Prisma.BottleSelect;
 
@@ -55,7 +60,10 @@ function isAdminRequest(req: AuthRequest): boolean {
 async function withPublicAvailability<T extends { id: number; isAvailable: boolean }>(
   cocktails: T[],
 ): Promise<(T & { available: boolean })[]> {
-  const availabilities = await calculateAvailabilities(prisma, cocktails.map(({ id }) => id));
+  const availabilities = await calculateAvailabilities(
+    prisma,
+    cocktails.map(({ id }) => id),
+  );
   return cocktails.map((cocktail) => {
     const maxServings = availabilities.get(cocktail.id)?.maxServings ?? 0;
     return { ...cocktail, available: cocktail.isAvailable && maxServings > 0 };
@@ -111,7 +119,10 @@ router.get('/menus/:slug', async (req: AuthRequest, res: Response) => {
   if (!menu || (!menu.isPublic && !isAdmin)) throw new NotFoundError();
 
   const cocktails = await withPublicAvailability(menu.cocktails.map(({ cocktail }) => cocktail));
-  const menuCocktails = menu.cocktails.map((menuCocktail, index) => ({ ...menuCocktail, cocktail: cocktails[index] }));
+  const menuCocktails = menu.cocktails.map((menuCocktail, index) => ({
+    ...menuCocktail,
+    cocktail: cocktails[index],
+  }));
   res.json(parseNameTranslations({ ...menu, cocktails: menuCocktails }));
 });
 
@@ -127,7 +138,9 @@ router.get('/cocktails/:id/export', async (req: AuthRequest, res: Response) => {
   if (id === null) throw new NotFoundError();
 
   const isAdmin = isAdminRequest(req);
-  const exported = await exportCocktail(buildPublicCocktailWhere(id, isAdmin), { includePrivate: isAdmin });
+  const exported = await exportCocktail(buildPublicCocktailWhere(id, isAdmin), {
+    includePrivate: isAdmin,
+  });
   if (!exported) throw new NotFoundError();
   res.attachment(exported.filename).json(exported.payload);
 });
@@ -221,7 +234,12 @@ router.get('/share/menu/:slug/cocktail/:id', async (req: Request, res: Response)
   });
   if (!menuCocktail) throw new NotFoundError();
 
-  await sendSharePage(req, res, menuCocktail.cocktail, `/menu/${encodeURIComponent(slug)}/cocktail/${id}`);
+  await sendSharePage(
+    req,
+    res,
+    menuCocktail.cocktail,
+    `/menu/${encodeURIComponent(slug)}/cocktail/${id}`,
+  );
 });
 
 export default router;

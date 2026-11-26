@@ -18,7 +18,12 @@ interface CategoryFormModalProps {
   onSubmit: (data: CategoryInput) => void;
 }
 
-export default function CategoryFormModal({ entityForm, categoryTypes, isSaving, onSubmit }: CategoryFormModalProps) {
+export default function CategoryFormModal({
+  entityForm,
+  categoryTypes,
+  isSaving,
+  onSubmit,
+}: CategoryFormModalProps) {
   const { t } = useTranslation();
   const { typeLabel } = useCategoryTypeName();
   const { form, setField, editing } = entityForm;
@@ -73,9 +78,15 @@ export default function CategoryFormModal({ entityForm, categoryTypes, isSaving,
           placeholder={form.name}
         />
         <Field label={t('categories.type')} error={isCustomType ? undefined : typeError}>
-          <Select ref={typeSelectRef} value={form.type} onChange={(event) => handleTypeChange(event.target.value)}>
+          <Select
+            ref={typeSelectRef}
+            value={form.type}
+            onChange={(event) => handleTypeChange(event.target.value)}
+          >
             {categoryTypes.map((categoryType) => (
-              <option key={categoryType.name} value={categoryType.name}>{typeLabel(categoryType)}</option>
+              <option key={categoryType.name} value={categoryType.name}>
+                {typeLabel(categoryType)}
+              </option>
             ))}
             <option value={OTHER_TYPE}>{t('categories.otherType')}</option>
           </Select>
@@ -114,8 +125,12 @@ export default function CategoryFormModal({ entityForm, categoryTypes, isSaving,
           <p className="text-xs text-fg-muted mt-1">{t('shortages.threshold')}</p>
         </div>
         <div className="flex justify-end gap-3 pt-2">
-          <Button variant="ghost" onClick={handleClose}>{t('common.cancel')}</Button>
-          <Button type="submit" loading={isSaving}>{t('common.save')}</Button>
+          <Button variant="ghost" onClick={handleClose}>
+            {t('common.cancel')}
+          </Button>
+          <Button type="submit" loading={isSaving}>
+            {t('common.save')}
+          </Button>
         </div>
       </form>
     </Modal>

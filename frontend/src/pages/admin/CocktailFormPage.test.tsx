@@ -29,7 +29,14 @@ import CocktailFormPage from './CocktailFormPage';
 
 const RUM_CATEGORY = buildCategory({ id: 1, name: 'Rum', minimumPercent: 0 });
 const bottle = (id: number, name: string, remainingPercent = 100) =>
-  buildBottle({ id, name, categoryId: 1, remainingPercent, purchasePrice: null, alcoholPercentage: null });
+  buildBottle({
+    id,
+    name,
+    categoryId: 1,
+    remainingPercent,
+    purchasePrice: null,
+    alcoholPercentage: null,
+  });
 
 const mojito = buildCocktail({
   id: 42,
@@ -38,8 +45,15 @@ const mojito = buildCocktail({
   tags: 'rum, mint',
   ingredients: [
     buildCocktailIngredient({
-      id: 7, cocktailId: 42, quantity: 5, unitId: 1, sourceType: 'CATEGORY', categoryId: 1, ingredient: null,
-      position: 0, preferredBottles: [{ id: 1, cocktailIngredientId: 7, bottleId: 2 }],
+      id: 7,
+      cocktailId: 42,
+      quantity: 5,
+      unitId: 1,
+      sourceType: 'CATEGORY',
+      categoryId: 1,
+      ingredient: null,
+      position: 0,
+      preferredBottles: [{ id: 1, cocktailIngredientId: 7, bottleId: 2 }],
     }),
   ],
   instructions: [{ id: 1, cocktailId: 42, stepNumber: 1, text: 'Muddle the mint' }],
@@ -85,7 +99,10 @@ async function addIngredientRow(user: ReturnType<typeof userEvent.setup>) {
 
 /** Records the recipe the form sends: POST /api/cocktails, or PUT /api/cocktails/:id. */
 function captureRecipe(method: 'post' | 'put') {
-  const request = captureRequest(method, method === 'post' ? '/api/cocktails' : '/api/cocktails/:id');
+  const request = captureRequest(
+    method,
+    method === 'post' ? '/api/cocktails' : '/api/cocktails/:id',
+  );
   return {
     ...request,
     recipe: async (): Promise<CocktailInput> => {
@@ -100,7 +117,11 @@ function isCocktailInput(body: unknown): body is CocktailInput {
   return typeof body === 'object' && body !== null && 'name' in body;
 }
 
-async function setQuantity(user: ReturnType<typeof userEvent.setup>, row: HTMLElement, quantity: string) {
+async function setQuantity(
+  user: ReturnType<typeof userEvent.setup>,
+  row: HTMLElement,
+  quantity: string,
+) {
   const input = within(row).getByRole('spinbutton', { name: 'Qty' });
   await user.clear(input);
   if (quantity) await user.type(input, quantity);
@@ -108,9 +129,15 @@ async function setQuantity(user: ReturnType<typeof userEvent.setup>, row: HTMLEl
 
 beforeEach(() => {
   mockApiResponse('get', '/api/categories', [RUM_CATEGORY]);
-  mockApiResponse('get', '/api/bottles', [bottle(1, 'Havana'), bottle(2, 'Diplomatico', 0), bottle(3, 'Empty rum', 0)]);
+  mockApiResponse('get', '/api/bottles', [
+    bottle(1, 'Havana'),
+    bottle(2, 'Diplomatico', 0),
+    bottle(3, 'Empty rum', 0),
+  ]);
   mockApiResponse('get', '/api/ingredients', [buildIngredient({ id: 1, name: 'Sugar syrup' })]);
-  mockApiResponse('get', '/api/units', [buildUnit({ id: 1, name: 'Centilitre', abbreviation: 'cl', conversionFactorToMl: 10 })]);
+  mockApiResponse('get', '/api/units', [
+    buildUnit({ id: 1, name: 'Centilitre', abbreviation: 'cl', conversionFactorToMl: 10 }),
+  ]);
   mockApiResponse('get', '/api/availability/cocktails', {});
   mockCocktail(mojito);
   mockApiResponse('post', '/api/cocktails', mojito, 201);
@@ -139,10 +166,16 @@ describe('CocktailFormPage, creation', () => {
       notes: null,
       tags: ['classic', 'sour'],
       isAvailable: true,
-      ingredients: [{
-        sourceType: 'INGREDIENT', bottleId: null, categoryId: null, ingredientId: 1,
-        quantity: 2, unitId: 1,
-      }],
+      ingredients: [
+        {
+          sourceType: 'INGREDIENT',
+          bottleId: null,
+          categoryId: null,
+          ingredientId: 1,
+          quantity: 2,
+          unitId: 1,
+        },
+      ],
       instructions: [{ text: 'Shake' }],
     });
     expect(screen.getByText('Cocktail created')).toBeInTheDocument();
@@ -157,9 +190,14 @@ describe('CocktailFormPage, creation', () => {
     await setQuantity(user, row, '0');
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
-    expect(await within(row).findByText('Choose an item · Must be greater than 0')).toBeInTheDocument();
+    expect(
+      await within(row).findByText('Choose an item · Must be greater than 0'),
+    ).toBeInTheDocument();
     expect(screen.getByText('Required')).toBeInTheDocument();
-    expect(within(row).getByRole('spinbutton', { name: 'Qty' })).toHaveAttribute('aria-invalid', 'true');
+    expect(within(row).getByRole('spinbutton', { name: 'Qty' })).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
     expect(created.count()).toBe(0);
   });
 
@@ -204,14 +242,24 @@ describe('CocktailFormPage, creation', () => {
     await user.selectOptions(bottleSelect, '1');
 
     await user.selectOptions(within(row).getByRole('combobox', { name: 'Source' }), 'CATEGORY');
-    await user.selectOptions(within(row).getByRole('combobox', { name: 'Category (any bottle)' }), '1');
+    await user.selectOptions(
+      within(row).getByRole('combobox', { name: 'Category (any bottle)' }),
+      '1',
+    );
     await user.click(within(row).getByRole('checkbox', { name: 'Havana' }));
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
-    expect((await created.recipe()).ingredients).toEqual([{
-      sourceType: 'CATEGORY', bottleId: null, categoryId: 1, ingredientId: null,
-      quantity: 1, unitId: 1, preferredBottleIds: [1],
-    }]);
+    expect((await created.recipe()).ingredients).toEqual([
+      {
+        sourceType: 'CATEGORY',
+        bottleId: null,
+        categoryId: 1,
+        ingredientId: null,
+        quantity: 1,
+        unitId: 1,
+        preferredBottleIds: [1],
+      },
+    ]);
   });
 
   it('removes a recipe step', async () => {
@@ -276,8 +324,14 @@ describe('CocktailFormPage, creation', () => {
 
   it('keeps the message of an unknown reference whose details are malformed', async () => {
     const user = userEvent.setup();
-    const message = 'A recipe line names a unit, bottle, category or ingredient that does not exist';
-    mockApiResponse('post', '/api/cocktails', { error: message, details: [{ line: 1, field: 'ingredientId' }] }, 400);
+    const message =
+      'A recipe line names a unit, bottle, category or ingredient that does not exist';
+    mockApiResponse(
+      'post',
+      '/api/cocktails',
+      { error: message, details: [{ line: 1, field: 'ingredientId' }] },
+      400,
+    );
     await user.type(await renderNewForm(), 'Mojito');
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -376,7 +430,9 @@ describe('CocktailFormPage, edition', () => {
     const updated = captureRecipe('put');
     renderAt('/admin/cocktails/42');
 
-    const row = (await screen.findByRole('combobox', { name: 'Category (any bottle)' })).closest('li');
+    const row = (await screen.findByRole('combobox', { name: 'Category (any bottle)' })).closest(
+      'li',
+    );
     if (!row) throw new Error('No ingredient row');
     const emptyPreferred = within(row).getByRole('checkbox', { name: 'Diplomatico' });
     expect(emptyPreferred).toBeChecked();
@@ -460,7 +516,9 @@ describe('CocktailFormPage, edition', () => {
     expect(await updated.recipe()).toMatchObject({
       description: null,
       tags: ['rum', 'mint'],
-      ingredients: [expect.objectContaining({ sourceType: 'CATEGORY', categoryId: 1, preferredBottleIds: [2] })],
+      ingredients: [
+        expect.objectContaining({ sourceType: 'CATEGORY', categoryId: 1, preferredBottleIds: [2] }),
+      ],
     });
     expect(screen.getByText('Cocktail updated')).toBeInTheDocument();
   });
@@ -468,11 +526,25 @@ describe('CocktailFormPage, edition', () => {
   it('warns when no preferred bottle of a category line is available', async () => {
     mockApiResponse('get', '/api/availability/cocktails', {
       42: {
-        cocktailId: 42, isAvailable: true, maxServings: 4, lowStock: [],
-        ingredients: [{
-          cocktailIngredientId: 7, sourceType: 'CATEGORY', name: 'Rum', nameTranslations: null, orphan: false, icon: null, quantity: 5, unit: 'cl',
-          isAvailable: true, availableCount: 4, preferredAvailable: false,
-        }],
+        cocktailId: 42,
+        isAvailable: true,
+        maxServings: 4,
+        lowStock: [],
+        ingredients: [
+          {
+            cocktailIngredientId: 7,
+            sourceType: 'CATEGORY',
+            name: 'Rum',
+            nameTranslations: null,
+            orphan: false,
+            icon: null,
+            quantity: 5,
+            unit: 'cl',
+            isAvailable: true,
+            availableCount: 4,
+            preferredAvailable: false,
+          },
+        ],
       },
     });
     renderAt('/admin/cocktails/42');
@@ -487,7 +559,10 @@ describe('CocktailFormPage, edition', () => {
     renderAt('/admin/cocktails/999');
 
     expect(await screen.findByText('This cocktail does not exist.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Back to cocktails' })).toHaveAttribute('href', '/admin/cocktails');
+    expect(screen.getByRole('link', { name: 'Back to cocktails' })).toHaveAttribute(
+      'href',
+      '/admin/cocktails',
+    );
   });
 
   it('offers to retry when the cocktail fails to load', async () => {
@@ -522,9 +597,20 @@ describe('CocktailFormPage, lines stored with a defect (C-21)', () => {
   const oldRecipe: Cocktail = {
     ...mojito,
     ingredients: [
-      buildCocktailIngredient({ id: 7, cocktailId: 42, quantity: 4, sourceType: 'CATEGORY', ingredient: null, position: 0 }),
       buildCocktailIngredient({
-        id: 8, cocktailId: 42, quantity: 0, ingredient: buildIngredient({ id: 1, name: 'Sugar syrup' }), position: 1,
+        id: 7,
+        cocktailId: 42,
+        quantity: 4,
+        sourceType: 'CATEGORY',
+        ingredient: null,
+        position: 0,
+      }),
+      buildCocktailIngredient({
+        id: 8,
+        cocktailId: 42,
+        quantity: 0,
+        ingredient: buildIngredient({ id: 1, name: 'Sugar syrup' }),
+        position: 1,
       }),
     ],
   };
@@ -543,7 +629,9 @@ describe('CocktailFormPage, lines stored with a defect (C-21)', () => {
   // meanwhile, in another tab for instance.
   it('names the line in the error toast when the backend refuses a defect the form let through', async () => {
     const user = userEvent.setup();
-    mockValidationError('put', '/api/cocktails/:id', [{ path: 'body.ingredients.1.quantity', code: 'too_small' }]);
+    mockValidationError('put', '/api/cocktails/:id', [
+      { path: 'body.ingredients.1.quantity', code: 'too_small' },
+    ]);
     renderAt('/admin/cocktails/42');
     await renameTo(user, 'Old mojito');
 
@@ -557,16 +645,23 @@ describe('CocktailFormPage, lines stored with a defect (C-21)', () => {
   // An item picked in the form was deleted, in another tab for instance, before the save.
   it('names the line and the field in the error toast when the recipe names a deleted item', async () => {
     const user = userEvent.setup();
-    mockApiResponse('put', '/api/cocktails/:id', {
-      error: 'A recipe line names a unit, bottle, category or ingredient that does not exist',
-      details: [{ line: 1, field: 'ingredientId', id: 7 }],
-    }, 400);
+    mockApiResponse(
+      'put',
+      '/api/cocktails/:id',
+      {
+        error: 'A recipe line names a unit, bottle, category or ingredient that does not exist',
+        details: [{ line: 1, field: 'ingredientId', id: 7 }],
+      },
+      400,
+    );
     renderAt('/admin/cocktails/42');
     await renameTo(user, 'Old mojito');
 
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
-    expect(await screen.findByText('Row 2, Ingredient: this item no longer exists, choose another one')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Row 2, Ingredient: this item no longer exists, choose another one'),
+    ).toBeInTheDocument();
     expect(screen.queryByText('cocktail list')).not.toBeInTheDocument();
   });
 
@@ -576,17 +671,23 @@ describe('CocktailFormPage, lines stored with a defect (C-21)', () => {
     renderAt('/admin/cocktails/42');
     await renameTo(user, 'Old mojito');
 
-    expect(screen.getAllByText('This line was saved incomplete by an earlier version (deleted source or quantity 0). It is kept as is: fix or remove it when you can.')).toHaveLength(2);
+    expect(
+      screen.getAllByText(
+        'This line was saved incomplete by an earlier version (deleted source or quantity 0). It is kept as is: fix or remove it when you can.',
+      ),
+    ).toHaveLength(2);
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(await screen.findByText('cocktail list')).toBeInTheDocument();
-    expect(await updated.recipe()).toEqual(expect.objectContaining({
-      name: 'Old mojito',
-      ingredients: [
-        expect.objectContaining({ sourceType: 'CATEGORY', categoryId: null, quantity: 4 }),
-        expect.objectContaining({ sourceType: 'INGREDIENT', ingredientId: 1, quantity: 0 }),
-      ],
-    }));
+    expect(await updated.recipe()).toEqual(
+      expect.objectContaining({
+        name: 'Old mojito',
+        ingredients: [
+          expect.objectContaining({ sourceType: 'CATEGORY', categoryId: null, quantity: 4 }),
+          expect.objectContaining({ sourceType: 'INGREDIENT', ingredientId: 1, quantity: 0 }),
+        ],
+      }),
+    );
   });
 
   it('blocks the save once a defective line is changed but keeps its defect', async () => {
@@ -599,7 +700,11 @@ describe('CocktailFormPage, lines stored with a defect (C-21)', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(await within(orphanRow!).findByText('Choose an item')).toBeInTheDocument();
-    expect(within(orphanRow!).queryByText('This line was saved incomplete by an earlier version (deleted source or quantity 0). It is kept as is: fix or remove it when you can.')).not.toBeInTheDocument();
+    expect(
+      within(orphanRow!).queryByText(
+        'This line was saved incomplete by an earlier version (deleted source or quantity 0). It is kept as is: fix or remove it when you can.',
+      ),
+    ).not.toBeInTheDocument();
     expect(updated.count()).toBe(0);
   });
 

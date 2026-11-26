@@ -40,9 +40,11 @@ const FIELD_LETTER_KEYS: Record<DateField, string> = {
 
 /** The exact code first (`en-GB`), then its base language (`en`), then the app's fallback language. */
 function dateFormat(language: string): DateFormat {
-  return DATE_FORMATS.get(language)
-    ?? DATE_FORMATS.get(getBaseLanguage(language))
-    ?? FALLBACK_DATE_FORMAT;
+  return (
+    DATE_FORMATS.get(language) ??
+    DATE_FORMATS.get(getBaseLanguage(language)) ??
+    FALLBACK_DATE_FORMAT
+  );
 }
 
 function pad(value: number, length: number): string {
@@ -58,7 +60,7 @@ const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 /** `Date` would roll 31/02 over to March: the day is checked against the month. */
 function isCalendarDate(year: number, month: number, day: number): boolean {
   if (month < 1 || month > 12 || day < 1) return false;
-  const lastDay = month === 2 && isLeapYear(year) ? 29 : DAYS_IN_MONTH[month - 1] ?? 0;
+  const lastDay = month === 2 && isLeapYear(year) ? 29 : (DAYS_IN_MONTH[month - 1] ?? 0);
   return day <= lastDay;
 }
 

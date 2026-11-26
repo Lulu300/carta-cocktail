@@ -1,6 +1,11 @@
 import { useState, useEffect, useId, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ApiError, auth as authApi, settings as settingsApi, backup as backupApi } from '../../services/api';
+import {
+  ApiError,
+  auth as authApi,
+  settings as settingsApi,
+  backup as backupApi,
+} from '../../services/api';
 import type { BackupRestoreResult } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteSettings } from '../../contexts/SiteSettingsContext';
@@ -12,12 +17,30 @@ import Icon from '../../components/ui/Icon';
 import Input from '../../components/ui/Input';
 import { cx } from '../../components/ui/classNames';
 import { exceedsUploadLimit, MAX_BACKUP_UPLOAD_BYTES } from '../../utils/uploadLimits';
-import { openSignInAfterLogoutEverywhere, openSignInAfterRestore } from '../../utils/signInAfterRestore';
+import {
+  openSignInAfterLogoutEverywhere,
+  openSignInAfterRestore,
+} from '../../utils/signInAfterRestore';
 import Alert from '../../components/ui/Alert';
 
 const ICON_OPTIONS = [
-  '', '🍸', '🍹', '🥃', '🍷', '🥂', '🍺', '🧉', '🫗',
-  '🍾', '🥤', '🧊', '🔥', '🌿', '🍋', '🫒', '🍒',
+  '',
+  '🍸',
+  '🍹',
+  '🥃',
+  '🍷',
+  '🥂',
+  '🍺',
+  '🧉',
+  '🫗',
+  '🍾',
+  '🥤',
+  '🧊',
+  '🔥',
+  '🌿',
+  '🍋',
+  '🫒',
+  '🍒',
 ];
 
 /**
@@ -66,10 +89,14 @@ function RestoreReport({ result }: { result: BackupRestoreResult }) {
         </Alert>
       )}
       {result.skippedFiles > 0 && (
-        <p className="text-sm text-fg-muted">{t('settings.backup.skippedFiles', { count: result.skippedFiles })}</p>
+        <p className="text-sm text-fg-muted">
+          {t('settings.backup.skippedFiles', { count: result.skippedFiles })}
+        </p>
       )}
       <Button variant="secondary" size="sm" onClick={openSignInAfterRestore}>
-        {result.restartRecommended ? t('settings.backup.signInAfterRestart') : t('auth.signInAgain')}
+        {result.restartRecommended
+          ? t('settings.backup.signInAfterRestart')
+          : t('auth.signInAgain')}
       </Button>
     </div>
   );
@@ -118,11 +145,14 @@ export default function SettingsPage() {
   const siteIconHintId = useId();
 
   useEffect(() => {
-    settingsApi.get().then((data) => {
-      setSiteName(data.siteName);
-      setSiteIcon(data.siteIcon);
-      setSiteLoading(false);
-    }).catch(() => setSiteLoading(false));
+    settingsApi
+      .get()
+      .then((data) => {
+        setSiteName(data.siteName);
+        setSiteIcon(data.siteIcon);
+        setSiteLoading(false);
+      })
+      .catch(() => setSiteLoading(false));
   }, []);
 
   const handleSiteSave = async (e: React.FormEvent) => {
@@ -200,8 +230,9 @@ export default function SettingsPage() {
   };
 
   /** Why a restore ended without its result, followed by the advice shared by both causes. */
-  const restoreMayStillRun = (cause: 'settings.backup.restoreTimeout' | 'settings.backup.restoreNoAnswer') =>
-    `${t(cause)} ${t('settings.backup.restoreMayStillRun')}`;
+  const restoreMayStillRun = (
+    cause: 'settings.backup.restoreTimeout' | 'settings.backup.restoreNoAnswer',
+  ) => `${t(cause)} ${t('settings.backup.restoreMayStillRun')}`;
 
   /**
    * Keeps the chosen archive only when the backend can accept it. Refused here rather than when
@@ -285,7 +316,11 @@ export default function SettingsPage() {
   };
 
   if (siteLoading) {
-    return <div role="status" className="text-fg-muted">{t('common.loading')}</div>;
+    return (
+      <div role="status" className="text-fg-muted">
+        {t('common.loading')}
+      </div>
+    );
   }
 
   return (
@@ -313,30 +348,48 @@ export default function SettingsPage() {
                   aria-label={icon || t('settings.noIcon')}
                   className={cx(
                     'w-10 h-10 rounded-lg border-2 flex items-center justify-center text-xl transition-colors',
-                    siteIcon === icon ? 'border-accent bg-accent/10' : 'border-line-strong hover:border-fg-muted bg-canvas',
+                    siteIcon === icon
+                      ? 'border-accent bg-accent/10'
+                      : 'border-line-strong hover:border-fg-muted bg-canvas',
                   )}
                 >
-                  {icon || <span aria-hidden="true" className="text-xs text-fg-muted">-</span>}
+                  {icon || (
+                    <span aria-hidden="true" className="text-xs text-fg-muted">
+                      -
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
-            <p id={siteIconHintId} className="text-xs text-fg-muted mt-2">{t('settings.siteIconHint')}</p>
+            <p id={siteIconHintId} className="text-xs text-fg-muted mt-2">
+              {t('settings.siteIconHint')}
+            </p>
           </fieldset>
         </div>
 
         {siteMessage && <p className="mt-4 text-sm text-green-400">{siteMessage}</p>}
         {siteError && <p className="mt-4 text-sm text-red-400">{siteError}</p>}
 
-        <Button type="submit" className="mt-6">{t('common.save')}</Button>
+        <Button type="submit" className="mt-6">
+          {t('common.save')}
+        </Button>
       </form>
 
       {/* Profile Settings */}
-      <form onSubmit={handleProfileSave} className="bg-surface border border-line rounded-xl p-6 mb-8">
+      <form
+        onSubmit={handleProfileSave}
+        className="bg-surface border border-line rounded-xl p-6 mb-8"
+      >
         <h2 className="text-lg font-semibold text-fg mb-4">{t('settings.profileConfig')}</h2>
 
         <div className="space-y-4">
           <Field label={t('settings.email')} required>
-            <Input type="email" autoComplete="username" value={email} onChange={(e) => setTypedEmail(e.target.value)} />
+            <Input
+              type="email"
+              autoComplete="username"
+              value={email}
+              onChange={(e) => setTypedEmail(e.target.value)}
+            />
           </Field>
 
           <hr className="border-line" />
@@ -378,7 +431,11 @@ export default function SettingsPage() {
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <Button type="submit">{t('common.save')}</Button>
-          <Button variant="secondary" onClick={handleLogoutEverywhere} disabled={loggingOutEverywhere}>
+          <Button
+            variant="secondary"
+            onClick={handleLogoutEverywhere}
+            disabled={loggingOutEverywhere}
+          >
             {t('settings.logoutEverywhere')}
           </Button>
         </div>
@@ -409,8 +466,19 @@ export default function SettingsPage() {
                 disabled={backupImporting}
                 className="border border-line-strong"
               >
-                <svg aria-hidden="true" className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                <svg
+                  aria-hidden="true"
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                  />
                 </svg>
                 {t('settings.backup.selectFile')}
               </Button>
@@ -429,7 +497,9 @@ export default function SettingsPage() {
             </div>
 
             {backupFileTooLarge && (
-              <p role="alert" className="text-sm text-red-400">{t('common.requestTooLarge')}</p>
+              <p role="alert" className="text-sm text-red-400">
+                {t('common.requestTooLarge')}
+              </p>
             )}
 
             {backupFile && (

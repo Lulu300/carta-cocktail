@@ -15,10 +15,12 @@ interface ImportStepUploadProps {
 function isRecipe(data: unknown): data is CocktailExportFormat {
   if (!data || typeof data !== 'object') return false;
   const { version, cocktail } = data as { version?: unknown; cocktail?: Record<string, unknown> };
-  return version === 1
-    && !!cocktail?.name
-    && Array.isArray(cocktail.ingredients)
-    && Array.isArray(cocktail.instructions);
+  return (
+    version === 1 &&
+    !!cocktail?.name &&
+    Array.isArray(cocktail.ingredients) &&
+    Array.isArray(cocktail.instructions)
+  );
 }
 
 function parseRecipe(text: string): CocktailExportFormat | null {
@@ -62,7 +64,9 @@ export default function ImportStepUpload({ recipes, onLoaded, onNext }: ImportSt
       // Loaded on demand: only ZIP imports need it
       const { default: JSZip } = await import('jszip');
       const zip = await JSZip.loadAsync(file);
-      const jsonFiles = Object.entries(zip.files).filter(([name, entry]) => name.endsWith('.json') && !entry.dir);
+      const jsonFiles = Object.entries(zip.files).filter(
+        ([name, entry]) => name.endsWith('.json') && !entry.dir,
+      );
       if (jsonFiles.length === 0) {
         setError(t('cocktails.importWizard.zipNoRecipes'));
         return;
@@ -119,7 +123,11 @@ export default function ImportStepUpload({ recipes, onLoaded, onNext }: ImportSt
                 <span className="text-accent font-mono text-xs w-5 text-right">#{i + 1}</span>
                 <span className="font-serif">{r.cocktail.name}</span>
                 <span className="text-fg-muted text-xs">
-                  ({t('cocktails.importWizard.ingredientCount', { count: r.cocktail.ingredients.length })})
+                  (
+                  {t('cocktails.importWizard.ingredientCount', {
+                    count: r.cocktail.ingredients.length,
+                  })}
+                  )
                 </span>
               </li>
             ))}
@@ -139,13 +147,23 @@ export default function ImportStepUpload({ recipes, onLoaded, onNext }: ImportSt
             )}
           </div>
           <div className="flex gap-4 text-sm text-fg-muted">
-            <span>{t('cocktails.importWizard.ingredientCount', { count: recipe.cocktail.ingredients.length })}</span>
-            <span>{t('cocktails.importWizard.instructionCount', { count: recipe.cocktail.instructions.length })}</span>
+            <span>
+              {t('cocktails.importWizard.ingredientCount', {
+                count: recipe.cocktail.ingredients.length,
+              })}
+            </span>
+            <span>
+              {t('cocktails.importWizard.instructionCount', {
+                count: recipe.cocktail.instructions.length,
+              })}
+            </span>
           </div>
           {recipe.cocktail.tags && recipe.cocktail.tags.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {recipe.cocktail.tags.map((tag, i) => (
-                <span key={i} className="bg-accent/10 text-accent text-xs px-2 py-0.5 rounded-full">{tag}</span>
+                <span key={i} className="bg-accent/10 text-accent text-xs px-2 py-0.5 rounded-full">
+                  {tag}
+                </span>
               ))}
             </div>
           )}

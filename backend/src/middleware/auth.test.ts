@@ -3,12 +3,24 @@ import type { Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { AuthRequest, authMiddleware, optionalAuth, signToken, verifyToken } from './auth';
 import {
-  setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData, getAuthToken, prisma,
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+  getAuthToken,
+  prisma,
 } from '../test/helpers';
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
-beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
+beforeEach(async () => {
+  await cleanDatabase();
+  await seedRequiredData();
+});
 
 // The admin seeded by seedRequiredData
 const ADMIN_ID = 1;
@@ -70,7 +82,9 @@ describe('verifyToken', () => {
   });
 
   it('rejects a token without a numeric user id', async () => {
-    expect(await verifyToken(jwt.sign({ sub: 'admin', tv: 0 }, process.env.JWT_SECRET!))).toBeNull();
+    expect(
+      await verifyToken(jwt.sign({ sub: 'admin', tv: 0 }, process.env.JWT_SECRET!)),
+    ).toBeNull();
   });
 
   it('rejects a token without a token version (issued before revocation existed)', async () => {
@@ -107,8 +121,9 @@ describe('authMiddleware', () => {
   it('rejects with a 401 without an Authorization header', async () => {
     const next = vi.fn();
 
-    await expect(authMiddleware(requestWith(), fakeResponse() as unknown as Response, next))
-      .rejects.toMatchObject({ status: 401, i18nKey: 'errors.unauthorized' });
+    await expect(
+      authMiddleware(requestWith(), fakeResponse() as unknown as Response, next),
+    ).rejects.toMatchObject({ status: 401, i18nKey: 'errors.unauthorized' });
 
     expect(next).not.toHaveBeenCalled();
   });
@@ -117,8 +132,9 @@ describe('authMiddleware', () => {
     const req = requestWith(`Bearer ${getAuthToken(ADMIN_ID, { algorithm: 'HS512' })}`);
     const next = vi.fn();
 
-    await expect(authMiddleware(req, fakeResponse() as unknown as Response, next))
-      .rejects.toMatchObject({ status: 401, i18nKey: 'errors.invalidToken' });
+    await expect(
+      authMiddleware(req, fakeResponse() as unknown as Response, next),
+    ).rejects.toMatchObject({ status: 401, i18nKey: 'errors.invalidToken' });
 
     expect(next).not.toHaveBeenCalled();
     expect(req.userId).toBeUndefined();

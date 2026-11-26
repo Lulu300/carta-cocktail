@@ -20,8 +20,15 @@ export default function PublicLayout() {
       <SkipLink />
       <header className="h-[var(--header-h)] bg-surface/80 backdrop-blur-sm border-b border-line px-4 sm:px-6 sticky top-0 z-10">
         <nav aria-label={t('nav.main')} className="h-full flex items-center justify-between gap-3">
-          <Link to="/" className="min-w-0 truncate text-xl font-bold text-accent font-serif hover:text-accent-soft transition-colors">
-            {siteSettings.siteIcon && <span aria-hidden="true" className="mr-1">{siteSettings.siteIcon}</span>}
+          <Link
+            to="/"
+            className="min-w-0 truncate text-xl font-bold text-accent font-serif hover:text-accent-soft transition-colors"
+          >
+            {siteSettings.siteIcon && (
+              <span aria-hidden="true" className="mr-1">
+                {siteSettings.siteIcon}
+              </span>
+            )}
             <SiteName />
           </Link>
           <div className="flex items-center gap-3 shrink-0">
@@ -42,7 +49,9 @@ export default function PublicLayout() {
       </main>
       {/* Guests come for the menu: the admin sign-in link stays discreet, down here. */}
       <footer className="border-t border-line px-4 sm:px-6 py-6 flex items-center justify-between gap-3 text-sm text-fg-muted print:hidden">
-        <span className="min-w-0 truncate"><SiteName /></span>
+        <span className="min-w-0 truncate">
+          <SiteName />
+        </span>
         {!user && (
           <Link to="/login" className="shrink-0 hover:text-fg transition-colors">
             {t('nav.login')}

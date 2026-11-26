@@ -12,8 +12,14 @@ describe('downloadBlob', () => {
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:file');
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
     const clicked: { href: string; download: string; inDocument: boolean }[] = [];
-    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function record(this: HTMLAnchorElement) {
-      clicked.push({ href: this.href, download: this.download, inDocument: document.body.contains(this) });
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function record(
+      this: HTMLAnchorElement,
+    ) {
+      clicked.push({
+        href: this.href,
+        download: this.download,
+        inDocument: document.body.contains(this),
+      });
     });
 
     downloadBlob(new Blob(['x']), 'recipe.json');

@@ -111,18 +111,21 @@ describe('locale bundles', () => {
     },
   );
 
-  it.each(Object.entries(BUNDLES))('every plural form of the %s bundle has its pair', (_, bundle) => {
-    // French and English both need _one and _other; i18next falls back to the key itself without them.
-    for (const messages of Object.values(bundle)) {
-      const keys = Object.keys(messages);
-      const orphans = keys.filter(
-        (key) =>
-          (key.endsWith('_one') && !keys.includes(key.replace(/_one$/, '_other'))) ||
-          (key.endsWith('_other') && !keys.includes(key.replace(/_other$/, '_one'))),
-      );
-      expect(orphans).toEqual([]);
-    }
-  });
+  it.each(Object.entries(BUNDLES))(
+    'every plural form of the %s bundle has its pair',
+    (_, bundle) => {
+      // French and English both need _one and _other; i18next falls back to the key itself without them.
+      for (const messages of Object.values(bundle)) {
+        const keys = Object.keys(messages);
+        const orphans = keys.filter(
+          (key) =>
+            (key.endsWith('_one') && !keys.includes(key.replace(/_one$/, '_other'))) ||
+            (key.endsWith('_other') && !keys.includes(key.replace(/_other$/, '_one'))),
+        );
+        expect(orphans).toEqual([]);
+      }
+    },
+  );
 
   it.each(Object.entries(BUNDLES))(
     'the %s bundle writes no plural inside a message, such as "bottle(s)"',
@@ -210,7 +213,10 @@ describe('admin bundle registration', () => {
 
 describe('messages', () => {
   const languages = Object.entries(BUNDLES).flatMap(([name, bundle]) =>
-    Object.entries(bundle).map(([language, messages]) => ({ name: `${name}/${language}`, messages })),
+    Object.entries(bundle).map(([language, messages]) => ({
+      name: `${name}/${language}`,
+      messages,
+    })),
   );
 
   it.each(languages)('$name gives every "_one" plural form its "_other" form', ({ messages }) => {

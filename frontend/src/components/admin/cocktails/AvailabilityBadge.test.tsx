@@ -18,7 +18,12 @@ describe('AvailabilityBadge', () => {
   it.each([
     ['while loading', availability({}), true, '...'],
     ['without availability', undefined, false, '...'],
-    ['for an unavailable cocktail', availability({ isAvailable: false, maxServings: 0 }), false, 'Unavailable'],
+    [
+      'for an unavailable cocktail',
+      availability({ isAvailable: false, maxServings: 0 }),
+      false,
+      'Unavailable',
+    ],
     ['for a single serving', availability({ maxServings: 1 }), false, '1 serving'],
     ['for unlimited servings', availability({ maxServings: 999 }), false, '∞ servings'],
   ])('shows the right text %s', (_case, value, loading, text) => {

@@ -32,7 +32,10 @@ export const DEFAULT_DESIRED_STOCK = 1;
  * Key of an entity in the resolutions, as the backend reads it: the lowercased
  * abbreviation of a unit, the lowercased name of anything else.
  */
-export function resolutionKey(type: ImportEntityType, ref: Pick<ImportEntityRef, 'name' | 'abbreviation'>): string {
+export function resolutionKey(
+  type: ImportEntityType,
+  ref: Pick<ImportEntityRef, 'name' | 'abbreviation'>,
+): string {
   // `||`: a blank abbreviation falls back on the unit name
   const label = type === 'units' ? ref.abbreviation || ref.name : ref.name;
   return label?.toLowerCase() ?? '';
@@ -42,7 +45,10 @@ export function resolutionKey(type: ImportEntityType, ref: Pick<ImportEntityRef,
  * How the wizard names a referenced entity. A unit shows its abbreviation too;
  * a hand-made file may give a unit without a name.
  */
-export function referenceLabel(type: ImportEntityType, ref: Pick<ImportEntityRef, 'name' | 'abbreviation'>): string {
+export function referenceLabel(
+  type: ImportEntityType,
+  ref: Pick<ImportEntityRef, 'name' | 'abbreviation'>,
+): string {
   if (type !== 'units') return ref.name ?? '';
   if (ref.name && ref.abbreviation) return `${ref.name} (${ref.abbreviation})`;
   return ref.name || ref.abbreviation || '';
@@ -88,7 +94,10 @@ export function defaultCreateData(type: ImportEntityType, ref: ImportEntityRef):
   }
 }
 
-function autoResolution(type: ImportEntityType, entity: ImportEntityResolution): EntityResolutionAction {
+function autoResolution(
+  type: ImportEntityType,
+  entity: ImportEntityResolution,
+): EntityResolutionAction {
   if (entity.status === 'matched' && entity.existingMatch) {
     return { action: 'use_existing', existingId: entity.existingMatch.id };
   }
@@ -113,9 +122,7 @@ export function buildAutoResolutions(preview: ImportPreviewResponse): ImportReso
 
 /** How a value compares with the existing rows: one row found, none, or several equal ignoring case. */
 export type ExistingMatch<Row> =
-  | { status: 'none' }
-  | { status: 'found'; row: Row }
-  | { status: 'ambiguous'; rows: Row[] };
+  { status: 'none' } | { status: 'found'; row: Row } | { status: 'ambiguous'; rows: Row[] };
 
 /**
  * The existing row the backend uses for a category name or a unit abbreviation it is asked to
@@ -125,14 +132,20 @@ export type ExistingMatch<Row> =
  * to create it (409). The preview applies this rule to the file's values only, while the admin may
  * type another one.
  */
-export function matchIgnoringCase<Row>(rows: Row[], value: string, valueOf: (row: Row) => string): ExistingMatch<Row> {
+export function matchIgnoringCase<Row>(
+  rows: Row[],
+  value: string,
+  valueOf: (row: Row) => string,
+): ExistingMatch<Row> {
   const key = caseInsensitiveKey(value);
   const candidates = rows.filter((row) => caseInsensitiveKey(valueOf(row)) === key);
   const exact = candidates.find((row) => valueOf(row) === value);
   if (exact) return { status: 'found', row: exact };
   const [first] = candidates;
   if (first === undefined) return { status: 'none' };
-  return candidates.length === 1 ? { status: 'found', row: first } : { status: 'ambiguous', rows: candidates };
+  return candidates.length === 1
+    ? { status: 'found', row: first }
+    : { status: 'ambiguous', rows: candidates };
 }
 
 /** Existing rows the creation data is checked against. */
@@ -146,7 +159,10 @@ export interface ExistingRows {
 export type UniqueRow = ExistingRows['categories'][number] | ExistingRows['units'][number];
 
 /** The field a category or a unit is unique by, ignoring case. */
-export const UNIQUE_FIELD: Partial<Record<ImportEntityType, 'name' | 'abbreviation'>> = { categories: 'name', units: 'abbreviation' };
+export const UNIQUE_FIELD: Partial<Record<ImportEntityType, 'name' | 'abbreviation'>> = {
+  categories: 'name',
+  units: 'abbreviation',
+};
 
 /**
  * The existing row a category or unit to create meets, by name or by abbreviation: the backend
@@ -159,10 +175,20 @@ export const UNIQUE_FIELD: Partial<Record<ImportEntityType, 'name' | 'abbreviati
  * lists both as created. The bottle import replays that order to count its creations
  * (`countCategoriesToCreate`).
  */
-export function existingRowFor(type: ImportEntityType, data: ImportEntityRef, existing: ExistingRows): ExistingMatch<UniqueRow> {
+export function existingRowFor(
+  type: ImportEntityType,
+  data: ImportEntityRef,
+  existing: ExistingRows,
+): ExistingMatch<UniqueRow> {
   // The backend trims these values
-  if (type === 'categories') return matchIgnoringCase(existing.categories, data.name?.trim() ?? '', (row) => row.name);
-  if (type === 'units') return matchIgnoringCase(existing.units, data.abbreviation?.trim() ?? '', (row) => row.abbreviation);
+  if (type === 'categories')
+    return matchIgnoringCase(existing.categories, data.name?.trim() ?? '', (row) => row.name);
+  if (type === 'units')
+    return matchIgnoringCase(
+      existing.units,
+      data.abbreviation?.trim() ?? '',
+      (row) => row.abbreviation,
+    );
   return { status: 'none' };
 }
 
@@ -186,14 +212,23 @@ function isWholeNumber(value: number | null | undefined, min: number): boolean {
  * abbreviation several existing rows hold ignoring case, a category type the backend refuses,
  * missing or invalid numbers. Existing category types are kept as picked.
  */
-export function invalidCreateFields(type: ImportEntityType, data: ImportEntityRef, existing: ExistingRows): CreateDataField[] {
+export function invalidCreateFields(
+  type: ImportEntityType,
+  data: ImportEntityRef,
+  existing: ExistingRows,
+): CreateDataField[] {
   const invalid: CreateDataField[] = [];
   if (!data.name?.trim()) invalid.push('name');
   if (type === 'units' && !data.abbreviation?.trim()) invalid.push('abbreviation');
   const uniqueField = UNIQUE_FIELD[type];
-  if (uniqueField && existingRowFor(type, data, existing).status === 'ambiguous') invalid.push(uniqueField);
+  if (uniqueField && existingRowFor(type, data, existing).status === 'ambiguous')
+    invalid.push(uniqueField);
   // The backend gives its default type to a category sent without one
-  if (type === 'categories' && isMissingCategoryType(data.type ?? DEFAULT_CATEGORY_TYPE, existing.categoryTypes)) invalid.push('type');
+  if (
+    type === 'categories' &&
+    isMissingCategoryType(data.type ?? DEFAULT_CATEGORY_TYPE, existing.categoryTypes)
+  )
+    invalid.push('type');
   if (type === 'bottles' && !isWholeNumber(data.capacityMl, 1)) invalid.push('capacityMl');
   if (type === 'categories' && !isWholeNumber(data.desiredStock, 0)) invalid.push('desiredStock');
   return invalid;
@@ -208,7 +243,10 @@ export function isResolutionComplete(
     case 'use_existing':
       return resolution.existingId !== undefined;
     case 'create':
-      return resolution.data !== undefined && invalidCreateFields(type, resolution.data, existing).length === 0;
+      return (
+        resolution.data !== undefined &&
+        invalidCreateFields(type, resolution.data, existing).length === 0
+      );
     case 'skip':
       return true;
     default:
@@ -225,7 +263,8 @@ export function countIncompleteResolutions(
   let count = 0;
   for (const type of IMPORT_ENTITY_TYPES) {
     for (const entity of preview[type]) {
-      if (!isResolutionComplete(type, resolutions[type][resolutionKey(type, entity.ref)], existing)) count += 1;
+      if (!isResolutionComplete(type, resolutions[type][resolutionKey(type, entity.ref)], existing))
+        count += 1;
     }
   }
   return count;

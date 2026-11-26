@@ -38,19 +38,25 @@ describe('reference messages', () => {
 
 describe('describeUnresolvedReference', () => {
   it('names the row, counted from 1, and the item of the file', () => {
-    expect(describeUnresolvedReference({ line: 1, kind: 'unit', name: 'cl' })).toBe('Row 2: unit "cl" is neither matched nor created');
-    expect(describeUnresolvedReference({ line: 0, kind: 'bottle', name: 'Havana' }))
-      .toBe('Row 1: bottle "Havana" is neither matched nor created, or has no category');
+    expect(describeUnresolvedReference({ line: 1, kind: 'unit', name: 'cl' })).toBe(
+      'Row 2: unit "cl" is neither matched nor created',
+    );
+    expect(describeUnresolvedReference({ line: 0, kind: 'bottle', name: 'Havana' })).toBe(
+      'Row 1: bottle "Havana" is neither matched nor created, or has no category',
+    );
   });
 
   it('reads a row without unit', () => {
-    expect(describeUnresolvedReference({ line: 2, kind: 'unit', name: null })).toBe('Row 3: no unit');
+    expect(describeUnresolvedReference({ line: 2, kind: 'unit', name: null })).toBe(
+      'Row 3: no unit',
+    );
   });
 
   it('is in French when the admin chose French', async () => {
     await i18n.changeLanguage('fr');
-    expect(describeUnresolvedReference({ line: 0, kind: 'ingredient', name: 'Menthe' }))
-      .toBe('Ligne 1 : ingrédient « Menthe » ni associé ni créé');
+    expect(describeUnresolvedReference({ line: 0, kind: 'ingredient', name: 'Menthe' })).toBe(
+      'Ligne 1 : ingrédient « Menthe » ni associé ni créé',
+    );
   });
 
   it('names nothing for a kind this version does not know, or a source without name', () => {
@@ -61,8 +67,9 @@ describe('describeUnresolvedReference', () => {
 
 describe('describeUnknownReference', () => {
   it('names the row, counted from 1, and the field', () => {
-    expect(describeUnknownReference({ line: 2, field: 'ingredientId', id: 7 }))
-      .toBe('Row 3, Ingredient: this item no longer exists, choose another one');
+    expect(describeUnknownReference({ line: 2, field: 'ingredientId', id: 7 })).toBe(
+      'Row 3, Ingredient: this item no longer exists, choose another one',
+    );
   });
 
   it('names nothing for a field this version does not know', () => {
@@ -95,9 +102,15 @@ describe('refusalDetails', () => {
   });
 
   it('is empty for malformed or unknown details, and for anything but an ApiError', () => {
-    expect(refusalDetails(badRequest('Refused', [{ line: 0, kind: 'glass', name: 'Highball' }, 'unit']))).toEqual([]);
+    expect(
+      refusalDetails(badRequest('Refused', [{ line: 0, kind: 'glass', name: 'Highball' }, 'unit'])),
+    ).toEqual([]);
     expect(refusalDetails(badRequest('Refused', { line: 0 }))).toEqual([]);
-    expect(refusalDetails(new ApiError(409, 'In use', { details: [{ line: 0, field: 'unitId', id: 1 }] }))).toEqual([]);
+    expect(
+      refusalDetails(
+        new ApiError(409, 'In use', { details: [{ line: 0, field: 'unitId', id: 1 }] }),
+      ),
+    ).toEqual([]);
     expect(refusalDetails(new Error('Boom'))).toEqual([]);
   });
 });
@@ -112,12 +125,20 @@ describe('refusalMessage', () => {
       { line: 0, field: 'unitId', id: 4 },
       { line: 3, field: 'bottleId', id: 5 },
     ]);
-    expect(refusalMessage(error)).toBe('Row 1, Unit: this item no longer exists, choose another one');
+    expect(refusalMessage(error)).toBe(
+      'Row 1, Unit: this item no longer exists, choose another one',
+    );
     expect(refusalMessage(badRequest('Refused', []))).toBeNull();
   });
 
   it('names the row of an unknown reference in the error toasts of the admin', () => {
-    toast.error(badRequest('A recipe line names a unit that does not exist', [{ line: 1, field: 'unitId', id: 4 }]));
-    expect(toastStore.getSnapshot().at(-1)?.message).toBe('Row 2, Unit: this item no longer exists, choose another one');
+    toast.error(
+      badRequest('A recipe line names a unit that does not exist', [
+        { line: 1, field: 'unitId', id: 4 },
+      ]),
+    );
+    expect(toastStore.getSnapshot().at(-1)?.message).toBe(
+      'Row 2, Unit: this item no longer exists, choose another one',
+    );
   });
 });

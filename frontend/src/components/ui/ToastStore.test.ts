@@ -99,7 +99,9 @@ describe('ToastStore', () => {
     });
 
     it('shows the description of the errors it knows, the error message of the others', () => {
-      setErrorDescriber((error) => (error instanceof ApiError && error.status === 400 ? 'Name: required' : null));
+      setErrorDescriber((error) =>
+        error instanceof ApiError && error.status === 400 ? 'Name: required' : null,
+      );
 
       toast.error(new ApiError(400, 'Validation error'));
       toast.error(new ApiError(409, 'Already exists'));

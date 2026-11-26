@@ -4,8 +4,19 @@ import { render, screen, waitFor, within } from '../../test/test-utils';
 import AdminLayout from '../../components/layout/AdminLayout';
 import { AppProviders } from '../../test/appProviders';
 import { createQueryClient } from '../../queries/queryClient';
-import { buildBottle, buildCategory, buildCocktail, buildMenu, buildShortage } from '../../test/factories';
-import { captureRequest, mockApiError, mockApiPending, mockApiResponse } from '../../test/msw/utils';
+import {
+  buildBottle,
+  buildCategory,
+  buildCocktail,
+  buildMenu,
+  buildShortage,
+} from '../../test/factories';
+import {
+  captureRequest,
+  mockApiError,
+  mockApiPending,
+  mockApiResponse,
+} from '../../test/msw/utils';
 import DashboardPage from './DashboardPage';
 
 afterEach(() => {
@@ -15,11 +26,32 @@ afterEach(() => {
 
 const getCard = (label: RegExp) => screen.getByRole('link', { name: label });
 
-function mockCounts(counts: { categories: number; bottles: number; cocktails: number; menus: number }) {
-  mockApiResponse('get', '/api/categories', Array.from({ length: counts.categories }, () => buildCategory()));
-  mockApiResponse('get', '/api/bottles', Array.from({ length: counts.bottles }, () => buildBottle()));
-  mockApiResponse('get', '/api/cocktails', Array.from({ length: counts.cocktails }, () => buildCocktail()));
-  mockApiResponse('get', '/api/menus', Array.from({ length: counts.menus }, () => buildMenu()));
+function mockCounts(counts: {
+  categories: number;
+  bottles: number;
+  cocktails: number;
+  menus: number;
+}) {
+  mockApiResponse(
+    'get',
+    '/api/categories',
+    Array.from({ length: counts.categories }, () => buildCategory()),
+  );
+  mockApiResponse(
+    'get',
+    '/api/bottles',
+    Array.from({ length: counts.bottles }, () => buildBottle()),
+  );
+  mockApiResponse(
+    'get',
+    '/api/cocktails',
+    Array.from({ length: counts.cocktails }, () => buildCocktail()),
+  );
+  mockApiResponse(
+    'get',
+    '/api/menus',
+    Array.from({ length: counts.menus }, () => buildMenu()),
+  );
 }
 
 describe('DashboardPage', () => {

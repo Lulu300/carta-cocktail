@@ -11,7 +11,11 @@ describe('Card', () => {
   });
 
   it('renders as a section without padding', () => {
-    render(<Card as="section" padding="none" aria-label="Stats" className="mt-4">Content</Card>);
+    render(
+      <Card as="section" padding="none" aria-label="Stats" className="mt-4">
+        Content
+      </Card>,
+    );
     const card = screen.getByRole('region', { name: 'Stats' });
     expect(card.tagName).toBe('SECTION');
     expect(card).not.toHaveClass('p-6');

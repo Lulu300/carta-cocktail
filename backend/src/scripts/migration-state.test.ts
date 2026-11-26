@@ -14,7 +14,11 @@ function runScript(databaseUrl: string | undefined) {
   const env = { ...process.env };
   delete env.DATABASE_URL;
   if (databaseUrl !== undefined) env.DATABASE_URL = databaseUrl;
-  return spawnSync(TSX, ['src/scripts/migration-state.ts'], { cwd: BACKEND_DIR, env, encoding: 'utf8' });
+  return spawnSync(TSX, ['src/scripts/migration-state.ts'], {
+    cwd: BACKEND_DIR,
+    env,
+    encoding: 'utf8',
+  });
 }
 
 describe('src/scripts/migration-state.ts', () => {

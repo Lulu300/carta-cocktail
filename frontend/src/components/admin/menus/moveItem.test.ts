@@ -27,10 +27,18 @@ describe('moveItem', () => {
 });
 
 describe('orderByIds', () => {
-  const items = [{ id: 1, position: 0 }, { id: 2, position: 1 }, { id: 3, position: 2 }];
+  const items = [
+    { id: 1, position: 0 },
+    { id: 2, position: 1 },
+    { id: 3, position: 2 },
+  ];
 
   it('puts the items in the order of the ids and renumbers their positions', () => {
-    expect(orderByIds(items, [3, 1, 2])).toEqual([{ id: 3, position: 0 }, { id: 1, position: 1 }, { id: 2, position: 2 }]);
+    expect(orderByIds(items, [3, 1, 2])).toEqual([
+      { id: 3, position: 0 },
+      { id: 1, position: 1 },
+      { id: 2, position: 2 },
+    ]);
   });
 
   it('leaves out an item missing from the ids', () => {

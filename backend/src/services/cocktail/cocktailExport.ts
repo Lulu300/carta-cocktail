@@ -36,7 +36,12 @@ interface ExportedLine {
   sourceType: string;
   quantity: number;
   position: number;
-  unit: { name: string; abbreviation: string; conversionFactorToMl: number | null; nameTranslations: Translations };
+  unit: {
+    name: string;
+    abbreviation: string;
+    conversionFactorToMl: number | null;
+    nameTranslations: Translations;
+  };
   bottle: ExportedBottle | null;
   category: ExportedCategory | null;
   ingredient: { name: string; icon: string | null; nameTranslations: Translations } | null;
@@ -54,11 +59,17 @@ export interface ExportedCocktail {
 }
 
 function splitTags(tags: string): string[] {
-  return tags.split(',').map((tag) => tag.trim()).filter(Boolean);
+  return tags
+    .split(',')
+    .map((tag) => tag.trim())
+    .filter(Boolean);
 }
 
 // The name of the line's source and what the import needs to create it again
-function describeSource(line: ExportedLine): { sourceName: string; sourceDetail: Record<string, unknown> } {
+function describeSource(line: ExportedLine): {
+  sourceName: string;
+  sourceDetail: Record<string, unknown>;
+} {
   if (line.sourceType === 'BOTTLE' && line.bottle) {
     const { category } = line.bottle;
     return {
@@ -73,7 +84,10 @@ function describeSource(line: ExportedLine): { sourceName: string; sourceDetail:
   if (line.sourceType === 'CATEGORY' && line.category) {
     return {
       sourceName: line.category.name,
-      sourceDetail: { type: line.category.type, nameTranslations: parseTranslations(line.category.nameTranslations) },
+      sourceDetail: {
+        type: line.category.type,
+        nameTranslations: parseTranslations(line.category.nameTranslations),
+      },
     };
   }
   if (line.sourceType === 'INGREDIENT' && line.ingredient) {
@@ -145,8 +159,14 @@ export interface CocktailExportFile {
   payload: ReturnType<typeof buildCocktailExport>;
 }
 
-function toExportFile(cocktail: ExportedCocktail & { id: number }, options: ExportOptions): CocktailExportFile {
-  return { filename: exportFilename(cocktail.name, cocktail.id), payload: buildCocktailExport(cocktail, options) };
+function toExportFile(
+  cocktail: ExportedCocktail & { id: number },
+  options: ExportOptions,
+): CocktailExportFile {
+  return {
+    filename: exportFilename(cocktail.name, cocktail.id),
+    payload: buildCocktailExport(cocktail, options),
+  };
 }
 
 /** Loads the first cocktail matching `where` and builds its export, or null when none matches. */
@@ -154,7 +174,10 @@ export async function exportCocktail(
   where: Prisma.CocktailWhereInput,
   options: ExportOptions,
 ): Promise<CocktailExportFile | null> {
-  const cocktail = await prisma.cocktail.findFirst({ where, select: buildPublicCocktailSelect(options.includePrivate) });
+  const cocktail = await prisma.cocktail.findFirst({
+    where,
+    select: buildPublicCocktailSelect(options.includePrivate),
+  });
   if (!cocktail) return null;
   return toExportFile(cocktail, options);
 }
@@ -164,7 +187,10 @@ export async function exportCocktail(
  * the files are the ones `exportCocktail` gives one by one. Returns null when one of
  * the cocktails does not exist, so that a batch is exported whole or not at all.
  */
-export async function exportCocktails(ids: number[], options: ExportOptions): Promise<CocktailExportFile[] | null> {
+export async function exportCocktails(
+  ids: number[],
+  options: ExportOptions,
+): Promise<CocktailExportFile[] | null> {
   const cocktails = await prisma.cocktail.findMany({
     where: { id: { in: ids } },
     select: buildPublicCocktailSelect(options.includePrivate),

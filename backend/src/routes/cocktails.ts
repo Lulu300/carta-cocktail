@@ -11,7 +11,11 @@ import { cocktailInclude } from '../services/cocktail/includes';
 import { exportCocktail, exportCocktails } from '../services/cocktail/cocktailExport';
 import { imageUpload, setImage } from '../services/cocktail/cocktailImage';
 import { confirmImport, previewImport } from '../services/cocktail/cocktailImport';
-import { createCocktail, removeCocktail, updateCocktail } from '../services/cocktail/cocktailService';
+import {
+  createCocktail,
+  removeCocktail,
+  updateCocktail,
+} from '../services/cocktail/cocktailService';
 
 const router = Router();
 
@@ -28,7 +32,9 @@ router.get('/:id/export', validate(idRequest), async (_req: AuthRequest, res: Re
 const exportBatchSchemas = { body: CocktailExportBatch };
 
 router.post('/export', validate(exportBatchSchemas), async (_req: AuthRequest, res: Response) => {
-  const files = await exportCocktails(valid<typeof exportBatchSchemas>(res).body.ids, { includePrivate: true });
+  const files = await exportCocktails(valid<typeof exportBatchSchemas>(res).body.ids, {
+    includePrivate: true,
+  });
   if (!files) throw new NotFoundError();
   res.json(files.map(({ filename, payload }) => ({ filename, data: payload })));
 });
@@ -36,18 +42,26 @@ router.post('/export', validate(exportBatchSchemas), async (_req: AuthRequest, r
 // Import preview: analyze JSON and return matched/missing entities
 const importPreviewSchemas = { body: ImportRecipeV1 };
 
-router.post('/import/preview', validate(importPreviewSchemas), async (_req: AuthRequest, res: Response) => {
-  res.json(await previewImport(valid<typeof importPreviewSchemas>(res).body.cocktail));
-});
+router.post(
+  '/import/preview',
+  validate(importPreviewSchemas),
+  async (_req: AuthRequest, res: Response) => {
+    res.json(await previewImport(valid<typeof importPreviewSchemas>(res).body.cocktail));
+  },
+);
 
 // Import confirm: create missing entities + cocktail in a transaction
 const importConfirmSchemas = { body: ImportConfirm };
 
-router.post('/import/confirm', validate(importConfirmSchemas), async (_req: AuthRequest, res: Response) => {
-  const { recipe, resolutions } = valid<typeof importConfirmSchemas>(res).body;
-  const cocktail = await confirmImport(recipe.cocktail, resolutions);
-  res.status(201).json(parseNameTranslations(cocktail));
-});
+router.post(
+  '/import/confirm',
+  validate(importConfirmSchemas),
+  async (_req: AuthRequest, res: Response) => {
+    const { recipe, resolutions } = valid<typeof importConfirmSchemas>(res).body;
+    const cocktail = await confirmImport(recipe.cocktail, resolutions);
+    res.status(201).json(parseNameTranslations(cocktail));
+  },
+);
 
 // List all cocktails
 router.get('/', async (_req: AuthRequest, res: Response) => {
@@ -80,7 +94,10 @@ router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Respons
 const updateSchemas = { params: IdParams, body: CocktailUpdate };
 
 router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Response) => {
-  const { params: { id }, body } = valid<typeof updateSchemas>(res);
+  const {
+    params: { id },
+    body,
+  } = valid<typeof updateSchemas>(res);
   res.json(parseNameTranslations(await updateCocktail(id, body)));
 });
 
@@ -91,9 +108,14 @@ router.delete('/:id', validate(idRequest), async (req: AuthRequest, res: Respons
 });
 
 // Upload image. The id is checked before multer writes the file.
-router.post('/:id/image', validate(idRequest), imageUpload.single('image'), async (req: AuthRequest, res: Response) => {
-  if (!req.file) throw new BadRequestError();
-  res.json(await setImage(valid<typeof idRequest>(res).params.id, req.file));
-});
+router.post(
+  '/:id/image',
+  validate(idRequest),
+  imageUpload.single('image'),
+  async (req: AuthRequest, res: Response) => {
+    if (!req.file) throw new BadRequestError();
+    res.json(await setImage(valid<typeof idRequest>(res).params.id, req.file));
+  },
+);
 
 export default router;

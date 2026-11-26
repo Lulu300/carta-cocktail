@@ -119,7 +119,13 @@ describe('ProtectedRoute', () => {
     const rateLimited = () => new ApiError(429, 'Too many requests: try again in a few minutes');
 
     function failSessionCheck(sessionError: Error) {
-      mockUseAuth.mockReturnValue({ user: null, isLoading: false, sessionError, retrySession, logout });
+      mockUseAuth.mockReturnValue({
+        user: null,
+        isLoading: false,
+        sessionError,
+        retrySession,
+        logout,
+      });
     }
 
     it('shows the backend message of a rate limit with Retry, without sending the admin to /login', async () => {

@@ -13,10 +13,19 @@ const PADDING_CLASSES: Record<CardPadding, string> = {
   md: 'p-6',
 };
 
-export default function Card({ as: Component = 'div', padding = 'md', className, ...rest }: CardProps) {
+export default function Card({
+  as: Component = 'div',
+  padding = 'md',
+  className,
+  ...rest
+}: CardProps) {
   return (
     <Component
-      className={cx('bg-surface border border-line rounded-xl', PADDING_CLASSES[padding], className)}
+      className={cx(
+        'bg-surface border border-line rounded-xl',
+        PADDING_CLASSES[padding],
+        className,
+      )}
       {...rest}
     />
   );

@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
 import type { i18n as I18n } from 'i18next';
-import { LANGUAGE_STORAGE_KEY, LEGACY_LANGUAGE_STORAGE_KEY, storeLanguageChoice } from '../utils/languageChoice';
+import {
+  LANGUAGE_STORAGE_KEY,
+  LEGACY_LANGUAGE_STORAGE_KEY,
+  storeLanguageChoice,
+} from '../utils/languageChoice';
 
 // Loads fresh i18n modules, apart from the instance setup.ts registers for the other tests.
 // navigator.language(s) are read-only in jsdom, so they are stubbed through their getters.
@@ -92,13 +96,16 @@ describe('i18n language detection', () => {
   });
 
   // Other English variants also write the day first, but only en-GB is an app language.
-  it.each(['en-AU', 'en-IE', 'en-NZ', 'en-IN'])('should resolve an %s browser locale to English (US)', async (locale) => {
-    await i18n.changeLanguage('fr');
-    clearCachedLanguage();
-    stubBrowserLanguage(locale);
-    await i18n.changeLanguage();
-    expect(i18n.language).toBe('en');
-  });
+  it.each(['en-AU', 'en-IE', 'en-NZ', 'en-IN'])(
+    'should resolve an %s browser locale to English (US)',
+    async (locale) => {
+      await i18n.changeLanguage('fr');
+      clearCachedLanguage();
+      stubBrowserLanguage(locale);
+      await i18n.changeLanguage();
+      expect(i18n.language).toBe('en');
+    },
+  );
 
   it('should keep English (US) for an admin who chose en, even with an en-GB browser', async () => {
     await i18n.changeLanguage('fr');

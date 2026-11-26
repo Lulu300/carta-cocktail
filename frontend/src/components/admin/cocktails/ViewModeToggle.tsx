@@ -26,7 +26,9 @@ export default function ViewModeToggle({ value, onChange }: ViewModeToggleProps)
           aria-pressed={value === mode}
           className={cx(
             'rounded-md px-3 py-1.5 text-sm transition-colors',
-            value === mode ? 'bg-accent text-on-accent font-semibold' : 'text-fg-muted hover:text-fg',
+            value === mode
+              ? 'bg-accent text-on-accent font-semibold'
+              : 'text-fg-muted hover:text-fg',
           )}
         >
           {t(labelKey)}

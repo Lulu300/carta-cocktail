@@ -18,7 +18,13 @@ interface BottleGroupActionRowProps {
 
 /** A group of identical bottles outside the menu, with the button that brings it in. */
 export default function BottleGroupActionRow({
-  bottle, count, isEmpty, note, actionText, actionLabel, onAction,
+  bottle,
+  count,
+  isEmpty,
+  note,
+  actionText,
+  actionLabel,
+  onAction,
 }: BottleGroupActionRowProps) {
   return (
     <li className="flex items-center gap-3 p-3 rounded-lg border border-line-strong bg-canvas">

@@ -20,7 +20,9 @@ export const SUPPORTED_LANGUAGES: readonly string[] = [...TRANSLATED_LANGUAGES, 
  * case of the region ("en-gb"), so the match ignores it.
  */
 function toSupportedLanguage(code: string): string {
-  const supported = SUPPORTED_LANGUAGES.find((language) => language.toLowerCase() === code.toLowerCase());
+  const supported = SUPPORTED_LANGUAGES.find(
+    (language) => language.toLowerCase() === code.toLowerCase(),
+  );
   return supported ?? getBaseLanguage(code);
 }
 

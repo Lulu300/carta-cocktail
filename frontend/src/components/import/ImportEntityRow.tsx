@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { EntityResolutionAction, ImportEntityRef, ImportEntityResolution, ImportMatchStatus } from '../../types';
+import type {
+  EntityResolutionAction,
+  ImportEntityRef,
+  ImportEntityResolution,
+  ImportMatchStatus,
+} from '../../types';
 import IconPicker from '../ui/IconPicker';
 import Field from '../ui/Field';
 import Input from '../ui/Input';
@@ -58,13 +63,26 @@ const FIELD_ERROR_KEYS: Record<CreateDataField, string> = {
  * like the backend compares category names (`caseInsensitiveKey`). The backend's matches stay
  * listed while the lists are loading.
  */
-function pickableOptions(entity: ImportEntityResolution, type: ImportEntityType, options: ExistingOption[]): ExistingOption[] {
-  const categoryKey = entity.ref.categoryName ? caseInsensitiveKey(entity.ref.categoryName) : undefined;
-  const sameCategory = type === 'bottles' && categoryKey
-    ? options.filter((option) => option.category?.name !== undefined && caseInsensitiveKey(option.category.name) === categoryKey)
-    : options;
-  const matches = entity.existingMatch ? [entity.existingMatch] : entity.ambiguousMatches ?? [];
-  const unlisted = matches.filter((match) => !sameCategory.some((option) => option.id === match.id));
+function pickableOptions(
+  entity: ImportEntityResolution,
+  type: ImportEntityType,
+  options: ExistingOption[],
+): ExistingOption[] {
+  const categoryKey = entity.ref.categoryName
+    ? caseInsensitiveKey(entity.ref.categoryName)
+    : undefined;
+  const sameCategory =
+    type === 'bottles' && categoryKey
+      ? options.filter(
+          (option) =>
+            option.category?.name !== undefined &&
+            caseInsensitiveKey(option.category.name) === categoryKey,
+        )
+      : options;
+  const matches = entity.existingMatch ? [entity.existingMatch] : (entity.ambiguousMatches ?? []);
+  const unlisted = matches.filter(
+    (match) => !sameCategory.some((option) => option.id === match.id),
+  );
   return [...unlisted, ...sameCategory];
 }
 
@@ -83,12 +101,18 @@ export default function ImportEntityRow({
   const [expanded, setExpanded] = useState(!isMatched);
 
   // An ambiguous entity has no resolution until the admin picks one of its matches
-  const choice: ResolutionChoice = resolution?.action ?? (isMatched || isAmbiguous ? 'use_existing' : 'create');
+  const choice: ResolutionChoice =
+    resolution?.action ?? (isMatched || isAmbiguous ? 'use_existing' : 'create');
   const options = pickableOptions(entity, type, existingOptions);
-  const createData = (resolution?.action === 'create' && resolution.data) || defaultCreateData(type, entity.ref);
+  const createData =
+    (resolution?.action === 'create' && resolution.data) || defaultCreateData(type, entity.ref);
   const invalidFields = invalidCreateFields(type, createData, existingRows);
   const uniqueField = UNIQUE_FIELD[type];
-  const uniqueFieldMessages = existingMatchMessages(t, existingRowFor(type, createData, existingRows), (row) => existingOptionLabel(type, row));
+  const uniqueFieldMessages = existingMatchMessages(
+    t,
+    existingRowFor(type, createData, existingRows),
+    (row) => existingOptionLabel(type, row),
+  );
   const errorOf = (field: CreateDataField) => {
     if (!invalidFields.includes(field)) return undefined;
     return (field === uniqueField && uniqueFieldMessages.error) || t(FIELD_ERROR_KEYS[field]);
@@ -97,7 +121,10 @@ export default function ImportEntityRow({
   const choose = (next: ResolutionChoice) => {
     // The button is disabled when `options` is empty. Of several matches, none is picked for the admin.
     if (next === 'use_existing') {
-      onChange({ action: 'use_existing', existingId: isAmbiguous ? undefined : entity.existingMatch?.id ?? options[0]?.id });
+      onChange({
+        action: 'use_existing',
+        existingId: isAmbiguous ? undefined : (entity.existingMatch?.id ?? options[0]?.id),
+      });
     } else if (next === 'create') {
       onChange({ action: 'create', data: defaultCreateData(type, entity.ref) });
     } else {
@@ -105,13 +132,24 @@ export default function ImportEntityRow({
     }
   };
 
-  const updateCreateData = (field: keyof ImportEntityRef, value: ImportEntityRef[keyof ImportEntityRef]) => {
+  const updateCreateData = (
+    field: keyof ImportEntityRef,
+    value: ImportEntityRef[keyof ImportEntityRef],
+  ) => {
     onChange({ action: 'create', data: { ...createData, [field]: value } });
   };
 
   const textField = (field: 'name' | 'abbreviation', label: string) => (
-    <Field label={label} hint={field === uniqueField ? uniqueFieldMessages.hint : undefined} error={errorOf(field)} required>
-      <Input value={createData[field] ?? ''} onChange={(e) => updateCreateData(field, e.target.value)} />
+    <Field
+      label={label}
+      hint={field === uniqueField ? uniqueFieldMessages.hint : undefined}
+      error={errorOf(field)}
+      required
+    >
+      <Input
+        value={createData[field] ?? ''}
+        onChange={(e) => updateCreateData(field, e.target.value)}
+      />
     </Field>
   );
 
@@ -127,7 +165,9 @@ export default function ImportEntityRow({
   );
 
   // Empty until the admin picks one of several matches
-  const selectedId = resolution?.existingId ?? (isAmbiguous ? '' : entity.existingMatch?.id ?? options[0]?.id ?? '');
+  const selectedId =
+    resolution?.existingId ??
+    (isAmbiguous ? '' : (entity.existingMatch?.id ?? options[0]?.id ?? ''));
 
   return (
     <div className="border border-gray-700 rounded-lg overflow-hidden">
@@ -140,7 +180,16 @@ export default function ImportEntityRow({
         <MatchDot status={entity.status} />
         <span className="flex-1 text-sm font-medium">{referenceLabel(type, entity.ref)}</span>
         <MatchBadge status={entity.status} label={t(STATUS_LABEL_KEYS[entity.status])} />
-        <svg aria-hidden="true" className={cx('w-4 h-4 text-fg-muted transition-transform motion-reduce:transition-none', expanded && 'rotate-180')} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg
+          aria-hidden="true"
+          className={cx(
+            'w-4 h-4 text-fg-muted transition-transform motion-reduce:transition-none',
+            expanded && 'rotate-180',
+          )}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
@@ -149,7 +198,11 @@ export default function ImportEntityRow({
         <div className="px-4 pb-4 pt-3 border-t border-gray-700/50 space-y-3">
           {isAmbiguous && <AmbiguousMatches matches={entity.ambiguousMatches ?? []} />}
           <div className="flex gap-2">
-            <ChoiceButton selected={choice === 'use_existing'} disabled={options.length === 0} onClick={() => choose('use_existing')}>
+            <ChoiceButton
+              selected={choice === 'use_existing'}
+              disabled={options.length === 0}
+              onClick={() => choose('use_existing')}
+            >
               {t('cocktails.importWizard.useExisting')}
             </ChoiceButton>
             <ChoiceButton selected={choice === 'create'} onClick={() => choose('create')}>
@@ -166,11 +219,19 @@ export default function ImportEntityRow({
             <Field label={t('cocktails.importWizard.existingEntity')}>
               <Select
                 value={selectedId}
-                onChange={(e) => onChange({ action: 'use_existing', existingId: Number(e.target.value) })}
+                onChange={(e) =>
+                  onChange({ action: 'use_existing', existingId: Number(e.target.value) })
+                }
               >
-                {selectedId === '' && <option value="" disabled>{t('importMatches.pickMatch')}</option>}
+                {selectedId === '' && (
+                  <option value="" disabled>
+                    {t('importMatches.pickMatch')}
+                  </option>
+                )}
                 {options.map((option) => (
-                  <option key={option.id} value={option.id}>{existingOptionLabel(type, option)}</option>
+                  <option key={option.id} value={option.id}>
+                    {existingOptionLabel(type, option)}
+                  </option>
                 ))}
               </Select>
             </Field>

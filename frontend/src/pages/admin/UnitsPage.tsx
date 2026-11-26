@@ -8,7 +8,11 @@ import type { Unit } from '../../types';
 import { qk } from '../../queries/keys';
 import { useUnits } from '../../queries/units';
 import { useCrudMutations } from '../../queries/crud';
-import { buildNameTranslations, toTranslationForm, type TranslationForm } from '../../utils/translations';
+import {
+  buildNameTranslations,
+  toTranslationForm,
+  type TranslationForm,
+} from '../../utils/translations';
 import Button from '../../components/ui/Button';
 import Field from '../../components/ui/Field';
 import IconButton from '../../components/ui/IconButton';
@@ -39,7 +43,8 @@ function toUnitForm(unit?: Unit): UnitForm {
   return {
     name: unit?.name ?? '',
     abbreviation: unit?.abbreviation ?? '',
-    conversionFactorToMl: unit?.conversionFactorToMl != null ? String(unit.conversionFactorToMl) : '',
+    conversionFactorToMl:
+      unit?.conversionFactorToMl != null ? String(unit.conversionFactorToMl) : '',
     translations: toTranslationForm(unit?.nameTranslations),
   };
 }
@@ -48,7 +53,8 @@ function toUnitInput(form: UnitForm): UnitInput {
   return {
     name: form.name,
     abbreviation: form.abbreviation,
-    conversionFactorToMl: form.conversionFactorToMl === '' ? null : parseFloat(form.conversionFactorToMl),
+    conversionFactorToMl:
+      form.conversionFactorToMl === '' ? null : parseFloat(form.conversionFactorToMl),
     nameTranslations: buildNameTranslations(form.translations),
   };
 }
@@ -64,7 +70,12 @@ export default function UnitsPage() {
     api: unitsApi,
     invalidates: [qk.availability],
     // No forced deletion for a unit: a recipe line needs one.
-    messages: { created: 'units.created', updated: 'units.updated', deleted: 'units.deleted', inUse: 'units.inUseHint' },
+    messages: {
+      created: 'units.created',
+      updated: 'units.updated',
+      deleted: 'units.deleted',
+      inUse: 'units.inUseHint',
+    },
   });
   const unitForm = useEntityForm(toUnitForm);
   const { form, setField, editing } = unitForm;
@@ -74,8 +85,10 @@ export default function UnitsPage() {
     const units = unitsQuery.data ?? [];
     const query = search.trim().toLowerCase();
     if (!query) return units;
-    return units.filter((unit) =>
-      localize(unit).toLowerCase().includes(query) || unit.abbreviation.toLowerCase().includes(query),
+    return units.filter(
+      (unit) =>
+        localize(unit).toLowerCase().includes(query) ||
+        unit.abbreviation.toLowerCase().includes(query),
     );
   }, [unitsQuery.data, search, localize]);
 
@@ -96,16 +109,33 @@ export default function UnitsPage() {
   };
 
   const columns: Column<Unit>[] = [
-    { key: 'name', header: t('units.name'), sortable: true, className: 'font-medium', render: (unit) => localize(unit) },
-    { key: 'abbreviation', header: t('units.abbreviation'), sortable: true, className: 'text-fg-muted', render: (unit) => unit.abbreviation },
+    {
+      key: 'name',
+      header: t('units.name'),
+      sortable: true,
+      className: 'font-medium',
+      render: (unit) => localize(unit),
+    },
+    {
+      key: 'abbreviation',
+      header: t('units.abbreviation'),
+      sortable: true,
+      className: 'text-fg-muted',
+      render: (unit) => unit.abbreviation,
+    },
     {
       key: 'conversionFactorToMl',
       header: t('units.conversionFactor'),
       sortable: true,
       className: 'text-fg-muted',
-      render: (unit) => (unit.conversionFactorToMl !== null
-        ? <span>1 {unit.abbreviation} = {t('units.ml', { value: unit.conversionFactorToMl })}</span>
-        : <span className="italic">{t('units.notConvertible')}</span>),
+      render: (unit) =>
+        unit.conversionFactorToMl !== null ? (
+          <span>
+            1 {unit.abbreviation} = {t('units.ml', { value: unit.conversionFactorToMl })}
+          </span>
+        ) : (
+          <span className="italic">{t('units.notConvertible')}</span>
+        ),
     },
     {
       key: 'actions',
@@ -114,7 +144,12 @@ export default function UnitsPage() {
       render: (unit) => (
         <div className="flex items-center justify-end gap-1">
           <IconButton icon="edit" label={t('common.edit')} onClick={() => unitForm.open(unit)} />
-          <IconButton icon="delete" label={t('common.delete')} variant="danger" onClick={() => handleDelete(unit)} />
+          <IconButton
+            icon="delete"
+            label={t('common.delete')}
+            variant="danger"
+            onClick={() => handleDelete(unit)}
+          />
         </div>
       ),
     },
@@ -126,7 +161,12 @@ export default function UnitsPage() {
         <h1 className="text-2xl font-bold font-serif text-accent">{t('units.title')}</h1>
         <Button onClick={() => unitForm.open()}>{t('units.add')}</Button>
       </div>
-      <SearchInput value={search} onChange={setSearch} label={t('units.search')} className="max-w-sm mb-4" />
+      <SearchInput
+        value={search}
+        onChange={setSearch}
+        label={t('units.search')}
+        className="max-w-sm mb-4"
+      />
       <DataTable
         columns={columns}
         rows={pagination.paginatedItems}
@@ -154,12 +194,12 @@ export default function UnitsPage() {
             placeholder={form.name}
           />
           <Field label={t('units.abbreviation')} required>
-            <Input value={form.abbreviation} onChange={(event) => setField('abbreviation', event.target.value)} />
+            <Input
+              value={form.abbreviation}
+              onChange={(event) => setField('abbreviation', event.target.value)}
+            />
           </Field>
-          <Field
-            label={t('units.conversionFactor')}
-            hint={t('units.conversionFactorHint')}
-          >
+          <Field label={t('units.conversionFactor')} hint={t('units.conversionFactorHint')}>
             <Input
               type="number"
               step="any"
@@ -169,8 +209,12 @@ export default function UnitsPage() {
             />
           </Field>
           <div className="flex justify-end gap-3 pt-2">
-            <Button variant="ghost" onClick={unitForm.close}>{t('common.cancel')}</Button>
-            <Button type="submit" loading={isSaving}>{t('common.save')}</Button>
+            <Button variant="ghost" onClick={unitForm.close}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="submit" loading={isSaving}>
+              {t('common.save')}
+            </Button>
           </div>
         </form>
       </Modal>

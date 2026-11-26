@@ -32,13 +32,19 @@ describe('translationsToStore', () => {
   });
 
   it('should compose each new translation', () => {
-    expect(translationsToStore({ fr: DECOMPOSED, en: 'Cream' })).toEqual({ fr: COMPOSED, en: 'Cream' });
+    expect(translationsToStore({ fr: DECOMPOSED, en: 'Cream' })).toEqual({
+      fr: COMPOSED,
+      en: 'Cream',
+    });
   });
 
   it('should keep a stored translation sent back as it is, language by language', () => {
     const stored = JSON.stringify({ fr: DECOMPOSED, en: 'Cre\u0300am' });
 
-    expect(translationsToStore({ fr: DECOMPOSED, en: 'Cre\u0300am!' }, stored)).toEqual({ fr: DECOMPOSED, en: 'Cr\u00E8am!' });
+    expect(translationsToStore({ fr: DECOMPOSED, en: 'Cre\u0300am!' }, stored)).toEqual({
+      fr: DECOMPOSED,
+      en: 'Cr\u00E8am!',
+    });
     // The French text of the stored English translation is not the stored French one
     expect(translationsToStore({ fr: 'Cre\u0300am' }, stored)).toEqual({ fr: 'Cr\u00E8am' });
   });

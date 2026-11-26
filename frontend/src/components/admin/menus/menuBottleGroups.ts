@@ -63,7 +63,8 @@ function groupByKey<T>(items: T[], keyOf: (item: T) => string): [string, [T, ...
 
 /** Groups identical bottles of the same section. */
 export function groupMenuBottles(entries: MenuBottleEntry[]): MenuBottleGroup[] {
-  const sectionAndBottle = (entry: MenuBottleEntry) => `${bottleGroupKey(entry.bottle)}|${entry.menuSectionId ?? ''}`;
+  const sectionAndBottle = (entry: MenuBottleEntry) =>
+    `${bottleGroupKey(entry.bottle)}|${entry.menuSectionId ?? ''}`;
 
   return groupByKey(entries, sectionAndBottle).map(([key, groupEntries]) => ({
     key,
@@ -78,12 +79,14 @@ export function groupMenuBottles(entries: MenuBottleEntry[]): MenuBottleGroup[] 
 
 /** Groups identical removed bottles. */
 export function groupExcludedBottles(exclusions: MenuBottleExclusion[]): ExcludedBottleGroup[] {
-  return groupByKey(exclusions, (exclusion) => bottleGroupKey(exclusion.bottle)).map(([key, groupExclusions]) => ({
-    key,
-    bottle: groupExclusions[0].bottle,
-    exclusions: groupExclusions,
-    isEmpty: groupExclusions.every((exclusion) => isEmptyBottle(exclusion.bottle)),
-  }));
+  return groupByKey(exclusions, (exclusion) => bottleGroupKey(exclusion.bottle)).map(
+    ([key, groupExclusions]) => ({
+      key,
+      bottle: groupExclusions[0].bottle,
+      exclusions: groupExclusions,
+      isEmpty: groupExclusions.every((exclusion) => isEmptyBottle(exclusion.bottle)),
+    }),
+  );
 }
 
 /** Groups identical bottles to add to a menu. */

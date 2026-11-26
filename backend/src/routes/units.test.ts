@@ -1,12 +1,27 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
-  setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
-  request, authHeader, prisma, seedUnit, seedIngredient, seedCocktailUsing,
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+  request,
+  authHeader,
+  prisma,
+  seedUnit,
+  seedIngredient,
+  seedCocktailUsing,
 } from '../test/helpers';
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
-beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
+beforeEach(async () => {
+  await cleanDatabase();
+  await seedRequiredData();
+});
 
 describe('GET /api/units', () => {
   it('should return 401 without auth', async () => {
@@ -54,28 +69,39 @@ describe('POST /api/units', () => {
 
   // A name of spaces passes the form's `required`: the frontend names the field from these details (E-23).
   it('should return 400 naming the field when the name is only spaces', async () => {
-    const res = await request.post('/api/units').set(authHeader()).send({ name: '   ', abbreviation: 'x' });
+    const res = await request
+      .post('/api/units')
+      .set(authHeader())
+      .send({ name: '   ', abbreviation: 'x' });
     expect(res.status).toBe(400);
-    expect(res.body.details).toEqual([expect.objectContaining({ path: 'body.name', code: 'too_small' })]);
+    expect(res.body.details).toEqual([
+      expect.objectContaining({ path: 'body.name', code: 'too_small' }),
+    ]);
     expect(await prisma.unit.count({ where: { abbreviation: 'x' } })).toBe(0);
   });
 
   it('should create unit with conversionFactorToMl', async () => {
-    const res = await request.post('/api/units').set(authHeader())
+    const res = await request
+      .post('/api/units')
+      .set(authHeader())
       .send({ name: 'Centilitre', abbreviation: 'cl', conversionFactorToMl: 10 });
     expect(res.status).toBe(201);
     expect(res.body.conversionFactorToMl).toBe(10);
   });
 
   it('should create unit with null conversionFactorToMl', async () => {
-    const res = await request.post('/api/units').set(authHeader())
+    const res = await request
+      .post('/api/units')
+      .set(authHeader())
       .send({ name: 'Piece', abbreviation: 'pce' });
     expect(res.status).toBe(201);
     expect(res.body.conversionFactorToMl).toBeNull();
   });
 
   it('should store nameTranslations', async () => {
-    const res = await request.post('/api/units').set(authHeader())
+    const res = await request
+      .post('/api/units')
+      .set(authHeader())
       .send({ name: 'Centilitre', abbreviation: 'cl', nameTranslations: { fr: 'Centilitre' } });
     expect(res.status).toBe(201);
     expect(res.body.nameTranslations).toEqual({ fr: 'Centilitre' });
@@ -84,24 +110,37 @@ describe('POST /api/units', () => {
   it.each([
     ['a list', ['x']],
     ['an unknown language', { de: 'x' }],
-  ])('should return 400 and store nothing for nameTranslations as %s', async (_label, nameTranslations) => {
-    const res = await request.post('/api/units').set(authHeader())
-      .send({ name: 'Centilitre', abbreviation: 'cl', nameTranslations });
-    expect(res.status).toBe(400);
-    expect(res.body.details[0].path).toMatch(/^body\.nameTranslations/);
-    expect(await prisma.unit.count()).toBe(0);
-  });
+  ])(
+    'should return 400 and store nothing for nameTranslations as %s',
+    async (_label, nameTranslations) => {
+      const res = await request
+        .post('/api/units')
+        .set(authHeader())
+        .send({ name: 'Centilitre', abbreviation: 'cl', nameTranslations });
+      expect(res.status).toBe(400);
+      expect(res.body.details[0].path).toMatch(/^body\.nameTranslations/);
+      expect(await prisma.unit.count()).toBe(0);
+    },
+  );
 
   it('should leave blank translations out', async () => {
-    const res = await request.post('/api/units').set(authHeader())
-      .send({ name: 'Centilitre', abbreviation: 'cl', nameTranslations: { fr: 'Centilitre', en: ' ' } });
+    const res = await request
+      .post('/api/units')
+      .set(authHeader())
+      .send({
+        name: 'Centilitre',
+        abbreviation: 'cl',
+        nameTranslations: { fr: 'Centilitre', en: ' ' },
+      });
     expect(res.status).toBe(201);
     expect(res.body.nameTranslations).toEqual({ fr: 'Centilitre' });
   });
 
   it('should return 409 when the abbreviation exists, ignoring case', async () => {
     await seedUnit({ abbreviation: 'cl' });
-    const res = await request.post('/api/units').set(authHeader())
+    const res = await request
+      .post('/api/units')
+      .set(authHeader())
       .send({ name: 'Other centilitre', abbreviation: 'CL' });
     expect(res.status).toBe(409);
     expect(await prisma.unit.count()).toBe(1);
@@ -111,7 +150,9 @@ describe('POST /api/units', () => {
 describe('PUT /api/units/:id', () => {
   it('should update unit', async () => {
     const unit = await seedUnit();
-    const res = await request.put(`/api/units/${unit.id}`).set(authHeader())
+    const res = await request
+      .put(`/api/units/${unit.id}`)
+      .set(authHeader())
       .send({ name: 'Updated', abbreviation: 'upd' });
     expect(res.status).toBe(200);
     expect(res.body.name).toBe('Updated');
@@ -120,7 +161,9 @@ describe('PUT /api/units/:id', () => {
 
   it('should update conversionFactorToMl', async () => {
     const unit = await seedUnit({ conversionFactorToMl: 10 });
-    const res = await request.put(`/api/units/${unit.id}`).set(authHeader())
+    const res = await request
+      .put(`/api/units/${unit.id}`)
+      .set(authHeader())
       .send({ conversionFactorToMl: 15 });
     expect(res.status).toBe(200);
     expect(res.body.conversionFactorToMl).toBe(15);
@@ -128,7 +171,9 @@ describe('PUT /api/units/:id', () => {
 
   it('should return 400 and keep the unit when conversionFactorToMl is not a number', async () => {
     const unit = await seedUnit({ conversionFactorToMl: 10 });
-    const res = await request.put(`/api/units/${unit.id}`).set(authHeader())
+    const res = await request
+      .put(`/api/units/${unit.id}`)
+      .set(authHeader())
       .send({ conversionFactorToMl: 'ten' });
     expect(res.status).toBe(400);
     expect(res.body.details[0].path).toBe('body.conversionFactorToMl');
@@ -139,14 +184,18 @@ describe('PUT /api/units/:id', () => {
   it('should return 409 when taking the abbreviation of another unit', async () => {
     await seedUnit({ name: 'Millilitre', abbreviation: 'ml' });
     const unit = await seedUnit({ abbreviation: 'cl' });
-    const res = await request.put(`/api/units/${unit.id}`).set(authHeader())
+    const res = await request
+      .put(`/api/units/${unit.id}`)
+      .set(authHeader())
       .send({ abbreviation: 'ml' });
     expect(res.status).toBe(409);
   });
 
   it('should keep its own abbreviation', async () => {
     const unit = await seedUnit({ abbreviation: 'cl' });
-    const res = await request.put(`/api/units/${unit.id}`).set(authHeader())
+    const res = await request
+      .put(`/api/units/${unit.id}`)
+      .set(authHeader())
       .send({ name: 'Centiliter', abbreviation: 'cl' });
     expect(res.status).toBe(200);
   });
@@ -169,7 +218,9 @@ describe('DELETE /api/units/:id', () => {
     const res = await request.delete(`/api/units/${unit.id}?force=true`).set(authHeader());
 
     expect(res.status).toBe(409);
-    expect(res.body.details.cocktails).toEqual([{ id: cocktail.id, name: 'Gimlet', removedLines: 1 }]);
+    expect(res.body.details.cocktails).toEqual([
+      { id: cocktail.id, name: 'Gimlet', removedLines: 1 },
+    ]);
     expect(await prisma.unit.findUnique({ where: { id: unit.id } })).not.toBeNull();
   });
 });
@@ -181,24 +232,46 @@ const DECOMPOSED = 'e\u0301corce';
 describe('Unit names and abbreviations in another Unicode form', () => {
   it('should return 409 for a decomposed abbreviation next to the composed one, or the composed one in upper case', async () => {
     await seedUnit({ abbreviation: COMPOSED });
-    const decomposed = await request.post('/api/units').set(authHeader()).send({ name: 'Peel', abbreviation: DECOMPOSED });
-    const upperCase = await request.post('/api/units').set(authHeader()).send({ name: 'Peel', abbreviation: '\u00C9CORCE' });
+    const decomposed = await request
+      .post('/api/units')
+      .set(authHeader())
+      .send({ name: 'Peel', abbreviation: DECOMPOSED });
+    const upperCase = await request
+      .post('/api/units')
+      .set(authHeader())
+      .send({ name: 'Peel', abbreviation: '\u00C9CORCE' });
     expect(decomposed.status).toBe(409);
     expect(upperCase.status).toBe(409);
     expect(await prisma.unit.count()).toBe(1);
   });
 
   it('should store a new name, abbreviation and translations composed', async () => {
-    const res = await request.post('/api/units').set(authHeader())
-      .send({ name: 'E\u0301corce', abbreviation: DECOMPOSED, nameTranslations: { fr: 'E\u0301corce' } });
+    const res = await request
+      .post('/api/units')
+      .set(authHeader())
+      .send({
+        name: 'E\u0301corce',
+        abbreviation: DECOMPOSED,
+        nameTranslations: { fr: 'E\u0301corce' },
+      });
     expect(res.status).toBe(201);
-    expect(res.body).toMatchObject({ name: '\u00C9corce', abbreviation: COMPOSED, nameTranslations: { fr: '\u00C9corce' } });
+    expect(res.body).toMatchObject({
+      name: '\u00C9corce',
+      abbreviation: COMPOSED,
+      nameTranslations: { fr: '\u00C9corce' },
+    });
   });
 
   it('should keep a stored decomposed value sent back as it is, and compose the values the admin changes', async () => {
     const unit = await seedUnit({ name: 'E\u0301corce', abbreviation: DECOMPOSED });
-    const res = await request.put(`/api/units/${unit.id}`).set(authHeader())
-      .send({ name: 'Ze\u0301ste', abbreviation: DECOMPOSED, nameTranslations: { fr: 'Ze\u0301ste' } });
+    const res = await request
+      .put(`/api/units/${unit.id}`)
+      .set(authHeader())
+      .send({
+        name: 'Ze\u0301ste',
+        abbreviation: DECOMPOSED,
+        nameTranslations: { fr: 'Ze\u0301ste' },
+      });
     expect(res.status).toBe(200);
     expect(await prisma.unit.findUniqueOrThrow({ where: { id: unit.id } })).toMatchObject({
       name: 'Z\u00E9ste',
@@ -206,7 +279,10 @@ describe('Unit names and abbreviations in another Unicode form', () => {
       nameTranslations: JSON.stringify({ fr: 'Z\u00E9ste' }),
     });
 
-    const renamed = await request.put(`/api/units/${unit.id}`).set(authHeader()).send({ abbreviation: 'ZE\u0301STE' });
+    const renamed = await request
+      .put(`/api/units/${unit.id}`)
+      .set(authHeader())
+      .send({ abbreviation: 'ZE\u0301STE' });
     expect(renamed.body.abbreviation).toBe('Z\u00C9STE');
   });
 

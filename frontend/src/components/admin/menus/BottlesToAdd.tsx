@@ -33,7 +33,9 @@ export default function BottlesToAdd({ menu, hint, noChoice, onAdd }: BottlesToA
   const [search, setSearch] = useState('');
 
   const inMenu = new Set((menu.bottles ?? []).map((entry) => entry.bottleId));
-  const choices = (bottlesQuery.data ?? []).filter((bottle) => isAvailableForMenu(bottle, menu) && !inMenu.has(bottle.id));
+  const choices = (bottlesQuery.data ?? []).filter(
+    (bottle) => isAvailableForMenu(bottle, menu) && !inMenu.has(bottle.id),
+  );
   const groups = groupBottleChoices(
     choices.filter((bottle) => matchesSearchText(getBottleSearchText(bottle, localize), search)),
   );
@@ -42,15 +44,26 @@ export default function BottlesToAdd({ menu, hint, noChoice, onAdd }: BottlesToA
     <Card as="section" className="mt-6">
       <h2 className="text-lg font-semibold mb-2">{t('menus.bottles.addTitle')}</h2>
       <p className="mb-4 text-sm text-fg-muted">{hint}</p>
-      {bottlesQuery.isPending && <div className="flex justify-center py-4"><Spinner /></div>}
+      {bottlesQuery.isPending && (
+        <div className="flex justify-center py-4">
+          <Spinner />
+        </div>
+      )}
       {bottlesQuery.isError && <LoadError onRetry={() => bottlesQuery.refetch()} />}
       {bottlesQuery.isSuccess && choices.length === 0 && (
         <p className="text-center py-4 text-sm text-fg-muted">{noChoice}</p>
       )}
       {choices.length > 0 && (
         <>
-          <SearchInput value={search} onChange={setSearch} label={t('menus.bottles.searchChoices')} className="mb-4" />
-          {groups.length === 0 && <p className="text-center py-4 text-sm text-fg-muted">{t('common.noResults')}</p>}
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            label={t('menus.bottles.searchChoices')}
+            className="mb-4"
+          />
+          {groups.length === 0 && (
+            <p className="text-center py-4 text-sm text-fg-muted">{t('common.noResults')}</p>
+          )}
           <ul className="space-y-2 max-h-96 overflow-y-auto">
             {groups.map((group) => (
               <BottleGroupActionRow
