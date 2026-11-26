@@ -14,11 +14,31 @@ This guide lists the actions required to upgrade an existing instance, version b
 
 Pre-releases (`vX.Y.Z-rc.N`) are not listed: they use the section of their target version `vX.Y.Z`. The detailed changes of each version are in its [GitHub Release](https://github.com/Lulu300/carta-cocktail/releases) and in [`docs/releases/`](docs/releases/).
 
-We recommend pinning the images to a version (`:1.15.0`, or `:1.15` to follow its patch releases; these `:X.Y` tags exist from v1.12.0 on) instead of `:latest`, so that an upgrade only happens when you have read this guide.
+We recommend pinning the images to a version (`:1.16.0`, or `:1.16` to follow its patch releases; these `:X.Y` tags exist from v1.12.0 on) instead of `:latest`, so that an upgrade only happens when you have read this guide.
 
 To restore a backup made by an older version, see [Restoring a backup from an older version](#restoring-a-backup-from-an-older-version), at the end of this guide.
 
 The commands below assume the default `docker-compose.prod.yml`, run from its folder. Adapt the file name and the service name `carta-cocktail-backend` if yours differ.
+
+## v1.16.0
+
+No required action, no migration. Pin both images to `:1.16.0`, or `:1.16` to follow the 1.16.x patch releases (`:1.15` does not move to 1.16.0), then pull and restart. This release adds personal aperitif and digestif menus, makes the bottle and cocktail imports safer, and fixes a security advisory (GHSA-mjcw-gfh6-3cxm). Release notes: [`docs/releases/v1.16.0.md`](docs/releases/v1.16.0.md).
+
+Instances older than v1.12.0: upgrade to v1.12.0 first, following the [v1.12.0 section](#v1120) (and the sections before it), check that it works, then apply this one.
+
+**Testing a pre-release**: use `:1.16.0-rc.N` instead of `:1.16.0`.
+
+Worth checking after the upgrade:
+
+- **HSTS.** The backend no longer sends `Strict-Transport-Security`. If your site is served over HTTPS and relies on it, enable it in your reverse proxy (see [`docs/operations.md`](docs/operations.md#https) › HTTPS) or with the commented line of `frontend/security-headers.conf`.
+- **Rolling back to v1.15.x.** Pin the images back to `:1.15`. There is no migration, so the database needs no restore.
+
+**If you download `docker-compose.prod.yml` again** (optional): the new file passes `SQLITE_WAL`, `JWT_EXPIRES_IN`, `LOGIN_RATE_LIMIT`, `API_RATE_LIMIT`, `TRUST_PROXY` and `CORS_ORIGIN` from `.env` (see [README › "Environment Variables"](README.md#environment-variables)).
+
+- Put in `.env` the variables you had added by hand to the `environment` list of `carta-cocktail-backend`, such as `SQLITE_WAL=false` for a database on a network share (see [README › "Database files and network shares"](README.md#database-files-and-network-shares)).
+- If you put such a line back in the new file instead, keep it at the end of the `environment` list. Otherwise the empty entry below it wins, and the variable goes back to its default without a warning.
+- If you read these variables from an `env_file`, move them to `.env` or remove their lines from the new file, for the same reason.
+- A value already in `.env`, which Docker ignored until now, starts to apply.
 
 ## v1.15.0
 
