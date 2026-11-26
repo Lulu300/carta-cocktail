@@ -5,13 +5,13 @@ phase: C
 lane: backend
 criticite: basse
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [C-66]
 touches: [backend/src/routes/bottles.ts, backend/src/validation/bottleImport.ts, backend/src/routes/bottles.test.ts, frontend/src/types/index.ts, frontend/src/components/import/bottleImportResolutions.ts, frontend/src/components/import/bottleImportResolutions.test.ts, frontend/src/components/import/BottleImportRowsStep.tsx, frontend/src/components/import/ImportBottlesWizard.test.tsx]
 sources: []
-branch:
-pr:
+branch: fix/C-68-bottle-row-existing-category
+pr: https://github.com/Lulu300/carta-cocktail/pull/236
 ---
 
 ## Contexte
@@ -34,9 +34,9 @@ Depuis C-66, le sélecteur de la ligne n'offre plus ces catégories (il ne propo
 
 ## Critères d'acceptation
 
-- [ ] Dans les deux cas ci-dessus, une ligne peut être rangée dans `Rhum`.
-- [ ] Une ligne qui garde le nom du fichier va toujours dans la catégorie résolue pour ce nom.
-- [ ] Base `Rhum` et `Gin`, fichier `rhum` créé comme `Rhum agricole` et `gin` créé comme `Rhum` : la ligne `gin` affiche `Rhum` (depuis C-66, `Rhum` n'est pas une option et le sélecteur retombe sur « Choisir une catégorie »).
+- [x] Dans les deux cas ci-dessus, une ligne peut être rangée dans `Rhum`.
+- [x] Une ligne qui garde le nom du fichier va toujours dans la catégorie résolue pour ce nom.
+- [x] Base `Rhum` et `Gin`, fichier `rhum` créé comme `Rhum agricole` et `gin` créé comme `Rhum` : la ligne `gin` affiche `Rhum` (depuis C-66, `Rhum` n'est pas une option et le sélecteur retombe sur « Choisir une catégorie »).
 
 ## Tests à ajouter ou adapter
 
@@ -50,3 +50,5 @@ Depuis C-66, le sélecteur de la ligne n'offre plus ces catégories (il ne propo
 ## Journal
 
 - 2026-11-25 : tâche créée pendant C-66 (hors périmètre : la règle de la confirmation, que C-66 reproduit côté frontend sans la changer).
+- 2026-11-26 : PR #236 (branche `fix/C-68-bottle-row-existing-category`). La résolution de ligne accepte un `categoryId` facultatif (catégorie existante), prioritaire sur `categoryName` ; un nom seul reste accepté, un id inconnu laisse la ligne de côté (`skippedNoCategory`). Le sélecteur propose toutes les catégories : une existante envoie son id, une créée par l'import la clé de résolution qui la crée (son nom peut être la clé d'une autre catégorie du fichier, résolue ailleurs). Une ligne qui garde le nom du fichier l'envoie toujours, et suit donc la résolution de ce nom.
+- Notes de version : « In the bottle import wizard, a bottle can now be put in any existing category, including one whose name, ignoring case, is that of a category of the file resolved to another category or created under another name (`Rhum` when the file's `rhum` goes to `RHUM` or is created as `Rhum agricole`). »
