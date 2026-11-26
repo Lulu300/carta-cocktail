@@ -13,7 +13,7 @@ export default function NotFoundState({ title, linkTo, linkLabel }: NotFoundStat
     <EmptyState
       icon="🍸"
       title={title}
-      role="alert"
+      titleProps={{ role: 'alert' }}
       className="min-h-[60vh] justify-center"
       action={(
         <Link to={linkTo} className="text-accent hover:text-accent-soft underline underline-offset-4">

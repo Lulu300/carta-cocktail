@@ -20,7 +20,7 @@ const ERROR_CLASSES = 'min-h-[60vh] justify-center';
 
 /**
  * Tells "this page does not exist" apart from "this page could not be loaded".
- * Both replace the loading status, so they are announced as an alert.
+ * Both replace the loading status, so they are announced as an alert, the title alone: the retry button stays out of it.
  */
 export default function PublicErrorState({ error, loadErrorTitle, notFound, onRetry, isRetrying }: PublicErrorStateProps) {
   const { t } = useTranslation();
@@ -42,7 +42,7 @@ export default function PublicErrorState({ error, loadErrorTitle, notFound, onRe
       icon="⚠️"
       title={loadErrorTitle}
       description={t('public.loadErrorHint')}
-      role="alert"
+      titleProps={{ role: 'alert' }}
       className={ERROR_CLASSES}
       action={(
         <Button variant="secondary" loading={isRetrying} onClick={retry}>
