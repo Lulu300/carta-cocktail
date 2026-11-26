@@ -11,7 +11,7 @@ depends_on: [E-13]
 touches: [frontend/src/test/, frontend/src/**/*.test.tsx, frontend/src/**/*.test.ts, frontend/AGENTS.md]
 sources: ["04-tests.md §5.1"]
 branch: test/E-34-tests-real-i18next
-pr:
+pr: 283
 ---
 
 ## Contexte
