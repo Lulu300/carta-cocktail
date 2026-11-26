@@ -369,11 +369,24 @@ export interface BottleImportRowError {
   code: BottleImportRowErrorCode;
 }
 
+/**
+ * A value of a row the import keeps as it is, but that the admin should check, located like a
+ * `BottleImportRowError`. `lineBreak`: a line break in a single-line text field.
+ */
+export interface BottleImportRowWarning {
+  source: 'bottles' | 'categories';
+  line: number;
+  field: string;
+  code: 'lineBreak';
+}
+
 export interface BottleImportPreviewResponse {
   payload: BottleImportPayload;
   categories: BottleCategoryPreview[];
   bottles: BottleRowPreview[];
   errors: BottleImportRowError[];
+  // A backend older than this frontend sends none
+  warnings?: BottleImportRowWarning[];
 }
 
 export type BottleCategoryResolution =

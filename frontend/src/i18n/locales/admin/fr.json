@@ -160,6 +160,14 @@
           "malformedQuotes": "{{field}} contient un guillemet mal placé",
           "unknown": "{{field}} invalide"
         }
+      },
+      "rowWarnings": {
+        "title": "{{count}} valeur(s) à vérifier, importée(s) telle(s) quelle(s)",
+        "hint": "Un guillemet mal placé dans le fichier peut réunir plusieurs lignes en une seule valeur.",
+        "code": {
+          "lineBreak": "{{field}} s'étend sur plusieurs lignes",
+          "unknown": "{{field}} à vérifier"
+        }
       }
     },
     "search": "Rechercher une bouteille",

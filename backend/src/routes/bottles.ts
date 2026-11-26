@@ -76,9 +76,9 @@ function parseUploadedFile(file: Express.Multer.File, language: string): Normali
 router.post('/import/preview', importUpload.single('file'), async (req: AuthRequest, res: Response) => {
   if (!req.file) throw new BadRequestError();
 
-  // The rows left out are listed apart: the payload goes back unchanged to /import/confirm
+  // The rows left out and the values to check are listed apart: the payload goes back unchanged to /import/confirm
   // A date typed in a spreadsheet is read in the order of the app's language (Accept-Language)
-  const { errors, ...payload } = parseUploadedFile(req.file, req.language);
+  const { errors, warnings, ...payload } = parseUploadedFile(req.file, req.language);
 
   const allBottles = await prisma.bottle.findMany({ include: { category: true } });
 
@@ -113,7 +113,7 @@ router.post('/import/preview', importUpload.single('file'), async (req: AuthRequ
     };
   });
 
-  res.json({ payload, categories, bottles, errors });
+  res.json({ payload, categories, bottles, errors, warnings });
 });
 
 const importConfirmSchemas = { body: BottleImportConfirm };
