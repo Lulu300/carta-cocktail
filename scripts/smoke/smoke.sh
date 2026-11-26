@@ -112,6 +112,18 @@ if [[ "$(header x-content-type-options)" != "nosniff" ]]; then
   fail "missing security header X-Content-Type-Options: nosniff"
 fi
 
+step "The service worker and the web manifest of the installable app"
+grep -q '<link rel="manifest" href="/manifest.webmanifest">' "$BODY" || fail "index.html links no web manifest"
+# A cached sw.js would keep browsers on an old version of the app (frontend/nginx.conf.template)
+request GET /sw.js
+expect_status 200
+expect_content_type '*javascript*'
+[[ "$(header cache-control)" == "no-cache" ]] || fail "sw.js: expected Cache-Control no-cache, got '$(header cache-control)'"
+request GET /manifest.webmanifest
+expect_status 200
+expect_content_type 'application/manifest+json*'
+[[ "$(json_field .start_url)" == "/" ]] || fail "expected start_url / in the manifest: $(body_excerpt)"
+
 step "GET $asset is gzip-compressed"
 request GET "$asset" -H 'Accept-Encoding: gzip'
 expect_status 200

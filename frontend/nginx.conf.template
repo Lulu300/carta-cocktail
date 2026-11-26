@@ -97,6 +97,20 @@ server {
         include /etc/nginx/snippets/security-headers.conf;
     }
 
+    # Service worker (vite-plugin-pwa): revalidated on every load, like index.html, so that a
+    # browser or a proxy never holds on to an old worker and the old app it precached.
+    location = /sw.js {
+        add_header Cache-Control "no-cache";
+        include /etc/nginx/snippets/security-headers.conf;
+    }
+
+    # Web app manifest: the mime.types of nginx does not know the .webmanifest extension.
+    location = /manifest.webmanifest {
+        default_type application/manifest+json;
+        add_header Cache-Control "no-cache";
+        include /etc/nginx/snippets/security-headers.conf;
+    }
+
     # Docker healthcheck of the frontend service: kept out of the access log, so that the probe
     # (every 30 s) does not bury the requests of real visitors.
     location = /healthz {
