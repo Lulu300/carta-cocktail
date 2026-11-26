@@ -6,7 +6,7 @@ import { BadRequestError, ForbiddenError, NotFoundError } from '../errors';
 import { valid, validate } from '../validation/validate';
 import { IdParams, idRequest } from '../validation/common';
 import { MenuCreate, MenuUpdate } from '../validation/menus';
-import { assertBottlesAllowed, isSystemMenu } from '../services/menuSyncService';
+import { assertBottlesAllowed, assertCocktailsAllowed, isSystemMenu } from '../services/menuSyncService';
 import { parseNameTranslations } from '../utils/translations';
 
 const router = Router();
@@ -126,6 +126,7 @@ router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Respo
   // must leave the existing associations untouched.
   const menu = await prisma.$transaction(async (tx) => {
     await assertSectionsBelongToMenu(tx, menuId, [...(cocktails ?? []), ...(bottles ?? [])]);
+    if (cocktails) assertCocktailsAllowed(existing, cocktails);
     if (bottles) await assertBottlesAllowed(tx, existing, bottles.map((b) => b.bottleId));
 
     if (cocktails) {

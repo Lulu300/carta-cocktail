@@ -26,6 +26,7 @@
     "passwordTooShort": "The new password must be at least 12 characters long",
     "invalidEmail": "The email address is not valid",
     "bottleNotAllowedInMenu": "This bottle cannot go in this menu: only bottles checked for the menu's type (aperitif or digestif) can",
+    "cocktailNotAllowedInMenu": "This cocktail cannot go in this menu: only a cocktail menu can hold cocktails",
     "cannotSyncCocktailMenu": "A cocktail menu has no bottles to synchronize",
     "cannotSyncPersonalMenu": "Only the Aperitifs and Digestifs menus follow the bottles: add the bottles of this menu by hand",
     "systemMenuBottlesManaged": "The bottles of this menu follow their aperitif / digestif box: remove a bottle or put a removed one back instead",
