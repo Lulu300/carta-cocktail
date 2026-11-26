@@ -101,6 +101,33 @@ describe('locale bundles', () => {
     },
   );
 
+  it.each(Object.entries(BUNDLES))('every plural form of the %s bundle has its pair', (_, bundle) => {
+    // French and English both need _one and _other; i18next falls back to the key itself without them.
+    for (const messages of Object.values(bundle)) {
+      const keys = Object.keys(messages);
+      const orphans = keys.filter(
+        (key) =>
+          (key.endsWith('_one') && !keys.includes(key.replace(/_one$/, '_other'))) ||
+          (key.endsWith('_other') && !keys.includes(key.replace(/_other$/, '_one'))),
+      );
+      expect(orphans).toEqual([]);
+    }
+  });
+
+  it.each(Object.entries(BUNDLES))(
+    'the %s bundle writes no plural inside a message, such as "bottle(s)"',
+    (_, bundle) => {
+      // A letter right before the parenthesis: "(ml)" and "Name (brand)" are not plurals.
+      const WRITTEN_PLURAL = /\p{L}\([\p{L}/]+\)/u;
+      for (const messages of Object.values(bundle)) {
+        const offenders = Object.entries(messages)
+          .filter(([, message]) => WRITTEN_PLURAL.test(message))
+          .map(([key]) => key);
+        expect(offenders).toEqual([]);
+      }
+    },
+  );
+
   it('never define a key in both bundles', () => {
     const publicEnKeys = Object.keys(BUNDLES.public.en);
     const adminEnKeys = Object.keys(BUNDLES.admin.en);
@@ -272,6 +299,40 @@ describe('plural forms', () => {
     const t = i18n.getFixedT('fr');
     expect(t('cocktails.doses', { count: 1, servings: 1 })).toBe('1 dose');
     expect(t('cocktails.doses', { count: 999, servings: '∞' })).toBe('∞ doses');
+  });
+});
+
+describe('plural forms of the import wizards and selections', () => {
+  it('count imported bottles in French, where 0 is singular', async () => {
+    await import('./admin');
+    const t = i18n.getFixedT('fr');
+    const key = 'bottles.importWizard.successCount';
+    expect(t(key, { count: 0 })).toBe('0 bouteille importée');
+    expect(t(key, { count: 1 })).toBe('1 bouteille importée');
+    expect(t(key, { count: 2 })).toBe('2 bouteilles importées');
+  });
+
+  it('count imported bottles in English', async () => {
+    await import('./admin');
+    const t = i18n.getFixedT('en');
+    const key = 'bottles.importWizard.successCount';
+    expect(t(key, { count: 1 })).toBe('1 bottle imported');
+    expect(t(key, { count: 2 })).toBe('2 bottles imported');
+  });
+
+  it('agree the batch summary with the number of imported recipes', async () => {
+    await import('./admin');
+    const t = i18n.getFixedT('fr');
+    const key = 'cocktails.importWizard.batchSummaryCount';
+    expect(t(key, { count: 1, success: 1, total: 3 })).toBe('1 sur 3 importé avec succès');
+    expect(t(key, { count: 2, success: 2, total: 3 })).toBe('2 sur 3 importés avec succès');
+  });
+
+  it('agree the selection count in French', async () => {
+    await import('./admin');
+    const t = i18n.getFixedT('fr');
+    expect(t('common.selected', { count: 1 })).toBe('1 sélectionné');
+    expect(t('common.selected', { count: 3 })).toBe('3 sélectionnés');
   });
 });
 

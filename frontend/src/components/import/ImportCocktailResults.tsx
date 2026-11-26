@@ -114,7 +114,7 @@ export function ImportBatchSummary({ state, onClose }: { state: CocktailImportSt
     <WizardResult
       variant="summary"
       title={t('cocktails.importWizard.batchComplete')}
-      message={t('cocktails.importWizard.batchSummaryCount', { success: successCount, total: results.length })}
+      message={t('cocktails.importWizard.batchSummaryCount', { count: successCount, success: successCount, total: results.length })}
       actions={<Button onClick={onClose}>{t('cocktails.importWizard.close')}</Button>}
     >
       <ul className="text-left max-w-md mx-auto space-y-2">
