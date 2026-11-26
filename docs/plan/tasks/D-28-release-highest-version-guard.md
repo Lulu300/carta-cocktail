@@ -5,12 +5,12 @@ phase: D
 lane: ci
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [D-05]
-touches: [.github/workflows/release.yml, docs/plan/README.md]
+touches: [.github/workflows/release.yml, .github/scripts/release-tags.mjs, docs/plan/README.md, README.md]
 sources: ["07-devops-history.md §3.4"]
-branch:
+branch: chore/D-28-release-highest-version-guard
 pr:
 ---
 
@@ -56,3 +56,4 @@ D-05 (PR #118) publie les versions finales avec les tags d'image `X.Y.Z`, `X.Y`,
 ## Journal
 
 - 2026-10-12 : tâche créée après la relecture de D-05 (PR #118), décision de l'humain.
+- 2026-11-26 : fait. Choix : publication réduite (pas de refus), décidée par `.github/scripts/release-tags.mjs` dans `verify` ; `:X` pour la plus haute de sa majeure, `:X.Y` pour la plus haute de sa mineure, `latest` et `make_latest` pour la plus haute. Pas de branche de maintenance : le refus aurait bloqué tout correctif d'une ancienne ligne.

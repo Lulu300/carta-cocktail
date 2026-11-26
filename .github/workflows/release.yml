@@ -4,7 +4,8 @@ name: Release
 # - vX.Y.Z-rc.N: pre-release, tagged on develop. Publishes :X.Y.Z-rc.N images
 #   (latest is not moved) and a GitHub Release marked as pre-release.
 # - vX.Y.Z: final release, tagged on main. Publishes :X.Y.Z, :X.Y, :X and
-#   :latest images and a normal GitHub Release.
+#   :latest images and a normal GitHub Release. A version lower than a
+#   published one only moves the tags it is the highest of (release-tags.mjs).
 # Images are built for linux/amd64 and linux/arm64, with SBOM and provenance,
 # only after the full CI of the tagged commit has passed.
 # Push the branch before the tag: the branch rule reads origin/<branch>.
@@ -34,6 +35,9 @@ jobs:
       prerelease: ${{ steps.tag.outputs.prerelease }}
       notes: ${{ steps.notes.outputs.path }}
       prev_tag: ${{ steps.prev.outputs.tag }}
+      latest: ${{ steps.moving.outputs.latest }}
+      major: ${{ steps.moving.outputs.major }}
+      minor: ${{ steps.moving.outputs.minor }}
 
     steps:
       # fetch-depth 0 brings origin/main, origin/develop and every tag
@@ -151,6 +155,13 @@ jobs:
           echo "tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
           echo "Previous tag: ${PREV_TAG:-none}"
 
+      # A fix of an older line (v1.15.1 after v1.16.0) must not move :latest,
+      # :X or another minor's :X.Y backwards. Decided here, before any push.
+      - name: Moving tags
+        id: moving
+        run: |
+          git tag --list 'v*' | node .github/scripts/release-tags.mjs "$GITHUB_REF_NAME" | tee -a "$GITHUB_OUTPUT"
+
   # The full CI of the tagged commit (tests, lint, audit, Docker builds): no
   # image is pushed unless it passes. ci.yml keeps its own concurrency group,
   # named after this workflow ("ci-Release-<sha>"): never reuse it here.
@@ -197,20 +208,20 @@ jobs:
         id: repo
         run: echo "name=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
 
-      # X.Y.Z for every tag; X.Y and X for a final release only (the action
-      # gives a pre-release its {{version}} tag alone). latest follows the
-      # verify job: only a final release moves it.
+      # X.Y.Z for every tag. X.Y, X and latest follow the verify job: a final
+      # release moves each one only when it is the highest version of that
+      # minor, major or overall (a pre-release moves none).
       - name: Image tags and labels
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}/${{ matrix.service }}
           flavor: |
-            latest=${{ needs.verify.outputs.prerelease == 'false' }}
+            latest=${{ needs.verify.outputs.latest }}
           tags: |
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ needs.verify.outputs.minor }}
+            type=semver,pattern={{major}},enable=${{ needs.verify.outputs.major }}
 
       # The cache is read from the scope written by the CI pushes (amd64 only,
       # rewritten at each push) and from the release scope, which keeps the
@@ -282,4 +293,4 @@ jobs:
         with:
           body_path: ${{ runner.temp }}/release-body.md
           prerelease: ${{ needs.verify.outputs.prerelease == 'true' }}
-          make_latest: ${{ needs.verify.outputs.prerelease == 'true' && 'false' || 'true' }}
+          make_latest: ${{ needs.verify.outputs.latest }}
