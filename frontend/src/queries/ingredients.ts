@@ -5,7 +5,7 @@ import { useEntityMutation, type EntityMutation } from './crud';
 import { qk } from './keys';
 
 export function useIngredients(): UseQueryResult<Ingredient[], Error> {
-  return useQuery({ queryKey: qk.ingredients, queryFn: () => ingredientsApi.list() });
+  return useQuery({ queryKey: qk.ingredients, queryFn: ({ signal }) => ingredientsApi.list(signal) });
 }
 
 /** Creates an ingredient from its name alone, e.g. while writing a recipe. */

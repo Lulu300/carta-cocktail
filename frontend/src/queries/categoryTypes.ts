@@ -4,5 +4,5 @@ import type { CategoryType } from '../types';
 import { qk } from './keys';
 
 export function useCategoryTypes(): UseQueryResult<CategoryType[], Error> {
-  return useQuery({ queryKey: qk.categoryTypes, queryFn: () => categoryTypesApi.list() });
+  return useQuery({ queryKey: qk.categoryTypes, queryFn: ({ signal }) => categoryTypesApi.list(signal) });
 }

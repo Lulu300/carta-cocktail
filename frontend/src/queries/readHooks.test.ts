@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { UseQueryResult } from '@tanstack/react-query';
-import { captureRequest, mockApiError, mockApiResponse } from '../test/msw/utils';
+import { http } from 'msw';
+import { server } from '../test/msw/server';
+import { captureRequest, mockApiError, mockApiPending, mockApiResponse } from '../test/msw/utils';
 import { createTestQueryClient, renderHook, waitFor } from '../test/test-utils';
 import { qk } from './keys';
 import { useBottles } from './bottles';
@@ -76,6 +78,38 @@ describe('useCocktailsAvailability options', () => {
 
     expect(result.current.fetchStatus).toBe('idle');
     expect(request.count()).toBe(0);
+  });
+});
+
+describe('request cancellation', () => {
+  it('aborts the request of a read when its page is left before the answer', async () => {
+    let received!: AbortSignal;
+    let reached!: () => void;
+    const requestReceived = new Promise<void>((resolve) => { reached = resolve; });
+    server.use(http.get('/api/units', ({ request }) => {
+      received = request.signal;
+      reached();
+      return new Promise<Response>(() => {});
+    }));
+    const { unmount } = renderHook(useUnits);
+    await requestReceived;
+    expect(received.aborted).toBe(false);
+
+    unmount();
+
+    await waitFor(() => expect(received.aborted).toBe(true));
+  });
+
+  it('shows no error for a read cancelled while it is loading', async () => {
+    mockApiPending('get', '/api/units');
+    const queryClient = createTestQueryClient();
+    const { result } = renderHook(useUnits, { queryClient });
+    await waitFor(() => expect(result.current.fetchStatus).toBe('fetching'));
+
+    await queryClient.cancelQueries({ queryKey: qk.units });
+
+    await waitFor(() => expect(result.current.fetchStatus).toBe('idle'));
+    expect(result.current.isError).toBe(false);
   });
 });
 
