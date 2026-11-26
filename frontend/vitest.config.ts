@@ -5,6 +5,9 @@ export default defineConfig({
   plugins: [react()],
   test: {
     globals: true,
+    // Vitest defaults to the `minimal` reporter under an AI agent, which hides the
+    // console of passing tests. Pin it so the output is the same everywhere.
+    reporters: ['default', ...(process.env.GITHUB_ACTIONS === 'true' ? ['github-actions'] : [])],
     environment: 'jsdom',
     css: false,
     setupFiles: ['./src/test/setup.ts'],

@@ -5,12 +5,12 @@ phase: E
 lane: frontend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: []
 touches: [frontend/vitest.config.ts, frontend/AGENTS.md, backend/vitest.config.ts, backend/AGENTS.md]
 sources: []
-branch:
+branch: test/E-33-vitest-reporter
 pr:
 ---
 
@@ -51,3 +51,4 @@ Décision de l'humain (2026-10-13) : la PR #139 ajoute tout de suite une ligne d
 ## Journal
 
 - 2026-10-13 : tâche créée à partir de la relecture de la PR #139 (E-13, 1/2) et de la décision de l'humain (« Les deux » : ligne dans `frontend/AGENTS.md` tout de suite, tâche séparée pour la configuration).
+- 2026-11-26 : `reporters` fixé dans les deux `vitest.config.ts`. Contrôle manuel sous un agent : un test qui fait `console.warn` est masqué avec `--reporter=minimal` (ancien défaut) et affiché avec la config ; les deux suites passent. Ligne `--silent=false` de `frontend/AGENTS.md` remplacée, phrase ajoutée dans `backend/AGENTS.md`.
