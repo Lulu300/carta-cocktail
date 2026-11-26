@@ -97,16 +97,33 @@ export class Instance {
     return publishedContainerPort(this.composeTemplate(), FRONTEND_SERVICE);
   }
 
-  /** Writes the compose file of the current generation with the current images. */
-  writeComposeFile(adminEmail) {
-    fs.writeFileSync(this.composePath, renderTemplate(this.composeTemplate(), {
+  renderCompose(adminEmail) {
+    return renderTemplate(this.composeTemplate(), {
       PROJECT: this.project,
       ADMIN_EMAIL: adminEmail,
       BACKEND_IMAGE: this.images.backend,
       FRONTEND_IMAGE: this.images.frontend,
       BACKEND_PLATFORM: this.images.platform,
       FRONTEND_PLATFORM: this.images.platform,
-    }));
+    });
+  }
+
+  /** Writes the compose file of the current generation with the current images. */
+  writeComposeFile(adminEmail) {
+    fs.writeFileSync(this.composePath, this.renderCompose(adminEmail));
+  }
+
+  /**
+   * `docker compose config` of the current generation, as JSON. The containers still come from the
+   * previous generation until the jump, so the file is rendered next to the real one, in the same
+   * folder (relative bind paths and the env file resolve the same way) and left untouched.
+   */
+  plannedConfig(adminEmail) {
+    const plannedPath = path.join(this.dir, `planned-${this.layout.composeFile}`);
+    fs.writeFileSync(plannedPath, this.renderCompose(adminEmail));
+    const output = docker(['compose', '--project-name', this.project, '--file', plannedPath, 'config', '--format', 'json']).stdout;
+    fs.rmSync(plannedPath);
+    return JSON.parse(output);
   }
 
   compose(args, options) {
