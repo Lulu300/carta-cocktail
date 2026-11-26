@@ -5,13 +5,13 @@ phase: F
 lane: backend
 criticite: moyenne
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [D-11, D-05, C-01]
 touches: [backend/prisma/schema.prisma, backend/prisma/migrations/, backend/src/services/upgradeNoticeService.ts, backend/src/routes/system.ts, backend/src/app.ts, backend/src/index.ts, backend/src/i18n/, backend/package.json, backend/package-lock.json, backend/Dockerfile, .github/workflows/release.yml, .github/workflows/ci.yml, docker-compose.yml, frontend/src/components/admin/UpgradeNoticeBanner.tsx, frontend/src/components/layout/AdminLayout.tsx, frontend/src/services/api.ts, frontend/src/i18n/locales/]
 sources: ["07-devops-history.md §3.4"]
-branch:
-pr:
+branch: feature/F-09-in-app-upgrade-guide
+pr: https://github.com/Lulu300/carta-cocktail/pull/255
 ---
 
 ## Décisions validées (2026-10-09)
@@ -53,16 +53,16 @@ L'instance tourne sur un NAS et se met à jour par `docker compose pull`, souven
 
 ## Critères d'acceptation
 
-- [ ] La migration ajoute l'état applicatif ; `npm run db:check` passe.
-- [ ] Installation neuve : aucun bandeau ; `lastRunVersion` vaut la version lancée.
-- [ ] Passage de 1.5.0 à 1.7.0 avec des notes pour 1.6.0 et 1.7.0 : les logs et le bandeau listent les actions de 1.6.0 puis de 1.7.0, dans l'ordre des fichiers.
-- [ ] Après validation, le bandeau disparaît et ne revient pas au redémarrage suivant de la même version.
-- [ ] Retour à une version plus ancienne : avertissement dans les logs, pas de bandeau, `lastRunVersion` inchangé.
-- [ ] `APP_VERSION=dev` : rien n'est enregistré ni affiché.
-- [ ] Un fichier de notes invalide n'empêche pas le démarrage.
-- [ ] Les actions « before » sont signalées comme telles, avec le lien vers `UPGRADING.md`.
-- [ ] Les fichiers `docs/releases/*.md` sont présents dans l'image (`docker run --rm --entrypoint ls <image> /app/releases`).
-- [ ] Couverture ≥ 80 % sur les lignes modifiées, backend et frontend.
+- [x] La migration ajoute l'état applicatif ; `npm run db:check` passe.
+- [x] Installation neuve : aucun bandeau ; `lastRunVersion` vaut la version lancée.
+- [x] Passage de 1.5.0 à 1.7.0 avec des notes pour 1.6.0 et 1.7.0 : les logs et le bandeau listent les actions de 1.6.0 puis de 1.7.0, dans l'ordre des fichiers.
+- [x] Après validation, le bandeau disparaît et ne revient pas au redémarrage suivant de la même version.
+- [x] Retour à une version plus ancienne : avertissement dans les logs, pas de bandeau, `lastRunVersion` inchangé.
+- [x] `APP_VERSION=dev` : rien n'est enregistré ni affiché.
+- [x] Un fichier de notes invalide n'empêche pas le démarrage.
+- [x] Les actions « before » sont signalées comme telles, avec le lien vers `UPGRADING.md`.
+- [x] Les fichiers `docs/releases/*.md` sont présents dans l'image (`docker run --rm --entrypoint ls <image> /app/releases`).
+- [x] Couverture ≥ 80 % sur les lignes modifiées, backend et frontend.
 
 ## Tests à ajouter ou adapter
 
@@ -91,3 +91,5 @@ L'instance tourne sur un NAS et se met à jour par `docker compose pull`, souven
 - 2026-10-09 : tâche créée à partir des décisions humaines du 2026-10-09 (guide de mise à jour dans l'instance).
 - 2026-10-09 : revue de la PR #38. Points d'attention ajoutés : notes de version (règle de D-11), restauration de backup (réenregistrer la version courante), contexte `releases` pour les builds de D-04 et D-08.
 - 2026-10-09 : deuxième revue de la PR #38. `.github/workflows/ci.yml` ajouté à `touches` (job de build de D-04) ; le smoke test de D-08 passe par `docker-compose.yml`, déjà listé.
+- 2026-11-26 : PR #255 (branche `feature/F-09-in-app-upgrade-guide`). Modèle `AppState` à une ligne plutôt que des champs sur `SiteSettings` (contenu de l'utilisateur, renvoyé par les routes des réglages ; une table à part se garde d'un bloc à la restauration). Front matter lu avec le paquet `yaml` (ISC, sans dépendance ni script d'installation) : même lecture que `yq` dans le job `verify`, échappements compris. Comparaison par release (X.Y.Z) : une pré-version prend les notes de sa version cible. Un avis non validé garde son point de départ. Une montée sans action ne laisse pas d'avis. Seule la version qui a enregistré l'avis l'affiche. La route renvoie 204 une fois l'avis validé, sans champ `acknowledged`. La restauration recopie la ligne `AppState` vivante dans la base restaurée. Le banc `scripts/upgrade-test/` passe le contexte `releases` à son build local. Smoke local `carta-f-09` vert ; bout en bout sur l'image : 1.11.0 puis 1.12.0 affiche les 6 actions de v1.12.0.
+- **Notes de version** (règle 9). `breaking: false`, aucune action obligatoire. Nouvelle migration `20261126120000_app_state` (table vide, copie `pre-migrate-<date>.db` au premier démarrage). Après une mise à jour, le journal du backend et un bandeau de l'administration listent les actions obligatoires des versions sautées, « before » comprises (à vérifier après coup), jusqu'au clic sur « J'ai fait ces actions » ; `UPGRADING.md` reste la référence. Le bandeau n'apparaît qu'à partir de la mise à jour **suivante** : cette version enregistre seulement la sienne. Un compose personnalisé qui construit lui-même l'image backend doit ajouter `additional_contexts: { releases: ./docs/releases }` sous `build:` (Docker Compose ≥ 2.17), et un `docker build` manuel `--build-context releases=./docs/releases` ; rien à faire avec les images publiées. Épinglage recommandé : `:<majeure>.<mineure>`.
