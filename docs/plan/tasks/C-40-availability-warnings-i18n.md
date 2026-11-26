@@ -11,7 +11,7 @@ depends_on: [E-10]
 touches: [backend/src/services/availabilityService.ts, backend/src/services/availabilityService.test.ts, backend/src/routes/availability.test.ts, frontend/src/types/index.ts, frontend/src/components/admin/cocktails/AvailabilityWarnings.tsx, frontend/src/components/admin/cocktails/, frontend/src/pages/admin/CocktailsPage.test.tsx, frontend/src/pages/admin/CocktailFormPage.test.tsx, frontend/src/i18n/locales/admin/, frontend/src/i18n/bundles.test.ts]
 sources: []
 branch: fix/C-40-availability-warnings-i18n
-pr: 0
+pr: 261
 ---
 
 ## Contexte
