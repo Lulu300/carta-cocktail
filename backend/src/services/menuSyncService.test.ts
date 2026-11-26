@@ -4,7 +4,7 @@ import {
   seedBottle, seedCategory, seedMenu, seedMenuSection, addBottleToMenu, excludeBottleFromMenu, findSystemMenu,
 } from '../test/helpers';
 import {
-  assertBottlesAllowed, BottleMenuType, excludeBottles, isAvailableFor, isEligible, isSystemMenu,
+  assertBottlesAllowed, assertCocktailsAllowed, BottleMenuType, excludeBottles, isAvailableFor, isEligible, isSystemMenu,
   restoreBottles, syncBottle, syncMenu, syncNewBottles,
 } from './menuSyncService';
 
@@ -65,6 +65,19 @@ describe('isSystemMenu', () => {
     ['summer-aperitifs', false],
   ])('%s → %s', (slug, expected) => {
     expect(isSystemMenu({ slug })).toBe(expected);
+  });
+});
+
+describe('assertCocktailsAllowed', () => {
+  it('refuses cocktails in a bottle menu, but lets it be emptied', () => {
+    for (const type of ['APEROS', 'DIGESTIFS']) {
+      expect(() => assertCocktailsAllowed({ type }, [1])).toThrow(expect.objectContaining({ i18nKey: 'errors.cocktailNotAllowedInMenu' }));
+      expect(() => assertCocktailsAllowed({ type }, [])).not.toThrow();
+    }
+  });
+
+  it('accepts cocktails in a cocktail menu', () => {
+    expect(() => assertCocktailsAllowed({ type: 'COCKTAILS' }, [1])).not.toThrow();
   });
 });
 

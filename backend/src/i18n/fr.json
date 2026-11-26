@@ -26,6 +26,7 @@
     "passwordTooShort": "Le nouveau mot de passe doit contenir au moins 12 caractères",
     "invalidEmail": "L’adresse email n’est pas valide",
     "bottleNotAllowedInMenu": "Cette bouteille ne peut pas aller dans cette carte : seules les bouteilles cochées pour le type de la carte (apéritif ou digestif) le peuvent",
+    "cocktailNotAllowedInMenu": "Ce cocktail ne peut pas aller dans cette carte : seule une carte de cocktails peut en contenir",
     "cannotSyncCocktailMenu": "Une carte de cocktails n'a pas de bouteilles à synchroniser",
     "cannotSyncPersonalMenu": "Seules les cartes Apéritifs et Digestifs suivent les bouteilles : ajoutez à la main les bouteilles de cette carte",
     "systemMenuBottlesManaged": "Les bouteilles de cette carte suivent leur case apéritif / digestif : retirez une bouteille ou remettez une bouteille retirée",

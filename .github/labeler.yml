@@ -1,0 +1,20 @@
+# Labels added to a pull request when it is opened (task D-24).
+#
+# Read by .github/workflows/labeler.yml. The labels match the categories of
+# .github/release.yml, so that the release notes sort the PR list.
+#
+# Branch names follow docs/plan/README.md (rule 3). `chore/` gets nothing from
+# its prefix: only the files it changes can tell. `breaking` and
+# `skip-changelog` stay manual, and Dependabot PRs arrive already labeled.
+fix:
+  - head-branch: ['^fix/']
+
+feature:
+  - head-branch: ['^feature/']
+
+docs:
+  - head-branch: ['^docs/']
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file: ['.github/workflows/**']
