@@ -11,7 +11,7 @@ depends_on: []
 touches: [frontend/src/services/api.ts, frontend/src/services/api.test.ts, frontend/src/i18n/locales/]
 sources: ["07-devops-history.md §2.4", "05-frontend-archi.md §3.2"]
 branch: fix/E-17-api-non-json-errors
-pr:
+pr: "#268"
 ---
 
 ## Contexte
