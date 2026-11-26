@@ -250,7 +250,8 @@ nginx (`frontend/nginx.conf.template`) limits the whole multipart body, so its `
 | `npm run build`         | TypeScript compilation to dist/                            |
 | `npm start`             | Run compiled JS from dist/                                 |
 | `npm run lint`          | ESLint                                                     |
-| `npm run format:check`  | Prettier check (fails until the repository reformat)       |
+| `npm run format`        | Prettier, rewrites the files                               |
+| `npm run format:check`  | Prettier check (must stay green, CI runs it)               |
 | `npm test`              | Tests (Vitest)                                             |
 | `npm run test:watch`    | Tests in watch mode                                        |
 | `npm run test:coverage` | Tests with coverage                                        |

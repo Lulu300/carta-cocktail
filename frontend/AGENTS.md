@@ -188,16 +188,17 @@ Safari and iOS 16.0+, Chrome and Edge 107+, Firefox 104+ (`build.target` in `vit
 
 ## Scripts
 
-| Command                 | Description                                          |
-| ----------------------- | ---------------------------------------------------- |
-| `npm run dev`           | Vite dev server (port 5173, proxies /api to :3001)   |
-| `npm run build`         | TypeScript check + Vite production build             |
-| `npm run lint`          | ESLint                                               |
-| `npm run format:check`  | Prettier check (fails until the repository reformat) |
-| `npm run preview`       | Preview production build                             |
-| `npm test`              | Tests (Vitest)                                       |
-| `npm run test:watch`    | Tests in watch mode                                  |
-| `npm run test:coverage` | Tests with coverage                                  |
+| Command                 | Description                                        |
+| ----------------------- | -------------------------------------------------- |
+| `npm run dev`           | Vite dev server (port 5173, proxies /api to :3001) |
+| `npm run build`         | TypeScript check + Vite production build           |
+| `npm run lint`          | ESLint                                             |
+| `npm run format`        | Prettier, rewrites the files                       |
+| `npm run format:check`  | Prettier check (must stay green, CI runs it)       |
+| `npm run preview`       | Preview production build                           |
+| `npm test`              | Tests (Vitest)                                     |
+| `npm run test:watch`    | Tests in watch mode                                |
+| `npm run test:coverage` | Tests with coverage                                |
 
 ## Dependencies
 

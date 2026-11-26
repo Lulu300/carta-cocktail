@@ -8,6 +8,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint .",
+    "format": "prettier --write . --ignore-path .gitignore --ignore-path ../.prettierignore",
     "format:check": "prettier --check . --ignore-path .gitignore --ignore-path ../.prettierignore",
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
