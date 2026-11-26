@@ -11,7 +11,7 @@ depends_on: [D-07]
 touches: [.github/labeler.yml, .github/workflows/labeler.yml]
 sources: ["07-devops-history.md §1.3"]
 branch: chore/D-24-pr-auto-labels
-pr:
+pr: 248
 ---
 
 ## Contexte
