@@ -5,12 +5,12 @@ phase: E
 lane: frontend
 criticite: basse
 effort: S
-status: todo
+status: dropped
 owner: agent
 depends_on: []
 touches: [frontend/src/services/api.ts, frontend/src/services/api.test.ts, frontend/src/i18n/locales/]
 sources: ["07-devops-history.md §2.4", "05-frontend-archi.md §3.2"]
-branch:
+branch: fix/E-17-api-non-json-errors
 pr:
 ---
 
@@ -61,3 +61,5 @@ En Docker, nginx est la seule porte d'entrée. Quand il refuse une requête lui-
 
 - 2026-10-08 : tâche créée à partir des revues de PR de la phase A (A-06, A-10).
 - 2026-10-13 : relecture d'E-30 (PR #133) : les locales frontend sont scindées en `locales/public/` (premier chargement) et `locales/admin/`. `errors.fileTooLarge` et `errors.serverUnavailable` seront lues par `services/api.ts`, qui fait partie du premier chargement : elles vont dans `locales/public/{en,fr}.json` (`frontend/src/i18n/bundles.test.ts` le vérifie), pas dans `locales/en.json`.
+- 2026-11-26 : `dropped`, déjà faite par E-45 (PR #180, 5xx : `common.serverUnavailable`) et E-46 (PR #181, 413 et autres 4xx sans JSON : `common.requestTooLarge`, `common.requestFailed`), dans `errorMessage()` de `services/api.ts`, avec les clés dans `locales/public/{en,fr}.json` et les tests de `api.test.ts` (502, 503, 504, 413 HTML, 413 JSON, 4xx divers, 401). Vérifié : plus aucun « HTTP <code> » dans le frontend ; le statut reste dans `ApiError.status`. Seul écart avec la tâche : un statut 4xx inconnu affiche « erreur 418 » (E-46) au lieu de `common.error`, volontairement, pour que l'admin ait un détail à signaler. Aucun code à changer.
+- Notes de version : aucune (l'effet visible est déjà dans les lignes d'E-45 et d'E-46).
