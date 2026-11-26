@@ -33,12 +33,12 @@ Worth checking after the upgrade:
 - **HSTS.** The backend no longer sends `Strict-Transport-Security`. If your site is served over HTTPS and relies on it, enable it in your reverse proxy (see [`docs/operations.md`](docs/operations.md#https) › HTTPS) or with the commented line of `frontend/security-headers.conf`.
 - **Rolling back to v1.15.x.** Pin the images back to `:1.15`. There is no migration, so the database needs no restore.
 
-**If you download `docker-compose.prod.yml` again** (optional): the new file passes `SQLITE_WAL`, `JWT_EXPIRES_IN`, `LOGIN_RATE_LIMIT`, `API_RATE_LIMIT`, `TRUST_PROXY` and `CORS_ORIGIN` from `.env` (see [README › "Environment Variables"](README.md#environment-variables)).
+**If you download `docker-compose.prod.yml` again** (optional): the new file passes `SQLITE_WAL`, `JWT_EXPIRES_IN`, `LOGIN_RATE_LIMIT`, `API_RATE_LIMIT`, `TRUST_PROXY` and `CORS_ORIGIN` from `.env` (see [README › "Environment Variables"](README.md#environment-variables)), and its frontend healthcheck probes `/healthz`, which keeps the probes out of the access log.
 
 - Put in `.env` the variables you had added by hand to the `environment` list of `carta-cocktail-backend`, such as `SQLITE_WAL=false` for a database on a network share (see [README › "Database files and network shares"](README.md#database-files-and-network-shares)).
 - If you put such a line back in the new file instead, keep it at the end of the `environment` list. Otherwise the empty entry below it wins, and the variable goes back to its default without a warning.
 - If you read these variables from an `env_file`, move them to `.env` or remove their lines from the new file, for the same reason.
-- A value already in `.env`, which Docker ignored until now, starts to apply.
+- A value already in `.env`, which Docker ignored until now, starts to apply. Check these values before you restart: the backend refuses to start with a value it cannot read (`JWT_EXPIRES_IN`, `LOGIN_RATE_LIMIT`, `API_RATE_LIMIT`, `TRUST_PROXY`), as outside Docker.
 
 ## v1.15.0
 
