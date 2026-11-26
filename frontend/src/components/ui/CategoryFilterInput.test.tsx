@@ -115,7 +115,7 @@ describe('CategoryFilterInput', () => {
     await user.click(screen.getByRole('option', { name: 'Gin' }));
     expect(onChange).toHaveBeenLastCalledWith('Gin', 3);
 
-    await user.click(screen.getByRole('button', { name: 'common.clear' }));
+    await user.click(screen.getByRole('button', { name: 'Clear' }));
     expect(onChange).toHaveBeenLastCalledWith('', null);
     expect(getCombobox()).toHaveValue('');
     // The button disappears with the text: the field takes the focus back.

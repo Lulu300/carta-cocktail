@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import type { TFunction } from 'i18next';
 import { ApiError } from '../services/api';
-import { translateWithValues } from '../test/translateWithValues';
+import i18n from '../i18n';
 import { describeMutationError, readDeletionImpact } from './deletionImpact';
 
-const t = translateWithValues as unknown as TFunction;
+const t: TFunction = i18n.t.bind(i18n);
 
 function conflict(details: unknown) {
   return new ApiError(409, 'This category still has bottles', { error: 'This category still has bottles', details });
@@ -43,7 +43,7 @@ describe('describeMutationError', () => {
     const described = describeMutationError(error, t) as Error;
 
     expect(described.message).toBe(
-      'This category still has bottles deletion.usedByCocktails(Mojito 1, Mojito 2) deletion.usedByBottles(Havana 3)',
+      'This category still has bottles Used by these cocktails: Mojito 1, Mojito 2. Bottles in it: Havana 3.',
     );
   });
 
@@ -52,7 +52,7 @@ describe('describeMutationError', () => {
 
     const described = describeMutationError(error, t, 'Change the unit first.') as Error;
 
-    expect(described.message).toBe('This category still has bottles deletion.usedByCocktails(Mojito 1) Change the unit first.');
+    expect(described.message).toBe('This category still has bottles Used by these cocktails: Mojito 1. Change the unit first.');
   });
 
   it('lists five names and counts the others', () => {
@@ -61,7 +61,7 @@ describe('describeMutationError', () => {
     const described = describeMutationError(error, t) as Error;
 
     expect(described.message).toBe(
-      'This category still has bottles deletion.usedByCocktails(Cocktail 1, Cocktail 2, Cocktail 3, Cocktail 4, Cocktail 5 deletion.more(2))',
+      'This category still has bottles Used by these cocktails: Cocktail 1, Cocktail 2, Cocktail 3, Cocktail 4, Cocktail 5 and 2 more.',
     );
   });
 });

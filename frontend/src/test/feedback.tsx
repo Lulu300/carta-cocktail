@@ -4,8 +4,8 @@ import Toaster from '../components/ui/Toaster';
 import { toast, toastStore } from '../components/ui/ToastStore';
 import { act, render } from './test-utils';
 
-// Kept apart from test-utils: the toast store loads the real i18n setup, which
-// tests that mock react-i18next without initReactI18next cannot import.
+// Kept apart from test-utils, which every test imports: only the pages that show toasts or
+// confirmations need the toast store and the confirmation provider.
 
 /**
  * Renders a page with the confirmation dialog and the toasts it relies on, as

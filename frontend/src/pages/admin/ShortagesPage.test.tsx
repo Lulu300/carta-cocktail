@@ -37,7 +37,7 @@ describe('ShortagesPage', () => {
     mockShortages();
     render(<ShortagesPage />);
 
-    expect(screen.getByRole('heading', { level: 1, name: 'shortages.title' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Shortages' })).toBeInTheDocument();
     expect(await screen.findByRole('heading', { name: 'Vodka' })).toBeInTheDocument();
     // English name of the category and of its type, with the badge color of the type
     expect(screen.getByRole('heading', { name: 'Dry gin' })).toBeInTheDocument();
@@ -56,9 +56,9 @@ describe('ShortagesPage', () => {
       render(<ShortagesPage />);
 
       await screen.findByRole('heading', { name: 'Rum' });
-      expect(within(getCard('Rum')).getByText('␣SPIRIT␣ categoryTypes.withSpaces')).toBeInTheDocument();
+      expect(within(getCard('Rum')).getByText('␣SPIRIT␣ (with spaces)')).toBeInTheDocument();
       expect(within(getCard('Gin')).getByText('SPIRIT')).toBeInTheDocument();
-      expect(within(getCard('Water')).getByText('categoryTypes.emptyName')).toBeInTheDocument();
+      expect(within(getCard('Water')).getByText('(no name)')).toBeInTheDocument();
     });
 
     it('adds the stored name to a translation that would hide it', async () => {
@@ -67,7 +67,7 @@ describe('ShortagesPage', () => {
       render(<ShortagesPage />);
 
       await screen.findByRole('heading', { name: 'Rum' });
-      expect(within(getCard('Rum')).getByText('Spirits – ␣SPIRIT␣ categoryTypes.withSpaces')).toBeInTheDocument();
+      expect(within(getCard('Rum')).getByText('Spirits – ␣SPIRIT␣ (with spaces)')).toBeInTheDocument();
       expect(within(getCard('Gin')).getByText('Spirits')).toBeInTheDocument();
     });
 
@@ -76,7 +76,7 @@ describe('ShortagesPage', () => {
       render(<ShortagesPage />);
 
       await screen.findByRole('heading', { name: 'Rum' });
-      expect(within(getCard('Rum')).getByText('X␣␣Y categoryTypes.withSpaces')).toBeInTheDocument();
+      expect(within(getCard('Rum')).getByText('X␣␣Y (with spaces)')).toBeInTheDocument();
     });
   });
 
@@ -99,14 +99,14 @@ describe('ShortagesPage', () => {
   it('shows a message when nothing is short', async () => {
     mockShortages([]);
     render(<ShortagesPage />);
-    expect(await screen.findByText('shortages.noShortages')).toBeInTheDocument();
+    expect(await screen.findByText('All stock levels are sufficient!')).toBeInTheDocument();
   });
 
   it('shows a loading message instead of "no shortages" while loading', () => {
     mockApiPending('get', '/api/shortages');
     render(<ShortagesPage />);
-    expect(screen.getByText('common.loading')).toBeInTheDocument();
-    expect(screen.queryByText('shortages.noShortages')).not.toBeInTheDocument();
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    expect(screen.queryByText('All stock levels are sufficient!')).not.toBeInTheDocument();
   });
 
   it('shows an error with a retry button when loading fails', async () => {
@@ -114,16 +114,16 @@ describe('ShortagesPage', () => {
     mockApiError('get', '/api/shortages', 500, 'Database unavailable');
     render(<ShortagesPage />);
 
-    expect(await screen.findByText('common.error')).toBeInTheDocument();
-    expect(screen.queryByText('shortages.noShortages')).not.toBeInTheDocument();
+    expect(await screen.findByText('An error occurred')).toBeInTheDocument();
+    expect(screen.queryByText('All stock levels are sufficient!')).not.toBeInTheDocument();
 
     mockShortages();
     const retried = captureRequest('get', '/api/shortages');
-    await user.click(screen.getByRole('button', { name: 'common.retry' }));
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
 
     expect(await screen.findByRole('heading', { name: 'Vodka' })).toBeInTheDocument();
     expect(retried.count()).toBe(1);
-    expect(screen.queryByText('common.error')).not.toBeInTheDocument();
+    expect(screen.queryByText('An error occurred')).not.toBeInTheDocument();
   });
 
   it('renders a full bar instead of NaN when the required percent is 0', async () => {

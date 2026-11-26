@@ -82,7 +82,7 @@ describe('ImportStepUpload with a ZIP file', () => {
 
     uploadZip();
 
-    expect(await screen.findByText('cocktails.importWizard.zipNoRecipes')).toBeInTheDocument();
+    expect(await screen.findByText('No JSON files found in the ZIP')).toBeInTheDocument();
   });
 
   it('reports an archive without any valid recipe', async () => {
@@ -92,7 +92,7 @@ describe('ImportStepUpload with a ZIP file', () => {
 
     uploadZip();
 
-    expect(await screen.findByText('cocktails.importWizard.zipNoValidRecipes')).toBeInTheDocument();
+    expect(await screen.findByText('No valid recipes found in the ZIP')).toBeInTheDocument();
   });
 
   it('reports an unreadable archive', async () => {
@@ -100,7 +100,7 @@ describe('ImportStepUpload with a ZIP file', () => {
 
     uploadZip();
 
-    expect(await screen.findByText('cocktails.importWizard.zipReadError')).toBeInTheDocument();
+    expect(await screen.findByText('Unable to read ZIP file')).toBeInTheDocument();
   });
 });
 
@@ -120,14 +120,14 @@ describe('ImportStepUpload with a JSON file', () => {
   ])('refuses a recipe %s', async (_case, recipe) => {
     upload(new File([JSON.stringify(recipe)], 'recipe.json', { type: 'application/json' }));
 
-    expect(await screen.findByText('cocktails.importWizard.invalidFile')).toBeInTheDocument();
+    expect(await screen.findByText('Invalid JSON file')).toBeInTheDocument();
     expect(props.onLoaded).not.toHaveBeenCalled();
   });
 
   it('refuses a file that is not JSON', async () => {
     upload(new File(['{not json'], 'recipe.json', { type: 'application/json' }));
 
-    expect(await screen.findByText('cocktails.importWizard.invalidFile')).toBeInTheDocument();
+    expect(await screen.findByText('Invalid JSON file')).toBeInTheDocument();
   });
 
   it('reports a file the browser cannot read', async () => {
@@ -137,7 +137,7 @@ describe('ImportStepUpload with a JSON file', () => {
 
     upload(new File(['{}'], 'recipe.json', { type: 'application/json' }));
 
-    expect(await screen.findByText('cocktails.importWizard.fileReadError')).toBeInTheDocument();
+    expect(await screen.findByText('The file could not be read')).toBeInTheDocument();
     expect(props.onLoaded).not.toHaveBeenCalled();
     readAsText.mockRestore();
   });
@@ -150,7 +150,7 @@ describe('ImportStepUpload with a JSON file', () => {
     expect(await screen.findByText('mojito.json')).toBeInTheDocument();
 
     fireEvent.change(input, { target: { files: [new File(['{not json'], 'broken.json', { type: 'application/json' })] } });
-    expect(await screen.findByText('cocktails.importWizard.invalidFile')).toBeInTheDocument();
+    expect(await screen.findByText('Invalid JSON file')).toBeInTheDocument();
     expect(screen.getByText('mojito.json')).toBeInTheDocument();
     expect(screen.queryByText('broken.json')).not.toBeInTheDocument();
   });
@@ -158,7 +158,7 @@ describe('ImportStepUpload with a JSON file', () => {
   it('refuses an extension other than .json and .zip', async () => {
     upload(new File(['x'], 'recipe.txt', { type: 'text/plain' }));
 
-    expect(await screen.findByText('cocktails.importWizard.invalidFile')).toBeInTheDocument();
+    expect(await screen.findByText('Invalid JSON file')).toBeInTheDocument();
   });
 });
 
@@ -172,14 +172,14 @@ describe('ImportStepUpload preview', () => {
     expect(screen.getByText('Mojito')).toBeInTheDocument();
     expect(screen.getByText('rum')).toBeInTheDocument();
     expect(screen.getByText('Fresh')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('cocktails.importWizard.next'));
+    fireEvent.click(screen.getByText('Next'));
     expect(onNext).toHaveBeenCalled();
   });
 
   it('lists every recipe of a batch', () => {
     render(<ImportStepUpload {...props} recipes={[recipe('Mojito'), recipe('Negroni')]} />);
 
-    expect(screen.getByText('cocktails.importWizard.batchPreview')).toBeInTheDocument();
+    expect(screen.getByText(/^.+ cocktails found in ZIP$/)).toBeInTheDocument();
     expect(screen.getByText('Mojito')).toBeInTheDocument();
     expect(screen.getByText('Negroni')).toBeInTheDocument();
   });

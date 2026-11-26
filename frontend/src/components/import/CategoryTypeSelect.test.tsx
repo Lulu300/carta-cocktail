@@ -9,7 +9,7 @@ const spacedSpirit = buildCategoryType({ name: ' SPIRIT ' });
 const spirit = buildCategoryType({ name: 'SPIRIT' });
 const unnamed = buildCategoryType({ name: '' });
 const doubleSpaced = buildCategoryType({ name: 'X  Y' });
-const SPACED_SPIRIT_LABEL = '␣SPIRIT␣ categoryTypes.withSpaces';
+const SPACED_SPIRIT_LABEL = '␣SPIRIT␣ (with spaces)';
 
 function renderOptions(value: string, categoryTypes: CategoryType[]) {
   render(<CategoryTypeSelect value={value} onChange={() => undefined} categoryTypes={categoryTypes} />);
@@ -19,7 +19,7 @@ function renderOptions(value: string, categoryTypes: CategoryType[]) {
 describe('CategoryTypeSelect', () => {
   it('tells the stored names apart, and labels the empty name', () => {
     expect(renderOptions('SPIRIT', [spacedSpirit, spirit, unnamed, doubleSpaced])).toEqual([
-      SPACED_SPIRIT_LABEL, 'SPIRIT', 'categoryTypes.emptyName', 'X␣␣Y categoryTypes.withSpaces',
+      SPACED_SPIRIT_LABEL, 'SPIRIT', '(no name)', 'X␣␣Y (with spaces)',
     ]);
     expect(screen.getByRole('option', { name: SPACED_SPIRIT_LABEL })).toBeInTheDocument();
   });

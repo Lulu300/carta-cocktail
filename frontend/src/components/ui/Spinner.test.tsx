@@ -5,8 +5,8 @@ import Spinner from './Spinner';
 describe('Spinner', () => {
   it('announces the default loading label', () => {
     render(<Spinner />);
-    expect(screen.getByRole('status')).toHaveTextContent('common.loading');
-    expect(screen.getByText('common.loading')).toHaveClass('sr-only');
+    expect(screen.getByRole('status')).toHaveTextContent('Loading...');
+    expect(screen.getByText('Loading...')).toHaveClass('sr-only');
   });
 
   it('announces a custom label', () => {

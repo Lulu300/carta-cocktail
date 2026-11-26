@@ -4,11 +4,6 @@ import type { CocktailExportFormat } from '../../types';
 import { initialCocktailImportState } from './importCocktailReducer';
 import { ImportBatchSummary } from './ImportCocktailResults';
 
-vi.mock('react-i18next', async () => {
-  const { translateWithValues } = await import('../../test/translateWithValues');
-  return { useTranslation: () => ({ t: translateWithValues, i18n: { language: 'en' } }) };
-});
-
 function recipe(name: string): CocktailExportFormat {
   return {
     version: 1,
@@ -28,6 +23,6 @@ describe('ImportBatchSummary', () => {
     render(<ImportBatchSummary state={state} onClose={vi.fn()} />);
 
     // Values are listed in the order the component passes them: count, success, total.
-    expect(screen.getByText('cocktails.importWizard.batchSummaryCount(1,1,3)')).toBeInTheDocument();
+    expect(screen.getByText('1 of 3 imported successfully')).toBeInTheDocument();
   });
 });

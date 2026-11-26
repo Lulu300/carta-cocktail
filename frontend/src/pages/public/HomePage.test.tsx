@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { render, screen } from '../../test/test-utils';
 import { AppProviders } from '../../test/appProviders';
@@ -7,14 +7,6 @@ import { mockApiPending, mockApiResponse, mockNetworkError, mockRateLimited } fr
 import type { Menu } from '../../types';
 import { axe } from '../../test/axe';
 import HomePage from './HomePage';
-
-vi.mock('react-i18next', async (importOriginal) => {
-  const { translateWithValues } = await import('../../test/translateWithValues');
-  return {
-    ...await importOriginal<typeof import('react-i18next')>(),
-    useTranslation: () => ({ t: translateWithValues, i18n: { language: 'en' } }),
-  };
-});
 
 function mockMenus(menus: Menu[]) {
   mockApiResponse('get', '/api/public/menus', menus);
@@ -40,8 +32,8 @@ describe('HomePage', () => {
 
     expect(await screen.findByRole('link', { name: /Summer/ })).toHaveAttribute('href', '/menu/summer');
     expect(screen.getByText('Fresh drinks')).toBeInTheDocument();
-    expect(screen.getByText('menus.cocktailCount(1)')).toBeInTheDocument();
-    expect(screen.getByText('menus.bottleCount(5)')).toBeInTheDocument();
+    expect(screen.getByText('1 cocktail')).toBeInTheDocument();
+    expect(screen.getByText('5 bottles')).toBeInTheDocument();
     expect(await screen.findByRole('heading', { level: 1, name: /Chez Lulu/ })).toBeInTheDocument();
   });
 
@@ -50,7 +42,7 @@ describe('HomePage', () => {
 
     renderHome();
 
-    expect(await screen.findByText('menus.cocktailCount(0)')).toBeInTheDocument();
+    expect(await screen.findByText('0 cocktails')).toBeInTheDocument();
   });
 
   it('says when no menu is published', async () => {
@@ -58,7 +50,7 @@ describe('HomePage', () => {
 
     renderHome();
 
-    expect(await screen.findByText('home.noMenus')).toBeInTheDocument();
+    expect(await screen.findByText('No menus available at the moment')).toBeInTheDocument();
   });
 
   it('shows an error with a retry, never "no menus", when the menus cannot be loaded', async () => {
@@ -67,12 +59,12 @@ describe('HomePage', () => {
 
     renderHome();
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('home.loadError');
-    expect(screen.queryByText('home.noMenus')).not.toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load the menus');
+    expect(screen.queryByText('No menus available at the moment')).not.toBeInTheDocument();
 
     mockMenus([buildMenu({ name: 'Summer' })]);
 
-    await user.click(screen.getByRole('button', { name: 'common.retry' }));
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
 
     expect(await screen.findByText('Summer')).toBeInTheDocument();
   });
@@ -84,13 +76,13 @@ describe('HomePage', () => {
 
     renderHome();
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('home.loadError');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load the menus');
     expect(screen.getByRole('heading', { level: 1 }).textContent?.trim()).toBe('');
 
     mockApiResponse('get', '/api/public/settings', buildSiteSettings({ siteName: 'Chez Lulu', siteIcon: '🍹' }));
     mockMenus([buildMenu({ name: 'Summer' })]);
 
-    await user.click(screen.getByRole('button', { name: 'common.retry' }));
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
 
     expect(await screen.findByText('Summer')).toBeInTheDocument();
     expect(await screen.findByRole('heading', { level: 1, name: /Chez Lulu/ })).toHaveTextContent('🍹');
@@ -102,7 +94,7 @@ describe('HomePage', () => {
     renderHome();
 
     expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
-    expect(screen.queryByText('home.noMenus')).not.toBeInTheDocument();
+    expect(screen.queryByText('No menus available at the moment')).not.toBeInTheDocument();
   });
 });
 

@@ -56,7 +56,7 @@ describe('ConfirmProvider and useConfirm', () => {
     const dialog = screen.getByRole('alertdialog', { name: 'Delete the bottle?' });
     expect(dialog).toHaveAccessibleDescription('It is used by 2 menus.');
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'common.cancel' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
   });
 
   it('resolves to true on "Confirm" and closes the dialog', async () => {
@@ -64,7 +64,7 @@ describe('ConfirmProvider and useConfirm', () => {
     renderAsk();
 
     await user.click(screen.getByText('Ask'));
-    await user.click(screen.getByRole('button', { name: 'common.confirm' }));
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
 
     expect(answers()).toBe('true');
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
@@ -75,7 +75,7 @@ describe('ConfirmProvider and useConfirm', () => {
     renderAsk();
 
     await user.click(screen.getByText('Ask'));
-    await user.click(screen.getByRole('button', { name: 'common.cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(answers()).toBe('false');
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
@@ -108,9 +108,9 @@ describe('ConfirmProvider and useConfirm', () => {
     renderAsk();
 
     await user.click(screen.getByText('Ask'));
-    await user.click(screen.getByRole('button', { name: 'common.confirm' }));
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
     await user.click(screen.getByText('Ask'));
-    await user.click(screen.getByRole('button', { name: 'common.cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(answers()).toBe('true,false');
   });
@@ -128,7 +128,7 @@ describe('ConfirmProvider and useConfirm', () => {
 
     await expect(first).resolves.toBe(false);
     expect(screen.getByRole('alertdialog', { name: 'Second' })).toBeInTheDocument();
-    fireEvent.click(await screen.findByRole('button', { name: 'common.confirm' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }));
     await expect(second).resolves.toBe(true);
   });
 
@@ -142,7 +142,7 @@ describe('ConfirmProvider and useConfirm', () => {
       first = result.current({ title: 'First', acknowledgeLabel });
     });
     await user.click(screen.getByRole('checkbox', { name: acknowledgeLabel }));
-    expect(screen.getByRole('button', { name: 'common.confirm' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeEnabled();
 
     act(() => {
       result.current({ title: 'Second', acknowledgeLabel });
@@ -151,7 +151,7 @@ describe('ConfirmProvider and useConfirm', () => {
     await expect(first).resolves.toBe(false);
     expect(screen.getByRole('alertdialog', { name: 'Second' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: acknowledgeLabel })).not.toBeChecked();
-    expect(screen.getByRole('button', { name: 'common.confirm' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeDisabled();
   });
 
   it('throws when used outside a ConfirmProvider', () => {

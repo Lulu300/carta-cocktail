@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
 import type { i18n as I18n } from 'i18next';
 import { LANGUAGE_STORAGE_KEY, LEGACY_LANGUAGE_STORAGE_KEY, storeLanguageChoice } from '../utils/languageChoice';
 
-// Uses the real i18next instance: setup.ts only mocks react-i18next.
+// Loads fresh i18n modules, apart from the instance setup.ts registers for the other tests.
 // navigator.language(s) are read-only in jsdom, so they are stubbed through their getters.
 // Some browsers (Safari) only report the regional locale, without its base language.
 function stubBrowserLanguage(locale: string) {

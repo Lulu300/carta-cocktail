@@ -133,17 +133,17 @@ function installFakeBackend() {
 const user = userEvent.setup();
 
 async function goToConfirmation() {
-  await user.click(await screen.findByRole('button', { name: 'cocktails.importWizard.next' }));
-  await user.click(await screen.findByRole('button', { name: 'cocktails.importWizard.next' }));
+  await user.click(await screen.findByRole('button', { name: 'Next' }));
+  await user.click(await screen.findByRole('button', { name: 'Next' }));
 }
 
 /** From the resolve step of the next recipe of a batch. */
 async function goToConfirmationFromResolve() {
-  await user.click(await screen.findByRole('button', { name: 'cocktails.importWizard.next' }));
+  await user.click(await screen.findByRole('button', { name: 'Next' }));
 }
 
 async function confirmImport() {
-  await user.click(await screen.findByRole('button', { name: 'cocktails.importWizard.confirmImport' }));
+  await user.click(await screen.findByRole('button', { name: 'Confirm import' }));
 }
 
 beforeEach(() => {
@@ -155,25 +155,30 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** The modal header has its own "Close" button: the one of the screen comes after it. */
+function closeButtonOfScreen() {
+  return screen.getAllByRole('button', { name: 'Close' }).at(-1)!;
+}
+
 describe('ImportCocktailWizard', () => {
   it('imports a single JSON recipe and sends no NaN', async () => {
     answerPreview = () => HttpResponse.json(bottleToCreatePreview);
     render(<ImportCocktailWizard onClose={vi.fn()} />);
 
     uploadJson(recipe('Daiquiri'));
-    await user.click(await screen.findByRole('button', { name: 'cocktails.importWizard.next' }));
+    await user.click(await screen.findByRole('button', { name: 'Next' }));
 
     // The capacity of the bottle to create is emptied: the import is blocked
-    const capacity = await screen.findByLabelText(/bottles\.capacityMl/);
+    const capacity = await screen.findByLabelText(/Capacity \(ml\)/);
     await user.clear(capacity);
-    expect(screen.getByRole('button', { name: 'cocktails.importWizard.next' })).toBeDisabled();
-    expect(screen.getByText('cocktails.importWizard.unresolvedCount')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+    expect(screen.getByText('1 dependency to resolve')).toBeInTheDocument();
 
     await user.type(capacity, '750');
-    await user.click(screen.getByRole('button', { name: 'cocktails.importWizard.next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
     await confirmImport();
 
-    expect(await screen.findByText('cocktails.importWizard.success')).toBeInTheDocument();
+    expect(await screen.findByText('Cocktail imported successfully!')).toBeInTheDocument();
     // JSON turns a NaN into null: every number of the resolutions must come out as sent
     expect(confirmations[0].resolutions.bottles).toEqual({
       'havana 3': {
@@ -182,7 +187,7 @@ describe('ImportCocktailWizard', () => {
       },
     });
     expect(JSON.stringify(confirmations[0].resolutions)).not.toContain('null');
-    expect(screen.getByRole('link', { name: 'cocktails.importWizard.editImported' })).toHaveAttribute('href', '/admin/cocktails/100');
+    expect(screen.getByRole('link', { name: 'Edit cocktail' })).toHaveAttribute('href', '/admin/cocktails/100');
   });
 
   it('blocks the import while the name of an entity to create is empty', async () => {
@@ -190,12 +195,12 @@ describe('ImportCocktailWizard', () => {
     render(<ImportCocktailWizard onClose={vi.fn()} />);
 
     uploadJson(recipe('Daiquiri'));
-    await user.click(await screen.findByRole('button', { name: 'cocktails.importWizard.next' }));
-    const name = await screen.findByLabelText(/bottles\.name/);
+    await user.click(await screen.findByRole('button', { name: 'Next' }));
+    const name = await screen.findByLabelText(/Name \(brand\)/);
     await user.clear(name);
 
     expect(name).toHaveValue('');
-    expect(screen.getByRole('button', { name: 'cocktails.importWizard.next' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
   });
 
   it('blocks the import while a category to create has the type with an empty name', async () => {
@@ -211,22 +216,22 @@ describe('ImportCocktailWizard', () => {
     render(<ImportCocktailWizard onClose={vi.fn()} />);
 
     uploadJson(recipe('Grenadine'));
-    await user.click(await screen.findByRole('button', { name: 'cocktails.importWizard.next' }));
-    await screen.findByRole('option', { name: 'categoryTypes.emptyName' });
-    const typeSelect = screen.getByLabelText(/categories\.type/);
+    await user.click(await screen.findByRole('button', { name: 'Next' }));
+    await screen.findByRole('option', { name: '(no name)' });
+    const typeSelect = screen.getByLabelText(/Type/);
 
     await user.selectOptions(typeSelect, '');
-    expect(screen.getByText('categories.typeRequired')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'cocktails.importWizard.next' })).toBeDisabled();
-    expect(screen.getByText('cocktails.importWizard.unresolvedCount')).toBeInTheDocument();
+    expect(screen.getByText('Choose or enter a type with a name.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+    expect(screen.getByText('1 dependency to resolve')).toBeInTheDocument();
 
     // An existing type made only of spaces is kept as picked, as the backend does
     await user.selectOptions(typeSelect, '   ');
-    expect(screen.queryByText('categories.typeRequired')).not.toBeInTheDocument();
+    expect(screen.queryByText('Choose or enter a type with a name.')).not.toBeInTheDocument();
     await goToConfirmationFromResolve();
     await confirmImport();
 
-    expect(await screen.findByText('cocktails.importWizard.success')).toBeInTheDocument();
+    expect(await screen.findByText('Cocktail imported successfully!')).toBeInTheDocument();
     expect(confirmations[0].resolutions.categories).toEqual({
       sirop: { action: 'create', data: { name: 'Sirop', type: '   ', desiredStock: 1, nameTranslations: null } },
     });
@@ -247,17 +252,17 @@ describe('ImportCocktailWizard', () => {
     render(<ImportCocktailWizard onClose={vi.fn()} />);
 
     uploadJson(recipe('Daiquiri'));
-    await user.click(await screen.findByRole('button', { name: 'cocktails.importWizard.next' }));
-    expect(await screen.findByText('importMatches.pickOne')).toBeInTheDocument();
-    expect(screen.getByText('cocktails.importWizard.unresolvedCount')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'cocktails.importWizard.next' })).toBeDisabled();
+    await user.click(await screen.findByRole('button', { name: 'Next' }));
+    expect(await screen.findByText(/^Several existing ones differ only by case: .+\. Use one of them, or create it under another name\.$/)).toBeInTheDocument();
+    expect(screen.getByText('1 dependency to resolve')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
 
-    await user.selectOptions(screen.getByLabelText('cocktails.importWizard.existingEntity'), await screen.findByRole('option', { name: 'RHUM' }));
-    expect(screen.getByText('cocktails.importWizard.allResolved')).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('Existing entry'), await screen.findByRole('option', { name: 'RHUM' }));
+    expect(screen.getByText('All dependencies are resolved')).toBeInTheDocument();
     await goToConfirmationFromResolve();
     await confirmImport();
 
-    expect(await screen.findByText('cocktails.importWizard.success')).toBeInTheDocument();
+    expect(await screen.findByText('Cocktail imported successfully!')).toBeInTheDocument();
     expect(confirmations[0].resolutions.categories).toEqual({ rhum: { action: 'use_existing', existingId: 11 } });
   });
 
@@ -265,17 +270,17 @@ describe('ImportCocktailWizard', () => {
     render(<ImportCocktailWizard onClose={vi.fn()} />);
 
     uploadJson(recipe('Daiquiri'));
-    await user.click(await screen.findByRole('button', { name: 'cocktails.importWizard.next' }));
+    await user.click(await screen.findByRole('button', { name: 'Next' }));
     await user.click(await screen.findByRole('button', { name: /^Rhum/ }));
-    await user.click(screen.getByRole('button', { name: 'cocktails.importWizard.createNew' }));
-    const name = screen.getByLabelText(/categories\.name/);
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+    const name = screen.getByLabelText(/Name/);
     await user.clear(name);
     await user.type(name, 'RHUM');
-    expect(name).toHaveAccessibleDescription('importMatches.usedAsItIs');
+    expect(name).toHaveAccessibleDescription(/^Already exists as ".+": it will be used as it is, and the other fields are ignored\.$/);
     await goToConfirmationFromResolve();
 
-    expect(screen.getByText(/cocktails\.importWizard\.entitiesMapped/)).toBeInTheDocument();
-    expect(screen.queryByText(/cocktails\.importWizard\.entitiesToCreate/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Existing entities used/)).toBeInTheDocument();
+    expect(screen.queryByText(/Entities to create/)).not.toBeInTheDocument();
   });
 
   it('refreshes the lists after a confirmation that created an entity', async () => {
@@ -295,30 +300,30 @@ describe('ImportCocktailWizard', () => {
     render(<ImportCocktailWizard onClose={vi.fn()} />);
 
     uploadZip(['Mojito', 'Negroni', 'Daiquiri']);
-    await screen.findByText('cocktails.importWizard.batchPreview');
+    await screen.findByText(/^.+ cocktails found in ZIP$/);
     await goToConfirmation();
     await confirmImport();
 
     // Negroni fails, then succeeds on retry
     await goToConfirmationFromResolve();
     await confirmImport();
-    expect(await screen.findByText('cocktails.importWizard.batchItemError')).toBeInTheDocument();
+    expect(await screen.findByText(/^Error importing ".+"$/)).toBeInTheDocument();
     expect(screen.getByText('Boom')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'cocktails.importWizard.tryAgain' }));
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
     await goToConfirmationFromResolve();
     await confirmImport();
 
     await goToConfirmationFromResolve();
     await confirmImport();
 
-    expect(await screen.findByText('cocktails.importWizard.batchComplete')).toBeInTheDocument();
+    expect(await screen.findByText('Batch import complete')).toBeInTheDocument();
     const lines = within(screen.getByRole('list')).getAllByRole('listitem');
     expect(lines.map((line) => line.textContent)).toEqual([
       expect.stringContaining('Mojito'),
       expect.stringContaining('Negroni'),
       expect.stringContaining('Daiquiri'),
     ]);
-    expect(screen.getAllByText('cocktails.importWizard.resultImported')).toHaveLength(3);
+    expect(screen.getAllByText('imported')).toHaveLength(3);
     expect(confirmations.map((confirmation) => nameOf(confirmation.recipe))).toEqual(['Mojito', 'Negroni', 'Negroni', 'Daiquiri']);
   });
 
@@ -328,20 +333,21 @@ describe('ImportCocktailWizard', () => {
     render(<ImportCocktailWizard onClose={onClose} />);
 
     uploadZip(['Mojito', 'Negroni']);
-    await screen.findByText('cocktails.importWizard.batchPreview');
+    await screen.findByText(/^.+ cocktails found in ZIP$/);
     await goToConfirmation();
     await confirmImport();
 
     expect(await screen.findByText('Invalid recipe')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'cocktails.importWizard.back' })).not.toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'cocktails.importWizard.close' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
+    // The close button of the modal header and the one of the error screen
+    expect(screen.getAllByRole('button', { name: 'Close' })).toHaveLength(2);
 
-    await user.click(screen.getByRole('button', { name: 'cocktails.importWizard.showSummary' }));
-    expect(await screen.findByText('cocktails.importWizard.batchComplete')).toBeInTheDocument();
-    expect(screen.getAllByText('cocktails.importWizard.resultImported')).toHaveLength(1);
-    expect(screen.getAllByText('cocktails.importWizard.resultNotImported')).toHaveLength(1);
+    await user.click(screen.getByRole('button', { name: 'See the summary' }));
+    expect(await screen.findByText('Batch import complete')).toBeInTheDocument();
+    expect(screen.getAllByText('imported')).toHaveLength(1);
+    expect(screen.getAllByText('not imported')).toHaveLength(1);
 
-    await user.click(screen.getByRole('button', { name: 'cocktails.importWizard.close' }));
+    await user.click(closeButtonOfScreen());
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -357,7 +363,7 @@ describe('ImportCocktailWizard', () => {
 
     try {
       uploadZip(names);
-      await screen.findByText('cocktails.importWizard.batchPreview');
+      await screen.findByText(/^.+ cocktails found in ZIP$/);
       await goToConfirmation();
       await confirmImport();
       for (let i = 1; i < names.length; i++) {
@@ -366,7 +372,7 @@ describe('ImportCocktailWizard', () => {
         await confirmImport();
       }
 
-      expect(await screen.findByText('cocktails.importWizard.batchComplete')).toBeInTheDocument();
+      expect(await screen.findByText('Batch import complete')).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
@@ -379,13 +385,13 @@ describe('ImportCocktailWizard', () => {
     render(<ImportCocktailWizard onClose={vi.fn()} />);
 
     uploadJson(recipe('Mojito'));
-    await user.click(await screen.findByRole('button', { name: 'cocktails.importWizard.next' }));
+    await user.click(await screen.findByRole('button', { name: 'Next' }));
     expect(await screen.findByText('Server down')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'cocktails.importWizard.back' }));
+    await user.click(screen.getByRole('button', { name: 'Back' }));
 
-    await user.click(await screen.findByRole('button', { name: 'cocktails.importWizard.next' }));
-    await user.click(await screen.findByRole('button', { name: 'cocktails.importWizard.back' }));
-    expect(await screen.findByText('cocktails.importWizard.dropzone')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Next' }));
+    await user.click(await screen.findByRole('button', { name: 'Back' }));
+    expect(await screen.findByText('Drop a JSON or ZIP file here or click to browse')).toBeInTheDocument();
   });
 
   it('retries a failed preview', async () => {
@@ -393,10 +399,10 @@ describe('ImportCocktailWizard', () => {
     render(<ImportCocktailWizard onClose={vi.fn()} />);
 
     uploadJson(recipe('Mojito'));
-    await user.click(await screen.findByRole('button', { name: 'cocktails.importWizard.next' }));
-    await user.click(await screen.findByRole('button', { name: 'cocktails.importWizard.tryAgain' }));
+    await user.click(await screen.findByRole('button', { name: 'Next' }));
+    await user.click(await screen.findByRole('button', { name: 'Try again' }));
 
-    expect(await screen.findByText('cocktails.importWizard.allResolved')).toBeInTheDocument();
+    expect(await screen.findByText('All dependencies are resolved')).toBeInTheDocument();
   });
 
   it('warns when an existing list cannot be loaded', async () => {
@@ -404,9 +410,9 @@ describe('ImportCocktailWizard', () => {
     render(<ImportCocktailWizard onClose={vi.fn()} />);
 
     uploadJson(recipe('Mojito'));
-    await user.click(await screen.findByRole('button', { name: 'cocktails.importWizard.next' }));
+    await user.click(await screen.findByRole('button', { name: 'Next' }));
 
-    expect(await screen.findByText('cocktails.importWizard.listsLoadError')).toBeInTheDocument();
+    expect(await screen.findByText('Some existing entries could not be loaded: they are missing from the lists.')).toBeInTheDocument();
   });
 
   it('lists each reference a refused confirmation names, then goes back to the choices', async () => {
@@ -425,8 +431,8 @@ describe('ImportCocktailWizard', () => {
       'Row 1: bottle "Havana 3" is neither matched nor created, or has no category',
     ]);
 
-    await user.click(screen.getByRole('button', { name: 'cocktails.importWizard.tryAgain' }));
-    expect(await screen.findByRole('button', { name: 'cocktails.importWizard.next' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByRole('button', { name: 'Next' })).toBeInTheDocument();
   });
 
   it('names the row of an existing item deleted before the confirmation', async () => {
@@ -469,10 +475,10 @@ describe('ImportCocktailWizard', () => {
     rejectNextFetch('not an Error');
     await confirmImport();
 
-    expect(await screen.findByText('cocktails.importWizard.error')).toBeInTheDocument();
-    expect(screen.getByText('common.error')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'cocktails.importWizard.skipRecipe' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'cocktails.importWizard.close' }));
+    expect(await screen.findByText('Import error')).toBeInTheDocument();
+    expect(screen.getByText('An error occurred')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Skip this cocktail' })).not.toBeInTheDocument();
+    await user.click(closeButtonOfScreen());
     expect(onClose).toHaveBeenCalled();
   });
 });

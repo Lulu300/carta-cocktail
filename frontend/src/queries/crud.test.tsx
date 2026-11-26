@@ -51,7 +51,7 @@ describe('useCrudMutations', () => {
     await waitFor(() => expect(result.current.create.isSuccess).toBe(true));
     expect(api.create).toHaveBeenCalledWith({ name: 'Shot' });
     expect(invalidatedKeys(invalidate)).toEqual([qk.units, qk.availability]);
-    expect(toast.success).toHaveBeenCalledWith('units.created');
+    expect(toast.success).toHaveBeenCalledWith('Unit created');
   });
 
   it('updates by id and shows the updated toast', async () => {
@@ -61,7 +61,7 @@ describe('useCrudMutations', () => {
 
     await waitFor(() => expect(result.current.update.isSuccess).toBe(true));
     expect(api.update).toHaveBeenCalledWith(4, { name: 'Dash' });
-    expect(toast.success).toHaveBeenCalledWith('units.updated');
+    expect(toast.success).toHaveBeenCalledWith('Unit updated');
   });
 
   it('deletes by id and shows the deleted toast', async () => {
@@ -71,7 +71,7 @@ describe('useCrudMutations', () => {
 
     await waitFor(() => expect(result.current.remove.isSuccess).toBe(true));
     expect(api.delete).toHaveBeenCalledWith(4);
-    expect(toast.success).toHaveBeenCalledWith('units.deleted');
+    expect(toast.success).toHaveBeenCalledWith('Unit deleted');
   });
 
   it('shows the error in a toast and refreshes nothing when the request fails', async () => {
@@ -98,7 +98,7 @@ describe('useCrudMutations', () => {
 
     await waitFor(() => expect(result.current.remove.isError).toBe(true));
     const shown = vi.mocked(toast.error).mock.calls[0][0] as Error;
-    expect(shown.message).toBe('Still in use deletion.usedByCocktails');
+    expect(shown.message).toBe('Still in use Used by these cocktails: Mojito.');
   });
 });
 

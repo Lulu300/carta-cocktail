@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import i18n from '../i18n';
 import { datePattern, formatDate, isoDatePattern, parseDateInput } from './dates';
 
-const FRENCH_LETTERS: Record<string, string> = { 'dates.day': 'jj', 'dates.month': 'mm', 'dates.year': 'aaaa' };
-const ENGLISH_LETTERS: Record<string, string> = { 'dates.day': 'dd', 'dates.month': 'mm', 'dates.year': 'yyyy' };
-const french = (key: string) => FRENCH_LETTERS[key];
-const english = (key: string) => ENGLISH_LETTERS[key];
+const french = i18n.getFixedT('fr');
+const english = i18n.getFixedT('en');
 
 describe('formatDate', () => {
   // West of UTC, a midnight-UTC date read in local time is the day before. Pinned here because

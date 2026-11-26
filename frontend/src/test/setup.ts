@@ -1,6 +1,9 @@
 import '@testing-library/jest-dom/vitest';
 import { afterAll, afterEach, beforeAll, vi } from 'vitest';
+import i18n from '../i18n';
+import '../i18n/admin';
 import { resetFactories } from './factories';
+import { collectMissingKeys, takeMissingKeys } from './missingKeys';
 import { resetCreatedIds } from './msw/handlers';
 import { server } from './msw/server';
 
@@ -29,16 +32,6 @@ if (!Blob.prototype.stream) {
     });
   };
 }
-
-// Mock react-i18next
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string) => key,
-    i18n: { language: 'en', changeLanguage: vi.fn() },
-  }),
-  Trans: ({ children }: { children: React.ReactNode }) => children,
-  initReactI18next: { type: '3rdParty', init: vi.fn() },
-}));
 
 // jsdom does not implement HTMLDialogElement.showModal/close: minimal polyfill
 // that toggles `open` and emits `close`, enough for the Modal component.
@@ -78,13 +71,24 @@ server.events.on('request:unhandled', ({ request }) => {
   unhandledRequests.push(`${request.method} ${new URL(request.url).pathname}`);
 });
 
+// The real i18next instance, with the public and admin bundles as in the app once the admin is
+// loaded: tests read the English messages. A key found in no bundle fails the test that displayed it.
+collectMissingKeys();
+
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }));
-afterEach(() => {
+
+afterEach(async () => {
+  // Back to English for the next test, only when this one changed it: each change also rewrites <html lang>.
+  if (i18n.language !== 'en') await i18n.changeLanguage('en');
   server.resetHandlers();
   resetCreatedIds();
   resetFactories();
   localStorage.clear();
+  const absentKeys = takeMissingKeys();
   const unexpected = unhandledRequests.splice(0);
+  if (absentKeys.length > 0) {
+    throw new Error(`Translation keys found in no bundle: ${absentKeys.join(', ')}`);
+  }
   if (unexpected.length > 0) {
     throw new Error(`Requests without a handler: ${unexpected.join(', ')}`);
   }

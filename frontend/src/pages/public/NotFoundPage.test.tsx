@@ -16,9 +16,9 @@ describe('NotFoundPage', () => {
     const { container } = render(<AppProviders><NotFoundPage /></AppProviders>);
 
     // The title comes after the site settings: waiting for it leaves no update pending
-    await waitFor(() => expect(document.title).toBe('public.pageNotFound · Chez Lulu'));
-    expect(screen.getByRole('alert')).toHaveTextContent('public.pageNotFound');
-    expect(screen.getByRole('link', { name: 'public.backHome' })).toHaveAttribute('href', '/');
+    await waitFor(() => expect(document.title).toBe('Page not found · Chez Lulu'));
+    expect(screen.getByRole('alert')).toHaveTextContent('Page not found');
+    expect(screen.getByRole('link', { name: 'Back to home' })).toHaveAttribute('href', '/');
     expect(await axe(container)).toHaveNoViolations();
   });
 });

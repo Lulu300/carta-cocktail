@@ -1,18 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { buildCocktailIngredient, buildIngredient, buildMenuCocktail } from '../../test/factories';
 import type { CocktailIngredient } from '../../types';
 import PublicCocktailItem from './PublicCocktailItem';
-
-vi.mock('react-i18next', async (importOriginal) => {
-  const { translateWithValues } = await import('../../test/translateWithValues');
-  return {
-    ...await importOriginal<typeof import('react-i18next')>(),
-    useTranslation: () => ({ t: translateWithValues, i18n: { language: 'en' } }),
-  };
-});
 
 function ingredient(id: number, name: string): CocktailIngredient {
   return buildCocktailIngredient({ id, ingredient: buildIngredient({ id, name }) });
@@ -44,7 +36,7 @@ describe('PublicCocktailItem', () => {
 
     expect(screen.getByText('Sugar')).toBeInTheDocument();
     expect(screen.queryByText('Soda')).not.toBeInTheDocument();
-    expect(screen.getByText('public.moreIngredients(2)')).toHaveClass('sr-only');
+    expect(screen.getByText('2 more ingredients')).toHaveClass('sr-only');
     expect(screen.getByText('+2')).toHaveAttribute('aria-hidden', 'true');
   });
 
@@ -69,7 +61,7 @@ describe('PublicCocktailItem', () => {
 
     const link = screen.getByRole('link', { name: /Mojito/ });
     expect(link).toHaveClass('grayscale');
-    expect(screen.getByText('public.unavailable')).toBeInTheDocument();
+    expect(screen.getByText('Currently unavailable')).toBeInTheDocument();
 
     await user.click(link);
     expect(screen.queryByText(/cocktail page/)).not.toBeInTheDocument();
@@ -82,7 +74,7 @@ describe('PublicCocktailItem', () => {
     expect(link).not.toHaveClass('grayscale');
     expect(link).not.toHaveAttribute('aria-disabled');
     expect(link).not.toHaveAttribute('tabindex');
-    expect(screen.queryByText('public.unavailable')).not.toBeInTheDocument();
+    expect(screen.queryByText('Currently unavailable')).not.toBeInTheDocument();
   });
 
   it('takes an unavailable cocktail out of the tab order and announces it as disabled', () => {

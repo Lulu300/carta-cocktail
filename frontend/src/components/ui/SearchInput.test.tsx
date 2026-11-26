@@ -14,7 +14,7 @@ describe('SearchInput', () => {
     render(<Harness />);
 
     const input = screen.getByRole('searchbox', { name: 'Search units' });
-    expect(input).toHaveAttribute('placeholder', 'common.search');
+    expect(input).toHaveAttribute('placeholder', 'Search...');
     expect(input).toHaveAttribute('enterkeyhint', 'search');
   });
 
@@ -26,10 +26,10 @@ describe('SearchInput', () => {
   it('shows a named clear button only once something is typed', async () => {
     const user = userEvent.setup();
     render(<Harness />);
-    expect(screen.queryByRole('button', { name: 'common.clearSearch' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Clear search' })).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText('Search units'), 'cl');
-    await user.click(screen.getByRole('button', { name: 'common.clearSearch' }));
+    await user.click(screen.getByRole('button', { name: 'Clear search' }));
 
     expect(screen.getByLabelText('Search units')).toHaveValue('');
   });

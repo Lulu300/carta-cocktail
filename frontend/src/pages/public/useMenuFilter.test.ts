@@ -66,7 +66,7 @@ describe('useMenuFilter on a bottle menu', () => {
   it('puts bottles without a category under "other"', () => {
     const menu = bottleMenu([menuBottle(1, { category: undefined })]);
 
-    expect(filter(menu).bottleBlocks[0]).toMatchObject({ title: 'public.other', anchorId: 'section-category-other' });
+    expect(filter(menu).bottleBlocks[0]).toMatchObject({ title: 'Other', anchorId: 'section-category-other' });
   });
 
   it('keeps the admin order of the bottles inside a block', () => {
@@ -127,7 +127,7 @@ describe('useMenuFilter on a cocktail menu', () => {
     const { cocktailBlocks } = filter(menu);
 
     expect(cocktailBlocks.map((block) => [block.kind, block.title, block.anchorId])).toEqual([
-      ['unsectioned', 'public.withoutSection', 'section-unsectioned'],
+      ['unsectioned', 'Without a section', 'section-unsectioned'],
       ['section', 'Classics', 'section-10'],
       ['section', 'Signatures', 'section-20'],
     ]);
