@@ -245,7 +245,7 @@ test('expectations: --inject-duplicate expects the refused database copy (v1.6.0
   assert.deepEqual(allowed, { checkDatabaseCopy: INJECTED_DUPLICATE_REASON });
   const actions = [
     { step: 'v1.6.0 Before 3', action: 'copyDatabase', status: 'done' },
-    { step: 'v1.6.0 Before 4', action: 'checkDatabaseCopy', status: 'failed', refused: true },
+    { step: 'v1.6.0 Before 4', action: 'checkDatabaseCopy', status: 'failed', refused: true, refusal: FAILED_MIGRATION_REFUSAL },
     { step: 'v1.5.0 After 1', action: 'restoreUploads', status: 'failed' },
   ];
   markExpectedActions(actions, allowed);
@@ -267,9 +267,11 @@ test('expectations: --inject-duplicate, a database copy that started stays an un
 });
 
 /** A simulated step (a start or a refused start, and a refused database copy), judged by judgeStep. */
-function judgedStep({ mode, started, injectedDuplicate, refusal = started ? null : FAILED_MIGRATION_REFUSAL }) {
+function judgedStep({
+  mode, started, injectedDuplicate, refusal = started ? null : FAILED_MIGRATION_REFUSAL, copyRefusal = FAILED_MIGRATION_REFUSAL,
+}) {
   const step = {
-    actions: [{ step: 'v1.6.0 Before 4', action: 'checkDatabaseCopy', status: 'failed', refused: true }],
+    actions: [{ step: 'v1.6.0 Before 4', action: 'checkDatabaseCopy', status: 'failed', refused: true, refusal: copyRefusal }],
     checks: [
       row('startup', 'backend starts', started, started ? 'API running' : 'refused: exit code 1, 1 restart(s)'),
       started
@@ -328,6 +330,14 @@ test('judgeStep: --inject-duplicate, a start refused for "cannot write" leaves t
   const conformant = judgedStep({ mode: 'conformant', started: false, injectedDuplicate: true, refusal: UNWRITABLE_REFUSAL });
   assert.deepEqual(unexpectedOf(conformant), [['startup', 'refused: exit code 1, 1 restart(s)']]);
   assert.equal(conformant.checks[1].status, 'skip');
+});
+
+test('judgeStep: --inject-duplicate, a database copy refused for another reason is not the expected refusal', () => {
+  for (const copyRefusal of [UNWRITABLE_REFUSAL, BASELINE_REFUSAL, null]) {
+    const step = judgedStep({ mode: 'conformant', started: false, injectedDuplicate: true, copyRefusal });
+    assert.equal(step.actions[0].expected, undefined, copyRefusal?.log);
+    assert.deepEqual(unexpectedOf(step), [['checkDatabaseCopy', undefined]], copyRefusal?.log);
+  }
 });
 
 test('judgeStep: without the option, or before v1.8.0, no refusal is required', () => {

@@ -4,7 +4,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { changeAdminPassword, checkLogLines } from './checks.mjs';
+import { changeAdminPassword, checkLogLines, findRefusal } from './checks.mjs';
 import { copyDatabaseFiles, DB_FILE_NAME } from './database.mjs';
 import { containerMounts, docker, runHelper } from './docker.mjs';
 import { isRequirementMet } from './expectations.mjs';
@@ -17,6 +17,8 @@ const DEFAULT_ADMIN_PASSWORD = 'admin123';
 // v1.5.0 refuses a shorter ADMIN_PASSWORD to create or reset the admin.
 const MIN_ADMIN_PASSWORD_LENGTH = 12;
 const NEW_ADMIN_PASSWORD_LENGTH = 16;
+// User of the backend image from v1.12.0 (CARTA_UID/CARTA_GID defaults).
+const IMAGE_OWNER = '1000:1000';
 export const MIGRATE_STATUS_OK = 'Database schema is up to date!';
 
 export function randomSecret(length) {
@@ -134,15 +136,19 @@ function copyDatabase(ctx) {
 }
 
 /**
- * Result of the database copy check: refused (`refused: true`), or started with every expected log
- * line and an up-to-date migration status. `readMigrateStatus` is only called on a started copy.
+ * Result of the database copy check: refused (`refused: true`, with the `refusal` found in the logs
+ * among `refusals`, or null), or started with every expected log line and an up-to-date migration
+ * status. `readMigrateStatus` is only called on a started copy.
  */
-export function judgeDatabaseCopy(outcome, expectedStartLogs, readMigrateStatus) {
+export function judgeDatabaseCopy(outcome, expectedStartLogs, readMigrateStatus, refusals) {
   if (!outcome.started) {
+    const refusal = findRefusal(refusals, outcome.logs);
+    const found = refusal ? `"${refusal.log}"` : 'no known refusal message';
     return {
       status: 'failed',
       refused: true,
-      detail: `the copy was refused (exit code ${outcome.exitCode ?? 'none'}): the notes say not to upgrade`,
+      refusal,
+      detail: `the copy was refused (exit code ${outcome.exitCode ?? 'none'}, ${found}): the notes say not to upgrade`,
     };
   }
   const lines = checkLogLines(outcome.logs, expectedStartLogs);
@@ -158,6 +164,9 @@ export function judgeDatabaseCopy(outcome, expectedStartLogs, readMigrateStatus)
 async function checkDatabaseCopy(ctx) {
   const checkDir = path.join(ctx.workDir, `db-check-${ctx.target.label}`);
   fs.cpSync(databaseCopyDir(ctx), checkDir, { recursive: true });
+  // The image runs as uid 1000 from v1.12.0 and refuses a data folder it cannot write to, which
+  // would hide the refusal under test. The copy belongs to the host user, so give it to the image.
+  runHelper([`${checkDir}:/target`], `chown -R ${IMAGE_OWNER} /target`);
   const name = `${ctx.instance.project}-check`;
   docker(['run', '--detach', '--name', name, '--platform', ctx.target.images.platform,
     '-v', `${checkDir}:/app/data`,
@@ -166,7 +175,8 @@ async function checkDatabaseCopy(ctx) {
   try {
     const outcome = await waitForStart(name, ctx.timeoutMs);
     return judgeDatabaseCopy(outcome, ctx.expectedStartLogs,
-      () => docker(['exec', name, 'npx', 'prisma', 'migrate', 'status'], { allowFailure: true }).stdout);
+      () => docker(['exec', name, 'npx', 'prisma', 'migrate', 'status'], { allowFailure: true }).stdout,
+      ctx.profile.refusals);
   } finally {
     docker(['rm', '--force', '--volumes', name], { allowFailure: true });
   }
