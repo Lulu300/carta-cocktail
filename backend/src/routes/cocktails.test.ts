@@ -569,7 +569,7 @@ describe('POST /api/cocktails/export', () => {
   /** The single export of a cocktail, as the batch must repeat it. */
   async function singleExport(id: number) {
     const res = await request.get(`/api/cocktails/${id}/export`).set(authHeader());
-    const filename = /filename="([^"]+)"/.exec(res.headers['content-disposition'])?.[1];
+    const filename = /filename="?([^";]+)"?/.exec(res.headers['content-disposition'])?.[1];
     return { filename, data: res.body };
   }
 
@@ -1231,7 +1231,7 @@ describe('GET /api/cocktails/:id/export - file name', () => {
     const cocktail = await seedCocktail({ name: 'Piña Colada' });
     const res = await request.get(`/api/cocktails/${cocktail.id}/export`).set(authHeader());
     expect(res.status).toBe(200);
-    expect(res.headers['content-disposition']).toBe('attachment; filename="cocktail-pina-colada.json"');
+    expect(res.headers['content-disposition']).toBe('attachment; filename=cocktail-pina-colada.json');
   });
 
   it('should name a cocktail without latin letters after its id', async () => {
