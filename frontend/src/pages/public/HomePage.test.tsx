@@ -85,7 +85,7 @@ describe('HomePage', () => {
     renderHome();
 
     expect(await screen.findByRole('alert')).toHaveTextContent('home.loadError');
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Carta Cocktail');
+    expect(screen.getByRole('heading', { level: 1 }).textContent?.trim()).toBe('');
 
     mockApiResponse('get', '/api/public/settings', buildSiteSettings({ siteName: 'Chez Lulu', siteIcon: '🍹' }));
     mockMenus([buildMenu({ name: 'Summer' })]);

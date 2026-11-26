@@ -7,9 +7,11 @@ import {
   buildCategory,
   buildCocktail,
   buildCocktailIngredient,
+  buildSiteSettings,
   buildUnit,
 } from '../../test/factories';
 import { captureRequest, mockApiError, mockApiPending, mockApiResponse } from '../../test/msw/utils';
+import { SiteSettingsProvider } from '../../contexts/SiteSettingsContext';
 import CocktailPublicPage from './CocktailPublicPage';
 
 const mockNavigate = vi.fn();
@@ -82,6 +84,15 @@ describe('CocktailPublicPage', () => {
     expect(screen.getByText('Stir with ice.')).toBeInTheDocument();
     // The unit converter turns the quantity into a button once the units are loaded
     expect(await screen.findByRole('button', { name: '30 ml' })).toBeInTheDocument();
+  });
+
+  it('puts the cocktail name before the site name in the tab title', async () => {
+    mockUseAuth.mockReturnValue({ user: null });
+    mockApiResponse('get', '/api/public/settings', buildSiteSettings({ siteName: 'Chez Lulu' }));
+
+    render(<SiteSettingsProvider><CocktailPublicPage /></SiteSettingsProvider>);
+
+    await waitFor(() => expect(document.title).toBe('Negroni · Chez Lulu'));
   });
 
   it('shows notes and preferred bottles for logged-in admins', async () => {

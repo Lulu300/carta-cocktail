@@ -5,13 +5,13 @@ phase: C
 lane: frontend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [C-11]
-touches: [frontend/src/contexts/AuthContext.tsx, frontend/src/services/api.ts, frontend/src/pages/admin/SettingsPage.tsx, frontend/src/i18n/locales/]
+touches: [frontend/src/contexts/AuthContext.tsx, frontend/src/services/api.ts, frontend/src/pages/admin/SettingsPage.tsx, frontend/src/pages/auth/LoginPage.tsx, frontend/src/utils/signInAfterRestore.ts, frontend/src/i18n/locales/]
 sources: ["03-security.md §7"]
-branch:
-pr:
+branch: feature/C-25-logout-everywhere
+pr: 258
 ---
 
 ## Contexte
@@ -51,3 +51,4 @@ C-11 ajoute `POST /api/auth/logout-all` : la route incrémente `User.tokenVersio
 - 2026-10-11 : tâche créée pendant C-11 (PR #82).
 - 2026-10-11 : point d'attention sur les tokens ramenés par une restauration remplacé par un renvoi vers C-30 (PR #93).
 - 2026-11-13 : l'étape 3 est faite par E-39 (PR #175) : au démarrage, `AuthContext.tsx` ne termine la session que sur un 401 (`isUnauthorizedError()`), et une autre erreur garde le token et affiche `SessionCheckError` (`App.tsx`) avec « Retry », « Sign in again » et « Back to home ». Il reste les étapes 1, 2 et 4 ; les deux derniers critères d'acceptation et le test de `AuthContext.test.tsx` qui portent sur ce comportement sont déjà couverts par E-39 : ne pas le refaire.
+- 2026-11-26 : fait. Bouton « Se déconnecter partout » (confirmation `useConfirm`, `auth.logoutAll()`, puis `logout()` et chargement complet de `/login?reason=logged-out-everywhere`, sur le modèle de C-31 : `signInAfterRestore.ts` gère les deux raisons). La page de connexion affiche « Déconnecté de tous les appareils ». Étapes 1, 2 et 4 faites, étape 3 faite par E-39. Notes de version : aucune action requise. Les Paramètres ont un bouton « Se déconnecter partout » qui révoque les sessions de tous les appareils, celui-ci compris, après confirmation ; la page de connexion l’explique.

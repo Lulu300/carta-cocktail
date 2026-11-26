@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { CocktailAvailability } from '../../../types';
+import { useLocalizedName } from '../../../hooks/useLocalizedName';
+import type { CocktailAvailability, IngredientAvailability } from '../../../types';
 import { cx } from '../../ui/classNames';
 
 // Enough to recognise the problem on a card; the recipe page lists the rest.
@@ -42,16 +43,19 @@ interface AvailabilityWarningsProps {
 /** Low stock, missing ingredients and category lines whose preferred bottles are all empty. */
 export default function AvailabilityWarnings({ availability, loading }: AvailabilityWarningsProps) {
   const { t } = useTranslation();
+  const localizedName = useLocalizedName();
   if (!availability || loading) return null;
 
-  const missing = availability.missingIngredients;
-  const withoutPreferred = availability.ingredients
-    .filter((line) => line.preferredAvailable === false)
-    .map((line) => line.name);
+  const lineName = (line: IngredientAvailability) =>
+    line.orphan ? t('cocktails.unknownSource') : localizedName(line);
+  const lowStock = availability.lowStock.map((resource) =>
+    t('cocktails.lowStockItem', { name: localizedName(resource), count: resource.servings }));
+  const missing = availability.ingredients.filter((line) => !line.isAvailable).map(lineName);
+  const withoutPreferred = availability.ingredients.filter((line) => line.preferredAvailable === false).map(lineName);
 
   return (
     <>
-      <WarningBox tone="warning" title={`⚠️ ${t('cocktails.lowStock')}`} names={availability.lowStockWarnings} />
+      <WarningBox tone="warning" title={`⚠️ ${t('cocktails.lowStock')}`} names={lowStock} />
       <WarningBox
         tone="danger"
         title={`❌ ${t('cocktails.missing')}`}

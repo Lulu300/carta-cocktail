@@ -5,13 +5,13 @@ phase: E
 lane: frontend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: []
 touches: [frontend/index.html, frontend/src/contexts/SiteSettingsContext.tsx, frontend/src/hooks/usePageTitle.ts, frontend/package.json, frontend/package-lock.json, frontend/src/index.css, frontend/src/main.tsx, frontend/src/pages/public/HomePage.tsx, frontend/src/pages/public/MenuPublicPage.tsx, frontend/src/pages/public/CocktailPublicPage.tsx]
 sources: ["06-frontend-ux-perf.md §4", "06-frontend-ux-perf.md §1"]
-branch:
-pr:
+branch: feature/E-12-meta-fonts-loading
+pr: 260
 ---
 
 ## Contexte
@@ -79,3 +79,4 @@ Les premières secondes d'une visite sont soignées nulle part : écran blanc pu
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-12 : revue de la PR #105 (B-06, Vite 8) : TanStack Query est réparti entre le chunk `keys` (avec `src/queries/keys.ts`) et l'entrée, sans cache long terme : retéléchargé à chaque release ou changement de `keys.ts`. Non régressif (il était dans l'entrée sous Vite 7). Un groupe `vendor-query` dans `build.rolldownOptions.output.codeSplitting.groups` (`vite.config.ts`) le réglerait ; mesurer avec `bundle-budget.mjs`.
+- 2026-11-26 : faite. Polices Inter et Playfair Display auto-hébergées (Fontsource variable, importées dans `main.tsx`, sous-ensemble latin seul téléchargé), CSP de `security-headers.conf` sans domaine Google. `index.html` : favicon 🍸 en data URI, `theme-color`, `color-scheme`, `description`, fond sombre, indicateur de chargement, `<noscript>`. `SiteSettingsContext` : nom vide tant que rien n'est connu, copie `localStorage` (`siteSettings`), favicon de repli 🍸, titre composé par `usePageTitle` (le contexte garde le titre : un seul propriétaire, pas de course entre effets). Déjà fait avant : retries du premier chargement. Écarts : pas d'`isLoaded` (aucun consommateur) ; fiche cocktail = « cocktail · site », sans le nom du menu (la fiche ne le porte pas, une requête en plus pour le titre n'en vaut pas la peine). Bundle public 136,81 kB (+0,2 kB), les woff2 sont des assets hors du JS gzip du script. Vérifié sur un build avec Chrome sans interface, hors-ligne sauf localhost : polices servies en local, aucun appel externe ni `/vite.svg`, titre « Summer menu · Chez Lulu ». LCP Lighthouse non mesuré (pas de Lighthouse sur cette machine). Notes de version : les polices Inter et Playfair Display sont désormais servies par l'application, plus par Google Fonts : la carte s'affiche avec ses polices sans accès Internet et n'envoie plus l'adresse IP des invités à Google ; la CSP de nginx n'autorise plus `fonts.googleapis.com` ni `fonts.gstatic.com` ; l'onglet affiche le nom de la page (« Mojito · Nom du bar »), le favicon par défaut est un 🍸, et l'écran de chargement est sombre. Aucune action requise.

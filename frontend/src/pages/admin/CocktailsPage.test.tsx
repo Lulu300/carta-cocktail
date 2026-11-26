@@ -6,7 +6,7 @@ import CocktailsPage from './CocktailsPage';
 import { qk } from '../../queries/keys';
 import { buildAvailability, buildCocktail } from '../../test/factories';
 import { captureRequest, holdApiResponse, mockApiResponse, mockNetworkError } from '../../test/msw/utils';
-import type { Cocktail } from '../../types';
+import type { Cocktail, IngredientAvailability } from '../../types';
 
 // Builds a ZIP of every selected recipe: services/exportZip.test.ts covers it.
 vi.mock('../../services/exportZip', () => ({
@@ -27,9 +27,18 @@ import { exportCocktailsAsZip } from '../../services/exportZip';
 const mojito = buildCocktail({ id: 1, name: 'Mojito', description: 'Classic', notes: 'Jus de citron frais', tags: 'rum,lime' });
 const negroni = buildCocktail({ id: 2, name: 'Negroni', imagePath: 'negroni.jpg' });
 
+function missingLine(id: number, name: string): IngredientAvailability {
+  return {
+    cocktailIngredientId: id, sourceType: 'INGREDIENT', name, nameTranslations: null, orphan: false,
+    icon: null, quantity: 1, unit: 'cl', isAvailable: false, availableCount: 0,
+  };
+}
+
 const mockAvailabilities = {
   1: buildAvailability({ cocktailId: 1, maxServings: 5 }),
-  2: buildAvailability({ cocktailId: 2, isAvailable: false, maxServings: 0, missingIngredients: ['Campari'] }),
+  2: buildAvailability({
+    cocktailId: 2, isAvailable: false, maxServings: 0, ingredients: [missingLine(5, 'Campari')],
+  }),
 };
 
 function mockCocktails(cocktails: Cocktail[]) {
@@ -353,12 +362,16 @@ describe('CocktailsPage', () => {
       ...mockAvailabilities,
       1: {
         ...mockAvailabilities[1],
-        lowStockWarnings: ['Rum is running low'],
-        missingIngredients: ['Mint', 'Lime', 'Soda'],
-        ingredients: [{
-          cocktailIngredientId: 1, sourceType: 'CATEGORY', name: 'White rum', icon: null, quantity: 5,
-          unit: 'cl', isAvailable: true, availableCount: 5, preferredAvailable: false,
-        }],
+        lowStock: [{ name: 'Rum', nameTranslations: null, servings: 2 }],
+        ingredients: [
+          { ...missingLine(1, 'Mint'), },
+          { ...missingLine(2, 'Lime') },
+          { ...missingLine(3, 'Soda') },
+          {
+            cocktailIngredientId: 4, sourceType: 'CATEGORY', name: 'White rum', nameTranslations: null, orphan: false,
+            icon: null, quantity: 5, unit: 'cl', isAvailable: true, availableCount: 5, preferredAvailable: false,
+          },
+        ],
       },
     });
     render(<CocktailsPage />);
@@ -366,7 +379,7 @@ describe('CocktailsPage', () => {
     expect(await screen.findByText('White rum')).toBeInTheDocument();
     expect(screen.getByText('⚠️ cocktails.noPreferredAvailable')).toBeInTheDocument();
     expect(screen.getByText('⚠️ cocktails.lowStock')).toBeInTheDocument();
-    expect(screen.getByText('Rum is running low')).toBeInTheDocument();
+    expect(screen.getByText('cocktails.lowStockItem')).toBeInTheDocument();
     expect(screen.getByText('cocktails.moreMissing')).toBeInTheDocument();
   });
 

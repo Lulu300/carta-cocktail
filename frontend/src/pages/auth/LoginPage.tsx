@@ -8,7 +8,7 @@ import Button from '../../components/ui/Button';
 import Field from '../../components/ui/Field';
 import Input from '../../components/ui/Input';
 import LanguageSelector from '../../components/ui/LanguageSelector';
-import { isSignInAfterRestore } from '../../utils/signInAfterRestore';
+import { isSignInAfterLogoutEverywhere, isSignInAfterRestore } from '../../utils/signInAfterRestore';
 
 const ADMIN_HOME = '/admin';
 
@@ -79,6 +79,12 @@ export default function LoginPage() {
           {isSignInAfterRestore(location.search) && (
             <p className="bg-info/10 border border-info/30 text-info px-4 py-3 rounded-lg text-sm">
               {t('auth.backupRestored')}
+            </p>
+          )}
+
+          {isSignInAfterLogoutEverywhere(location.search) && (
+            <p className="bg-info/10 border border-info/30 text-info px-4 py-3 rounded-lg text-sm">
+              {t('auth.loggedOutEverywhere')}
             </p>
           )}
 

@@ -22,6 +22,7 @@
     "loginButton": "Se connecter",
     "loginError": "Email ou mot de passe invalide",
     "backupRestored": "Sauvegarde restaurée. Connectez-vous avec l'email et le mot de passe en vigueur à la date de la sauvegarde.",
+    "loggedOutEverywhere": "Déconnecté de tous les appareils. Connectez-vous à nouveau pour continuer.",
     "welcome": "Bienvenue sur Carta Cocktail"
   },
   "dashboard": {
@@ -312,6 +313,9 @@
     "doses_one": "{{servings}} dose",
     "doses_other": "{{servings}} doses",
     "lowStock": "Stock faible",
+    "lowStockItem_one": "{{name}} : plus que {{count}} dose",
+    "lowStockItem_other": "{{name}} : plus que {{count}} doses",
+    "unknownSource": "Source inconnue",
     "missing": "Manquant",
     "moreMissing_one": "+{{count}} autre",
     "moreMissing_other": "+{{count}} autres"
@@ -436,6 +440,8 @@
     "confirmPassword": "Confirmer le mot de passe",
     "confirmPasswordPlaceholder": "Retaper le nouveau mot de passe",
     "profileUpdated": "Profil mis à jour",
+    "logoutEverywhere": "Se déconnecter partout",
+    "confirmLogoutEverywhere": "Tous les appareils, celui-ci compris, seront déconnectés et devront saisir à nouveau le mot de passe. À utiliser si un appareil a été perdu ou partagé.",
     "passwordMismatch": "Les mots de passe ne correspondent pas",
     "backup": {
       "title": "Sauvegarde & Restauration",

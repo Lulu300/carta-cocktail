@@ -78,7 +78,7 @@ frontend/
 │   │   ├── useCategoryTypeName.ts # Category type names admin screens can tell apart (admin messages only)
 │   │   ├── useClickOutside.ts
 │   │   ├── useLocalizedName.ts    # Get localized name from translation object
-│   │   ├── usePagination.ts
+│   │   ├── usePageTitle.ts        # Tab title: page parts before the site name
 │   │   └── useSort.ts
 │   ├── queries/                # TanStack Query: query keys (keys.ts), query client, one file per resource
 │   ├── services/

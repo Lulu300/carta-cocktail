@@ -229,6 +229,8 @@ export const auth = {
       body: JSON.stringify({ email, password }),
     }),
   me: () => request<{ id: number; email: string }>('/auth/me'),
+  /** Revokes every token of the admin, the one sending this request included. */
+  logoutAll: () => request<{ message: string }>('/auth/logout-all', { method: 'POST' }),
 };
 
 /**
