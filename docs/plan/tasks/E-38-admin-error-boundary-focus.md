@@ -11,7 +11,7 @@ depends_on: [E-18]
 touches: [frontend/src/App.tsx, frontend/src/App.test.tsx, frontend/src/components/layout/, frontend/src/components/ui/EmptyState.tsx, frontend/src/components/ui/EmptyState.test.tsx, frontend/src/pages/public/PublicErrorState.tsx, frontend/src/pages/public/PublicErrorState.test.tsx, frontend/src/i18n/locales/]
 sources: []
 branch: fix/E-38-admin-error-boundary
-pr: PRNUM
+pr: 281
 ---
 
 ## Contexte
