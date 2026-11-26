@@ -11,7 +11,7 @@ depends_on: [D-01]
 touches: [backend/prisma.config.ts, backend/src/lib/databasePath.ts, backend/Dockerfile]
 sources: []
 branch: chore/D-26-prisma-cli-config-without-src
-pr:
+pr: 252
 ---
 
 ## Contexte
