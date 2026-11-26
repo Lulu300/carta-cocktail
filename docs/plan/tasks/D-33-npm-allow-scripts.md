@@ -5,12 +5,12 @@ phase: D
 lane: infra
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: []
 touches: [backend/package.json, frontend/package.json, backend/Dockerfile, backend/AGENTS.md, frontend/AGENTS.md]
 sources: []
-branch:
+branch: chore/D-33-npm-allow-scripts
 pr:
 ---
 
@@ -66,3 +66,4 @@ Pas de test unitaire : le garde du `Dockerfile` et l'étape de CI en tiennent li
 ## Journal
 
 - 2026-11-05 : tâche créée par la PR docs de suivi du lot E-15/B-13/C-42/B-19/B-16, à partir de la relecture de la PR Dependabot #142 (avertissement npm `allowScripts`). Décision de l'humain : « Create a task ». Faits npm 11.19.1 / npm 12, portée réelle (seul `better-sqlite3`) et `touches` corrigés après la relecture de la PR #151. Criticité : décision de l'humain « basse » (aucune version de Node n'embarque npm 12 à ce jour).
+- 2026-11-26 : faite. Faits : npm 11.19.1 (Node 24.22, images et CI) applique déjà `allowScripts` ; npm 12 bloque tout script non listé. Seul `better-sqlite3` est autorisé (clé sans version : une montée Dependabot ne bloque pas le script sous npm 12). `esbuild`, `prisma`, `@prisma/engines` (backend) et `fsevents` (backend et frontend) sont refusés explicitement : leurs binaires viennent de paquets de plateforme (`esbuild`, `fsevents` précompilé) ou du `postinstall` du projet (`prisma generate` récupère le moteur de schéma), et `npm ci` n'affiche plus d'avertissement. `msw` n'a pas de script dans la version installée. Vérifié avec npm 12.2.2 : `npm ci` backend et frontend, binaire `better-sqlite3`, `prisma --version`, tests verts. Garde dans l'étage `prod-deps` du `Dockerfile` (ouvre une base en mémoire) ; pas d'étape de CI (les tests échouent déjà sans le binaire). Sabotage : sans l'entrée `better-sqlite3`, l'étage `prod-deps` construit avec npm 12 échoue sur le garde ; avec l'entrée il passe, et l'image construite avec npm 11.19.1 démarre (`/api/health` ok). Aucune note de version : rien de visible pour l'utilisateur.

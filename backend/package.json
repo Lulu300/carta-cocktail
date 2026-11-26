@@ -74,5 +74,12 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.74.0",
     "vitest": "^5.0.3"
+  },
+  "allowScripts": {
+    "better-sqlite3": true,
+    "esbuild": false,
+    "prisma": false,
+    "@prisma/engines": false,
+    "fsevents": false
   }
 }

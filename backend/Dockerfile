@@ -56,6 +56,10 @@ RUN node /tmp/prune-unused-deps.mjs \
 # startup a package cut above: otherwise only the first container start would show it.
 # Without network, as in a container that cannot reach the registry.
 RUN --network=none CHECKPOINT_DISABLE=1 node_modules/.bin/prisma --version
+# Fails the build when npm skipped the install script of better-sqlite3 (npm 12
+# blocks the scripts missing from allowScripts in package.json): otherwise the
+# image builds and only fails at the first database access.
+RUN node -e "new (require('better-sqlite3'))(':memory:').close()"
 
 FROM node:24.22-alpine AS runtime
 # tini forwards SIGTERM to the entrypoint, then to Node once the entrypoint has exec'd it

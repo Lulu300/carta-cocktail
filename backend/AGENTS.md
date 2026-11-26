@@ -253,6 +253,8 @@ nginx (`frontend/nginx.conf.template`) limits the whole multipart body, so its `
 **Runtime (database)**: @prisma/client 7, @prisma/adapter-better-sqlite3 7, better-sqlite3 12 (native module, prebuilt for linux x64/arm64 musl), prisma 7 (the CLI applies the migrations when the container starts)
 **Dev**: typescript 5.9, tsx, eslint 10, typescript-eslint, prettier 3, vitest, supertest
 
+**Install scripts**: npm 12 skips the install scripts of dependencies that `allowScripts` in `package.json` does not list (npm 11.19 only warns). Only `better-sqlite3` is allowed: without its script the native binary is missing. `esbuild`, `prisma`, `@prisma/engines` and `fsevents` are denied (`false`): their binaries come from platform packages or from `prisma generate` (the project `postinstall`). Keys have no version, so a Dependabot bump keeps working. A new dependency whose script is needed must be added to `allowScripts` (`npm install-scripts approve <pkg> --no-allow-scripts-pin`), otherwise denied (`npm install-scripts deny <pkg>`), so that `npm ci` prints no `install-scripts` warning. The `prod-deps` stage of the `Dockerfile` opens `better-sqlite3` and fails the build when its binary is missing.
+
 The Docker image holds the runtime dependencies only and runs as the `node` user (uid 1000): code that runs there (server, seed, scripts) lives in `src/` and is compiled by `npm run build`. It never relies on `tsx`. `src/lib/databasePath.ts` is the only source file copied into the image (for `prisma.config.ts`): it imports Node built-ins only. A new file in `src/scripts/` stays a thin entry point and is added to the coverage exclusions (`vitest.config.ts` and `ci.yml`).
 
 ## Database
