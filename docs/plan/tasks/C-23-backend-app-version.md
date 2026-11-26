@@ -11,7 +11,7 @@ depends_on: [C-05]
 touches: [backend/src/services/backupService.ts, backend/src/services/backupService.test.ts, backend/src/routes/backup.test.ts, backend/Dockerfile, .github/workflows/release.yml, backend/src/routes/health.ts, backend/src/routes/health.test.ts]
 sources: []
 branch: fix/C-23-backend-app-version
-pr:
+pr: 259
 ---
 
 ## Contexte
