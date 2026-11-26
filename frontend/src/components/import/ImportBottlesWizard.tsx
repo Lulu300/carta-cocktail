@@ -15,6 +15,7 @@ import Button from '../ui/Button';
 import WizardModal from './WizardModal';
 import WizardResult from './WizardResult';
 import FileDropzone from './FileDropzone';
+import { exceedsUploadLimit, MAX_BOTTLE_IMPORT_BYTES } from '../../utils/uploadLimits';
 import BottleImportRowErrors, { BottleImportRowWarnings } from './BottleImportRowErrors';
 import BottleImportCategoryStep from './BottleImportCategoryStep';
 import BottleImportRowsStep from './BottleImportRowsStep';
@@ -49,6 +50,11 @@ export default function ImportBottlesWizard({ onClose, onImported }: ImportBottl
   const { data: categoryTypes = [] } = useCategoryTypes();
 
   const selectFile = (selected: File) => {
+    if (exceedsUploadLimit(selected, MAX_BOTTLE_IMPORT_BYTES)) {
+      setFile(null);
+      setError(t('common.requestTooLarge'));
+      return;
+    }
     setError(null);
     setFile(selected);
   };

@@ -111,6 +111,55 @@ describe('ImportBottlesWizard', () => {
     expect(await screen.findByText('bottles.importWizard.invalidFile')).toBeInTheDocument();
   });
 
+  describe('file size', () => {
+    // MAX_BOTTLE_IMPORT_BYTES of backend/src/utils/bottlesImport.ts, the largest import file it accepts
+    const BACKEND_LIMIT = 10 * 1024 * 1024;
+
+    /** A file of `size` bytes: only its size is read, so no 10 MB buffer is allocated. */
+    const fileOfSize = (size: number) => {
+      const file = new File(['x'], 'bottles.json', { type: 'application/json' });
+      Object.defineProperty(file, 'size', { value: size });
+      return file;
+    };
+
+    it.each([
+      ['one byte under the backend limit', BACKEND_LIMIT - 1],
+      ['exactly the backend limit', BACKEND_LIMIT],
+    ])('accepts a file of %s', async (_case, size) => {
+      const user = userEvent.setup();
+      render(<ImportBottlesWizard onClose={() => undefined} />);
+
+      await user.upload(fileInput(), fileOfSize(size));
+
+      expect(screen.getByText('bottles.importWizard.next')).toBeInTheDocument();
+      expect(screen.queryByText('common.requestTooLarge')).not.toBeInTheDocument();
+    });
+
+    it('refuses a file one byte over the backend limit, without sending it', async () => {
+      const user = userEvent.setup();
+      const preview = captureRequest('post', '/api/bottles/import/preview');
+      render(<ImportBottlesWizard onClose={() => undefined} />);
+
+      await user.upload(fileInput(), fileOfSize(BACKEND_LIMIT + 1));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('common.requestTooLarge');
+      expect(screen.queryByText('bottles.importWizard.next')).not.toBeInTheDocument();
+      expect(preview.count()).toBe(0);
+    });
+
+    it('drops the file chosen before when a too large one replaces it', async () => {
+      const user = userEvent.setup();
+      render(<ImportBottlesWizard onClose={() => undefined} />);
+      await user.upload(fileInput(), new File(['x'], 'first.json'));
+
+      await user.upload(fileInput(), fileOfSize(BACKEND_LIMIT + 1));
+
+      expect(await screen.findByText('common.requestTooLarge')).toBeInTheDocument();
+      expect(screen.queryByText('first.json')).not.toBeInTheDocument();
+      expect(screen.queryByText('bottles.importWizard.next')).not.toBeInTheDocument();
+    });
+  });
+
   it('accepts a CSV file and shows the Next button', async () => {
     const user = userEvent.setup();
     render(<ImportBottlesWizard onClose={() => undefined} />);

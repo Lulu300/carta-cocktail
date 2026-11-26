@@ -11,6 +11,7 @@ import Field from '../../components/ui/Field';
 import Icon from '../../components/ui/Icon';
 import Input from '../../components/ui/Input';
 import { cx } from '../../components/ui/classNames';
+import { exceedsUploadLimit, MAX_BACKUP_UPLOAD_BYTES } from '../../utils/uploadLimits';
 import { openSignInAfterLogoutEverywhere, openSignInAfterRestore } from '../../utils/signInAfterRestore';
 
 const ICON_OPTIONS = [
@@ -28,15 +29,6 @@ const GATEWAY_TIMEOUT = 504;
 function isGatewayTimeout(err: unknown): boolean {
   return err instanceof ApiError && err.status === GATEWAY_TIMEOUT;
 }
-
-/**
- * Largest backup archive the backend accepts, this size included: MAX_BACKUP_UPLOAD_BYTES in
- * backend/src/services/backupService.ts, keep both in line. A larger archive is refused before
- * it is sent, so that every browser shows the same message: past its own limit (210 MB), nginx
- * answers 413 while the archive is still being sent, and Firefox does not read that answer. It
- * sends the archive again until it gives up, then shows the "may still be running" message.
- */
-const MAX_BACKUP_UPLOAD_BYTES = 200 * 1024 * 1024;
 
 /** What orNoAnswer resolves to when the connection was lost. */
 const NO_ANSWER = Symbol('no answer');
@@ -220,7 +212,7 @@ export default function SettingsPage() {
    */
   const handleBackupFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
-    const tooLarge = file !== null && file.size > MAX_BACKUP_UPLOAD_BYTES;
+    const tooLarge = file !== null && exceedsUploadLimit(file, MAX_BACKUP_UPLOAD_BYTES);
     setBackupFileTooLarge(tooLarge);
     setBackupFile(tooLarge ? null : file);
   };
