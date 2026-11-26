@@ -5,13 +5,13 @@ phase: D
 lane: ci
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: []
-touches: [frontend/tsconfig.node.json, backend/tsconfig.json]
+touches: [frontend/tsconfig.node.json, backend/tsconfig.config.json, backend/package.json]
 sources: []
-branch:
-pr:
+branch: chore/D-44-typecheck-config-files
+pr: 0
 ---
 
 ## Contexte
@@ -50,3 +50,4 @@ Vitest et le CLI Prisma chargent ces fichiers sans vérifier leurs types.
 ## Journal
 
 - 2026-11-24 : tâche créée par D-09 (hors périmètre de la synchronisation de la documentation).
+- 2026-11-26 : faite. `backend/tsconfig.config.json` (noEmit) vérifie `vitest.config.ts` et `prisma.config.ts` via `npm run typecheck`, utilisé par la CI ; `vitest.config.ts` du frontend rejoint `tsconfig.node.json`. Sonde : une erreur de type dans chacun des trois fichiers fait échouer la commande ; `dist/` inchangé.

@@ -1,0 +1,10 @@
+{
+  // Type-checks the tool configuration files that tsconfig.json leaves out, so that
+  // `npm run build` does not compile them into dist/. Run by `npm run typecheck`.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "."
+  },
+  "include": ["vitest.config.ts", "prisma.config.ts"]
+}

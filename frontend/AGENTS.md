@@ -99,7 +99,7 @@ frontend/
 ├── package.json
 ├── tsconfig.json                 # Project references only: check types with `tsc -b`
 ├── tsconfig.app.json             # src/
-├── tsconfig.node.json            # vite.config.ts
+├── tsconfig.node.json            # vite.config.ts, vitest.config.ts
 ├── vite.config.ts
 ├── vitest.config.ts
 ├── eslint.config.js

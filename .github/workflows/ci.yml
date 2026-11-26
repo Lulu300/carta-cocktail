@@ -51,8 +51,8 @@ jobs:
       - name: Check that migrations match the Prisma schema
         run: npm run db:check
 
-      - name: TypeScript check
-        run: npx tsc --noEmit
+      - name: TypeScript check (src and config files)
+        run: npm run typecheck
 
       - name: Lint
         run: npm run lint

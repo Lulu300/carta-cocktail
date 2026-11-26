@@ -11,6 +11,7 @@
     "format:check": "prettier --check . --ignore-path .gitignore --ignore-path ../.prettierignore",
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.config.json",
     "start": "node dist/index.js",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",

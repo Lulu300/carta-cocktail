@@ -10,13 +10,13 @@ Before committing any change:
 
 1. Create a branch from `develop`: `<type>/<task id>-<slug>` for a plan task (`fix/`, `feature/`, `chore/`, `docs/`, see `docs/plan/README.md`), `feature/xxx` or `fix/xxx` otherwise
 2. **Add or update tests** for any new or modified feature (see Testing section below)
-3. Ensure TypeScript compiles: `npx tsc --noEmit`
+3. Ensure TypeScript compiles: `npm run typecheck` (`tsc --noEmit` on `src/`, then `tsconfig.config.json` for `vitest.config.ts` and `prisma.config.ts`, which `npm run build` keeps out of `dist/`)
 4. Ensure lint and build pass: `npm run lint` (config in `eslint.config.js`), `npm run build`
 5. Run tests: `npm test`
 6. **Verify coverage thresholds are met**: `npm test -- --coverage`
 7. Commit, push, open PR to `develop`
 
-CI runs automatically on PRs (`Backend` job of `.github/workflows/ci.yml`): `npm ci` (prisma generate) → `npm audit --omit=dev --audit-level=high` → `npm run db:check` → tsc → lint → build → tests with coverage → delta coverage (80%). The `Docker build (backend)` job builds the image, and the `Smoke` workflow starts it with the frontend (see the root `AGENTS.md`).
+CI runs automatically on PRs (`Backend` job of `.github/workflows/ci.yml`): `npm ci` (prisma generate) → `npm audit --omit=dev --audit-level=high` → `npm run db:check` → `npm run typecheck` → lint → build → tests with coverage → delta coverage (80%). The `Docker build (backend)` job builds the image, and the `Smoke` workflow starts it with the frontend (see the root `AGENTS.md`).
 
 ## Testing Requirements
 
@@ -112,6 +112,7 @@ backend/
 │   └── prune-unused-deps.mjs  # Image build: removes from node_modules the packages the image never loads
 ├── package.json
 ├── tsconfig.json
+├── tsconfig.config.json       # noEmit check of vitest.config.ts and prisma.config.ts
 ├── vitest.config.ts
 ├── eslint.config.js
 ├── docker-entrypoint.sh       # As the node user: writable check, backup, migrations, seed, then Node
