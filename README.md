@@ -429,13 +429,15 @@ The **Release** workflow (`.github/workflows/release.yml`) runs on version tags 
 | Tag | Tagged on | Docker images | GitHub Release |
 | --- | --- | --- | --- |
 | `vX.Y.Z-rc.N` (pre-release) | a commit of `develop` | `:X.Y.Z-rc.N` only, `latest` does not move | marked as pre-release |
-| `vX.Y.Z` (final) | a commit of `main` | `:X.Y.Z`, `:X.Y`, `:X` and `latest` | normal release, marked as latest |
+| `vX.Y.Z` (final) | a commit of `main` | `:X.Y.Z`, `:X.Y`, `:X` and `latest`, each one only if this version is the highest of its minor, its major, or overall | normal release, marked as latest only if this version is the highest |
 
 Before pushing any image, the workflow runs the whole CI on the tagged commit (`ci.yml`). Images are built for `linux/amd64` and `linux/arm64` (the CI builds `amd64` only, so the `arm64` build is first tested here), with SBOM and provenance attestations, and carry their version (`APP_VERSION`, shown in the admin and by `/api/health`; `dev` in any other build).
 
 1. **Notes first.** On `develop`, copy `docs/releases/TEMPLATE.md` to `docs/releases/vX.Y.Z.md` (summary, detailed changes, required actions before and after the upgrade, `breaking`), and add the version's section to `UPGRADING.md`. A pre-release uses the notes of its target version, unless `docs/releases/vX.Y.Z-rc.N.md` exists.
 2. **Pre-release.** Push `develop`, then tag it: `git tag vX.Y.Z-rc.N origin/develop && git push origin vX.Y.Z-rc.N`.
 3. **Final release.** Merge `develop` into `main` (pull request), then tag `main`: `git fetch origin && git tag vX.Y.Z origin/main && git push origin vX.Y.Z`.
+
+A fix of an older line does not move the tags of a newer one. After `v1.16.0`, tagging `v1.15.1` publishes `:1.15.1` and `:1.15`, but neither `:1` nor `latest`, and its GitHub Release is not marked "Latest". The `verify` job decides this with `.github/scripts/release-tags.mjs`, from the existing final tags, before any image is pushed. Re-running the highest tag keeps all its tags.
 
 **Push the branch before the tag.** The workflow checks that a final tag is reachable from `origin/main` and a pre-release from `origin/develop`. A tag on another commit, or a tag without its notes file, fails before any image is pushed.
 
