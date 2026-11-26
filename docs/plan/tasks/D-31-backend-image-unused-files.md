@@ -11,7 +11,7 @@ depends_on: [D-30]
 touches: [backend/Dockerfile, backend/docker/prune-unused-deps.mjs]
 sources: []
 branch: chore/D-31-backend-image-unused-files
-pr: PRNUM
+pr: 253
 ---
 
 ## Décisions validées (2026-10-13)
