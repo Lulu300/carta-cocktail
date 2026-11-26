@@ -22,6 +22,7 @@
     "loginButton": "Sign In",
     "loginError": "Invalid email or password",
     "backupRestored": "Backup restored. Sign in with the email and password that were in use when the backup was made.",
+    "loggedOutEverywhere": "Signed out of every device. Sign in again to continue.",
     "welcome": "Welcome to Carta Cocktail"
   },
   "dashboard": {
@@ -436,6 +437,8 @@
     "confirmPassword": "Confirm Password",
     "confirmPasswordPlaceholder": "Retype new password",
     "profileUpdated": "Profile updated",
+    "logoutEverywhere": "Sign out everywhere",
+    "confirmLogoutEverywhere": "Every device, this one included, will be signed out and will need the password again. Use it when a device was lost or shared.",
     "passwordMismatch": "Passwords do not match",
     "backup": {
       "title": "Backup & Restore",

@@ -249,6 +249,57 @@ describe('SettingsPage', () => {
     await waitFor(() => expect(document.title).toBe('New Bar Name'));
   });
 
+  describe('sign out everywhere', () => {
+    const SIGN_IN_AFTER_LOGOUT_EVERYWHERE = '/login?reason=logged-out-everywhere';
+    const logoutEverywhereButton = () => screen.getByRole('button', { name: 'settings.logoutEverywhere' });
+
+    async function answerLogoutEverywhereDialog(buttonName: 'settings.logoutEverywhere' | 'common.cancel') {
+      const dialog = await screen.findByRole('alertdialog', { name: 'settings.logoutEverywhere' });
+      expect(dialog).toHaveAccessibleDescription('settings.confirmLogoutEverywhere');
+      await userEvent.click(within(dialog).getByRole('button', { name: buttonName }));
+    }
+
+    it('revokes every session, clears this one and opens the sign-in page with its reason', async () => {
+      mockApiResponse('post', '/api/auth/logout-all', { message: 'ok' });
+      const revoked = captureRequest('post', '/api/auth/logout-all');
+      await renderLoadedPage();
+
+      await userEvent.click(logoutEverywhereButton());
+      await answerLogoutEverywhereDialog('settings.logoutEverywhere');
+
+      await revoked.body;
+      await waitFor(() => expect(assignLocation).toHaveBeenCalledWith(SIGN_IN_AFTER_LOGOUT_EVERYWHERE));
+      expect(localStorage.getItem('token')).toBeNull();
+    });
+
+    it('does nothing when the confirmation is cancelled', async () => {
+      mockApiResponse('post', '/api/auth/logout-all', { message: 'ok' });
+      await renderLoadedPage();
+      const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+      await userEvent.click(logoutEverywhereButton());
+      await answerLogoutEverywhereDialog('common.cancel');
+
+      const requestedUrls = fetchSpy.mock.calls.map(([input]) => (input instanceof Request ? input.url : String(input)));
+      expect(requestedUrls.some((url) => url.includes('/auth/logout-all'))).toBe(false);
+      expect(assignLocation).not.toHaveBeenCalled();
+      expect(localStorage.getItem('token')).toBe('admin-token');
+    });
+
+    it('keeps the session and shows the error when the revocation fails', async () => {
+      mockApiError('post', '/api/auth/logout-all', 500, 'Internal server error');
+      await renderLoadedPage();
+
+      await userEvent.click(logoutEverywhereButton());
+      await answerLogoutEverywhereDialog('settings.logoutEverywhere');
+
+      expect(await screen.findByText('Internal server error')).toBeInTheDocument();
+      expect(assignLocation).not.toHaveBeenCalled();
+      expect(localStorage.getItem('token')).toBe('admin-token');
+      expect(logoutEverywhereButton()).toBeEnabled();
+    });
+  });
+
   it('shows the server message when the site save fails', async () => {
     mockApiError('put', '/api/settings', 400, 'Site name is required');
     const user = userEvent.setup();

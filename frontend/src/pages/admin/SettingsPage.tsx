@@ -1,6 +1,6 @@
 import { useState, useEffect, useId, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ApiError, settings as settingsApi, backup as backupApi } from '../../services/api';
+import { ApiError, auth as authApi, settings as settingsApi, backup as backupApi } from '../../services/api';
 import type { BackupRestoreResult } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteSettings } from '../../contexts/SiteSettingsContext';
@@ -11,7 +11,7 @@ import Field from '../../components/ui/Field';
 import Icon from '../../components/ui/Icon';
 import Input from '../../components/ui/Input';
 import { cx } from '../../components/ui/classNames';
-import { openSignInAfterRestore } from '../../utils/signInAfterRestore';
+import { openSignInAfterLogoutEverywhere, openSignInAfterRestore } from '../../utils/signInAfterRestore';
 
 const ICON_OPTIONS = [
   '', '🍸', '🍹', '🥃', '🍷', '🥂', '🍺', '🧉', '🫗',
@@ -85,7 +85,7 @@ function RestoreReport({ result }: { result: BackupRestoreResult }) {
 
 export default function SettingsPage() {
   const { t } = useTranslation();
-  const { user, updateSession } = useAuth();
+  const { user, updateSession, logout } = useAuth();
   const { refresh: refreshSiteSettings } = useSiteSettings();
   const confirm = useConfirm();
 
@@ -103,6 +103,7 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [profileMessage, setProfileMessage] = useState('');
   const [profileError, setProfileError] = useState('');
+  const [loggingOutEverywhere, setLoggingOutEverywhere] = useState(false);
   // The server asks for the current password before changing the login email or the password
   const isEmailChanged = email !== user?.email;
   const isCurrentPasswordRequired = isEmailChanged || newPassword !== '';
@@ -173,6 +174,30 @@ export default function SettingsPage() {
     } catch (err: unknown) {
       setProfileError(err instanceof Error ? err.message : t('common.error'));
     }
+  };
+
+  const handleLogoutEverywhere = async () => {
+    const confirmed = await confirm({
+      title: t('settings.logoutEverywhere'),
+      message: t('settings.confirmLogoutEverywhere'),
+      confirmLabel: t('settings.logoutEverywhere'),
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+
+    setProfileMessage('');
+    setProfileError('');
+    setLoggingOutEverywhere(true);
+    try {
+      await authApi.logoutAll();
+    } catch (err: unknown) {
+      setProfileError(err instanceof Error ? err.message : t('common.error'));
+      setLoggingOutEverywhere(false);
+      return;
+    }
+    // The token of this session is revoked too: clear it, then reload on the sign-in page.
+    logout();
+    openSignInAfterLogoutEverywhere();
   };
 
   /**
@@ -361,7 +386,12 @@ export default function SettingsPage() {
         {profileMessage && <p className="mt-4 text-sm text-green-400">{profileMessage}</p>}
         {profileError && <p className="mt-4 text-sm text-red-400">{profileError}</p>}
 
-        <Button type="submit" className="mt-6">{t('common.save')}</Button>
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <Button type="submit">{t('common.save')}</Button>
+          <Button variant="secondary" onClick={handleLogoutEverywhere} disabled={loggingOutEverywhere}>
+            {t('settings.logoutEverywhere')}
+          </Button>
+        </div>
       </form>
 
       {/* Backup & Restore */}
