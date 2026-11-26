@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { NotFoundError } from '../errors';
 import { parseNameTranslations, serializeTranslations } from '../utils/translations';
+import { nameToStore, translationsToStore } from '../utils/storedNames';
 import { deleteIngredient, isForceRequested } from '../services/deletionService';
 import { valid, validate } from '../validation/validate';
 import { deleteRequest, IdParams, idRequest } from '../validation/common';
@@ -39,9 +40,9 @@ router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Respons
   const { name, icon, nameTranslations } = valid<typeof createSchemas>(res).body;
   const ingredient = await prisma.ingredient.create({
     data: {
-      name,
+      name: nameToStore(name),
       icon: icon || null,
-      nameTranslations: serializeTranslations(nameTranslations),
+      nameTranslations: serializeTranslations(translationsToStore(nameTranslations)),
     },
   });
   res.status(201).json(parseNameTranslations(ingredient));
@@ -52,14 +53,16 @@ const updateSchemas = { params: IdParams, body: IngredientUpdate };
 router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Response) => {
   const { params: { id }, body } = valid<typeof updateSchemas>(res);
   const { name, icon, isAvailable, nameTranslations } = body;
+  const stored = await prisma.ingredient.findUnique({ where: { id } });
+  if (!stored) throw new NotFoundError();
   // Absent fields are undefined, which Prisma leaves untouched
   const ingredient = await prisma.ingredient.update({
     where: { id },
     data: {
-      name,
+      name: name === undefined ? undefined : nameToStore(name, stored.name),
       icon,
       isAvailable,
-      nameTranslations: serializeTranslations(nameTranslations),
+      nameTranslations: serializeTranslations(translationsToStore(nameTranslations, stored.nameTranslations)),
     },
   });
   res.json(parseNameTranslations(ingredient));

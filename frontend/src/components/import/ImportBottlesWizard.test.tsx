@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '../../test/test-utils';
+import { createTestQueryClient, render, screen, waitFor, fireEvent, within } from '../../test/test-utils';
+import { qk } from '../../queries/keys';
 import userEvent from '@testing-library/user-event';
 import ImportBottlesWizard from './ImportBottlesWizard';
 import { buildCategory, buildCategoryType } from '../../test/factories';
@@ -271,6 +272,28 @@ describe('ImportBottlesWizard', () => {
     await previewWith(samplePreview);
 
     expect(screen.queryByText('bottles.importWizard.rowErrors.title')).not.toBeInTheDocument();
+    expect(screen.queryByText('bottles.importWizard.rowWarnings.title')).not.toBeInTheDocument();
+  });
+
+  it('lists the values on several lines without blocking the import, and sends the payload unchanged', async () => {
+    const confirmed = captureRequest('post', '/api/bottles/import/confirm');
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    const user = await previewWith({
+      ...samplePreview,
+      warnings: [
+        { source: 'bottles', line: 2, field: 'name', code: 'lineBreak' },
+        { source: 'bottles', line: 2, field: 'location', code: 'lineBreak' },
+      ],
+    });
+
+    const warnings = screen.getByRole('status');
+    expect(within(warnings).getByText('bottles.importWizard.rowWarnings.title')).toBeInTheDocument();
+    expect(within(warnings).getAllByText('bottles.importWizard.rowWarnings.code.lineBreak')).toHaveLength(2);
+    await user.click(screen.getAllByText('bottles.importWizard.next').at(-1)!);
+    await user.click(screen.getByText('bottles.importWizard.confirmImport'));
+
+    await screen.findByText('bottles.importWizard.successCount');
+    expect(await confirmed.body).toMatchObject({ payload: samplePreview.payload });
   });
 
   it('edits a category to create, with the types in the interface language', async () => {
@@ -289,6 +312,85 @@ describe('ImportBottlesWizard', () => {
     expect(await screen.findByRole('option', { name: 'Spirits' })).toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText('categories.type'), 'Liqueur');
     expect(screen.getByLabelText('categories.type')).toHaveValue('LIQUEUR');
+  });
+
+  it('blocks the import while a category to create has the type with an empty name', async () => {
+    mockApiResponse('get', '/api/category-types', [
+      buildCategoryType({ name: 'SPIRIT' }),
+      buildCategoryType({ name: '' }),
+      buildCategoryType({ name: '   ' }),
+    ]);
+    const confirmed = captureRequest('post', '/api/bottles/import/confirm');
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    const user = await previewWith(samplePreview);
+    const next = screen.getAllByText('bottles.importWizard.next').at(-1)!.closest('button')!;
+    const typeSelect = screen.getByLabelText('categories.type');
+    await screen.findByRole('option', { name: 'categoryTypes.emptyName' });
+
+    await user.selectOptions(typeSelect, '');
+    expect(typeSelect).toHaveAttribute('aria-invalid', 'true');
+    expect(typeSelect).toHaveAccessibleDescription('categories.typeRequired');
+    expect(next).toBeDisabled();
+    expect(screen.getByText('bottles.importWizard.categoriesWithoutType')).toBeInTheDocument();
+
+    // An existing type made only of spaces is kept as picked, as the backend does
+    await user.selectOptions(typeSelect, '   ');
+    expect(typeSelect).not.toHaveAttribute('aria-invalid');
+    expect(screen.queryByText('categories.typeRequired')).not.toBeInTheDocument();
+    expect(screen.queryByText('bottles.importWizard.categoriesWithoutType')).not.toBeInTheDocument();
+    await user.click(next);
+    await user.click(screen.getByText('bottles.importWizard.confirmImport'));
+
+    await screen.findByText('bottles.importWizard.successCount');
+    expect(await confirmed.body).toMatchObject({
+      resolutions: { categories: { rhum: { action: 'create', data: { type: '   ' } } } },
+    });
+  });
+
+  it('flags a file type made only of invisible characters as soon as the step opens', async () => {
+    // The file reader trims each cell, and trimming keeps a zero-width space
+    const invisibleType = '​';
+    mockApiResponse('get', '/api/category-types', [buildCategoryType({ name: 'SPIRIT' })]);
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    const user = await previewWith({
+      ...samplePreview,
+      categories: [{ ...samplePreview.categories[0], ref: { ...samplePreview.categories[0].ref, type: invisibleType } }],
+    });
+    const next = screen.getAllByText('bottles.importWizard.next').at(-1)!.closest('button')!;
+    const typeSelect = screen.getByLabelText('categories.type');
+    await screen.findByRole('option', { name: 'SPIRIT' });
+
+    expect(typeSelect).toHaveValue(invisibleType);
+    expect(typeSelect).toHaveAccessibleDescription('categories.typeRequired');
+    expect(screen.getByText('bottles.importWizard.categoriesWithoutType')).toBeInTheDocument();
+    expect(next).toBeDisabled();
+
+    await user.selectOptions(typeSelect, 'SPIRIT');
+    expect(screen.queryByText('bottles.importWizard.categoriesWithoutType')).not.toBeInTheDocument();
+    expect(next).toBeEnabled();
+  });
+
+  it('disables the import when the type picked disappears from the list before confirming', async () => {
+    const invisibleType = '​';
+    // An existing type is kept as picked, even one made only of invisible characters
+    mockApiResponse('get', '/api/category-types', [buildCategoryType({ name: invisibleType })]);
+    const queryClient = createTestQueryClient();
+    render(<ImportBottlesWizard onClose={() => undefined} />, { queryClient });
+    const user = await previewWith({
+      ...samplePreview,
+      categories: [{ ...samplePreview.categories[0], ref: { ...samplePreview.categories[0].ref, type: invisibleType } }],
+    });
+    await waitFor(() => expect(screen.getByLabelText('categories.type')).not.toHaveAttribute('aria-invalid'));
+    await user.click(screen.getAllByText('bottles.importWizard.next').at(-1)!);
+    const importButton = screen.getByText('bottles.importWizard.confirmImport').closest('button')!;
+    expect(importButton).toBeEnabled();
+
+    // The type is deleted elsewhere: the import would now create a blank type, which the backend refuses
+    mockApiResponse('get', '/api/category-types', [buildCategoryType({ name: 'SPIRIT' })]);
+    await queryClient.invalidateQueries({ queryKey: qk.categoryTypes });
+
+    await waitFor(() => expect(importButton).toBeDisabled());
+    expect(screen.getByText('bottles.importWizard.categoriesWithoutType')).toBeInTheDocument();
   });
 
   it('maps a category to the existing match and offers the existing categories for each row', async () => {
@@ -313,7 +415,7 @@ describe('ImportBottlesWizard', () => {
     await screen.findByText('bottles.importWizard.successCount');
     expect(await confirmed.body).toEqual({
       payload: samplePreview.payload,
-      resolutions: { categories: { rhum: { action: 'use_existing', existingId: 4 } }, bottles: { 0: { action: 'import', categoryName: 'Rhum ambré' } } },
+      resolutions: { categories: { rhum: { action: 'use_existing', existingId: 4 } }, bottles: { 0: { action: 'import', categoryId: 5 } } },
     });
     expect(screen.getByText('bottles.importWizard.duplicatesCreatedRecap')).toBeInTheDocument();
     expect(screen.getByText('bottles.importWizard.skippedRecap')).toBeInTheDocument();
@@ -375,5 +477,210 @@ describe('ImportBottlesWizard', () => {
 
     expect(await screen.findByText('Row 2, Capacity (ml): value too small')).toBeInTheDocument();
     expect(screen.queryByText('Validation error')).not.toBeInTheDocument();
+  });
+});
+
+// Data older than C-07 can hold two categories that differ only by case: the backend refuses to
+// create a third one, or to guess which one a row means (C-19)
+describe('ImportBottlesWizard - categories equal ignoring case', () => {
+  const rhum = buildCategory({ id: 1, name: 'Rhum' });
+  const upperRhum = buildCategory({ id: 2, name: 'RHUM' });
+  const fileCategory = { ...samplePreview.categories[0].ref, name: 'rhum' };
+  const ambiguousPreview: BottleImportPreviewResponse = {
+    ...samplePreview,
+    payload: { ...samplePreview.payload, categories: [fileCategory] },
+    categories: [{
+      ref: fileCategory,
+      existingMatch: null,
+      status: 'ambiguous',
+      ambiguousMatches: [{ id: 1, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 }, { id: 2, name: 'RHUM', type: 'SPIRIT', desiredStock: 1 }],
+    }],
+    bottles: [{ ...samplePreview.bottles[0], ref: { ...samplePreview.bottles[0].ref, categoryName: 'rhum' } }],
+  };
+
+  beforeEach(() => {
+    mockApiResponse('get', '/api/categories', [rhum, upperRhum]);
+  });
+
+  function nextButton() {
+    return screen.getAllByText('bottles.importWizard.next').at(-1)!.closest('button')!;
+  }
+
+  it('blocks the import until one of the matches is picked, then sends it', async () => {
+    const confirmed = captureRequest('post', '/api/bottles/import/confirm');
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    const user = await previewWith(ambiguousPreview);
+
+    expect(screen.getByText('importMatches.ambiguous')).toBeInTheDocument();
+    expect(screen.getByText('importMatches.pickOne')).toBeInTheDocument();
+    expect(screen.getByText('bottles.importWizard.categoriesToResolve')).toBeInTheDocument();
+    expect(nextButton()).toBeDisabled();
+    const matchSelect = screen.getByLabelText('importMatches.existingEntry');
+    expect(matchSelect).toHaveValue('');
+
+    // The row's `rhum` holds no category yet
+    expect(screen.getByLabelText('bottles.category')).toHaveValue('');
+
+    await user.selectOptions(matchSelect, 'RHUM');
+    expect(screen.queryByText('bottles.importWizard.categoriesToResolve')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('bottles.category')).toHaveDisplayValue('RHUM');
+    await user.click(nextButton());
+    await user.click(screen.getByText('bottles.importWizard.confirmImport'));
+
+    await screen.findByText('bottles.importWizard.successCount');
+    expect(await confirmed.body).toMatchObject({ resolutions: { categories: { rhum: { action: 'use_existing', existingId: 2 } } } });
+  });
+
+  // A row naming `Rhum` would go in `RHUM`, resolved for the file's `rhum`: the row sends the id (C-68)
+  it('puts a row in the match the file category is not resolved to, by its id', async () => {
+    const confirmed = captureRequest('post', '/api/bottles/import/confirm');
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    const user = await previewWith(ambiguousPreview);
+    await user.selectOptions(screen.getByLabelText('importMatches.existingEntry'), 'RHUM');
+
+    const rowCategory = screen.getByLabelText('bottles.category');
+    expect(within(rowCategory).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'bottles.importWizard.pickCategory',
+      'Rhum',
+      'RHUM',
+    ]);
+    await user.selectOptions(rowCategory, 'Rhum');
+    expect(rowCategory).toHaveDisplayValue('Rhum');
+    await user.click(nextButton());
+    await user.click(screen.getByText('bottles.importWizard.confirmImport'));
+
+    await screen.findByText('bottles.importWizard.successCount');
+    expect(await confirmed.body).toMatchObject({ resolutions: { bottles: { 0: { action: 'import', categoryId: 1 } } } });
+  });
+
+  it('creates it only under a name the matches do not hold', async () => {
+    const confirmed = captureRequest('post', '/api/bottles/import/confirm');
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    const user = await previewWith(ambiguousPreview);
+
+    await user.click(screen.getByText('bottles.importWizard.createNew'));
+    const name = screen.getByLabelText('categories.name');
+    expect(name).toHaveAttribute('aria-invalid', 'true');
+    expect(name).toHaveAccessibleDescription('importMatches.ambiguousName');
+    expect(screen.getByText('bottles.importWizard.categoriesToResolve')).toBeInTheDocument();
+    expect(nextButton()).toBeDisabled();
+
+    // Back to "use existing": still no match picked
+    await user.click(screen.getByText('bottles.importWizard.useExisting'));
+    expect(screen.getByLabelText('importMatches.existingEntry')).toHaveValue('');
+    expect(nextButton()).toBeDisabled();
+
+    await user.click(screen.getByText('bottles.importWizard.createNew'));
+    await user.type(screen.getByLabelText('categories.name'), ' blanc');
+    expect(screen.getByLabelText('categories.name')).not.toHaveAttribute('aria-invalid');
+    await user.click(nextButton());
+    expect(screen.getByText('bottles.importWizard.categoriesToCreate').nextSibling).toHaveTextContent('1');
+    await user.click(screen.getByText('bottles.importWizard.confirmImport'));
+
+    await screen.findByText('bottles.importWizard.successCount');
+    expect(await confirmed.body).toMatchObject({
+      resolutions: { categories: { rhum: { action: 'create', data: { name: 'rhum blanc' } } } },
+    });
+  });
+
+  it('says that a category to create that exists ignoring case is used as it is, and not created', async () => {
+    mockApiResponse('get', '/api/categories', [rhum]);
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    const user = await previewWith({
+      ...ambiguousPreview,
+      categories: [{ ref: fileCategory, existingMatch: { id: 1, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 }, status: 'matched' }],
+    });
+
+    await user.click(screen.getByText('bottles.importWizard.createNew'));
+    const name = screen.getByLabelText('categories.name');
+    expect(await screen.findByText('importMatches.usedAsItIs')).toBeInTheDocument();
+    expect(name).toHaveAccessibleDescription('importMatches.usedAsItIs');
+    expect(name).not.toHaveAttribute('aria-invalid');
+
+    await user.click(nextButton());
+    expect(screen.getByText('bottles.importWizard.categoriesToCreate').nextSibling).toHaveTextContent('0');
+  });
+
+  it('shows each row in the category the confirmation puts it in', async () => {
+    mockApiResponse('get', '/api/categories', [rhum]);
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    const user = await previewWith({
+      ...ambiguousPreview,
+      categories: [{ ref: fileCategory, existingMatch: { id: 1, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 }, status: 'matched' }],
+    });
+    const rowCategory = screen.getByLabelText('bottles.category');
+    // The row sends the file's `rhum`, which the confirmation puts in `Rhum`
+    expect(rowCategory).toHaveDisplayValue('Rhum');
+
+    // Created under the name of the file, the category is the existing one: nothing to create
+    await user.click(screen.getByText('bottles.importWizard.createNew'));
+    expect(rowCategory).toHaveDisplayValue('Rhum');
+    expect(within(rowCategory).queryByRole('option', { name: /bottles\.importWizard\.willCreate/ })).not.toBeInTheDocument();
+
+    // Renamed, it is created, and the row goes in it
+    const name = screen.getByLabelText('categories.name');
+    await user.clear(name);
+    await user.type(name, 'Rhum agricole');
+    expect(rowCategory).toHaveDisplayValue('Rhum agricole (bottles.importWizard.willCreate)');
+    expect(within(rowCategory).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'bottles.importWizard.pickCategory',
+      'Rhum',
+      'Rhum agricole (bottles.importWizard.willCreate)',
+    ]);
+  });
+
+  it('puts a row in the existing category of the name the file category is created away from', async () => {
+    mockApiResponse('get', '/api/categories', [rhum]);
+    const confirmed = captureRequest('post', '/api/bottles/import/confirm');
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    const user = await previewWith({
+      ...ambiguousPreview,
+      categories: [{ ref: fileCategory, existingMatch: { id: 1, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 }, status: 'matched' }],
+      bottles: [ambiguousPreview.bottles[0], ambiguousPreview.bottles[0]],
+    });
+    await user.click(screen.getByText('bottles.importWizard.createNew'));
+    const name = screen.getByLabelText('categories.name');
+    await user.clear(name);
+    await user.type(name, 'Rhum agricole');
+
+    const [movedRow, keptRow] = screen.getAllByLabelText('bottles.category');
+    await user.selectOptions(movedRow, 'Rhum');
+    expect(movedRow).toHaveDisplayValue('Rhum');
+    expect(keptRow).toHaveDisplayValue('Rhum agricole (bottles.importWizard.willCreate)');
+    await user.click(nextButton());
+    await user.click(screen.getByText('bottles.importWizard.confirmImport'));
+
+    await screen.findByText('bottles.importWizard.successCount');
+    expect(await confirmed.body).toMatchObject({
+      resolutions: { bottles: { 0: { action: 'import', categoryId: 1 }, 1: { action: 'import', categoryName: 'rhum' } } },
+    });
+  });
+
+  it('shows a row in the existing category its file category is created as, whose name another file category holds', async () => {
+    const gin = buildCategory({ id: 3, name: 'Gin' });
+    mockApiResponse('get', '/api/categories', [rhum, gin]);
+    const ginCategory = { ...fileCategory, name: 'gin' };
+    render(<ImportBottlesWizard onClose={() => undefined} />);
+    const user = await previewWith({
+      ...ambiguousPreview,
+      payload: { ...ambiguousPreview.payload, categories: [fileCategory, ginCategory] },
+      categories: [
+        { ref: fileCategory, existingMatch: { id: 1, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 }, status: 'matched' },
+        { ref: ginCategory, existingMatch: { id: 3, name: 'Gin', type: 'SPIRIT', desiredStock: 1 }, status: 'matched' },
+      ],
+      bottles: [{ ...ambiguousPreview.bottles[0], ref: { ...ambiguousPreview.bottles[0].ref, categoryName: 'gin' } }],
+    });
+
+    const [createRhum, createGin] = screen.getAllByText('bottles.importWizard.createNew');
+    await user.click(createRhum);
+    await user.click(createGin);
+    const [rhumName, ginName] = screen.getAllByLabelText('categories.name');
+    await user.clear(rhumName);
+    await user.type(rhumName, 'Rhum agricole');
+    await user.clear(ginName);
+    await user.type(ginName, 'Rhum');
+
+    // The confirmation finds `Rhum` for the `gin` category to create, and puts the row there
+    expect(screen.getByLabelText('bottles.category')).toHaveDisplayValue('Rhum');
   });
 });

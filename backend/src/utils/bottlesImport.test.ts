@@ -189,6 +189,141 @@ describe('parseCsvBottles', () => {
     expect(payload.errors).toEqual([{ source: 'bottles', line: 5, field: 'capacityMl', code: 'required' }]);
   });
 
+  describe('line breaks in single-line columns', () => {
+    const lineBreak = (line: number, field: string) => ({ source: 'bottles', line, field, code: 'lineBreak' });
+
+    it('keeps the values and warns on the line each record starts on', () => {
+      const payload = parseCsvBottles(csvOf(
+        'Plain,Rhum,,700,1,,,,,,,',
+        '"Gin\nOld Tom","Gin\r\nLondon","SPIRIT\nX",700,1,,,,"Shelf\r\nleft",,,',
+        'Vodka,Vodka,,700,1,,,,"Bar\rtop",,,',
+      ), 'en');
+
+      expect(payload.bottles.map((b) => [b.name, b.categoryName, b.location])).toEqual([
+        ['Plain', 'Rhum', null], ['Gin\nOld Tom', 'Gin\r\nLondon', 'Shelf\r\nleft'], ['Vodka', 'Vodka', 'Bar\rtop'],
+      ]);
+      expect(payload.categories.map((c) => c.type)).toEqual(['SPIRIT', 'SPIRIT\nX', 'SPIRIT']);
+      expect(payload.errors).toEqual([]);
+      expect(payload.warnings).toEqual([
+        lineBreak(3, 'name'), lineBreak(3, 'categoryName'), lineBreak(3, 'location'), lineBreak(3, 'categoryType'),
+        lineBreak(8, 'location'),
+      ]);
+    });
+
+    // The last case of lines swallowed by a quote (C-36): valid CSV, read as one quoted cell
+    it('warns about a quote closed lines later, which merges the lines between into one name', () => {
+      const payload = parseCsvBottles('name,capacityMl\n"Bourbon,700\nB,700\nC 3",700\nD,700', 'en');
+
+      expect(payload.bottles.map((b) => b.name)).toEqual(['Bourbon,700\nB,700\nC 3', 'D']);
+      expect(payload.warnings).toEqual([lineBreak(2, 'name')]);
+    });
+
+    it('does not warn about a line break the cell trims, nor about the columns that are not text', () => {
+      const payload = parseCsvBottles('name,capacityMl,isApero,location\n"Gin\n",700,"true\n","\r\nBar"', 'en');
+
+      expect(payload.bottles.map((b) => [b.name, b.location])).toEqual([['Gin', 'Bar']]);
+      expect(payload.warnings).toEqual([]);
+    });
+
+    it('does not warn about a row left out of the import', () => {
+      const payload = parseCsvBottles('name,capacityMl\n"Gin\nOld Tom",\nRum,700', 'en');
+
+      expect(payload.errors).toEqual([{ source: 'bottles', line: 2, field: 'capacityMl', code: 'required' }]);
+      expect(payload.warnings).toEqual([]);
+    });
+  });
+
+  describe('quotes a hand-written file misplaces', () => {
+    const malformed = (line: number, field: string) => ({ source: 'bottles', line, field, code: 'malformedQuotes' });
+
+    it.each([
+      [',', '\n', ''],
+      [';', '\r\n', BOM],
+    ])('reads a quote inside a cell as text, with "%s" and the next lines too', (separator, newline, bom) => {
+      const csv = bom + [
+        ['name', 'capacityMl', 'location'],
+        ['Bourbon 12" edition', '700', 'Cellar'],
+        ['Gin', '700', 'Bar'],
+        ['Rum', '70cl', 'Bar'],
+        ['Vodka', '500', 'Shelf 3"'],
+        ['Tequila', '700', ''],
+      ].map((cells) => cells.join(separator)).join(newline);
+
+      const payload = parseCsvBottles(csv, 'en');
+
+      expect(payload.bottles.map((b) => [b.name, b.location])).toEqual([
+        ['Bourbon 12" edition', 'Cellar'], ['Gin', 'Bar'], ['Vodka', 'Shelf 3"'], ['Tequila', null],
+      ]);
+      expect(payload.errors).toEqual([{ source: 'bottles', line: 4, field: 'capacityMl', code: 'invalidNumber' }]);
+    });
+
+    it('reads every line between two quotes inside cells', () => {
+      const payload = parseCsvBottles('name,capacityMl\nA 1" x,700\nB,700\nC,700\nD 2" y,700\nE,700', 'en');
+      expect(payload.bottles.map((b) => b.name)).toEqual(['A 1" x', 'B', 'C', 'D 2" y', 'E']);
+    });
+
+    it.each([
+      ['at the start of a line', '"Bourbon,700,Bar', 'name'],
+      ['at the end of a line', 'Bourbon,700,"', 'location'],
+    ])('reports a quote %s never closed, and reads the lines after it', (_label, row, field) => {
+      const payload = parseCsvBottles(`name,capacityMl,location\n${row}\nBad,,\nRum,700,Bar`, 'en');
+
+      expect(payload.bottles.map((b) => b.name)).toEqual(['Rum']);
+      expect(payload.errors).toEqual([
+        malformed(2, field),
+        { source: 'bottles', line: 3, field: 'capacityMl', code: 'required' },
+      ]);
+    });
+
+    it('reports text after a closing quote, and reads the lines it would swallow', () => {
+      const payload = parseCsvBottles('name,capacityMl\n"Special" Reserve,700\n"Bourbon,700\nGin,700\nRum 3" x,700', 'en');
+
+      expect(payload.bottles.map((b) => b.name)).toEqual(['Gin', 'Rum 3" x']);
+      expect(payload.errors).toEqual([malformed(2, 'name'), malformed(3, 'name')]);
+    });
+
+    it('accepts spaces between a closing quote and the separator', () => {
+      const payload = parseCsvBottles('name,capacityMl\n"Gin" \t,"700"  \n"Rum",700', 'en');
+      expect(payload.bottles.map((b) => [b.name, b.capacityMl])).toEqual([['Gin', 700], ['Rum', 700]]);
+    });
+
+    it('locates a malformed cell past the last named column by its number', () => {
+      const payload = parseCsvBottles('name,capacityMl,\nGin,700,"note\nRum,700,,"x\nVodka,700', 'en');
+
+      expect(payload.bottles.map((b) => b.name)).toEqual(['Vodka']);
+      expect(payload.errors).toEqual([
+        { ...malformed(2, ''), column: 3 },
+        { ...malformed(3, ''), column: 4 },
+      ]);
+    });
+
+    it('lists the errors in the order of the file lines', () => {
+      const payload = parseCsvBottles('name,capacityMl\nBad,\n"Gin" x,700', 'en');
+      expect(payload.errors.map((e) => e.line)).toEqual([2, 3]);
+    });
+
+    it('finds the semicolons of a header after a quote inside a column name', () => {
+      const payload = parseCsvBottles('owner"s note;name;capacityMl\nmine;Gin;700', 'en');
+      expect(payload.bottles.map((b) => b.name)).toEqual(['Gin']);
+    });
+
+    it('counts no separator inside a quoted column name, escaped quotes included', () => {
+      const payload = parseCsvBottles('"note ""a, b, c, d""";name;"capacityMl"\nmine;Gin;700', 'en');
+      expect(payload.bottles.map((b) => b.name)).toEqual(['Gin']);
+    });
+
+    it('finds the separator on the first line that is not blank', () => {
+      const payload = parseCsvBottles('\n \r\nname;capacityMl\nGin;700', 'en');
+      expect(payload.bottles.map((b) => [b.name, b.capacityMl])).toEqual([['Gin', 700]]);
+    });
+
+    it('refuses a file whose header has a misplaced quote', () => {
+      expect(parseError(() => parseCsvBottles('\n"name,capacityMl\nGin,700', 'en'))).toMatchObject({
+        code: 'malformedHeader', params: { file: 'bottles.csv' },
+      });
+    });
+  });
+
   it('refuses a file without a capacityMl column', () => {
     expect(parseError(() => parseCsvBottles('name\nHavana', 'en'))).toMatchObject({
       code: 'missingColumn', params: { column: 'capacityMl' },
@@ -196,7 +331,7 @@ describe('parseCsvBottles', () => {
   });
 
   it('reads an empty file as an empty import', () => {
-    expect(parseCsvBottles(BOM, 'en')).toEqual({ version: 1, categories: [], bottles: [], errors: [] });
+    expect(parseCsvBottles(BOM, 'en')).toEqual({ version: 1, categories: [], bottles: [], errors: [], warnings: [] });
   });
 
   it(`accepts ${MAX_IMPORT_ROWS} rows and refuses one more`, () => {
@@ -294,6 +429,24 @@ describe('parseJsonBottles', () => {
     ]);
   });
 
+  it('adds the categories the rows name that the list leaves out, with the defaults, as a CSV does', () => {
+    const payload = parseJsonBottles({
+      version: 1,
+      categories: [{ name: 'Rhum', type: 'SPIRIT', desiredStock: 3 }],
+      bottles: [
+        jsonBottle({ categoryName: 'RHUM' }),
+        jsonBottle({ categoryName: 'Gin' }),
+        jsonBottle({ categoryName: 'gin' }),
+        jsonBottle({ categoryName: '' }),
+      ],
+    }, 'en');
+
+    expect(payload.categories).toEqual([
+      { name: 'Rhum', type: 'SPIRIT', desiredStock: 3, minimumPercent: 30, nameTranslations: null },
+      { name: 'Gin', type: 'SPIRIT', desiredStock: 1, minimumPercent: 30, nameTranslations: null },
+    ]);
+  });
+
   it('keeps a valid opening date as written', () => {
     const payload = parseJsonBottles({ version: 1, bottles: [jsonBottle({ openedAt: '2026-10-11' })] }, 'en');
     expect(payload.bottles[0].openedAt).toBe('2026-10-11');
@@ -341,6 +494,36 @@ describe('parseJsonBottles', () => {
     expect(payload.errors).toEqual([
       { source: 'categories', line: 2, field: 'desiredStock', code: 'outOfRange' },
       { source: 'bottles', line: 2, field: 'capacityMl', code: 'outOfRange' },
+    ]);
+  });
+
+  it('warns about the line breaks of the single-line fields of both lists, and keeps the values', () => {
+    const payload = parseJsonBottles({
+      version: 1,
+      categories: [
+        { name: 'Rhum' },
+        { name: 'Rhum\nagricole', type: 'SPIRIT\r\nX', nameTranslations: { fr: 'Rhum', en: 'Agricole\nrum' } },
+        { name: '', type: 'Ignored\nrow' },
+        { name: 'Bad\nrow', desiredStock: -1 },
+      ],
+      bottles: [
+        jsonBottle(),
+        jsonBottle({ name: 'Havana\n7', categoryName: 'Rhum\nagricole', location: 'Shelf\r\nleft', categoryType: 'A\nB' }),
+        jsonBottle({ name: 'Left\nout', capacityMl: 0 }),
+      ],
+    }, 'en');
+
+    expect(payload.bottles.map((b) => b.name)).toEqual(['Havana', 'Havana\n7']);
+    expect(payload.categories.map((c) => c.name)).toEqual(['Rhum', 'Rhum\nagricole']);
+    expect(payload.categories[1].nameTranslations).toEqual({ fr: 'Rhum', en: 'Agricole\nrum' });
+    expect(payload.warnings).toEqual([
+      { source: 'categories', line: 2, field: 'name', code: 'lineBreak' },
+      { source: 'categories', line: 2, field: 'type', code: 'lineBreak' },
+      { source: 'categories', line: 2, field: 'nameTranslations', code: 'lineBreak' },
+      { source: 'bottles', line: 2, field: 'name', code: 'lineBreak' },
+      { source: 'bottles', line: 2, field: 'categoryName', code: 'lineBreak' },
+      { source: 'bottles', line: 2, field: 'location', code: 'lineBreak' },
+      { source: 'bottles', line: 2, field: 'categoryType', code: 'lineBreak' },
     ]);
   });
 
@@ -421,6 +604,47 @@ describe('parseZipBottles', () => {
       { name: 'Rhum', type: 'SPIRIT', desiredStock: 3, minimumPercent: 25, nameTranslations: { fr: 'Rhum' } },
     ]);
     expect(payload.errors).toEqual([{ source: 'categories', line: 3, field: 'desiredStock', code: 'outOfRange' }]);
+  });
+
+  it('refuses an archive whose categories.csv header has a misplaced quote, naming that file', () => {
+    const zip = zipOf({ 'bottles.csv': 'name,capacityMl\nGin,700', 'categories.csv': 'name,"type\nRhum,SPIRIT' });
+    expect(parseError(() => parseZipBottles(zip, 'en'))).toMatchObject({
+      code: 'malformedHeader', params: { file: 'categories.csv' },
+    });
+  });
+
+  it('reports the misplaced quotes of categories.csv after the rows of bottles.csv, each in line order', () => {
+    const zip = zipOf({
+      'bottles.csv': 'name,capacityMl\nBad,\n"Gin" x,700\nRum,700',
+      'categories.csv': 'name,desiredStock\nGin,-1\n"Rhum,2\nSirop 1" pur,1',
+    });
+
+    const payload = parseZipBottles(zip, 'en');
+
+    expect(payload.bottles.map((b) => b.name)).toEqual(['Rum']);
+    expect(payload.categories.map((c) => c.name)).toEqual(['Sirop 1" pur']);
+    expect(payload.errors).toEqual([
+      { source: 'bottles', line: 2, field: 'capacityMl', code: 'required' },
+      { source: 'bottles', line: 3, field: 'name', code: 'malformedQuotes' },
+      { source: 'categories', line: 2, field: 'desiredStock', code: 'outOfRange' },
+      { source: 'categories', line: 3, field: 'name', code: 'malformedQuotes' },
+    ]);
+  });
+
+  it('warns about the line breaks of categories.csv after those of bottles.csv', () => {
+    const zip = zipOf({
+      'bottles.csv': 'name,capacityMl,categoryName\n"Gin\nOld Tom",700,Gin',
+      'categories.csv': 'name,type,nameTranslations\nGin,SPIRIT,\n"Rhum\nagricole",SPIRIT,"{""en"":""Agricole\\nrum""}"',
+    });
+
+    const payload = parseZipBottles(zip, 'en');
+
+    expect(payload.categories.map((c) => c.name)).toEqual(['Gin', 'Rhum\nagricole']);
+    expect(payload.warnings).toEqual([
+      { source: 'bottles', line: 2, field: 'name', code: 'lineBreak' },
+      { source: 'categories', line: 3, field: 'name', code: 'lineBreak' },
+      { source: 'categories', line: 3, field: 'nameTranslations', code: 'lineBreak' },
+    ]);
   });
 
   it('reads bottles.csv and categories.csv saved in Windows-1252', () => {

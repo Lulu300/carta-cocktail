@@ -23,6 +23,43 @@ function isValidationIssue(value: unknown): value is ValidationIssue {
   return typeof issue?.path === 'string' && typeof issue.code === 'string';
 }
 
+/**
+ * A recipe line the import cannot write, from the `details` of an `importUnresolved` 400: `line`
+ * is its index in the recipe (0 for the first), `kind` what is missing (`unit`, `category`,
+ * `bottle`, `ingredient`), `name` the unit abbreviation or the source name of the file, null
+ * for a line without unit.
+ */
+export interface UnresolvedReference {
+  line: number;
+  kind: string;
+  name: string | null;
+}
+
+/**
+ * A recipe line naming a row that no longer exists, from the `details` of an `unknownReference`
+ * 400: `line` is its index in the request, `field` the key naming it (`unitId`, `bottleId`…).
+ */
+export interface UnknownReference {
+  line: number;
+  field: string;
+  id: number;
+}
+
+function isLineIndex(value: unknown): value is number {
+  return Number.isInteger(value) && (value as number) >= 0;
+}
+
+function isUnresolvedReference(value: unknown): value is UnresolvedReference {
+  const reference = value as Partial<UnresolvedReference> | null;
+  return isLineIndex(reference?.line) && typeof reference.kind === 'string'
+    && (typeof reference.name === 'string' || reference.name === null);
+}
+
+function isUnknownReference(value: unknown): value is UnknownReference {
+  const reference = value as Partial<UnknownReference> | null;
+  return isLineIndex(reference?.line) && typeof reference.field === 'string' && typeof reference.id === 'number';
+}
+
 /** HTTP error that keeps the server message and status code. */
 export class ApiError extends Error {
   readonly status: number;
@@ -40,14 +77,28 @@ export class ApiError extends Error {
 
   /**
    * The issues of a 400 refused by the backend's validation, empty for any other error.
-   * Other 400s send `details` of another shape (an import's unresolved references): their
+   * Other 400s send `details` of another shape (unresolved or unknown references): their
    * entries are left out, `body` keeps them as sent.
    */
   validationIssues(): ValidationIssue[] {
+    return this.badRequestDetails().filter(isValidationIssue).map(({ path, code }) => ({ path, code }));
+  }
+
+  /** The lines of an import confirmation refused with `importUnresolved`, empty for any other error. */
+  unresolvedReferences(): UnresolvedReference[] {
+    return this.badRequestDetails().filter(isUnresolvedReference).map(({ line, kind, name }) => ({ line, kind, name }));
+  }
+
+  /** The lines of a recipe refused with `unknownReference`, empty for any other error. */
+  unknownReferences(): UnknownReference[] {
+    return this.badRequestDetails().filter(isUnknownReference).map(({ line, field, id }) => ({ line, field, id }));
+  }
+
+  // Each 400 sends its own shape of details: the callers keep the entries of the shape they read.
+  private badRequestDetails(): unknown[] {
     if (this.status !== 400) return [];
     const details = (this.body as { details?: unknown } | undefined)?.details;
-    if (!Array.isArray(details)) return [];
-    return details.filter(isValidationIssue).map(({ path, code }) => ({ path, code }));
+    return Array.isArray(details) ? details : [];
   }
 }
 
@@ -361,6 +412,18 @@ export const menuBottles = {
     }),
   delete: (id: number) =>
     request<{ message: string }>(`/menu-bottles/${id}`, { method: 'DELETE' }),
+  /** Adds these bottles at the end of a personal menu, in this order, all of them or none. */
+  addBottles: (menuId: number, bottleIds: number[]) =>
+    request<{ message: string }>(`/menu-bottles/menu/${menuId}/entries`, {
+      method: 'POST',
+      body: JSON.stringify({ bottleIds }),
+    }),
+  /** Removes these entries (`MenuBottle.id`) of the menu, all of them or none; a system menu keeps them as exclusions. */
+  removeEntries: (menuId: number, ids: number[]) =>
+    request<{ message: string }>(`/menu-bottles/menu/${menuId}/entries/remove`, {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    }),
   sync: (menuId: number) =>
     request<{ message: string; added: number; removed: number }>(`/menu-bottles/menu/${menuId}/sync`, { method: 'POST' }),
   /** `ids` lists every entry (`MenuBottle.id`) of the menu, in the new order: one transaction. */

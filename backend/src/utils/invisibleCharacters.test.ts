@@ -1,0 +1,176 @@
+import { describe, it, expect } from 'vitest';
+import { caseInsensitiveKey, composeName, replaceInvisibleCharacters, tidyName } from './invisibleCharacters';
+
+// Same cases as frontend/src/utils/invisibleCharacters.test.ts: both packages apply one rule.
+function removeInvisible(text: string): string {
+  return replaceInvisibleCharacters(text, () => '');
+}
+
+describe('replaceInvisibleCharacters', () => {
+  it.each([
+    ['zero-width space', '\u200B'],
+    ['word joiner', '\u2060'],
+    ['soft hyphen', '\u00AD'],
+    ['byte order mark', '\uFEFF'],
+    ['invisible plus', '\u2064'],
+    ['left-to-right mark', '\u200E'],
+    ['right-to-left mark', '\u200F'],
+    ['Arabic letter mark', '\u061C'],
+    ['left-to-right embedding', '\u202A'],
+    ['right-to-left override', '\u202E'],
+    ['left-to-right isolate', '\u2066'],
+    ['pop directional isolate', '\u2069'],
+    ['combining grapheme joiner', '\u034F'],
+    ['Mongolian vowel separator between Latin letters', '\u180E'],
+    ['zero-width non-joiner between Latin letters', '\u200C'],
+    ['zero-width joiner between Latin letters', '\u200D'],
+    ['variation selector after a Latin letter', '\uFE0F'],
+    ['ideographic variation selector after a Latin letter', '\u{E0100}'],
+    ['tag after a Latin letter', '\u{E0067}\u{E0062}'],
+    ['language tag', '\u{E0001}'],
+  ])('should find the %s invisible', (_name, invisible) => {
+    expect(removeInvisible(`X${invisible}Y`)).toBe('XY');
+  });
+
+  // These scripts neither join their letters nor form conjuncts: a joiner changes nothing
+  it.each([
+    ['CJK ideographs', '梅', '酒'],
+    ['kana', 'さけ', 'さけ'],
+    ['Hangul', '술', '술'],
+    ['Hebrew', 'יין', 'יין'],
+    ['Thai', 'เหล\u0E49า', 'เหล\u0E49า'],
+    ['Armenian', 'գինի', 'գինի'],
+  ])('should find a joiner or non-joiner between %s invisible', (_name, before, after) => {
+    expect(removeInvisible(`${before}\u200D${after}`)).toBe(`${before}${after}`);
+    expect(removeInvisible(`${before}\u200C${after}`)).toBe(`${before}${after}`);
+  });
+
+  it.each([
+    ['after a Hebrew letter', 'י\uFE0E', 'י'],
+    ['after a CJK ideograph', '梅\uFE0F', '梅'],
+    ['after a digit that is not a keycap', 'RUM1\uFE0F', 'RUM1'],
+    ['an ideographic selector after a Hebrew letter', 'י\u{E0100}', 'י'],
+  ])('should find a variation selector %s invisible', (_name, text, expected) => {
+    expect(removeInvisible(text)).toBe(expected);
+  });
+
+  it.each([
+    ['accented Latin letters', 'CRÈME DE CASSIS'],
+    ['Greek and Cyrillic letters', 'ΟΥΖΟ ДЖИН'],
+    ['CJK ideographs', '梅酒'],
+    ['Persian with its zero-width non-joiner', 'می\u200Cخواهم'],
+    ['a Devanagari conjunct with its zero-width joiner', 'क\u094D\u200Dष'],
+    ['a Devanagari half form at the end of a word', 'क\u094D\u200D'],
+    ['a Malayalam chillu written with a zero-width joiner', 'ന\u0D4D\u200D'],
+    ['a forced Arabic joining form', 'ه\u200D'],
+    ['an emoji ZWJ sequence', '👩\u200D💻'],
+    ['an emoji ZWJ sequence with a variation selector', '🏳\uFE0F\u200D🌈'],
+    ['an emoji ZWJ sequence with a skin tone', '👩\u{1F3FD}\u200D💻'],
+    ['an emoji variation selector', '❤\uFE0F'],
+    ['a text variation selector', '❤\uFE0E'],
+    ['a digit keycap', '1\uFE0F\u20E3'],
+    ['a hash keycap', '#\uFE0F\u20E3'],
+    ['a subdivision flag', '🏴\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}'],
+    ['an ideographic variation sequence', '葛\u{E0100}'],
+    ['a Mongolian free variation selector', 'ᠠ\u180B'],
+    ['a visible format character', '\u0600١٢'],
+    ['spaces', ' X  Y\t'],
+    ['characters drawn as a blank', 'X\u2800Y\u3164\uFFA0'],
+  ])('should keep %s', (_name, text) => {
+    expect(removeInvisible(text)).toBe(text);
+  });
+
+  it.each([
+    ['a joiner at the end of an emoji', '🍹\u200D', '🍹'],
+    ['a joiner between an emoji and a Latin letter', '🍹\u200DX', '🍹X'],
+    ['a Persian non-joiner at the end of a word', 'می\u200C', 'می'],
+    ['a non-joiner before an invisible character', 'ی\u200C\u200B', 'ی'],
+    ['a second variation selector', '❤\uFE0F\uFE0F', '❤\uFE0F'],
+    ['the first of two joiners', '👩\u200D\u200D💻', '👩\u200D💻'],
+  ])('should judge each character by its neighbours: %s', (_name, text, expected) => {
+    expect(removeInvisible(text)).toBe(expected);
+  });
+
+  it('should replace each invisible character with the replacement of that character', () => {
+    const codePoint = (char: string) => `<${char.codePointAt(0)?.toString(16)}>`;
+    expect(replaceInvisibleCharacters('\u200BX\u00ADY\u{E0001}', codePoint)).toBe('<200b>X<ad>Y<e0001>');
+  });
+});
+
+describe('composeName', () => {
+  it.each([
+    ['a decomposed accent', 'CRE\u0300ME', 'CR\u00C8ME'],
+    ['decomposed Hangul, as macOS file names store it', '\u1109\u116E\u11AF', '\uC220'],
+    ['accents in another order', 'A\u0316\u0301', '\u00C1\u0316'],
+    ['the angstrom sign', '\u212B', '\u00C5'],
+  ])('should compose %s', (_name, text, expected) => {
+    expect(composeName(text)).toBe(expected);
+  });
+
+  // NFKC would change them, though they are drawn differently
+  it.each([
+    ['a ligature', '\uFB01NO'],
+    ['a subscript', 'CO\u2082'],
+    ['full-width letters', '\uFF36\uFF2F\uFF24\uFF2B\uFF21'],
+    ['half-width kana', '\uFF76\uFF9E'],
+    ['Hangul compatibility jamo', '\u3131\u314F'],
+    ['the numero sign', '\u2116 5'],
+    ['a Hangul filler', 'X\u3164Y'],
+    ['an already composed name', 'CR\u00C8ME'],
+  ])('should keep %s', (_name, text) => {
+    expect(composeName(text)).toBe(text);
+  });
+});
+
+describe('caseInsensitiveKey', () => {
+  it.each([
+    ['a name in each case and form', ['Cr\u00E8me', 'Cre\u0300me', 'CR\u00C8ME', 'CRE\u0300ME', 'cre\u0300me'], 'cr\u00E8me'],
+    // Upper case decomposes it: '\u0399\u0308\u0301', whose composed form '\u03AA\u0301' is lower-cased to '\u03CA\u0301'
+    ['a Greek letter that upper case decomposes', ['\u0390', '\u03B9\u0308\u0301', '\u0399\u0308\u0301', '\u03AA\u0301'], '\u0390'],
+    // Its lower case is 'i' and a combining dot, which has no composed form
+    ['a Turkish capital I with a dot', ['\u0130', 'I\u0307', 'i\u0307'], 'i\u0307'],
+  ])('should give %s one composed key', (_name, names, expected) => {
+    names.forEach((name) => expect(caseInsensitiveKey(name)).toBe(expected));
+  });
+
+  it('should keep apart names that differ otherwise than by case and form', () => {
+    expect(caseInsensitiveKey('\u0130')).not.toBe(caseInsensitiveKey('I'));
+    expect(caseInsensitiveKey('\uFB01NO')).not.toBe(caseInsensitiveKey('FINO'));
+    expect(caseInsensitiveKey('Creme')).not.toBe(caseInsensitiveKey('Cr\u00E8me'));
+  });
+});
+
+const TIDY_CASES: [string, string][] = [
+  ['JUICE', 'JUICE'],
+  [' FRUIT \t\n JUICE ', 'FRUIT JUICE'],
+  ['\u200B X \u200B Y \u200E', 'X Y'],
+  ['X\uFEFFY', 'XY'],
+  ['X\u2800Y', 'X Y'],
+  ['\u2800SPIRIT\u3164', 'SPIRIT'],
+  ['X \u2800\uFFA0 Y', 'X Y'],
+  ['\u2800\u200B \u3164', ''],
+  ['梅\u200D酒', '梅酒'],
+  ['می\u200Cخواهم', 'می\u200Cخواهم'],
+  ['CRE\u0300ME', 'CR\u00C8ME'],
+  [' CRE\u0300ME  DE\u200B CASSIS ', 'CR\u00C8ME DE CASSIS'],
+  // The accent is composed with its letter once the invisible character between them is gone
+  ['CRE\u200B\u0300ME', 'CR\u00C8ME'],
+  ['\uFB01NO', '\uFB01NO'],
+  // Composing changes the character before a joiner: the joiner rule is applied again after it
+  ['E\u0308\u200DX', '\u00CBX'],
+  ['e\u0308\u200C\u0915', '\u00EB\u0915'],
+  ['E\u200B\u0308\u200D', '\u00CB'],
+];
+
+describe('tidyName', () => {
+  it.each(TIDY_CASES)('should tidy %j as %j', (name, expected) => {
+    expect(tidyName(name)).toBe(expected);
+  });
+
+  // A tidy name is stored as it is and never marked: tidying it again changes nothing
+  it.each(TIDY_CASES)('should leave nothing to tidy in the tidy form of %j', (name) => {
+    const tidy = tidyName(name);
+    expect(tidyName(tidy)).toBe(tidy);
+    expect(removeInvisible(tidy)).toBe(tidy);
+  });
+});

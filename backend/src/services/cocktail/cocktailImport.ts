@@ -3,9 +3,13 @@ import { Prisma } from '../../generated/prisma/client';
 import { prisma } from '../../lib/prisma';
 import { BadRequestError } from '../../errors';
 import { ImportRecipeV1, ImportResolutions } from '../../validation/cocktailImport';
+import { importedCategoryTypePath } from '../../validation/categories';
 import { SOURCE_KEYS, SourceType } from '../../validation/cocktails';
-import { ensureCategoryType } from '../categoryTypeService';
+import { categoryTypeNameFor, createMissingCategoryType } from '../categoryTypeService';
 import { parseNameTranslations, serializeTranslations } from '../../utils/translations';
+import { CaseInsensitiveIndex, CaseInsensitiveMatch, previewMatch } from '../../utils/uniqueness';
+import { nameToStore, translationsToStore } from '../../utils/storedNames';
+import { composeName } from '../../utils/invisibleCharacters';
 import { createCocktailIn, IngredientLineValue } from './cocktailService';
 import { collectImportReferences, ImportReferences, ImportedLine, lowercase } from './importReferences';
 
@@ -55,27 +59,48 @@ async function cocktailNameExists(name: string): Promise<boolean> {
   return cocktails.some((cocktail) => lowercase(cocktail.name) === lowercase(name));
 }
 
-/** Pairs each reference with the row whose compared field (`keyOf`) matches it, ignoring case. */
+// `name` is the compared field: the abbreviation for a unit
+function existingRow<Row extends { id: number }>(row: Row, keyOf: (row: Row) => string) {
+  return parseNameTranslations({ ...row, id: row.id, name: keyOf(row) });
+}
+
+/** Finds the existing row for a name or an abbreviation. */
+interface RowMatcher<Row> {
+  match(value: string): CaseInsensitiveMatch<Row>;
+}
+
+/** Pairs each reference with the existing row `rows` finds for its name (`refValue`). */
 function matchReferences<Ref, Row extends { id: number }>(
   refs: Map<string, Ref>,
-  rows: Row[],
+  refValue: (ref: Ref) => string,
+  rows: RowMatcher<Row>,
   keyOf: (row: Row) => string,
 ) {
-  return Array.from(refs.entries()).map(([key, ref]) => {
-    const match = rows.find((row) => lowercase(keyOf(row)) === key);
-    return {
-      ref,
-      // `name` is the compared field: the abbreviation for a unit
-      existingMatch: match ? parseNameTranslations({ ...match, id: match.id, name: keyOf(match) }) : null,
-      status: match ? ('matched' as const) : ('missing' as const),
-    };
-  });
+  return Array.from(refs.values()).map((ref) => ({
+    ref,
+    ...previewMatch(rows.match(refValue(ref)), (row) => existingRow(row, keyOf)),
+  }));
+}
+
+/**
+ * Bottle names repeat, and ingredient names may differ only by case: unlike categories and units,
+ * nothing makes them unique ignoring case. The exact row is proposed first, else the first row
+ * equal ignoring case, never an ambiguity (`matchFirst`).
+ */
+function exactOrFirst<Row>(rows: Row[], keyOf: (row: Row) => string): RowMatcher<Row> {
+  const index = new CaseInsensitiveIndex(rows, keyOf);
+  return { match: (value) => index.matchFirst(value) };
 }
 
 const byName = (row: { name: string }) => row.name;
+const byAbbreviation = (row: { abbreviation: string }) => row.abbreviation;
 
 export async function previewImport(recipe: ImportedRecipe) {
   const refs = collectImportReferences(recipe);
+  const units = new CaseInsensitiveIndex(await prisma.unit.findMany(), byAbbreviation);
+  const categories = new CaseInsensitiveIndex(await prisma.category.findMany(), byName);
+  const bottles = exactOrFirst(await prisma.bottle.findMany({ include: { category: true } }), byName);
+  const ingredients = exactOrFirst(await prisma.ingredient.findMany(), byName);
   return {
     cocktail: {
       name: recipe.name,
@@ -83,10 +108,10 @@ export async function previewImport(recipe: ImportedRecipe) {
       tags: recipe.tags || [],
       alreadyExists: await cocktailNameExists(recipe.name),
     },
-    units: matchReferences(refs.units, await prisma.unit.findMany(), (unit) => unit.abbreviation),
-    categories: matchReferences(refs.categories, await prisma.category.findMany(), byName),
-    bottles: matchReferences(refs.bottles, await prisma.bottle.findMany({ include: { category: true } }), byName),
-    ingredients: matchReferences(refs.ingredients, await prisma.ingredient.findMany(), byName),
+    units: matchReferences(refs.units, (ref) => ref.abbreviation, units, byAbbreviation),
+    categories: matchReferences(refs.categories, byName, categories, byName),
+    bottles: matchReferences(refs.bottles, byName, bottles, byName),
+    ingredients: matchReferences(refs.ingredients, byName, ingredients, byName),
   };
 }
 
@@ -138,34 +163,67 @@ function firstLineUsingBottle(recipe: ImportedRecipe, key: string): number {
   });
 }
 
-// A name the admin cleared in the wizard falls back on the one in the file
+interface IngredientRow {
+  id: number;
+  name: string;
+}
+
+/**
+ * Ingredients by the name a new one would be stored under (composed, `nameToStore`): the unique
+ * index refuses a second ingredient of that name, so an ingredient to create that one already holds,
+ * existing or created earlier by this import, is used as it is, as a category or a unit that exists
+ * ignoring case is. The row stored exactly under that name comes first; else a row whose name is
+ * only its decomposed form, which looks the same. Unlike categories and units, the case counts:
+ * ingredient names may differ only by case (C-19).
+ */
+function ingredientsByStoredName(rows: IngredientRow[]) {
+  const byName = new Map<string, IngredientRow>();
+  const add = (row: IngredientRow) => {
+    const name = composeName(row.name);
+    if (!byName.has(name) || row.name === name) byName.set(name, row);
+  };
+  rows.forEach(add);
+  return { add, get: (name: string) => byName.get(name) };
+}
+
+// A name the admin cleared in the wizard falls back on the one in the file. A unit or category
+// to create that already exists ignoring case is used as it is (`findOrCreate`). The names of a
+// created unit, category or ingredient are stored composed, like the routes store them
 async function resolveAll(db: Db, recipe: ImportedRecipe, refs: ImportReferences, resolutions: Resolutions | undefined) {
+  const units = new CaseInsensitiveIndex(await db.unit.findMany(), byAbbreviation);
   const unit = await resolveEntities(refs.units, resolutions?.units, async (data, ref, key) => {
     const abbreviation = data.abbreviation || ref.abbreviation || key;
-    const created = await db.unit.create({
+    const row = await units.findOrCreate(abbreviation, 'errors.ambiguousUnitAbbreviation', () => db.unit.create({
       data: {
         // A hand-made file may give no unit name: the abbreviation names it then
-        name: data.name || ref.name || abbreviation,
-        abbreviation,
+        name: nameToStore(data.name || ref.name || abbreviation),
+        abbreviation: nameToStore(abbreviation),
         conversionFactorToMl: data.conversionFactorToMl ?? null,
-        nameTranslations: serializeTranslations(data.nameTranslations),
+        nameTranslations: serializeTranslations(translationsToStore(data.nameTranslations)),
       },
-    });
-    return created.id;
+    }));
+    return row.id;
   });
 
+  const categories = new CaseInsensitiveIndex(await db.category.findMany(), byName);
   const category = await resolveEntities(refs.categories, resolutions?.categories, async (data, ref, key) => {
-    const created = await db.category.create({
-      data: {
-        name: data.name || ref.name || key,
-        // The schema defaults the type to SPIRIT
-        type: await ensureCategoryType(db, data.type),
-        desiredStock: data.desiredStock,
-        minimumPercent: data.minimumPercent,
-        nameTranslations: serializeTranslations(data.nameTranslations),
-      },
+    const name = data.name || ref.name || key;
+    // The schema defaults the type to SPIRIT. The wizard keys resolutions by lowercased name, like `key`.
+    // Checked before the lookup, so the request is refused or not whatever the database holds
+    const typeName = await categoryTypeNameFor(db, data.type, importedCategoryTypePath(key));
+    const row = await categories.findOrCreate(name, 'errors.ambiguousCategoryName', async () => {
+      await createMissingCategoryType(db, typeName);
+      return db.category.create({
+        data: {
+          name: nameToStore(name),
+          type: typeName,
+          desiredStock: data.desiredStock,
+          minimumPercent: data.minimumPercent,
+          nameTranslations: serializeTranslations(translationsToStore(data.nameTranslations)),
+        },
+      });
     });
-    return created.id;
+    return row.id;
   });
 
   const bottle = await resolveEntities(refs.bottles, resolutions?.bottles, async (data, ref, key) => {
@@ -180,14 +238,19 @@ async function resolveAll(db: Db, recipe: ImportedRecipe, refs: ImportReferences
     return created.id;
   });
 
+  const ingredients = ingredientsByStoredName(await db.ingredient.findMany());
   const ingredient = await resolveEntities(refs.ingredients, resolutions?.ingredients, async (data, ref, key) => {
+    const name = nameToStore(data.name || ref.name || key);
+    const existing = ingredients.get(name);
+    if (existing) return existing.id;
     const created = await db.ingredient.create({
       data: {
-        name: data.name || ref.name || key,
+        name,
         icon: data.icon ?? null,
-        nameTranslations: serializeTranslations(data.nameTranslations),
+        nameTranslations: serializeTranslations(translationsToStore(data.nameTranslations)),
       },
     });
+    ingredients.add(created);
     return created.id;
   });
 

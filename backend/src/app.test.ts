@@ -1,11 +1,15 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import type { Express } from 'express';
+import fs from 'fs';
+import path from 'path';
 import supertest from 'supertest';
 import app from './app';
+import { config } from './config';
 import {
   setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
   request, authHeader, seedUnit, seedCategory, seedBottle, seedIngredient, seedCocktailUsing, prisma,
 } from './test/helpers';
+import { MAX_IMAGE_BYTES } from './services/cocktail/cocktailImage';
 
 beforeAll(async () => { await setupTestDatabase(); });
 afterAll(async () => { await teardownTestDatabase(); });
@@ -107,12 +111,12 @@ describe('Request body errors', () => {
     expectJsonError(res);
   });
 
-  it('answers 413 JSON for a cocktail image over 5 MB', async () => {
+  it('answers 413 JSON for a cocktail image over its limit', async () => {
     const cocktail = await prisma.cocktail.create({ data: { name: 'Big Picture' } });
-    const sixMegabytes = Buffer.alloc(6 * 1024 * 1024);
+    const tooLarge = Buffer.alloc(MAX_IMAGE_BYTES + 1);
 
     const res = await request.post(`/api/cocktails/${cocktail.id}/image`).set(authHeader())
-      .attach('image', sixMegabytes, { filename: 'big.jpg', contentType: 'image/jpeg' });
+      .attach('image', tooLarge, { filename: 'big.jpg', contentType: 'image/jpeg' });
 
     expect(res.status).toBe(413);
     expectJsonError(res);
@@ -162,6 +166,47 @@ describe('CORS', () => {
       .set('Origin', 'https://evil.example')
       .set('Access-Control-Request-Method', 'POST');
     expect(res.headers['access-control-allow-origin']).toBeUndefined();
+  });
+});
+
+describe('Security headers', () => {
+  const PHOTO_NAME = 'security-headers-test.png';
+  const photoPath = path.join(config.uploadDir, PHOTO_NAME);
+
+  beforeAll(() => {
+    fs.mkdirSync(config.uploadDir, { recursive: true });
+    fs.writeFileSync(photoPath, Buffer.from('not really a png'));
+  });
+  afterAll(() => { fs.rmSync(photoPath, { force: true }); });
+
+  // The helmet headers that HSTS must not take down with it
+  const HELMET_HEADERS = {
+    'cross-origin-resource-policy': 'cross-origin',
+    'cross-origin-opener-policy': 'same-origin',
+    'origin-agent-cluster': '?1',
+    'referrer-policy': 'no-referrer',
+    'x-content-type-options': 'nosniff',
+    'x-dns-prefetch-control': 'off',
+    'x-download-options': 'noopen',
+    'x-frame-options': 'SAMEORIGIN',
+    'x-permitted-cross-domain-policies': 'none',
+    'x-xss-protection': '0',
+  };
+
+  it.each([
+    ['an API route', '/api/public/settings', 200],
+    ['an uploaded photo', `/uploads/${PHOTO_NAME}`, 200],
+    ['a missing photo', '/uploads/missing.png', 404],
+  ])('%s does not carry Strict-Transport-Security', async (_label, url, status) => {
+    const res = await request.get(url);
+    expect(res.status).toBe(status);
+    expect(res.headers['strict-transport-security']).toBeUndefined();
+  });
+
+  it.each(['/api/public/settings', `/uploads/${PHOTO_NAME}`])('%s keeps the other helmet headers', async (url) => {
+    const res = await request.get(url);
+    expect(res.headers).toEqual(expect.objectContaining(HELMET_HEADERS));
+    expect(res.headers['content-security-policy']).toContain("default-src 'self'");
   });
 });
 

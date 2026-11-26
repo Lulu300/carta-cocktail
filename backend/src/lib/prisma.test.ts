@@ -39,10 +39,11 @@ afterEach(async () => {
 });
 
 describe('configureSqlite', () => {
-  it('should switch the database to WAL by default', async () => {
+  // The compose files pass SQLITE_WAL empty when .env does not set it
+  it.each([undefined, ''])('should switch the database to WAL by default (SQLITE_WAL=%j)', async (value) => {
     const client = openClient();
 
-    expect(await configureSqlite(client, {})).toBe('wal');
+    expect(await configureSqlite(client, { SQLITE_WAL: value })).toBe('wal');
     expect(await readPragma(client, 'journal_mode')).toBe('wal');
   });
 

@@ -1,25 +1,32 @@
 import { Router, Response } from 'express';
 import { Prisma } from '../generated/prisma/client';
+import type { Category } from '../generated/prisma/client';
 import { prisma } from '../lib/prisma';
 import multer from 'multer';
 import { AuthRequest } from '../middleware/auth';
 import { BadRequestError, NotFoundError } from '../errors';
 import { parseNameTranslations, serializeTranslations } from '../utils/translations';
 import { buildExportPayload, buildCsvPayload } from '../utils/bottlesExport';
-import { ImportParseError, parseImportFile, NormalizedImportPayload } from '../utils/bottlesImport';
+import {
+  ImportParseError, MAX_BOTTLE_IMPORT_BYTES, parseImportFile, NormalizedImportPayload,
+} from '../utils/bottlesImport';
 import { deleteBottle, isForceRequested } from '../services/deletionService';
 import { syncBottle, syncNewBottles } from '../services/menuSyncService';
-import { ensureCategoryType } from '../services/categoryTypeService';
+import { categoryTypeNameFor, createMissingCategoryType } from '../services/categoryTypeService';
 import { valid, validate } from '../validation/validate';
 import { deleteRequest, IdParams, idRequest } from '../validation/common';
 import { BottleCreate, BottleExportQuery, BottleListQuery, BottleUpdate } from '../validation/bottles';
 import { BottleImportConfirm } from '../validation/bottleImport';
+import { importedCategoryTypePath } from '../validation/categories';
+import { CaseInsensitiveIndex, previewMatch } from '../utils/uniqueness';
+import { nameToStore, translationsToStore } from '../utils/storedNames';
+import { caseInsensitiveKey } from '../utils/invisibleCharacters';
 
 const router = Router();
 
 const importUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: MAX_BOTTLE_IMPORT_BYTES },
 });
 
 const listSchemas = { query: BottleListQuery };
@@ -43,9 +50,18 @@ const CREATE_BATCH_SIZE = 500;
 // A 2,000-bottle import takes well under a second; the 5 s default leaves no margin on a slow disk
 const IMPORT_TRANSACTION_TIMEOUT_MS = 30_000;
 
-/** Same name, capacity and category, whatever the case: the import warns about such a bottle. */
-function duplicateKey(name: string, capacityMl: number, categoryName: string): string {
-  return `${name.toLowerCase()}|${capacityMl}|${categoryName.toLowerCase()}`;
+/**
+ * Same name whatever the case, capacity and category: the import warns about such a bottle.
+ * `category` is the category name in the preview, which has no resolution yet, under the key
+ * categories are compared with (`caseInsensitiveKey`), and the id of the category a row is
+ * resolved to in the confirmation.
+ */
+function duplicateKey(name: string, capacityMl: number, category: string | number): string {
+  return `${name.toLowerCase()}|${capacityMl}|${category}`;
+}
+
+function previewCategory(category: Category) {
+  return { id: category.id, name: category.name, type: category.type, desiredStock: category.desiredStock };
 }
 
 function parseUploadedFile(file: Express.Multer.File, language: string): NormalizedImportPayload {
@@ -60,41 +76,29 @@ function parseUploadedFile(file: Express.Multer.File, language: string): Normali
 router.post('/import/preview', importUpload.single('file'), async (req: AuthRequest, res: Response) => {
   if (!req.file) throw new BadRequestError();
 
-  // The rows left out are listed apart: the payload goes back unchanged to /import/confirm
+  // The rows left out and the values to check are listed apart: the payload goes back unchanged to /import/confirm
   // A date typed in a spreadsheet is read in the order of the app's language (Accept-Language)
-  const { errors, ...payload } = parseUploadedFile(req.file, req.language);
+  const { errors, warnings, ...payload } = parseUploadedFile(req.file, req.language);
 
-  const allCategories = await prisma.category.findMany();
   const allBottles = await prisma.bottle.findMany({ include: { category: true } });
 
   // Indexes instead of a scan per imported row: an import has up to 2,000 rows
-  const categoriesByName = new Map<string, (typeof allCategories)[number]>();
-  for (const category of allCategories) {
-    const key = category.name.toLowerCase();
-    // The first match wins, as before
-    if (!categoriesByName.has(key)) categoriesByName.set(key, category);
-  }
+  const categoriesByName = new CaseInsensitiveIndex(await prisma.category.findMany(), (category) => category.name);
   const bottlesByKey = new Map<string, typeof allBottles>();
   for (const bottle of allBottles) {
-    const key = duplicateKey(bottle.name, bottle.capacityMl, bottle.category.name);
+    const key = duplicateKey(bottle.name, bottle.capacityMl, caseInsensitiveKey(bottle.category.name));
     const sameKey = bottlesByKey.get(key);
     if (sameKey) sameKey.push(bottle);
     else bottlesByKey.set(key, [bottle]);
   }
 
-  const categories = payload.categories.map((c) => {
-    const match = categoriesByName.get(c.name.toLowerCase());
-    return {
-      ref: c,
-      existingMatch: match
-        ? { id: match.id, name: match.name, type: match.type, desiredStock: match.desiredStock }
-        : null,
-      status: match ? ('matched' as const) : ('missing' as const),
-    };
-  });
+  const categories = payload.categories.map((c) => ({
+    ref: c,
+    ...previewMatch(categoriesByName.match(c.name), previewCategory),
+  }));
 
   const bottles = payload.bottles.map((b) => {
-    const duplicates = (bottlesByKey.get(duplicateKey(b.name, b.capacityMl, b.categoryName)) ?? [])
+    const duplicates = (bottlesByKey.get(duplicateKey(b.name, b.capacityMl, caseInsensitiveKey(b.categoryName))) ?? [])
       .map((d) => ({
         id: d.id,
         name: d.name,
@@ -109,7 +113,7 @@ router.post('/import/preview', importUpload.single('file'), async (req: AuthRequ
     };
   });
 
-  res.json({ payload, categories, bottles, errors });
+  res.json({ payload, categories, bottles, errors, warnings });
 });
 
 const importConfirmSchemas = { body: BottleImportConfirm };
@@ -118,31 +122,52 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
   const { payload, resolutions } = valid<typeof importConfirmSchemas>(res).body;
 
   const created = await prisma.$transaction(async (tx) => {
-    const categoryMap = new Map<string, number>(); // lowercased name -> id
-
-    // Seed map with already-existing categories matching any reference
-    const allCats = await tx.category.findMany();
-    for (const c of allCats) categoryMap.set(c.name.toLowerCase(), c.id);
+    const resolvedCategories = new Map<string, number>(); // lowercased name -> id
+    const categories = await tx.category.findMany();
+    const existingCategories = new CaseInsensitiveIndex(categories, (category) => category.name);
+    const existingCategoryIds = new Set(categories.map((category) => category.id));
 
     // Apply explicit category resolutions
     for (const [key, resolution] of Object.entries(resolutions?.categories || {})) {
       if (resolution.action === 'use_existing' && resolution.existingId) {
-        categoryMap.set(key.toLowerCase(), resolution.existingId);
+        resolvedCategories.set(key.toLowerCase(), resolution.existingId);
       } else if (resolution.action === 'create' && resolution.data) {
         // The schema fills the type, desired stock and minimum percent defaults
         const { nameTranslations, name, type, desiredStock, minimumPercent } = resolution.data;
-        const createdCat = await tx.category.create({
-          data: {
-            name: name || key,
-            type: await ensureCategoryType(tx, type),
-            desiredStock,
-            minimumPercent,
-            nameTranslations: serializeTranslations(nameTranslations),
-          },
+        const categoryName = name || key;
+        // Checked before the lookup, so the request is refused or not whatever the database holds
+        const typeName = await categoryTypeNameFor(tx, type, importedCategoryTypePath(key));
+        // A category that exists ignoring case is used as it is, its type included
+        const category = await existingCategories.findOrCreate(categoryName, 'errors.ambiguousCategoryName', async () => {
+          await createMissingCategoryType(tx, typeName);
+          return tx.category.create({
+            data: {
+              name: nameToStore(categoryName),
+              type: typeName,
+              desiredStock,
+              minimumPercent,
+              nameTranslations: serializeTranslations(translationsToStore(nameTranslations)),
+            },
+          });
         });
-        categoryMap.set((name || key).toLowerCase(), createdCat.id);
+        // Under the file's name, as `use_existing`: the rows name it, even when the admin renamed
+        // the category. A row moved to the new name finds it in `existingCategories`.
+        resolvedCategories.set(key.toLowerCase(), category.id);
       }
     }
+
+    // A row goes in the category resolved for its name, else in the existing one of that name
+    const categoryIdOf = (categoryName: string) => resolvedCategories.get(categoryName.toLowerCase())
+      ?? existingCategories.findUnambiguous(categoryName, 'errors.ambiguousCategoryName')?.id;
+
+    // An existing category picked by its id, else the category of the row's name, else of the file's
+    const rowCategoryId = (fileCategory: string, resolution: { categoryId?: number; categoryName?: string }) => {
+      if (resolution.categoryId !== undefined) {
+        return existingCategoryIds.has(resolution.categoryId) ? resolution.categoryId : undefined;
+      }
+      const categoryName = (resolution.categoryName || fileCategory).trim();
+      return categoryName ? categoryIdOf(categoryName) : undefined;
+    };
 
     let skippedNoCategory = 0;
     let duplicatesCreated = 0;
@@ -150,9 +175,11 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
 
     const bottleResolutions = resolutions?.bottles || {};
 
-    const existingBottles = await tx.bottle.findMany({ include: { category: true } });
+    // By category id: a row may go in a category created under another name than the file's,
+    // or in one of several categories that differ only by case
+    const existingBottles = await tx.bottle.findMany();
     const existingKeys = new Set(
-      existingBottles.map((b) => duplicateKey(b.name, b.capacityMl, b.category.name))
+      existingBottles.map((b) => duplicateKey(b.name, b.capacityMl, b.categoryId))
     );
 
     for (let i = 0; i < payload.bottles.length; i++) {
@@ -161,18 +188,13 @@ router.post('/import/confirm', validate(importConfirmSchemas), async (_req: Auth
 
       if (resolution.action === 'skip') continue;
 
-      const finalCategoryName = (resolution.categoryName || b.categoryName).trim();
-      if (!finalCategoryName) {
-        skippedNoCategory++;
-        continue;
-      }
-      const categoryId = categoryMap.get(finalCategoryName.toLowerCase());
+      const categoryId = rowCategoryId(b.categoryName, resolution);
       if (!categoryId) {
         skippedNoCategory++;
         continue;
       }
 
-      if (existingKeys.has(duplicateKey(b.name, b.capacityMl, finalCategoryName))) {
+      if (existingKeys.has(duplicateKey(b.name, b.capacityMl, categoryId))) {
         duplicatesCreated += b.quantity;
       }
 

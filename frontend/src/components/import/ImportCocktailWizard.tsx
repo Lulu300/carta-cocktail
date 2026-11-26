@@ -4,6 +4,7 @@ import { useMutation } from '@tanstack/react-query';
 import { cocktails as api } from '../../services/api';
 import type { CocktailExportFormat } from '../../types';
 import { useInvalidateQueries } from '../../queries/crud';
+import { refusalDetails } from '../../utils/refusalDetails';
 import Spinner from '../ui/Spinner';
 import WizardModal from './WizardModal';
 import ImportStepUpload from './ImportStepUpload';
@@ -17,6 +18,7 @@ import {
   initialCocktailImportState,
   isBatch,
   type CocktailImportStep,
+  type ImportRefusal,
 } from './importCocktailReducer';
 import { createsEntities, type ImportResolutions } from './importResolutions';
 import { IMPORT_REFERENCE_KEYS, useImportReferenceLists } from './useImportReferenceLists';
@@ -38,8 +40,9 @@ const STEP_INDICATOR_INDEX: Partial<Record<CocktailImportStep, number>> = {
   confirm: 2,
 };
 
-function messageOf(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
+// The backend's message, and the recipe rows or inputs its refusal names
+function refusalOf(error: unknown, fallback: string): ImportRefusal {
+  return { message: error instanceof Error ? error.message : fallback, details: refusalDetails(error) };
 }
 
 export default function ImportCocktailWizard({ onClose }: ImportCocktailWizardProps) {
@@ -67,7 +70,7 @@ export default function ImportCocktailWizard({ onClose }: ImportCocktailWizardPr
         if (!cancelled) dispatch({ type: 'PREVIEW_OK', preview });
       },
       (error: unknown) => {
-        if (!cancelled) dispatch({ type: 'PREVIEW_FAILED', message: messageOf(error, fallbackError) });
+        if (!cancelled) dispatch({ type: 'PREVIEW_FAILED', ...refusalOf(error, fallbackError) });
       },
     );
     return () => {
@@ -79,7 +82,7 @@ export default function ImportCocktailWizard({ onClose }: ImportCocktailWizardPr
     if (!recipe || confirmMutation.isPending) return;
     confirmMutation.mutate({ recipe, resolutions: state.resolutions }, {
       onSuccess: (cocktail) => dispatch({ type: 'CONFIRM_OK', cocktail }),
-      onError: (error) => dispatch({ type: 'CONFIRM_FAILED', message: messageOf(error, fallbackError) }),
+      onError: (error) => dispatch({ type: 'CONFIRM_FAILED', ...refusalOf(error, fallbackError) }),
     });
   };
 

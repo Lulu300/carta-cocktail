@@ -5,6 +5,7 @@ import { clearToasts, renderWithFeedback } from '../../test/feedback';
 import { qk } from '../../queries/keys';
 import { axe } from '../../test/axe';
 import { buildCategory, buildCategoryType } from '../../test/factories';
+import type { CategoryType } from '../../types';
 import { captureRequest, mockApiError, mockApiPending, mockApiResponse, mockItemInUse } from '../../test/msw/utils';
 import CategoriesPage from './CategoriesPage';
 
@@ -22,6 +23,14 @@ const doubleSpaced = buildCategoryType({ name: 'X  Y', color: 'gray', _count: { 
 const singleSpaced = buildCategoryType({ name: 'X Y', color: 'gray', _count: { categories: 0 } });
 const tabbed = buildCategoryType({ name: 'X\tY', color: 'gray', _count: { categories: 0 } });
 const DOUBLE_SPACED_LABEL = 'X␣␣Y categoryTypes.withSpaces';
+// HTML shows a zero-width space as nothing: 'X\u200BY' looks exactly like 'XY'.
+const zeroWidth = buildCategoryType({ name: 'X\u200BY', color: 'gray', _count: { categories: 1 } });
+const joined = buildCategoryType({ name: 'XY', color: 'gray', _count: { categories: 0 } });
+const ZERO_WIDTH_LABEL = 'X[U+200B]Y categoryTypes.withInvisibleCharacters';
+// HTML shows 'E' and a combining grave accent (U+0300) exactly like the composed 'È' (U+00C8).
+const decomposed = buildCategoryType({ name: 'CRE\u0300ME', color: 'gray', _count: { categories: 1 } });
+const composed = buildCategoryType({ name: 'CR\u00C8ME', color: 'gray', _count: { categories: 0 } });
+const DECOMPOSED_LABEL = 'CRE\u0300ME categoryTypes.nonStandardForm';
 
 type User = ReturnType<typeof userEvent.setup>;
 
@@ -82,6 +91,61 @@ describe('CategoriesPage', () => {
 
     expect(screen.getByText('Vodka')).toBeInTheDocument();
     expect(screen.queryByText('Grenadine')).not.toBeInTheDocument();
+  });
+
+  describe('type badge of a category whose type name HTML would hide', () => {
+    /** The type cell of a category's row: its accessible name is what a screen reader reads. */
+    async function typeCell(categoryName: string) {
+      const row = (await screen.findByText(categoryName)).closest('tr');
+      if (!row) throw new Error(`No row for ${categoryName}`);
+      return within(row).getAllByRole('cell')[1];
+    }
+
+    /** A category of the given type, which the categories list sends with it. */
+    const categoryOfType = (name: string, categoryType: CategoryType | null, type = categoryType?.name ?? '') =>
+      buildCategory({ name, type, categoryType });
+
+    it('tells the stored names apart, and labels the empty name', async () => {
+      mockApiResponse('get', '/api/categories', [
+        categoryOfType('Rum', spacedSpirit),
+        categoryOfType('Gin', spirit),
+        categoryOfType('Water', unnamed),
+        categoryOfType('Tonic', doubleSpaced),
+      ]);
+      renderPage();
+
+      expect(await typeCell('Rum')).toHaveAccessibleName(SPACED_SPIRIT_LABEL);
+      expect(await typeCell('Gin')).toHaveAccessibleName('SPIRIT');
+      expect(await typeCell('Water')).toHaveAccessibleName('categoryTypes.emptyName');
+      expect(await typeCell('Tonic')).toHaveAccessibleName(DOUBLE_SPACED_LABEL);
+    });
+
+    it('adds the stored name to a translation that would hide it', async () => {
+      const nameTranslations = { en: 'Spirits' };
+      mockApiResponse('get', '/api/categories', [
+        categoryOfType('Rum', { ...spacedSpirit, nameTranslations }),
+        categoryOfType('Gin', { ...spirit, nameTranslations }),
+        categoryOfType('Water', { ...unnamed, nameTranslations }),
+      ]);
+      renderPage();
+
+      expect(await typeCell('Rum')).toHaveAccessibleName(`Spirits – ${SPACED_SPIRIT_LABEL}`);
+      expect(await typeCell('Gin')).toHaveAccessibleName('Spirits');
+      expect(await typeCell('Water')).toHaveAccessibleName('Spirits – categoryTypes.emptyName');
+    });
+
+    it('marks the stored name of a category sent without its type', async () => {
+      mockApiResponse('get', '/api/categories', [
+        categoryOfType('Rum', null, ' SPIRIT '),
+        categoryOfType('Gin', null, 'SPIRIT'),
+        categoryOfType('Water', null, ''),
+      ]);
+      renderPage();
+
+      expect(await typeCell('Rum')).toHaveAccessibleName(SPACED_SPIRIT_LABEL);
+      expect(await typeCell('Gin')).toHaveAccessibleName('SPIRIT');
+      expect(await typeCell('Water')).toHaveAccessibleName('categoryTypes.emptyName');
+    });
   });
 
   describe('category form', () => {
@@ -164,6 +228,45 @@ describe('CategoriesPage', () => {
       expect(within(categoryDialog()).queryByText('categories.typeRequired')).not.toBeInTheDocument();
       await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
       expect(await created.body).toMatchObject({ type: 'MIXER' });
+    });
+
+    // A custom type is tidied as the backend stores it
+    it('does not send a custom type of invisible or blank characters, and sends a typed one tidied', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const created = captureRequest('post', '/api/categories');
+      await user.click(screen.getByRole('button', { name: 'categories.add' }));
+
+      await user.type(within(categoryDialog()).getByLabelText(/categories\.name/), 'Tonic');
+      await user.selectOptions(within(categoryDialog()).getByLabelText('categories.type'), '__OTHER__');
+      const customType = within(categoryDialog()).getByPlaceholderText('categories.customType');
+      await user.type(customType, '\u200B\u2800');
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
+
+      expect(created.count()).toBe(0);
+      expect(customType).toHaveAccessibleDescription('categories.typeRequired');
+
+      await user.type(customType, 'mi\u200Bxer');
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
+      expect(await created.body).toMatchObject({ type: 'MIXER' });
+    });
+
+    // Upper case decomposes 'ΐ' into 'Ι\u0308\u0301': the type is composed after it
+    it.each([
+      ['cre\u0300me', 'CR\u00C8ME'],
+      ['\u0390', '\u03AA\u0301'],
+    ])('sends the custom type %j composed, as %j', async (typed, sent) => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const created = captureRequest('post', '/api/categories');
+      await user.click(screen.getByRole('button', { name: 'categories.add' }));
+
+      await user.type(within(categoryDialog()).getByLabelText(/categories\.name/), 'Cassis');
+      await user.selectOptions(within(categoryDialog()).getByLabelText('categories.type'), '__OTHER__');
+      await user.type(within(categoryDialog()).getByPlaceholderText('categories.customType'), typed);
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
+
+      expect(await created.body).toMatchObject({ type: sent });
     });
 
     it('sends a single request on a fast double click on save', async () => {
@@ -285,6 +388,32 @@ describe('CategoriesPage', () => {
         ]);
 
         expect(await openTypeOptions(user)).toEqual([`Mixers – ${DOUBLE_SPACED_LABEL}`, 'Mixers', 'categories.otherType']);
+      });
+
+      it('tells a type with an invisible character from the type without it, also with the same translation', async () => {
+        const user = userEvent.setup();
+        const nameTranslations = { en: 'Mixers' };
+        mockApiResponse('get', '/api/category-types', [
+          zeroWidth, joined, { ...zeroWidth, name: 'Z\u200BW', nameTranslations }, { ...joined, name: 'ZW', nameTranslations },
+        ]);
+
+        expect(await openTypeOptions(user)).toEqual([
+          ZERO_WIDTH_LABEL, 'XY', 'Mixers – Z[U+200B]W categoryTypes.withInvisibleCharacters', 'Mixers', 'categories.otherType',
+        ]);
+        expect(within(categoryDialog()).getByRole('option', { name: ZERO_WIDTH_LABEL })).toBeInTheDocument();
+      });
+
+      it('tells a decomposed type from the composed one, also with the same translation', async () => {
+        const user = userEvent.setup();
+        const nameTranslations = { en: 'Creams' };
+        mockApiResponse('get', '/api/category-types', [
+          decomposed, composed, { ...decomposed, name: 'CRE\u0301ME', nameTranslations }, { ...composed, name: 'CR\u00C9ME', nameTranslations },
+        ]);
+
+        expect(await openTypeOptions(user)).toEqual([
+          DECOMPOSED_LABEL, 'CR\u00C8ME', 'Creams – CRE\u0301ME categoryTypes.nonStandardForm', 'Creams', 'categories.otherType',
+        ]);
+        expect(within(categoryDialog()).getByRole('option', { name: DECOMPOSED_LABEL })).toBeInTheDocument();
       });
     });
 
@@ -472,6 +601,33 @@ describe('CategoriesPage', () => {
       expect(created.count()).toBe(0);
     });
 
+    it.each([
+      ['cre\u0300me', 'CR\u00C8ME'],
+      ['\u0390', '\u03AA\u0301'],
+    ])('creates the type %j composed after its upper case, as %j', async (typed, sent) => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const created = captureRequest('post', '/api/category-types');
+      const manager = await openTypesManager(user);
+
+      await user.type(within(manager).getByPlaceholderText('GARNISH, MIXER...'), typed);
+      await user.click(within(manager).getByRole('button', { name: 'common.create' }));
+
+      expect(await created.body).toMatchObject({ name: sent });
+    });
+
+    it('does not create a type whose name is only invisible or blank characters', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const created = captureRequest('post', '/api/category-types');
+      const manager = await openTypesManager(user);
+
+      await user.type(within(manager).getByPlaceholderText('GARNISH, MIXER...'), '\u200B\u2800');
+      await user.click(within(manager).getByRole('button', { name: 'common.create' }));
+
+      expect(created.count()).toBe(0);
+    });
+
     it('edits a type: name locked, translations open, color and translations sent', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
@@ -595,6 +751,30 @@ describe('CategoriesPage', () => {
       const rows = within(manager).getAllByRole('listitem').map((row) => row.textContent);
       expect(rows[0]).toContain(`${DOUBLE_SPACED_LABEL}${DOUBLE_SPACED_LABEL}(1)`);
       expect(rows[1]).toContain('X YX Y(0)');
+    });
+
+    it('tells a type with an invisible character from the type without it', async () => {
+      const user = userEvent.setup();
+      mockApiResponse('get', '/api/category-types', [zeroWidth, joined]);
+      await renderLoadedPage();
+
+      const manager = await openTypesManager(user);
+
+      const rows = within(manager).getAllByRole('listitem').map((row) => row.textContent);
+      expect(rows[0]).toContain(`${ZERO_WIDTH_LABEL}${ZERO_WIDTH_LABEL}(1)`);
+      expect(rows[1]).toContain('XYXY(0)');
+    });
+
+    it('tells a decomposed type from the composed one', async () => {
+      const user = userEvent.setup();
+      mockApiResponse('get', '/api/category-types', [decomposed, composed]);
+      await renderLoadedPage();
+
+      const manager = await openTypesManager(user);
+
+      const rows = within(manager).getAllByRole('listitem').map((row) => row.textContent);
+      expect(rows[0]).toContain(`${DECOMPOSED_LABEL}${DECOMPOSED_LABEL}(1)`);
+      expect(rows[1]).toContain('CR\u00C8MECR\u00C8ME(0)');
     });
 
     // The decision is about names: a translation is shown as the admin typed it

@@ -7,7 +7,7 @@ import EmptyState from '../../components/ui/EmptyState';
 import Skeleton from '../../components/ui/Skeleton';
 import PublicErrorState from './PublicErrorState';
 import PublicLoading from './PublicLoading';
-import { isBottleMenu } from './useMenuFilter';
+import { isBottleMenu } from '../../utils/menuType';
 import { useScrollRestoration } from './useScrollRestoration';
 
 const PLACEHOLDER_CARDS = [1, 2, 3, 4];

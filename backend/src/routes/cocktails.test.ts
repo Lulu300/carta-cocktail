@@ -10,6 +10,7 @@ import {
 } from '../test/helpers';
 import type { CocktailIngredient } from '../generated/prisma/client';
 import type { CocktailExportFile } from '../services/cocktail/cocktailExport';
+import { MAX_IMAGE_BYTES } from '../services/cocktail/cocktailImage';
 import { MAX_EXPORT_BATCH } from '../validation/cocktails';
 
 beforeAll(async () => { await setupTestDatabase(); });
@@ -1044,6 +1045,23 @@ describe('POST /api/cocktails/import/confirm', () => {
     expect(res.body.ingredients[0].sourceType).toBe('INGREDIENT');
     expect(res.body.ingredients[0].ingredient.name).toBe('Fresh Mint');
   });
+  // A category needs a type, even when a type has the empty name: the category form refuses it too
+  it('should return 400 for a category to create under the empty name, and create nothing', async () => {
+    await prisma.categoryType.create({ data: { name: '', color: 'red' } });
+
+    const res = await request.post('/api/cocktails/import/confirm').set(authHeader()).send({
+      recipe: {
+        version: 1,
+        cocktail: { name: 'Mezcal Sour', ingredients: [{ sourceType: 'CATEGORY', sourceName: 'Mezcal', quantity: 2 }] },
+      },
+      resolutions: { categories: { mezcal: { action: 'create', data: { name: 'Mezcal', type: '' } } } },
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.details).toMatchObject([{ path: 'body.resolutions.categories.mezcal.data.type', code: 'too_small' }]);
+    expect(await prisma.category.count()).toBe(0);
+    expect(await prisma.cocktail.count()).toBe(0);
+  });
 });
 
 describe('POST /api/cocktails - with preferredBottleIds', () => {
@@ -1127,6 +1145,37 @@ describe('DELETE /api/cocktails/:id - with imagePath set', () => {
   });
 });
 
+// The service tests cover the rule (C-19): this one checks the message the admin reads
+describe('POST /api/cocktails/import/confirm - unit that several units hold ignoring case', () => {
+  it('should answer 409 with a message naming the abbreviation and the units, and write nothing', async () => {
+    await seedUnit({ abbreviation: 'CL' });
+    await seedUnit({ abbreviation: 'Cl' });
+
+    const res = await request.post('/api/cocktails/import/confirm').set(authHeader()).set('Accept-Language', 'en').send({
+      recipe: {
+        version: 1,
+        cocktail: {
+          name: 'Daiquiri',
+          ingredients: [{ sourceType: 'INGREDIENT', sourceName: 'Lime', quantity: 2, unit: { abbreviation: 'cl' } }],
+        },
+      },
+      resolutions: {
+        units: { cl: { action: 'create', data: { name: 'Centilitre', abbreviation: 'cl' } } },
+        ingredients: { lime: { action: 'create', data: { name: 'Lime' } } },
+      },
+    });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe(
+      'Several units match the abbreviation "cl" when case is ignored, and none exactly: CL, Cl. '
+      + 'Use one of them, or change their abbreviations so that they differ by more than case',
+    );
+    expect(await prisma.unit.count()).toBe(2);
+    expect(await prisma.cocktail.count()).toBe(0);
+    expect(await prisma.ingredient.count()).toBe(0);
+  });
+});
+
 describe('POST /api/cocktails/:id/image - upload replacing existing', () => {
   it('should return 400 when no file is uploaded', async () => {
     const cocktail = await seedCocktail({ name: 'No Image Cocktail' });
@@ -1196,11 +1245,11 @@ function uploadedFiles(): string[] {
   return fs.existsSync(config.uploadDir) ? fs.readdirSync(config.uploadDir) : [];
 }
 
-function uploadImage(id: number, filename: string, contentType: string) {
+function uploadImage(id: number, filename: string, contentType: string, content = Buffer.from('image-data')) {
   return request
     .post(`/api/cocktails/${id}/image`)
     .set(authHeader())
-    .attach('image', Buffer.from('image-data'), { filename, contentType });
+    .attach('image', content, { filename, contentType });
 }
 
 describe('POST /api/cocktails/:id/image - file checks', () => {
@@ -1226,6 +1275,29 @@ describe('POST /api/cocktails/:id/image - file checks', () => {
 
     expect(res.status).toBe(400);
     expect(uploadedFiles()).toEqual(before);
+  });
+
+  it.each([
+    ['one byte under the limit', MAX_IMAGE_BYTES - 1],
+    ['exactly the limit', MAX_IMAGE_BYTES],
+  ])('should store a photo of %s, whole', async (_case, size) => {
+    const cocktail = await seedCocktail();
+
+    const res = await uploadImage(cocktail.id, 'photo.jpg', 'image/jpeg', Buffer.alloc(size));
+
+    expect(res.status).toBe(200);
+    expect(fs.statSync(path.join(config.uploadDir, res.body.imagePath)).size).toBe(size);
+  });
+
+  it('should answer 413 and keep no file for a photo one byte over the limit', async () => {
+    const cocktail = await seedCocktail();
+    const before = uploadedFiles();
+
+    const res = await uploadImage(cocktail.id, 'photo.jpg', 'image/jpeg', Buffer.alloc(MAX_IMAGE_BYTES + 1));
+
+    expect(res.status).toBe(413);
+    expect(uploadedFiles()).toEqual(before);
+    expect((await prisma.cocktail.findUniqueOrThrow({ where: { id: cocktail.id } })).imagePath).toBeNull();
   });
 
   it('should store the image under a random name with the lowercased extension', async () => {

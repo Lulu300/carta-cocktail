@@ -13,7 +13,9 @@ import {
   buildImage, ensureHelperImage, pullImage, remoteDigest, RESOURCE_PREFIX, serverPlatform,
 } from './lib/docker.mjs';
 import { renderReport } from './lib/report.mjs';
-import { checkDuplicateInjectionPath, loadHookFiles, parseUpgradePath } from './lib/versions.mjs';
+import {
+  checkDuplicateInjectionPath, fixtureVersion, loadHookFiles, parseUpgradePath,
+} from './lib/versions.mjs';
 
 const BENCH_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(BENCH_DIR, '../..');
@@ -175,6 +177,7 @@ async function main() {
   const reportPath = path.join(reportDir, reportName);
   fs.writeFileSync(reportPath, renderReport({
     generatedAt: now.toISOString(), layout, pathLabels: steps.map((step) => step.label), images, runs,
+    fixtureVersion: fixtureVersion(hookFiles),
   }));
   console.log(`Report: ${reportPath}`);
   for (const run of runs) {

@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { render, screen, fireEvent, waitFor, within } from '../../test/test-utils';
 import userEvent from '@testing-library/user-event';
 import { createQueryClient } from '../../queries/queryClient';
-import { buildCategory, buildCocktail } from '../../test/factories';
+import { buildCategory, buildCategoryType, buildCocktail } from '../../test/factories';
 import { server } from '../../test/msw/server';
 import {
   captureRequest,
@@ -14,6 +14,8 @@ import {
   type CapturedRequest,
 } from '../../test/msw/utils';
 import type { CocktailExportFormat, EntityResolutionAction, ImportPreviewResponse } from '../../types';
+// Registers the admin messages the details of a refused confirmation are written with
+import '../../i18n/admin';
 import ImportCocktailWizard from './ImportCocktailWizard';
 
 const mockLoadAsync = vi.fn();
@@ -196,6 +198,86 @@ describe('ImportCocktailWizard', () => {
     expect(screen.getByRole('button', { name: 'cocktails.importWizard.next' })).toBeDisabled();
   });
 
+  it('blocks the import while a category to create has the type with an empty name', async () => {
+    answerPreview = (name) => HttpResponse.json({
+      ...matchedPreview(name),
+      categories: [{ ref: { name: 'Sirop', type: 'SYRUP', desiredStock: 1 }, existingMatch: null, status: 'missing' }],
+    });
+    mockApiResponse('get', '/api/category-types', [
+      buildCategoryType({ name: 'SYRUP' }),
+      buildCategoryType({ name: '' }),
+      buildCategoryType({ name: '   ' }),
+    ]);
+    render(<ImportCocktailWizard onClose={vi.fn()} />);
+
+    uploadJson(recipe('Grenadine'));
+    await user.click(await screen.findByRole('button', { name: 'cocktails.importWizard.next' }));
+    await screen.findByRole('option', { name: 'categoryTypes.emptyName' });
+    const typeSelect = screen.getByLabelText(/categories\.type/);
+
+    await user.selectOptions(typeSelect, '');
+    expect(screen.getByText('categories.typeRequired')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'cocktails.importWizard.next' })).toBeDisabled();
+    expect(screen.getByText('cocktails.importWizard.unresolvedCount')).toBeInTheDocument();
+
+    // An existing type made only of spaces is kept as picked, as the backend does
+    await user.selectOptions(typeSelect, '   ');
+    expect(screen.queryByText('categories.typeRequired')).not.toBeInTheDocument();
+    await goToConfirmationFromResolve();
+    await confirmImport();
+
+    expect(await screen.findByText('cocktails.importWizard.success')).toBeInTheDocument();
+    expect(confirmations[0].resolutions.categories).toEqual({
+      sirop: { action: 'create', data: { name: 'Sirop', type: '   ', desiredStock: 1, nameTranslations: null } },
+    });
+  });
+
+  // Data older than C-07 can hold two categories that differ only by case (C-19)
+  it('blocks the import until one of the categories a name could mean is picked', async () => {
+    mockApiResponse('get', '/api/categories', [buildCategory({ id: 10, name: 'Rhum' }), buildCategory({ id: 11, name: 'RHUM' })]);
+    answerPreview = (name) => HttpResponse.json({
+      ...matchedPreview(name),
+      categories: [{
+        ref: { name: 'rhum' },
+        existingMatch: null,
+        status: 'ambiguous',
+        ambiguousMatches: [{ id: 10, name: 'Rhum' }, { id: 11, name: 'RHUM' }],
+      }],
+    });
+    render(<ImportCocktailWizard onClose={vi.fn()} />);
+
+    uploadJson(recipe('Daiquiri'));
+    await user.click(await screen.findByRole('button', { name: 'cocktails.importWizard.next' }));
+    expect(await screen.findByText('importMatches.pickOne')).toBeInTheDocument();
+    expect(screen.getByText('cocktails.importWizard.unresolvedCount')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'cocktails.importWizard.next' })).toBeDisabled();
+
+    await user.selectOptions(screen.getByLabelText('cocktails.importWizard.existingEntity'), await screen.findByRole('option', { name: 'RHUM' }));
+    expect(screen.getByText('cocktails.importWizard.allResolved')).toBeInTheDocument();
+    await goToConfirmationFromResolve();
+    await confirmImport();
+
+    expect(await screen.findByText('cocktails.importWizard.success')).toBeInTheDocument();
+    expect(confirmations[0].resolutions.categories).toEqual({ rhum: { action: 'use_existing', existingId: 11 } });
+  });
+
+  it('shows a category to create that exists ignoring case as used, not created', async () => {
+    render(<ImportCocktailWizard onClose={vi.fn()} />);
+
+    uploadJson(recipe('Daiquiri'));
+    await user.click(await screen.findByRole('button', { name: 'cocktails.importWizard.next' }));
+    await user.click(await screen.findByRole('button', { name: /^Rhum/ }));
+    await user.click(screen.getByRole('button', { name: 'cocktails.importWizard.createNew' }));
+    const name = screen.getByLabelText(/categories\.name/);
+    await user.clear(name);
+    await user.type(name, 'RHUM');
+    expect(name).toHaveAccessibleDescription('importMatches.usedAsItIs');
+    await goToConfirmationFromResolve();
+
+    expect(screen.getByText(/cocktails\.importWizard\.entitiesMapped/)).toBeInTheDocument();
+    expect(screen.queryByText(/cocktails\.importWizard\.entitiesToCreate/)).not.toBeInTheDocument();
+  });
+
   it('refreshes the lists after a confirmation that created an entity', async () => {
     answerPreview = () => HttpResponse.json(bottleToCreatePreview);
     render(<ImportCocktailWizard onClose={vi.fn()} />);
@@ -325,6 +407,56 @@ describe('ImportCocktailWizard', () => {
     await user.click(await screen.findByRole('button', { name: 'cocktails.importWizard.next' }));
 
     expect(await screen.findByText('cocktails.importWizard.listsLoadError')).toBeInTheDocument();
+  });
+
+  it('lists each reference a refused confirmation names, then goes back to the choices', async () => {
+    const unresolved = [{ line: 1, kind: 'unit', name: 'cl' }, { line: 0, kind: 'bottle', name: 'Havana 3' }];
+    answerConfirm = () => HttpResponse.json({ error: 'The recipe cannot be imported', details: unresolved }, { status: 400 });
+    render(<ImportCocktailWizard onClose={vi.fn()} />);
+
+    uploadJson(recipe('Daiquiri'));
+    await goToConfirmation();
+    await confirmImport();
+
+    const alert = await screen.findByRole('alert');
+    expect(within(alert).getByText('The recipe cannot be imported')).toBeInTheDocument();
+    expect(within(alert).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'Row 2: unit "cl" is neither matched nor created',
+      'Row 1: bottle "Havana 3" is neither matched nor created, or has no category',
+    ]);
+
+    await user.click(screen.getByRole('button', { name: 'cocktails.importWizard.tryAgain' }));
+    expect(await screen.findByRole('button', { name: 'cocktails.importWizard.next' })).toBeInTheDocument();
+  });
+
+  it('names the row of an existing item deleted before the confirmation', async () => {
+    answerConfirm = () => HttpResponse.json(
+      { error: 'A recipe line names a unit that does not exist', details: [{ line: 0, field: 'categoryId', id: 10 }] },
+      { status: 400 },
+    );
+    render(<ImportCocktailWizard onClose={vi.fn()} />);
+
+    uploadJson(recipe('Daiquiri'));
+    await goToConfirmation();
+    await confirmImport();
+
+    expect(await screen.findByText('Row 1, Category: this item no longer exists, choose another one')).toBeInTheDocument();
+  });
+
+  it('keeps the message alone when the details of a refusal are malformed', async () => {
+    answerConfirm = () => HttpResponse.json(
+      { error: 'The recipe cannot be imported', details: [{ line: 'one', kind: 'unit', name: 'cl' }] },
+      { status: 400 },
+    );
+    render(<ImportCocktailWizard onClose={vi.fn()} />);
+
+    uploadJson(recipe('Daiquiri'));
+    await goToConfirmation();
+    await confirmImport();
+
+    const alert = await screen.findByRole('alert');
+    expect(within(alert).getByText('The recipe cannot be imported')).toBeInTheDocument();
+    expect(within(alert).queryByRole('list')).not.toBeInTheDocument();
   });
 
   it('closes from the error screen of a single recipe', async () => {

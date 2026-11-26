@@ -96,6 +96,59 @@ describe('POST /api/category-types', () => {
     expect(await prisma.categoryType.findUnique({ where: { name: 'X  Y' } })).toMatchObject({ color: 'red' });
   });
 
+  // HTML shows 'X\u200BY' exactly like 'XY': a new type never keeps a character drawn as nothing
+  it('should remove the invisible characters of a new type', async () => {
+    const res = await request.post('/api/category-types').set(authHeader()).send({ name: '\u200Bfruit\u00AD juice\u2060' });
+    expect(res.status).toBe(201);
+    expect(res.body.name).toBe('FRUIT JUICE');
+    expect(await prisma.categoryType.findUnique({ where: { name: 'FRUIT JUICE' } })).not.toBeNull();
+  });
+
+  it('should return 409 for a name that only differs from an existing type by invisible characters', async () => {
+    await request.post('/api/category-types').set(authHeader()).send({ name: 'xy' });
+    const res = await request.post('/api/category-types').set(authHeader()).send({ name: 'x\u200By' });
+    expect(res.status).toBe(409);
+    expect(await prisma.categoryType.count({ where: { name: { startsWith: 'X' } } })).toBe(1);
+  });
+
+  // HTML shows 'E\u0300' exactly like 'È': a new type is stored composed
+  it('should compose a new decomposed type', async () => {
+    const res = await request.post('/api/category-types').set(authHeader()).send({ name: 'cre\u0300me' });
+    expect(res.status).toBe(201);
+    expect(res.body.name).toBe('CR\u00C8ME');
+    expect(await prisma.categoryType.findUnique({ where: { name: 'CRE\u0300ME' } })).toBeNull();
+  });
+
+  it('should return 409 for a name that only differs from an existing type by its decomposed letters', async () => {
+    await request.post('/api/category-types').set(authHeader()).send({ name: 'cr\u00E8me' });
+    const res = await request.post('/api/category-types').set(authHeader()).send({ name: 'cre\u0300me' });
+    expect(res.status).toBe(409);
+    expect(await prisma.categoryType.count({ where: { name: { startsWith: 'CR' } } })).toBe(1);
+  });
+
+  it('should create the composed type next to an older decomposed one', async () => {
+    await prisma.categoryType.create({ data: { name: 'CRE\u0300ME', color: 'red' } });
+    const res = await request.post('/api/category-types').set(authHeader()).send({ name: 'cr\u00E8me' });
+    expect(res.status).toBe(201);
+    expect(res.body.name).toBe('CR\u00C8ME');
+    expect(await prisma.categoryType.findUnique({ where: { name: 'CRE\u0300ME' } })).toMatchObject({ color: 'red' });
+  });
+
+  // Upper case decomposes 'ΐ' into 'Ι\u0308\u0301': the name is composed after it
+  it('should store a new type composed after its upper case', async () => {
+    const res = await request.post('/api/category-types').set(authHeader()).send({ name: '\u0390' });
+    expect(res.status).toBe(201);
+    expect(res.body.name).toBe('\u03AA\u0301');
+  });
+
+  it('should return 400 for a name of invisible characters, and create nothing', async () => {
+    const typeCount = await prisma.categoryType.count();
+    const res = await request.post('/api/category-types').set(authHeader()).send({ name: '\u200B \u2800\u00AD' });
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({ error: 'Validation error', details: [{ path: 'body.name', code: 'too_small' }] });
+    expect(await prisma.categoryType.count()).toBe(typeCount);
+  });
+
   it('should store nameTranslations', async () => {
     const res = await request.post('/api/category-types').set(authHeader())
       .send({ name: 'BITTERS', nameTranslations: { fr: 'Amers' }, color: 'red' });
@@ -123,6 +176,19 @@ describe('PUT /api/category-types/:name', () => {
       .send({ nameTranslations: { fr: 'Spiritueux' } });
     expect(res.status).toBe(200);
     expect(res.body.nameTranslations).toEqual({ fr: 'Spiritueux' });
+  });
+
+  // Like the type names (C-61) and the names of categories, units and ingredients (C-65)
+  it('should compose the translations the admin changes, and keep the ones sent back as they are', async () => {
+    await prisma.categoryType.create({ data: { name: 'CREAM', color: 'red', nameTranslations: JSON.stringify({ fr: 'Cre\u0300me' }) } });
+    const res = await request.put('/api/category-types/CREAM').set(authHeader())
+      .send({ nameTranslations: { fr: 'Cre\u0300me', en: 'Cre\u0300am' } });
+    expect(res.status).toBe(200);
+    expect(res.body.nameTranslations).toEqual({ fr: 'Cre\u0300me', en: 'Cr\u00E8am' });
+
+    const created = await request.post('/api/category-types').set(authHeader())
+      .send({ name: 'LIQUEUR', nameTranslations: { fr: 'Liqueur a\u0300 la cre\u0300me' } });
+    expect(created.body.nameTranslations).toEqual({ fr: 'Liqueur \u00E0 la cr\u00E8me' });
   });
 });
 

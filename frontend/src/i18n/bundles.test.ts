@@ -211,6 +211,7 @@ describe('translation keys used in the code', () => {
     'bottles.importWizard.rowErrors.source.${source}',
     'validation.fields.${field}',
     'validation.codes.${code}',
+    'validation.unresolved.${kind}',
   ];
 
   /** "colors.${color}" matches "colors.blue": each placeholder stands for one key segment. */

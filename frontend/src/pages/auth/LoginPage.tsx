@@ -8,6 +8,7 @@ import Button from '../../components/ui/Button';
 import Field from '../../components/ui/Field';
 import Input from '../../components/ui/Input';
 import LanguageSelector from '../../components/ui/LanguageSelector';
+import { isSignInAfterRestore } from '../../utils/signInAfterRestore';
 
 const ADMIN_HOME = '/admin';
 
@@ -74,6 +75,12 @@ export default function LoginPage() {
           className="bg-surface rounded-xl border border-line p-8 space-y-6"
         >
           <h2 className="text-xl font-semibold text-center">{t('auth.login')}</h2>
+
+          {isSignInAfterRestore(location.search) && (
+            <p className="bg-info/10 border border-info/30 text-info px-4 py-3 rounded-lg text-sm">
+              {t('auth.backupRestored')}
+            </p>
+          )}
 
           {error && (
             <div role="alert" className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg text-sm">

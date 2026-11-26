@@ -2,10 +2,20 @@ import { describe, it, expect, vi } from 'vitest';
 import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { CategoryType, EntityResolutionAction, ImportEntityResolution } from '../../types';
+import type { Category, CategoryType, EntityResolutionAction, ImportEntityResolution, Unit } from '../../types';
 import ImportEntityRow from './ImportEntityRow';
 import { defaultCreateData, type ImportEntityType } from './importResolutions';
 import type { ExistingOption } from './useImportReferenceLists';
+import { buildCategory, buildCategoryType, buildUnit } from '../../test/factories';
+
+// Shows the names a message interpolates: "importMatches.pickOne(Rhum, RHUM)"
+vi.mock('react-i18next', async (importOriginal) => {
+  const { translateWithValues } = await import('../../test/translateWithValues');
+  return {
+    ...await importOriginal<typeof import('react-i18next')>(),
+    useTranslation: () => ({ t: translateWithValues, i18n: { language: 'en' } }),
+  };
+});
 
 interface HarnessProps {
   entity: ImportEntityResolution;
@@ -14,10 +24,12 @@ interface HarnessProps {
   initial?: EntityResolutionAction;
   onChange?: (resolution: EntityResolutionAction) => void;
   categoryTypes?: CategoryType[];
+  categories?: Category[];
+  units?: Unit[];
 }
 
 /** Holds the resolution like the resolve step does. */
-function Harness({ entity, type, existingOptions = [], initial, onChange, categoryTypes }: HarnessProps) {
+function Harness({ entity, type, existingOptions = [], initial, onChange, categoryTypes = [], categories = [], units = [] }: HarnessProps) {
   const [resolution, setResolution] = useState(initial);
   return (
     <ImportEntityRow
@@ -30,7 +42,7 @@ function Harness({ entity, type, existingOptions = [], initial, onChange, catego
         onChange?.(next);
       }}
       allowSkip={type === 'bottles'}
-      categoryTypes={categoryTypes}
+      existingRows={{ categoryTypes, categories, units }}
     />
   );
 }
@@ -95,6 +107,25 @@ describe('ImportEntityRow', () => {
 
     expect(onChange).toHaveBeenLastCalledWith({ action: 'use_existing', existingId: 2 });
     expect(screen.getByRole('option', { name: 'Havana 7' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Gordon' })).not.toBeInTheDocument();
+  });
+
+  // Compared like the backend compares category names (C-65): case and Unicode form ignored
+  it.each([
+    ['decomposed, the existing one composed', 'CRE\u0300ME', 'Cr\u00E8me'],
+    ['composed, the existing one decomposed', 'CR\u00C8ME', 'Cre\u0300me'],
+  ])('lists the bottles of a category written %s', async (_case, fileCategory, existingCategory) => {
+    const user = userEvent.setup();
+    const bottle: ImportEntityResolution = { ref: { name: 'Cassis', categoryName: fileCategory }, existingMatch: null, status: 'missing' };
+    const options = [
+      { id: 1, name: 'Gordon', category: { name: 'Gin' } },
+      { id: 2, name: 'Lejay', category: { name: existingCategory } },
+    ];
+    render(<Harness entity={bottle} type="bottles" existingOptions={options} initial={createResolution('bottles', bottle)} />);
+
+    await user.click(screen.getByRole('button', { name: 'cocktails.importWizard.useExisting' }));
+
+    expect(screen.getByRole('option', { name: 'Lejay' })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Gordon' })).not.toBeInTheDocument();
   });
 
@@ -165,6 +196,31 @@ describe('ImportEntityRow', () => {
     expect(onChange).toHaveBeenLastCalledWith({ action: 'create', data: expect.objectContaining({ type: 'SPIRIT' }) });
   });
 
+  it('flags the type with an empty name until another type is chosen', async () => {
+    const user = userEvent.setup();
+    const category: ImportEntityResolution = { ref: { name: 'Sirop', type: 'SYRUP', desiredStock: 1 }, existingMatch: null, status: 'missing' };
+    const categoryTypes = [buildCategoryType({ name: 'SYRUP' }), buildCategoryType({ name: '' }), buildCategoryType({ name: ' SPIRIT ' })];
+    render(<Harness entity={category} type="categories" initial={createResolution('categories', category)} categoryTypes={categoryTypes} />);
+    const typeSelect = screen.getByLabelText(/categories\.type/);
+
+    await user.selectOptions(typeSelect, 'categoryTypes.emptyName');
+    expect(typeSelect).toHaveValue('');
+    expect(typeSelect).toHaveAttribute('aria-invalid', 'true');
+    expect(typeSelect).toHaveAccessibleDescription('categories.typeRequired');
+
+    // A type whose name only has spaces around it can be picked
+    await user.selectOptions(typeSelect, ' SPIRIT ');
+    expect(typeSelect).not.toHaveAttribute('aria-invalid');
+    expect(screen.queryByText('categories.typeRequired')).not.toBeInTheDocument();
+  });
+
+  it('flags a file type made only of invisible characters, which the backend would refuse to create', () => {
+    const category: ImportEntityResolution = { ref: { name: 'Sirop', type: '\u200B', desiredStock: 1 }, existingMatch: null, status: 'missing' };
+    render(<Harness entity={category} type="categories" initial={createResolution('categories', category)} categoryTypes={[buildCategoryType({ name: 'SYRUP' })]} />);
+
+    expect(screen.getByText('categories.typeRequired')).toBeInTheDocument();
+  });
+
   it('keeps the file type selectable before the types are loaded', () => {
     const category: ImportEntityResolution = { ref: { name: 'Bitter', type: 'BITTER' }, existingMatch: null, status: 'missing' };
     render(<Harness entity={category} type="categories" initial={createResolution('categories', category)} />);
@@ -211,10 +267,113 @@ describe('ImportEntityRow', () => {
     const ingredient: ImportEntityResolution = { ref: { name: 'Mint' }, existingMatch: null, status: 'missing' };
     render(<Harness entity={ingredient} type="ingredients" initial={createResolution('ingredients', ingredient)} onChange={onChange} />);
 
-    // The i18n mock gives every emoji the same name: pick the 🌿 button among them.
-    const emojiButtons = screen.getAllByRole('button', { name: 'iconPicker.emoji' });
-    await user.click(emojiButtons.find((button) => button.textContent === '🌿')!);
+    await user.click(screen.getByRole('button', { name: 'iconPicker.emoji(🌿)' }));
 
     expect(onChange).toHaveBeenLastCalledWith({ action: 'create', data: expect.objectContaining({ icon: '🌿' }) });
+  });
+});
+
+// Data older than C-07 can hold two categories or two units that differ only by case (C-19)
+describe('ImportEntityRow - rows equal ignoring case', () => {
+  const rhum = buildCategory({ id: 1, name: 'Rhum' });
+  const upperRhum = buildCategory({ id: 2, name: 'RHUM' });
+  const gin = buildCategory({ id: 3, name: 'Gin' });
+  const categories = [rhum, upperRhum, gin];
+  const ambiguousCategory: ImportEntityResolution = {
+    ref: { name: 'rhum', type: 'SPIRIT', desiredStock: 1 },
+    existingMatch: null,
+    status: 'ambiguous',
+    ambiguousMatches: [{ id: 1, name: 'Rhum' }, { id: 2, name: 'RHUM' }],
+  };
+
+  function renderAmbiguous(onChange = vi.fn(), initial?: EntityResolutionAction) {
+    render(
+      <Harness entity={ambiguousCategory} type="categories" existingOptions={categories} categories={categories} initial={initial} onChange={onChange} />,
+    );
+    return onChange;
+  }
+
+  it('names the matches and picks none of them for the admin', () => {
+    const onChange = renderAmbiguous();
+
+    expect(screen.getByText('importMatches.ambiguous')).toBeInTheDocument();
+    expect(screen.getByText('importMatches.pickOne(Rhum, RHUM)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'cocktails.importWizard.useExisting' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByLabelText('cocktails.importWizard.existingEntity')).toHaveValue('');
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('uses the match the admin picks', async () => {
+    const user = userEvent.setup();
+    const onChange = renderAmbiguous();
+
+    await user.selectOptions(screen.getByLabelText('cocktails.importWizard.existingEntity'), 'RHUM');
+
+    expect(onChange).toHaveBeenLastCalledWith({ action: 'use_existing', existingId: 2 });
+    expect(screen.queryByRole('option', { name: 'importMatches.pickMatch' })).not.toBeInTheDocument();
+  });
+
+  it('comes back to "use existing" without a match picked', async () => {
+    const user = userEvent.setup();
+    const onChange = renderAmbiguous(vi.fn(), { action: 'create', data: defaultCreateData('categories', ambiguousCategory.ref) });
+
+    await user.click(screen.getByRole('button', { name: 'cocktails.importWizard.useExisting' }));
+
+    expect(onChange).toHaveBeenLastCalledWith({ action: 'use_existing', existingId: undefined });
+    expect(screen.getByLabelText('cocktails.importWizard.existingEntity')).toHaveValue('');
+  });
+
+  it('refuses to create it under a name the matches hold, until another name is typed', async () => {
+    const user = userEvent.setup();
+    renderAmbiguous();
+
+    await user.click(screen.getByRole('button', { name: 'cocktails.importWizard.createNew' }));
+    const name = screen.getByLabelText(/categories\.name/);
+    expect(name).toHaveAttribute('aria-invalid', 'true');
+    expect(name).toHaveAccessibleDescription('importMatches.ambiguousName(Rhum, RHUM)');
+
+    await user.type(name, ' blanc');
+    expect(name).not.toHaveAttribute('aria-invalid');
+    expect(name).not.toHaveAccessibleDescription();
+  });
+
+  it('says that a category to create that exists ignoring case is used as it is', async () => {
+    const user = userEvent.setup();
+    const category: ImportEntityResolution = { ref: { name: 'Vodka', type: 'SPIRIT' }, existingMatch: null, status: 'missing' };
+    render(<Harness entity={category} type="categories" categories={categories} initial={createResolution('categories', category)} />);
+    const name = screen.getByLabelText(/categories\.name/);
+    expect(name).not.toHaveAccessibleDescription();
+
+    await user.clear(name);
+    await user.type(name, 'GIN');
+    expect(name).toHaveAccessibleDescription('importMatches.usedAsItIs(Gin)');
+    expect(name).not.toHaveAttribute('aria-invalid');
+
+    // The exact name of one of the twins is that one, not an ambiguity
+    await user.clear(name);
+    await user.type(name, 'RHUM');
+    expect(name).toHaveAccessibleDescription('importMatches.usedAsItIs(RHUM)');
+  });
+
+  it('compares a unit by its abbreviation only', async () => {
+    const user = userEvent.setup();
+    const units = [buildUnit({ id: 1, name: 'Centilitre', abbreviation: 'CL' }), buildUnit({ id: 2, name: 'Centilitre', abbreviation: 'Cl' })];
+    const unit: ImportEntityResolution = {
+      ref: { name: 'Centilitre', abbreviation: 'cl' },
+      existingMatch: null,
+      status: 'ambiguous',
+      ambiguousMatches: [{ id: 1, name: 'CL' }, { id: 2, name: 'Cl' }],
+    };
+    render(<Harness entity={unit} type="units" existingOptions={units} units={units} />);
+    expect(screen.getByText('importMatches.pickOne(CL, Cl)')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'cocktails.importWizard.createNew' }));
+    const abbreviation = screen.getByLabelText(/units\.abbreviation/);
+    expect(abbreviation).toHaveAccessibleDescription('importMatches.ambiguousName(Centilitre (CL), Centilitre (Cl))');
+    expect(screen.getByLabelText(/units\.name/)).not.toHaveAccessibleDescription();
+
+    await user.clear(abbreviation);
+    await user.type(abbreviation, 'Cl');
+    expect(abbreviation).toHaveAccessibleDescription('importMatches.usedAsItIs(Centilitre (Cl))');
   });
 });

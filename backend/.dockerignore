@@ -11,6 +11,14 @@ coverage
 **/*.db
 **/*.db-journal
 prisma/prisma
+# Leftovers of interrupted runs, never needed by the image: the test database
+# folder, SQLite WAL side files, a half-done restore copy and the session floor
+# file (the container creates its own at runtime)
+prisma/test
+**/*.db-wal
+**/*.db-shm
+**/*.db.restore-*
+**/*.session-floor*
 .omc
 **/.claude
 **/.DS_Store

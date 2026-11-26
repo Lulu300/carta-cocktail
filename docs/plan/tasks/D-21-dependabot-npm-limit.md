@@ -5,13 +5,13 @@ phase: D
 lane: ci
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: mixed
 depends_on: [D-06, B-01, B-02, B-03, B-04, B-05, B-06, B-07, B-08, B-09, B-10, B-11]
 touches: [.github/dependabot.yml]
 sources: ["07-devops-history.md §3.5"]
-branch:
-pr:
+branch: chore/D-21-dependabot-npm-limit
+pr: https://github.com/Lulu300/carta-cocktail/pull/220
 ---
 
 ## Contexte
@@ -33,10 +33,10 @@ D-06 a ajouté `.github/dependabot.yml`. Décision humaine du 2026-10-11 : pour 
 
 ## Critères d'acceptation
 
-- [ ] Les deux entrées npm ont `open-pull-requests-limit: 5`.
-- [ ] Le fichier passe la validation du schéma Dependabot.
+- [x] Les deux entrées npm ont `open-pull-requests-limit: 5`.
+- [x] Le fichier passe la validation du schéma Dependabot.
 - [ ] La décision humaine sur « Dependabot security updates » est consignée dans le Journal.
-- [ ] Après merge, « Check for updates » (Insights > Dependency graph > Dependabot) ouvre au plus une PR groupée mineure/patch par paquet, vers `develop`.
+- [ ] Après merge, « Check for updates » (Insights > Dependency graph > Dependabot) ouvre au plus une PR groupée mineure/patch par paquet, vers `develop`. À vérifier une fois le fichier sur `main` (merge `develop` → `main` de la prochaine release) : GitHub ne lit `.github/dependabot.yml` que sur la branche par défaut.
 
 ## Tests à ajouter ou adapter
 
@@ -52,3 +52,6 @@ D-06 a ajouté `.github/dependabot.yml`. Décision humaine du 2026-10-11 : pour 
 - 2026-10-11 : tâche créée par D-06 pour relever la limite npm à la fin de la phase B (décision humaine du 2026-10-11).
 - 2026-10-11 : `owner: mixed` : « Check for updates » et la décision sur les security updates demandent l'humain.
 - 2026-10-12 : relecture de C-15 (PR #103) : la majeure Prisma 8 doit aussi être ignorée (ou groupée) pour `@prisma/adapter-better-sqlite3`, sinon elle arrive seule, décalée du client ; `better-sqlite3` 13 sort de la plage `^12.6` de l'adapter.
+- 2026-11-25 : PR #220, étapes 1, 2, 3 et 5. Étape 1 : D-06 et B-01 à B-11 sont `done` ; B-14 et B-22 restent ouvertes mais hors `depends_on` (B-22 le précise). Étape 2 : `open-pull-requests-limit: 5` sur les deux entrées npm, commentaire de la limite à 0 retiré. Étape 3, registre au 2026-11-25 : `typescript` majeure toujours ignorée (F-07) ; `prisma` et `@prisma/client` gardées, `@prisma/adapter-better-sqlite3` et `better-sqlite3` ajoutées (Prisma monte en bloc ; `better-sqlite3` 13.2.0 est sortie mais l'adapter 7.10.1 demande `^12.6.0`), suivies par la nouvelle tâche D-47 ; `@types/node` majeure ignorée dans les deux paquets (suit Node 24 des images et de la CI, 26.x publiée), suivie elle aussi par D-47 avec l'image `node`. `prisma@latest` = 8.0.0-rc.35, stable 7.10.1 sous `prev` : Dependabot ne propose pas la rc (dependabot-core, `latest_version_finder.rb` : le dist-tag `latest` n'est retenu que si son statut de pré-version est celui de la version actuelle, et les pré-versions sont écartées tant que la version actuelle est stable). Majeures laissées à Dependabot, sans tâche prévue : `msw` 3, `jsdom` 31, `@hookform/resolvers` 7, `@testing-library/jest-dom` 8, `@types/supertest` 7 ; `@types/bcryptjs` 3.0.0 est un stub déprécié, que Dependabot écarte (son retrait, `bcryptjs` 3 fournissant ses types, est un volet de D-47). Surcharges `effect` (B-24) et `minimatch` sous `readdir-glob` (B-22) inchangées. Étape 5 : `check-jsonschema --builtin-schema vendor.dependabot` (0.39.0) valide.
+- 2026-11-25 : étape 4 en attente de l'humain, aucun réglage GitHub modifié. État par `gh api` : `automated-security-fixes` → `enabled: false` (`dependabot_security_updates: disabled`), alertes Dependabot actives (`vulnerability-alerts` → 204), 0 alerte ouverte, branche par défaut `main`. Si elles sont activées : PR vers `main` ; avec `target-branch: develop` sur chaque entrée, les options de l'entrée (`ignore`, `groups`, `labels`, `commit-message`) ne s'appliquent plus aux mises à jour de sécurité (doc GitHub, « Dependabot options reference », `target-branch`) ; limite fixe de 10 PR ouvertes, pas de délai de 3 jours par défaut ; le correctif mergé sur `main` doit revenir sur `develop`, avec un conflit possible sur un lockfile modifié entre-temps sur `develop` (PR Dependabot groupée ou tâche `deps`). Le fichier n'est lu que sur `main` : tant que le merge `develop` → `main` de la prochaine release n'est pas fait, `main` garde l'ancien fichier (limite npm à 0). Des mises à jour de sécurité activées avant cette release tourneraient donc avec l'ancien fichier, ce qui change peu, puisqu'elles n'appliquent de toute façon pas les options des entrées npm. Tâche passée `done` pour les étapes de fichier ; la décision de l'humain et le contrôle des premières PR (« Check for updates », après ce merge vers `main`) restent à consigner ici.
+- 2026-11-26 : décision de l'humain du 2026-11-25 sur l'étape 4 : ne pas réactiver « Dependabot security updates » pour l'instant, car trop de changements arrivent sur `develop`. La réactivation se fera une fois toutes les tâches du plan d'audit terminées, quand le développement ralentira. Aucun réglage GitHub modifié.

@@ -197,4 +197,13 @@ exposed_ports="$(docker inspect --format '{{json .Config.ExposedPorts}}' "$front
   || fail "cannot inspect the frontend container"
 [[ "$exposed_ports" == '{"8080/tcp":{}}' ]] || fail "expected 8080/tcp only, got: $exposed_ports"
 
+step "The healthcheck probe stays out of the frontend access log, a real request does not"
+# The marker is a query string: the probe line carries none, and the visit line keeps it.
+curl -fsS -o /dev/null "$BASE_URL/healthz" || fail "/healthz does not answer 200"
+curl -fsS -o /dev/null "$BASE_URL/?smoke-access-log" || fail "/ does not answer 200"
+frontend_log="$(cd "$REPO_ROOT" && docker compose logs --no-log-prefix "$FRONTEND_SERVICE")" \
+  || fail "cannot read the frontend logs"
+grep -q 'smoke-access-log' <<<"$frontend_log" || fail "a request to / is missing from the access log"
+! grep -q 'healthz' <<<"$frontend_log" || fail "the /healthz probe is in the access log"
+
 echo "Smoke test passed"

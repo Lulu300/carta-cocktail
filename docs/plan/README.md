@@ -40,8 +40,10 @@ Le script n'a aucune dépendance : Node 20 ou plus suffit.
 | `owner` | `agent`, `human`, `mixed` | `human`/`mixed` : une partie demande une action manuelle (réglages GitHub, décision produit) |
 | `depends_on` | liste d'`id` | Tâches à terminer avant de commencer |
 | `touches` | liste de chemins ou dossiers (`dossier/`) | Fichiers modifiés. Sert à détecter les conflits entre tâches lancées en parallèle |
-| `sources` | `"0X-rapport.md §section"` | Passages des rapports de revue qui justifient la tâche |
+| `sources` | liste de `"0X-rapport.md §section"` | Passages des rapports de revue qui justifient la tâche |
 | `branch`, `pr` | texte | Renseignés par l'agent qui traite la tâche |
+
+`depends_on`, `touches` et `sources` s'écrivent entre crochets, sur une seule ligne (`[]` s'il n'y a rien). `node docs/plan/build.mjs --check` refuse une valeur scalaire, vide, sans crochet fermant ou écrite en liste YAML sur plusieurs lignes.
 
 Le corps suit toujours les mêmes sections : **Contexte**, **Problème constaté**, **Ce qu'il faut faire**, **Critères d'acceptation** (cases à cocher), **Tests à ajouter ou adapter**, **Points d'attention**, **Journal**.
 
@@ -122,6 +124,17 @@ Modèle fixé par D-11, appliqué par `.github/workflows/release.yml` (détails 
 - **Pousser la branche avant le tag** : le job `verify` vérifie que le commit du tag est atteignable depuis `origin/main` (version finale) ou `origin/develop` (pré-version), et que le fichier de notes existe et a un front matter valide. Sinon il échoue avant tout push d'image.
 - Un tag refusé par `verify`, ou dont le job `ci` a échoué, n'a rien publié : le supprimer (local et distant), corriger, puis le reposer. Pour un échec ponctuel du job `ci`, « Re-run failed jobs » dans le run Release suffit.
 - Un tag qui a publié une image n'est jamais déplacé ni repoussé : en cas d'échec après le push d'une image, corriger puis taguer la pré-version suivante (`-rc.N+1`) pour une pré-version, ou la version suivante (ex. `v1.5.1`) pour une version finale.
+- **Quand faire une release** (décision de l'humain, 2026-11-26) : seulement quand elle apporte quelque chose de concret :
+  - une correction de sécurité ;
+  - une migration de base, ou un changement qui peut casser une installation (à passer au banc avant qu'il ne s'accumule avec d'autres) ;
+  - une fonctionnalité visible qui vaut la peine d'être livrée.
+
+  Sinon, les lots s'enchaînent et s'accumulent sur `develop`.
+- **Release allégée** (même décision) :
+  - le coordinateur rédige lui-même les notes et la section d'`UPGRADING.md` à partir des lignes « Notes de version », avec un seul relecteur ;
+  - un écart trouvé à la relecture va dans les notes ou dans le lot suivant, sauf s'il casse une installation ou perd des données : pas de chaîne de correctifs avant la pré-version ;
+  - le banc, automatique, reste complet ;
+  - la version finale suit la pré-version dès que le banc passe.
 - Chaque tag demande l'accord de l'humain. Première release avec ce modèle : D-12 (`v1.5.0-rc.1` puis `v1.5.0`).
 
 ## Décisions validées

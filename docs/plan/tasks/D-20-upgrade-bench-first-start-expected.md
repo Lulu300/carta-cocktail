@@ -5,13 +5,13 @@ phase: D
 lane: ci
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [D-15]
 touches: [scripts/upgrade-test/]
 sources: []
-branch:
-pr:
+branch: chore/D-20-upgrade-bench-first-start
+pr: 217
 ---
 
 ## Contexte
@@ -32,8 +32,8 @@ Le banc de mise à jour (D-15) démarre la première version du chemin avec le c
 
 ## Critères d'acceptation
 
-- [ ] `node scripts/upgrade-test/run.mjs --fixture <dir> --layout friend --path 1.5.0,local` finit en code `0` quand l'étape `local` passe, et le rapport donne la cause des KO du premier démarrage.
-- [ ] Un échec inattendu au premier démarrage (backend qui ne démarre pas, perte de lignes) reste en KO.
+- [x] `node scripts/upgrade-test/run.mjs --fixture <dir> --layout friend --path 1.5.0,local` finit en code `0` quand l'étape `local` passe, et le rapport donne la cause des KO du premier démarrage. Vérifié avec `1.5.0,1.14.0` : le premier démarrage n'a plus de KO, le rapport liste les actions des notes appliquées pour l'atteindre et dit comment le premier pas est atteint.
+- [x] Un échec inattendu au premier démarrage (backend qui ne démarre pas, perte de lignes) reste en KO.
 
 ## Tests à ajouter ou adapter
 
@@ -46,3 +46,5 @@ Le banc de mise à jour (D-15) démarre la première version du chemin avec le c
 ## Journal
 
 - 2026-10-11 : tâche créée pendant C-16 (banc `friend`, chemin `1.5.0,local`).
+- 2026-11-24 : reproduit sur `develop` avec une copie de la fixture, plus largement que décrit : tout chemin qui part après 1.4.0 a un premier démarrage KO dans les deux modes et les deux layouts (photos, port 8080 du frontend dès 1.8.0, volumes de root refusés par l'image non-root dès 1.12.0), et le saut naïf suivant hérite de ces échecs comme attendus. Correction (seconde option de « Ce qu'il faut faire », étendue aux deux modes) : le premier pas est un saut depuis la version de la fixture (`stepOrigin`), qui applique les actions des notes traversées depuis 1.4.0 et est jugé comme en mode conforme (`stepMode`) ; aucun échec du premier démarrage n'est plus attendu, hors bugs connus de la version. Banc : `friend` depuis 1.4.0, 1.5.0, 1.8.0 et 1.12.0, `official` depuis 1.4.0, 1.8.0 et 1.12.0, jusqu'à 1.14.0, mode `both` : tous OK, code 0 (avant : code 1). Hors périmètre : D-45 (`chownMounts` lit les montages de l'ancien conteneur). Notes de version : aucune (outil de développement). PR #217.
+- 2026-11-25 : relecture de #217 approuvée. Le choix fait pour chaque pas (origine, mode, notes traversées) est extrait dans `stepPlan` (`lib/expectations.mjs`), testé avec les vrais fichiers de hooks : revenir à l'ancien premier pas (mode du passage, ou aucune note traversée) fait échouer 2 et 3 tests. Le README signale l'`ADMIN_PASSWORD` de 6 caractères gardé dans le fichier d'env d'un chemin `friend` qui part après 1.4.0, sans effet sur les contrôles. Le comportement du banc ne change pas : pas de nouveau passage.

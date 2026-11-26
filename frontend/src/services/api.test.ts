@@ -213,6 +213,41 @@ describe('API request helper', () => {
       const error = await failedRequest(409, { error: 'In use', details: [{ path: 'body.name', code: 'custom' }] });
       expect(error.validationIssues()).toEqual([]);
     });
+
+    it('lists the unresolved references of an import, and only those', async () => {
+      const error = await failedRequest(400, {
+        error: 'The recipe cannot be imported',
+        details: [
+          { line: 1, kind: 'unit', name: 'cl' },
+          { line: 0, kind: 'unit', name: null },
+          { line: -1, kind: 'bottle', name: 'Rum' },
+          { line: 1.5, kind: 'bottle', name: 'Rum' },
+          { line: 2, kind: 'bottle', name: 3 },
+          { line: 2, field: 'unitId', id: 4 },
+          null,
+        ],
+      });
+      expect(error.unresolvedReferences()).toEqual([
+        { line: 1, kind: 'unit', name: 'cl' },
+        { line: 0, kind: 'unit', name: null },
+      ]);
+      expect(error.unknownReferences()).toEqual([{ line: 2, field: 'unitId', id: 4 }]);
+      expect(error.validationIssues()).toEqual([]);
+    });
+
+    it('lists the unknown references of a recipe, and leaves out a malformed one', async () => {
+      const error = await failedRequest(400, {
+        error: 'A recipe line names a unit that does not exist',
+        details: [{ line: 2, field: 'ingredientId', id: 7 }, { line: '2', field: 'unitId', id: 4 }, { line: 0, field: 'unitId' }],
+      });
+      expect(error.unknownReferences()).toEqual([{ line: 2, field: 'ingredientId', id: 7 }]);
+    });
+
+    it('reads no references for another status', async () => {
+      const error = await failedRequest(409, { error: 'In use', details: [{ line: 0, field: 'unitId', id: 4 }] });
+      expect(error.unknownReferences()).toEqual([]);
+      expect(error.unresolvedReferences()).toEqual([]);
+    });
   });
 
   it('should send the UI language in Accept-Language', async () => {
@@ -756,6 +791,23 @@ describe('menuBottles API', () => {
     expect(url).toBe('/api/menu-bottles/menu/5/entries');
     expect(init.method).toBe('PUT');
     expect(JSON.parse(init.body)).toEqual({ ids: [12, 7], menuSectionId: null });
+  });
+
+  it('should add bottles to, and remove entries from, a personal menu in one request each', async () => {
+    const api = await getApi();
+    mockOk({ message: 'ok' });
+    await api.menuBottles.addBottles(5, [3, 4]);
+    const [addUrl, addInit] = mockFetch.mock.calls[0];
+    expect(addUrl).toBe('/api/menu-bottles/menu/5/entries');
+    expect(addInit.method).toBe('POST');
+    expect(JSON.parse(addInit.body)).toEqual({ bottleIds: [3, 4] });
+
+    mockOk({ message: 'ok' });
+    await api.menuBottles.removeEntries(5, [12, 7]);
+    const [removeUrl, removeInit] = mockFetch.mock.calls[1];
+    expect(removeUrl).toBe('/api/menu-bottles/menu/5/entries/remove');
+    expect(removeInit.method).toBe('POST');
+    expect(JSON.parse(removeInit.body)).toEqual({ ids: [12, 7] });
   });
 });
 

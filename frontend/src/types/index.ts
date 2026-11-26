@@ -275,10 +275,18 @@ export interface ImportEntityRef {
   icon?: string | null;
 }
 
+/**
+ * `ambiguous` (categories and units only): several existing rows equal the name ignoring case,
+ * none exactly. `existingMatch` is null and `ambiguousMatches` lists them; the backend refuses to
+ * create the entity (409), the admin uses one of them.
+ */
+export type ImportMatchStatus = 'matched' | 'missing' | 'ambiguous';
+
 export interface ImportEntityResolution {
   ref: ImportEntityRef;
   existingMatch: { id: number; name: string } | null;
-  status: 'matched' | 'missing';
+  status: ImportMatchStatus;
+  ambiguousMatches?: { id: number; name: string }[];
 }
 
 export interface EntityResolutionAction {
@@ -328,7 +336,8 @@ export interface BottleImportPayload {
 export interface BottleCategoryPreview {
   ref: BottleImportCategoryRecord;
   existingMatch: { id: number; name: string; type: string; desiredStock: number } | null;
-  status: 'matched' | 'missing';
+  status: ImportMatchStatus;
+  ambiguousMatches?: { id: number; name: string; type: string; desiredStock: number }[];
 }
 
 export interface BottleDuplicateEntry {
@@ -345,17 +354,30 @@ export interface BottleRowPreview {
   potentialDuplicates: BottleDuplicateEntry[];
 }
 
-export type BottleImportRowErrorCode = 'required' | 'outOfRange' | 'invalidDate' | 'invalidNumber';
+export type BottleImportRowErrorCode = 'required' | 'outOfRange' | 'invalidDate' | 'invalidNumber' | 'malformedQuotes';
 
 /**
  * A row of the file left out of the import. `line` is the CSV line (header = 1)
- * or the position in the JSON list (first = 1), within `source`.
+ * or the position in the JSON list (first = 1), within `source`. A CSV cell past the
+ * last named column has an empty `field`, and its `column` number (first = 1).
  */
 export interface BottleImportRowError {
   source: 'bottles' | 'categories';
   line: number;
   field: string;
+  column?: number;
   code: BottleImportRowErrorCode;
+}
+
+/**
+ * A value of a row the import keeps as it is, but that the admin should check, located like a
+ * `BottleImportRowError`. `lineBreak`: a line break in a single-line text field.
+ */
+export interface BottleImportRowWarning {
+  source: 'bottles' | 'categories';
+  line: number;
+  field: string;
+  code: 'lineBreak';
 }
 
 export interface BottleImportPreviewResponse {
@@ -363,10 +385,13 @@ export interface BottleImportPreviewResponse {
   categories: BottleCategoryPreview[];
   bottles: BottleRowPreview[];
   errors: BottleImportRowError[];
+  // A backend older than this frontend sends none
+  warnings?: BottleImportRowWarning[];
 }
 
 export type BottleCategoryResolution =
-  | { action: 'use_existing'; existingId: number }
+  // No id while the admin has not picked one of several matches yet
+  | { action: 'use_existing'; existingId?: number }
   | {
       action: 'create';
       data: {
@@ -379,7 +404,8 @@ export type BottleCategoryResolution =
     };
 
 export type BottleRowResolution =
-  | { action: 'import'; categoryName?: string }
+  // `categoryId`: an existing category, which takes precedence over `categoryName`
+  | { action: 'import'; categoryId?: number; categoryName?: string }
   | { action: 'skip' };
 
 export interface BottleImportResolutions {

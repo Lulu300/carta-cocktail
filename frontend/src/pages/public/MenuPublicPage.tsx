@@ -16,7 +16,8 @@ import PublicCocktailItem from './PublicCocktailItem';
 import PublicErrorState from './PublicErrorState';
 import SectionBlock from './SectionBlock';
 import SectionNav, { type SectionNavItem } from './SectionNav';
-import { isBottleMenu, useMenuFilter, type BottleGroupEntry, type MenuBlock } from './useMenuFilter';
+import { isBottleMenu } from '../../utils/menuType';
+import { useMenuFilter, type BottleGroupEntry, type MenuBlock } from './useMenuFilter';
 import { useScrollRestoration } from './useScrollRestoration';
 
 type ViewMode = 'grid' | 'list';

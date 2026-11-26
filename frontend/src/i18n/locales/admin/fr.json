@@ -21,6 +21,7 @@
     "password": "Mot de passe",
     "loginButton": "Se connecter",
     "loginError": "Email ou mot de passe invalide",
+    "backupRestored": "Sauvegarde restaurée. Connectez-vous avec l'email et le mot de passe en vigueur à la date de la sauvegarde.",
     "welcome": "Bienvenue sur Carta Cocktail"
   },
   "dashboard": {
@@ -65,7 +66,9 @@
     "updated": "Type modifié",
     "deleted": "Type supprimé",
     "emptyName": "(sans nom)",
-    "withSpaces": "(avec espaces)"
+    "withSpaces": "(avec espaces)",
+    "withInvisibleCharacters": "(avec caractères invisibles)",
+    "nonStandardForm": "(forme Unicode non standard)"
   },
   "bottles": {
     "title": "Bouteilles",
@@ -119,6 +122,8 @@
       "pickCategory": "— Choisir une catégorie —",
       "willCreate": "à créer",
       "categoryRequired": "Catégorie obligatoire pour cette bouteille",
+      "categoriesWithoutType": "{{count}} catégorie(s) à créer sans type qui a un nom : choisissez un autre type.",
+      "categoriesToResolve": "{{count}} catégorie(s) correspondent à plusieurs existantes qui ne diffèrent que par la casse : utilisez l'une d'elles, ou créez-la sous un autre nom.",
       "duplicateFlag": "{{count}} doublon(s) existant(s)",
       "confirmTitle": "Résumé de l'import",
       "categoriesToCreate": "Catégories à créer",
@@ -142,6 +147,7 @@
       "rowErrors": {
         "title": "{{count}} ligne(s) écartée(s) de l'import",
         "position": "{{source}}, ligne {{line}} :",
+        "column": "colonne {{number}}",
         "source": {
           "bottles": "Bouteilles",
           "categories": "Catégories"
@@ -151,7 +157,16 @@
           "outOfRange": "{{field}} hors limites",
           "invalidDate": "{{field}} n'est pas une date valide (attendu : {{pattern}} ou {{isoPattern}})",
           "invalidNumber": "{{field}} n'est pas un nombre valide",
+          "malformedQuotes": "{{field}} contient un guillemet mal placé",
           "unknown": "{{field}} invalide"
+        }
+      },
+      "rowWarnings": {
+        "title": "{{count}} valeur(s) à vérifier, importée(s) telle(s) quelle(s)",
+        "hint": "Un guillemet mal placé dans le fichier peut réunir plusieurs lignes en une seule valeur.",
+        "code": {
+          "lineBreak": "{{field}} s'étend sur plusieurs lignes",
+          "unknown": "{{field}} à vérifier"
         }
       }
     },
@@ -160,6 +175,14 @@
     "usage": "Utilisation",
     "usableAsApero": "Utilisable comme apéritif",
     "usableAsDigestif": "Utilisable comme digestif"
+  },
+  "importMatches": {
+    "ambiguous": "Plusieurs correspondances",
+    "pickOne": "Plusieurs existantes ne diffèrent que par la casse : {{names}}. Utilisez l'une d'elles, ou créez-la sous un autre nom.",
+    "pickMatch": "— Choisir l'une d'elles —",
+    "existingEntry": "Entrée existante à utiliser",
+    "usedAsItIs": "Existe déjà sous « {{name}} » : elle sera utilisée telle quelle, et les autres champs ignorés.",
+    "ambiguousName": "Correspond à {{names}}, qui ne diffèrent que par la casse : utilisez l'une d'elles, ou changez cette valeur."
   },
   "ingredients": {
     "title": "Ingrédients",
@@ -349,20 +372,36 @@
       "noExcluded": "Aucune bouteille retirée de cette carte.",
       "restore": "Remettre",
       "restoreLabel": "Remettre {{name}} dans la carte",
-      "cocktailMenu": "Cette carte est une carte de cocktails : elle ne contient pas de bouteilles.",
+      "add": "Ajouter",
+      "addTitle": "Ajouter des bouteilles",
+      "addLabel": "Ajouter {{name}} à la carte",
+      "searchChoices": "Rechercher les bouteilles à ajouter",
       "aperos": {
         "title": "Gérer la carte des apéritifs",
         "hint": "Les bouteilles cochées comme apéritif apparaissent automatiquement ici. Utilisez « Synchroniser » pour mettre à jour la liste.",
-        "empty": "Aucune bouteille. Cochez des bouteilles comme apéritif, puis synchronisez."
+        "empty": "Aucune bouteille. Cochez des bouteilles comme apéritif, puis synchronisez.",
+        "personalTitle": "Gérer une carte d’apéritifs",
+        "personalHint": "Choisissez les bouteilles de cette carte parmi les bouteilles cochées comme apéritif. Décocher une bouteille la retire de cette carte.",
+        "personalEmpty": "Aucune bouteille pour l’instant. Ajoutez des bouteilles cochées comme apéritif depuis la liste ci-dessous.",
+        "choices": "Bouteilles cochées comme apéritif qui ne sont pas encore dans cette carte. Une bouteille vide reste cachée aux invités jusqu’à son remplacement.",
+        "noChoice": "Toutes les bouteilles cochées comme apéritif sont déjà dans cette carte. Cochez d’autres bouteilles comme apéritif pour les ajouter ici.",
+        "unchecked": "N’est plus cochée comme apéritif : « Remettre » la retire seulement de cette liste. La carte la reprend dès qu’elle est de nouveau cochée comme apéritif."
       },
       "digestifs": {
         "title": "Gérer la carte des digestifs",
         "hint": "Les bouteilles cochées comme digestif apparaissent automatiquement ici. Utilisez « Synchroniser » pour mettre à jour la liste.",
-        "empty": "Aucune bouteille. Cochez des bouteilles comme digestif, puis synchronisez."
+        "empty": "Aucune bouteille. Cochez des bouteilles comme digestif, puis synchronisez.",
+        "personalTitle": "Gérer une carte de digestifs",
+        "personalHint": "Choisissez les bouteilles de cette carte parmi les bouteilles cochées comme digestif. Décocher une bouteille la retire de cette carte.",
+        "personalEmpty": "Aucune bouteille pour l’instant. Ajoutez des bouteilles cochées comme digestif depuis la liste ci-dessous.",
+        "choices": "Bouteilles cochées comme digestif qui ne sont pas encore dans cette carte. Une bouteille vide reste cachée aux invités jusqu’à son remplacement.",
+        "noChoice": "Toutes les bouteilles cochées comme digestif sont déjà dans cette carte. Cochez d’autres bouteilles comme digestif pour les ajouter ici.",
+        "unchecked": "N’est plus cochée comme digestif : « Remettre » la retire seulement de cette liste. La carte la reprend dès qu’elle est de nouveau cochée comme digestif."
       }
     },
     "search": "Rechercher une carte",
     "type": "Type",
+    "typeHint": "Non modifiable ensuite. Les cartes d’apéritifs et de digestifs contiennent des bouteilles, choisies parmi les bouteilles cochées pour leur type.",
     "types": {
       "cocktails": "Cocktails",
       "aperos": "Apéritifs",
@@ -406,11 +445,10 @@
       "import": "Restaurer une sauvegarde",
       "importing": "Restauration en cours...",
       "selectFile": "Sélectionner un fichier ZIP",
-      "confirmRestore": "Cela remplacera TOUTES les données actuelles (base de données et images). Cette action est irréversible. Continuer ?",
+      "confirmRestore": "Cela remplacera TOUTES les données actuelles (base de données, images et compte administrateur). Cette action est irréversible. Vous devrez ensuite vous reconnecter avec l'email et le mot de passe en vigueur à la date de la sauvegarde. Continuer ?",
       "exportSuccess": "Sauvegarde exportée avec succès",
       "exportTimeout": "La préparation de la sauvegarde a pris trop de temps : le proxy placé devant le serveur a cessé d'attendre. Un nouvel essai tout de suite échouera sans doute de la même façon. Réessayez plus tard, quand le serveur est moins occupé. Si l'échec se répète, consultez les journaux du backend et le délai d'attente du proxy inverse placé devant Carta Cocktail, s'il y en a un.",
       "exportNoAnswer": "La connexion au serveur a été coupée avant la fin du téléchargement de la sauvegarde. L'export ne modifie rien sur le serveur : vérifiez votre connexion et réessayez.",
-      "importSuccess": "Sauvegarde restaurée avec succès. La page va se recharger.",
       "importDone": "Sauvegarde restaurée.",
       "restoreTimeout": "Le serveur n'a pas répondu à temps, mais la restauration est peut-être encore en cours.",
       "restoreNoAnswer": "La connexion au serveur a été coupée avant sa réponse (le navigateur ou un proxy a cessé d'attendre, ou le réseau a été perdu), mais la restauration est peut-être encore en cours. Vérifiez la connexion réseau.",
@@ -421,8 +459,7 @@
       "restartMayFail": "Cela peut ne pas suffire : pour une sauvegarde de la v1.0.x, ou d'avant la v1.8.0 avec des noms de catégories ou des abréviations d'unités en double, ou, sans Docker, de la v1.5.0 ou plus ancienne, la mise à jour de la base échoue. Lisez « Restoring a backup from an older version » dans UPGRADING.md avant de redémarrer.",
       "skippedFiles_one": "{{count}} fichier du dossier uploads n'a pas été restauré : seules les images JPG, PNG et WebP sont restaurées, une fois par nom de fichier.",
       "skippedFiles_other": "{{count}} fichiers du dossier uploads n'ont pas été restaurés : seules les images JPG, PNG et WebP sont restaurées, une fois par nom de fichier.",
-      "reload": "Recharger la page",
-      "reloadAfterRestart": "Recharger la page une fois le backend redémarré",
+      "signInAfterRestart": "Se reconnecter une fois le backend redémarré",
       "fileSelected": "Fichier : {{name}}"
     },
     "noIcon": "Aucune icône"
@@ -488,6 +525,14 @@
     "issue": "{{field}} : {{rule}}",
     "issueInRow": "Ligne {{row}}, {{field}} : {{rule}}",
     "issueInCategoryRow": "Catégorie {{row}}, {{field}} : {{rule}}",
+    "unknownReference": "Ligne {{row}}, {{field}} : cet élément n'existe plus, choisissez-en un autre",
+    "unresolved": {
+      "unit": "Ligne {{row}} : unité « {{name}} » ni associée ni créée",
+      "noUnit": "Ligne {{row}} : aucune unité",
+      "category": "Ligne {{row}} : catégorie « {{name}} » ni associée ni créée",
+      "bottle": "Ligne {{row}} : bouteille « {{name}} » ni associée ni créée, ou sans catégorie",
+      "ingredient": "Ligne {{row}} : ingrédient « {{name}} » ni associé ni créé"
+    },
     "fields": {
       "name": "Nom",
       "slug": "Slug URL",

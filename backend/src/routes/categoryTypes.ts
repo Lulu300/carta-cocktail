@@ -4,11 +4,12 @@ import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { ConflictError, NotFoundError } from '../errors';
 import { parseNameTranslations, serializeTranslations } from '../utils/translations';
+import { translationsToStore } from '../utils/storedNames';
 import { valid, validate } from '../validation/validate';
 import {
   CategoryTypeCreate, CategoryTypeParams, CategoryTypeQuery, CategoryTypeUpdate,
 } from '../validation/categoryTypes';
-import { newCategoryTypeName } from '../services/categoryTypeService';
+import { requireNewCategoryTypeName } from '../services/categoryTypeService';
 
 const router = Router();
 
@@ -26,13 +27,14 @@ const createSchemas = { body: CategoryTypeCreate };
 
 router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Response) => {
   const { name, nameTranslations, color } = valid<typeof createSchemas>(res).body;
-  const typeName = newCategoryTypeName(name).toUpperCase();
+  // Upper case first: it can decompose a composed letter ('ΐ' becomes 'Ι\u0308\u0301')
+  const typeName = requireNewCategoryTypeName(name.toUpperCase(), ['body', 'name']);
   const existing = await prisma.categoryType.findUnique({ where: { name: typeName } });
   if (existing) throw new ConflictError();
   const created = await prisma.categoryType.create({
     data: {
       name: typeName,
-      nameTranslations: serializeTranslations(nameTranslations),
+      nameTranslations: serializeTranslations(translationsToStore(nameTranslations)),
       color: color || 'gray',
     },
   });
@@ -47,7 +49,7 @@ async function updateCategoryType(typeName: string, { nameTranslations, color }:
   const updated = await prisma.categoryType.update({
     where: { name: typeName },
     data: {
-      nameTranslations: serializeTranslations(nameTranslations),
+      nameTranslations: serializeTranslations(translationsToStore(nameTranslations, existing.nameTranslations)),
       ...(color !== undefined && { color }),
     },
   });

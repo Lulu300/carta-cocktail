@@ -1,23 +1,28 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { CategoryType, EntityResolutionAction, ImportEntityRef, ImportEntityResolution } from '../../types';
+import type { EntityResolutionAction, ImportEntityRef, ImportEntityResolution, ImportMatchStatus } from '../../types';
 import IconPicker from '../ui/IconPicker';
 import Field from '../ui/Field';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
 import { cx } from '../ui/classNames';
+import { caseInsensitiveKey } from '../../utils/invisibleCharacters';
 import {
+  UNIQUE_FIELD,
   defaultCreateData,
+  existingRowFor,
   invalidCreateFields,
   parseNumberInput,
   referenceLabel,
   type CreateDataField,
+  type ExistingRows,
   type ImportEntityType,
 } from './importResolutions';
 import { existingOptionLabel, type ExistingOption } from './useImportReferenceLists';
+import { existingMatchMessages } from './existingMatchMessages';
 import ChoiceButton from './ChoiceButton';
 import CategoryTypeSelect from './CategoryTypeSelect';
-import { MatchBadge, MatchDot } from './MatchStatus';
+import { AmbiguousMatches, MatchBadge, MatchDot } from './MatchStatus';
 
 type ResolutionChoice = EntityResolutionAction['action'];
 
@@ -28,28 +33,39 @@ interface ImportEntityRowProps {
   resolution: EntityResolutionAction | undefined;
   onChange: (resolution: EntityResolutionAction) => void;
   allowSkip?: boolean;
-  categoryTypes?: CategoryType[];
+  /** The category types, and the categories and units a new one must not duplicate. */
+  existingRows?: ExistingRows;
 }
+
+const NO_EXISTING_ROWS: ExistingRows = { categoryTypes: [], categories: [], units: [] };
+
+const STATUS_LABEL_KEYS: Record<ImportMatchStatus, string> = {
+  matched: 'cocktails.importWizard.matched',
+  missing: 'cocktails.importWizard.missing',
+  ambiguous: 'importMatches.ambiguous',
+};
 
 const FIELD_ERROR_KEYS: Record<CreateDataField, string> = {
   name: 'cocktails.importWizard.fieldRequired',
   abbreviation: 'cocktails.importWizard.fieldRequired',
+  type: 'categories.typeRequired',
   capacityMl: 'cocktails.importWizard.capacityInvalid',
   desiredStock: 'cocktails.importWizard.desiredStockInvalid',
 };
 
 /**
- * The entities the admin can pick. A bottle only maps to a bottle of the same
- * category. The backend's match stays listed while the lists are loading.
+ * The entities the admin can pick. A bottle only maps to a bottle of the same category, compared
+ * like the backend compares category names (`caseInsensitiveKey`). The backend's matches stay
+ * listed while the lists are loading.
  */
 function pickableOptions(entity: ImportEntityResolution, type: ImportEntityType, options: ExistingOption[]): ExistingOption[] {
-  const categoryName = entity.ref.categoryName?.toLowerCase();
-  const sameCategory = type === 'bottles' && categoryName
-    ? options.filter((option) => option.category?.name?.toLowerCase() === categoryName)
+  const categoryKey = entity.ref.categoryName ? caseInsensitiveKey(entity.ref.categoryName) : undefined;
+  const sameCategory = type === 'bottles' && categoryKey
+    ? options.filter((option) => option.category?.name !== undefined && caseInsensitiveKey(option.category.name) === categoryKey)
     : options;
-  const match = entity.existingMatch;
-  if (!match || sameCategory.some((option) => option.id === match.id)) return sameCategory;
-  return [match, ...sameCategory];
+  const matches = entity.existingMatch ? [entity.existingMatch] : entity.ambiguousMatches ?? [];
+  const unlisted = matches.filter((match) => !sameCategory.some((option) => option.id === match.id));
+  return [...unlisted, ...sameCategory];
 }
 
 export default function ImportEntityRow({
@@ -59,23 +75,34 @@ export default function ImportEntityRow({
   resolution,
   onChange,
   allowSkip = false,
-  categoryTypes = [],
+  existingRows = NO_EXISTING_ROWS,
 }: ImportEntityRowProps) {
   const { t } = useTranslation();
   const isMatched = entity.status === 'matched';
+  const isAmbiguous = entity.status === 'ambiguous';
   const [expanded, setExpanded] = useState(!isMatched);
 
-  const choice: ResolutionChoice = resolution?.action ?? (isMatched ? 'use_existing' : 'create');
+  // An ambiguous entity has no resolution until the admin picks one of its matches
+  const choice: ResolutionChoice = resolution?.action ?? (isMatched || isAmbiguous ? 'use_existing' : 'create');
   const options = pickableOptions(entity, type, existingOptions);
   const createData = (resolution?.action === 'create' && resolution.data) || defaultCreateData(type, entity.ref);
-  const invalidFields = invalidCreateFields(type, createData);
-  const errorOf = (field: CreateDataField) => (invalidFields.includes(field) ? t(FIELD_ERROR_KEYS[field]) : undefined);
+  const invalidFields = invalidCreateFields(type, createData, existingRows);
+  const uniqueField = UNIQUE_FIELD[type];
+  const uniqueFieldMessages = existingMatchMessages(t, existingRowFor(type, createData, existingRows), (row) => existingOptionLabel(type, row));
+  const errorOf = (field: CreateDataField) => {
+    if (!invalidFields.includes(field)) return undefined;
+    return (field === uniqueField && uniqueFieldMessages.error) || t(FIELD_ERROR_KEYS[field]);
+  };
 
   const choose = (next: ResolutionChoice) => {
-    // The button is disabled when `options` is empty
-    if (next === 'use_existing') onChange({ action: 'use_existing', existingId: entity.existingMatch?.id ?? options[0].id });
-    else if (next === 'create') onChange({ action: 'create', data: defaultCreateData(type, entity.ref) });
-    else onChange({ action: 'skip' });
+    // The button is disabled when `options` is empty. Of several matches, none is picked for the admin.
+    if (next === 'use_existing') {
+      onChange({ action: 'use_existing', existingId: isAmbiguous ? undefined : entity.existingMatch?.id ?? options[0].id });
+    } else if (next === 'create') {
+      onChange({ action: 'create', data: defaultCreateData(type, entity.ref) });
+    } else {
+      onChange({ action: 'skip' });
+    }
   };
 
   const updateCreateData = (field: keyof ImportEntityRef, value: ImportEntityRef[keyof ImportEntityRef]) => {
@@ -83,7 +110,7 @@ export default function ImportEntityRow({
   };
 
   const textField = (field: 'name' | 'abbreviation', label: string) => (
-    <Field label={label} error={errorOf(field)} required>
+    <Field label={label} hint={field === uniqueField ? uniqueFieldMessages.hint : undefined} error={errorOf(field)} required>
       <Input value={createData[field] ?? ''} onChange={(e) => updateCreateData(field, e.target.value)} />
     </Field>
   );
@@ -99,7 +126,8 @@ export default function ImportEntityRow({
     </Field>
   );
 
-  const selectedId = resolution?.existingId ?? entity.existingMatch?.id ?? options[0]?.id ?? '';
+  // Empty until the admin picks one of several matches
+  const selectedId = resolution?.existingId ?? (isAmbiguous ? '' : entity.existingMatch?.id ?? options[0]?.id ?? '');
 
   return (
     <div className="border border-gray-700 rounded-lg overflow-hidden">
@@ -109,12 +137,9 @@ export default function ImportEntityRow({
         aria-expanded={expanded}
         className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-800/30"
       >
-        <MatchDot matched={isMatched} />
+        <MatchDot status={entity.status} />
         <span className="flex-1 text-sm font-medium">{referenceLabel(type, entity.ref)}</span>
-        <MatchBadge
-          matched={isMatched}
-          label={isMatched ? t('cocktails.importWizard.matched') : t('cocktails.importWizard.missing')}
-        />
+        <MatchBadge status={entity.status} label={t(STATUS_LABEL_KEYS[entity.status])} />
         <svg aria-hidden="true" className={cx('w-4 h-4 text-fg-muted transition-transform motion-reduce:transition-none', expanded && 'rotate-180')} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
@@ -122,6 +147,7 @@ export default function ImportEntityRow({
 
       {expanded && (
         <div className="px-4 pb-4 pt-3 border-t border-gray-700/50 space-y-3">
+          {isAmbiguous && <AmbiguousMatches matches={entity.ambiguousMatches ?? []} />}
           <div className="flex gap-2">
             <ChoiceButton selected={choice === 'use_existing'} disabled={options.length === 0} onClick={() => choose('use_existing')}>
               {t('cocktails.importWizard.useExisting')}
@@ -142,6 +168,7 @@ export default function ImportEntityRow({
                 value={selectedId}
                 onChange={(e) => onChange({ action: 'use_existing', existingId: Number(e.target.value) })}
               >
+                {selectedId === '' && <option value="" disabled>{t('importMatches.pickMatch')}</option>}
                 {options.map((option) => (
                   <option key={option.id} value={option.id}>{existingOptionLabel(type, option)}</option>
                 ))}
@@ -155,11 +182,11 @@ export default function ImportEntityRow({
               {type === 'units' && textField('abbreviation', t('units.abbreviation'))}
               {type === 'categories' && (
                 <>
-                  <Field label={t('categories.type')}>
+                  <Field label={t('categories.type')} error={errorOf('type')}>
                     <CategoryTypeSelect
                       value={createData.type ?? ''}
                       onChange={(categoryType) => updateCreateData('type', categoryType)}
-                      categoryTypes={categoryTypes}
+                      categoryTypes={existingRows.categoryTypes}
                     />
                   </Field>
                   {numberField('desiredStock', t('cocktails.importWizard.desiredStock'), 0)}

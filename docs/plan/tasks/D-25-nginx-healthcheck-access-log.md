@@ -5,13 +5,13 @@ phase: D
 lane: infra
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [D-03]
-touches: [frontend/nginx.conf.template, docker-compose.yml, docker-compose.prod.yml]
+touches: [frontend/nginx.conf.template, docker-compose.yml, docker-compose.prod.yml, scripts/smoke/smoke.sh]
 sources: []
-branch:
-pr:
+branch: chore/D-25-healthcheck-access-log
+pr: 234
 ---
 
 ## Contexte
@@ -55,3 +55,5 @@ D-03 (PR #117) ajoute un healthcheck au service frontend des deux compose : `wge
 ## Journal
 
 - 2026-10-12 : tâche créée pendant la relecture de D-03 (PR #117), remarque hors périmètre du relecteur.
+- 2026-11-26 : faite. Le healthcheck sondait `/` (wget, port 8080, image aplatie par D-43). Location `= /healthz` avec `access_log off` et `return 200` (pas de test des fichiers de la SPA : le backend sain est déjà exigé, et `try_files` vers `/index.html` remettrait la sonde dans le log). Aucune route de la SPA ne porte ce nom. Le smoke test vérifie que `/healthz` reste hors du log et qu'une requête sur `/` y figure.
+- Notes de version : le log d'accès du frontend (`docker compose logs frontend`) ne contient plus les sondes du healthcheck (environ 2 900 lignes par jour) ; les requêtes des visiteurs y restent. Aucune action requise.

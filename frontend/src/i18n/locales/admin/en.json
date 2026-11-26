@@ -21,6 +21,7 @@
     "password": "Password",
     "loginButton": "Sign In",
     "loginError": "Invalid email or password",
+    "backupRestored": "Backup restored. Sign in with the email and password that were in use when the backup was made.",
     "welcome": "Welcome to Carta Cocktail"
   },
   "dashboard": {
@@ -65,7 +66,9 @@
     "updated": "Type updated",
     "deleted": "Type deleted",
     "emptyName": "(no name)",
-    "withSpaces": "(with spaces)"
+    "withSpaces": "(with spaces)",
+    "withInvisibleCharacters": "(with invisible characters)",
+    "nonStandardForm": "(non-standard Unicode form)"
   },
   "bottles": {
     "title": "Bottles",
@@ -119,6 +122,8 @@
       "pickCategory": "— Pick a category —",
       "willCreate": "will be created",
       "categoryRequired": "Category required for this bottle",
+      "categoriesWithoutType": "{{count}} category(ies) to create have no type with a name: choose another type.",
+      "categoriesToResolve": "{{count}} category(ies) match several existing ones that differ only by case: use one of them, or create it under another name.",
       "duplicateFlag": "{{count}} existing duplicate(s)",
       "confirmTitle": "Import summary",
       "categoriesToCreate": "Categories to create",
@@ -142,6 +147,7 @@
       "rowErrors": {
         "title": "{{count}} row(s) left out of the import",
         "position": "{{source}}, line {{line}}:",
+        "column": "column {{number}}",
         "source": {
           "bottles": "Bottles",
           "categories": "Categories"
@@ -151,7 +157,16 @@
           "outOfRange": "{{field}} is out of range",
           "invalidDate": "{{field}} is not a valid date (expected {{pattern}} or {{isoPattern}})",
           "invalidNumber": "{{field}} is not a valid number",
+          "malformedQuotes": "{{field}} has a misplaced quotation mark",
           "unknown": "{{field}} is invalid"
+        }
+      },
+      "rowWarnings": {
+        "title": "{{count}} value(s) to check, imported as they are",
+        "hint": "A misplaced quotation mark in the file can merge several lines into one value.",
+        "code": {
+          "lineBreak": "{{field}} spans several lines",
+          "unknown": "{{field}} to check"
         }
       }
     },
@@ -160,6 +175,14 @@
     "usage": "Use",
     "usableAsApero": "Can be served as an aperitif",
     "usableAsDigestif": "Can be served as a digestif"
+  },
+  "importMatches": {
+    "ambiguous": "Several matches",
+    "pickOne": "Several existing ones differ only by case: {{names}}. Use one of them, or create it under another name.",
+    "pickMatch": "— Pick one of them —",
+    "existingEntry": "Existing entry to use",
+    "usedAsItIs": "Already exists as \"{{name}}\": it will be used as it is, and the other fields are ignored.",
+    "ambiguousName": "Matches {{names}}, which differ only by case: use one of them, or change this value."
   },
   "ingredients": {
     "title": "Ingredients",
@@ -349,20 +372,36 @@
       "noExcluded": "No bottle removed from this menu.",
       "restore": "Put back",
       "restoreLabel": "Put {{name}} back in the menu",
-      "cocktailMenu": "This is a cocktail menu: it holds no bottles.",
+      "add": "Add",
+      "addTitle": "Add bottles",
+      "addLabel": "Add {{name}} to the menu",
+      "searchChoices": "Search the bottles to add",
       "aperos": {
         "title": "Manage the aperitifs menu",
         "hint": "Bottles checked as aperitif appear here automatically. Use \"Synchronize\" to update the list.",
-        "empty": "No bottles. Check bottles as aperitif, then synchronize."
+        "empty": "No bottles. Check bottles as aperitif, then synchronize.",
+        "personalTitle": "Manage an aperitifs menu",
+        "personalHint": "Choose the bottles of this menu among the bottles checked as aperitif. Unchecking a bottle removes it from this menu.",
+        "personalEmpty": "No bottles yet. Add bottles checked as aperitif from the list below.",
+        "choices": "Bottles checked as aperitif that are not in this menu yet. An empty bottle stays hidden from guests until it is refilled.",
+        "noChoice": "Every bottle checked as aperitif is already in this menu. Check more bottles as aperitif to add them here.",
+        "unchecked": "No longer checked as aperitif: \"Put back\" only takes it off this list. The menu gets it back once it is checked as aperitif again."
       },
       "digestifs": {
         "title": "Manage the digestifs menu",
         "hint": "Bottles checked as digestif appear here automatically. Use \"Synchronize\" to update the list.",
-        "empty": "No bottles. Check bottles as digestif, then synchronize."
+        "empty": "No bottles. Check bottles as digestif, then synchronize.",
+        "personalTitle": "Manage a digestifs menu",
+        "personalHint": "Choose the bottles of this menu among the bottles checked as digestif. Unchecking a bottle removes it from this menu.",
+        "personalEmpty": "No bottles yet. Add bottles checked as digestif from the list below.",
+        "choices": "Bottles checked as digestif that are not in this menu yet. An empty bottle stays hidden from guests until it is refilled.",
+        "noChoice": "Every bottle checked as digestif is already in this menu. Check more bottles as digestif to add them here.",
+        "unchecked": "No longer checked as digestif: \"Put back\" only takes it off this list. The menu gets it back once it is checked as digestif again."
       }
     },
     "search": "Search menus",
     "type": "Type",
+    "typeHint": "Cannot be changed later. Aperitifs and digestifs menus hold bottles, chosen among the bottles checked for their type.",
     "types": {
       "cocktails": "Cocktails",
       "aperos": "Aperitifs",
@@ -406,11 +445,10 @@
       "import": "Restore Backup",
       "importing": "Restoring...",
       "selectFile": "Select ZIP file",
-      "confirmRestore": "This will replace ALL current data (database and images). This action cannot be undone. Continue?",
+      "confirmRestore": "This will replace ALL current data (database, images and admin account). This action cannot be undone. You will then have to sign in again with the email and password that were in use when the backup was made. Continue?",
       "exportSuccess": "Backup exported successfully",
       "exportTimeout": "Preparing the backup took too long: the proxy in front of the server stopped waiting. Trying again right away will probably fail the same way. Try again later, when the server is less busy. If it keeps failing, check the backend logs and the timeout of any reverse proxy in front of Carta Cocktail.",
       "exportNoAnswer": "The connection to the server was cut before the backup was fully downloaded. The export changes nothing on the server: check your connection and try again.",
-      "importSuccess": "Backup restored successfully. The page will reload.",
       "importDone": "Backup restored.",
       "restoreTimeout": "The server did not answer in time, but the restore may still be running.",
       "restoreNoAnswer": "The connection to the server was cut before it answered (the browser or a proxy stopped waiting, or the network was lost), but the restore may still be running. Check your network connection.",
@@ -421,8 +459,7 @@
       "restartMayFail": "This may not be enough: for a backup from v1.0.x, or from before v1.8.0 with duplicate category names or unit abbreviations, or, without Docker, from v1.5.0 or older, the database update fails. Read \"Restoring a backup from an older version\" in UPGRADING.md before restarting.",
       "skippedFiles_one": "{{count}} file of the uploads folder was not restored: only JPG, PNG and WebP images are restored, once per file name.",
       "skippedFiles_other": "{{count}} files of the uploads folder were not restored: only JPG, PNG and WebP images are restored, once per file name.",
-      "reload": "Reload the page",
-      "reloadAfterRestart": "Reload the page once the backend has restarted",
+      "signInAfterRestart": "Sign in again once the backend has restarted",
       "fileSelected": "File: {{name}}"
     },
     "noIcon": "No icon"
@@ -488,6 +525,14 @@
     "issue": "{{field}}: {{rule}}",
     "issueInRow": "Row {{row}}, {{field}}: {{rule}}",
     "issueInCategoryRow": "Category {{row}}, {{field}}: {{rule}}",
+    "unknownReference": "Row {{row}}, {{field}}: this item no longer exists, choose another one",
+    "unresolved": {
+      "unit": "Row {{row}}: unit \"{{name}}\" is neither matched nor created",
+      "noUnit": "Row {{row}}: no unit",
+      "category": "Row {{row}}: category \"{{name}}\" is neither matched nor created",
+      "bottle": "Row {{row}}: bottle \"{{name}}\" is neither matched nor created, or has no category",
+      "ingredient": "Row {{row}}: ingredient \"{{name}}\" is neither matched nor created"
+    },
     "fields": {
       "name": "Name",
       "slug": "URL slug",

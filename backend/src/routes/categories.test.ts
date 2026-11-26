@@ -216,6 +216,38 @@ describe('POST /api/categories', () => {
     expect(await prisma.categoryType.findUnique({ where: { name: 'X Y' } })).toBeNull();
   });
 
+  it('should remove the invisible characters of a new type', async () => {
+    const res = await request.post('/api/categories').set(authHeader()).send({ name: 'OJ', type: 'FRUIT\u200B JUICE\u00AD' });
+    expect(res.status).toBe(201);
+    expect(res.body.type).toBe('FRUIT JUICE');
+    expect(await prisma.categoryType.findUnique({ where: { name: 'FRUIT JUICE' } })).not.toBeNull();
+  });
+
+  it('should keep an existing type with an invisible character chosen as it is', async () => {
+    await prisma.categoryType.create({ data: { name: 'X\u200BY', color: 'gray' } });
+    const res = await request.post('/api/categories').set(authHeader()).send({ name: 'Rum', type: 'X\u200BY' });
+    expect(res.status).toBe(201);
+    expect(res.body.type).toBe('X\u200BY');
+    expect(await prisma.categoryType.findUnique({ where: { name: 'XY' } })).toBeNull();
+  });
+
+  it('should compose a new decomposed type', async () => {
+    const res = await request.post('/api/categories').set(authHeader()).send({ name: 'Cassis', type: 'CRE\u0300ME' });
+    expect(res.status).toBe(201);
+    expect(res.body.type).toBe('CR\u00C8ME');
+    expect(await prisma.categoryType.findUnique({ where: { name: 'CRE\u0300ME' } })).toBeNull();
+  });
+
+  it('should file the category under the type chosen when one is decomposed and the other composed', async () => {
+    await prisma.categoryType.create({ data: { name: 'CRE\u0300ME', color: 'red' } });
+    await prisma.categoryType.create({ data: { name: 'CR\u00C8ME', color: 'blue' } });
+    const decomposed = await request.post('/api/categories').set(authHeader()).send({ name: 'Cassis', type: 'CRE\u0300ME' });
+    const composed = await request.post('/api/categories').set(authHeader()).send({ name: 'Mûre', type: 'CR\u00C8ME' });
+    expect(decomposed.body.type).toBe('CRE\u0300ME');
+    expect(composed.body.type).toBe('CR\u00C8ME');
+    expect(await prisma.categoryType.count()).toBe(5);
+  });
+
   it('should return 409 when the name exists with another case', async () => {
     await seedCategory({ name: 'Rhum' });
     const res = await request.post('/api/categories').set(authHeader())
@@ -304,6 +336,22 @@ describe('PUT /api/categories/:id', () => {
     expect(res.status).toBe(200);
     expect(res.body.type).toBe('FRUIT JUICE');
     expect(await prisma.categoryType.findUnique({ where: { name: ' FRUIT   JUICE ' } })).toBeNull();
+  });
+
+  it('should compose a new decomposed type given on edit', async () => {
+    const cat = await seedCategory({ name: 'Cassis' });
+    const res = await request.put(`/api/categories/${cat.id}`).set(authHeader()).send({ type: 'CRE\u0300ME' });
+    expect(res.status).toBe(200);
+    expect(res.body.type).toBe('CR\u00C8ME');
+  });
+
+  it('should keep an existing decomposed type when the category is saved', async () => {
+    await prisma.categoryType.create({ data: { name: 'CRE\u0300ME', color: 'red' } });
+    const cat = await seedCategory({ name: 'Cassis', type: 'CRE\u0300ME' });
+    const res = await request.put(`/api/categories/${cat.id}`).set(authHeader()).send({ name: 'Cassis', type: 'CRE\u0300ME' });
+    expect(res.status).toBe(200);
+    expect(await prisma.category.findUniqueOrThrow({ where: { id: cat.id } })).toMatchObject({ type: 'CRE\u0300ME' });
+    expect(await prisma.categoryType.findUnique({ where: { name: 'CR\u00C8ME' } })).toBeNull();
   });
 
   it('should return 400 for a blank type that names no type, and change nothing', async () => {
@@ -413,5 +461,62 @@ describe('DELETE /api/categories/:id', () => {
     expect(await prisma.category.count()).toBe(1);
     expect(await prisma.bottle.count()).toBe(1);
     expect(await prisma.cocktailIngredient.count()).toBe(1);
+  });
+});
+
+// 'Cr\u00E8me' and its decomposed form look the same: a new name is stored composed (C-65)
+const COMPOSED = 'Cr\u00E8me';
+const DECOMPOSED = 'Cre\u0300me';
+
+describe('Category names in another Unicode form', () => {
+  it('should return 409 for a decomposed name next to the composed one, or the composed name in upper case', async () => {
+    await seedCategory({ name: COMPOSED });
+    const decomposed = await request.post('/api/categories').set(authHeader()).send({ name: DECOMPOSED, type: 'SPIRIT' });
+    const upperCase = await request.post('/api/categories').set(authHeader()).send({ name: 'CR\u00C8ME', type: 'SPIRIT' });
+    expect(decomposed.status).toBe(409);
+    expect(upperCase.status).toBe(409);
+    expect(await prisma.category.count()).toBe(1);
+  });
+
+  it('should store a new name and its translations composed', async () => {
+    const res = await request.post('/api/categories').set(authHeader())
+      .send({ name: DECOMPOSED, type: 'SPIRIT', nameTranslations: { fr: DECOMPOSED, en: 'Cream' } });
+    expect(res.status).toBe(201);
+    expect(res.body.name).toBe(COMPOSED);
+    expect(res.body.nameTranslations).toEqual({ fr: COMPOSED, en: 'Cream' });
+  });
+
+  it('should compose a name and a translation the admin changes', async () => {
+    const cat = await seedCategory({ name: 'Cassis', nameTranslations: JSON.stringify({ fr: 'Cassis' }) });
+    const res = await request.put(`/api/categories/${cat.id}`).set(authHeader())
+      .send({ name: DECOMPOSED, nameTranslations: { fr: DECOMPOSED } });
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe(COMPOSED);
+    expect(res.body.nameTranslations).toEqual({ fr: COMPOSED });
+  });
+
+  it('should keep a stored decomposed name and translation sent back as they are', async () => {
+    const cat = await seedCategory({ name: DECOMPOSED, nameTranslations: JSON.stringify({ fr: DECOMPOSED }) });
+    const res = await request.put(`/api/categories/${cat.id}`).set(authHeader())
+      .send({ name: DECOMPOSED, desiredStock: 3, nameTranslations: { fr: DECOMPOSED, en: 'Cre\u0300am' } });
+    expect(res.status).toBe(200);
+    expect(await prisma.category.findUniqueOrThrow({ where: { id: cat.id } })).toMatchObject({
+      name: DECOMPOSED,
+      desiredStock: 3,
+      // The new English translation is composed, the French one sent back as it is stays as it is
+      nameTranslations: JSON.stringify({ fr: DECOMPOSED, en: 'Cr\u00E8am' }),
+    });
+  });
+
+  it('should return 409 when renaming to the decomposed name of another category', async () => {
+    await seedCategory({ name: COMPOSED });
+    const cat = await seedCategory({ name: 'Cassis' });
+    const res = await request.put(`/api/categories/${cat.id}`).set(authHeader()).send({ name: DECOMPOSED });
+    expect(res.status).toBe(409);
+  });
+
+  it('should return 404 for a category that does not exist', async () => {
+    const res = await request.put('/api/categories/9999').set(authHeader()).send({ name: COMPOSED });
+    expect(res.status).toBe(404);
   });
 });

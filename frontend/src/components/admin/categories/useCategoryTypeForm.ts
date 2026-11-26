@@ -4,6 +4,7 @@ import type { CategoryType } from '../../../types';
 import { qk } from '../../../queries/keys';
 import { useEntityMutation } from '../../../queries/crud';
 import { buildNameTranslations, toTranslationForm, type TranslationForm } from '../../../utils/translations';
+import { tidyName } from '../../../utils/invisibleCharacters';
 import { useEntityForm } from '../useEntityForm';
 
 export interface CategoryTypeForm {
@@ -66,7 +67,9 @@ export function useCategoryTypeForm() {
       update.mutate({ name: editing.name, ...changes }, { onSuccess: resetForm });
       return;
     }
-    const name = form.name.trim().toUpperCase();
+    // Tidied as the backend stores it, after the upper case, which can decompose a letter: a name
+    // of spaces or invisible characters is not sent
+    const name = tidyName(form.name.toUpperCase());
     if (name) create.mutate({ name, ...changes }, { onSuccess: resetForm });
   };
 

@@ -6,7 +6,7 @@ import {
   seedMenu, seedMenuSection, addBottleToMenu, excludeBottleFromMenu, findSystemMenu,
 } from '../test/helpers';
 import type { BottlesExportPayload } from '../utils/bottlesExport';
-import type { ImportCategoryRecord } from '../utils/bottlesImport';
+import { MAX_BOTTLE_IMPORT_BYTES, type ImportCategoryRecord } from '../utils/bottlesImport';
 import { windows1252Bytes } from '../test/windows1252';
 
 beforeAll(async () => { await setupTestDatabase(); });
@@ -611,6 +611,48 @@ describe('GET /api/bottles/export', () => {
     expect(confirm.status).toBe(201);
     expect(await bottleSnapshot()).toEqual(exported);
   });
+
+  // The forms are single-line, but the API and the imports accept line breaks (C-63)
+  describe('values on several lines', () => {
+    async function seedMultiLineValues() {
+      const gin = await seedCategory({ name: 'Gin' });
+      const rhum = await seedCategory({ name: 'Rhum\nagricole' });
+      await seedBottle({ name: 'Gin\nOld Tom', categoryId: gin.id, location: 'Shelf\r\nleft' });
+      await seedBottle({ name: 'Havana', categoryId: rhum.id });
+    }
+
+    async function exportedFile(format: 'csv' | 'json'): Promise<[Buffer, string]> {
+      if (format === 'csv') return [await exportCsvBytes(), 'bottles.csv'];
+      const res = await request.get('/api/bottles/export').set(authHeader());
+      return [Buffer.from(JSON.stringify(res.body)), 'bottles.json'];
+    }
+
+    const lineBreak = (source: string, line: number, field: string) => ({ source, line, field, code: 'lineBreak' });
+
+    it.each([
+      // The CSV names the line each record starts on: the first one spans lines 2 to 4
+      ['csv', [lineBreak('bottles', 2, 'name'), lineBreak('bottles', 2, 'location'), lineBreak('bottles', 5, 'categoryName')]],
+      ['json', [
+        lineBreak('categories', 2, 'name'),
+        lineBreak('bottles', 1, 'name'), lineBreak('bottles', 1, 'location'), lineBreak('bottles', 2, 'categoryName'),
+      ]],
+    ] as const)('should import back a %s export with warnings and no error', async (format, warnings) => {
+      await seedMultiLineValues();
+      const exported = await bottleSnapshot();
+      const [file, filename] = await exportedFile(format);
+
+      const preview = await request.post('/api/bottles/import/preview').set(authHeader()).attach('file', file, filename);
+      await prisma.bottle.deleteMany();
+      const confirm = await request.post('/api/bottles/import/confirm').set(authHeader())
+        .send({ payload: preview.body.payload, resolutions: {} });
+
+      expect(preview.body.errors).toEqual([]);
+      expect(preview.body.warnings).toEqual(warnings);
+      expect(preview.body.payload).not.toHaveProperty('warnings');
+      expect(confirm.status).toBe(201);
+      expect(await bottleSnapshot()).toEqual(exported);
+    });
+  });
 });
 
 describe('POST /api/bottles/import/preview', () => {
@@ -739,10 +781,31 @@ describe('POST /api/bottles/import/preview', () => {
     expect(res.body.details).toEqual({ code: 'missingColumn', column: 'capacityMl' });
   });
 
-  it('should answer 413 JSON for a file over 10 MB', async () => {
+  // JSON ignores the trailing spaces that bring the file to the size under test
+  function importFileOf(size: number): Buffer {
+    const payload = { version: 1, bottles: [{ name: 'Havana', categoryName: 'Rhum', capacityMl: 700, quantity: 1 }] };
+    return Buffer.from(JSON.stringify(payload).padEnd(size, ' '));
+  }
+
+  it.each([
+    ['one byte under the limit', MAX_BOTTLE_IMPORT_BYTES - 1],
+    ['exactly the limit', MAX_BOTTLE_IMPORT_BYTES],
+  ])('should read a file of %s', async (_case, size) => {
+    const file = importFileOf(size);
+    expect(file.length).toBe(size);
+
     const res = await request.post('/api/bottles/import/preview')
       .set(authHeader())
-      .attach('file', Buffer.alloc(11 * 1024 * 1024), 'bottles.csv');
+      .attach('file', file, 'bottles.json');
+
+    expect(res.status).toBe(200);
+    expect(res.body.payload.bottles).toHaveLength(1);
+  });
+
+  it('should answer 413 JSON for a file one byte over the limit', async () => {
+    const res = await request.post('/api/bottles/import/preview')
+      .set(authHeader())
+      .attach('file', importFileOf(MAX_BOTTLE_IMPORT_BYTES + 1), 'bottles.json');
     expect(res.status).toBe(413);
     expect(res.body.error).toBe('The file or request is too large');
   });
@@ -777,6 +840,22 @@ describe('POST /api/bottles/import/preview', () => {
     expect(res.body).toEqual({
       error: 'The ZIP archive must contain bottles.csv or bottles.json',
       details: { code: 'zipMissingBottles' },
+    });
+  });
+
+  it('should refuse a ZIP whose categories.csv header has a misplaced quote, naming that file', async () => {
+    const zip = new AdmZip();
+    zip.addFile('bottles.csv', Buffer.from('name,capacityMl\nHavana,700'));
+    zip.addFile('categories.csv', Buffer.from('"name,type\nRhum,SPIRIT'));
+    const res = await request.post('/api/bottles/import/preview')
+      .set(authHeader())
+      .set('Accept-Language', 'fr')
+      .attach('file', zip.toBuffer(), 'bottles.zip');
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({
+      error: 'Les noms de colonnes de categories.csv (sa première ligne) contiennent un guillemet mal placé',
+      details: { code: 'malformedHeader', file: 'categories.csv' },
     });
   });
 
@@ -828,6 +907,8 @@ describe('POST /api/bottles/import/preview', () => {
       ['en-US', '2024-12-03'],
       ['en-GB', '2024-03-12'],
       ['en-gb', '2024-03-12'],
+      // The language of the messages: the first one the app has
+      ['de-DE, fr;q=0.5', '2024-03-12'],
     ])('should read 12/03/2024 with Accept-Language %s as %s', async (language, expected) => {
       const res = await request.post('/api/bottles/import/preview').set(authHeader())
         .set('Accept-Language', language)
@@ -879,6 +960,21 @@ describe('POST /api/bottles/import/preview', () => {
 
     expect(res.body.bottles[0].potentialDuplicates.map((d: { name: string }) => d.name)).toEqual(['HAVANA', 'havana']);
     expect(res.body.bottles[1].potentialDuplicates).toEqual([]);
+  });
+
+  // Category names are compared ignoring case and Unicode form (C-65)
+  it.each([
+    ['decomposed, the existing one composed', 'CRE\u0300ME', 'Cr\u00E8me'],
+    ['composed, the existing one decomposed', 'CR\u00C8ME', 'Cre\u0300me'],
+  ])('should list a duplicate whose category is written %s', async (_case, fileCategory, existingCategory) => {
+    const cream = await seedCategory({ name: existingCategory });
+    await seedBottle({ name: 'Lejay', categoryId: cream.id, capacityMl: 700 });
+    const payload = { version: 1, bottles: [importRow({ name: 'Lejay', categoryName: fileCategory })] };
+
+    const res = await request.post('/api/bottles/import/preview').set(authHeader())
+      .attach('file', Buffer.from(JSON.stringify(payload)), 'bottles.json');
+
+    expect(res.body.bottles[0].potentialDuplicates.map((d: { name: string }) => d.name)).toEqual(['Lejay']);
   });
 });
 
@@ -1218,6 +1314,79 @@ describe('POST /api/bottles/import/confirm', () => {
     expect(category.type).toBe('AROMATIC BITTER');
     expect(await prisma.categoryType.findUnique({ where: { name: 'AROMATIC   BITTER' } })).toBeNull();
   });
+
+  // Data older than v1.9.0 can hold ' SPIRIT ' next to 'SPIRIT': the wizard lists both, and the
+  // category goes under the one picked, as when it is created by hand (C-57)
+  describe('type picked for a category to create', () => {
+    /** Imports one bottle per category, each category created under the type given. */
+    function importUnderTypes(typesByCategory: Record<string, string>) {
+      const names = Object.keys(typesByCategory);
+      const payload = {
+        version: 1,
+        bottles: names.map((categoryName) => importRow({ name: `${categoryName} bottle`, categoryName })),
+      };
+      const categories = Object.fromEntries(names.map((name) => [
+        name.toLowerCase(), { action: 'create', data: { name, type: typesByCategory[name] } },
+      ]));
+      return request.post('/api/bottles/import/confirm').set(authHeader()).send({ payload, resolutions: { categories } });
+    }
+
+    async function typeOf(categoryName: string) {
+      return (await prisma.category.findUniqueOrThrow({ where: { name: categoryName } })).type;
+    }
+
+    it('should keep an existing type with surrounding spaces, and create no type', async () => {
+      await prisma.categoryType.create({ data: { name: ' RUM ', color: 'red' } });
+      const typeCount = await prisma.categoryType.count();
+
+      const res = await importUnderTypes({ Rhum: ' RUM ' });
+
+      expect(res.status).toBe(201);
+      expect(await typeOf('Rhum')).toBe(' RUM ');
+      expect(await prisma.categoryType.count()).toBe(typeCount);
+    });
+
+    it("should file each category under the type picked when ' SPIRIT ' and 'SPIRIT' both exist", async () => {
+      await prisma.categoryType.create({ data: { name: ' SPIRIT ', color: 'red' } });
+      const typesBefore = await prisma.categoryType.findMany({ orderBy: { name: 'asc' } });
+
+      const res = await importUnderTypes({ Rhum: ' SPIRIT ', Gin: 'SPIRIT' });
+
+      expect(res.status).toBe(201);
+      expect(await typeOf('Rhum')).toBe(' SPIRIT ');
+      expect(await typeOf('Gin')).toBe('SPIRIT');
+      expect(await prisma.categoryType.findMany({ orderBy: { name: 'asc' } })).toEqual(typesBefore);
+    });
+
+    it('should trim and collapse a new type, created in gray', async () => {
+      const res = await importUnderTypes({ Rhum: ' rum  x ' });
+
+      expect(res.status).toBe(201);
+      expect(await typeOf('Rhum')).toBe('rum x');
+      expect(await prisma.categoryType.findUnique({ where: { name: 'rum x' } }))
+        .toEqual({ name: 'rum x', nameTranslations: null, color: 'gray' });
+    });
+
+    it.each([
+      ['a blank new type', '   '],
+      ['a new type of invisible characters', '\u200B\u00AD'],
+      ['a new type of blank characters', '\u2800 \u3164'],
+      // A category needs a type, even when a type has the empty name: the category form refuses it too
+      ['the empty name, even when a type has it', ''],
+    ])('should return 400 for %s, pointing at its resolution, and import nothing', async (_case, type) => {
+      // A blank new type is refused, and the empty name even when a type has it
+      await prisma.categoryType.create({ data: { name: '', color: 'red' } });
+      const typeCount = await prisma.categoryType.count();
+
+      const res = await importUnderTypes({ Rhum: type });
+
+      expect(res.status).toBe(400);
+      expect(res.body.details).toMatchObject([{ path: 'body.resolutions.categories.rhum.data.type', code: 'too_small' }]);
+      expect(await prisma.category.count()).toBe(0);
+      expect(await prisma.bottle.count()).toBe(0);
+      expect(await prisma.categoryType.count()).toBe(typeCount);
+    });
+  });
 });
 
 describe('bottle menus', () => {
@@ -1411,6 +1580,285 @@ describe('bottle menus', () => {
     await seedCategory({ name: 'Apero' });
     await sendWithFailingMenuSync(() => request.post('/api/bottles/import/confirm').set(authHeader())
       .send({ payload: importPayload([{ name: 'Aperol', isApero: true }]), resolutions: {} }));
+    expect(await prisma.bottle.count()).toBe(0);
+  });
+});
+
+// The routes refuse a second category that differs only by case (C-07): the import uses the
+// existing one instead of creating it (C-19). Older data may still hold 'Rhum' next to 'RHUM'.
+describe('POST /api/bottles/import - categories that exist ignoring case', () => {
+  function previewOf(categoryName: string) {
+    const file = {
+      version: 1,
+      categories: [{ name: categoryName, type: 'SPIRIT', desiredStock: 1, minimumPercent: 30, nameTranslations: null }],
+      bottles: [{ name: 'Havana', categoryName, capacityMl: 700, quantity: 1 }],
+    };
+    return request.post('/api/bottles/import/preview').set(authHeader())
+      .attach('file', Buffer.from(JSON.stringify(file)), 'bottles.json');
+  }
+
+  function confirm(
+    bottles: Record<string, unknown>[],
+    categories: Record<string, unknown> = {},
+    rows: Record<string, unknown> = {},
+  ) {
+    const payload = { version: 1, categories: [], bottles: bottles.map(importRow) };
+    return request.post('/api/bottles/import/confirm').set(authHeader())
+      .send({ payload, resolutions: { categories, bottles: rows } });
+  }
+
+  async function bottleCategoryIds() {
+    return (await prisma.bottle.findMany({ orderBy: { id: 'asc' } })).map((bottle) => bottle.categoryId);
+  }
+
+  it('should match the exact category before the others equal ignoring case', async () => {
+    await seedCategory({ name: 'Rhum' });
+    const lowerRhum = await seedCategory({ name: 'rhum' });
+
+    const res = await previewOf('rhum');
+
+    expect(res.body.categories[0]).toMatchObject({ status: 'matched', existingMatch: { id: lowerRhum.id, name: 'rhum' } });
+  });
+
+  it('should list the categories a name could mean when several are equal ignoring case and none exactly', async () => {
+    const rhum = await seedCategory({ name: 'Rhum', desiredStock: 3 });
+    const upperRhum = await seedCategory({ name: 'RHUM' });
+
+    const res = await previewOf('rhum');
+
+    expect(res.body.categories[0]).toEqual({
+      ref: expect.objectContaining({ name: 'rhum' }),
+      existingMatch: null,
+      status: 'ambiguous',
+      ambiguousMatches: [
+        { id: rhum.id, name: 'Rhum', type: 'SPIRIT', desiredStock: 3 },
+        { id: upperRhum.id, name: 'RHUM', type: 'SPIRIT', desiredStock: 1 },
+      ],
+    });
+  });
+
+  it('should flag a category several hold ignoring case that only the rows of a JSON file name', async () => {
+    await seedCategory({ name: 'Rhum' });
+    await seedCategory({ name: 'RHUM' });
+    const file = { version: 1, bottles: [{ name: 'Havana', categoryName: 'rhum', capacityMl: 700 }] };
+
+    const res = await request.post('/api/bottles/import/preview').set(authHeader())
+      .attach('file', Buffer.from(JSON.stringify(file)), 'bottles.json');
+
+    expect(res.body.categories).toEqual([expect.objectContaining({ ref: expect.objectContaining({ name: 'rhum' }), status: 'ambiguous' })]);
+  });
+
+  it.each([
+    ['in another case', 'rhum'],
+    ['exactly', 'Rhum'],
+  ])('should put the bottles in a category to create that exists %s, with its own type', async (_case, name) => {
+    const rhum = await seedCategory({ name: 'Rhum', type: 'SPIRIT' });
+    const typeCount = await prisma.categoryType.count();
+
+    const res = await confirm([{ categoryName: name }], { [name.toLowerCase()]: { action: 'create', data: { name, type: 'NEW TYPE' } } });
+
+    expect(res.status).toBe(201);
+    expect(await bottleCategoryIds()).toEqual([rhum.id]);
+    expect(await prisma.category.findMany({ select: { name: true, type: true } })).toEqual([{ name: 'Rhum', type: 'SPIRIT' }]);
+    expect(await prisma.categoryType.count()).toBe(typeCount);
+  });
+
+  // A name pasted from a macOS file name can hold decomposed accents (C-65)
+  it('should match a category whose name is stored in the other Unicode form', async () => {
+    const cream = await seedCategory({ name: 'Cr\u00E8me' });
+
+    const res = await previewOf('Cre\u0300me');
+
+    expect(res.body.categories[0]).toMatchObject({ status: 'matched', existingMatch: { id: cream.id } });
+  });
+
+  it('should put the bottles of a decomposed category to create in the composed one', async () => {
+    const cream = await seedCategory({ name: 'Cr\u00E8me' });
+
+    const res = await confirm([{ categoryName: 'Cre\u0300me' }], { 'cre\u0300me': { action: 'create', data: { name: 'Cre\u0300me' } } });
+
+    expect(res.status).toBe(201);
+    expect(await bottleCategoryIds()).toEqual([cream.id]);
+    expect(await prisma.category.count()).toBe(1);
+  });
+
+  // The resolutions are keyed by the file's name in lower case only: a row naming the other form
+  // misses that key and finds the category through the index, created rows included
+  it('should put a row naming the decomposed form in the category created for the composed one', async () => {
+    const res = await confirm([{ categoryName: 'Cr\u00E8me' }, { categoryName: 'Cre\u0300me' }], {
+      'cr\u00E8me': { action: 'create', data: { name: 'Cr\u00E8me' } },
+    });
+
+    expect(res.status).toBe(201);
+    const cream = await prisma.category.findFirstOrThrow();
+    expect(await bottleCategoryIds()).toEqual([cream.id, cream.id]);
+    expect(await prisma.category.count()).toBe(1);
+  });
+
+  it('should store a category it creates composed, translations included', async () => {
+    const res = await confirm([{ categoryName: 'Cre\u0300me' }], {
+      'cre\u0300me': { action: 'create', data: { name: 'Cre\u0300me', nameTranslations: { fr: 'Cre\u0300me' } } },
+    });
+
+    expect(res.status).toBe(201);
+    const cream = await prisma.category.findFirstOrThrow();
+    expect(cream).toMatchObject({ name: 'Cr\u00E8me', nameTranslations: JSON.stringify({ fr: 'Cr\u00E8me' }) });
+    expect(await bottleCategoryIds()).toEqual([cream.id]);
+  });
+
+  it('should create a category once when two file categories create it under names equal ignoring case', async () => {
+    const res = await confirm([{ categoryName: 'Mezcal' }, { categoryName: 'MEZCAL' }], {
+      mezcal: { action: 'create', data: { name: 'Mezcal' } },
+      // The admin typed 'MEZCAL' for the file's 'Mescal'
+      mescal: { action: 'create', data: { name: 'MEZCAL' } },
+    });
+
+    expect(res.status).toBe(201);
+    const mezcal = await prisma.category.findUniqueOrThrow({ where: { name: 'Mezcal' } });
+    expect(await bottleCategoryIds()).toEqual([mezcal.id, mezcal.id]);
+    expect(await prisma.category.count()).toBe(1);
+  });
+
+  it.each([
+    ['a blank', '   '],
+    ['an invisible', '\u200B'],
+  ])('should refuse %s new type even when the category exists ignoring case, and write nothing', async (_case, type) => {
+    await seedCategory({ name: 'Rhum' });
+    const typeCount = await prisma.categoryType.count();
+
+    const res = await confirm([{ categoryName: 'rhum' }], { rhum: { action: 'create', data: { name: 'rhum', type } } });
+
+    expect(res.status).toBe(400);
+    expect(res.body.details).toEqual([expect.objectContaining({ path: 'body.resolutions.categories.rhum.data.type' })]);
+    expect(await prisma.bottle.count()).toBe(0);
+    expect(await prisma.category.count()).toBe(1);
+    expect(await prisma.categoryType.count()).toBe(typeCount);
+  });
+
+  // The wizard keeps each row on the file's category name: the category created for it holds them (C-64)
+  it('should put the rows of a category created under another name in it', async () => {
+    const res = await confirm([{ categoryName: 'Rhum' }], { rhum: { action: 'create', data: { name: 'Rhum agricole' } } });
+
+    expect(res.status).toBe(201);
+    expect(res.body.skippedNoCategory).toBe(0);
+    const created = await prisma.category.findUniqueOrThrow({ where: { name: 'Rhum agricole' } });
+    expect(await bottleCategoryIds()).toEqual([created.id]);
+  });
+
+  it('should find a category created under another name for a row moved to that name', async () => {
+    const res = await confirm([{ categoryName: 'Rhum agricole' }], { rhum: { action: 'create', data: { name: 'Rhum agricole' } } });
+
+    expect(res.status).toBe(201);
+    const created = await prisma.category.findUniqueOrThrow({ where: { name: 'Rhum agricole' } });
+    expect(await bottleCategoryIds()).toEqual([created.id]);
+  });
+
+  it.each([
+    ['one of them', 'RHUM', null],
+    ['a category created under another name', 'Rhum blanc', { action: 'create', data: { name: 'Rhum blanc' } }],
+  ])('should put the rows of a category several hold ignoring case in %s', async (_case, expected, resolution) => {
+    await seedCategory({ name: 'Rhum' });
+    const upperRhum = await seedCategory({ name: 'RHUM' });
+
+    const res = await confirm([{ categoryName: 'rhum' }], { rhum: resolution ?? { action: 'use_existing', existingId: upperRhum.id } });
+
+    expect(res.status).toBe(201);
+    const target = await prisma.category.findUniqueOrThrow({ where: { name: expected } });
+    expect(await bottleCategoryIds()).toEqual([target.id]);
+  });
+
+  // Duplicates are counted in the category a row goes in, not by the file's category name
+  it('should count no duplicate for a row put in a category created under another name', async () => {
+    const rhum = await seedCategory({ name: 'Rhum' });
+    await seedBottle({ name: 'Havana', categoryId: rhum.id, capacityMl: 700 });
+
+    const res = await confirm([{ categoryName: 'Rhum' }], { rhum: { action: 'create', data: { name: 'Rhum agricole' } } });
+
+    expect(res.status).toBe(201);
+    expect(res.body.duplicatesCreated).toBe(0);
+  });
+
+  it.each([
+    ['the one that holds the same bottle', 'Rhum', 1],
+    ['the other one', 'RHUM', 0],
+  ])('should count the duplicates of a row put in %s of two categories equal ignoring case', async (_case, picked, duplicates) => {
+    const rhum = await seedCategory({ name: 'Rhum' });
+    const upperRhum = await seedCategory({ name: 'RHUM' });
+    await seedBottle({ name: 'Havana', categoryId: rhum.id, capacityMl: 700 });
+    const existingId = picked === 'Rhum' ? rhum.id : upperRhum.id;
+
+    const res = await confirm([{ categoryName: 'rhum' }], { rhum: { action: 'use_existing', existingId } });
+
+    expect(res.status).toBe(201);
+    expect(res.body.duplicatesCreated).toBe(duplicates);
+  });
+
+  // A row's name meets the resolution of the file's category of that name first: only an id can
+  // put it in the existing category that resolution leads away from (C-68)
+  it('should put a row picked by id in a category another one of that name ignoring case is resolved away from', async () => {
+    const rhum = await seedCategory({ name: 'Rhum' });
+    const upperRhum = await seedCategory({ name: 'RHUM' });
+
+    const res = await confirm(
+      [{ categoryName: 'rhum' }, { categoryName: 'rhum' }],
+      { rhum: { action: 'use_existing', existingId: upperRhum.id } },
+      { 0: { action: 'import', categoryId: rhum.id }, 1: { action: 'import', categoryName: 'rhum' } },
+    );
+
+    expect(res.status).toBe(201);
+    expect(await bottleCategoryIds()).toEqual([rhum.id, upperRhum.id]);
+  });
+
+  it('should put a row picked by id in the existing category of the name the file creates under another one', async () => {
+    const rhum = await seedCategory({ name: 'Rhum' });
+
+    const res = await confirm(
+      [{ categoryName: 'Rhum' }, { categoryName: 'Rhum' }],
+      { rhum: { action: 'create', data: { name: 'Rhum agricole' } } },
+      // The id wins over the name the row also sends
+      { 0: { action: 'import', categoryId: rhum.id, categoryName: 'Rhum' } },
+    );
+
+    expect(res.status).toBe(201);
+    const created = await prisma.category.findUniqueOrThrow({ where: { name: 'Rhum agricole' } });
+    expect(await bottleCategoryIds()).toEqual([rhum.id, created.id]);
+  });
+
+  it('should leave out a row picked by the id of no category', async () => {
+    const rhum = await seedCategory({ name: 'Rhum' });
+
+    const res = await confirm([{ categoryName: 'Rhum' }], {}, { 0: { action: 'import', categoryId: rhum.id + 1 } });
+
+    expect(res.status).toBe(201);
+    expect(res.body.skippedNoCategory).toBe(1);
+    expect(await prisma.bottle.count()).toBe(0);
+  });
+
+  it('should put a row in the exact category when others are equal to it ignoring case', async () => {
+    await seedCategory({ name: 'Rhum' });
+    const upperRhum = await seedCategory({ name: 'RHUM' });
+
+    const res = await confirm([{ categoryName: 'RHUM' }]);
+
+    expect(res.status).toBe(201);
+    expect(await bottleCategoryIds()).toEqual([upperRhum.id]);
+  });
+
+  it.each([
+    ['a category to create', [{ categoryName: 'rhum' }], { rhum: { action: 'create', data: { name: 'rhum' } } }],
+    ['the category of a row', [{ categoryName: 'Gin' }, { categoryName: 'rhum' }], {}],
+  ])('should refuse %s that several categories hold ignoring case, naming them, and write nothing', async (_case, bottles, categories) => {
+    await seedCategory({ name: 'Gin' });
+    await seedCategory({ name: 'Rhum' });
+    await seedCategory({ name: 'RHUM' });
+
+    const res = await confirm(bottles, categories).set('Accept-Language', 'fr');
+
+    expect(res.status).toBe(409);
+    expect(res.body.details).toEqual({ name: 'rhum', matches: 'Rhum, RHUM' });
+    expect(res.body.error).toContain('« rhum »');
+    expect(res.body.error).toContain('Rhum, RHUM');
+    expect(await prisma.category.count()).toBe(3);
     expect(await prisma.bottle.count()).toBe(0);
   });
 });
