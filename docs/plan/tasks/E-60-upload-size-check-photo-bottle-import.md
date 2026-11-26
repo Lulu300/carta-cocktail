@@ -5,13 +5,13 @@ phase: E
 lane: frontend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [E-58]
 touches: [frontend/src/components/admin/cocktails/ImagePicker.tsx, frontend/src/components/import/ImportBottlesWizard.tsx, frontend/src/components/import/FileDropzone.tsx]
 sources: []
-branch:
-pr:
+branch: fix/E-60-upload-size-check
+pr: https://github.com/Lulu300/carta-cocktail/pull/270
 ---
 
 ## Contexte
@@ -29,8 +29,8 @@ Un fichier trop gros part en entier. Jusqu'à 20 Mio, le backend répond un 413 
 
 ## Critères d'acceptation
 
-- [ ] Photo et import : un fichier de limite - 1 et de limite octets part, un fichier de limite + 1 octets est refusé sans requête, avec le message traduit.
-- [ ] Les limites du frontend renvoient par un commentaire aux constantes du backend.
+- [x] Photo et import : un fichier de limite - 1 et de limite octets part, un fichier de limite + 1 octets est refusé sans requête, avec le message traduit.
+- [x] Les limites du frontend renvoient par un commentaire aux constantes du backend.
 
 ## Tests à ajouter ou adapter
 
@@ -43,3 +43,5 @@ Un fichier trop gros part en entier. Jusqu'à 20 Mio, le backend répond un 413 
 ## Journal
 
 - 2026-11-24 : tâche créée pendant E-59.
+- 2026-11-26 : faite. Les trois limites du frontend vivent dans `frontend/src/utils/uploadLimits.ts` avec `exceedsUploadLimit` (reprise de `SettingsPage`, qui l'utilise aussi), chacune avec un commentaire vers sa constante du backend. La photo (`ImagePicker`) et le fichier d'import (`ImportBottlesWizard`) sont refusés au choix avec `common.requestTooLarge` ; la photo déjà choisie reste en place, le fichier d'import déjà choisi est abandonné comme l'archive de sauvegarde. Le message ne donne pas la limite (choix d'E-58 conservé).
+- Notes de version : une photo de cocktail de plus de 5 Mio et un fichier d'import de bouteilles de plus de 10 Mio sont refusés dès qu'on les choisit, avant tout envoi (avant : envoi complet puis refus, ou, au-delà de 20 Mo dans Firefox, des renvois puis une erreur réseau). Aucune action requise.
