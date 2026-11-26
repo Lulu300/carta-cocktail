@@ -1,15 +1,23 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { render, screen } from '../../test/test-utils';
 import { buildUnit } from '../../test/factories';
 import { mockApiResponse, mockNetworkError } from '../../test/msw/utils';
 import UnitConverter from './UnitConverter';
 
+const i18nState = vi.hoisted(() => ({ language: 'en' }));
+
+vi.mock('react-i18next', () => ({
+  initReactI18next: { type: '3rdParty', init: vi.fn() },
+  useTranslation: () => ({ t: (key: string) => key, i18n: i18nState }),
+}));
+
 function unit(id: number, abbreviation: string, conversionFactorToMl: number | null) {
   return buildUnit({ id, name: abbreviation, abbreviation, conversionFactorToMl });
 }
 
 beforeEach(() => {
+  i18nState.language = 'en';
   mockApiResponse('get', '/api/public/units', [unit(1, 'cl', 10), unit(2, 'ml', 1), unit(3, 'oz', 29.57)]);
 });
 
@@ -68,5 +76,24 @@ describe('UnitConverter', () => {
 
     expect(button).toHaveAttribute('aria-expanded', 'false');
     expect(button).toHaveFocus();
+  });
+
+  it.each([
+    ['en', '1.5 cl', '3.33 cs', '0.51 oz'],
+    ['fr', '1,5 cl', '3,33 cs', '0,51 oz'],
+  ])('writes the quantities in %s and converts back to the original', async (language, original, spoons, ounces) => {
+    i18nState.language = language;
+    mockApiResponse('get', '/api/public/units', [unit(1, 'cl', 10), unit(2, 'cs', 4.5), unit(3, 'oz', 29.5735)]);
+    const user = userEvent.setup();
+    render(<UnitConverter quantity={1.5} unit="cl" />);
+    await user.click(await screen.findByRole('button', { name: original }));
+    expect(screen.getByRole('button', { name: ounces })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: spoons }));
+    const trigger = screen.getByRole('button', { name: spoons });
+    await user.click(trigger);
+    await user.click(screen.getByRole('button', { name: original }));
+
+    expect(screen.getByRole('button', { name: original, expanded: false })).toBeInTheDocument();
   });
 });

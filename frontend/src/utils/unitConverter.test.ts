@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Unit } from '../types';
 import {
   isConvertible, toMilliliters, fromMilliliters, convertUnit,
-  formatQuantity, getAllConversions,
+  roundQuantity, formatQuantity, getAllConversions,
 } from './unitConverter';
 
 const mlUnit: Unit = { id: 1, name: 'Millilitre', abbreviation: 'ml', conversionFactorToMl: 1 };
@@ -25,6 +25,15 @@ describe('isConvertible', () => {
   });
 });
 
+// The warning is the behavior under test: spying keeps it out of the test output
+beforeEach(() => {
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe('toMilliliters', () => {
   it('should convert cl to ml', () => {
     expect(toMilliliters(5, clUnit)).toBe(50);
@@ -36,6 +45,7 @@ describe('toMilliliters', () => {
 
   it('should return quantity for non-convertible unit', () => {
     expect(toMilliliters(3, pieceUnit)).toBe(3);
+    expect(console.warn).toHaveBeenCalledWith('Unit pce is not convertible');
   });
 });
 
@@ -50,6 +60,7 @@ describe('fromMilliliters', () => {
 
   it('should return ml value for non-convertible unit', () => {
     expect(fromMilliliters(100, pieceUnit)).toBe(100);
+    expect(console.warn).toHaveBeenCalledWith('Unit pce is not convertible');
   });
 });
 
@@ -67,25 +78,35 @@ describe('convertUnit', () => {
   });
 });
 
+describe('roundQuantity', () => {
+  it('keeps ml whole when it is whole, else 1 decimal', () => {
+    expect(roundQuantity(50, mlUnit)).toBe(50);
+    expect(roundQuantity(50.54, mlUnit)).toBe(50.5);
+  });
+
+  it('rounds units under 1 ml to 1 decimal', () => {
+    expect(roundQuantity(3.46, dashUnit)).toBe(3.5);
+  });
+
+  it('rounds larger units to 2 decimals', () => {
+    expect(roundQuantity(10 / 3, clUnit)).toBe(3.33);
+    expect(roundQuantity(50 / 29.5735, ozUnit)).toBe(1.69);
+    expect(roundQuantity(5, clUnit)).toBe(5);
+  });
+});
+
 describe('formatQuantity', () => {
-  it('should format ml integer without decimals', () => {
-    expect(formatQuantity(50, mlUnit)).toBe('50');
+  it('uses the decimal separator of the language', () => {
+    expect(formatQuantity(3.33, 'en')).toBe('3.33');
+    expect(formatQuantity(3.33, 'fr')).toBe('3,33');
   });
 
-  it('should format ml with 1 decimal when needed', () => {
-    expect(formatQuantity(50.5, mlUnit)).toBe('50.5');
+  it('writes whole numbers without decimals', () => {
+    expect(formatQuantity(5, 'fr')).toBe('5');
   });
 
-  it('should format cl with trimmed decimals', () => {
-    expect(formatQuantity(5, clUnit)).toBe('5');
-  });
-
-  it('should format dash with 1 decimal', () => {
-    expect(formatQuantity(3.5, dashUnit)).toBe('3.5');
-  });
-
-  it('should format oz with trimmed decimals', () => {
-    expect(formatQuantity(1.5, ozUnit)).toBe('1.5');
+  it('separates thousands as the language does', () => {
+    expect(formatQuantity(1500, 'en')).toBe('1,500');
   });
 });
 
@@ -99,6 +120,7 @@ describe('getAllConversions', () => {
     // Should include ml and oz, but not cl (same) and not pce (non-convertible)
     expect(result).toHaveLength(2);
     expect(result.find(r => r.unit.id === mlUnit.id)?.quantity).toBe(50);
+    expect(result.find(r => r.unit.id === ozUnit.id)?.quantity).toBe(1.69);
   });
 
   it('should not include the source unit', () => {
