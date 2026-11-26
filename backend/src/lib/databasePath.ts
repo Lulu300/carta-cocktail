@@ -4,9 +4,10 @@ import fs from 'fs';
 import path from 'path';
 
 /**
- * Folder of schema.prisma, the same from src/lib and dist/lib (where the bundled CLI config sits too). Prisma 6 resolved
- * a relative SQLite path from there: keeping that base lets existing setups
- * (`file:./carta_cocktail.db` in backend/.env) open the same file.
+ * Folder of schema.prisma, the same from src/lib and dist/lib (where the bundled
+ * CLI config sits too). Prisma 6 resolved a relative SQLite path from there:
+ * keeping that base lets existing setups (`file:./carta_cocktail.db` in
+ * backend/.env) open the same file.
  */
 export const PRISMA_DIR = path.resolve(__dirname, '../../prisma');
 
