@@ -11,7 +11,7 @@ depends_on: [E-10, E-30]
 touches: [frontend/src/i18n/locales/admin/, frontend/src/i18n/bundles.test.ts, frontend/src/components/import/]
 sources: ["06-frontend-ux-perf.md §2"]
 branch: fix/E-31-i18n-plural-forms
-pr:
+pr: 271
 ---
 
 ## Contexte
