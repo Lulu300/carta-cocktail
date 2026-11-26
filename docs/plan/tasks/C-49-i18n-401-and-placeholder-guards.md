@@ -11,7 +11,7 @@ depends_on: [C-12]
 touches: [backend/src/routes/auth.test.ts, backend/src/i18n/, backend/src/test/messages.ts]
 sources: []
 branch: test/C-49-i18n-401-placeholder-guards
-pr: PRNUM
+pr: 251
 ---
 
 ## Contexte
