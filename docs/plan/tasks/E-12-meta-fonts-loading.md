@@ -11,7 +11,7 @@ depends_on: []
 touches: [frontend/index.html, frontend/src/contexts/SiteSettingsContext.tsx, frontend/src/hooks/usePageTitle.ts, frontend/package.json, frontend/package-lock.json, frontend/src/index.css, frontend/src/main.tsx, frontend/src/pages/public/HomePage.tsx, frontend/src/pages/public/MenuPublicPage.tsx, frontend/src/pages/public/CocktailPublicPage.tsx]
 sources: ["06-frontend-ux-perf.md §4", "06-frontend-ux-perf.md §1"]
 branch: feature/E-12-meta-fonts-loading
-pr: 0
+pr: 260
 ---
 
 ## Contexte
