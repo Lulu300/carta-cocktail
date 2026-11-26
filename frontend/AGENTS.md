@@ -103,7 +103,7 @@ frontend/
 ├── vite.config.ts
 ├── vitest.config.ts
 ├── eslint.config.js
-├── nginx.conf.template           # Production: nginx server, proxies /api and /uploads to the backend (BACKEND_HOST)
+├── nginx.conf.template           # Production: nginx server, proxies /api and /uploads to the backend (BACKEND_HOST); link preview robots on /menu/ get the backend's Open Graph page
 ├── security-headers.conf         # Security headers included by nginx.conf.template
 └── Dockerfile                    # Vite build, then nginx (non-root, uid 101, port 8080)
 ```

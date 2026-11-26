@@ -1,3 +1,12 @@
+# Link preview robots of messaging apps and social networks, matched on the User-Agent without
+# case. They read the Open Graph tags of a shared link but do not run JavaScript, so the SPA
+# shell tells them nothing. iMessage sends facebookexternalhit and Twitterbot. Keep the list
+# short: a robot missing here only shows a plain link.
+map $http_user_agent $is_preview_bot {
+    default 0;
+    "~*(facebookexternalhit|facebot|whatsapp|twitterbot|slackbot|telegrambot|discordbot|linkedinbot|skypeuripreview)" 1;
+}
+
 server {
     # Unprivileged port: nginx runs as a non-root user (also under rootless Docker and Podman).
     listen 8080;
@@ -32,6 +41,9 @@ server {
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
+    # Host as the client sent it, port included ($host drops it): the link previews of
+    # /menu/ build absolute URLs from it when PUBLIC_BASE_URL is not set.
+    proxy_set_header X-Forwarded-Host $http_host;
 
     # Resolve the backend at request time, not once at startup: a recreated backend container
     # gets a new IP, which would otherwise give 502 errors until nginx restarts. The resolvers
@@ -91,6 +103,17 @@ server {
         access_log off;
         default_type text/plain;
         return 200 "ok\n";
+    }
+
+    # Public menu and cocktail pages. Preview robots get a small HTML page with the Open Graph
+    # tags of the menu or the cocktail, built by the backend (/api/public/share/menu/...); every
+    # other client gets the SPA, as on any other route. "rewrite ... last" is one of the uses of
+    # "if" in a location that nginx documents as safe.
+    location /menu/ {
+        if ($is_preview_bot) {
+            rewrite ^ /api/public/share$uri last;
+        }
+        try_files $uri $uri/ /index.html;
     }
 
     # SPA fallback
