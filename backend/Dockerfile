@@ -52,6 +52,21 @@ RUN node /tmp/prune-unused-deps.mjs \
     prisma:mysql2 \
     prisma:postgres \
     better-sqlite3:prebuild-install
+# Files of the kept packages that nothing loads at runtime. Each path is removed
+# without -f and the maps are searched first, so the build stops when an update
+# renames or drops one of them and this list is stale.
+# - @prisma/studio-core/dist/ui: the web interface, served by `prisma studio` only
+#   (the CLI imports it from build/studio.js, which no kept command loads);
+# - @prisma/studio-core/dist/metafile-*.json: esbuild bundle reports, never read;
+# - better-sqlite3/deps: the SQLite sources, compiled only by `npm ci` when no
+#   prebuilt binary exists (the binary stays in build/Release);
+# - *.map: read only under --enable-source-maps, which neither the entrypoint nor
+#   this image sets (NODE_OPTIONS is empty).
+RUN set -eu; \
+    studio=node_modules/@prisma/studio-core/dist; \
+    test -n "$(find node_modules -name '*.map' -print -quit)"; \
+    rm -r "$studio/ui" $studio/metafile-*.json node_modules/better-sqlite3/deps; \
+    find node_modules -name '*.map' -delete
 # Fails the build, on every platform, when a Prisma update makes the CLI load at
 # startup a package cut above: otherwise only the first container start would show it.
 # Without network, as in a container that cannot reach the registry.
