@@ -85,6 +85,14 @@ server {
         include /etc/nginx/snippets/security-headers.conf;
     }
 
+    # Docker healthcheck of the frontend service: kept out of the access log, so that the probe
+    # (every 30 s) does not bury the requests of real visitors.
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
     # SPA fallback
     location / {
         try_files $uri $uri/ /index.html;
