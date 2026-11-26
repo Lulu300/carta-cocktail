@@ -226,6 +226,23 @@ describe('route code splitting', () => {
   });
 });
 
+describe('unknown addresses', () => {
+  beforeEach(() => {
+    mockUseAuth.mockReturnValue({ user: null, isLoading: false });
+  });
+
+  it.each(['/nimporte-quoi', '/menu/summer/unknown/segments', '/admin/nope'])(
+    'shows the not-found page for %s instead of redirecting home',
+    (path) => {
+      renderAt(path);
+
+      expect(screen.getByRole('alert')).toHaveTextContent('public.pageNotFound');
+      expect(screen.getByRole('link', { name: 'public.backHome' })).toHaveAttribute('href', '/');
+      expect(screen.queryByTestId('home-page')).not.toBeInTheDocument();
+    },
+  );
+});
+
 describe('route error boundary', () => {
   beforeEach(() => {
     // React reports every error a boundary catches on the console

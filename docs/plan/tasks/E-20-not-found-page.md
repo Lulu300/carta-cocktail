@@ -5,12 +5,12 @@ phase: E
 lane: frontend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [E-11]
 touches: [frontend/src/App.tsx, frontend/src/App.test.tsx, frontend/src/pages/public/, frontend/src/i18n/locales/]
 sources: ["06-frontend-ux-perf.md §2"]
-branch:
+branch: feature/E-20-not-found-page
 pr:
 ---
 
@@ -32,9 +32,9 @@ E-11 distingue sur la carte publique une carte ou un cocktail introuvable (404 d
 
 ## Critères d'acceptation
 
-- [ ] `/nimporte-quoi` affiche « Page introuvable » et un lien vers l'accueil ; l'adresse reste celle demandée.
-- [ ] `/`, `/menu/:slug`, `/menu/:slug/cocktail/:id`, `/login` et `/admin/*` se comportent comme avant.
-- [ ] Couverture ≥ 80 % sur les lignes modifiées.
+- [x] `/nimporte-quoi` affiche « Page introuvable » et un lien vers l'accueil ; l'adresse reste celle demandée.
+- [x] `/`, `/menu/:slug`, `/menu/:slug/cocktail/:id`, `/login` et `/admin/*` se comportent comme avant.
+- [x] Couverture ≥ 80 % sur les lignes modifiées.
 
 ## Tests à ajouter ou adapter
 
@@ -49,3 +49,5 @@ E-11 distingue sur la carte publique une carte ou un cocktail introuvable (404 d
 ## Journal
 
 - 2026-10-11 : tâche créée pendant E-11 (redirection `*` → `/` relevée dans ses « Points d'attention », hors périmètre).
+- 2026-11-26 : faite. `NotFoundPage` (titre d'onglet « Page introuvable · site ») sous `PublicLayout` pour la route `*`, sans redirection ; la présentation « introuvable » d'E-11 est extraite de `PublicErrorState` dans `NotFoundState`, réutilisée par les deux. La carte et le cocktail publics introuvables n'étaient déjà plus des redirections (E-11) : rien à changer. Décision admin : une adresse `/admin/*` inconnue affiche la même page publique (le routeur ne la rattache à aucune route admin, aucun appel à l'API n'est fait et la page ne dépend pas de la session ; une variante dans `AdminLayout` demanderait un splat protégé de plus). Bundle public 136,8 → 136,9 kB (budget 140) : pas de chargement différé. Sonde de sabotage : remettre `<Navigate to="/" />` fait échouer 3 tests de `App.test.tsx`.
+- 2026-11-26 : Notes de version : une adresse inconnue (lien mal recopié, ancien QR code) affiche désormais une page « Page introuvable » avec un lien vers l'accueil, au lieu de renvoyer silencieusement vers l'accueil. Aucune action requise. `breaking: false`.

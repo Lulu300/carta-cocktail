@@ -11,6 +11,7 @@ import RouteErrorBoundary from './components/layout/RouteErrorBoundary';
 import HomePage from './pages/public/HomePage';
 import MenuPublicPage from './pages/public/MenuPublicPage';
 import CocktailPublicPage from './pages/public/CocktailPublicPage';
+import NotFoundPage from './pages/public/NotFoundPage';
 
 // Guests scanning a menu QR code only need the public pages: everything behind
 // /login and /admin is split into on-demand chunks to keep the first load small.
@@ -102,6 +103,8 @@ export default function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/menu/:slug" element={<MenuPublicPage />} />
             <Route path="/menu/:slug/cocktail/:id" element={<CocktailPublicPage />} />
+            {/* Unknown addresses, /admin/* ones included, keep their URL and show the 404 page */}
+            <Route path="*" element={<NotFoundPage />} />
           </Route>
 
           {/* Auth */}
@@ -130,9 +133,6 @@ export default function App() {
             <Route path="shortages" element={<ShortagesPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
-
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Suspense>
     </RouteErrorBoundary>
