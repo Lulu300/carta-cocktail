@@ -3,13 +3,16 @@
 /**
  * Bundle Budget Check
  *
- * Guards the JavaScript a guest downloads before the first navigation (the
- * public menu opened from a QR code): the entry script of index.html plus its
- * <link rel="modulepreload"> chunks. Fails when:
+ * Guards the JavaScript a guest downloads: before the first navigation (the
+ * public menu opened from a QR code), the entry script of index.html plus its
+ * <link rel="modulepreload"> chunks; then, in the background, the precache of
+ * the service worker (sw.js, vite-plugin-pwa). Fails when:
  *   - one of these chunks contains admin, login or import wizard code, the admin
  *     messages, or jszip;
  *   - one of these chunks contains the text "JSZip" (safety net);
- *   - their total gzip size exceeds the budget.
+ *   - the total gzip size of the first load exceeds the budget;
+ *   - the precache misses index.html, the web manifest or a chunk of the first
+ *     load: the menu would not open offline.
  *
  * Which source modules ended up in a chunk is read from its source map. The
  * Vite manifest is not enough: it lists chunks, not modules, so a page imported
@@ -45,6 +48,10 @@ const FORBIDDEN_MODULES = [
 ];
 
 const FORBIDDEN_TEXT = 'JSZip';
+
+const SERVICE_WORKER = 'sw.js';
+// Without them in the precache, an offline visit has no page to start from.
+const REQUIRED_IN_PRECACHE = ['index.html', 'manifest.webmanifest'];
 
 // Rolldown's CJS interop helpers: generated code only, emitted without a source map.
 const GENERATED_CHUNK = /^assets\/rolldown-runtime-[\w-]+\.js$/;
@@ -107,6 +114,18 @@ function initialChunks(distDir) {
 }
 
 /**
+ * Files of the service worker precache, as dist-relative paths. Workbox writes
+ * them in the precacheAndRoute() call of sw.js, as {url:"...",revision:...}.
+ */
+function precachedFiles(distDir) {
+  const swPath = join(distDir, SERVICE_WORKER);
+  if (!existsSync(swPath)) throw new Error(`${SERVICE_WORKER} not found in ${distDir}`);
+  const precacheCall = readFileSync(swPath, 'utf-8').match(/precacheAndRoute\(\[(.*?)\]/s);
+  if (!precacheCall) throw new Error(`No precacheAndRoute([...]) call found in ${SERVICE_WORKER}`);
+  return [...precacheCall[1].matchAll(/\burl:"([^"]+)"/g)].map(([, url]) => url.replace(/^\//, ''));
+}
+
+/**
  * Source modules of a chunk, relative to the frontend folder, from its source map.
  *
  * Every chunk needs its map, except Rolldown's runtime chunk (GENERATED_CHUNK): it
@@ -159,20 +178,40 @@ function formatTable(chunks, totalGzipBytes, budgetKb) {
     .join('\n');
 }
 
-function findViolations(chunks, totalGzipBytes, budgetKb) {
-  const violations = [];
-  for (const chunk of chunks) {
-    for (const modulePath of chunk.forbiddenModules) {
-      violations.push(`${chunk.path} contains ${modulePath}: load it with a dynamic import() instead.`);
-    }
-    if (chunk.hasForbiddenText) {
-      violations.push(`${chunk.path} contains the text "${FORBIDDEN_TEXT}": jszip must stay out of the initial load.`);
-    }
+const INITIAL_LOAD = { name: 'initial load', fix: 'load it with a dynamic import() instead' };
+const PRECACHE = { name: 'precache', fix: 'keep it out of the precache (publicShell in frontend/vite.config.ts)' };
+
+/** Admin code or jszip in a chunk of the initial load or of the precache. */
+function chunkViolations(chunk, download) {
+  const violations = chunk.forbiddenModules.map((modulePath) => `${chunk.path} contains ${modulePath}: ${download.fix}.`);
+  if (chunk.hasForbiddenText) {
+    violations.push(`${chunk.path} contains the text "${FORBIDDEN_TEXT}": jszip must stay out of the ${download.name}.`);
   }
+  return violations;
+}
+
+function findViolations(chunks, totalGzipBytes, budgetKb) {
+  const violations = chunks.flatMap((chunk) => chunkViolations(chunk, INITIAL_LOAD));
   if (totalGzipBytes > budgetKb * 1000) {
     violations.push(`Initial load is ${formatKb(totalGzipBytes)} gzip, over the ${budgetKb} kB budget.`);
   }
   return violations;
+}
+
+/**
+ * The precache must hold everything an offline visit starts from, and nothing more for a
+ * guest to download than public code. The chunks of the initial load are already checked.
+ */
+function findPrecacheViolations(distDir, initialChunks, precache) {
+  const precached = new Set(precache);
+  const initialPaths = initialChunks.map((chunk) => chunk.path);
+  const violations = [...REQUIRED_IN_PRECACHE, ...initialPaths]
+    .filter((path) => !precached.has(path))
+    .map((path) => `${SERVICE_WORKER} does not precache ${path}: the menu would not open offline.`);
+  const otherChunks = precache
+    .filter((path) => path.endsWith('.js') && !initialPaths.includes(path))
+    .map((path) => inspectChunk(distDir, { path, role: 'precache' }));
+  return [...violations, ...otherChunks.flatMap((chunk) => chunkViolations(chunk, PRECACHE))];
 }
 
 function main() {
@@ -184,11 +223,16 @@ function main() {
   console.log(formatTable(chunks, totalGzipBytes, budgetKb));
   console.log('');
 
-  const violations = findViolations(chunks, totalGzipBytes, budgetKb);
+  const precache = precachedFiles(distDir);
+  const violations = [
+    ...findViolations(chunks, totalGzipBytes, budgetKb),
+    ...findPrecacheViolations(distDir, chunks, precache),
+  ];
   if (violations.length > 0) {
     fail(violations.join('\n'));
   }
   console.log(`Initial load ${formatKb(totalGzipBytes)} gzip is within the ${budgetKb} kB budget.`);
+  console.log(`The ${SERVICE_WORKER} precache (${precache.length} files) holds the initial load and no admin code.`);
 }
 
 try {

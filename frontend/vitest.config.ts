@@ -3,6 +3,10 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    // vite-plugin-pwa (vite.config.ts) is not loaded here: its virtual module gets a stand-in.
+    alias: { 'virtual:pwa-register': '/src/test/pwaRegister.ts' },
+  },
   test: {
     globals: true,
     // Vitest defaults to the `minimal` reporter under an AI agent, which hides the

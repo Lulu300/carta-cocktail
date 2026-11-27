@@ -33,6 +33,8 @@ import {
   sessionFloorPath,
 } from '../services/sessionFloor';
 import { recordStartup } from '../services/upgradeNoticeService';
+import { backfillImageVariants, derivedVariantNames } from '../services/cocktail/imageVariants';
+import { writeStoredPhoto } from '../test/images';
 
 const dbPath = resolveDatabasePath();
 const preRestoreDir = path.join(path.dirname(dbPath), 'backups');
@@ -514,6 +516,23 @@ describe('backup restore', () => {
     expect(res.body.skippedFiles).toBe(1);
     expect(uploadDirContent()).toEqual(['PHOTO.JPG', 'a.png', 'ok.webp']);
     expect(fs.readFileSync(path.join(config.uploadDir, 'a.png'), 'utf8')).toBe('png bytes');
+  });
+
+  it('should add the smaller copies of the photos of an older backup', async () => {
+    // A backup made before the copies existed holds the photo alone
+    await writeStoredPhoto('1700000000-42.jpg');
+    await seedCocktail({ name: 'Old', imagePath: '1700000000-42.jpg' });
+    const backup = await exportBackup();
+    emptyUploadDir();
+
+    const res = await importBackup(backup);
+    // Queued after the backfill the restore started, so it ends once that one has
+    expect(await backfillImageVariants(prisma)).toEqual({ created: 0, failed: 0 });
+
+    expect(res.status).toBe(200);
+    expect(uploadDirContent()).toEqual(
+      ['1700000000-42.jpg', ...derivedVariantNames('1700000000-42.jpg')].sort(),
+    );
   });
 
   it('should keep an image with a traversal name inside the uploads folder', async () => {

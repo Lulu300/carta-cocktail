@@ -112,6 +112,18 @@ if [[ "$(header x-content-type-options)" != "nosniff" ]]; then
   fail "missing security header X-Content-Type-Options: nosniff"
 fi
 
+step "The service worker and the web manifest of the installable app"
+grep -q '<link rel="manifest" href="/manifest.webmanifest">' "$BODY" || fail "index.html links no web manifest"
+# A cached sw.js would keep browsers on an old version of the app (frontend/nginx.conf.template)
+request GET /sw.js
+expect_status 200
+expect_content_type '*javascript*'
+[[ "$(header cache-control)" == "no-cache" ]] || fail "sw.js: expected Cache-Control no-cache, got '$(header cache-control)'"
+request GET /manifest.webmanifest
+expect_status 200
+expect_content_type 'application/manifest+json*'
+[[ "$(json_field .start_url)" == "/" ]] || fail "expected start_url / in the manifest: $(body_excerpt)"
+
 step "GET $asset is gzip-compressed"
 request GET "$asset" -H 'Accept-Encoding: gzip'
 expect_status 200
@@ -150,10 +162,16 @@ fi
 expect_status 200
 image_path="$(json_field .imagePath)"
 
-step "GET /uploads/$image_path serves the photo"
-request GET "/uploads/$image_path"
-expect_status 200
-expect_content_type 'image/*'
+step "GET /uploads/$image_path serves the photo and its smaller copies"
+# The backend stores the photo as WebP, with copies named after it (imageVariants.ts)
+[[ "$image_path" == *.webp ]] || fail "expected a WebP photo, got $image_path"
+image_stem="${image_path%.webp}"
+for stored in "$image_path:image/webp" "$image_stem-960.webp:image/webp" \
+  "$image_stem-480.webp:image/webp" "$image_stem-og.jpg:image/jpeg"; do
+  request GET "/uploads/${stored%%:*}"
+  expect_status 200
+  expect_content_type "${stored#*:}"
+done
 
 step "The photo survives a recreation of the backend container (uploads volume)"
 (cd "$REPO_ROOT" && docker compose up -d --no-deps --force-recreate --wait --wait-timeout 180 "$BACKEND_SERVICE") \
@@ -192,8 +210,9 @@ request GET "/menu/$menu_slug" -A 'WhatsApp/2.23.20.0'
 expect_status 200
 expect_content_type 'text/html*'
 grep -q '<meta property="og:title" content="Smoke menu · ' "$BODY" || fail "no og:title: $(body_excerpt)"
-grep -q "<meta property=\"og:image\" content=\"[^\"]*/uploads/$image_path\">" "$BODY" \
-  || fail "no og:image of the photo: $(body_excerpt)"
+# The JPEG copy: WhatsApp and iMessage do not always show a WebP image
+grep -q "<meta property=\"og:image\" content=\"[^\"]*/uploads/$image_stem-og.jpg\">" "$BODY" \
+  || fail "no og:image of the JPEG copy of the photo: $(body_excerpt)"
 request GET /menu/smoke-unknown-menu -A 'WhatsApp/2.23.20.0'
 expect_status 404
 

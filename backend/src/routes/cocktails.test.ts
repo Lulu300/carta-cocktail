@@ -22,6 +22,8 @@ import {
 import type { CocktailIngredient } from '../generated/prisma/client';
 import type { CocktailExportFile } from '../services/cocktail/cocktailExport';
 import { MAX_IMAGE_BYTES } from '../services/cocktail/cocktailImage';
+import { derivedVariantNames } from '../services/cocktail/imageVariants';
+import { jpegOfSize, testImage } from '../test/images';
 import { MAX_EXPORT_BATCH } from '../validation/cocktails';
 
 beforeAll(async () => {
@@ -1455,6 +1457,8 @@ describe('POST /api/cocktails/import/confirm - unit that several units hold igno
 });
 
 describe('POST /api/cocktails/:id/image - upload replacing existing', () => {
+  beforeEach(emptyUploadDir);
+
   it('should return 400 when no file is uploaded', async () => {
     const cocktail = await seedCocktail({ name: 'No Image Cocktail' });
     const res = await request.post(`/api/cocktails/${cocktail.id}/image`).set(authHeader());
@@ -1473,7 +1477,7 @@ describe('POST /api/cocktails/:id/image - upload replacing existing', () => {
     const res = await request
       .post(`/api/cocktails/${cocktail.id}/image`)
       .set(authHeader())
-      .attach('image', Buffer.from('fake-png-data'), {
+      .attach('image', await testImage({ format: 'png' }), {
         filename: 'test.png',
         contentType: 'image/png',
       });
@@ -1486,27 +1490,16 @@ describe('POST /api/cocktails/:id/image - upload replacing existing', () => {
     expect(fs.existsSync(path.join(config.uploadDir, res.body.imagePath))).toBe(true);
   });
 
-  it('should delete the previous image file from disk when a new one is uploaded', async () => {
+  it('should delete the previous photo and its copies from disk when a new one is uploaded', async () => {
     const cocktail = await seedCocktail({ name: 'Old File Cocktail' });
-    const oldFileName = 'old-image-on-disk.png';
-    const oldFilePath = path.join(config.uploadDir, oldFileName);
-    fs.writeFileSync(oldFilePath, 'old-png-data');
-    await prisma.cocktail.update({
-      where: { id: cocktail.id },
-      data: { imagePath: oldFileName },
-    });
+    const previous = await uploadImage(cocktail.id, 'old.png', 'image/png');
+    expect(uploadedFiles()).toEqual(storedFiles(previous.body.imagePath));
 
-    const res = await request
-      .post(`/api/cocktails/${cocktail.id}/image`)
-      .set(authHeader())
-      .attach('image', Buffer.from('new-png-data'), {
-        filename: 'new.png',
-        contentType: 'image/png',
-      });
+    const res = await uploadImage(cocktail.id, 'new.png', 'image/png');
 
     expect(res.status).toBe(200);
-    expect(fs.existsSync(oldFilePath)).toBe(false);
-    expect(fs.existsSync(path.join(config.uploadDir, res.body.imagePath))).toBe(true);
+    // Only the new photo and its copies are left
+    expect(uploadedFiles()).toEqual(storedFiles(res.body.imagePath));
   });
 });
 
@@ -1527,23 +1520,29 @@ describe('GET /api/cocktails/:id/export - file name', () => {
   });
 });
 
-function uploadedFiles(): string[] {
-  return fs.existsSync(config.uploadDir) ? fs.readdirSync(config.uploadDir) : [];
+function emptyUploadDir(): void {
+  fs.rmSync(config.uploadDir, { recursive: true, force: true });
 }
 
-function uploadImage(
-  id: number,
-  filename: string,
-  contentType: string,
-  content = Buffer.from('image-data'),
-) {
+function uploadedFiles(): string[] {
+  return fs.existsSync(config.uploadDir) ? fs.readdirSync(config.uploadDir).sort() : [];
+}
+
+/** The photo an upload stores and its smaller copies, sorted as uploadedFiles() lists them. */
+function storedFiles(imagePath: string): string[] {
+  return [imagePath, ...derivedVariantNames(imagePath)].sort();
+}
+
+async function uploadImage(id: number, filename: string, contentType: string, content?: Buffer) {
   return request
     .post(`/api/cocktails/${id}/image`)
     .set(authHeader())
-    .attach('image', content, { filename, contentType });
+    .attach('image', content ?? (await testImage()), { filename, contentType });
 }
 
 describe('POST /api/cocktails/:id/image - file checks', () => {
+  beforeEach(emptyUploadDir);
+
   it('should return 404 and keep no file for a cocktail that does not exist', async () => {
     const before = uploadedFiles();
 
@@ -1571,13 +1570,28 @@ describe('POST /api/cocktails/:id/image - file checks', () => {
   it.each([
     ['one byte under the limit', MAX_IMAGE_BYTES - 1],
     ['exactly the limit', MAX_IMAGE_BYTES],
-  ])('should store a photo of %s, whole', async (_case, size) => {
+  ])('should accept a photo of %s', async (_case, size) => {
     const cocktail = await seedCocktail();
 
-    const res = await uploadImage(cocktail.id, 'photo.jpg', 'image/jpeg', Buffer.alloc(size));
+    const res = await uploadImage(cocktail.id, 'photo.jpg', 'image/jpeg', await jpegOfSize(size));
 
     expect(res.status).toBe(200);
-    expect(fs.statSync(path.join(config.uploadDir, res.body.imagePath)).size).toBe(size);
+    expect(uploadedFiles()).toEqual(storedFiles(res.body.imagePath));
+  });
+
+  it('should answer 400 and keep no file for a file that is not a readable image', async () => {
+    const cocktail = await seedCocktail();
+
+    const res = await uploadImage(
+      cocktail.id,
+      'photo.png',
+      'image/png',
+      Buffer.from('fake-png-data'),
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('The photo cannot be read: send a JPEG, PNG or WebP image');
+    expect(uploadedFiles()).toEqual([]);
   });
 
   it('should answer 413 and keep no file for a photo one byte over the limit', async () => {
@@ -1598,14 +1612,14 @@ describe('POST /api/cocktails/:id/image - file checks', () => {
     ).toBeNull();
   });
 
-  it('should store the image under a random name with the lowercased extension', async () => {
+  it('should store the photo as WebP under a random name, with its smaller copies', async () => {
     const cocktail = await seedCocktail();
 
     const res = await uploadImage(cocktail.id, '../My Photo.JPEG', 'image/jpeg');
 
     expect(res.status).toBe(200);
-    expect(res.body.imagePath).toMatch(/^[0-9a-f-]{36}\.jpeg$/);
-    expect(fs.existsSync(path.join(config.uploadDir, res.body.imagePath))).toBe(true);
+    expect(res.body.imagePath).toMatch(/^[0-9a-f-]{36}\.webp$/);
+    expect(uploadedFiles()).toEqual(storedFiles(res.body.imagePath));
   });
 });
 
@@ -1632,22 +1646,28 @@ describe('POST /api/cocktails/:id/image - failed update', () => {
 });
 
 describe('DELETE /api/cocktails/:id - image file', () => {
+  beforeEach(emptyUploadDir);
+
   it('should return 404 for a cocktail that does not exist', async () => {
     const res = await request.delete('/api/cocktails/99999').set(authHeader());
     expect(res.status).toBe(404);
   });
 
-  it('should delete the image file with the cocktail', async () => {
+  it('should delete the photo and its smaller copies with the cocktail', async () => {
     const cocktail = await seedCocktail();
-    const upload = await uploadImage(cocktail.id, 'photo.webp', 'image/webp');
-    const imageFile = path.join(config.uploadDir, upload.body.imagePath);
-    expect(fs.existsSync(imageFile)).toBe(true);
+    const upload = await uploadImage(
+      cocktail.id,
+      'photo.webp',
+      'image/webp',
+      await testImage({ format: 'webp' }),
+    );
+    expect(uploadedFiles()).toEqual(storedFiles(upload.body.imagePath));
 
     const res = await request.delete(`/api/cocktails/${cocktail.id}`).set(authHeader());
 
     expect(res.status).toBe(200);
     expect(await prisma.cocktail.findUnique({ where: { id: cocktail.id } })).toBeNull();
-    expect(fs.existsSync(imageFile)).toBe(false);
+    expect(uploadedFiles()).toEqual([]);
   });
 
   it('should keep the image file when the cocktail cannot be deleted', async () => {

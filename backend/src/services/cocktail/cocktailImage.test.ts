@@ -2,7 +2,8 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { config } from '../../config';
-import { removeImageFile, safeUploadPath } from './cocktailImage';
+import { removeImageFile } from './cocktailImage';
+import { safeUploadPath } from './imageVariants';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -37,6 +38,19 @@ describe('removeImageFile', () => {
     await removeImageFile('to-remove.png');
 
     expect(fs.existsSync(file)).toBe(false);
+  });
+
+  it('should delete the smaller copies with the photo', async () => {
+    fs.mkdirSync(config.uploadDir, { recursive: true });
+    const files = ['photo.jpg', 'photo-960.webp', 'photo-480.webp', 'photo-og.jpg'];
+    for (const name of [...files, 'photo-other.webp']) {
+      fs.writeFileSync(path.join(config.uploadDir, name), 'image');
+    }
+
+    await removeImageFile('photo.jpg');
+
+    for (const name of files) expect(fs.existsSync(path.join(config.uploadDir, name))).toBe(false);
+    expect(fs.existsSync(path.join(config.uploadDir, 'photo-other.webp'))).toBe(true);
   });
 
   it('should ignore a file that is already gone', async () => {

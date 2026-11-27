@@ -254,6 +254,8 @@ export async function seedCocktail(
     name: string;
     description: string | null;
     tags: string;
+    /** Name of a photo in config.uploadDir; the file itself is the test's business. */
+    imagePath: string | null;
   }> = {},
 ) {
   return prisma.cocktail.create({
@@ -261,6 +263,7 @@ export async function seedCocktail(
       name: overrides.name ?? 'Test Cocktail',
       description: overrides.description ?? null,
       tags: overrides.tags ?? '',
+      imagePath: overrides.imagePath ?? null,
     },
   });
 }

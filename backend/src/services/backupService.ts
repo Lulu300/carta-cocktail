@@ -10,6 +10,7 @@ import { checkpointWal, configureSqlite, createPrismaClient, prisma } from '../l
 import { BadRequestError, ConflictError } from '../errors';
 import { hasTokenVersionColumn, writeSessionFloor } from './sessionFloor';
 import { APP_STATE_ID } from './upgradeNoticeService';
+import { backfillImageVariants } from './cocktail/imageVariants';
 
 /** Format of the backup archive, written to metadata.json. Every published version wrote 1. */
 export const BACKUP_FORMAT_VERSION = 1;
@@ -513,9 +514,14 @@ export async function restoreBackup(zipPath: string): Promise<RestoreResult> {
   if (restoreInProgress) throw new ConflictError('errors.restoreInProgress');
   if (exportsInProgress > 0) throw new ConflictError('errors.exportInProgress');
   restoreInProgress = true;
+  let result: RestoreResult;
   try {
-    return await replaceLiveData(zipPath);
+    result = await replaceLiveData(zipPath);
   } finally {
     restoreInProgress = false;
   }
+  // An older backup brings photos without their smaller copies. In the background:
+  // the pages show the photo itself meanwhile. Never rejects.
+  void backfillImageVariants(prisma);
+  return result;
 }

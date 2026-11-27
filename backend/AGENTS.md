@@ -86,7 +86,7 @@ backend/
 │   ├── services/             # Business logic shared by routes and scripts
 │   │   ├── availabilityService.ts  # Stock-based availability calculation
 │   │   ├── backupService.ts  # Backup export snapshot and restore
-│   │   ├── cocktail/         # Cocktail CRUD, image upload, JSON export and import
+│   │   ├── cocktail/         # Cocktail CRUD, image upload and copies (imageVariants.ts), JSON export and import
 │   │   ├── deletionService.ts # Impact and forced deletion of items used by recipes
 │   │   ├── menuSyncService.ts # Bottles of the system menus (apero/digestif flags, exclusions)
 │   │   ├── sessionFloor.ts   # Session revocation kept across the restart after a restore
@@ -238,9 +238,12 @@ nginx (`frontend/nginx.conf.template`) limits the whole multipart body, so its `
 ### Image Upload
 
 - Limit: `MAX_IMAGE_BYTES` (see File Uploads)
-- Accepted: jpg, jpeg, png, webp
+- Accepted: jpg, jpeg, png, webp. multer keeps the file in memory; sharp (`services/cocktail/imageVariants.ts`) decodes it once (`MAX_INPUT_PIXELS`, 100 Mpx, bounds the memory), applies the EXIF orientation, drops every metadata block (GPS included) and writes `<uuid>.webp` (1600 px wide at most, the name stored in `imagePath`), `<uuid>-960.webp`, `<uuid>-480.webp` and `<uuid>-og.jpg` (1200 px, the `og:image` of link previews). The upload itself is never kept (decision of 2026-11-27); a file sharp cannot read, or one over the pixel limit, gets a 400 (`errors.invalidImage`)
+- Every copy is named after `imagePath` (`derivedVariantNames()`), with no schema change: `frontend/src/utils/uploads.ts` builds the same names. Deleting or replacing a photo deletes its copies
+- Photos stored before the copies existed keep their original file, never rewritten. `backfillImageVariants()` adds the missing copies in the background at startup (`src/index.ts`) and after a backup restore; until then the public pages and link previews use the photo itself
 - Stored at the root of `config.uploadDir`: `UPLOAD_DIR`, or `<repo>/uploads` when it is not set. The Docker image and both compose files set `UPLOAD_DIR=/app/uploads` (the `uploads` volume)
 - Served statically at `/uploads/*`
+- Tests build real images with `src/test/images.ts` (`testImage()`, `jpegOfSize()`, `writeStoredPhoto()`)
 
 ## Scripts
 
@@ -263,11 +266,11 @@ nginx (`frontend/nginx.conf.template`) limits the whole multipart body, so its `
 
 ## Dependencies
 
-**Runtime**: express 5, express-rate-limit, bcryptjs, cors, helmet, morgan, jsonwebtoken, multer, archiver and adm-zip (backups), i18next, i18next-http-middleware, dotenv, zod 4, yaml (front matter of the release notes)
+**Runtime**: express 5, express-rate-limit, bcryptjs, cors, helmet, morgan, jsonwebtoken, multer, sharp (photo copies; libvips prebuilt in its optional `@img/sharp-<platform>` packages, no install script), archiver and adm-zip (backups), i18next, i18next-http-middleware, dotenv, zod 4, yaml (front matter of the release notes)
 **Runtime (database)**: @prisma/client 7, @prisma/adapter-better-sqlite3 7, better-sqlite3 12 (native module, prebuilt for linux x64/arm64 musl), prisma 7 (the CLI applies the migrations when the container starts)
 **Dev**: typescript 5.9, tsx, eslint 10, typescript-eslint, prettier 3, vitest, supertest
 
-**Install scripts**: npm 12 skips the install scripts of dependencies that `allowScripts` in `package.json` does not list (npm 11.19 only warns). Only `better-sqlite3` is allowed: without its script the native binary is missing. `esbuild`, `prisma`, `@prisma/engines` and `fsevents` are denied (`false`): their binaries come from platform packages or from `prisma generate` (the project `postinstall`). Keys have no version, so a Dependabot bump keeps working. A new dependency whose script is needed must be added to `allowScripts` (`npm install-scripts approve <pkg> --no-allow-scripts-pin`), otherwise denied (`npm install-scripts deny <pkg>`), so that `npm ci` prints no `install-scripts` warning. The `prod-deps` stage of the `Dockerfile` opens `better-sqlite3` and fails the build when its binary is missing.
+**Install scripts**: npm 12 skips the install scripts of dependencies that `allowScripts` in `package.json` does not list (npm 11.19 only warns). Only `better-sqlite3` is allowed: without its script the native binary is missing. `esbuild`, `prisma`, `@prisma/engines` and `fsevents` are denied (`false`): their binaries come from platform packages or from `prisma generate` (the project `postinstall`). Keys have no version, so a Dependabot bump keeps working. A new dependency whose script is needed must be added to `allowScripts` (`npm install-scripts approve <pkg> --no-allow-scripts-pin`), otherwise denied (`npm install-scripts deny <pkg>`), so that `npm ci` prints no `install-scripts` warning. The `prod-deps` stage of the `Dockerfile` opens `better-sqlite3` and encodes an image with `sharp`, and fails the build when either binary is missing. It prunes with `--omit=dev` only: `--omit=optional` would drop the binary of sharp, so the optional peers of the dev tooling (typescript, magicast) are cut by `docker/prune-unused-deps.mjs` instead.
 
 The Docker image holds the runtime dependencies only and runs as the `node` user (uid 1000): code that runs there (server, seed, scripts) lives in `src/` and is compiled by `npm run build`. It never relies on `tsx`. The image has no `src/`: the Dockerfile bundles `prisma.config.ts` with `src/lib/databasePath.ts` into `dist/lib/prisma.config.js` (esbuild), which `docker/prisma.config.js` loads, so `databasePath.ts` imports Node built-ins only. A new file in `src/scripts/` stays a thin entry point and is added to the coverage exclusions (`vitest.config.ts` and `ci.yml`).
 

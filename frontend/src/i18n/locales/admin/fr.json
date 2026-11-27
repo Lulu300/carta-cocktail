@@ -625,5 +625,8 @@
     "after": "À faire après la mise à jour",
     "acknowledge": "J'ai fait ces actions",
     "guideLink": "Guide de mise à jour (UPGRADING.md)"
+  },
+  "appUpdate": {
+    "available": "Une nouvelle version est disponible"
   }
 }

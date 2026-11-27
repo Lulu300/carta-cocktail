@@ -105,6 +105,20 @@ describe('PublicCocktailItem', () => {
     );
   });
 
+  it('loads the smallest copy of the photo that fills the card, lazily', () => {
+    renderItem(buildMenuCocktail({ id: 1, cocktail: { imagePath: 'mojito.webp' } }));
+    const photo = screen.getByRole('link', { name: /Mojito/ }).querySelector('img');
+
+    expect(photo).toHaveAttribute('src', '/uploads/mojito.webp');
+    expect(photo).toHaveAttribute(
+      'srcset',
+      '/uploads/mojito-480.webp 480w, /uploads/mojito-960.webp 960w, /uploads/mojito.webp 1600w',
+    );
+    expect(photo).toHaveAttribute('sizes', expect.stringContaining('calc(100vw - 2rem)'));
+    expect(photo).toHaveAttribute('loading', 'lazy');
+    expect(photo).toHaveAttribute('decoding', 'async');
+  });
+
   it('hides the placeholder emoji from screen readers', () => {
     renderItem(buildMenuCocktail({ id: 1, cocktail: { imagePath: null } }));
     expect(screen.getByText('🍸')).toHaveAttribute('aria-hidden', 'true');
