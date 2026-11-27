@@ -2,9 +2,20 @@
 // schemas, generated into generated.ts (`npm run contracts:generate` in backend/, task F-05);
 // importWizard.ts holds the import wizards' own state.
 
-export { MENU_TYPES, SOURCE_KEYS, SOURCE_TYPES } from './generated';
+export {
+  API_TOKEN_LIFETIME_DAYS,
+  API_TOKEN_SCOPES,
+  DEFAULT_API_TOKEN_LIFETIME_DAYS,
+  MAX_API_TOKEN_NAME_LENGTH,
+  MENU_TYPES,
+  SOURCE_KEYS,
+  SOURCE_TYPES,
+} from './generated';
 export type {
   AdminSiteSettings,
+  ApiToken,
+  ApiTokenInput,
+  ApiTokenScope,
   Bottle,
   BottleCategoryPreview,
   BottleImportCategoryRecord,
@@ -39,6 +50,7 @@ export type {
   CocktailInstruction,
   CocktailPreferredBottle,
   CocktailRow,
+  CreatedApiToken,
   DeletionImpact,
   DeletionResponse,
   ImportMatchStatus,

@@ -307,6 +307,29 @@ const settingsHandlers = [
   ),
 ];
 
+const apiTokenHandlers = [
+  // No token by default: a test that lists some says so.
+  http.get('/api/api-tokens', () => HttpResponse.json([])),
+  http.post('/api/api-tokens', async ({ request }) => {
+    const body = await readJsonObject(request);
+    createdId += 1;
+    return HttpResponse.json(
+      {
+        id: createdId,
+        name: body.name,
+        scope: body.scope ?? 'READ_ONLY',
+        lastFour: 'Wxyz',
+        createdAt: '2026-11-27T10:00:00.000Z',
+        expiresAt: '2027-02-25T10:00:00.000Z',
+        lastUsedAt: null,
+        token: `carta_${'x'.repeat(39)}Wxyz`,
+      },
+      { status: 201 },
+    );
+  }),
+  http.delete('/api/api-tokens/:id', () => HttpResponse.json({ message: 'API token revoked' })),
+];
+
 const systemHandlers = [
   // No upgrade notice by default: a test that needs one says so.
   http.get('/api/system/upgrade-notice', () => new HttpResponse(null, { status: 204 })),
@@ -331,5 +354,6 @@ export const handlers = [
   ...publicHandlers,
   ...stockHandlers,
   ...settingsHandlers,
+  ...apiTokenHandlers,
   ...systemHandlers,
 ];

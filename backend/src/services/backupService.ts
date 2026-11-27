@@ -9,6 +9,7 @@ import { PRISMA_DIR, resolveDatabasePath } from '../lib/databasePath';
 import { checkpointWal, configureSqlite, createPrismaClient, prisma } from '../lib/prisma';
 import { BadRequestError, ConflictError } from '../errors';
 import { hasTokenVersionColumn, writeSessionFloor } from './sessionFloor';
+import { hasApiTokenTable } from './apiTokenService';
 import { APP_STATE_ID } from './upgradeNoticeService';
 import { backfillImageVariants } from './cocktail/imageVariants';
 
@@ -54,23 +55,53 @@ export interface RestoreResult {
   restartRecommended: boolean;
 }
 
-/**
- * Writes a consistent copy of the live database to a temporary file and returns
- * its path. VACUUM INTO reads one transaction snapshot, WAL content included,
- * so writes made during the export never end up half copied.
- */
-export async function createSnapshot(client: PrismaClient = prisma): Promise<string> {
-  const snapshotPath = path.join(os.tmpdir(), `carta-snapshot-${randomUUID()}.db`);
-  const quotedPath = snapshotPath.replace(/'/g, "''");
-  await client.$executeRawUnsafe(`VACUUM INTO '${quotedPath}'`);
-  return snapshotPath;
-}
-
 async function listTables(client: PrismaClient): Promise<string[]> {
   const rows = await client.$queryRawUnsafe<{ name: string }[]>(
     "SELECT name FROM sqlite_master WHERE type = 'table'",
   );
   return rows.map((row) => row.name);
+}
+
+/**
+ * Deletes every API token of a database (F-16): a backup never carries them, and a restore
+ * revokes them all, like the sessions. secure_delete overwrites the deleted rows, so that
+ * their hashes do not stay in the free pages of the file. A database made before the table
+ * existed has nothing to delete.
+ */
+async function removeApiTokens(client: PrismaClient): Promise<void> {
+  if (!(await hasApiTokenTable(client))) return;
+  // The pragma returns a row, so it needs $queryRaw rather than $executeRaw
+  await client.$queryRawUnsafe('PRAGMA secure_delete = ON');
+  await client.$executeRawUnsafe('DELETE FROM "ApiToken"');
+}
+
+async function removeApiTokensFromFile(dbPath: string): Promise<void> {
+  const client = createPrismaClient(`file:${dbPath}`);
+  try {
+    await removeApiTokens(client);
+  } finally {
+    await client.$disconnect();
+    removeSqliteSideFiles(dbPath);
+  }
+}
+
+/**
+ * Writes a consistent copy of the live database, without the API tokens, to a
+ * temporary file and returns its path. VACUUM INTO reads one transaction
+ * snapshot, WAL content included, so writes made during the export never end up
+ * half copied.
+ */
+export async function createSnapshot(client: PrismaClient = prisma): Promise<string> {
+  const snapshotPath = path.join(os.tmpdir(), `carta-snapshot-${randomUUID()}.db`);
+  const quotedPath = snapshotPath.replace(/'/g, "''");
+  await client.$executeRawUnsafe(`VACUUM INTO '${quotedPath}'`);
+  try {
+    await removeApiTokensFromFile(snapshotPath);
+  } catch (err) {
+    fs.rmSync(snapshotPath, { force: true });
+    throw err;
+  }
+  return snapshotPath;
 }
 
 /**
@@ -265,6 +296,8 @@ async function prepareRestoredDatabase(restoredDbPath: string, live: LiveState):
   const client = createPrismaClient(`file:${restoredDbPath}`);
   try {
     await keepLiveAppState(client, live.appState);
+    // A backup exported by Carta has none, but a database file copied by hand may
+    await removeApiTokens(client);
     return await raiseRestoredTokenVersion(client, live.tokenVersion);
   } finally {
     await client.$disconnect();
@@ -401,8 +434,9 @@ function fileTimestamp(date: Date): string {
  * a copy of the replaced database in `<database folder>/backups/`, and puts the
  * previous database and uploads back if it fails. The restored database comes
  * with a raised token version (at the next start for a backup made before
- * v1.11.0): every session, the restoring one included, ends. It keeps the
- * live AppState row (version that ran last, upgrade notice).
+ * v1.11.0): every session, the restoring one included, ends. Every API token is
+ * revoked too: the live ones go with the replaced database, and the restored one
+ * keeps none. It keeps the live AppState row (version that ran last, upgrade notice).
  */
 async function replaceLiveData(zipPath: string): Promise<RestoreResult> {
   const zip = openArchive(zipPath);

@@ -2,11 +2,15 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { prisma } from '../lib/prisma';
-import { UnauthorizedError } from '../errors';
+import { ForbiddenError, UnauthorizedError } from '../errors';
+import { isApiToken, verifyApiToken, type Principal } from '../services/apiTokenService';
 
 export interface AuthRequest extends Request {
   userId?: number;
 }
+
+// A read-only API token may only read
+const READ_METHODS = new Set(['GET', 'HEAD']);
 
 const BEARER_PREFIX = 'Bearer ';
 const ALGORITHM = 'HS256';
@@ -64,7 +68,20 @@ function extractBearerToken(req: Request): string | null {
   return authHeader.slice(BEARER_PREFIX.length);
 }
 
-/** Rejects the request with a 401, answered by errorHandler, unless it carries a valid admin token. */
+/**
+ * Checks a Bearer token: an API token (`carta_…`, F-16) or a session JWT. Returns null when
+ * the token is not valid.
+ */
+async function authenticate(token: string): Promise<Principal | null> {
+  if (isApiToken(token)) return verifyApiToken(token);
+  const userId = await verifyToken(token);
+  return userId === null ? null : { userId, canWrite: true };
+}
+
+/**
+ * Rejects the request with a 401, answered by errorHandler, unless it carries a valid admin
+ * token or API token, and with a 403 when a read-only API token sends anything but a read.
+ */
 export async function authMiddleware(
   req: AuthRequest,
   _res: Response,
@@ -73,16 +90,36 @@ export async function authMiddleware(
   const token = extractBearerToken(req);
   if (!token) throw new UnauthorizedError();
 
-  const userId = await verifyToken(token);
-  if (userId === null) throw new UnauthorizedError('errors.invalidToken');
+  const principal = await authenticate(token);
+  if (!principal) throw new UnauthorizedError('errors.invalidToken');
+  if (!principal.canWrite && !READ_METHODS.has(req.method)) {
+    throw new ForbiddenError('errors.apiTokenReadOnly');
+  }
 
-  req.userId = userId;
+  req.userId = principal.userId;
+  next();
+}
+
+/** The admin id set by authMiddleware, for a route mounted behind it. */
+export function authenticatedUserId(req: AuthRequest): number {
+  if (req.userId === undefined) throw new UnauthorizedError();
+  return req.userId;
+}
+
+/**
+ * Refuses with a 403 any request that carries an API token, valid or not: app.ts mounts it on
+ * the routes reserved to the admin's session (SESSION_ONLY_ROUTES). It reads the header only,
+ * so it runs before authMiddleware wherever that one is mounted.
+ */
+export function refuseApiTokens(req: Request, _res: Response, next: NextFunction): void {
+  const token = extractBearerToken(req);
+  if (token && isApiToken(token)) throw new ForbiddenError('errors.apiTokenSessionOnly');
   next();
 }
 
 /**
- * Sets req.userId when a valid admin token is sent, and never rejects the request.
- * Guests holding a stale token in localStorage must still see the public menu.
+ * Sets req.userId when a valid admin token or API token is sent, and never rejects the
+ * request. Guests holding a stale token in localStorage must still see the public menu.
  */
 export async function optionalAuth(
   req: AuthRequest,
@@ -90,9 +127,9 @@ export async function optionalAuth(
   next: NextFunction,
 ): Promise<void> {
   const token = extractBearerToken(req);
-  const userId = token ? await verifyToken(token) : null;
-  if (userId !== null) {
-    req.userId = userId;
+  const principal = token ? await authenticate(token) : null;
+  if (principal) {
+    req.userId = principal.userId;
   }
   next();
 }

@@ -9,6 +9,8 @@ import { Prisma } from '../generated/prisma/client';
 import app from '../app';
 import { prisma } from '../lib/prisma';
 import { configureServerTimeouts } from '../serverTimeouts';
+import { createApiToken } from '../services/apiTokenService';
+import type { ApiTokenCreate } from '../validation/apiTokens';
 import type { SourceType } from '../validation/cocktails';
 import type { MenuType } from '../validation/menus';
 
@@ -151,6 +153,24 @@ export function getAuthToken(userId: number = 1, options: AuthTokenOptions = {})
  */
 export function authHeader(userId: number = 1): { Authorization: string } {
   return { Authorization: `Bearer ${getAuthToken(userId)}` };
+}
+
+export interface ApiTokenOptions extends Partial<z.output<typeof ApiTokenCreate>> {
+  /** When the token was created: an old date gives an expired token. Now by default. */
+  createdAt?: Date;
+}
+
+/**
+ * Creates an API token of the admin, read and write for 90 days by default, as the route
+ * does, and returns it with the Authorization header that sends it.
+ */
+export async function seedApiToken({ createdAt, ...input }: ApiTokenOptions = {}) {
+  const created = await createApiToken(
+    1,
+    { name: 'Script', scope: 'READ_WRITE', expiresInDays: 90, ...input },
+    createdAt,
+  );
+  return { ...created, header: { Authorization: `Bearer ${created.token}` } };
 }
 
 // ---- Seed factories ----

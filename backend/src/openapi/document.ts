@@ -26,7 +26,14 @@ interface DocumentedRoute extends ApiRoute {
   doc: RouteDoc;
 }
 
-const SECURITY_SCHEME = 'bearerAuth';
+// The admin's session token, and the API tokens of scripts and MCP clients (F-16)
+const SESSION_SCHEME = 'bearerAuth';
+const API_TOKEN_SCHEME = 'apiToken';
+const SESSION = { [SESSION_SCHEME]: [] };
+const API_TOKEN = { [API_TOKEN_SCHEME]: [] };
+
+// Methods a read-only API token may send (authMiddleware)
+const READ_METHODS = new Set(['get', 'head']);
 
 // Errors that follow from the middleware in front of a route, described once in
 // components.responses and referred to by every route they apply to.
@@ -39,7 +46,7 @@ const COMMON_ERRORS = {
   401: {
     name: 'Unauthorized',
     description:
-      'No session token, or one that is invalid, expired or revoked (password changed, "log out everywhere", backup restored).',
+      'No token, or one that is invalid, expired or revoked: a session token after a password change, "log out everywhere" or a backup restore; an API token once revoked or expired, or after "log out everywhere" or a backup restore.',
   },
   413: {
     name: 'PayloadTooLarge',
@@ -52,19 +59,48 @@ const COMMON_ERRORS = {
   },
 } as const;
 
+const API_TOKEN_SECURITY_SCHEME = {
+  type: 'http',
+  scheme: 'bearer',
+  bearerFormat: 'carta_<43 base64url characters>',
+  description:
+    'API token of a script or an MCP client, created in Settings > API tokens and shown once. Read only (`GET` and `HEAD`) or read and write; it expires. The routes whose security lists the session only refuse it (403).',
+};
+
+// The 403 answers of an API token, from authMiddleware and refuseApiTokens
+const TOKEN_REFUSALS = {
+  readOnly: {
+    name: 'ReadOnlyApiToken',
+    description:
+      'The request carries a read-only API token: such a token may only send `GET` and `HEAD`.',
+  },
+  sessionOnly: {
+    name: 'SessionOnly',
+    description:
+      "The request carries an API token: this route only accepts the admin's session token, whatever the scope of the token.",
+  },
+} as const;
+
 const RATE_LIMIT_HEADERS = {
   'Retry-After': 'Seconds to wait before the next request.',
   RateLimit: 'Requests left in the current window (IETF draft 7 format).',
   'RateLimit-Policy': 'Limit and window of the limiter that refused the request.',
 };
 
-const DESCRIPTION = `REST API of Carta Cocktail: cocktail recipes, bottle stock and published menus.
+const INTRODUCTION = `REST API of Carta Cocktail: cocktail recipes, bottle stock and published menus.`;
 
-**Authentication.** \`POST /api/auth/login\` answers a session token (JWT). Send it in the
+const SESSION_AUTHENTICATION = `**Authentication.** \`POST /api/auth/login\` answers a session token (JWT). Send it in the
 \`Authorization: Bearer <token>\` header. It lasts 7 days by default and ends when the admin
-changes the password, signs out everywhere or restores a backup.
+changes the password, signs out everywhere or restores a backup.`;
 
-**Errors.** Every error answers JSON with the same shape, the \`ApiError\` schema: \`error\`, a
+// Full document only: the public one describes nothing that an API token could call
+const API_TOKEN_AUTHENTICATION = `A script or an MCP client uses an API token instead (\`Authorization: Bearer carta_…\`), which
+the admin creates in Settings and which expires after 30, 90 or 365 days. A read-only token may
+only send \`GET\` and \`HEAD\` (403 otherwise). The routes that manage the tokens, the admin
+account, signing out everywhere and the backups refuse every API token (403): their security
+lists the session only. Signing out everywhere and restoring a backup delete every API token.`;
+
+const ERRORS_AND_LIMITS = `**Errors.** Every error answers JSON with the same shape, the \`ApiError\` schema: \`error\`, a
 message in the language of the request (\`Accept-Language\`, English by default), and sometimes
 \`details\`.
 
@@ -130,17 +166,32 @@ function hasRequestBody(route: DocumentedRoute): boolean {
   return route.schemas.body !== undefined || route.doc.upload !== undefined;
 }
 
+function requiresToken(route: DocumentedRoute): boolean {
+  return route.access === 'admin' || route.access === 'session';
+}
+
+/** Why an API token gets 403 here, when it can: the route is reserved to the session, or writes. */
+function tokenRefusal(route: DocumentedRoute): keyof typeof TOKEN_REFUSALS | undefined {
+  if (route.access === 'session') return 'sessionOnly';
+  if (route.access === 'admin' && !READ_METHODS.has(route.method)) return 'readOnly';
+  return undefined;
+}
+
 /** Error responses: those the middleware implies, then those the route declares. */
 function errorResponses(route: DocumentedRoute) {
   const implied: (keyof typeof COMMON_ERRORS)[] = [];
   if (Object.keys(route.schemas).length > 0 || route.doc.upload) implied.push(400);
-  if (route.access === 'admin') implied.push(401);
+  if (requiresToken(route)) implied.push(401);
   if (hasRequestBody(route)) implied.push(413);
   if (route.rateLimited) implied.push(429);
 
   const responses: Record<string, unknown> = {};
   for (const status of implied) {
     responses[status] = { $ref: `#/components/responses/${COMMON_ERRORS[status].name}` };
+  }
+  const refusal = tokenRefusal(route);
+  if (refusal) {
+    responses[403] = { $ref: `#/components/responses/${TOKEN_REFUSALS[refusal].name}` };
   }
   for (const [status, description] of Object.entries(route.doc.errors ?? {})) {
     responses[status] = errorResponse(description);
@@ -219,14 +270,35 @@ function parameters(route: DocumentedRoute) {
   ];
 }
 
-function security(route: DocumentedRoute) {
-  if (route.access === 'admin') return [{ [SECURITY_SCHEME]: [] }];
+function documentDescription(scope: DocumentScope): string {
+  if (scope === 'public') {
+    return (
+      [INTRODUCTION, SESSION_AUTHENTICATION, ERRORS_AND_LIMITS].join('\n\n') + PUBLIC_SCOPE_NOTE
+    );
+  }
+  return [INTRODUCTION, SESSION_AUTHENTICATION, API_TOKEN_AUTHENTICATION, ERRORS_AND_LIMITS].join(
+    '\n\n',
+  );
+}
+
+/**
+ * Each entry is one way to call the route: with a session token, an API token, or none. The
+ * public document leaves the API tokens out: it describes them nowhere.
+ */
+function security(route: DocumentedRoute, scope: DocumentScope) {
+  if (route.access === 'session') return [SESSION];
+  if (route.access === 'admin') return [SESSION, API_TOKEN];
   // The admin's token is optional: with it, the route also answers what only the admin sees
-  if (route.access === 'optional') return [{}, { [SECURITY_SCHEME]: [] }];
+  if (route.access === 'optional')
+    return scope === 'full' ? [{}, SESSION, API_TOKEN] : [{}, SESSION];
   return [];
 }
 
-function operationObject(route: DocumentedRoute, components: SchemaComponents) {
+function operationObject(
+  route: DocumentedRoute,
+  components: SchemaComponents,
+  scope: DocumentScope,
+) {
   const { doc } = route;
   const params = parameters(route);
   const body = requestBody(route);
@@ -241,17 +313,22 @@ function operationObject(route: DocumentedRoute, components: SchemaComponents) {
     summary: doc.summary,
     ...(doc.description && { description: doc.description }),
     tags: [doc.tag],
-    security: security(route),
+    security: security(route, scope),
     ...(params.length > 0 && { parameters: params }),
     ...(body && { requestBody: body }),
     responses: { ...responses, ...errorResponses(route) },
   };
 }
 
-function commonComponents(components: SchemaComponents) {
+function commonComponents(components: SchemaComponents, scope: DocumentScope) {
   components.output(ApiError);
+  // Only the routes of the full document refuse API tokens
+  const errors = [
+    ...Object.values(COMMON_ERRORS),
+    ...(scope === 'full' ? Object.values(TOKEN_REFUSALS) : []),
+  ];
   const responses: Record<string, object> = Object.fromEntries(
-    Object.values(COMMON_ERRORS).map(({ name, description }) => [name, errorResponse(description)]),
+    errors.map(({ name, description }) => [name, errorResponse(description)]),
   );
   responses[COMMON_ERRORS[429].name] = {
     ...errorResponse(COMMON_ERRORS[429].description),
@@ -261,7 +338,7 @@ function commonComponents(components: SchemaComponents) {
 }
 
 function isInScope(route: DocumentedRoute, scope: DocumentScope): boolean {
-  return scope === 'full' || route.access !== 'admin';
+  return scope === 'full' || !requiresToken(route);
 }
 
 /** The routes the document describes: declared, not excluded, within the scope. */
@@ -279,13 +356,13 @@ export function buildOpenApiDocument(
   { scope, version }: { scope: DocumentScope; version: string },
 ) {
   const components = new SchemaComponents();
-  const responses = commonComponents(components);
+  const responses = commonComponents(components, scope);
   const included = documentedRoutes(routes, scope);
 
   const paths: Record<string, Record<string, unknown>> = {};
   for (const route of included) {
     paths[route.path] ??= {};
-    paths[route.path]![route.method] = operationObject(route, components);
+    paths[route.path]![route.method] = operationObject(route, components, scope);
   }
   const tags = [...new Set(included.map((route) => route.doc.tag))].sort();
 
@@ -294,7 +371,7 @@ export function buildOpenApiDocument(
     info: {
       title: 'Carta Cocktail API',
       version,
-      description: scope === 'public' ? DESCRIPTION + PUBLIC_SCOPE_NOTE : DESCRIPTION,
+      description: documentDescription(scope),
       license: { name: 'MIT', identifier: 'MIT' },
     },
     tags: tags.map((name) => ({ name })),
@@ -303,12 +380,13 @@ export function buildOpenApiDocument(
       schemas: components.schemas,
       responses,
       securitySchemes: {
-        [SECURITY_SCHEME]: {
+        [SESSION_SCHEME]: {
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'JWT',
           description: 'Session token of the admin, answered by `POST /api/auth/login`.',
         },
+        ...(scope === 'full' && { [API_TOKEN_SCHEME]: API_TOKEN_SECURITY_SCHEME }),
       },
     },
   };

@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { settings as settingsApi } from '../../services/api';
 import { useMenus } from '../../queries/menus';
 import { useSiteSettings } from '../../contexts/SiteSettingsContext';
-import { toast } from '../ui/ToastStore';
 import Button from '../ui/Button';
+import CopyButton from '../ui/CopyButton';
 import Field from '../ui/Field';
 import Select from '../ui/Select';
 import Textarea from '../ui/Textarea';
@@ -45,8 +45,6 @@ export default function EmbedMenuSettings({ initialOrigins }: EmbedMenuSettingsP
       `${window.location.origin}/menu/${encodeURIComponent(slug)}`,
       siteSettings.siteName || t('app.name'),
     );
-  // Missing outside a secure context (a plain http LAN address): the code is still selectable
-  const canCopy = Boolean(navigator.clipboard);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,17 +57,6 @@ export default function EmbedMenuSettings({ initialOrigins }: EmbedMenuSettingsP
       setMessage(t('settings.embed.saved'));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t('common.error'));
-    }
-  };
-
-  const handleCopy = async () => {
-    if (!embedCode) return;
-    try {
-      await navigator.clipboard.writeText(embedCode);
-      toast.success(t('settings.embed.copied'));
-    } catch {
-      // Refused by the browser (permission): the code stays selectable in the field
-      toast.error(new Error(t('settings.embed.copyFailed')));
     }
   };
 
@@ -124,11 +111,13 @@ export default function EmbedMenuSettings({ initialOrigins }: EmbedMenuSettingsP
                 className="font-mono text-xs"
               />
             </Field>
-            {canCopy && (
-              <Button variant="secondary" onClick={handleCopy}>
-                {t('settings.embed.copy')}
-              </Button>
-            )}
+            <CopyButton
+              text={embedCode}
+              copiedMessage={t('settings.embed.copied')}
+              failedMessage={t('settings.embed.copyFailed')}
+            >
+              {t('settings.embed.copy')}
+            </CopyButton>
           </>
         ) : (
           <p className="text-sm text-fg-muted">{t('settings.embed.noPublicMenu')}</p>

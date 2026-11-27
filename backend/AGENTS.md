@@ -58,10 +58,11 @@ backend/
 │   │   ├── serializedAdapter.ts # Queries wait for the open transaction (single connection)
 │   │   └── prisma.ts         # The only PrismaClient factory + SQLite setup (WAL)
 │   ├── middleware/
-│   │   ├── auth.ts           # JWT Bearer validation, AuthRequest type
+│   │   ├── auth.ts           # Bearer validation (session JWT or API token), AuthRequest type, refuseApiTokens
 │   │   ├── errorHandler.ts   # Maps thrown errors to `{ error, details? }`
 │   │   └── rateLimit.ts      # createRateLimiter() (429 through errorHandler), resetRateLimits() for tests
 │   ├── routes/               # One file per resource
+│   │   ├── apiTokens.ts      # GET, POST, DELETE /api/api-tokens: API tokens of scripts and MCP clients (session only)
 │   │   ├── auth.ts           # POST /login, GET /me, POST /logout-all
 │   │   ├── availability.ts   # GET cocktail availability
 │   │   ├── backup.ts         # GET /api/backup/export, POST /api/backup/import (ZIP of database + photos)
@@ -85,6 +86,7 @@ backend/
 │   │   ├── check-integrity.ts # Read-only report on a copy of the database before an upgrade
 │   │   └── migration-state.ts # Migrations to apply and failed ones, read by docker-entrypoint.sh
 │   ├── services/             # Business logic shared by routes and scripts
+│   │   ├── apiTokenService.ts # API tokens: generation, SHA-256 hash, scope, expiry, last use
 │   │   ├── availabilityService.ts  # Stock-based availability calculation
 │   │   ├── backupService.ts  # Backup export snapshot and restore
 │   │   ├── cocktail/         # Cocktail CRUD, image upload and copies (imageVariants.ts), JSON export and import
@@ -171,6 +173,15 @@ export default router;
   restored version above both the backup's and the live one (`backupService.ts`), so every session ends, the restoring
   one included. A backup made before v1.11.0 has no column: the restore writes the live version to
   `<database>.session-floor`, and the next start applies it after the migrations (`services/sessionFloor.ts`, C-30)
+- API tokens (F-16, `services/apiTokenService.ts`): `Authorization: Bearer carta_<43 base64url characters>`. Only
+  the SHA-256 hash is stored (`ApiToken.tokenHash`, unique): the secret has 256 bits, a slow hash would only slow
+  every request. `authMiddleware` tells a token from a JWT by its `carta_` prefix; an unknown (revoked) or expired
+  token gets 401, a `READ_ONLY` token 403 on any method but `GET` and `HEAD` (`errors.apiTokenReadOnly`).
+  `lastUsedAt` is written at most once a minute per token. Revoking a token deletes its row;
+  `POST /api/auth/logout-all` deletes them all, and so does a backup restore. An export never carries them (deleted
+  from the snapshot with `secure_delete`). `SESSION_ONLY_ROUTES` in `app.ts` lists the routes a token may never call,
+  whatever its scope (`refuseApiTokens`, 403 `errors.apiTokenSessionOnly`): `/api/api-tokens`,
+  `/api/settings/profile`, `/api/auth/logout-all` and `/api/backup`. A new route of that kind goes in that list
 - `POST /api/auth/login` allows `LOGIN_RATE_LIMIT` failed attempts (default 10) per client IP in 15 minutes, then
   answers 429. Every `/api` route except `/api/health` allows `API_RATE_LIMIT` requests (default 600) per client IP
   in one minute, counted before the body parsers and `authMiddleware`; `/api/backup` also allows 10 authenticated
@@ -256,12 +267,14 @@ router.get(
 
 - The rest comes from the app as Express runs it (`collectApiRoutes()`, `src/openapi/operations.ts`):
   the method and the path, the request schemas of `validate()`, the access (`authMiddleware`,
-  `optionalAuth`) and the rate limits (`createRateLimiter()`) of the middleware in front of the
+  `optionalAuth`, and `refuseApiTokens` for the session-only routes) and the rate limits (`createRateLimiter()`) of the middleware in front of the
   route. Mount every router with `mountApiRouter(app, path, ...middleware, router)` (`app.ts`):
   Express keeps no trace of a mount path, and a router mounted with `app.use` makes the document fail.
 - `responses`: a zod schema answers JSON; `{ description, content, headers }` anything else (a
   file, CSV, no body for a 204). `errors`: the statuses of the route itself and what they mean
-  there; 400 (validation), 401 (token), 413 (body) and 429 (limit) follow from the middleware.
+  there; 400 (validation), 401 (token), 403 (API token: read-only on a write, or any token on a
+  session-only route), 413 (body) and 429 (limit) follow from the middleware. The security of an
+  admin route lists `bearerAuth` (session) and `apiToken`; a session-only route lists `bearerAuth` only.
   A file sent as `multipart/form-data` is declared with `upload` and its limit constant (see File
   Uploads). A route that `validate()` does not check (`routes/public.ts`) declares `pathParams`.
 - Response schemas exported by `src/validation/` become components named after their export

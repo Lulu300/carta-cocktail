@@ -145,6 +145,19 @@ describe('coverage of the routes', () => {
     expect(find('GET /api/public/menus')).toMatchObject({ access: 'optional' });
     expect(find('GET /api/units')).toMatchObject({ access: 'admin', rateLimited: true });
     expect(find('GET /api/openapi/full.json')).toMatchObject({ access: 'admin' });
+    // SESSION_ONLY_ROUTES of app.ts: refuseApiTokens runs in front of them
+    for (const key of [
+      'GET /api/api-tokens',
+      'POST /api/api-tokens',
+      'DELETE /api/api-tokens/{id}',
+      'PUT /api/settings/profile',
+      'POST /api/auth/logout-all',
+      'GET /api/backup/export',
+      'POST /api/backup/import',
+    ]) {
+      expect(find(key), key).toMatchObject({ access: 'session' });
+    }
+    expect(find('PUT /api/settings')).toMatchObject({ access: 'admin' });
   });
 
   it('should take the request schemas from validate() and the parameters from the path', () => {
@@ -177,8 +190,12 @@ describe('coverage of the routes', () => {
       }),
       expect.objectContaining({ name: 'item', in: 'path', schema: { type: 'string' } }),
     ]);
-    expect(Object.keys(operation.responses).sort()).toEqual(['204', '400', '401', '413']);
-    expect(operation.security).toEqual([{ bearerAuth: [] }]);
+    // 403: a read-only API token cannot write
+    expect(Object.keys(operation.responses).sort()).toEqual(['204', '400', '401', '403', '413']);
+    expect(operation.responses['403']).toEqual({
+      $ref: '#/components/responses/ReadOnlyApiToken',
+    });
+    expect(operation.security).toEqual([{ bearerAuth: [] }, { apiToken: [] }]);
   });
 });
 
@@ -197,6 +214,41 @@ describe('the OpenAPI documents', () => {
       expect(() => validator.resolveRefs()).not.toThrow();
     },
   );
+
+  it('should accept API tokens on the admin routes but those reserved to the session', () => {
+    const document = documentOf('full');
+    const operation = (path: string, method: string) =>
+      (document.paths[path] as Record<string, Operation & { responses: Record<string, unknown> }>)[
+        method
+      ]!;
+    const bothTokens = [{ bearerAuth: [] }, { apiToken: [] }];
+
+    expect(document.components.securitySchemes.apiToken).toMatchObject({
+      type: 'http',
+      scheme: 'bearer',
+      bearerFormat: expect.stringMatching(/^carta_/),
+    });
+    // A read-only token reads, and gets 403 on a write
+    expect(operation('/api/units', 'get').security).toEqual(bothTokens);
+    expect(operation('/api/units', 'get').responses['403']).toBeUndefined();
+    expect(operation('/api/units', 'post').responses['403']).toEqual({
+      $ref: '#/components/responses/ReadOnlyApiToken',
+    });
+    // Reserved to the session: any API token gets 403, reads included
+    for (const [path, method] of [
+      ['/api/api-tokens', 'get'],
+      ['/api/backup/export', 'get'],
+      ['/api/settings/profile', 'put'],
+      ['/api/auth/logout-all', 'post'],
+    ] as const) {
+      expect(operation(path, method).security, path).toEqual([{ bearerAuth: [] }]);
+      expect(operation(path, method).responses['403'], path).toEqual({
+        $ref: '#/components/responses/SessionOnly',
+      });
+    }
+    // The public menus show more to the admin, whatever the token
+    expect(operation('/api/public/menus', 'get').security).toEqual([{}, ...bothTokens]);
+  });
 
   it('should give every operation a unique operationId', () => {
     const ids = operationsOf(documentOf('full')).map(({ operation }) => operation.operationId);
@@ -233,6 +285,18 @@ describe('the OpenAPI documents', () => {
     expect(schemas).toEqual(expect.arrayContaining(['ApiError', 'PublicMenu', 'LoginResponse']));
     expect(schemas).not.toContain('AdminSiteSettings');
     expect(schemas).not.toContain('BackupRestoreResult');
+  });
+
+  it('should leave the API tokens out of the public document', () => {
+    const publicDocument = JSON.stringify(documentOf('public'));
+    const fullDocument = JSON.stringify(documentOf('full'));
+
+    for (const term of ['apiToken', 'carta_', 'SessionOnly', 'ReadOnlyApiToken']) {
+      expect(publicDocument).not.toContain(term);
+      expect(fullDocument).toContain(term);
+    }
+    const publicMenus = documentOf('public').paths['/api/public/menus']?.get as Operation;
+    expect(publicMenus.security).toEqual([{}, { bearerAuth: [] }]);
   });
 
   it('should describe the error body once and refer to it from every client error response', () => {

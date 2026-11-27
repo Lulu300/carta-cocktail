@@ -20,6 +20,28 @@ model User {
   createdAt    DateTime @default(now())
   // Copied into each token; incrementing it revokes every token issued before
   tokenVersion Int      @default(0)
+
+  apiTokens ApiToken[]
+}
+
+// Token of a script or an MCP client (F-16), sent as `Authorization: Bearer carta_...`.
+// Only the SHA-256 hash of the secret is stored: the token itself is shown once, when it
+// is created. Revoking a token deletes its row. Never exported in a backup.
+model ApiToken {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  tokenHash  String    @unique
+  // Last characters of the token, so that the admin can tell tokens apart in the list
+  lastFour   String
+  scope      String    // READ_ONLY, READ_WRITE
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime
+  // Updated at most once a minute per token, not at every request
+  lastUsedAt DateTime?
+
+  @@index([userId])
 }
 
 model CategoryType {

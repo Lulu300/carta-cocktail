@@ -172,6 +172,7 @@ MenuBottleExclusion     # Bottles the admin removed from a system menu (never sy
 MenuSection             # Menu groupings
 SiteSettings            # Site name + favicon emoji
 AppState                # Instance state: version that ran last, pending upgrade notice (kept live by a restore)
+ApiToken                # API tokens of scripts and MCP clients: name, SHA-256 hash, scope, expiry (never in a backup)
 ```
 
 ## Key Architectural Decisions
@@ -203,7 +204,7 @@ cd frontend && npm install && npm run dev
 - **Public** (no auth): `/api/auth/login`, `/api/public/*`, `/api/health` (Docker healthcheck: status and version), `/api/openapi.json` (OpenAPI document of these public routes), `/uploads/*` (photos)
 - **Protected** (JWT Bearer): All other `/api/*` routes, `/api/auth/me`, `/api/auth/logout-all` and `/api/openapi/full.json` (OpenAPI document of every route) included
 - **OpenAPI**: each route carries its declaration (`apiDocs()`, see `backend/AGENTS.md`); the document is generated from the routes and their zod schemas, and the admin reads it on the API page (`/admin/api`)
-- Auth middleware validates JWT and sets `req.userId`
+- Auth middleware validates the session JWT or an API token (`Bearer carta_…`, created in Settings) and sets `req.userId`. A read-only token may only read; the token, account, `logout-all` and backup routes refuse every token (`SESSION_ONLY_ROUTES`, `backend/src/app.ts`)
 
 ## Languages
 

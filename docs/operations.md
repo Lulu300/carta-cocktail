@@ -122,10 +122,11 @@ Dans Paramètres > Sauvegarde & Restauration (Settings > Backup & Restore) :
 > **Attention : destructif.** La restauration remplace **toutes** les données actuelles. Le backend garde une copie de la base remplacée dans `/app/data/backups/pre-restore-<date>.db`, mais pas des photos : exportez d'abord une sauvegarde.
 
 - Une restauration termine toutes les sessions, y compris celle qui l'a lancée : reconnectez-vous avec l'email et le mot de passe enregistrés dans la sauvegarde.
+- Une sauvegarde ne contient aucun [jeton d'API](#jetons-dapi-scripts-et-clients-mcp), et une restauration les supprime tous : recréez ensuite ceux de vos scripts.
 - Une sauvegarde dont la base vient d'une version plus récente (migration inconnue de la version installée) est refusée : mettez d'abord l'application à jour. Une sauvegarde d'une version plus ancienne peut demander un redémarrage du backend (quand son schéma est plus ancien ; l'interface l'indique) : voir [UPGRADING › "Restoring a backup from an older version"](../UPGRADING.md#restoring-a-backup-from-an-older-version).
 - Le ZIP à restaurer ne doit pas dépasser 200 Mo, cette taille comprise (limite du backend, `MAX_BACKUP_UPLOAD_BYTES` ; nginx accepte jusqu'à 210 Mo pour laisser passer l'enveloppe multipart). L'export et la restauration sont limités à 10 requêtes en 15 minutes.
 
-Les mêmes opérations passent par l'API, avec le jeton de `POST /api/auth/login` : `GET /api/backup/export` et `POST /api/backup/import` (champ multipart `backup`).
+Les mêmes opérations passent par l'API, avec le jeton de `POST /api/auth/login` : `GET /api/backup/export` et `POST /api/backup/import` (champ multipart `backup`). Un jeton d'API n'y a pas accès : la sauvegarde contient le hash du mot de passe admin.
 
 ### Export automatique par cron
 
@@ -169,7 +170,7 @@ La page **API** de l'admin documente chaque route : ce qu'elle accepte, ce qu'el
 - `GET /api/openapi.json`, sans connexion : les routes qu'un client appelle sans session (cartes publiées, connexion, état de santé) ;
 - `GET /api/openapi/full.json`, avec un jeton : toutes les routes.
 
-Les routes de l'admin demandent un jeton de session (JWT), donné par `POST /api/auth/login` et envoyé dans l'en-tête `Authorization: Bearer <jeton>`. Avec `curl` et `jq`, et les variables `CARTA_URL`, `CARTA_EMAIL` et `CARTA_PASSWORD` du script de sauvegarde ci-dessus :
+Les routes de l'admin demandent un jeton dans l'en-tête `Authorization: Bearer <jeton>` : un [jeton d'API](#jetons-dapi-scripts-et-clients-mcp) créé dans Paramètres, le plus simple pour un script ou un client MCP, ou un jeton de session (JWT), donné par `POST /api/auth/login`. Le document OpenAPI décrit les deux (`apiToken` et `bearerAuth`) et, route par route, celles qui n'acceptent que la session. Avec un jeton de session, `curl` et `jq`, et les variables `CARTA_URL`, `CARTA_EMAIL` et `CARTA_PASSWORD` du script de sauvegarde ci-dessus :
 
 ```sh
 LOGIN=$(jq -n --arg email "$CARTA_EMAIL" --arg password "$CARTA_PASSWORD" '{email: $email, password: $password}')
@@ -184,7 +185,7 @@ curl -fsS -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: applicatio
   -d '{"name": "Lime", "icon": "🍋"}' "$CARTA_URL/api/ingredients"
 ```
 
-- Le jeton vaut une session de l'admin, avec tous ses droits : gardez-le comme le mot de passe. Il expire au bout de `JWT_EXPIRES_IN` (7 jours par défaut) et prend fin plus tôt quand le mot de passe change, avec « Se déconnecter partout » ou après la restauration d'une sauvegarde : le script se reconnecte alors.
+- Le jeton de session vaut une session de l'admin, avec tous ses droits : gardez-le comme le mot de passe. Il expire au bout de `JWT_EXPIRES_IN` (7 jours par défaut) et prend fin plus tôt quand le mot de passe change, avec « Se déconnecter partout » ou après la restauration d'une sauvegarde : le script se reconnecte alors.
 - Une erreur répond toujours en JSON `{ "error": "…", "details": … }` : `error` est un message dans la langue de l'en-tête `Accept-Language` (anglais par défaut), `details` précise certaines erreurs (champs refusés d'une requête invalide, éléments qui bloquent une suppression).
 - Les limites de requêtes s'appliquent comme dans l'interface (`API_RATE_LIMIT` par minute et par adresse, 10 sauvegardes en 15 minutes) : au-delà, l'API répond 429 avec l'en-tête `Retry-After`, en secondes.
 
@@ -261,7 +262,7 @@ Revenir à une version v1.11.x ou plus ancienne demande aussi son propre fichier
 
 ## Rotation de `JWT_SECRET`
 
-`JWT_SECRET` signe les sessions de l'admin. Le changer déconnecte toutes les sessions ouvertes, sur tous les appareils ; les données ne changent pas. À faire si le secret a fuité, et après avoir remis une base à la main (restauration à froid, copie `pre-migrate` ou `pre-restore`).
+`JWT_SECRET` signe les sessions de l'admin. Le changer déconnecte toutes les sessions ouvertes, sur tous les appareils ; les données ne changent pas. Les jetons d'API n'en dépendent pas : révoquez-les dans Paramètres, ou tous à la fois avec « Se déconnecter partout ». À faire si le secret a fuité, et après avoir remis une base à la main (restauration à froid, copie `pre-migrate` ou `pre-restore`). Une base remise à la main ramène aussi les jetons d'API qu'elle contenait (une copie `pre-restore-*.db` garde leurs hash) : révoquez-les ensuite, dans Paramètres ou avec « Se déconnecter partout ».
 
 1. Générer un nouveau secret : `openssl rand -hex 32`.
 2. Remplacer la valeur de `JWT_SECRET` dans `.env`.
@@ -316,6 +317,34 @@ Depuis la console du navigateur (F12 > Console, sur une page du site), ces deux 
 navigator.serviceWorker.getRegistrations().then((list) => list.forEach((r) => r.unregister()));
 caches.keys().then((names) => names.forEach((name) => caches.delete(name)));
 ```
+
+## Jetons d'API (scripts et clients MCP)
+
+Un jeton d'API permet à un script ou à un client MCP d'appeler l'API sans le mot de passe admin ni la session du navigateur.
+
+**Créer un jeton.** Admin > Paramètres > « Jetons d'API » (Settings > API tokens) :
+
+1. Donner un nom qui dit ce qui l'utilise (« Home Assistant », « MCP sur mon portable »).
+2. Choisir l'accès :
+   - **Lecture seule** : requêtes `GET` et `HEAD` seulement ; toute autre méthode reçoit `403` ;
+   - **Lecture et écriture** : toute l'API, sauf les routes réservées à la session (plus bas).
+3. Choisir la durée : 30, 90 (par défaut) ou 365 jours. Un jeton expire toujours.
+4. Cliquer sur « Créer le jeton », puis le copier : il commence par `carta_` et **n'est affiché qu'une fois**. La base n'en garde que le hash (SHA-256) ; la liste montre son nom et ses 4 derniers caractères.
+
+**Appeler l'API.** Le jeton passe dans l'en-tête `Authorization`, comme une session :
+
+```sh
+CARTA_TOKEN='carta_…'   # le jeton copié dans Paramètres
+curl -fsS -H "Authorization: Bearer $CARTA_TOKEN" https://carte.mon-bar.fr/api/cocktails
+# Avec un jeton en lecture et écriture : met une bouteille à 40 %
+curl -fsS -X PUT -H "Authorization: Bearer $CARTA_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"remainingPercent": 40}' https://carte.mon-bar.fr/api/bottles/12
+```
+
+- **Routes réservées à la session**, refusées à tout jeton (`403`) : la gestion des jetons (`/api/api-tokens`), le compte admin (`PUT /api/settings/profile`), « Se déconnecter partout » (`POST /api/auth/logout-all`) et les sauvegardes (`/api/backup`). Un script de sauvegarde se connecte donc avec l'email et le mot de passe ([export par cron](#export-automatique-par-cron)).
+- Un jeton révoqué, expiré ou inconnu reçoit `401`. La liste garde les jetons expirés, marqués « Expiré », jusqu'à leur révocation. Au plus 20 jetons non expirés.
+- La limite de l'API (`API_RATE_LIMIT`, 600 requêtes par minute et par adresse) compte aussi les requêtes des jetons.
+- **Révoquer** un jeton dans la liste le supprime : il est refusé à la requête suivante. « Se déconnecter partout » supprime **tous** les jetons, en plus des sessions, comme la restauration d'une sauvegarde. Changer le mot de passe ou `JWT_SECRET` ne les touche pas.
 
 ## Intégrer la carte dans le site du bar
 

@@ -27,4 +27,5 @@ export const qk = {
   publicCocktail: (id: number, viewer: PublicViewer) => ['public', 'cocktail', id, viewer] as const,
   upgradeNotice: ['system', 'upgradeNotice'] as const,
   openApiDocument: ['system', 'openApiDocument'] as const,
+  apiTokens: ['apiTokens'] as const,
 };

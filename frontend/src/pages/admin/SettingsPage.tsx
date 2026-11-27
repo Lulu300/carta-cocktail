@@ -23,6 +23,7 @@ import {
 } from '../../utils/signInAfterRestore';
 import Alert from '../../components/ui/Alert';
 import EmbedMenuSettings from '../../components/admin/EmbedMenuSettings';
+import ApiTokenSettings from '../../components/admin/ApiTokenSettings';
 
 const ICON_OPTIONS = [
   '',
@@ -203,6 +204,8 @@ export default function SettingsPage() {
     const confirmed = await confirm({
       title: t('settings.logoutEverywhere'),
       message: t('settings.confirmLogoutEverywhere'),
+      // Set apart, so that the loss of the API tokens does not come as a surprise
+      details: <Alert tone="warning">{t('settings.logoutEverywhereApiTokens')}</Alert>,
       confirmLabel: t('settings.logoutEverywhere'),
       tone: 'danger',
     });
@@ -445,6 +448,8 @@ export default function SettingsPage() {
           </Button>
         </div>
       </form>
+
+      <ApiTokenSettings />
 
       {/* Backup & Restore */}
       <div className="bg-surface border border-line rounded-xl p-6">

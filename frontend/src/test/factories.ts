@@ -1,4 +1,5 @@
 import type {
+  ApiToken,
   Bottle,
   Category,
   CategoryListItem,
@@ -39,6 +40,7 @@ import { CATEGORY_TYPE_COLORS } from '../utils/colors';
 const CREATED_AT = '2026-01-15T10:00:00.000Z';
 
 type Entity =
+  | 'apiToken'
   | 'bottle'
   | 'category'
   | 'categoryType'
@@ -533,4 +535,19 @@ export function buildAdminSiteSettings(
   overrides: Partial<AdminSiteSettings> = {},
 ): AdminSiteSettings {
   return { ...buildSiteSettings(), id: 1, embedOrigins: [], ...overrides };
+}
+
+/** A token as GET /api/api-tokens lists it: never its secret. Read only, never used. */
+export function buildApiToken(overrides: Partial<ApiToken> = {}): ApiToken {
+  const id = nextId('apiToken');
+  return {
+    id,
+    name: `Script ${id}`,
+    scope: 'READ_ONLY',
+    lastFour: 'a1B2',
+    createdAt: CREATED_AT,
+    expiresAt: '2099-01-15T10:00:00.000Z',
+    lastUsedAt: null,
+    ...overrides,
+  };
 }

@@ -2,6 +2,14 @@
 // from the zod schemas listed in backend/src/contracts/frontendTypes.ts. Do not edit:
 // change the schemas, then generate again.
 
+export const API_TOKEN_LIFETIME_DAYS = [30, 90, 365] as const;
+
+export const API_TOKEN_SCOPES = ['READ_ONLY', 'READ_WRITE'] as const;
+
+export const DEFAULT_API_TOKEN_LIFETIME_DAYS = 90 as const;
+
+export const MAX_API_TOKEN_NAME_LENGTH = 100 as const;
+
 export const MENU_TYPES = ['COCKTAILS', 'APEROS', 'DIGESTIFS'] as const;
 
 export const SOURCE_KEYS = {
@@ -15,6 +23,8 @@ export const SOURCE_TYPES = ['BOTTLE', 'CATEGORY', 'INGREDIENT'] as const;
 export type SourceType = 'BOTTLE' | 'CATEGORY' | 'INGREDIENT';
 
 export type MenuType = 'COCKTAILS' | 'APEROS' | 'DIGESTIFS';
+
+export type ApiTokenScope = 'READ_ONLY' | 'READ_WRITE';
 
 export type ImportMatchStatus = 'matched' | 'missing' | 'ambiguous';
 
@@ -738,6 +748,29 @@ export type BackupRestoreResult = {
   restartRecommended: boolean;
 };
 
+export type ApiToken = {
+  id: number;
+  name: string;
+  scope: ApiTokenScope;
+  /** Last characters of the token, to tell tokens apart. */
+  lastFour: string;
+  createdAt: string;
+  expiresAt: string;
+  lastUsedAt: string | null;
+};
+
+export type CreatedApiToken = {
+  id: number;
+  name: string;
+  scope: ApiTokenScope;
+  /** Last characters of the token, to tell tokens apart. */
+  lastFour: string;
+  createdAt: string;
+  expiresAt: string;
+  lastUsedAt: string | null;
+  token: string;
+};
+
 export type CategoryTypeInput = {
   name: string;
   nameTranslations?: {
@@ -1046,4 +1079,10 @@ export type ProfileInput = {
   email?: string;
   currentPassword?: string;
   newPassword?: string;
+};
+
+export type ApiTokenInput = {
+  name: string;
+  scope?: ApiTokenScope;
+  expiresInDays?: 30 | 90 | 365;
 };

@@ -20,6 +20,7 @@ import {
   excludeBottleFromMenu,
   findSystemMenu,
   seedAppState,
+  seedApiToken,
 } from './helpers';
 import { TEST_DATABASE_DIR } from './testDatabase';
 
@@ -63,6 +64,7 @@ async function seedEveryModel() {
   await addBottleToMenu(menu.id, bottle.id, { menuSectionId: section.id });
   await excludeBottleFromMenu((await findSystemMenu('aperitifs')).id, bottle.id);
   await seedAppState({ lastRunVersion: '1.17.0' });
+  await seedApiToken();
 }
 
 describe('cleanDatabase', () => {
