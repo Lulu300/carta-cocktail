@@ -22,7 +22,7 @@ The commands below assume the default `docker-compose.prod.yml`, run from its fo
 
 ## v1.19.0
 
-No required action, no migration. Pin both images to `:1.19.0`, or `:1.19` to follow the 1.19.x patch releases (`:1.18` does not move to 1.19.0), then pull and restart. This release makes the public menu installable and readable offline (service worker) and stores new photos as optimized WebP copies; at the first start, the backend adds reduced copies of existing photos in the background without touching the originals. Release notes: [`docs/releases/v1.19.0.md`](docs/releases/v1.19.0.md).
+No required action, no migration. Pin both images to `:1.19.0`, or `:1.19` to follow the 1.19.x patch releases (`:1.18` does not move to 1.19.0), then pull and restart. This release makes the public menu installable and readable offline (service worker), adds an optional light theme to it, and stores new photos as optimized WebP copies; at the first start, the backend adds reduced copies of existing photos in the background without touching the originals. Release notes: [`docs/releases/v1.19.0.md`](docs/releases/v1.19.0.md).
 
 Instances older than v1.12.0: upgrade to v1.12.0 first, following the [v1.12.0 section](#v1120) (and the sections before it), check that it works, then apply this one.
 
