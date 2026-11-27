@@ -203,9 +203,9 @@ cd frontend && npm install && npm run dev
 
 - **Public** (no auth): `/api/auth/login`, `/api/public/*`, `/api/health` (Docker healthcheck: status and version), `/api/openapi.json` (OpenAPI document of these public routes), `/uploads/*` (photos)
 - **Protected** (JWT Bearer): All other `/api/*` routes, `/api/auth/me`, `/api/auth/logout-all` and `/api/openapi/full.json` (OpenAPI document of every route) included
-- **MCP** (`/api/mcp`, F-15): Model Context Protocol over Streamable HTTP, with an API token or the session; each tool calls an API operation (`backend/AGENTS.md`, "MCP server (F-15)")
+- **MCP** (`/api/mcp`, F-15): Model Context Protocol over Streamable HTTP, with an API token or the session; each tool calls an API operation, and Code Mode's `search` and `execute` (off by default, a setting of the session) run the agent's code in a QuickJS sandbox (`backend/AGENTS.md`, "MCP server (F-15)")
 - **OpenAPI**: each route carries its declaration (`apiDocs()`, see `backend/AGENTS.md`); the document is generated from the routes and their zod schemas, and the admin reads it on the API page (`/admin/api`)
-- Auth middleware validates the session JWT or an API token (`Bearer carta_…`, created in Settings) and sets `req.userId`. A read-only token may only read; the token, account, `logout-all` and backup routes refuse every token (`SESSION_ONLY_ROUTES`, `backend/src/app.ts`)
+- Auth middleware validates the session JWT or an API token (`Bearer carta_…`, created in Settings) and sets `req.userId`. A read-only token may only read; the token, account, Code Mode setting, `logout-all` and backup routes refuse every token (`SESSION_ONLY_ROUTES`, `backend/src/app.ts`)
 
 ## Languages
 
