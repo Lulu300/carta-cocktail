@@ -22,7 +22,7 @@ The commands below assume the default `docker-compose.prod.yml`, run from its fo
 
 ## v1.20.0
 
-No required action. `docker-compose.prod.yml` has not changed since v1.19.0. Pin both images to `:1.20.0`, or `:1.20` to follow the 1.20.x patch releases (`:1.19` does not move to 1.20.0), then pull and restart. At the first start, the backend copies the database to `backups/pre-migrate-<date>.db` and applies one migration, `20261127120000_site_embed_origins`, which adds an empty list of sites allowed to embed the public menu: no existing row changes. The images now run on Node 26. Release notes: [`docs/releases/v1.20.0.md`](docs/releases/v1.20.0.md).
+No required action. `docker-compose.prod.yml` has not changed since v1.19.0. Pin both images to `:1.20.0`, or `:1.20` to follow the 1.20.x patch releases (`:1.19` does not move to 1.20.0), then pull and restart. At the first start, the backend copies the database to `backups/pre-migrate-<date>.db` and applies one migration, `20261127120000_site_embed_origins`, which adds an empty list of sites allowed to embed the public menu: no existing value changes. The images now run on Node 26. Release notes: [`docs/releases/v1.20.0.md`](docs/releases/v1.20.0.md).
 
 Instances older than v1.12.0: upgrade to v1.12.0 first, following the [v1.12.0 section](#v1120) (and the sections before it), check that it works, then apply this one.
 
