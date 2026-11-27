@@ -291,6 +291,20 @@ async function keepLiveAppState(
   ]);
 }
 
+/**
+ * Turns Code Mode of the MCP server off in the restored database, whatever the backup held: a
+ * setting that lets API tokens run code on the server never comes back silently from another
+ * instance or another time, as the API tokens do not. A backup made before the column existed
+ * gets it, off, from its migration at the next start.
+ */
+async function turnCodeModeOff(client: PrismaClient): Promise<void> {
+  const columns = await client.$queryRawUnsafe<{ name: string }[]>(
+    `SELECT name FROM pragma_table_info('SiteSettings') WHERE name = 'codeModeEnabled'`,
+  );
+  if (columns.length === 0) return;
+  await client.$executeRawUnsafe('UPDATE "SiteSettings" SET "codeModeEnabled" = false');
+}
+
 /** Returns false when the token version is left to the session floor (see raiseRestoredTokenVersion). */
 async function prepareRestoredDatabase(restoredDbPath: string, live: LiveState): Promise<boolean> {
   const client = createPrismaClient(`file:${restoredDbPath}`);
@@ -298,6 +312,7 @@ async function prepareRestoredDatabase(restoredDbPath: string, live: LiveState):
     await keepLiveAppState(client, live.appState);
     // A backup exported by Carta has none, but a database file copied by hand may
     await removeApiTokens(client);
+    await turnCodeModeOff(client);
     return await raiseRestoredTokenVersion(client, live.tokenVersion);
   } finally {
     await client.$disconnect();

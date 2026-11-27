@@ -1478,14 +1478,13 @@ describe('backup and the Code Mode setting', () => {
     if ((await codeModeColumns()) === 0) await applyCodeModeMigration();
   });
 
-  it('should bring back the setting of the backup, as the other settings', async () => {
+  it('should turn Code Mode off, even when the backup and the live instance had it on', async () => {
     await prisma.siteSettings.update({ where: { id: 1 }, data: { codeModeEnabled: true } });
     const backup = await exportBackup();
-    await prisma.siteSettings.update({ where: { id: 1 }, data: { codeModeEnabled: false } });
 
     expect((await importBackup(backup)).status).toBe(200);
 
-    expect(await codeModeEnabled()).toBe(true);
+    expect(await codeModeEnabled()).toBe(false);
   });
 
   it('should keep Code Mode off after restoring a backup made before the setting existed', async () => {
