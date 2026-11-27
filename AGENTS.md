@@ -104,10 +104,11 @@ Coverage is enforced automatically by CI. Run `npm test -- --coverage` in either
 
 ## CI/CD (GitHub Actions)
 
-**CI** (`.github/workflows/ci.yml`) — runs on PRs and pushes to `main`/`develop`, and is called by the release workflow (`workflow_call`). Four jobs run in parallel:
+**CI** (`.github/workflows/ci.yml`) — runs on PRs and pushes to `main`/`develop`, and is called by the release workflow (`workflow_call`). Five jobs run in parallel:
 - **Backend**: `npm ci` (postinstall: `prisma generate`) → `npm audit --omit=dev --audit-level=high` → `npm run db:check` (migrations match `schema.prisma`) → `npm run typecheck` → `npm run lint` → `npm run format:check` → `npm run build` → tests of `.github/scripts` → `npm run test:coverage` → delta coverage (80%, PRs only)
 - **Frontend**: `npm ci` → `npm audit --omit=dev --audit-level=high` → `tsc -b` → `npm run lint` → `npm run format:check` → `npm run build` → bundle budget of the public menu and admin-free service worker precache (`.github/scripts/bundle-budget.mjs`, 140 kB gzip) → CSS media queries readable by Safari 16 → `npm run test:coverage` → delta coverage (80%, PRs only)
-- **Docker build (backend)** and **Docker build (frontend)**: build each image for `linux/amd64`, without pushing it. The `linux/arm64` build only runs at release
+- **Docker build (backend)** and **Docker build (frontend)**: build each image for `linux/amd64`, without pushing it
+- **Docker build (backend arm64 dependencies)**: builds the `prod-deps` stage of the backend image for `linux/arm64` under QEMU, as the release does (`npm ci` with `prisma generate`, native module checks), from the cache when nothing changed. The full `linux/arm64` images are only built at release. Not a required check yet (the rulesets are the human's)
 - The Node jobs run on Node 26, the version used by the Docker images (`.nvmrc`); `engines` in both `package.json` require Node >= 26
 
 **Smoke** (`.github/workflows/smoke.yml`) — runs on PRs to `main`/`develop`, on demand, and as the `smoke` job of the release workflow:

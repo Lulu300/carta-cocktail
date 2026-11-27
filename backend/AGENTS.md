@@ -16,7 +16,7 @@ Before committing any change:
 6. **Verify coverage thresholds are met**: `npm test -- --coverage`
 7. Commit, push, open PR to `develop`
 
-CI runs automatically on PRs (`Backend` job of `.github/workflows/ci.yml`): `npm ci` (prisma generate) → `npm audit --omit=dev --audit-level=high` → `npm run db:check` → `npm run typecheck` → lint → build → tests with coverage → delta coverage (80%). The `Docker build (backend)` job builds the image, and the `Smoke` workflow starts it with the frontend (see the root `AGENTS.md`).
+CI runs automatically on PRs (`Backend` job of `.github/workflows/ci.yml`): `npm ci` (prisma generate) → `npm audit --omit=dev --audit-level=high` → `npm run db:check` → `npm run typecheck` → lint → build → tests with coverage → delta coverage (80%). The `Docker build (backend)` job builds the image, `Docker build (backend arm64 dependencies)` builds its `prod-deps` stage for arm64 under QEMU, and the `Smoke` workflow starts it with the frontend (see the root `AGENTS.md`).
 
 ## Testing Requirements
 
