@@ -34,6 +34,26 @@ import {
 
 export const ADMIN_USER = { id: 1, email: 'admin@carta.local' };
 
+/** A small OpenAPI document, in the shape of the backend's: one admin route. */
+export const OPENAPI_DOCUMENT = {
+  openapi: '3.1.1',
+  info: { title: 'Carta Cocktail API', version: 'test' },
+  paths: {
+    '/api/units': {
+      get: {
+        operationId: 'listUnits',
+        summary: 'List the units',
+        tags: ['Units'],
+        security: [{ bearerAuth: [] }],
+        responses: { 200: { description: 'OK' } },
+      },
+    },
+  },
+  components: {
+    securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' } },
+  },
+};
+
 function exportedRecipe(name: string): CocktailExportFormat {
   return {
     version: 1,
@@ -270,6 +290,10 @@ const settingsHandlers = [
   http.put('/api/settings', async ({ request }) =>
     HttpResponse.json({ ...(await readJsonObject(request)), id: 1 }),
   ),
+  http.put('/api/settings/code-mode', async ({ request }) => {
+    const { enabled } = await readJsonObject(request);
+    return HttpResponse.json(buildAdminSiteSettings({ codeModeEnabled: enabled === true }));
+  }),
   http.put('/api/settings/profile', async ({ request }) => {
     const body = await readJsonObject(request);
     return HttpResponse.json({
@@ -287,6 +311,29 @@ const settingsHandlers = [
   ),
 ];
 
+const apiTokenHandlers = [
+  // No token by default: a test that lists some says so.
+  http.get('/api/api-tokens', () => HttpResponse.json([])),
+  http.post('/api/api-tokens', async ({ request }) => {
+    const body = await readJsonObject(request);
+    createdId += 1;
+    return HttpResponse.json(
+      {
+        id: createdId,
+        name: body.name,
+        scope: body.scope ?? 'READ_ONLY',
+        lastFour: 'Wxyz',
+        createdAt: '2026-11-27T10:00:00.000Z',
+        expiresAt: '2027-02-25T10:00:00.000Z',
+        lastUsedAt: null,
+        token: `carta_${'x'.repeat(39)}Wxyz`,
+      },
+      { status: 201 },
+    );
+  }),
+  http.delete('/api/api-tokens/:id', () => HttpResponse.json({ message: 'API token revoked' })),
+];
+
 const systemHandlers = [
   // No upgrade notice by default: a test that needs one says so.
   http.get('/api/system/upgrade-notice', () => new HttpResponse(null, { status: 204 })),
@@ -294,6 +341,7 @@ const systemHandlers = [
     '/api/system/upgrade-notice/acknowledge',
     () => new HttpResponse(null, { status: 204 }),
   ),
+  http.get('/api/openapi/full.json', () => HttpResponse.json(OPENAPI_DOCUMENT)),
 ];
 
 export const handlers = [
@@ -310,5 +358,6 @@ export const handlers = [
   ...publicHandlers,
   ...stockHandlers,
   ...settingsHandlers,
+  ...apiTokenHandlers,
   ...systemHandlers,
 ];

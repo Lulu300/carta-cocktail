@@ -21,6 +21,7 @@ import {
   listenWithShortTimeouts,
   seedAppState,
   expectContract,
+  seedApiToken,
 } from '../test/helpers';
 import app from '../app';
 import { configureSqlite, createPrismaClient } from '../lib/prisma';
@@ -1336,6 +1337,167 @@ describe('backup restore and the upgrade guide', () => {
     await prisma.$executeRawUnsafe(fs.readFileSync(APP_STATE_MIGRATION, 'utf8'));
     expect(await restartAs170()).toEqual({ actions: [], warnings: [] });
     expect(await appState()).toMatchObject({ lastRunVersion: '1.7.0', pendingNoticeFrom: null });
+  });
+});
+
+describe('backup and API tokens', () => {
+  const API_TOKENS_MIGRATION = path.resolve(
+    __dirname,
+    '../../prisma/migrations/20261127180000_api_tokens/migration.sql',
+  );
+
+  async function unitsStatus(header: { Authorization: string }): Promise<number> {
+    return (await request.get('/api/units').set(header)).status;
+  }
+
+  /** What the next start does: the migration creates the table, empty. One statement per call. */
+  async function applyApiTokensMigration(): Promise<void> {
+    const statements = fs.readFileSync(API_TOKENS_MIGRATION, 'utf8').split(';');
+    for (const statement of statements.filter((sql) => sql.trim())) {
+      await prisma.$executeRawUnsafe(statement);
+    }
+  }
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    // The next tests need the table, even when an assertion failed before it came back
+    const tables = await prisma.$queryRawUnsafe<{ name: string }[]>(
+      "SELECT name FROM sqlite_master WHERE name = 'ApiToken'",
+    );
+    if (tables.length === 0) await applyApiTokensMigration();
+  });
+
+  it('should export no token, not even in the free pages of the database file', async () => {
+    const { header, token } = await seedApiToken();
+    const { tokenHash } = await prisma.apiToken.findFirstOrThrow();
+
+    const databaseBytes = new AdmZip(await exportBackup()).getEntry('database.db')!.getData();
+
+    const { result: exportedTokens } = await withDatabaseFile(databaseBytes, (client) =>
+      client.apiToken.count(),
+    );
+    expect(exportedTokens).toBe(0);
+    expect(databaseBytes.includes(tokenHash)).toBe(false);
+    expect(databaseBytes.includes(token)).toBe(false);
+    // The live token is untouched
+    expect(await unitsStatus(header)).toBe(200);
+  });
+
+  it('should fail the export and delete the copy of the database when the tokens cannot be removed from it', async () => {
+    await seedApiToken();
+    // Copied into the snapshot by VACUUM INTO: the deletion fails there
+    await prisma.$executeRawUnsafe(
+      `CREATE TRIGGER "keep_api_tokens" BEFORE DELETE ON "ApiToken" BEGIN SELECT RAISE(ABORT, 'kept'); END`,
+    );
+    const rmSync = vi.spyOn(fs, 'rmSync');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const res = await requestExport();
+
+      expect(res.status).toBe(500);
+      const snapshotPath = rmSync.mock.calls
+        .map(([file]) => String(file))
+        .find((file) => /carta-snapshot-.*\.db$/.test(file));
+      expect(snapshotPath).toBeDefined();
+      expect(fs.existsSync(snapshotPath!)).toBe(false);
+    } finally {
+      await prisma.$executeRawUnsafe('DROP TRIGGER "keep_api_tokens"');
+    }
+  });
+
+  it('should revoke every token, those created before and after the backup', async () => {
+    const before = await seedApiToken({ scope: 'READ_ONLY' });
+    const backup = await exportBackup();
+    const after = await seedApiToken({ scope: 'READ_WRITE' });
+
+    expect((await importBackup(backup)).status).toBe(200);
+
+    expect(await prisma.apiToken.count()).toBe(0);
+    expect([await unitsStatus(before.header), await unitsStatus(after.header)]).toEqual([401, 401]);
+  });
+
+  it('should revoke the tokens of a database file that carries some', async () => {
+    const { header, token } = await seedApiToken();
+    const { tokenHash, expiresAt } = await prisma.apiToken.findFirstOrThrow();
+    // A database copied by hand rather than exported by Carta
+    const backup = await withDatabaseChanged(await exportBackup(), [
+      `INSERT INTO "ApiToken" ("userId", "name", "tokenHash", "lastFour", "scope", "expiresAt")
+       VALUES (1, 'Copied', '${tokenHash}', '${token.slice(-4)}', 'READ_WRITE', ${expiresAt.getTime()})`,
+    ]);
+
+    expect((await importBackup(backup)).status).toBe(200);
+
+    expect(await prisma.apiToken.count()).toBe(0);
+    expect(await unitsStatus(header)).toBe(401);
+  });
+
+  it('should restore a backup made before the table existed', async () => {
+    const { header } = await seedApiToken();
+    const backup = await withDatabaseChanged(await exportBackup(), ['DROP TABLE "ApiToken"']);
+
+    const res = await importBackup(backup);
+
+    expect(res.status).toBe(200);
+    // Before the restart: "Sign out everywhere" still ends the sessions, without the table
+    const session = await currentSessionHeader();
+    const logoutAll = await request.post('/api/auth/logout-all').set(session);
+    expect(logoutAll.status).toBe(200);
+    expect(await unitsStatus(session)).toBe(401);
+    // Next start: the migration creates the table, empty
+    await applyApiTokensMigration();
+    expect(await unitsStatus(header)).toBe(401);
+  });
+});
+
+describe('backup and the Code Mode setting', () => {
+  const CODE_MODE_MIGRATION = path.resolve(
+    __dirname,
+    '../../prisma/migrations/20261127200000_site_code_mode/migration.sql',
+  );
+
+  async function codeModeColumns(): Promise<number> {
+    const columns = await prisma.$queryRawUnsafe<{ name: string }[]>(
+      `SELECT name FROM pragma_table_info('SiteSettings') WHERE name = 'codeModeEnabled'`,
+    );
+    return columns.length;
+  }
+
+  /** What the next start does: the migration adds the column, off. */
+  async function applyCodeModeMigration(): Promise<void> {
+    await prisma.$executeRawUnsafe(fs.readFileSync(CODE_MODE_MIGRATION, 'utf8'));
+  }
+
+  async function codeModeEnabled(): Promise<boolean> {
+    const res = await request.get('/api/settings').set(await currentSessionHeader());
+    expect(res.status).toBe(200);
+    return res.body.codeModeEnabled as boolean;
+  }
+
+  afterEach(async () => {
+    // The next tests need the column, even when an assertion failed before the migration
+    if ((await codeModeColumns()) === 0) await applyCodeModeMigration();
+  });
+
+  it('should turn Code Mode off, even when the backup and the live instance had it on', async () => {
+    await prisma.siteSettings.update({ where: { id: 1 }, data: { codeModeEnabled: true } });
+    const backup = await exportBackup();
+
+    expect((await importBackup(backup)).status).toBe(200);
+
+    expect(await codeModeEnabled()).toBe(false);
+  });
+
+  it('should keep Code Mode off after restoring a backup made before the setting existed', async () => {
+    await prisma.siteSettings.update({ where: { id: 1 }, data: { codeModeEnabled: true } });
+    const backup = await withDatabaseChanged(await exportBackup(), [
+      'ALTER TABLE "SiteSettings" DROP COLUMN "codeModeEnabled"',
+    ]);
+
+    expect((await importBackup(backup)).status).toBe(200);
+    expect(await codeModeColumns()).toBe(0);
+    // Next start: the migration adds the column, off
+    await applyCodeModeMigration();
+    expect(await codeModeEnabled()).toBe(false);
   });
 });
 

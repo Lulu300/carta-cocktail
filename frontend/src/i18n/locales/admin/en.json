@@ -11,6 +11,7 @@
     "menus": "Menus",
     "shortages": "Shortages",
     "settings": "Settings",
+    "api": "API",
     "logout": "Logout",
     "menu": "Navigation menu",
     "admin": "Administration"
@@ -458,6 +459,7 @@
     "profileUpdated": "Profile updated",
     "logoutEverywhere": "Sign out everywhere",
     "confirmLogoutEverywhere": "Every device, this one included, will be signed out and will need the password again. Use it when a device was lost or shared.",
+    "logoutEverywhereApiTokens": "Every API token will be deleted too: the scripts and MCP clients that use one will stop working until you create new tokens.",
     "passwordMismatch": "Passwords do not match",
     "embed": {
       "title": "Embed the menu in a website",
@@ -472,6 +474,48 @@
       "copied": "Code copied",
       "copyFailed": "The code could not be copied: select it in the field and copy it",
       "noPublicMenu": "Publish a menu to get the code to paste in your website."
+    },
+    "apiTokens": {
+      "title": "API tokens",
+      "description": "A token lets a script or an MCP client call the API without your password: send it in the Authorization header, as \"Bearer carta_…\". It cannot change the password, manage tokens, sign out everywhere or use the backups. \"Sign out everywhere\" and a backup restore delete every token.",
+      "name": "Token name",
+      "nameHint": "What uses it, such as \"Home Assistant\" or \"MCP on my laptop\"",
+      "scope": "Access",
+      "readOnly": "Read only",
+      "readWrite": "Read and write",
+      "lifetime": "Expires after",
+      "lifetimeDays_one": "{{count}} day",
+      "lifetimeDays_other": "{{count}} days",
+      "create": "Create token",
+      "createdTitle": "Token \"{{name}}\" created",
+      "shownOnce": "Copy it now and keep it somewhere safe: it will not be shown again.",
+      "tokenLabel": "New token",
+      "copy": "Copy the token",
+      "copied": "Token copied",
+      "copyFailed": "The token could not be copied: select it in the field and copy it",
+      "done": "I have copied it",
+      "empty": "No API token yet.",
+      "expired": "Expired",
+      "dates": "Created on {{created}}, expires on {{expires}}.",
+      "lastUsed": "Last used on {{date}}.",
+      "neverUsed": "Never used.",
+      "revoke": "Revoke",
+      "revokeNamed": "Revoke {{name}}",
+      "revokeTitle": "Revoke the token",
+      "confirmRevoke": "Scripts and MCP clients that use \"{{name}}\" will be refused from now on. This cannot be undone.",
+      "revoked": "Token revoked"
+    },
+    "codeMode": {
+      "title": "MCP server: Code Mode",
+      "description": "Code Mode adds two tools to the MCP server (/api/mcp), search and execute: the AI agent writes JavaScript that searches the documentation of the API or calls the API, and the server runs it. Off by default.",
+      "warningTitle": "Code written by the agent runs on this server",
+      "warning": "It runs in a sandbox (QuickJS in WebAssembly), without file system, network or access to the server, and its time, memory and number of API requests are limited. It has the rights of the agent's token: a read-only token only reads, a read and write token can change your recipes, stock and menus. It can never delete anything, nor use the tokens, the account or the backups. Turn it on only for agents you trust, with read-only tokens when they do not need to write.",
+      "toggle": "Code Mode",
+      "confirmTitle": "Turn on Code Mode",
+      "confirmEnable": "The agents connected to the MCP server will be able to run code on this server, with the rights of their token. Continue?",
+      "enable": "Turn on",
+      "enabled": "Code Mode is on: MCP clients get search and execute at their next request.",
+      "disabled": "Code Mode is off: MCP clients no longer get search and execute."
     },
     "backup": {
       "title": "Backup & Restore",
@@ -642,5 +686,10 @@
   },
   "appUpdate": {
     "available": "A new version is available"
+  },
+  "apiDocs": {
+    "title": "API",
+    "intro": "Every route of the API, with what it accepts and what it answers. The test button of a route sends the request with your session: it really changes your data.",
+    "publicDocument": "Without a session, scripts and integrations read the public routes at"
   }
 }

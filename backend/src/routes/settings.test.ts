@@ -8,6 +8,7 @@ import {
   request,
   authHeader,
   prisma,
+  seedApiToken,
 } from '../test/helpers';
 
 beforeAll(async () => {
@@ -124,6 +125,77 @@ describe('Sites allowed to embed the public menu', () => {
     const res = await putOrigins('https://www.mon-bar.fr');
     expect(res.status).toBe(400);
     expect(res.body.details[0].path).toBe('body.embedOrigins');
+  });
+});
+
+describe('PUT /api/settings/code-mode', () => {
+  const storedCodeMode = async () =>
+    (await prisma.siteSettings.findUniqueOrThrow({ where: { id: 1 } })).codeModeEnabled;
+
+  it('is off by default', async () => {
+    const res = await request.get('/api/settings').set(authHeader());
+    expect(res.body.codeModeEnabled).toBe(false);
+  });
+
+  it('turns Code Mode on and off, and answers the settings', async () => {
+    const on = await request
+      .put('/api/settings/code-mode')
+      .set(authHeader())
+      .send({ enabled: true });
+    expect(on.status).toBe(200);
+    expect(on.body).toMatchObject({ siteName: 'Test Carta', codeModeEnabled: true });
+    expect(await storedCodeMode()).toBe(true);
+
+    // Saving the other settings leaves it alone
+    await request.put('/api/settings').set(authHeader()).send({ siteName: 'Bar' }).expect(200);
+    expect(await storedCodeMode()).toBe(true);
+
+    const off = await request
+      .put('/api/settings/code-mode')
+      .set(authHeader())
+      .send({ enabled: false });
+    expect(off.body.codeModeEnabled).toBe(false);
+    expect(await storedCodeMode()).toBe(false);
+  });
+
+  it('creates the settings row when it is missing', async () => {
+    await prisma.siteSettings.deleteMany();
+
+    const res = await request
+      .put('/api/settings/code-mode')
+      .set(authHeader())
+      .send({ enabled: true });
+
+    expect(res.status).toBe(200);
+    expect(await storedCodeMode()).toBe(true);
+  });
+
+  it('ignores a codeModeEnabled sent with the other settings', async () => {
+    await request
+      .put('/api/settings')
+      .set(authHeader())
+      .send({ codeModeEnabled: true })
+      .expect(200);
+    expect(await storedCodeMode()).toBe(false);
+  });
+
+  it('refuses a body without a boolean', async () => {
+    const res = await request
+      .put('/api/settings/code-mode')
+      .set(authHeader())
+      .send({ enabled: 'yes' });
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('body.enabled');
+  });
+
+  it('refuses a request without a session, and every API token', async () => {
+    expect((await request.put('/api/settings/code-mode').send({ enabled: true })).status).toBe(401);
+    for (const scope of ['READ_ONLY', 'READ_WRITE'] as const) {
+      const { header } = await seedApiToken({ scope });
+      const res = await request.put('/api/settings/code-mode').set(header).send({ enabled: true });
+      expect(res.status).toBe(403);
+    }
+    expect(await storedCodeMode()).toBe(false);
   });
 });
 

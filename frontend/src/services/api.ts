@@ -1,5 +1,7 @@
 import type {
   AdminSiteSettings,
+  ApiToken,
+  ApiTokenInput,
   BackupRestoreResult,
   Bottle,
   BottleImportConfirmInput,
@@ -23,6 +25,8 @@ import type {
   CocktailImportInput,
   CocktailInput,
   CocktailRow,
+  CodeModeInput,
+  CreatedApiToken,
   DeletionResponse,
   EntityResolutionAction,
   ImportPreviewResponse,
@@ -561,6 +565,21 @@ export const settings = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+  // Session only: no API token may turn Code Mode on
+  updateCodeMode: (data: CodeModeInput) =>
+    request<AdminSiteSettings>('/settings/code-mode', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+};
+
+// API tokens of scripts and MCP clients (admin session only)
+export const apiTokens = {
+  list: (signal?: AbortSignal) => request<ApiToken[]>('/api-tokens', { signal }),
+  /** The only answer that carries the token itself: it is never readable again. */
+  create: (data: ApiTokenInput) =>
+    request<CreatedApiToken>('/api-tokens', { method: 'POST', body: JSON.stringify(data) }),
+  revoke: (id: number) => request<MessageResponse>(`/api-tokens/${id}`, { method: 'DELETE' }),
 };
 
 // System (admin)
@@ -570,6 +589,13 @@ export const system = {
     (await request<UpgradeNotice | undefined>('/system/upgrade-notice', { signal })) ?? null,
   acknowledgeUpgradeNotice: () =>
     request<void>('/system/upgrade-notice/acknowledge', { method: 'POST' }),
+};
+
+// OpenAPI document (admin)
+export const openApi = {
+  /** Every route of the API, as the API page shows them. The viewer reads it as is. */
+  getDocument: (signal?: AbortSignal) =>
+    request<Record<string, unknown>>('/openapi/full.json', { signal }),
 };
 
 // Backup

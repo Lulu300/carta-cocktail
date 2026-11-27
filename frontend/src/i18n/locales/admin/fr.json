@@ -11,6 +11,7 @@
     "menus": "Cartes",
     "shortages": "Pénuries",
     "settings": "Paramètres",
+    "api": "API",
     "logout": "Déconnexion",
     "menu": "Menu de navigation",
     "admin": "Administration"
@@ -458,6 +459,7 @@
     "profileUpdated": "Profil mis à jour",
     "logoutEverywhere": "Se déconnecter partout",
     "confirmLogoutEverywhere": "Tous les appareils, celui-ci compris, seront déconnectés et devront saisir à nouveau le mot de passe. À utiliser si un appareil a été perdu ou partagé.",
+    "logoutEverywhereApiTokens": "Tous les jetons d'API seront supprimés aussi : les scripts et clients MCP qui en utilisent un cesseront de fonctionner jusqu'à ce que vous créiez de nouveaux jetons.",
     "passwordMismatch": "Les mots de passe ne correspondent pas",
     "embed": {
       "title": "Intégrer la carte dans un site",
@@ -472,6 +474,48 @@
       "copied": "Code copié",
       "copyFailed": "Le code n'a pas pu être copié : sélectionnez-le dans le champ et copiez-le",
       "noPublicMenu": "Publiez une carte pour obtenir le code à coller dans votre site."
+    },
+    "apiTokens": {
+      "title": "Jetons d'API",
+      "description": "Un jeton permet à un script ou à un client MCP d'appeler l'API sans votre mot de passe : envoyez-le dans l'en-tête Authorization, sous la forme « Bearer carta_… ». Il ne peut ni changer le mot de passe, ni gérer les jetons, ni déconnecter partout, ni utiliser les sauvegardes. « Se déconnecter partout » et la restauration d'une sauvegarde suppriment tous les jetons.",
+      "name": "Nom du jeton",
+      "nameHint": "Ce qui l'utilise, par exemple « Home Assistant » ou « MCP sur mon portable »",
+      "scope": "Accès",
+      "readOnly": "Lecture seule",
+      "readWrite": "Lecture et écriture",
+      "lifetime": "Expire après",
+      "lifetimeDays_one": "{{count}} jour",
+      "lifetimeDays_other": "{{count}} jours",
+      "create": "Créer le jeton",
+      "createdTitle": "Jeton « {{name}} » créé",
+      "shownOnce": "Copiez-le maintenant et gardez-le en lieu sûr : il ne sera plus affiché.",
+      "tokenLabel": "Nouveau jeton",
+      "copy": "Copier le jeton",
+      "copied": "Jeton copié",
+      "copyFailed": "Le jeton n'a pas pu être copié : sélectionnez-le dans le champ et copiez-le",
+      "done": "Je l'ai copié",
+      "empty": "Aucun jeton d'API pour l'instant.",
+      "expired": "Expiré",
+      "dates": "Créé le {{created}}, expire le {{expires}}.",
+      "lastUsed": "Dernière utilisation le {{date}}.",
+      "neverUsed": "Jamais utilisé.",
+      "revoke": "Révoquer",
+      "revokeNamed": "Révoquer {{name}}",
+      "revokeTitle": "Révoquer le jeton",
+      "confirmRevoke": "Les scripts et clients MCP qui utilisent « {{name}} » seront refusés à partir de maintenant. Cette action est définitive.",
+      "revoked": "Jeton révoqué"
+    },
+    "codeMode": {
+      "title": "Serveur MCP : Code Mode",
+      "description": "Code Mode ajoute deux outils au serveur MCP (/api/mcp), search et execute : l'agent IA écrit du JavaScript qui cherche dans la documentation de l'API ou appelle l'API, et le serveur l'exécute. Désactivé par défaut.",
+      "warningTitle": "Le code écrit par l'agent s'exécute sur ce serveur",
+      "warning": "Il tourne dans un bac à sable (QuickJS en WebAssembly), sans système de fichiers, sans réseau ni accès au serveur, et son temps, sa mémoire et son nombre de requêtes à l'API sont limités. Il a les droits du jeton de l'agent : un jeton en lecture seule ne fait que lire, un jeton en lecture et écriture peut modifier vos recettes, votre stock et vos cartes. Il ne peut jamais rien supprimer, ni utiliser les jetons, le compte ou les sauvegardes. Ne l'activez que pour des agents de confiance, avec des jetons en lecture seule quand ils n'ont pas à écrire.",
+      "toggle": "Code Mode",
+      "confirmTitle": "Activer Code Mode",
+      "confirmEnable": "Les agents connectés au serveur MCP pourront exécuter du code sur ce serveur, avec les droits de leur jeton. Continuer ?",
+      "enable": "Activer",
+      "enabled": "Code Mode est activé : les clients MCP reçoivent search et execute à leur prochaine requête.",
+      "disabled": "Code Mode est désactivé : les clients MCP ne reçoivent plus search et execute."
     },
     "backup": {
       "title": "Sauvegarde & Restauration",
@@ -642,5 +686,10 @@
   },
   "appUpdate": {
     "available": "Une nouvelle version est disponible"
+  },
+  "apiDocs": {
+    "title": "API",
+    "intro": "Toutes les routes de l'API, avec ce que chacune accepte et ce qu'elle renvoie. Le bouton de test d'une route envoie la requête avec votre session : il modifie vraiment vos données.",
+    "publicDocument": "Sans session, les scripts et les intégrations lisent les routes publiques à l'adresse"
   }
 }

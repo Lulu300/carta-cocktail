@@ -56,14 +56,15 @@ frontend/
 │   ├── vite-env.d.ts           # Vite env types (VITE_APP_VERSION)
 │   ├── pages/
 │   │   ├── admin/              # One page per admin route (Dashboard, Categories, Bottles, Ingredients, Units,
-│   │   │                       # Cocktails, CocktailForm, Menus, MenuEdit, MenuBottleEdit, Shortages, Settings)
+│   │   │                       # Cocktails, CocktailForm, Menus, MenuEdit, MenuBottleEdit, Shortages, Settings, ApiDocs)
 │   │   ├── auth/
 │   │   │   └── LoginPage.tsx   # Admin login
 │   │   └── public/             # HomePage, MenuPublicPage, CocktailPublicPage and their parts
 │   │                           # (sections, search bar, skeletons, error state, useMenuFilter, useScrollRestoration)
 │   ├── components/
 │   │   ├── admin/              # Shared admin parts: DataTable, TranslationFields, DeletionImpactList,
-│   │   │   │                   # LoadError, useConfirmDelete, useEntityForm, useForcedDelete
+│   │   │   │                   # LoadError, useConfirmDelete, useEntityForm, useForcedDelete,
+│   │   │   │                   # sections of the settings page (EmbedMenuSettings, ApiTokenSettings, CodeModeSettings)
 │   │   │   ├── bottles/        # Bottle form modal, rows, history, export menu, filters
 │   │   │   ├── categories/     # Category form modal, category types manager
 │   │   │   ├── cocktails/      # Cocktail editor (react-hook-form + zod), list items, filters, selection
@@ -72,6 +73,7 @@ frontend/
 │   │   ├── layout/             # AdminLayout, PublicLayout, RouteErrorBoundary, SkipLink, AppVersion, BackHomeLink
 │   │   └── ui/                 # Design system: Button, Field, Input, Select, Modal, ConfirmDialog, Toaster,
 │   │                           # Pagination, SearchInput, SortableHeader, DateInput, LanguageSelector, IconButton,
+│   │                           # CopyButton (clipboard and toast, hidden without the clipboard API),
 │   │                       # UploadedPhoto (cocktail photo: srcset, falls back to the photo itself)…
 │   ├── contexts/
 │   │   ├── AuthContext.tsx         # Login/logout, token management, auth state
@@ -137,6 +139,7 @@ frontend/
 | `/admin/menus/:id/bottles` | MenuBottleEditPage | Protected |
 | `/admin/shortages`         | ShortagesPage      | Protected |
 | `/admin/settings`          | SettingsPage       | Protected |
+| `/admin/api`               | ApiDocsPage        | Protected |
 
 Protected routes use `ProtectedRoute` wrapper in `App.tsx` which checks `AuthContext`.
 
@@ -200,6 +203,10 @@ Safari and iOS 16.0+, Chrome and Edge 107+, Firefox 104+ (`build.target` in `vit
 - **Icons**: `pwa-icons/icon.svg` and `maskable.svg` (the glass inside the safe zone, 80% of the width), rendered at 512 px with headless Chrome, which cannot render a smaller window: `"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless --hide-scrollbars --window-size=512,512 --screenshot=../public/pwa-512.png icon.svg` from `pwa-icons/` (then `maskable.svg` to `pwa-maskable-512.png`). The 192 px icon and the 180 px `apple-touch-icon.png` are scaled down from `pwa-512.png` (`sips -z 192 192 pwa-512.png --out pwa-192.png` on macOS).
 - **Stuck worker**: `docs/operations.md` ("Carte hors ligne et installation") gives the steps to unregister it in each browser. A service worker needs HTTPS (or `localhost`).
 
+### API page
+
+`/admin/api` (`pages/admin/ApiDocsPage.tsx`) shows the OpenAPI document of every route (`GET /api/openapi/full.json`, read with the session through `services/api.ts`) with Scalar (`components/admin/ApiReference.tsx`). The viewer weighs about 2 MB with Vue: it is a lazy chunk of its own, loaded by the page only, and `bundle-budget.mjs` fails if `node_modules/@scalar/` reaches the first load or the precache. Its settings (`apiReferenceConfiguration.ts`) hand it the session token for its "Test Request" button and turn off everything that calls scalar.com (fonts, AI agent, MCP, telemetry): the CSP is not widened, and `e2e/tests/api-docs.spec.ts` checks the page under nginx's CSP. Scalar has its own translations: its locale follows the app's language. In jsdom, Scalar renders its content once per test file: a second page test checks the page around it, not the viewer.
+
 ### Import/Export
 
 - Single cocktail: JSON export/import with dependency resolution wizard
@@ -222,10 +229,10 @@ Safari and iOS 16.0+, Chrome and Edge 107+, Firefox 104+ (`build.target` in `vit
 
 ## Dependencies
 
-**Runtime**: react 19, react-dom 19, react-router-dom 7, @tanstack/react-query 5, react-hook-form 7, @hookform/resolvers, zod 4, i18next 27, react-i18next 18, i18next-browser-languagedetector 8, jszip 3
+**Runtime**: react 19, react-dom 19, react-router-dom 7, @tanstack/react-query 5, react-hook-form 7, @hookform/resolvers, zod 4, i18next 27, react-i18next 18, i18next-browser-languagedetector 8, jszip 3, @scalar/api-reference-react (OpenAPI viewer of the API page, F-14)
 **Dev**: vite 8, @vitejs/plugin-react 6, vite-plugin-pwa 2 (Workbox 7), tailwindcss 4, @tailwindcss/vite, typescript 5.9, eslint 10, eslint-plugin-i18next, prettier 3, vitest, jsdom, @testing-library/*, msw, vitest-axe
 
-**Install scripts**: npm 12 skips the install scripts of dependencies that `allowScripts` in `package.json` does not list (npm 11.19 only warns). None is needed here: `fsevents` (optional, macOS) is denied because its binary ships prebuilt in the package. A new dependency whose script is needed must be added to `allowScripts` (`npm install-scripts approve <pkg> --no-allow-scripts-pin`, no version so that a Dependabot bump keeps working), otherwise denied (`npm install-scripts deny <pkg>`), so that `npm ci` prints no `install-scripts` warning.
+**Install scripts**: npm 12 skips the install scripts of dependencies that `allowScripts` in `package.json` does not list (npm 11.19 only warns). None is needed here: `fsevents` (optional, macOS) is denied because its binary ships prebuilt in the package, and `vue-demi` (a dependency of Scalar) because its script only switches to Vue 2, and its published files already target Vue 3. A new dependency whose script is needed must be added to `allowScripts` (`npm install-scripts approve <pkg> --no-allow-scripts-pin`, no version so that a Dependabot bump keeps working), otherwise denied (`npm install-scripts deny <pkg>`), so that `npm ci` prints no `install-scripts` warning.
 
 ## Styling Conventions
 

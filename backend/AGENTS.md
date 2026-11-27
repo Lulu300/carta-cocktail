@@ -58,10 +58,11 @@ backend/
 │   │   ├── serializedAdapter.ts # Queries wait for the open transaction (single connection)
 │   │   └── prisma.ts         # The only PrismaClient factory + SQLite setup (WAL)
 │   ├── middleware/
-│   │   ├── auth.ts           # JWT Bearer validation, AuthRequest type
+│   │   ├── auth.ts           # Bearer validation (session JWT or API token), AuthRequest type, refuseApiTokens, protocolAuthMiddleware (MCP)
 │   │   ├── errorHandler.ts   # Maps thrown errors to `{ error, details? }`
 │   │   └── rateLimit.ts      # createRateLimiter() (429 through errorHandler), resetRateLimits() for tests
 │   ├── routes/               # One file per resource
+│   │   ├── apiTokens.ts      # GET, POST, DELETE /api/api-tokens: API tokens of scripts and MCP clients (session only)
 │   │   ├── auth.ts           # POST /login, GET /me, POST /logout-all
 │   │   ├── availability.ts   # GET cocktail availability
 │   │   ├── backup.ts         # GET /api/backup/export, POST /api/backup/import (ZIP of database + photos)
@@ -71,11 +72,13 @@ backend/
 │   │   ├── cocktails.ts      # CRUD + image upload + import/export
 │   │   ├── health.ts         # GET /api/health: status and version, public (Docker healthcheck)
 │   │   ├── ingredients.ts    # CRUD /api/ingredients + bulk availability
+│   │   ├── mcp.ts            # POST /api/mcp: MCP endpoint (Streamable HTTP, no sessions), excluded from the OpenAPI document
 │   │   ├── menuBottles.ts    # /api/menu-bottles + sync and exclusions of system menus
 │   │   ├── menuSections.ts   # /api/menu-sections + reorder
 │   │   ├── menus.ts          # CRUD /api/menus
+│   │   ├── openapi.ts        # GET /api/openapi.json (public routes), GET /api/openapi/full.json (admin)
 │   │   ├── public.ts         # Public read-only endpoints (no auth), link preview pages (/share/menu/...), embedding sites for nginx (/embed-origins)
-│   │   ├── settings.ts       # GET/PUT site settings + admin profile
+│   │   ├── settings.ts       # GET/PUT site settings + admin profile + Code Mode of the MCP server (session only)
 │   │   ├── shortages.ts      # GET /api/shortages
 │   │   ├── system.ts         # GET /api/system/upgrade-notice + acknowledge (in-app upgrade guide)
 │   │   └── units.ts          # CRUD /api/units
@@ -84,6 +87,7 @@ backend/
 │   │   ├── check-integrity.ts # Read-only report on a copy of the database before an upgrade
 │   │   └── migration-state.ts # Migrations to apply and failed ones, read by docker-entrypoint.sh
 │   ├── services/             # Business logic shared by routes and scripts
+│   │   ├── apiTokenService.ts # API tokens: generation, SHA-256 hash, scope, expiry, last use
 │   │   ├── availabilityService.ts  # Stock-based availability calculation
 │   │   ├── backupService.ts  # Backup export snapshot and restore
 │   │   ├── cocktail/         # Cocktail CRUD, image upload and copies (imageVariants.ts), JSON export and import
@@ -101,6 +105,13 @@ backend/
 │   │   ├── html.ts           # escapeHtml(): every value inserted in HTML
 │   │   └── ...               # importDates, records, storedNames, uniqueness
 │   ├── validation/           # zod schemas of requests and responses, one file per resource, validate() and valid()
+│   │                         # (errors.ts: the error body of errorHandler)
+│   ├── openapi/              # OpenAPI 3.1 document: route declarations (routeDoc.ts), routes read from the app
+│   │                         # (operations.ts, mounts.ts), zod to JSON Schema (jsonSchemas.ts), the document (document.ts)
+│   ├── mcp/                  # MCP server (F-15): tool catalog (catalog.ts), tools read from the routes
+│   │                         # (operationTools.ts), API request of a tool (callOperation.ts), server (server.ts),
+│   │                         # Code Mode's search and execute (codeMode.ts), their sandbox: a worker thread per
+│   │                         # run (sandbox.ts) running QuickJS (sandboxGuest.ts, entry sandboxWorker.ts)
 │   ├── contracts/            # Types generated for the frontend from the schemas (npm run contracts:generate)
 │   ├── test/                 # Test helpers, factories, database lifecycle (globalSetup, setup)
 │   └── i18n/
@@ -167,6 +178,17 @@ export default router;
   restored version above both the backup's and the live one (`backupService.ts`), so every session ends, the restoring
   one included. A backup made before v1.11.0 has no column: the restore writes the live version to
   `<database>.session-floor`, and the next start applies it after the migrations (`services/sessionFloor.ts`, C-30)
+- API tokens (F-16, `services/apiTokenService.ts`): `Authorization: Bearer carta_<43 base64url characters>`. Only
+  the SHA-256 hash is stored (`ApiToken.tokenHash`, unique): the secret has 256 bits, a slow hash would only slow
+  every request. `authMiddleware` tells a token from a JWT by its `carta_` prefix; an unknown (revoked) or expired
+  token gets 401, a `READ_ONLY` token 403 on any method but `GET` and `HEAD` (`errors.apiTokenReadOnly`).
+  `lastUsedAt` is written at most once a minute per token. Revoking a token deletes its row;
+  `POST /api/auth/logout-all` deletes them all, and so does a backup restore. An export never carries them (deleted
+  from the snapshot with `secure_delete`). `SESSION_ONLY_ROUTES` in `app.ts` lists the routes a token may never call,
+  whatever its scope (`refuseApiTokens`, 403 `errors.apiTokenSessionOnly`): `/api/api-tokens`,
+  `/api/settings/profile`, `/api/settings/code-mode`, `/api/auth/logout-all` and `/api/backup`. A new route of that kind goes in that list
+- The MCP endpoint (`/api/mcp`) sits behind `protocolAuthMiddleware`: same 401 as `authMiddleware`, but a read-only
+  token may POST, since every MCP request is a POST; `req.canWrite` tells the endpoint which tools to list
 - `POST /api/auth/login` allows `LOGIN_RATE_LIMIT` failed attempts (default 10) per client IP in 15 minutes, then
   answers 429. Every `/api` route except `/api/health` allows `API_RATE_LIMIT` requests (default 600) per client IP
   in one minute, counted before the body parsers and `authMiddleware`; `/api/backup` also allows 10 authenticated
@@ -227,6 +249,125 @@ router.put('/:id', validate(updateSchemas), async (_req, res) => {
   is out of date: after a schema change, run the script and commit both.
 - The frontend never imports zod schemas from here: it validates its forms with its own rules.
 
+### OpenAPI document (F-14)
+
+Every route declares its documentation in the route itself, with the middleware `doc()` built by
+`apiDocs(tag)` (`src/openapi/routeDoc.ts`), which does nothing but carry it:
+
+```typescript
+const doc = apiDocs('Units');
+
+router.get(
+  '/:id',
+  doc({
+    operationId: 'getUnit',
+    summary: 'Get a unit',
+    responses: { 200: Unit },
+    errors: { 404: 'No unit has this id.' },
+  }),
+  validate(idRequest),
+  async (_req, res) => {
+    /* ... */
+  },
+);
+```
+
+- The rest comes from the app as Express runs it (`collectApiRoutes()`, `src/openapi/operations.ts`):
+  the method and the path, the request schemas of `validate()`, the access (`authMiddleware`,
+  `optionalAuth`, and `refuseApiTokens` for the session-only routes) and the rate limits (`createRateLimiter()`) of the middleware in front of the
+  route. Mount every router with `mountApiRouter(app, path, ...middleware, router)` (`app.ts`):
+  Express keeps no trace of a mount path, and a router mounted with `app.use` makes the document fail.
+- `responses`: a zod schema answers JSON; `{ description, content, headers }` anything else (a
+  file, CSV, no body for a 204). `errors`: the statuses of the route itself and what they mean
+  there; 400 (validation), 401 (token), 403 (API token: read-only on a write, or any token on a
+  session-only route), 413 (body) and 429 (limit) follow from the middleware. The security of an
+  admin route lists `bearerAuth` (session) and `apiToken`; a session-only route lists `bearerAuth` only.
+  A file sent as `multipart/form-data` is declared with `upload` and its limit constant (see File
+  Uploads). A route that `validate()` does not check (`routes/public.ts`) declares `pathParams`.
+- Response schemas exported by `src/validation/` become components named after their export
+  (`Unit`, `PublicMenu`); request schemas are written in full (`io: 'input'`). zod 4's own
+  `z.toJSONSchema` converts them: no other library. Every error answer refers to the one
+  `ApiError` schema (`validation/errors.ts`). The document is in English.
+- `GET /api/openapi.json` answers the routes a client can call without a session (public, or with
+  an optional token): `/api/public/*`, the sign-in, the health check and the document itself.
+  `GET /api/openapi/full.json` answers every route, to the admin. Two URLs, so that no cache mixes
+  them up. A route left out on purpose (the link preview pages of `/api/public/share/`, HTML for
+  robots) is declared with `excludedFromApiDocs(reason)`.
+- Tests: `src/openapi/openapi.test.ts` fails when a route has no declaration, when the excluded
+  routes change, or when the document is not a valid OpenAPI 3.1 document
+  (`@seriousme/openapi-schema-validator`); `src/openapi/documentedResponses.test.ts` checks real
+  answers against the declaration of their route (`expectDocumentedResponse()`,
+  `src/test/documentedResponse.ts`), at least one route of each route file. A new route gets its
+  declaration, and a new route file a request in that test.
+
+### MCP server (F-15)
+
+`POST /api/mcp` serves the Model Context Protocol over Streamable HTTP with `@modelcontextprotocol/server` (SDK v2):
+the 2026-07-28 revision, and the stateless form of the 2025 ones (`initialize`); no sessions, so GET and DELETE answer 405. Each request gets its own `McpServer` (`createCartaMcpServer`, `src/mcp/server.ts`).
+
+- **Tools** are API operations: `src/mcp/catalog.ts` lists them by `operationId`, with a name, a title, a
+  description with an example and, when the method does not tell, hints. Nothing else is written there:
+  `buildOperationTools()` (`src/mcp/operationTools.ts`) reads each route from the app (`collectApiRoutes()`, as the
+  OpenAPI document does). The input schema is the path parameters, query and body of `validate()` side by side, the
+  output schema the JSON success response (`{ items }` for a list), both written in full without `$ref`
+  (`inputSchema()`, `standaloneOutputSchema()`). It throws for an unknown operation, a DELETE route, a route that is
+  not admin, or arguments that collide.
+- **A tool call** is an HTTP request to the server itself, at the address that received the MCP request
+  (`callOperation()`), with the same `Authorization` and `Accept-Language`, and the client address in
+  `X-Forwarded-For`: the route runs its own validation, scope check, rate limit and errors. A tool call counts twice
+  against `API_RATE_LIMIT` (under the backend's own address when `TRUST_PROXY` does not trust it). Before building
+  the URL, the path parameters are checked with the route's `params` schema, and an empty value, `.` or `..` (which
+  the URL would resolve into another route) is refused: 400 in the form of the API's errors. The API request waits
+  `OPERATION_TIMEOUT_MS` (30 s) at most, then the tool answers 504 (`errors.mcpToolTimeout`). The SDK does not validate the arguments (`advertisedOnly()`): an error answers the API's
+  status, message and `details` as the text of an `isError` result.
+- **Scope**: a read-only token does not see the tools whose method writes (calling one answers "tool not found"),
+  and the API route would refuse it anyway. Deletions, the backup restore and "log out everywhere" are never tools.
+- Tests: `src/mcp/mcp.test.ts` (SDK client: handshake, both revisions, scope, every tool, errors) keeps what a client
+  sees in `src/mcp/__snapshots__/tools.json`: after a deliberate change of a schema the tools use, run
+  `npx vitest run src/mcp/mcp.test.ts -u` and commit the file. `operationTools.test.ts` covers the refusals.
+  `connectMcpClient()` (`src/test/helpers.ts`) connects an SDK client to the app listening on loopback.
+
+#### Code Mode (`search` and `execute`)
+
+`SiteSettings.codeModeEnabled`, off by default, adds Cloudflare's two Code Mode tools (`src/mcp/codeMode.ts`), with the
+names and shapes of `openApiMcpServer()`: `search({ code })` runs the agent's async arrow function with
+`codemode.spec()` (the OpenAPI document of what the token may call, `$ref` resolved inline), `execute({ code })` also
+with `codemode.request({ method, path, query, body })`. `routes/mcp.ts` reads the setting at each request; only the
+session may change it (`PUT /api/settings/code-mode`, in `SESSION_ONLY_ROUTES`).
+
+- **Reach**: `codemode.request()` resolves the method and path against the documented routes, in Express's order, and
+  refuses (in the form of the API's errors) any `DELETE`, a session-only route, a route that is not admin, a route that
+  takes a file, a write of a read-only token, and a path with `?`, `#` or `\`, whatever the token, the session
+  included. The request then goes through `requestOperation()` (`callOperation.ts`), like a tool call: path parameter
+  check, same headers, `OPERATION_TIMEOUT_MS`.
+- **Sandbox**: QuickJS compiled to WebAssembly (`quickjs-emscripten-core` with the
+  `@jitl/quickjs-wasmfile-release-sync` variant), never Node's `vm`, in a **worker thread per run**
+  (`runInSandbox()`, `src/mcp/sandbox.ts`). The main thread holds every limit of time and ends the worker with
+  `terminate()`, which stops it wherever it is, in a native function of QuickJS that never checks for an interruption
+  too (`"a".repeat(2 ** 24).indexOf(…)`): the event loop of the server never waits for the code. CPU time is the time
+  the worker is busy, from a message of the main thread to its next `idle`. `SANDBOX_LIMITS`: wall time (10 s), CPU
+  (1 s), QuickJS heap (64 MB), WebAssembly memory (96 MB, a `WebAssembly.Memory` with a maximum: some allocations of
+  QuickJS escape its own limit), stack (128 KiB, on a worker stack of 4 MB), 50 host calls per run
+  (`codemode.spec()` included), 24,000 characters of answer and 5 MB of argument. `MAX_CONCURRENT_RUNS` (2) run at
+  once and `MAX_QUEUED_RUNS` (4) wait; the next ones are refused at once (`busy`, 429 `errors.codeModeBusy`), and a
+  queued run whose tool call the client cancels leaves the queue without running. A worker starts with an empty
+  environment (`SANDBOX_WORKER_OPTIONS`): it never holds `JWT_SECRET` or `ADMIN_PASSWORD`. The
+  image runs `dist/mcp/sandboxWorker.js`; from the TypeScript sources (tests, `npm run dev`) the worker loads
+  `sandboxWorker.ts` with `--import tsx`.
+- **Guest side** (`src/mcp/sandboxGuest.ts`, run by the thin entry `sandboxWorker.ts`, excluded from the coverage):
+  the code sees the built-ins and `codemode` only. A prelude, run first, keeps the host's `call` and `done` and the
+  built-ins it uses, then evaluates the code, awaits it and hands `done` the JSON of its result (or the description of
+  its error) cut at `outputChars`. The host reads strings only, and only short enough ones (`stringOf()`): never a
+  promise, a getter or `dump` of the guest's objects. Host calls cross as JSON messages; a value such as
+  `codemode.spec()` crosses once per run; past `maxHostCalls`, or once the run is over, nothing crosses any more. The
+  JavaScript heap of a worker keeps Node's defaults: a worker past a heap limit can take the process down, so what
+  crosses from QuickJS is bounded instead. `GuestRun` is tested in the test process (`sandboxGuest.test.ts`).
+- A backup restore turns Code Mode off (`turnCodeModeOff()`, `backupService.ts`), as it deletes the API tokens.
+- Tests: `sandbox.test.ts` (hostile code through real workers: loops, a native search, getters and `toJSON` that loop,
+  a `then` of the guest, memory measured in the worker, recursion, globals, prototypes, promises that never settle,
+  host calls, concurrency; each checks that the event loop kept turning) and `codeMode.test.ts` (through the MCP
+  endpoint: the setting, `search`, `execute`, requests outside the reach above, a full sandbox).
+
 ### Translations
 
 Entity names support multi-language via JSON strings stored in SQLite (`'{"fr": "Rhum", "en": "Rum"}'`).
@@ -286,9 +427,9 @@ nginx (`frontend/nginx.conf.template`) limits the whole multipart body, so its `
 
 ## Dependencies
 
-**Runtime**: express 5, express-rate-limit, bcryptjs, cors, helmet, morgan, jsonwebtoken, multer, sharp (photo copies; libvips prebuilt in its optional `@img/sharp-<platform>` packages, no install script), archiver and adm-zip (backups), i18next, i18next-http-middleware, dotenv, zod 4, yaml (front matter of the release notes)
+**Runtime**: express 5, express-rate-limit, bcryptjs, cors, helmet, morgan, jsonwebtoken, multer, @modelcontextprotocol/server (MCP endpoint), quickjs-emscripten-core and @jitl/quickjs-wasmfile-release-sync (Code Mode sandbox, WebAssembly: no native binary, no install script; run in worker threads), sharp (photo copies; libvips prebuilt in its optional `@img/sharp-<platform>` packages, no install script), archiver and adm-zip (backups), i18next, i18next-http-middleware, dotenv, zod 4, yaml (front matter of the release notes)
 **Runtime (database)**: @prisma/client 7, @prisma/adapter-better-sqlite3 7, better-sqlite3 12 (native module, prebuilt for linux x64/arm64 musl), prisma 7 (the CLI applies the migrations when the container starts)
-**Dev**: typescript 5.9, tsx, eslint 10, typescript-eslint, prettier 3, vitest, supertest
+**Dev**: typescript 5.9, tsx, eslint 10, typescript-eslint, prettier 3, vitest, supertest, @seriousme/openapi-schema-validator (OpenAPI 3.1 check of the generated document), @modelcontextprotocol/client (MCP tests)
 
 **Install scripts**: npm 12 skips the install scripts of dependencies that `allowScripts` in `package.json` does not list (npm 11.19 only warns). Only `better-sqlite3` is allowed: without its script the native binary is missing. `esbuild`, `prisma`, `@prisma/engines` and `fsevents` are denied (`false`): their binaries come from platform packages or from `prisma generate` (the project `postinstall`). Keys have no version, so a Dependabot bump keeps working. A new dependency whose script is needed must be added to `allowScripts` (`npm install-scripts approve <pkg> --no-allow-scripts-pin`), otherwise denied (`npm install-scripts deny <pkg>`), so that `npm ci` prints no `install-scripts` warning. The `prod-deps` stage of the `Dockerfile` opens `better-sqlite3` and encodes an image with `sharp`, and fails the build when either binary is missing. It prunes with `--omit=dev` only: `--omit=optional` would drop the binary of sharp, so the optional peers of the dev tooling (typescript, magicast) are cut by `docker/prune-unused-deps.mjs` instead.
 

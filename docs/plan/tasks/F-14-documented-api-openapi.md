@@ -5,28 +5,32 @@ phase: F
 lane: backend
 criticite: basse
 effort: L
-status: todo
+status: done
 owner: mixed
 depends_on: [F-05]
-touches: [backend/src/validation/, backend/src/routes/, backend/src/app.ts, backend/src/openapi/, backend/package.json, backend/package-lock.json, frontend/src/pages/admin/, frontend/src/App.tsx, frontend/src/i18n/locales/admin/, frontend/nginx.conf.template, frontend/security-headers.conf, README.md, docs/operations.md, .github/workflows/ci.yml]
+touches: [backend/src/validation/, backend/src/routes/, backend/src/app.ts, backend/src/openapi/, backend/package.json, backend/package-lock.json, frontend/src/pages/admin/, frontend/src/App.tsx, frontend/src/i18n/locales/admin/, frontend/nginx.conf.template, frontend/security-headers.conf, README.md, docs/operations.md, .github/workflows/ci.yml, backend/src/middleware/rateLimit.ts, backend/src/services/cocktail/cocktailImage.ts, backend/src/test/, backend/AGENTS.md, frontend/src/components/, frontend/src/queries/, frontend/src/services/api.ts, frontend/src/test/msw/handlers.ts, frontend/package.json, frontend/package-lock.json, frontend/AGENTS.md, AGENTS.md, .github/scripts/bundle-budget.mjs, .github/scripts/bundle-budget.test.mjs, e2e/tests/]
 sources: []
-branch:
-pr:
+branch: feature/F-14-openapi
+pr: 308
 ---
 
-## Décisions à valider avant de commencer
+## Décisions validées (2026-11-27)
 
 Demandée par l'humain le 2026-11-26 : « une API bien documentée pour tout le projet, avec une doc intégrée à l'application, disponible, propre, bien définie ». À faire après toutes les autres tâches du plan. Elle prépare F-15 (serveur MCP).
 
-Choix à faire par l'humain (`owner: mixed`) :
+Décisions de l'humain du 2026-11-27 :
 
-1. **Authentification.** Les jetons d'API (pour les scripts et le MCP) sont traités à part, dans F-16. Ici, le bouton « Essayer » de la documentation utilise la session de l'admin connecté.
-2. **Visibilité de la documentation.** Ce choix fixe le périmètre du premier critère d'acceptation.
-   - (a) Réservée à l'admin connecté : la page vit dans l'admin.
-   - (b) Spécification publique à `/api/openapi.json`, pages admin incluses, mais sans données.
-   - (c) Spécification publique pour les routes `/api/public/*` seulement, spécification complète pour l'admin connecté.
+1. **Authentification.** Le bouton « Essayer » de la documentation utilise la session de l'admin connecté. Les jetons d'API sont dans F-16, menée en parallèle : pas de schéma de sécurité pour les jetons ici, F-16 l'ajoutera.
+2. **Visibilité : option (c).**
+   - Sans authentification, `/api/openapi.json` sert une spécification qui ne contient que les routes `/api/public/*`. Les routes publiques nécessaires à un client, comme `/api/auth/login` et `/api/health`, peuvent y figurer si c'est justifié.
+   - L'admin connecté obtient la spécification complète.
+   - La forme (même URL selon l'authentification, ou deux URL) est au choix de l'agent, justifiée. Aucun cache ne doit mélanger les deux versions : `Cache-Control`, `Vary`, service worker et nginx.
 
-   Recommandation : (c).
+Choix faits dans la PR, dans ce cadre :
+
+- **Deux URL.** `GET /api/openapi.json` (sans session) et `GET /api/openapi/full.json` (admin, 401 sans jeton). Chaque URL répond toujours le même document : aucun cache ne peut servir l'un à la place de l'autre, sans dépendre d'un `Vary: Authorization`, et une session expirée reçoit un 401 au lieu d'un document réduit. `Cache-Control: no-cache` pour le public (ETag), `private, no-store` pour le complet. Le service worker ne met en cache que `/api/public/` et jamais une requête avec `Authorization` ; nginx ne met rien en cache sous `/api/` : rien à changer de ce côté.
+- **Document public** : les routes qu'un client appelle sans session, celles devant lesquelles ne passe pas `authMiddleware`, lu sur la route elle-même : `/api/public/*`, `/api/auth/login` (le moyen d'obtenir une session), `/api/health` (supervision) et `/api/openapi.json` lui-même. Les aperçus de liens de F-03 (`/api/public/share/…`, HTML pour les robots) sont exclus explicitement des deux documents.
+- **Sans bibliothèque côté backend** : `z.toJSONSchema` de zod 4 (dialecte JSON Schema 2020-12, celui d'OpenAPI 3.1) suffit. Lecteur : Scalar (`@scalar/api-reference-react`, MIT), sans `eval`, avec thème sombre, traduction française et pré-remplissage du jeton. Swagger UI contient `new Function`/`eval` dans ses bundles et n'a pas de thème sombre ; Redoc n'a pas de bouton « Essayer ».
 
 ## Contexte
 
@@ -65,9 +69,9 @@ Choix à faire par l'humain (`owner: mixed`) :
 
 ## Critères d'acceptation
 
-- [ ] La spécification complète, servie à l'admin connecté, est une OpenAPI 3.1 valide (vérifiée par un validateur en CI). Elle couvre 100 % des routes `/api`, avec leurs entrées, leurs sorties et leurs erreurs. Ce qui est servi sans authentification à `/api/openapi.json` suit la décision 2 : rien (a), tout (b) ou les routes `/api/public/*` seulement (c).
-- [ ] La page « API » de l'admin affiche la documentation, hors ligne, sans ressource externe. La CSP et le bundle public ne changent pas.
-- [ ] Une route ajoutée sans déclaration dans la spécification fait échouer la CI.
+- [x] La spécification complète, servie à l'admin connecté, est une OpenAPI 3.1 valide (vérifiée par un validateur en CI). Elle couvre 100 % des routes `/api`, avec leurs entrées, leurs sorties et leurs erreurs. Ce qui est servi sans authentification à `/api/openapi.json` suit la décision 2 : rien (a), tout (b) ou les routes `/api/public/*` seulement (c). (86 routes décrites ; les 2 pages d'aperçu de F-03 exclues explicitement ; option (c) avec la connexion, la santé et le document lui-même.)
+- [x] La page « API » de l'admin affiche la documentation, hors ligne, sans ressource externe. La CSP et le bundle public ne changent pas.
+- [x] Une route ajoutée sans déclaration dans la spécification fait échouer la CI.
 
 ## Tests à ajouter ou adapter
 
@@ -87,3 +91,10 @@ Choix à faire par l'humain (`owner: mixed`) :
 ## Journal
 
 - 2026-11-26 : tâche créée à la demande de l'humain (API documentée, doc intégrée), à faire après les autres tâches du plan. F-15 (serveur MCP compatible Code Mode) en dépend. 2026-11-26 : relecture de #289, jetons d'API sortis dans F-16 (tâche L trop large), critère 1 aligné sur la décision 2.
+- 2026-11-27 : décisions de l'humain (voir « Décisions validées ») : « Essayer » avec la session de l'admin, sans schéma de sécurité pour les jetons (F-16) ; visibilité (c).
+- 2026-11-27 : réalisée (branche `feature/F-14-openapi`, PR #308).
+  - Backend : chaque route porte sa déclaration (`apiDocs()`, middleware sans effet, `src/openapi/routeDoc.ts`) ; le document lit le reste dans l'app telle qu'Express l'exécute (`collectApiRoutes()` : chemins, schémas de `validate()`, `authMiddleware`/`optionalAuth`, limiteurs). `mountApiRouter()` monte les routeurs (Express ne garde pas le chemin de montage). Schémas convertis par `z.toJSONSchema` de zod 4, composants nommés d'après les exports de `src/validation/` ; format d'erreur `ApiError` décrit une fois (`validation/errors.ts`, dont `ValidationIssue` devient le type de `validate.ts`). Fichiers en `multipart/form-data` avec leurs constantes de limite (`ACCEPTED_IMAGE_TYPES` exportée de `cocktailImage.ts`), sauvegarde et exports en flux binaire ou CSV.
+  - Tests : couverture des routes (égalité routes Express = opérations + exclusions listées), validation OpenAPI 3.1 (`@seriousme/openapi-schema-validator`, devDependency, MIT), réponses réelles comparées à la déclaration de leur route pour au moins une route par fichier (`documentedResponses.test.ts`, échoue si un fichier de routes n'a aucune requête).
+  - Frontend : page `/admin/api` (Scalar, chunk différé, jeton de session pour « Test Request », polices, agent IA, MCP et télémétrie de Scalar coupés), `bundle-budget.mjs` refuse `node_modules/@scalar/` dans le premier chargement et le precache (138,45 kB, inchangé), parcours E2E `api-docs.spec.ts` sous la CSP de nginx (aucune violation, aucune requête vers un autre site, requête de test à 200 avec la session).
+  - Fichiers ajoutés à `touches` : `backend/src/middleware/rateLimit.ts`, `backend/src/services/cocktail/cocktailImage.ts`, `backend/src/test/`, `backend/AGENTS.md`, `frontend/src/components/`, `frontend/src/queries/`, `frontend/src/services/api.ts`, `frontend/src/test/msw/handlers.ts`, `frontend/package.json`, `frontend/package-lock.json`, `frontend/AGENTS.md`, `AGENTS.md`, `.github/scripts/bundle-budget.mjs` (et son test), `e2e/tests/`. `frontend/nginx.conf.template`, `frontend/security-headers.conf` et `.github/workflows/ci.yml` n'ont pas eu à changer.
+- 2026-11-27 : Notes de version : nouvelle page « API » dans l'admin : chaque route de l'API, ce qu'elle accepte et renvoie, avec un bouton pour l'essayer avec la session ouverte. Document OpenAPI 3.1 à `GET /api/openapi.json` (routes publiques, sans connexion) et `GET /api/openapi/full.json` (toutes les routes, admin connecté). Aucune action requise, pas de migration, `breaking: false`.

@@ -1,6 +1,6 @@
 # Guide d'exploitation
 
-Ce guide décrit l'exploitation de Carta Cocktail v1.20 avec les images publiées (`docker-compose.prod.yml`) : installation, sauvegardes, mises à jour, retour arrière, secrets et HTTPS. Les commandes se lancent depuis le dossier qui contient `docker-compose.prod.yml` et `.env`.
+Ce guide décrit l'exploitation de Carta Cocktail v1.21 avec les images publiées (`docker-compose.prod.yml`) : installation, sauvegardes, mises à jour, retour arrière, secrets et HTTPS. Les commandes se lancent depuis le dossier qui contient `docker-compose.prod.yml` et `.env`.
 
 Références :
 
@@ -22,14 +22,14 @@ Références :
 
    ```bash
    mkdir carta-cocktail && cd carta-cocktail
-   curl -fsSLO https://raw.githubusercontent.com/Lulu300/carta-cocktail/v1.20.0/docker-compose.prod.yml
+   curl -fsSLO https://raw.githubusercontent.com/Lulu300/carta-cocktail/v1.21.0/docker-compose.prod.yml
    ```
 
-2. Épingler la version : dans `docker-compose.prod.yml`, remplacer `:latest` par `:1.20` sur les deux lignes `image:`. `:1.20` suit les correctifs 1.20.x ; `:1.20.0` ne bouge jamais. Avec `:latest`, un `pull` peut installer une version dont vous n'avez pas lu les actions obligatoires.
+2. Épingler la version : dans `docker-compose.prod.yml`, remplacer `:latest` par `:1.21` sur les deux lignes `image:`. `:1.21` suit les correctifs 1.21.x ; `:1.21.0` ne bouge jamais. Avec `:latest`, un `pull` peut installer une version dont vous n'avez pas lu les actions obligatoires.
 
    ```yaml
-   image: ghcr.io/lulu300/carta-cocktail/backend:1.20
-   image: ghcr.io/lulu300/carta-cocktail/frontend:1.20
+   image: ghcr.io/lulu300/carta-cocktail/backend:1.21
+   image: ghcr.io/lulu300/carta-cocktail/frontend:1.21
    ```
 
 3. Créer `.env` à côté du fichier compose. `JWT_SECRET` (32 caractères au moins) et `ADMIN_PASSWORD` (12 caractères au moins) sont obligatoires : `docker compose` refuse de démarrer sans `JWT_SECRET`, et le backend refuse un secret trop court ou connu.
@@ -58,7 +58,7 @@ Références :
    curl -s http://localhost/api/health
    ```
 
-   Réponse attendue : `{"status":"ok","version":"1.20.0"}`. Le site répond sur le port 80 de l'hôte. Pour un autre port, changer `"80:8080"` en `"<port>:8080"` dans le service `carta-cocktail-frontend` : nginx écoute sur 8080 dans le conteneur.
+   Réponse attendue : `{"status":"ok","version":"1.21.0"}`. Le site répond sur le port 80 de l'hôte. Pour un autre port, changer `"80:8080"` en `"<port>:8080"` dans le service `carta-cocktail-frontend` : nginx écoute sur 8080 dans le conteneur.
 
 Le backend tourne sous l'uid 1000, le frontend (nginx) sous l'uid 101. Les volumes nommés n'ont besoin de rien. Pour des dossiers de l'hôte ou un partage réseau (SMB/NFS) à la place des volumes, voir [README › "Data folders and the node user"](../README.md#data-folders-and-the-node-user) et `SQLITE_WAL=false` dans [README › "Database files and network shares"](../README.md#database-files-and-network-shares).
 
@@ -122,10 +122,11 @@ Dans Paramètres > Sauvegarde & Restauration (Settings > Backup & Restore) :
 > **Attention : destructif.** La restauration remplace **toutes** les données actuelles. Le backend garde une copie de la base remplacée dans `/app/data/backups/pre-restore-<date>.db`, mais pas des photos : exportez d'abord une sauvegarde.
 
 - Une restauration termine toutes les sessions, y compris celle qui l'a lancée : reconnectez-vous avec l'email et le mot de passe enregistrés dans la sauvegarde.
+- Une sauvegarde ne contient aucun [jeton d'API](#jetons-dapi-scripts-et-clients-mcp), et une restauration les supprime tous : recréez ensuite ceux de vos scripts.
 - Une sauvegarde dont la base vient d'une version plus récente (migration inconnue de la version installée) est refusée : mettez d'abord l'application à jour. Une sauvegarde d'une version plus ancienne peut demander un redémarrage du backend (quand son schéma est plus ancien ; l'interface l'indique) : voir [UPGRADING › "Restoring a backup from an older version"](../UPGRADING.md#restoring-a-backup-from-an-older-version).
 - Le ZIP à restaurer ne doit pas dépasser 200 Mo, cette taille comprise (limite du backend, `MAX_BACKUP_UPLOAD_BYTES` ; nginx accepte jusqu'à 210 Mo pour laisser passer l'enveloppe multipart). L'export et la restauration sont limités à 10 requêtes en 15 minutes.
 
-Les mêmes opérations passent par l'API, avec le jeton de `POST /api/auth/login` : `GET /api/backup/export` et `POST /api/backup/import` (champ multipart `backup`).
+Les mêmes opérations passent par l'API, avec le jeton de `POST /api/auth/login` : `GET /api/backup/export` et `POST /api/backup/import` (champ multipart `backup`). Un jeton d'API n'y a pas accès : la sauvegarde contient le hash du mot de passe admin.
 
 ### Export automatique par cron
 
@@ -162,11 +163,37 @@ Puis, avec `crontab -e` (root) :
 
 Pensez à mettre à jour `CARTA_PASSWORD` quand vous changez le mot de passe admin : chaque échec de connexion compte dans la limite de `LOGIN_RATE_LIMIT` (10 échecs en 15 minutes par adresse) ; au-delà, toute connexion venant de la même adresse est refusée pendant 15 minutes au plus.
 
+## Appeler l'API
+
+La page **API** de l'admin documente chaque route : ce qu'elle accepte, ce qu'elle renvoie et ses erreurs. Son bouton de test envoie la requête avec la session ouverte : la requête est réelle et modifie les données. La page lit un document OpenAPI 3.1, que des outils (générateurs de clients, Postman, Insomnia…) savent aussi importer :
+
+- `GET /api/openapi.json`, sans connexion : les routes qu'un client appelle sans session (cartes publiées, connexion, état de santé) ;
+- `GET /api/openapi/full.json`, avec un jeton : toutes les routes.
+
+Les routes de l'admin demandent un jeton dans l'en-tête `Authorization: Bearer <jeton>` : un [jeton d'API](#jetons-dapi-scripts-et-clients-mcp) créé dans Paramètres, le plus simple pour un script ou un client MCP, ou un jeton de session (JWT), donné par `POST /api/auth/login`. Le document OpenAPI décrit les deux (`apiToken` et `bearerAuth`) et, route par route, celles qui n'acceptent que la session. Avec un jeton de session, `curl` et `jq`, et les variables `CARTA_URL`, `CARTA_EMAIL` et `CARTA_PASSWORD` du script de sauvegarde ci-dessus :
+
+```sh
+LOGIN=$(jq -n --arg email "$CARTA_EMAIL" --arg password "$CARTA_PASSWORD" '{email: $email, password: $password}')
+TOKEN=$(curl -fsS -X POST -H 'Content-Type: application/json' -d "$LOGIN" "$CARTA_URL/api/auth/login" | jq -r .token)
+
+# Read: the units, then the document of every route
+curl -fsS -H "Authorization: Bearer $TOKEN" "$CARTA_URL/api/units"
+curl -fsS -H "Authorization: Bearer $TOKEN" -o carta-openapi.json "$CARTA_URL/api/openapi/full.json"
+
+# Write: a JSON body, as the document describes it
+curl -fsS -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"name": "Lime", "icon": "🍋"}' "$CARTA_URL/api/ingredients"
+```
+
+- Le jeton de session vaut une session de l'admin, avec tous ses droits : gardez-le comme le mot de passe. Il expire au bout de `JWT_EXPIRES_IN` (7 jours par défaut) et prend fin plus tôt quand le mot de passe change, avec « Se déconnecter partout » ou après la restauration d'une sauvegarde : le script se reconnecte alors.
+- Une erreur répond toujours en JSON `{ "error": "…", "details": … }` : `error` est un message dans la langue de l'en-tête `Accept-Language` (anglais par défaut), `details` précise certaines erreurs (champs refusés d'une requête invalide, éléments qui bloquent une suppression).
+- Les limites de requêtes s'appliquent comme dans l'interface (`API_RATE_LIMIT` par minute et par adresse, 10 sauvegardes en 15 minutes) : au-delà, l'API répond 429 avec l'en-tête `Retry-After`, en secondes.
+
 ## Mise à jour
 
 1. Lire les sections d'[`UPGRADING.md`](../UPGRADING.md) de toutes les versions entre la vôtre et la nouvelle, et faire leurs actions « Before upgrading ». Ce guide ne les recopie pas.
 2. Sauvegarder : export depuis l'admin, ou [sauvegarde à froid](#sauvegarde-à-froid-des-volumes).
-3. Changer le tag des deux lignes `image:` de `docker-compose.prod.yml` (par exemple `:1.19` → `:1.20`). Avec un tag `:X.Y`, les correctifs de la même mineure arrivent par un simple `pull`. Si la version demande un nouveau fichier compose, téléchargez celui de son tag et remettez-y vos modifications (port, volumes). Les variables facultatives (`SQLITE_WAL`, `TRUST_PROXY`, limites de débit…) restent dans `.env` : si vous les aviez ajoutées à la liste `environment` d'un fichier compose de la v1.15.0 ou plus ancien, mettez-les dans `.env` au lieu de les remettre dans le nouveau fichier.
+3. Changer le tag des deux lignes `image:` de `docker-compose.prod.yml` (par exemple `:1.20` → `:1.21`). Avec un tag `:X.Y`, les correctifs de la même mineure arrivent par un simple `pull`. Si la version demande un nouveau fichier compose, téléchargez celui de son tag et remettez-y vos modifications (port, volumes). Les variables facultatives (`SQLITE_WAL`, `TRUST_PROXY`, limites de débit…) restent dans `.env` : si vous les aviez ajoutées à la liste `environment` d'un fichier compose de la v1.15.0 ou plus ancien, mettez-les dans `.env` au lieu de les remettre dans le nouveau fichier.
 4. Télécharger et redémarrer :
 
    ```bash
@@ -235,7 +262,7 @@ Revenir à une version v1.11.x ou plus ancienne demande aussi son propre fichier
 
 ## Rotation de `JWT_SECRET`
 
-`JWT_SECRET` signe les sessions de l'admin. Le changer déconnecte toutes les sessions ouvertes, sur tous les appareils ; les données ne changent pas. À faire si le secret a fuité, et après avoir remis une base à la main (restauration à froid, copie `pre-migrate` ou `pre-restore`).
+`JWT_SECRET` signe les sessions de l'admin. Le changer déconnecte toutes les sessions ouvertes, sur tous les appareils ; les données ne changent pas. Les jetons d'API n'en dépendent pas : révoquez-les dans Paramètres, ou tous à la fois avec « Se déconnecter partout ». À faire si le secret a fuité, et après avoir remis une base à la main (restauration à froid, copie `pre-migrate` ou `pre-restore`). Une base remise à la main ramène aussi les jetons d'API qu'elle contenait (une copie `pre-restore-*.db` garde leurs hash) : révoquez-les ensuite, dans Paramètres ou avec « Se déconnecter partout ».
 
 1. Générer un nouveau secret : `openssl rand -hex 32`.
 2. Remplacer la valeur de `JWT_SECRET` dans `.env`.
@@ -290,6 +317,186 @@ Depuis la console du navigateur (F12 > Console, sur une page du site), ces deux 
 navigator.serviceWorker.getRegistrations().then((list) => list.forEach((r) => r.unregister()));
 caches.keys().then((names) => names.forEach((name) => caches.delete(name)));
 ```
+
+## Jetons d'API (scripts et clients MCP)
+
+Un jeton d'API permet à un script ou à un client MCP ([serveur MCP](#serveur-mcp-agents-ia)) d'appeler l'API sans le mot de passe admin ni la session du navigateur.
+
+**Créer un jeton.** Admin > Paramètres > « Jetons d'API » (Settings > API tokens) :
+
+1. Donner un nom qui dit ce qui l'utilise (« Home Assistant », « MCP sur mon portable »).
+2. Choisir l'accès :
+   - **Lecture seule** : requêtes `GET` et `HEAD` seulement ; toute autre méthode reçoit `403` ;
+   - **Lecture et écriture** : toute l'API, sauf les routes réservées à la session (plus bas).
+3. Choisir la durée : 30, 90 (par défaut) ou 365 jours. Un jeton expire toujours.
+4. Cliquer sur « Créer le jeton », puis le copier : il commence par `carta_` et **n'est affiché qu'une fois**. La base n'en garde que le hash (SHA-256) ; la liste montre son nom et ses 4 derniers caractères.
+
+**Appeler l'API.** Le jeton passe dans l'en-tête `Authorization`, comme une session :
+
+```sh
+CARTA_TOKEN='carta_…'   # le jeton copié dans Paramètres
+curl -fsS -H "Authorization: Bearer $CARTA_TOKEN" https://carte.mon-bar.fr/api/cocktails
+# Avec un jeton en lecture et écriture : met une bouteille à 40 %
+curl -fsS -X PUT -H "Authorization: Bearer $CARTA_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"remainingPercent": 40}' https://carte.mon-bar.fr/api/bottles/12
+```
+
+- **Routes réservées à la session**, refusées à tout jeton (`403`) : la gestion des jetons (`/api/api-tokens`), le compte admin (`PUT /api/settings/profile`), « Se déconnecter partout » (`POST /api/auth/logout-all`) et les sauvegardes (`/api/backup`). Un script de sauvegarde se connecte donc avec l'email et le mot de passe ([export par cron](#export-automatique-par-cron)).
+- Un jeton révoqué, expiré ou inconnu reçoit `401`. La liste garde les jetons expirés, marqués « Expiré », jusqu'à leur révocation. Au plus 20 jetons non expirés.
+- La limite de l'API (`API_RATE_LIMIT`, 600 requêtes par minute et par adresse) compte aussi les requêtes des jetons.
+- **Révoquer** un jeton dans la liste le supprime : il est refusé à la requête suivante. « Se déconnecter partout » supprime **tous** les jetons, en plus des sessions, comme la restauration d'une sauvegarde. Changer le mot de passe ou `JWT_SECRET` ne les touche pas.
+
+## Serveur MCP (agents IA)
+
+L'instance sert un serveur [MCP](https://modelcontextprotocol.io) (Model Context Protocol) à `https://<votre domaine>/api/mcp` : un agent IA (Claude Code, Claude Desktop, un agent Cloudflare…) y trouve des outils pour consulter la carte et le stock, et les modifier. Transport Streamable HTTP, sans session. La route passe par le proxy nginx de l'image frontend comme le reste de `/api/` : rien à configurer.
+
+**Jeton.** Créez un [jeton d'API](#jetons-dapi-scripts-et-clients-mcp) pour chaque client, nommé d'après lui (« Claude Code sur mon portable »). **Choisissez la lecture seule par défaut** : un agent a tous les droits de son jeton, et peut se tromper. Ne prenez la lecture et écriture que pour un agent qui doit écrire, et révoquez le jeton quand il ne sert plus. La session de l'admin (JWT) marche aussi, mais elle expire et donne tous les droits.
+
+**Outils.**
+
+| Outil | Jeton | Ce qu'il fait |
+| --- | --- | --- |
+| `list_cocktails`, `get_cocktail` | lecture seule | Cocktails et recettes |
+| `list_cocktail_availability`, `get_cocktail_availability` | lecture seule | Cocktails réalisables avec le stock, nombre de verres, ingrédients qui manquent |
+| `list_shortages` | lecture seule | Catégories sous leur stock souhaité (liste de courses) |
+| `list_bottles`, `get_bottle` | lecture seule | Bouteilles et niveau restant |
+| `list_categories`, `list_ingredients`, `list_units` | lecture seule | Ce qu'il faut pour écrire une recette |
+| `list_menus`, `get_menu` | lecture seule | Cartes et leur composition |
+| `update_bottle` | lecture et écriture | Ajuster le niveau d'une bouteille (ou un autre champ) |
+| `create_cocktail`, `update_cocktail` | lecture et écriture | Créer ou modifier un cocktail |
+| `update_menu` | lecture et écriture | Publier une carte, y ajouter ou en retirer des cocktails (ou des bouteilles, sur une carte personnelle) |
+| `exclude_menu_bottles`, `restore_menu_bottles` | lecture et écriture | Retirer des bouteilles des cartes Apéritifs et Digestifs, puis les remettre |
+| `preview_cocktail_import` | lecture et écriture | Aperçu de l'import d'un fichier de cocktail : n'écrit rien, mais l'API le reçoit en `POST` |
+
+- Un jeton en lecture seule ne voit pas les outils d'écriture.
+- Aucun outil ne supprime, ne restaure une sauvegarde ni ne « déconnecte partout » : ces actions restent dans l'admin.
+- Chaque outil appelle une route de l'API avec le même jeton : mêmes contrôles, et mêmes erreurs (statut, message, `details`), dans la langue de l'en-tête `Accept-Language` du client. Un appel d'outil compte pour deux requêtes dans `API_RATE_LIMIT` : celle du client MCP, et celle de l'outil vers l'API. Avec `TRUST_PROXY=0`, ou une liste qui n'inclut pas l'adresse du backend lui-même, la requête de l'outil vers l'API est comptée sous l'adresse du backend, dans un compteur partagé par tous les clients MCP.
+- Un outil attend la réponse de l'API 30 secondes au plus, puis répond une erreur `504`.
+- Les schémas d'entrée et de sortie des outils sont ceux de l'API (document OpenAPI), écrits en entier, sans référence : un client Code Mode en tire une API TypeScript.
+
+**Claude Code.** Remplacez l'adresse et le jeton :
+
+```sh
+claude mcp add --transport http carta https://carte.mon-bar.fr/api/mcp \
+  --header "Authorization: Bearer carta_…"
+```
+
+`--scope user` l'ajoute à tous vos projets, et `claude mcp list` vérifie la connexion.
+
+**Claude Desktop.** Ses connecteurs personnalisés ne prennent pas d'en-tête `Authorization` fixe : passez par le pont local [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) (Node.js requis). Dans `claude_desktop_config.json` (Paramètres > Développeur > Modifier la configuration), puis redémarrez Claude Desktop :
+
+```json
+{
+  "mcpServers": {
+    "carta": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://carte.mon-bar.fr/api/mcp",
+        "--header",
+        "Authorization:${CARTA_AUTH}"
+      ],
+      "env": { "CARTA_AUTH": "Bearer carta_…" }
+    }
+  }
+}
+```
+
+L'en-tête s'écrit sans espace après `Authorization:`, et le jeton passe par `env` : `mcp-remote` documente cette forme, car Claude Desktop coupe mal les arguments qui contiennent une espace sous Windows.
+
+**Client Code Mode (Cloudflare Agents SDK).** Sans [Code Mode côté serveur](#code-mode-côté-serveur-search-et-execute), le modèle écrit du code qui appelle les outils, exécuté dans un bac à sable de Cloudflare (Worker Loader) ; le serveur Carta reste un serveur MCP ordinaire. Dans un agent :
+
+```ts
+import { Agent } from 'agents';
+import { createCodeTool } from '@cloudflare/codemode/ai';
+import { DynamicWorkerExecutor } from '@cloudflare/codemode';
+
+export class BarAgent extends Agent<Env> {
+  async onStart() {
+    // Idempotent for the same name and URL. The headers are kept in the storage of the Durable Object.
+    await this.addMcpServer('carta', 'https://carte.mon-bar.fr/api/mcp', {
+      id: 'carta',
+      transport: {
+        type: 'streamable-http',
+        headers: { Authorization: `Bearer ${this.env.CARTA_MCP_TOKEN}` },
+      },
+    });
+  }
+
+  async codeTool() {
+    await this.mcp.waitForConnections({ timeout: 10_000 });
+    return createCodeTool({
+      tools: this.mcp.getAITools({ serverId: 'carta' }),
+      executor: new DynamicWorkerExecutor({ loader: this.env.LOADER }),
+    });
+  }
+}
+```
+
+Avec, dans `wrangler.jsonc`, `"compatibility_flags": ["nodejs_compat"]` et `"worker_loaders": [{ "binding": "LOADER" }]`, et le jeton en secret : `npx wrangler secret put CARTA_MCP_TOKEN`. L'outil rendu par `codeTool()` se donne au modèle comme tout outil du SDK AI (`streamText({ tools: { codemode } })`). Le SDK Code Mode est marqué expérimental par Cloudflare : vérifiez sa documentation.
+
+Quand [Code Mode côté serveur](#code-mode-côté-serveur-search-et-execute) est activé, le code tourne chez Carta : l'agent n'a plus besoin de `createCodeTool`, ni de Worker Loader ni de `DynamicWorkerExecutor`. Il donne au modèle les outils du serveur, `search` et `execute` compris :
+
+```ts
+const result = streamText({
+  model,
+  tools: this.mcp.getAITools({ serverId: 'carta' }),
+  prompt: 'Which spirits are almost empty?',
+});
+```
+
+### Code Mode côté serveur (`search` et `execute`)
+
+En plus des outils ci-dessus, le serveur peut exposer les deux outils du [Code Mode de Cloudflare](https://developers.cloudflare.com/agents/model-context-protocol/codemode/), avec les mêmes noms : l'agent écrit une courte fonction JavaScript, et le serveur l'exécute.
+
+- `search({ code })` : le code lit le document OpenAPI des opérations que ce jeton peut appeler, avec `await codemode.spec()` (références `$ref` déjà résolues), et ne renvoie que ce qu'il cherche. Pas de réseau.
+- `execute({ code })` : le code appelle l'API avec `await codemode.request({ method, path, query, body })`, qui répond `{ status, body }`. Une réponse d'erreur rejette la promesse avec une `Error` qui porte le `status` et le `body` de l'API (`{ error, details }`).
+
+**Désactivé par défaut.** Admin > Paramètres > « Serveur MCP : Code Mode » l'active, après confirmation, et le désactive. Le changement vaut dès la requête MCP suivante : désactivé, `search` et `execute` disparaissent de la liste des outils, et les appeler échoue. Seule la session de l'admin peut changer ce réglage (`PUT /api/settings/code-mode`) : aucun jeton d'API, même en lecture et écriture, ne peut activer l'exécution de code.
+
+**Risques.** Le code écrit par l'agent s'exécute sur le serveur, avec les droits de son jeton. Il tourne dans un bac à sable, [QuickJS](https://github.com/justjake/quickjs-emscripten) compilé en WebAssembly, jamais dans le moteur de Node : il n'a ni `require`, ni `process`, ni `fetch`, ni système de fichiers, ni minuteries. Chaque exécution a son propre fil d'exécution (worker thread de Node), arrêté à la fin ou dès qu'une limite est atteinte, où que soit le code : le serveur continue de répondre pendant que le code calcule. `codemode.request()` est sa seule sortie, et elle a le même périmètre que les outils :
+
+- les opérations admin du document OpenAPI seulement, sans les routes qui prennent un fichier (photo, import de bouteilles) ;
+- jamais de `DELETE`, ni les routes réservées à la session (jetons, compte, « Se déconnecter partout », sauvegardes, ce réglage), même avec la session de l'admin ;
+- un jeton en lecture seule n'écrit pas ;
+- chaque requête passe par l'API avec le même jeton : mêmes contrôles, même limite `API_RATE_LIMIT` (un appel d'`execute` compte pour une requête, plus une par `codemode.request()`), mêmes erreurs, et 30 secondes au plus par requête.
+
+Activez-le seulement pour des agents de confiance, et gardez des jetons en lecture seule quand ils n'ont pas à écrire.
+
+**Limites d'une exécution.**
+
+| Limite | Valeur | Au-delà |
+| --- | --- | --- |
+| Durée | 10 s, démarrage et attente des requêtes compris | Erreur, l'exécution est arrêtée et ses requêtes annulées |
+| Calcul | 1 s de calcul du code (hors attente des requêtes) | Erreur, l'exécution est arrêtée, même dans une fonction native de QuickJS |
+| Mémoire | 64 Mo pour QuickJS, 96 Mo au plus de mémoire WebAssembly | `out of memory` dans le code |
+| Pile | 128 Kio | `stack overflow` dans le code ; une récursion que QuickJS ne contrôle pas arrête l'exécution |
+| Code reçu | 20 000 caractères | Erreur, rien n'est exécuté |
+| Appels au serveur | 50 par exécution, `codemode.spec()` compris (le document ne passe qu'une fois) | Les suivants rejettent avec le statut `429` |
+| Argument d'un appel | 5 Mo de JSON | L'appel rejette, sans être envoyé |
+| Réponse | 24 000 caractères (environ 6 000 tokens, comme chez Cloudflare) | Coupée, avec la marque `--- TRUNCATED ---` |
+| Exécutions simultanées | 2, et 4 en attente | Les suivantes sont refusées aussitôt : erreur `429` (« Le serveur exécute déjà autant de code qu'il le peut »), à réessayer |
+
+Chaque exécution démarre son fil d'exécution : environ 20 ms avant que le code ne tourne (mesuré dans l'image sur un processeur arm64 récent ; davantage sur une machine lente).
+
+**Exemples d'appel.** Arguments de `search`, pour lister les opérations :
+
+```json
+{
+  "code": "async () => { const spec = await codemode.spec(); return Object.entries(spec.paths).flatMap(([path, methods]) => Object.keys(methods).map((method) => `${method.toUpperCase()} ${path}`)); }"
+}
+```
+
+Arguments d'`execute`, pour les spiritueux presque vides :
+
+```json
+{
+  "code": "async () => { const { body } = await codemode.request({ method: 'GET', path: '/api/bottles', query: { type: 'SPIRIT' } }); return body.filter((b) => b.remainingPercent < 20).map(({ id, name, remainingPercent }) => ({ id, name, remainingPercent })); }"
+}
+```
+
+Le réglage est enregistré dans la base, mais une restauration le désactive toujours, quelle que soit la valeur de la sauvegarde : comme les jetons d'API, qu'elle supprime, un réglage qui permet d'exécuter du code ne revient pas en silence depuis une autre instance. Réactivez-le dans Paramètres si besoin.
 
 ## Intégrer la carte dans le site du bar
 

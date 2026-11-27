@@ -103,6 +103,12 @@ RUN node -e "const sharp = require('sharp'); \
     const pixel = () => sharp({ create: { width: 1, height: 1, channels: 3, background: '#000' } }); \
     Promise.all([pixel().webp().toBuffer(), pixel().jpeg().toBuffer()]).catch((error) => { \
       console.error(error); process.exit(1); })"
+# Same for the sandbox of Code Mode (MCP server), QuickJS compiled to WebAssembly: no native
+# binary, but its .wasm file must be in the image and run on the platform.
+RUN node -e "require('quickjs-emscripten-core').newQuickJSWASMModuleFromVariant( \
+      require('@jitl/quickjs-wasmfile-release-sync').default).then((quickjs) => { \
+      if (quickjs.evalCode('6 * 7') !== 42) throw new Error('QuickJS answered wrong'); }) \
+    .catch((error) => { console.error(error); process.exit(1); })"
 
 FROM node:26.13-alpine AS runtime
 # tini forwards SIGTERM to the entrypoint, then to Node once the entrypoint has exec'd it

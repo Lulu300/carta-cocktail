@@ -90,6 +90,19 @@ json_field() {
   jq -er "$1" "$BODY" || fail "no $1 in the response: $(body_excerpt)"
 }
 
+# The JSON-RPC message of an MCP answer, sent as JSON or as one server-sent event
+mcp_message() {
+  if [[ "$(header content-type)" == text/event-stream* ]]; then
+    sed -n 's/^data: //p' "$BODY"
+  else
+    cat "$BODY"
+  fi
+}
+
+mcp_field() {
+  mcp_message | jq -er "$1" || fail "no $1 in the MCP answer: $(body_excerpt)"
+}
+
 # Random noise does not compress: the PNG stays around 2.4 MB, above the 1 MB nginx default.
 write_png() {
   python3 - "$1" <<'PY'
@@ -151,6 +164,25 @@ auth=(-H "Authorization: Bearer $token")
 step "GET /api/cocktails without a token is refused"
 request GET /api/cocktails
 expect_status 401
+
+step "The MCP endpoint answers a read-only API token"
+request POST /api/api-tokens "${auth[@]}" -H 'Content-Type: application/json' \
+  --data '{"name":"Smoke MCP","scope":"READ_ONLY","expiresInDays":30}'
+expect_status 201
+mcp_token_id="$(json_field .id)"
+mcp=(-H "Authorization: Bearer $(json_field .token)" -H 'Content-Type: application/json'
+  -H 'Accept: application/json, text/event-stream')
+request POST /api/mcp "${mcp[@]}" --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"smoke","version":"1"}}}'
+expect_status 200
+[[ "$(mcp_field .result.serverInfo.name)" == "carta-cocktail" ]] || fail "not the Carta MCP server: $(body_excerpt)"
+request POST /api/mcp "${mcp[@]}" --data '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+expect_status 200
+tool_names="$(mcp_field '[.result.tools[].name] | join(" ")')"
+[[ " $tool_names " == *" list_cocktails "* ]] || fail "list_cocktails is missing from the tools: $tool_names"
+[[ " $tool_names " != *" update_bottle "* ]] || fail "a read-only token sees update_bottle: $tool_names"
+# custom-uid.sh runs this script again: leave no token behind
+request DELETE "/api/api-tokens/$mcp_token_id" "${auth[@]}"
+expect_status 200
 
 step "POST /api/cocktails creates a cocktail"
 request POST /api/cocktails "${auth[@]}" -H 'Content-Type: application/json' --data '{"name":"Smoke test"}'

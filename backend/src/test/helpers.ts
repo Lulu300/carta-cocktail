@@ -4,11 +4,18 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import supertest from 'supertest';
 import { expect } from 'vitest';
+import {
+  Client,
+  type ClientOptions,
+  StreamableHTTPClientTransport,
+} from '@modelcontextprotocol/client';
 import type { z } from 'zod';
 import { Prisma } from '../generated/prisma/client';
 import app from '../app';
 import { prisma } from '../lib/prisma';
 import { configureServerTimeouts } from '../serverTimeouts';
+import { createApiToken } from '../services/apiTokenService';
+import type { ApiTokenCreate } from '../validation/apiTokens';
 import type { SourceType } from '../validation/cocktails';
 import type { MenuType } from '../validation/menus';
 
@@ -21,14 +28,24 @@ export const request = supertest(app);
  * request and headers timeouts shortened to `timeoutMs` and checked every few
  * milliseconds: a test sees in a second what takes minutes in production.
  */
-export async function listenWithShortTimeouts(
-  timeoutMs: number,
-): Promise<{ port: number; close: () => void }> {
+export async function listenWithShortTimeouts(timeoutMs: number): Promise<ListeningServer> {
   const server = http.createServer(
     { requestTimeout: timeoutMs, headersTimeout: timeoutMs, connectionsCheckingInterval: 10 },
     app,
   );
   configureServerTimeouts(server);
+  return listenOnLoopback(server);
+}
+
+export interface ListeningServer {
+  port: number;
+  close: () => void;
+}
+
+/** Starts `server` (the app by default) on a free port of 127.0.0.1, for a client that needs a real socket. */
+export async function listenOnLoopback(
+  server: http.Server = http.createServer(app),
+): Promise<ListeningServer> {
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   return {
     port: (server.address() as AddressInfo).port,
@@ -37,6 +54,22 @@ export async function listenWithShortTimeouts(
       server.close();
     },
   };
+}
+
+/**
+ * An MCP client of `endpoint` (the app listening on loopback), connected with `headers`. It is
+ * added to `clients` before it connects: the test closes them all, those that failed included.
+ */
+export async function connectMcpClient(
+  endpoint: URL,
+  headers: Record<string, string>,
+  clients: Client[],
+  options: ClientOptions = {},
+): Promise<Client> {
+  const client = new Client({ name: 'carta-test', version: '1.0.0' }, options);
+  clients.push(client);
+  await client.connect(new StreamableHTTPClientTransport(endpoint, { requestInit: { headers } }));
+  return client;
 }
 
 /**
@@ -151,6 +184,24 @@ export function getAuthToken(userId: number = 1, options: AuthTokenOptions = {})
  */
 export function authHeader(userId: number = 1): { Authorization: string } {
   return { Authorization: `Bearer ${getAuthToken(userId)}` };
+}
+
+export interface ApiTokenOptions extends Partial<z.output<typeof ApiTokenCreate>> {
+  /** When the token was created: an old date gives an expired token. Now by default. */
+  createdAt?: Date;
+}
+
+/**
+ * Creates an API token of the admin, read and write for 90 days by default, as the route
+ * does, and returns it with the Authorization header that sends it.
+ */
+export async function seedApiToken({ createdAt, ...input }: ApiTokenOptions = {}) {
+  const created = await createApiToken(
+    1,
+    { name: 'Script', scope: 'READ_WRITE', expiresInDays: 90, ...input },
+    createdAt,
+  );
+  return { ...created, header: { Authorization: `Bearer ${created.token}` } };
 }
 
 // ---- Seed factories ----

@@ -30,6 +30,8 @@
     "node": ">=26"
   },
   "dependencies": {
+    "@jitl/quickjs-wasmfile-release-sync": "^0.32.0",
+    "@modelcontextprotocol/server": "^2.4.0",
     "@prisma/adapter-better-sqlite3": "7.10.1",
     "@prisma/client": "7.10.1",
     "adm-zip": "^0.6.1",
@@ -47,6 +49,7 @@
     "morgan": "^1.12.1",
     "multer": "^2.5.0",
     "prisma": "7.10.1",
+    "quickjs-emscripten-core": "^0.32.0",
     "sharp": "^0.35.5",
     "yaml": "^2.9.1",
     "zod": "^4.6.7"
@@ -61,6 +64,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@modelcontextprotocol/client": "^2.4.0",
+    "@seriousme/openapi-schema-validator": "^2.12.0",
     "@types/archiver": "^8.0.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",

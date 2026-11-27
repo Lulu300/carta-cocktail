@@ -6,6 +6,7 @@ import {
   seedRequiredData,
   request,
   authHeader,
+  seedApiToken,
 } from '../test/helpers';
 import { resetRateLimits } from '../middleware/rateLimit';
 
@@ -87,6 +88,17 @@ describe(`API rate limit (API_RATE_LIMIT=${API_LIMIT})`, () => {
     expect((await getUnits('203.0.113.3')).status).toBe(429);
   });
 
+  it('limits the requests of an API token like those of a session', async () => {
+    const { header } = await seedApiToken({ scope: 'READ_ONLY' });
+    const withApiToken = () =>
+      request.get('/api/units').set('X-Forwarded-For', '203.0.113.8').set(header);
+    expect(await statusesOf(API_LIMIT, withApiToken)).toEqual(Array(API_LIMIT).fill(200));
+
+    const blocked = await withApiToken();
+    expect(blocked.status).toBe(429);
+    expect(blocked.body.error).toBe('Too many requests: try again in a few minutes');
+  });
+
   it('refuses a request beyond the limit before reading its body', async () => {
     await statusesOf(API_LIMIT, () => getUnits('203.0.113.4'));
 
@@ -119,6 +131,35 @@ describe(`API rate limit (API_RATE_LIMIT=${API_LIMIT})`, () => {
     expect((await firstClient()).status).toBe(429);
 
     expect((await getPublicSettings(`198.51.100.2, ${OUTER_PROXY_IP}`)).status).toBe(200);
+  });
+
+  it('counts an MCP tool call twice: the MCP request and the API request of its tool', async () => {
+    const { header } = await seedApiToken({ scope: 'READ_ONLY' });
+    const callTool = () =>
+      request
+        .post('/api/mcp')
+        .set('X-Forwarded-For', '203.0.113.9')
+        .set(header)
+        .set('Accept', 'application/json, text/event-stream')
+        .send({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: { name: 'list_units', arguments: {} },
+        });
+    const callsWithinLimit = Math.floor(API_LIMIT / 2);
+    for (let sent = 0; sent < callsWithinLimit; sent++) {
+      expect((await callTool()).text).not.toContain('isError');
+    }
+
+    // The MCP request is the last one the limit allows: the API request of the tool is refused
+    const lastCall = await callTool();
+    expect(lastCall.status).toBe(200);
+    expect(lastCall.text).toContain('"isError":true');
+    expect(lastCall.text).toContain('\\"status\\":429');
+    expect((await callTool()).status).toBe(429);
+    // The same client address, whether it calls the API or the MCP endpoint
+    expect((await getUnits('203.0.113.9')).status).toBe(429);
   });
 
   it('never limits /api/health', async () => {

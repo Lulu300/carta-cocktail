@@ -4,9 +4,10 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import { config } from './config';
 import { i18nMiddleware } from './i18n';
-import { authMiddleware } from './middleware/auth';
+import { authMiddleware, protocolAuthMiddleware, refuseApiTokens } from './middleware/auth';
 import { apiNotFoundHandler, errorHandler } from './middleware/errorHandler';
 import { createRateLimiter } from './middleware/rateLimit';
+import { mountApiRouter } from './openapi/mounts';
 import authRoutes from './routes/auth';
 import categoryRoutes from './routes/categories';
 import categoryTypeRoutes from './routes/categoryTypes';
@@ -24,6 +25,9 @@ import settingsRoutes from './routes/settings';
 import backupRoutes from './routes/backup';
 import healthRoutes from './routes/health';
 import systemRoutes from './routes/system';
+import openapiRoutes from './routes/openapi';
+import apiTokenRoutes from './routes/apiTokens';
+import mcpRoutes from './routes/mcp';
 
 const LOGIN_RATE_WINDOW_MS = 15 * 60_000;
 const API_RATE_WINDOW_MS = 60_000;
@@ -52,7 +56,7 @@ app.use(
 app.use(cors({ origin: config.corsOrigin || false }));
 // Before the request logger: the Docker healthcheck calls it every 30 s and would fill the logs.
 // Public, like /api/auth and /api/public: Docker calls it without a token.
-app.use('/api/health', healthRoutes);
+mountApiRouter(app, '/api/health', healthRoutes);
 // Request logs would bury the test results
 if (process.env.NODE_ENV !== 'test') {
   app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
@@ -68,6 +72,19 @@ const apiLimiter = createRateLimiter({
   messageKey: 'errors.tooManyRequests',
 });
 app.use('/api', apiLimiter);
+// Routes an API token may never call, whatever its scope (F-16): the tokens themselves, the
+// admin account, signing out everywhere, the backups (a backup holds the password hash,
+// a restore replaces everything) and Code Mode of the MCP server (it runs a token's code on the
+// server). Matched by Express like the routers below, case and trailing slash included. Before
+// the body parsers: refused without reading the body.
+const SESSION_ONLY_ROUTES = [
+  '/api/api-tokens',
+  '/api/settings/profile',
+  '/api/settings/code-mode',
+  '/api/auth/logout-all',
+  '/api/backup',
+];
+app.use(SESSION_ONLY_ROUTES, refuseApiTokens);
 // The confirmation of a bottle import sends back up to 2,000 rows and their resolutions: about
 // 2 MB at most, far above the default 100 kB. Read here, before the global parser (which skips a
 // body already read) and before authMiddleware: the limit stays at a few MB, under nginx's 20 MB.
@@ -87,23 +104,30 @@ app.use('/api/auth/login', loginLimiter);
 app.use('/uploads', express.static(config.uploadDir));
 
 // Public routes (no auth)
-app.use('/api/auth', authRoutes);
-app.use('/api/public', publicRoutes);
+mountApiRouter(app, '/api/auth', authRoutes);
+mountApiRouter(app, '/api/public', publicRoutes);
+// GET /api/openapi.json (public routes), GET /api/openapi/full.json (admin)
+mountApiRouter(app, '/api', openapiRoutes);
 
 // Protected routes
-app.use('/api/category-types', authMiddleware, categoryTypeRoutes);
-app.use('/api/categories', authMiddleware, categoryRoutes);
-app.use('/api/bottles', authMiddleware, bottleRoutes);
-app.use('/api/ingredients', authMiddleware, ingredientRoutes);
-app.use('/api/units', authMiddleware, unitRoutes);
-app.use('/api/cocktails', authMiddleware, cocktailRoutes);
-app.use('/api/menus', authMiddleware, menuRoutes);
-app.use('/api/menu-bottles', authMiddleware, menuBottleRoutes);
-app.use('/api/menu-sections', authMiddleware, menuSectionRoutes);
-app.use('/api/shortages', authMiddleware, shortageRoutes);
-app.use('/api/availability', authMiddleware, availabilityRoutes);
-app.use('/api/settings', authMiddleware, settingsRoutes);
-app.use('/api/system', authMiddleware, systemRoutes);
+mountApiRouter(app, '/api/category-types', authMiddleware, categoryTypeRoutes);
+mountApiRouter(app, '/api/categories', authMiddleware, categoryRoutes);
+mountApiRouter(app, '/api/bottles', authMiddleware, bottleRoutes);
+mountApiRouter(app, '/api/ingredients', authMiddleware, ingredientRoutes);
+mountApiRouter(app, '/api/units', authMiddleware, unitRoutes);
+mountApiRouter(app, '/api/cocktails', authMiddleware, cocktailRoutes);
+mountApiRouter(app, '/api/menus', authMiddleware, menuRoutes);
+mountApiRouter(app, '/api/menu-bottles', authMiddleware, menuBottleRoutes);
+mountApiRouter(app, '/api/menu-sections', authMiddleware, menuSectionRoutes);
+mountApiRouter(app, '/api/shortages', authMiddleware, shortageRoutes);
+mountApiRouter(app, '/api/availability', authMiddleware, availabilityRoutes);
+mountApiRouter(app, '/api/settings', authMiddleware, settingsRoutes);
+mountApiRouter(app, '/api/system', authMiddleware, systemRoutes);
+mountApiRouter(app, '/api/api-tokens', authMiddleware, apiTokenRoutes);
+// MCP clients (F-15): every MCP request is a POST, so the scope of an API token cannot follow
+// from the method. The endpoint hides the tools that write from a read-only token, and each tool
+// calls its API route with the same token, where authMiddleware checks the scope again.
+mountApiRouter(app, '/api/mcp', protocolAuthMiddleware, mcpRoutes);
 // The backup limit counts authenticated requests only: authMiddleware already
 // refuses a request without a token at little cost, and the API limit covers
 // floods without one. Counting them here would let anyone who shares the admin's
@@ -114,7 +138,7 @@ const backupLimiter = createRateLimiter({
   limit: BACKUP_RATE_LIMIT,
   messageKey: 'errors.tooManyRequests',
 });
-app.use('/api/backup', authMiddleware, backupLimiter, backupRoutes);
+mountApiRouter(app, '/api/backup', authMiddleware, backupLimiter, backupRoutes);
 
 // Unknown API paths answer JSON, not Express's HTML page
 app.use('/api', apiNotFoundHandler);

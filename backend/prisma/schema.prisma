@@ -20,6 +20,28 @@ model User {
   createdAt    DateTime @default(now())
   // Copied into each token; incrementing it revokes every token issued before
   tokenVersion Int      @default(0)
+
+  apiTokens ApiToken[]
+}
+
+// Token of a script or an MCP client (F-16), sent as `Authorization: Bearer carta_...`.
+// Only the SHA-256 hash of the secret is stored: the token itself is shown once, when it
+// is created. Revoking a token deletes its row. Never exported in a backup.
+model ApiToken {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  tokenHash  String    @unique
+  // Last characters of the token, so that the admin can tell tokens apart in the list
+  lastFour   String
+  scope      String    // READ_ONLY, READ_WRITE
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime
+  // Updated at most once a minute per token, not at every request
+  lastUsedAt DateTime?
+
+  @@index([userId])
 }
 
 model CategoryType {
@@ -234,6 +256,9 @@ model SiteSettings {
   // Sites allowed to show the public menu in an iframe: origins separated by one space, the
   // format of a CSP source list (services/embedOrigins.ts). Empty: no site.
   embedOrigins String @default("")
+  // Code Mode of the MCP server (F-15): the `search` and `execute` tools, which run code written
+  // by an AI agent in a sandbox on the server. Off until the admin turns it on in Settings.
+  codeModeEnabled Boolean @default(false)
 }
 
 // State of the instance itself, not of its content: a single row (id = 1). A

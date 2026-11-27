@@ -112,11 +112,11 @@ Coverage is enforced automatically by CI. Run `npm test -- --coverage` in either
 - The Node jobs run on Node 26, the version used by the Docker images (`.nvmrc`); `engines` in both `package.json` require Node >= 26
 
 **Smoke** (`.github/workflows/smoke.yml`) — runs on PRs to `main`/`develop`, on demand, and as the `smoke` job of the release workflow:
-- Builds and starts `docker-compose.yml`, then runs `scripts/smoke/smoke.sh` through nginx: login, 2.4 MB photo upload, photo still served after the backend container is recreated, backup export, link preview of a public menu for a messaging robot. Then `scripts/smoke/custom-uid.sh` recreates the backend with `CARTA_UID`/`CARTA_GID`: refused on volumes of uid 1000, then started after a `chown`, and `smoke.sh` again
+- Builds and starts `docker-compose.yml`, then runs `scripts/smoke/smoke.sh` through nginx: login, MCP `initialize` and `tools/list` with a read-only API token, 2.4 MB photo upload, photo still served after the backend container is recreated, backup export, link preview of a public menu for a messaging robot. Then `scripts/smoke/custom-uid.sh` recreates the backend with `CARTA_UID`/`CARTA_GID`: refused on volumes of uid 1000, then started after a `chown`, and `smoke.sh` again
 - Locally, always in a dedicated compose project: `export COMPOSE_PROJECT_NAME=carta-smoke JWT_SECRET=$(openssl rand -hex 32) ADMIN_PASSWORD=$(openssl rand -hex 16)`, then `docker compose -p carta-smoke up -d --build --wait && ./scripts/smoke/smoke.sh`, then `docker compose -p carta-smoke down -v --remove-orphans --rmi local`, all in the same shell call (`smoke.sh` reads `COMPOSE_PROJECT_NAME` to recreate the backend). The default project is your local stack: `down -v` would delete its data (see the header of `smoke.sh`)
 
 **E2E** (`.github/workflows/e2e.yml`, folder `e2e/`) — runs on PRs to `develop` and on demand. Not a required check yet (it becomes one after a few stable weeks):
-- Builds and starts `docker-compose.yml` like Smoke, then runs the Playwright journeys in Chromium (`npm test` in `e2e/`): sign-in and sign-out, expired token, category → bottle → cocktail with a photo, menu with a section published and read by a guest, personal bottle menu, search, light theme, 404 page, offline menu, backup export and restore. The `*.public.spec.ts` files also run on a Pixel 7 profile (Chromium too). A failure uploads the Playwright report (trace and screenshot of each failed test) and the container logs
+- Builds and starts `docker-compose.yml` like Smoke, then runs the Playwright journeys in Chromium (`npm test` in `e2e/`): sign-in and sign-out, expired token, category → bottle → cocktail with a photo, menu with a section published and read by a guest, personal bottle menu, search, light theme, 404 page, offline menu, backup export and restore, API page (OpenAPI viewer under the CSP of nginx, test request with the session). The `*.public.spec.ts` files also run on a Pixel 7 profile (Chromium too). A failure uploads the Playwright report (trace and screenshot of each failed test) and the container logs
 - Locally, with a stack started in a dedicated compose project (`docker compose -p carta-e2e up -d --build --wait`, with `JWT_SECRET` and `ADMIN_PASSWORD` in the `.env` next to the compose file, which the config reads): `cd e2e && npm ci && npx playwright install chromium && npm test`, then `docker compose -p carta-e2e down -v --remove-orphans --rmi local`. `BASE_URL` points the tests elsewhere than `http://localhost`
 - Rules for new journeys: the test creates its data through the API (`support/api.ts`, `AdminApi`) with `uniqueName()` and clicks through the interface only for what it is about; the database is never reset and keeps the data of earlier runs, so a list is searched, never read from its first page; no retry (a flaky test is fixed, not retried). The admin signs in once (`auth.setup.ts`, the login route counts failed attempts and the backup routes allow 10 requests per 15 minutes: restart the backend container when a local loop hits them); the backup journey signs in again after the restore, which ends every session
 
@@ -172,6 +172,7 @@ MenuBottleExclusion     # Bottles the admin removed from a system menu (never sy
 MenuSection             # Menu groupings
 SiteSettings            # Site name + favicon emoji
 AppState                # Instance state: version that ran last, pending upgrade notice (kept live by a restore)
+ApiToken                # API tokens of scripts and MCP clients: name, SHA-256 hash, scope, expiry (never in a backup)
 ```
 
 ## Key Architectural Decisions
@@ -200,9 +201,11 @@ cd frontend && npm install && npm run dev
 
 ## API Structure
 
-- **Public** (no auth): `/api/auth/login`, `/api/public/*`, `/api/health` (Docker healthcheck: status and version), `/uploads/*` (photos)
-- **Protected** (JWT Bearer): All other `/api/*` routes, `/api/auth/me` and `/api/auth/logout-all` included
-- Auth middleware validates JWT and sets `req.userId`
+- **Public** (no auth): `/api/auth/login`, `/api/public/*`, `/api/health` (Docker healthcheck: status and version), `/api/openapi.json` (OpenAPI document of these public routes), `/uploads/*` (photos)
+- **Protected** (JWT Bearer): All other `/api/*` routes, `/api/auth/me`, `/api/auth/logout-all` and `/api/openapi/full.json` (OpenAPI document of every route) included
+- **MCP** (`/api/mcp`, F-15): Model Context Protocol over Streamable HTTP, with an API token or the session; each tool calls an API operation, and Code Mode's `search` and `execute` (off by default, a setting of the session) run the agent's code in a QuickJS sandbox (`backend/AGENTS.md`, "MCP server (F-15)")
+- **OpenAPI**: each route carries its declaration (`apiDocs()`, see `backend/AGENTS.md`); the document is generated from the routes and their zod schemas, and the admin reads it on the API page (`/admin/api`)
+- Auth middleware validates the session JWT or an API token (`Bearer carta_…`, created in Settings) and sets `req.userId`. A read-only token may only read; the token, account, Code Mode setting, `logout-all` and backup routes refuse every token (`SESSION_ONLY_ROUTES`, `backend/src/app.ts`)
 
 ## Languages
 

@@ -88,6 +88,7 @@ jobs:
           --ignore 'backend/src/scripts/seed.ts'
           --ignore 'backend/src/scripts/check-integrity.ts'
           --ignore 'backend/src/scripts/migration-state.ts'
+          --ignore 'backend/src/mcp/sandboxWorker.ts'
 
       - name: Upload backend coverage
         if: always()

@@ -19,8 +19,10 @@ import {
   prisma,
   seedUnit,
   expectContract,
+  seedApiToken,
 } from '../test/helpers';
 import { testImage } from '../test/images';
+import { ApiToken, CreatedApiToken } from '../validation/apiTokens';
 import { LoginResponse, User } from '../validation/auth';
 import { CocktailAvailabilities, CocktailAvailability } from '../validation/availability';
 import {
@@ -181,6 +183,16 @@ describe('response contracts of the public routes', () => {
     ]);
   });
 
+  it('PUT /api/settings/code-mode answers AdminSiteSettings', async () => {
+    const res = await request
+      .put('/api/settings/code-mode')
+      .set(authHeader())
+      .send({ enabled: true });
+
+    expect(res.status).toBe(200);
+    expect(expectContract(AdminSiteSettings, res.body).codeModeEnabled).toBe(true);
+  });
+
   it('GET /api/public/units answers Unit[]', async () => {
     await seedRecipe();
 
@@ -321,6 +333,29 @@ describe('response contracts of the auth routes', () => {
 
     expect(res.status).toBe(200);
     expectContract(MessageResponse, res.body);
+  });
+});
+
+describe('response contracts of the API token routes', () => {
+  it('POST answers CreatedApiToken, GET ApiToken[], DELETE MessageResponse', async () => {
+    const created = await request
+      .post('/api/api-tokens')
+      .set(authHeader())
+      .send({ name: 'MCP', scope: 'READ_ONLY', expiresInDays: 30 });
+    const { token, id } = expectContract(CreatedApiToken, created.body);
+    // Used once, so that the list fills lastUsedAt
+    await request.get('/api/units').set('Authorization', `Bearer ${token}`);
+    await seedApiToken({ name: 'Never used' });
+
+    const list = await request.get('/api/api-tokens').set(authHeader());
+    const revoked = await request.delete(`/api/api-tokens/${id}`).set(authHeader());
+
+    expect([created.status, list.status, revoked.status]).toEqual([201, 200, 200]);
+    const tokens = expectContract(z.array(ApiToken), list.body);
+    expect(tokens.map((listed) => listed.lastUsedAt === null)).toEqual(
+      expect.arrayContaining([true, false]),
+    );
+    expectContract(MessageResponse, revoked.body);
   });
 });
 

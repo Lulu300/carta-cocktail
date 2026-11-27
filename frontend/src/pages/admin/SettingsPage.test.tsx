@@ -231,6 +231,7 @@ describe('SettingsPage', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument();
     expect(screen.getByText('Site Configuration')).toBeInTheDocument();
     expect(screen.getByText('Admin Profile')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'API tokens' })).toBeInTheDocument();
     expect(screen.getByText('Backup & Restore')).toBeInTheDocument();
   });
 
@@ -278,6 +279,20 @@ describe('SettingsPage', () => {
     expect(await screen.findByText('Site settings updated')).toBeInTheDocument();
     // SiteSettingsProvider reloaded the public settings
     await waitFor(() => expect(document.title).toBe('New Bar Name'));
+  });
+
+  it('shows the stored Code Mode setting of the MCP server', async () => {
+    mockApiResponse(
+      'get',
+      '/api/settings',
+      buildAdminSiteSettings({ siteName: 'My Bar', codeModeEnabled: true }),
+    );
+    await renderLoadedPage();
+
+    expect(screen.getByRole('switch', { name: 'Code Mode' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
   });
 
   describe('sites allowed to embed the menu', () => {
@@ -382,6 +397,10 @@ describe('SettingsPage', () => {
       const dialog = await screen.findByRole('alertdialog', { name: 'Sign out everywhere' });
       expect(dialog).toHaveAccessibleDescription(
         'Every device, this one included, will be signed out and will need the password again. Use it when a device was lost or shared.',
+      );
+      // Decision of 2026-11-27 (F-16): the API tokens go too, and the dialog says so
+      expect(within(dialog).getByRole('status')).toHaveTextContent(
+        'Every API token will be deleted too: the scripts and MCP clients that use one will stop working until you create new tokens.',
       );
       await userEvent.click(within(dialog).getByRole('button', { name: buttonName }));
     }
