@@ -31,7 +31,7 @@ Instances older than v1.12.0: upgrade to v1.12.0 first, following the [v1.12.0 s
 Worth checking after the upgrade:
 
 - **Behind a reverse proxy or a CDN that caches**: `/sw.js` must not be cached, otherwise browsers keep an old version of the public menu.
-- **Rolling back to v1.18.x.** Pin the images back to `:1.18`; the database needs no restore. Browsers that visited v1.19 keep its service worker and may keep showing the v1.19 public menu: follow the removal steps of [`docs/operations.md`](docs/operations.md).
+- **Rolling back to v1.18.x.** Pin the images back to `:1.18`; the database needs no restore. Browsers that visited v1.19 keep its service worker and may keep showing the v1.19 public menu: v1.18 answers `/sw.js` with its home page, which browsers refuse as a worker, so they never remove it by themselves. Clear the site data on those browsers, as in [docs/operations.md › "Désinscrire un service worker bloqué"](docs/operations.md#désinscrire-un-service-worker-bloqué) (step 2).
 
 ## v1.18.0
 
