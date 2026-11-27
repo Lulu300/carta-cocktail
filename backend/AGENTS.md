@@ -110,7 +110,8 @@ backend/
 │   │                         # (operations.ts, mounts.ts), zod to JSON Schema (jsonSchemas.ts), the document (document.ts)
 │   ├── mcp/                  # MCP server (F-15): tool catalog (catalog.ts), tools read from the routes
 │   │                         # (operationTools.ts), API request of a tool (callOperation.ts), server (server.ts),
-│   │                         # Code Mode's search and execute (codeMode.ts) and their QuickJS sandbox (sandbox.ts)
+│   │                         # Code Mode's search and execute (codeMode.ts), their sandbox: a worker thread per
+│   │                         # run (sandbox.ts) running QuickJS (sandboxGuest.ts, entry sandboxWorker.ts)
 │   ├── contracts/            # Types generated for the frontend from the schemas (npm run contracts:generate)
 │   ├── test/                 # Test helpers, factories, database lifecycle (globalSetup, setup)
 │   └── i18n/
@@ -336,20 +337,34 @@ session may change it (`PUT /api/settings/code-mode`, in `SESSION_ONLY_ROUTES`).
 
 - **Reach**: `codemode.request()` resolves the method and path against the documented routes, in Express's order, and
   refuses (in the form of the API's errors) any `DELETE`, a session-only route, a route that is not admin, a route that
-  takes a file, a write of a read-only token, a path with `?`, `#` or `\`, and more than `MAX_REQUESTS_PER_RUN` (50)
-  requests per run, whatever the token, the session included. The request then goes through `requestOperation()`
-  (`callOperation.ts`), like a tool call: path parameter check, same headers, `OPERATION_TIMEOUT_MS`.
-- **Sandbox** (`src/mcp/sandbox.ts`): QuickJS compiled to WebAssembly (`quickjs-emscripten-core` with the
-  `@jitl/quickjs-wasmfile-release-sync` variant), never Node's `vm`. A fresh WebAssembly instance per run; the code
-  sees the built-ins and `codemode` only, whose functions take and return JSON. `SANDBOX_LIMITS`: wall time (10 s),
-  CPU through QuickJS's interrupt handler (1 s: the code runs on Node's thread), memory (64 MB) and stack (128 KiB,
-  well below Node's own stack, on which WebAssembly runs). An exception out of the instance itself (Node's stack
-  exhausted by a path QuickJS does not check) ends the run as `crashed`, never the process. The answer is cut at
-  `MAX_OUTPUT_CHARS` (24,000, about 6,000 tokens) with `TRUNCATION_MARKER`; the code may hold `MAX_CODE_LENGTH`
-  characters. The `prod-deps` stage of the Dockerfile runs QuickJS once on each platform.
-- Tests: `sandbox.test.ts` (hostile code against the sandbox: loops, memory, recursion, globals, prototypes, promises
-  that never settle, host faults) and `codeMode.test.ts` (through the MCP endpoint: the setting, `search`, `execute`,
-  and requests outside the reach above).
+  takes a file, a write of a read-only token, and a path with `?`, `#` or `\`, whatever the token, the session
+  included. The request then goes through `requestOperation()` (`callOperation.ts`), like a tool call: path parameter
+  check, same headers, `OPERATION_TIMEOUT_MS`.
+- **Sandbox**: QuickJS compiled to WebAssembly (`quickjs-emscripten-core` with the
+  `@jitl/quickjs-wasmfile-release-sync` variant), never Node's `vm`, in a **worker thread per run**
+  (`runInSandbox()`, `src/mcp/sandbox.ts`). The main thread holds every limit of time and ends the worker with
+  `terminate()`, which stops it wherever it is, in a native function of QuickJS that never checks for an interruption
+  too (`"a".repeat(2 ** 24).indexOf(…)`): the event loop of the server never waits for the code. CPU time is the time
+  the worker is busy, from a message of the main thread to its next `idle`. `SANDBOX_LIMITS`: wall time (10 s), CPU
+  (1 s), QuickJS heap (64 MB), WebAssembly memory (96 MB, a `WebAssembly.Memory` with a maximum: some allocations of
+  QuickJS escape its own limit), stack (128 KiB, on a worker stack of 4 MB), 50 host calls per run
+  (`codemode.spec()` included), 24,000 characters of answer and 5 MB of argument. `MAX_CONCURRENT_RUNS` (2) run at
+  once and `MAX_QUEUED_RUNS` (4) wait; the next ones are refused at once (`busy`, 429 `errors.codeModeBusy`). The
+  image runs `dist/mcp/sandboxWorker.js`; from the TypeScript sources (tests, `npm run dev`) the worker loads
+  `sandboxWorker.ts` with `--import tsx`.
+- **Guest side** (`src/mcp/sandboxGuest.ts`, run by the thin entry `sandboxWorker.ts`, excluded from the coverage):
+  the code sees the built-ins and `codemode` only. A prelude, run first, keeps the host's `call` and `done` and the
+  built-ins it uses, then evaluates the code, awaits it and hands `done` the JSON of its result (or the description of
+  its error) cut at `outputChars`. The host reads strings only, and only short enough ones (`stringOf()`): never a
+  promise, a getter or `dump` of the guest's objects. Host calls cross as JSON messages; a value such as
+  `codemode.spec()` crosses once per run; past `maxHostCalls`, or once the run is over, nothing crosses any more. The
+  JavaScript heap of a worker keeps Node's defaults: a worker past a heap limit can take the process down, so what
+  crosses from QuickJS is bounded instead. `GuestRun` is tested in the test process (`sandboxGuest.test.ts`).
+- A backup restore turns Code Mode off (`turnCodeModeOff()`, `backupService.ts`), as it deletes the API tokens.
+- Tests: `sandbox.test.ts` (hostile code through real workers: loops, a native search, getters and `toJSON` that loop,
+  a `then` of the guest, memory measured in the worker, recursion, globals, prototypes, promises that never settle,
+  host calls, concurrency; each checks that the event loop kept turning) and `codeMode.test.ts` (through the MCP
+  endpoint: the setting, `search`, `execute`, requests outside the reach above, a full sandbox).
 
 ### Translations
 
@@ -410,7 +425,7 @@ nginx (`frontend/nginx.conf.template`) limits the whole multipart body, so its `
 
 ## Dependencies
 
-**Runtime**: express 5, express-rate-limit, bcryptjs, cors, helmet, morgan, jsonwebtoken, multer, @modelcontextprotocol/server (MCP endpoint), quickjs-emscripten-core and @jitl/quickjs-wasmfile-release-sync (Code Mode sandbox, WebAssembly: no native binary, no install script), sharp (photo copies; libvips prebuilt in its optional `@img/sharp-<platform>` packages, no install script), archiver and adm-zip (backups), i18next, i18next-http-middleware, dotenv, zod 4, yaml (front matter of the release notes)
+**Runtime**: express 5, express-rate-limit, bcryptjs, cors, helmet, morgan, jsonwebtoken, multer, @modelcontextprotocol/server (MCP endpoint), quickjs-emscripten-core and @jitl/quickjs-wasmfile-release-sync (Code Mode sandbox, WebAssembly: no native binary, no install script; run in worker threads), sharp (photo copies; libvips prebuilt in its optional `@img/sharp-<platform>` packages, no install script), archiver and adm-zip (backups), i18next, i18next-http-middleware, dotenv, zod 4, yaml (front matter of the release notes)
 **Runtime (database)**: @prisma/client 7, @prisma/adapter-better-sqlite3 7, better-sqlite3 12 (native module, prebuilt for linux x64/arm64 musl), prisma 7 (the CLI applies the migrations when the container starts)
 **Dev**: typescript 5.9, tsx, eslint 10, typescript-eslint, prettier 3, vitest, supertest, @seriousme/openapi-schema-validator (OpenAPI 3.1 check of the generated document), @modelcontextprotocol/client (MCP tests)
 

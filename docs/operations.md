@@ -455,7 +455,7 @@ En plus des outils ci-dessus, le serveur peut exposer les deux outils du [Code M
 
 **Désactivé par défaut.** Admin > Paramètres > « Serveur MCP : Code Mode » l'active, après confirmation, et le désactive. Le changement vaut dès la requête MCP suivante : désactivé, `search` et `execute` disparaissent de la liste des outils, et les appeler échoue. Seule la session de l'admin peut changer ce réglage (`PUT /api/settings/code-mode`) : aucun jeton d'API, même en lecture et écriture, ne peut activer l'exécution de code.
 
-**Risques.** Le code écrit par l'agent s'exécute sur le serveur, avec les droits de son jeton. Il tourne dans un bac à sable, [QuickJS](https://github.com/justjake/quickjs-emscripten) compilé en WebAssembly, jamais dans le moteur de Node : il n'a ni `require`, ni `process`, ni `fetch`, ni système de fichiers, ni minuteries, et chaque exécution a sa propre instance, jetée ensuite. `codemode.request()` est sa seule sortie, et elle a le même périmètre que les outils :
+**Risques.** Le code écrit par l'agent s'exécute sur le serveur, avec les droits de son jeton. Il tourne dans un bac à sable, [QuickJS](https://github.com/justjake/quickjs-emscripten) compilé en WebAssembly, jamais dans le moteur de Node : il n'a ni `require`, ni `process`, ni `fetch`, ni système de fichiers, ni minuteries. Chaque exécution a son propre fil d'exécution (worker thread de Node), arrêté à la fin ou dès qu'une limite est atteinte, où que soit le code : le serveur continue de répondre pendant que le code calcule. `codemode.request()` est sa seule sortie, et elle a le même périmètre que les outils :
 
 - les opérations admin du document OpenAPI seulement, sans les routes qui prennent un fichier (photo, import de bouteilles) ;
 - jamais de `DELETE`, ni les routes réservées à la session (jetons, compte, « Se déconnecter partout », sauvegardes, ce réglage), même avec la session de l'admin ;
@@ -468,13 +468,17 @@ Activez-le seulement pour des agents de confiance, et gardez des jetons en lectu
 
 | Limite | Valeur | Au-delà |
 | --- | --- | --- |
-| Durée | 10 s, attente des requêtes comprise | Erreur, l'exécution est arrêtée et ses requêtes annulées |
-| Calcul | 1 s de calcul du code | Erreur. Pendant ce calcul, le serveur attend : la limite est courte pour cette raison |
-| Mémoire | 64 Mo | `out of memory` dans le code |
+| Durée | 10 s, démarrage et attente des requêtes compris | Erreur, l'exécution est arrêtée et ses requêtes annulées |
+| Calcul | 1 s de calcul du code (hors attente des requêtes) | Erreur, l'exécution est arrêtée, même dans une fonction native de QuickJS |
+| Mémoire | 64 Mo pour QuickJS, 96 Mo au plus de mémoire WebAssembly | `out of memory` dans le code |
 | Pile | 128 Kio | `stack overflow` dans le code ; une récursion que QuickJS ne contrôle pas arrête l'exécution |
 | Code reçu | 20 000 caractères | Erreur, rien n'est exécuté |
-| Requêtes à l'API | 50 par exécution | La 51e rejette avec le statut `429` |
+| Appels au serveur | 50 par exécution, `codemode.spec()` compris (le document ne passe qu'une fois) | Les suivants rejettent avec le statut `429` |
+| Argument d'un appel | 5 Mo de JSON | L'appel rejette, sans être envoyé |
 | Réponse | 24 000 caractères (environ 6 000 tokens, comme chez Cloudflare) | Coupée, avec la marque `--- TRUNCATED ---` |
+| Exécutions simultanées | 2, et 4 en attente | Les suivantes sont refusées aussitôt : erreur `429` (« Le serveur exécute déjà autant de code qu'il le peut »), à réessayer |
+
+Chaque exécution démarre son fil d'exécution : environ 20 ms avant que le code ne tourne (mesuré dans l'image sur un processeur arm64 récent ; davantage sur une machine lente).
 
 **Exemples d'appel.** Arguments de `search`, pour lister les opérations :
 
@@ -492,7 +496,7 @@ Arguments d'`execute`, pour les spiritueux presque vides :
 }
 ```
 
-Le réglage est enregistré dans la base : une restauration ramène celui de la sauvegarde, et une sauvegarde faite avant cette fonction le ramène désactivé.
+Le réglage est enregistré dans la base, mais une restauration le désactive toujours, quelle que soit la valeur de la sauvegarde : comme les jetons d'API, qu'elle supprime, un réglage qui permet d'exécuter du code ne revient pas en silence depuis une autre instance. Réactivez-le dans Paramètres si besoin.
 
 ## Intégrer la carte dans le site du bar
 
