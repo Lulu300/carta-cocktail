@@ -170,7 +170,7 @@ La page **API** de l'admin documente chaque route : ce qu'elle accepte, ce qu'el
 - `GET /api/openapi.json`, sans connexion : les routes qu'un client appelle sans session (cartes publiées, connexion, état de santé) ;
 - `GET /api/openapi/full.json`, avec un jeton : toutes les routes.
 
-Les routes de l'admin demandent un jeton de session (JWT), donné par `POST /api/auth/login` et envoyé dans l'en-tête `Authorization: Bearer <jeton>`. Avec `curl` et `jq`, et les variables `CARTA_URL`, `CARTA_EMAIL` et `CARTA_PASSWORD` du script de sauvegarde ci-dessus :
+Les routes de l'admin demandent un jeton dans l'en-tête `Authorization: Bearer <jeton>` : un [jeton d'API](#jetons-dapi-scripts-et-clients-mcp) créé dans Paramètres, le plus simple pour un script ou un client MCP, ou un jeton de session (JWT), donné par `POST /api/auth/login`. Le document OpenAPI décrit les deux (`apiToken` et `bearerAuth`) et, route par route, celles qui n'acceptent que la session. Avec un jeton de session, `curl` et `jq`, et les variables `CARTA_URL`, `CARTA_EMAIL` et `CARTA_PASSWORD` du script de sauvegarde ci-dessus :
 
 ```sh
 LOGIN=$(jq -n --arg email "$CARTA_EMAIL" --arg password "$CARTA_PASSWORD" '{email: $email, password: $password}')
@@ -185,7 +185,7 @@ curl -fsS -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: applicatio
   -d '{"name": "Lime", "icon": "🍋"}' "$CARTA_URL/api/ingredients"
 ```
 
-- Le jeton vaut une session de l'admin, avec tous ses droits : gardez-le comme le mot de passe. Il expire au bout de `JWT_EXPIRES_IN` (7 jours par défaut) et prend fin plus tôt quand le mot de passe change, avec « Se déconnecter partout » ou après la restauration d'une sauvegarde : le script se reconnecte alors.
+- Le jeton de session vaut une session de l'admin, avec tous ses droits : gardez-le comme le mot de passe. Il expire au bout de `JWT_EXPIRES_IN` (7 jours par défaut) et prend fin plus tôt quand le mot de passe change, avec « Se déconnecter partout » ou après la restauration d'une sauvegarde : le script se reconnecte alors.
 - Une erreur répond toujours en JSON `{ "error": "…", "details": … }` : `error` est un message dans la langue de l'en-tête `Accept-Language` (anglais par défaut), `details` précise certaines erreurs (champs refusés d'une requête invalide, éléments qui bloquent une suppression).
 - Les limites de requêtes s'appliquent comme dans l'interface (`API_RATE_LIMIT` par minute et par adresse, 10 sauvegardes en 15 minutes) : au-delà, l'API répond 429 avec l'en-tête `Retry-After`, en secondes.
 

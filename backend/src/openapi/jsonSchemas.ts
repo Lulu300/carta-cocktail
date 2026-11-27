@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import * as apiTokens from '../validation/apiTokens';
 import * as auth from '../validation/auth';
 import * as availability from '../validation/availability';
 import * as backup from '../validation/backup';
@@ -33,6 +34,7 @@ export type JsonSchema = Record<string, unknown>;
 
 /** The modules of src/validation/ whose exports become components. A test checks the list is complete. */
 export const VALIDATION_MODULES = {
+  apiTokens,
   auth,
   availability,
   backup,

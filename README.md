@@ -475,7 +475,7 @@ The API is documented in the admin, on the **API** page: every route, what it ac
 - `GET /api/openapi.json`, without signing in: the routes a client can call without a session (public menus, sign-in, health check);
 - `GET /api/openapi/full.json`, with the session token: every route.
 
-Calling the API with `curl` and a session token: [`docs/operations.md`](docs/operations.md#appeler-lapi) (French).
+Calling the API with `curl`, with an API token or a session token: [`docs/operations.md`](docs/operations.md#appeler-lapi) (French).
 
 | Endpoint | Auth | Description |
 | --- | --- | --- |

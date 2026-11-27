@@ -15,6 +15,7 @@ import {
   addBottleToMenu,
   addCocktailToMenu,
   findSystemMenu,
+  seedApiToken,
 } from '../test/helpers';
 import { documentedMountPaths, expectDocumentedResponse } from '../test/documentedResponse';
 import { resetRateLimits } from '../middleware/rateLimit';
@@ -69,6 +70,25 @@ describe('answers of the admin routes', () => {
     expectDocumented(await request.get('/api/settings').set(authHeader()));
     expectDocumented(await request.get('/api/system/upgrade-notice').set(authHeader()));
     expectDocumented(await request.get('/api/openapi/full.json').set(authHeader()));
+  });
+
+  it('API tokens: creation, list, revocation, and the 403 of a token', async () => {
+    const created = await request
+      .post('/api/api-tokens')
+      .set(authHeader())
+      .send({ name: 'MCP', scope: 'READ_ONLY' });
+    expectDocumented(created);
+    expectDocumented(await request.get('/api/api-tokens').set(authHeader()));
+    const readOnly = { Authorization: `Bearer ${created.body.token}` };
+    // A read-only token that writes, and any token on a route reserved to the session
+    const write = await request.post('/api/units').set(readOnly).send({ name: 'Shot' });
+    const sessionOnly = await request.get('/api/api-tokens').set(readOnly);
+    expect([write.status, sessionOnly.status]).toEqual([403, 403]);
+    expectDocumented(write);
+    expectDocumented(sessionOnly);
+    expectDocumented(await request.delete(`/api/api-tokens/${created.body.id}`).set(authHeader()));
+    const { header } = await seedApiToken();
+    expectDocumented(await request.get('/api/units').set(header));
   });
 
   it('a request without a token answers the documented 401', async () => {

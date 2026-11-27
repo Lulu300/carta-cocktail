@@ -1,5 +1,5 @@
 import type { Application } from 'express';
-import { authMiddleware, optionalAuth } from '../middleware/auth';
+import { authMiddleware, optionalAuth, refuseApiTokens } from '../middleware/auth';
 import { isRateLimiter } from '../middleware/rateLimit';
 import { type Schemas, validatedSchemas } from '../validation/validate';
 import { mountPathOf } from './mounts';
@@ -12,8 +12,11 @@ import { type ExcludedRoute, type RouteDoc, routeDocOf } from './routeDoc';
  * exists in the app.
  */
 
-/** Who may call a route: anyone, anyone with more answers for the admin, or the admin only. */
-export type RouteAccess = 'public' | 'optional' | 'admin';
+/**
+ * Who may call a route: anyone, anyone with more answers for the admin, the admin with a
+ * session or an API token, or the admin with a session only (SESSION_ONLY_ROUTES of app.ts).
+ */
+export type RouteAccess = 'public' | 'optional' | 'admin' | 'session';
 
 export interface ApiRoute {
   method: string;
@@ -85,7 +88,9 @@ function joinPaths(mountPath: string, routePath: string): string {
 }
 
 function accessOf(handlers: unknown[]): RouteAccess {
-  if (handlers.includes(authMiddleware)) return 'admin';
+  if (handlers.includes(authMiddleware)) {
+    return handlers.includes(refuseApiTokens) ? 'session' : 'admin';
+  }
   if (handlers.includes(optionalAuth)) return 'optional';
   return 'public';
 }

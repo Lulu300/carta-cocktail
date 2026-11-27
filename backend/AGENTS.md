@@ -267,12 +267,14 @@ router.get(
 
 - The rest comes from the app as Express runs it (`collectApiRoutes()`, `src/openapi/operations.ts`):
   the method and the path, the request schemas of `validate()`, the access (`authMiddleware`,
-  `optionalAuth`) and the rate limits (`createRateLimiter()`) of the middleware in front of the
+  `optionalAuth`, and `refuseApiTokens` for the session-only routes) and the rate limits (`createRateLimiter()`) of the middleware in front of the
   route. Mount every router with `mountApiRouter(app, path, ...middleware, router)` (`app.ts`):
   Express keeps no trace of a mount path, and a router mounted with `app.use` makes the document fail.
 - `responses`: a zod schema answers JSON; `{ description, content, headers }` anything else (a
   file, CSV, no body for a 204). `errors`: the statuses of the route itself and what they mean
-  there; 400 (validation), 401 (token), 413 (body) and 429 (limit) follow from the middleware.
+  there; 400 (validation), 401 (token), 403 (API token: read-only on a write, or any token on a
+  session-only route), 413 (body) and 429 (limit) follow from the middleware. The security of an
+  admin route lists `bearerAuth` (session) and `apiToken`; a session-only route lists `bearerAuth` only.
   A file sent as `multipart/form-data` is declared with `upload` and its limit constant (see File
   Uploads). A route that `validate()` does not check (`routes/public.ts`) declares `pathParams`.
 - Response schemas exported by `src/validation/` become components named after their export
