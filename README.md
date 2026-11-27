@@ -12,6 +12,7 @@ A cocktail menu management system with admin panel and public-facing menu displa
 - **Import/Export** cocktails as JSON or batch ZIP with smart dependency resolution
 - **Multi-language** UI (English / French) with i18next
 - **Public pages** for displaying menus and cocktail details to guests
+- **API tokens** for scripts and MCP clients: named, read-only or read and write, expiring, revocable one by one in Settings (`docs/operations.md`, "Jetons d'API")
 
 ## Tech Stack
 
@@ -474,7 +475,7 @@ docker pull ghcr.io/lulu300/carta-cocktail/frontend:1.20
 | `GET /api/health` | No | Status and version (Docker healthcheck) |
 | `POST /api/auth/login` | No | Admin login |
 | `GET /api/auth/me` | Yes | Signed-in admin |
-| `POST /api/auth/logout-all` | Yes | Revoke every session |
+| `POST /api/auth/logout-all` | Session | Revoke every session and every API token |
 | `GET /api/public/*` | No | Public menus and cocktails |
 | `GET/POST/PUT/DELETE /api/category-types` | Yes | Category types |
 | `GET/POST/PUT/DELETE /api/categories` | Yes | Category management |
@@ -493,8 +494,11 @@ docker pull ghcr.io/lulu300/carta-cocktail/frontend:1.20
 | `/api/menu-sections/*` | Yes | Menu sections and their order |
 | `GET /api/shortages` | Yes | Stock shortage analysis |
 | `GET /api/availability/*` | Yes | Cocktail availability |
-| `GET/PUT /api/settings` | Yes | Site settings and profile |
-| `GET /api/backup/export`, `POST /api/backup/import` | Yes | Backup (database and photos as a ZIP) and restore |
+| `GET/PUT /api/settings` | Yes | Site settings; `PUT /api/settings/profile` (email, password) needs the session |
+| `GET/POST/DELETE /api/api-tokens` | Session | API tokens of scripts and MCP clients |
+| `GET /api/backup/export`, `POST /api/backup/import` | Session | Backup (database and photos as a ZIP) and restore |
+
+"Yes": the admin session or an API token (`Authorization: Bearer carta_…`); a read-only token may only send `GET` and `HEAD`. "Session": the admin session only, an API token gets `403`.
 
 ## License
 

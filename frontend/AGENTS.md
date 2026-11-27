@@ -63,7 +63,8 @@ frontend/
 │   │                           # (sections, search bar, skeletons, error state, useMenuFilter, useScrollRestoration)
 │   ├── components/
 │   │   ├── admin/              # Shared admin parts: DataTable, TranslationFields, DeletionImpactList,
-│   │   │   │                   # LoadError, useConfirmDelete, useEntityForm, useForcedDelete
+│   │   │   │                   # LoadError, useConfirmDelete, useEntityForm, useForcedDelete,
+│   │   │   │                   # sections of the settings page (EmbedMenuSettings, ApiTokenSettings)
 │   │   │   ├── bottles/        # Bottle form modal, rows, history, export menu, filters
 │   │   │   ├── categories/     # Category form modal, category types manager
 │   │   │   ├── cocktails/      # Cocktail editor (react-hook-form + zod), list items, filters, selection
@@ -72,6 +73,7 @@ frontend/
 │   │   ├── layout/             # AdminLayout, PublicLayout, RouteErrorBoundary, SkipLink, AppVersion, BackHomeLink
 │   │   └── ui/                 # Design system: Button, Field, Input, Select, Modal, ConfirmDialog, Toaster,
 │   │                           # Pagination, SearchInput, SortableHeader, DateInput, LanguageSelector, IconButton,
+│   │                           # CopyButton (clipboard and toast, hidden without the clipboard API),
 │   │                       # UploadedPhoto (cocktail photo: srcset, falls back to the photo itself)…
 │   ├── contexts/
 │   │   ├── AuthContext.tsx         # Login/logout, token management, auth state
