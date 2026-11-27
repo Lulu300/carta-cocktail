@@ -320,7 +320,7 @@ caches.keys().then((names) => names.forEach((name) => caches.delete(name)));
 
 ## Jetons d'API (scripts et clients MCP)
 
-Un jeton d'API permet à un script ou à un client MCP d'appeler l'API sans le mot de passe admin ni la session du navigateur.
+Un jeton d'API permet à un script ou à un client MCP ([serveur MCP](#serveur-mcp-agents-ia)) d'appeler l'API sans le mot de passe admin ni la session du navigateur.
 
 **Créer un jeton.** Admin > Paramètres > « Jetons d'API » (Settings > API tokens) :
 
@@ -345,6 +345,96 @@ curl -fsS -X PUT -H "Authorization: Bearer $CARTA_TOKEN" -H 'Content-Type: appli
 - Un jeton révoqué, expiré ou inconnu reçoit `401`. La liste garde les jetons expirés, marqués « Expiré », jusqu'à leur révocation. Au plus 20 jetons non expirés.
 - La limite de l'API (`API_RATE_LIMIT`, 600 requêtes par minute et par adresse) compte aussi les requêtes des jetons.
 - **Révoquer** un jeton dans la liste le supprime : il est refusé à la requête suivante. « Se déconnecter partout » supprime **tous** les jetons, en plus des sessions, comme la restauration d'une sauvegarde. Changer le mot de passe ou `JWT_SECRET` ne les touche pas.
+
+## Serveur MCP (agents IA)
+
+L'instance sert un serveur [MCP](https://modelcontextprotocol.io) (Model Context Protocol) à `https://<votre domaine>/api/mcp` : un agent IA (Claude Code, Claude Desktop, un agent Cloudflare…) y trouve des outils pour consulter la carte et le stock, et les modifier. Transport Streamable HTTP, sans session. La route passe par le proxy nginx de l'image frontend comme le reste de `/api/` : rien à configurer.
+
+**Jeton.** Créez un [jeton d'API](#jetons-dapi-scripts-et-clients-mcp) pour chaque client, nommé d'après lui (« Claude Code sur mon portable »). **Choisissez la lecture seule par défaut** : un agent a tous les droits de son jeton, et peut se tromper. Ne prenez la lecture et écriture que pour un agent qui doit écrire, et révoquez le jeton quand il ne sert plus. La session de l'admin (JWT) marche aussi, mais elle expire et donne tous les droits.
+
+**Outils.**
+
+| Outil | Jeton | Ce qu'il fait |
+| --- | --- | --- |
+| `list_cocktails`, `get_cocktail` | lecture seule | Cocktails et recettes |
+| `list_cocktail_availability`, `get_cocktail_availability` | lecture seule | Cocktails réalisables avec le stock, nombre de verres, ingrédients qui manquent |
+| `list_shortages` | lecture seule | Catégories sous leur stock souhaité (liste de courses) |
+| `list_bottles`, `get_bottle` | lecture seule | Bouteilles et niveau restant |
+| `list_categories`, `list_ingredients`, `list_units` | lecture seule | Ce qu'il faut pour écrire une recette |
+| `list_menus`, `get_menu` | lecture seule | Cartes et leur composition |
+| `update_bottle` | lecture et écriture | Ajuster le niveau d'une bouteille (ou un autre champ) |
+| `create_cocktail`, `update_cocktail` | lecture et écriture | Créer ou modifier un cocktail |
+| `update_menu` | lecture et écriture | Publier une carte, y ajouter ou en retirer des cocktails (ou des bouteilles, sur une carte personnelle) |
+| `exclude_menu_bottles`, `restore_menu_bottles` | lecture et écriture | Retirer des bouteilles des cartes Apéritifs et Digestifs, puis les remettre |
+| `preview_cocktail_import` | lecture et écriture | Aperçu de l'import d'un fichier de cocktail : n'écrit rien, mais l'API le reçoit en `POST` |
+
+- Un jeton en lecture seule ne voit pas les outils d'écriture.
+- Aucun outil ne supprime, ne restaure une sauvegarde ni ne « déconnecte partout » : ces actions restent dans l'admin.
+- Chaque outil appelle une route de l'API avec le même jeton : mêmes contrôles, et mêmes erreurs (statut, message, `details`), dans la langue de l'en-tête `Accept-Language` du client. Un appel d'outil compte pour deux requêtes dans `API_RATE_LIMIT` : celle du client MCP, et celle de l'outil vers l'API. Avec `TRUST_PROXY=0`, ou une liste qui n'inclut pas l'adresse du backend lui-même, la requête de l'outil vers l'API est comptée sous l'adresse du backend, dans un compteur partagé par tous les clients MCP.
+- Un outil attend la réponse de l'API 30 secondes au plus, puis répond une erreur `504`.
+- Les schémas d'entrée et de sortie des outils sont ceux de l'API (document OpenAPI), écrits en entier, sans référence : un client Code Mode en tire une API TypeScript.
+
+**Claude Code.** Remplacez l'adresse et le jeton :
+
+```sh
+claude mcp add --transport http carta https://carte.mon-bar.fr/api/mcp \
+  --header "Authorization: Bearer carta_…"
+```
+
+`--scope user` l'ajoute à tous vos projets, et `claude mcp list` vérifie la connexion.
+
+**Claude Desktop.** Ses connecteurs personnalisés ne prennent pas d'en-tête `Authorization` fixe : passez par le pont local [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) (Node.js requis). Dans `claude_desktop_config.json` (Paramètres > Développeur > Modifier la configuration), puis redémarrez Claude Desktop :
+
+```json
+{
+  "mcpServers": {
+    "carta": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://carte.mon-bar.fr/api/mcp",
+        "--header",
+        "Authorization:${CARTA_AUTH}"
+      ],
+      "env": { "CARTA_AUTH": "Bearer carta_…" }
+    }
+  }
+}
+```
+
+L'en-tête s'écrit sans espace après `Authorization:`, et le jeton passe par `env` : `mcp-remote` documente cette forme, car Claude Desktop coupe mal les arguments qui contiennent une espace sous Windows.
+
+**Client Code Mode (Cloudflare Agents SDK).** Le modèle écrit du code qui appelle les outils, exécuté dans un bac à sable de Cloudflare (Worker Loader) ; le serveur Carta reste un serveur MCP ordinaire. Dans un agent :
+
+```ts
+import { Agent } from 'agents';
+import { createCodeTool } from '@cloudflare/codemode/ai';
+import { DynamicWorkerExecutor } from '@cloudflare/codemode';
+
+export class BarAgent extends Agent<Env> {
+  async onStart() {
+    // Idempotent for the same name and URL. The headers are kept in the storage of the Durable Object.
+    await this.addMcpServer('carta', 'https://carte.mon-bar.fr/api/mcp', {
+      id: 'carta',
+      transport: {
+        type: 'streamable-http',
+        headers: { Authorization: `Bearer ${this.env.CARTA_MCP_TOKEN}` },
+      },
+    });
+  }
+
+  async codeTool() {
+    await this.mcp.waitForConnections({ timeout: 10_000 });
+    return createCodeTool({
+      tools: this.mcp.getAITools({ serverId: 'carta' }),
+      executor: new DynamicWorkerExecutor({ loader: this.env.LOADER }),
+    });
+  }
+}
+```
+
+Avec, dans `wrangler.jsonc`, `"compatibility_flags": ["nodejs_compat"]` et `"worker_loaders": [{ "binding": "LOADER" }]`, et le jeton en secret : `npx wrangler secret put CARTA_MCP_TOKEN`. L'outil rendu par `codeTool()` se donne au modèle comme tout outil du SDK AI (`streamText({ tools: { codemode } })`). Le SDK Code Mode est marqué expérimental par Cloudflare : vérifiez sa documentation.
 
 ## Intégrer la carte dans le site du bar
 

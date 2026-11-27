@@ -7,10 +7,17 @@ import { isApiToken, verifyApiToken, type Principal } from '../services/apiToken
 
 export interface AuthRequest extends Request {
   userId?: number;
+  /** Set by protocolAuthMiddleware: false for a read-only API token. */
+  canWrite?: boolean;
 }
 
 // A read-only API token may only read
 const READ_METHODS = new Set(['GET', 'HEAD']);
+
+/** Whether a read-only API token may send this method. */
+export function isReadMethod(method: string): boolean {
+  return READ_METHODS.has(method.toUpperCase());
+}
 
 const BEARER_PREFIX = 'Bearer ';
 const ALGORITHM = 'HS256';
@@ -78,6 +85,16 @@ async function authenticate(token: string): Promise<Principal | null> {
   return userId === null ? null : { userId, canWrite: true };
 }
 
+/** The principal of the request's Bearer token, or a 401 when there is none or it is not valid. */
+async function requirePrincipal(req: Request): Promise<Principal> {
+  const token = extractBearerToken(req);
+  if (!token) throw new UnauthorizedError();
+
+  const principal = await authenticate(token);
+  if (!principal) throw new UnauthorizedError('errors.invalidToken');
+  return principal;
+}
+
 /**
  * Rejects the request with a 401, answered by errorHandler, unless it carries a valid admin
  * token or API token, and with a 403 when a read-only API token sends anything but a read.
@@ -87,16 +104,28 @@ export async function authMiddleware(
   _res: Response,
   next: NextFunction,
 ): Promise<void> {
-  const token = extractBearerToken(req);
-  if (!token) throw new UnauthorizedError();
-
-  const principal = await authenticate(token);
-  if (!principal) throw new UnauthorizedError('errors.invalidToken');
-  if (!principal.canWrite && !READ_METHODS.has(req.method)) {
+  const principal = await requirePrincipal(req);
+  if (!principal.canWrite && !isReadMethod(req.method)) {
     throw new ForbiddenError('errors.apiTokenReadOnly');
   }
 
   req.userId = principal.userId;
+  next();
+}
+
+/**
+ * authMiddleware for a protocol that sends every request as a POST, whatever it does (MCP): the
+ * method tells nothing about the scope a request needs, so a read-only API token is let through
+ * and `req.canWrite` tells the route what the token may do. Same 401 as authMiddleware.
+ */
+export async function protocolAuthMiddleware(
+  req: AuthRequest,
+  _res: Response,
+  next: NextFunction,
+): Promise<void> {
+  const principal = await requirePrincipal(req);
+  req.userId = principal.userId;
+  req.canWrite = principal.canWrite;
   next();
 }
 

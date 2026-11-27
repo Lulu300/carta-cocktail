@@ -13,6 +13,7 @@ A cocktail menu management system with admin panel and public-facing menu displa
 - **Multi-language** UI (English / French) with i18next
 - **Public pages** for displaying menus and cocktail details to guests
 - **API tokens** for scripts and MCP clients: named, read-only or read and write, expiring, revocable one by one in Settings (`docs/operations.md`, "Jetons d'API")
+- **MCP server** at `/api/mcp` for AI agents (Claude Code, Claude Desktop, Code Mode clients): typed tools over the API, read-only or read and write with the scope of the API token ([MCP server](#mcp-server))
 
 ## Tech Stack
 
@@ -506,8 +507,72 @@ Calling the API with `curl`, with an API token or a session token: [`docs/operat
 | `GET/PUT /api/settings` | Yes | Site settings; `PUT /api/settings/profile` (email, password) needs the session |
 | `GET/POST/DELETE /api/api-tokens` | Session | API tokens of scripts and MCP clients |
 | `GET /api/backup/export`, `POST /api/backup/import` | Session | Backup (database and photos as a ZIP) and restore |
+| `POST /api/mcp` | Yes | MCP endpoint for AI agents ([MCP server](#mcp-server)); a read-only token gets the tools that read |
 
 "Yes": the admin session or an API token (`Authorization: Bearer carta_…`); a read-only token may only send `GET` and `HEAD`. "Session": the admin session only, an API token gets `403`.
+
+### MCP server
+
+`/api/mcp` serves the [Model Context Protocol](https://modelcontextprotocol.io) over Streamable HTTP, without sessions, for AI agents: typed tools to read the cocktails, what the stock allows, the shortages, the bottles and the menus, and to adjust a bottle, create or update a cocktail, compose and publish a menu, and preview a cocktail import. Each tool calls an API route with the same token, so the same checks and errors apply. No tool deletes anything, restores a backup or signs out everywhere. Tool list and details: [`docs/operations.md`](docs/operations.md#serveur-mcp-agents-ia) (French).
+
+Create an API token for each client in Settings > API tokens. **Prefer a read-only token**: an agent has every right of its token. A read-only token does not see the tools that write.
+
+Claude Code:
+
+```sh
+claude mcp add --transport http carta https://bar.example.com/api/mcp \
+  --header "Authorization: Bearer carta_…"
+```
+
+Claude Desktop, whose custom connectors take no fixed `Authorization` header, through the local [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) bridge (Node.js), in `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "carta": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://bar.example.com/api/mcp",
+        "--header",
+        "Authorization:${CARTA_AUTH}"
+      ],
+      "env": { "CARTA_AUTH": "Bearer carta_…" }
+    }
+  }
+}
+```
+
+A Code Mode client, such as an agent of the Cloudflare Agents SDK, turns the tools into a TypeScript API that the model calls from code run in its own sandbox: the input and output schemas are written in full, without references.
+
+```ts
+import { Agent } from 'agents';
+import { createCodeTool } from '@cloudflare/codemode/ai';
+import { DynamicWorkerExecutor } from '@cloudflare/codemode';
+
+export class BarAgent extends Agent<Env> {
+  async onStart() {
+    await this.addMcpServer('carta', 'https://bar.example.com/api/mcp', {
+      id: 'carta',
+      transport: {
+        type: 'streamable-http',
+        headers: { Authorization: `Bearer ${this.env.CARTA_MCP_TOKEN}` },
+      },
+    });
+  }
+
+  async codeTool() {
+    await this.mcp.waitForConnections({ timeout: 10_000 });
+    return createCodeTool({
+      tools: this.mcp.getAITools({ serverId: 'carta' }),
+      executor: new DynamicWorkerExecutor({ loader: this.env.LOADER }),
+    });
+  }
+}
+```
+
+It needs `"compatibility_flags": ["nodejs_compat"]` and `"worker_loaders": [{ "binding": "LOADER" }]` in `wrangler.jsonc`, and the token as a secret (`npx wrangler secret put CARTA_MCP_TOKEN`).
 
 ## License
 

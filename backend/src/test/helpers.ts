@@ -23,14 +23,24 @@ export const request = supertest(app);
  * request and headers timeouts shortened to `timeoutMs` and checked every few
  * milliseconds: a test sees in a second what takes minutes in production.
  */
-export async function listenWithShortTimeouts(
-  timeoutMs: number,
-): Promise<{ port: number; close: () => void }> {
+export async function listenWithShortTimeouts(timeoutMs: number): Promise<ListeningServer> {
   const server = http.createServer(
     { requestTimeout: timeoutMs, headersTimeout: timeoutMs, connectionsCheckingInterval: 10 },
     app,
   );
   configureServerTimeouts(server);
+  return listenOnLoopback(server);
+}
+
+export interface ListeningServer {
+  port: number;
+  close: () => void;
+}
+
+/** Starts `server` (the app by default) on a free port of 127.0.0.1, for a client that needs a real socket. */
+export async function listenOnLoopback(
+  server: http.Server = http.createServer(app),
+): Promise<ListeningServer> {
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   return {
     port: (server.address() as AddressInfo).port,

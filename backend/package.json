@@ -30,6 +30,7 @@
     "node": ">=26"
   },
   "dependencies": {
+    "@modelcontextprotocol/server": "^2.4.0",
     "@prisma/adapter-better-sqlite3": "7.10.1",
     "@prisma/client": "7.10.1",
     "adm-zip": "^0.6.1",
@@ -61,6 +62,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@modelcontextprotocol/client": "^2.4.0",
     "@seriousme/openapi-schema-validator": "^2.12.0",
     "@types/archiver": "^8.0.0",
     "@types/cors": "^2.8.19",

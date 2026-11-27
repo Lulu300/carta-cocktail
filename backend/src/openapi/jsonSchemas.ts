@@ -111,10 +111,23 @@ export class SchemaComponents {
   }
 }
 
+/** A schema written in full, without any reference to a component. */
+function standaloneSchema(schema: z.ZodType, io: 'input' | 'output'): JsonSchema {
+  const converted = z.toJSONSchema(schema, { target: 'draft-2020-12', io }) as JsonSchema;
+  // zod only writes definitions for a recursive schema, which no request or response has
+  if ('$defs' in converted) throw new Error('Recursive schemas are not supported');
+  return withoutKeys(converted, '$schema');
+}
+
 /** The schema of what a client sends, written in full. */
 export function inputSchema(schema: z.ZodType): JsonSchema {
-  const converted = z.toJSONSchema(schema, { target: 'draft-2020-12', io: 'input' }) as JsonSchema;
-  // zod only writes definitions for a recursive schema, which no request has
-  if ('$defs' in converted) throw new Error('Recursive request schemas are not supported');
-  return withoutKeys(converted, '$schema');
+  return standaloneSchema(schema, 'input');
+}
+
+/**
+ * The schema of a response written in full, without references to components: for a reader of
+ * one schema at a time (the tools of the MCP server, src/mcp/), not of a whole document.
+ */
+export function standaloneOutputSchema(schema: z.ZodType): JsonSchema {
+  return standaloneSchema(schema, 'output');
 }

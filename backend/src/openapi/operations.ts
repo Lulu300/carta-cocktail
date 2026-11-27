@@ -1,5 +1,10 @@
 import type { Application } from 'express';
-import { authMiddleware, optionalAuth, refuseApiTokens } from '../middleware/auth';
+import {
+  authMiddleware,
+  optionalAuth,
+  protocolAuthMiddleware,
+  refuseApiTokens,
+} from '../middleware/auth';
 import { isRateLimiter } from '../middleware/rateLimit';
 import { type Schemas, validatedSchemas } from '../validation/validate';
 import { mountPathOf } from './mounts';
@@ -88,7 +93,7 @@ function joinPaths(mountPath: string, routePath: string): string {
 }
 
 function accessOf(handlers: unknown[]): RouteAccess {
-  if (handlers.includes(authMiddleware)) {
+  if (handlers.includes(authMiddleware) || handlers.includes(protocolAuthMiddleware)) {
     return handlers.includes(refuseApiTokens) ? 'session' : 'admin';
   }
   if (handlers.includes(optionalAuth)) return 'optional';

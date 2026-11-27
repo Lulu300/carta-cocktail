@@ -133,6 +133,35 @@ describe(`API rate limit (API_RATE_LIMIT=${API_LIMIT})`, () => {
     expect((await getPublicSettings(`198.51.100.2, ${OUTER_PROXY_IP}`)).status).toBe(200);
   });
 
+  it('counts an MCP tool call twice: the MCP request and the API request of its tool', async () => {
+    const { header } = await seedApiToken({ scope: 'READ_ONLY' });
+    const callTool = () =>
+      request
+        .post('/api/mcp')
+        .set('X-Forwarded-For', '203.0.113.9')
+        .set(header)
+        .set('Accept', 'application/json, text/event-stream')
+        .send({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: { name: 'list_units', arguments: {} },
+        });
+    const callsWithinLimit = Math.floor(API_LIMIT / 2);
+    for (let sent = 0; sent < callsWithinLimit; sent++) {
+      expect((await callTool()).text).not.toContain('isError');
+    }
+
+    // The MCP request is the last one the limit allows: the API request of the tool is refused
+    const lastCall = await callTool();
+    expect(lastCall.status).toBe(200);
+    expect(lastCall.text).toContain('"isError":true');
+    expect(lastCall.text).toContain('\\"status\\":429');
+    expect((await callTool()).status).toBe(429);
+    // The same client address, whether it calls the API or the MCP endpoint
+    expect((await getUnits('203.0.113.9')).status).toBe(429);
+  });
+
   it('never limits /api/health', async () => {
     const health = () => request.get('/api/health').set('X-Forwarded-For', '203.0.113.7');
     expect(await statusesOf(API_LIMIT + 5, health)).toEqual(Array(API_LIMIT + 5).fill(200));

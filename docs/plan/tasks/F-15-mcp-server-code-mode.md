@@ -5,16 +5,26 @@ phase: F
 lane: backend
 criticite: basse
 effort: L
-status: todo
+status: in-progress
 owner: mixed
 depends_on: [F-14, F-16]
-touches: [mcp/, backend/src/app.ts, backend/src/routes/, backend/package.json, backend/package-lock.json, README.md, docs/operations.md, .github/workflows/ci.yml, .github/workflows/release.yml]
+touches: [mcp/, backend/src/mcp/, backend/src/middleware/auth.ts, backend/src/openapi/, backend/src/test/helpers.ts, backend/AGENTS.md, AGENTS.md, scripts/smoke/smoke.sh, .prettierignore, backend/src/app.ts, backend/src/routes/, backend/package.json, backend/package-lock.json, README.md, docs/operations.md, .github/workflows/ci.yml, .github/workflows/release.yml]
 sources: []
-branch:
-pr:
+branch: feature/F-15-mcp-tools
+pr: 309
 ---
 
-## Décisions à valider avant de commencer
+## Décisions
+
+Décisions de l'humain (2026-11-27) :
+
+1. **Forme : option (c).** D'abord des outils typés (première PR). Puis Code Mode côté serveur (`search` et `execute`), derrière un réglage **désactivé par défaut**, et **toujours dans un vrai bac à sable** (QuickJS-wasm ou isolated-vm, jamais `vm` de Node) : seconde PR, après le merge de la première.
+2. **Transport : option (a).** Une route HTTP du backend en Streamable HTTP, protégée par un jeton d'API. Un paquet stdio seulement si un client l'exige : pas maintenant.
+3. **Périmètre.** Lecture et écritures courantes. Les suppressions, la restauration de sauvegarde et « Se déconnecter partout » restent hors du MCP.
+
+Consignes de conception données avec ces décisions : chemin `/api/mcp` (proxy nginx, limiteur et CORS existants, sans toucher la CSP ni nginx), route exclue du document OpenAPI ; `Authorization: Bearer` avec un jeton d'API ou la session, par le même contrôle que l'API ; un jeton en lecture seule ne voit pas les outils d'écriture ; schémas et logique tirés de l'API existante (F-14), par `operationId`, sans duplication ; un test casse si une opération utilisée disparaît ou change de schéma ; documentation prête à coller pour Claude Code, Claude Desktop et un client Code Mode, lecture seule recommandée par défaut.
+
+## Décisions à valider avant de commencer (historique)
 
 L'humain a demandé cette tâche le 2026-11-26 : « un MCP qu'on puisse paramétrer pour faire la majorité des actions dont on a besoin, prévu pour être le plus compatible possible avec Code Mode ». Elle vient après F-14 (API documentée, OpenAPI) et F-16 (jetons d'API).
 
@@ -69,10 +79,10 @@ Choix à faire par l'humain (`owner: mixed`) :
 
 ## Critères d'acceptation
 
-- [ ] Un client MCP standard liste les outils, les appelle avec un jeton lecture seule (les écritures sont refusées), puis avec un jeton lecture et écriture.
+- [x] Un client MCP standard liste les outils, les appelle avec un jeton lecture seule (les écritures sont refusées), puis avec un jeton lecture et écriture.
 - [ ] Un client Code Mode, par exemple le SDK Agents de Cloudflare, utilise le serveur sans adaptation, et l'exemple est documenté.
 - [ ] Si `execute` est livré, aucun code du modèle ne peut lire un fichier, ouvrir une connexion, dépasser son temps ou sa mémoire, ni appeler une route sans le jeton. Des tests hostiles le prouvent.
-- [ ] Les schémas des outils viennent de F-14. Un changement d'API casse un test, pas un outil en production.
+- [x] Les schémas des outils viennent de F-14. Un changement d'API casse un test, pas un outil en production.
 
 ## Tests à ajouter ou adapter
 
@@ -100,3 +110,8 @@ Choix à faire par l'humain (`owner: mixed`) :
 ## Journal
 
 - 2026-11-26 : tâche créée à la demande de l'humain (MCP compatible Code Mode), à faire après F-14, F-16 et les autres tâches du plan. Relecture de #289 : détails Cloudflare ajoutés aux points d'attention.
+- 2026-11-27 : décisions de l'humain (voir « Décisions ») : forme (c), outils typés d'abord puis Code Mode côté serveur dans une seconde PR, derrière un réglage désactivé par défaut et dans un vrai bac à sable ; transport (a), `/api/mcp` en Streamable HTTP avec un jeton d'API ; lecture et écritures courantes, sans suppression, restauration ni « Se déconnecter partout ».
+- 2026-11-27 : partie 1 (outils typés) sur `feature/F-15-mcp-tools`. SDK MCP v2 (`@modelcontextprotocol/server` 2.4.0, Apache-2.0, `npm audit` sans alerte ; le paquet v1 `@modelcontextprotocol/sdk` est remplacé par les paquets v2) : spécification 2026-07-28 sans état, et forme sans état des révisions 2025 (`initialize`) ; GET et DELETE répondent 405. `POST /api/mcp` derrière `protocolAuthMiddleware` (même 401 qu'`authMiddleware`, mais un jeton en lecture seule peut envoyer un POST : chaque requête MCP en est un), exclu du document OpenAPI. 19 outils listés par `operationId` dans `backend/src/mcp/catalog.ts` ; schémas d'entrée (paramètres, query et corps de `validate()`) et de sortie (réponse JSON de succès, `{ items }` pour une liste) lus sur la route, comme le document OpenAPI, écrits en entier sans `$ref`. Un appel d'outil est une requête HTTP vers le serveur lui-même, à l'adresse qui a reçu la requête MCP, avec le même jeton et l'adresse du client en `X-Forwarded-For` : validation, portée, limiteur et erreurs de l'API. Injection sans socket écartée : light-my-request réécrit les prototypes d'Express pour tout le processus et casse les requêtes suivantes. Un jeton en lecture seule ne voit pas les outils d'écriture (« tool not found »), et la route de l'API le refuserait de toute façon. `src/mcp/__snapshots__/tools.json` garde ce que voit un client. Étape MCP ajoutée au smoke (`initialize` et `tools/list` avec un jeton en lecture seule). Exemple Code Mode (Cloudflare Agents SDK) documenté, non exécuté contre Cloudflare.
+- 2026-11-27 : relecture de #309 (approuvée) : les paramètres de chemin d'un outil sont vérifiés avec le schéma `params` de la route avant de construire l'URL, et une valeur vide, `.` ou `..` est refusée (400 au format des erreurs de l'API) : `new URL` résolvait ces segments, et `get_cocktail {"id": "."}` appelait `GET /api/cocktails/`. La requête de l'outil vers l'API attend 30 s au plus (`OPERATION_TIMEOUT_MS`), puis l'outil répond 504 (`errors.mcpToolTimeout`). Test qui fige l'absence de SSRF (en-têtes `Host`, `X-Forwarded-Host` et `X-Forwarded-Proto` falsifiés), refus d'une route réservée à la session dans `buildOperationTools`. Doc : compteur partagé sous l'adresse du backend quand `TRUST_PROXY` ne lui fait pas confiance ; `update_menu` prévient qu'un nouveau `slug` casse les liens partagés et les QR codes imprimés.
+- 2026-11-27 : reste à faire (partie 2) : Code Mode côté serveur, `search` et `execute` derrière un réglage désactivé par défaut, dans un vrai bac à sable (QuickJS-wasm ou isolated-vm), avec les tests hostiles du critère d'acceptation. Aperçu de l'import de bouteilles (fichier multipart) non exposé : seul l'aperçu d'import de cocktail (JSON) est un outil.
+- 2026-11-27 : Notes de version : `breaking: false`, aucune action obligatoire, pas de migration. Nouvelle fonctionnalité visible : serveur MCP à `/api/mcp` pour les agents IA (Claude Code, Claude Desktop par `mcp-remote`, clients Code Mode), avec un jeton d'API : outils pour lire les cocktails, ce que le stock permet, les pénuries, les bouteilles et les cartes, et, avec un jeton en lecture et écriture, ajuster une bouteille, créer ou modifier un cocktail, composer et publier une carte, prévisualiser un import. Lecture seule recommandée par défaut. Un appel d'outil compte pour deux requêtes dans `API_RATE_LIMIT` (`docs/operations.md`, « Serveur MCP »).
