@@ -41,9 +41,27 @@ describe('bundle-budget.mjs CLI', () => {
     writeFileSync(join(distDir, 'index.html'), html);
   }
 
-  /** A compliant build: public entry, one vendor preload, and lazy admin chunks that are never preloaded. */
+  const PRECACHED_FILES = ['index.html', 'manifest.webmanifest', 'assets/index-abc.js', 'assets/vendor-react-def.js'];
+
+  /** sw.js as vite-plugin-pwa writes it (minified Workbox), precaching these dist-relative paths. */
+  function writeServiceWorker(urls = PRECACHED_FILES) {
+    const entries = urls.map((url) => `{url:"${url}",revision:${url.startsWith('assets/') ? 'null' : '"5ea4"'}}`);
+    const sw = [
+      'define(["./workbox-c416"],(function(e){"use strict";self.skipWaiting(),e.clientsClaim(),',
+      `e.precacheAndRoute([${entries.join(',')}],{}),`,
+      'e.registerRoute(({url:e,sameOrigin:s})=>s&&e.pathname.startsWith("/uploads/"),new e.CacheFirst,"GET")}));',
+    ].join('');
+    writeFileSync(join(distDir, 'sw.js'), sw);
+  }
+
+  /**
+   * A compliant build: public entry, one vendor preload, lazy admin chunks that are never
+   * preloaded, and a service worker that precaches the initial load and a lazy public chunk.
+   */
   function writeCompliantBuild() {
     writeIndexHtml();
+    writeServiceWorker([...PRECACHED_FILES, 'assets/registerServiceWorker-vwx.js']);
+    writeChunk('registerServiceWorker-vwx.js', { sources: ['../../src/pwa/registerServiceWorker.ts'] });
     writeChunk('index-abc.js', { sources: PUBLIC_MODULES });
     writeChunk('vendor-react-def.js', { sources: VENDOR_MODULES });
     writeChunk('DashboardPage-jkl.js', { sources: ['../../src/pages/admin/DashboardPage.tsx'] });
@@ -76,8 +94,9 @@ describe('bundle-budget.mjs CLI', () => {
     assert.match(run.stdout, /assets\/vendor-react-def\.js \(preload\)/);
     assert.match(run.stdout, /Budget\s+100\.00 kB/);
     assert.match(run.stdout, /within the 100 kB budget/);
+    assert.match(run.stdout, /The sw\.js precache \(5 files\) holds the initial load and no admin code/);
     // Lazy chunks and stylesheets are not part of the initial load.
-    assert.doesNotMatch(run.stdout, /DashboardPage|jszip|\.css/);
+    assert.doesNotMatch(run.stdout, /DashboardPage|jszip|registerServiceWorker|\.css/);
   });
 
   it('passes when the entry only references the file names of lazy admin and jszip chunks', () => {
@@ -208,6 +227,7 @@ describe('bundle-budget.mjs CLI', () => {
   it('accepts the Rolldown runtime chunk without source map, as generated code', () => {
     writeCompliantBuild();
     writeIndexHtml({ preloads: ['rolldown-runtime-stu.js', 'vendor-react-def.js'] });
+    writeServiceWorker([...PRECACHED_FILES, 'assets/rolldown-runtime-stu.js']);
     writeChunk('rolldown-runtime-stu.js', { content: 'var e=Object.create;export{e as t};\n' });
 
     const run = runCli([distDir, '100']);
@@ -251,6 +271,63 @@ describe('bundle-budget.mjs CLI', () => {
 
     assert.equal(run.status, 1);
     assert.match(run.stderr, /Chunk not found: .*vendor-react-def\.js/);
+  });
+
+  it('fails when the service worker precaches an admin chunk', () => {
+    writeCompliantBuild();
+    writeServiceWorker([...PRECACHED_FILES, 'assets/DashboardPage-jkl.js']);
+
+    const run = runCli([distDir, '100']);
+
+    assert.equal(run.status, 1);
+    assert.match(
+      run.stderr,
+      /assets\/DashboardPage-jkl\.js contains src\/pages\/admin\/DashboardPage\.tsx: keep it out of the precache/,
+    );
+  });
+
+  it('fails when the service worker precaches jszip', () => {
+    writeCompliantBuild();
+    writeServiceWorker([...PRECACHED_FILES, 'assets/jszip.min-mno.js']);
+
+    const run = runCli([distDir, '100']);
+
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /jszip\.min-mno\.js contains node_modules\/jszip\/dist\/jszip\.min\.js: keep it out of the precache/);
+    assert.match(run.stderr, /jszip\.min-mno\.js contains the text "JSZip": jszip must stay out of the precache/);
+  });
+
+  it('fails when the precache misses the page, the web manifest or a chunk of the initial load', () => {
+    writeCompliantBuild();
+    writeServiceWorker(['assets/index-abc.js']);
+
+    const run = runCli([distDir, '100']);
+
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /sw\.js does not precache index\.html: the menu would not open offline/);
+    assert.match(run.stderr, /sw\.js does not precache manifest\.webmanifest/);
+    assert.match(run.stderr, /sw\.js does not precache assets\/vendor-react-def\.js/);
+    assert.doesNotMatch(run.stderr, /does not precache assets\/index-abc\.js/);
+  });
+
+  it('fails when the build has no service worker', () => {
+    writeCompliantBuild();
+    rmSync(join(distDir, 'sw.js'));
+
+    const run = runCli([distDir, '100']);
+
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /sw\.js not found/);
+  });
+
+  it('fails when sw.js has no precache list', () => {
+    writeCompliantBuild();
+    writeFileSync(join(distDir, 'sw.js'), 'self.addEventListener("fetch", () => {});\n');
+
+    const run = runCli([distDir, '100']);
+
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /No precacheAndRoute\(\[\.\.\.\]\) call found in sw\.js/);
   });
 
   it('rejects missing or invalid arguments', () => {
