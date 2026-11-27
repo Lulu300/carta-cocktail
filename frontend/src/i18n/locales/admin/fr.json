@@ -463,7 +463,7 @@
       "title": "Intégrer la carte dans un site",
       "description": "La carte publique peut s'afficher dans un cadre de votre propre site. Seuls les sites listés ici peuvent le faire ; la connexion et l'administration ne s'ouvrent jamais dans un cadre.",
       "origins": "Sites autorisés",
-      "originsHint": "Une adresse par ligne, par exemple https://www.mon-bar.fr, sans chemin. Laissez vide pour qu'aucun site ne puisse intégrer la carte.",
+      "originsHint": "Une adresse par ligne, par exemple https://www.mon-bar.fr, sans chemin ; http:// seulement pour localhost et 127.0.0.1. Laissez vide pour qu'aucun site ne puisse intégrer la carte.",
       "saved": "Sites autorisés mis à jour",
       "menu": "Carte à intégrer",
       "code": "Code à coller dans votre site",

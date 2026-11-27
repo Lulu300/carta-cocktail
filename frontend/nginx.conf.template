@@ -121,6 +121,13 @@ server {
         include /etc/nginx/snippets/security-headers.conf;
     }
 
+    # Imported by sw.js (vite.config.ts): revalidated like it, so that an update reaches the
+    # browser's check of the worker's imported scripts.
+    location = /sw-frame-navigations.js {
+        add_header Cache-Control "no-cache";
+        include /etc/nginx/snippets/security-headers.conf;
+    }
+
     # Web app manifest: the mime.types of nginx does not know the .webmanifest extension.
     location = /manifest.webmanifest {
         default_type application/manifest+json;
@@ -162,10 +169,15 @@ server {
     # headers (token, Content-Length of a body that is not passed) nor its body go to the
     # backend; the proxy_set_header of the server block still do, so the request counts in the
     # rate limit of the client's address, as the SPA's own API requests do.
+    # Short timeouts: a backend that no longer answers would otherwise hold each menu page for
+    # nginx's default 60 s before the fallback above serves it, not embeddable.
     location = /internal/embed-origins {
         internal;
         proxy_pass_request_body off;
         proxy_pass_request_headers off;
+        proxy_connect_timeout 3s;
+        proxy_read_timeout 3s;
+        proxy_send_timeout 3s;
         proxy_pass $backend/api/public/embed-origins;
     }
 

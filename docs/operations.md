@@ -293,10 +293,11 @@ caches.keys().then((names) => names.forEach((name) => caches.delete(name)));
 
 ## Intégrer la carte dans le site du bar
 
-Par défaut, aucun site ne peut afficher la carte dans une iframe. Admin > Paramètres > « Intégrer la carte dans un site » liste les sites autorisés, une adresse par ligne (`https://www.mon-bar.fr`, sans chemin ; `http://` est refusé, sauf pour `localhost`), et donne le code `<iframe>` à coller dans le site.
+Par défaut, aucun site ne peut afficher la carte dans une iframe. Admin > Paramètres > « Intégrer la carte dans un site » liste les sites autorisés, une adresse par ligne (`https://www.mon-bar.fr`, sans chemin ; `http://` est refusé, sauf pour `localhost` et `127.0.0.1`), et donne le code `<iframe>` à coller dans le site.
 
 - Seules les pages `/menu/…` deviennent intégrables. La liste des cartes (`/`), la connexion, l'admin, l'API et les photos gardent `frame-ancestors 'none'` et `X-Frame-Options: DENY`. Dans le cadre, le lien « Connexion » ouvre la fenêtre entière.
-- nginx demande la liste au backend à chaque chargement d'une page `/menu/` : un changement s'applique au chargement suivant, sans redémarrage. Si le backend ne répond pas, la page reste servie, mais non intégrable.
+- nginx demande la liste au backend à chaque chargement d'une page `/menu/` : un changement s'applique au chargement suivant, sans redémarrage. Si le backend ne répond pas dans les 3 secondes, la page reste servie, mais non intégrable.
+- La liste est enregistrée dans la base : une restauration ramène celle de la sauvegarde, et une sauvegarde faite avant cette fonction ramène une liste vide (ressaisissez alors les sites).
 - Un site en HTTPS ne peut intégrer qu'une instance servie elle aussi en HTTPS : les navigateurs bloquent un cadre en HTTP.
 - Le reverse proxy ne doit pas ajouter son propre `X-Frame-Options` ou `Content-Security-Policy` (SWAG : lignes `add_header X-Frame-Options` de `ssl.conf`, en commentaire par défaut) : il bloquerait le cadre quoi que dise la liste.
 - Vérifier : `curl -sI https://carte.mon-bar.fr/menu/<slug> | grep -i -e frame-ancestors -e x-frame-options` montre `frame-ancestors 'self' https://www.mon-bar.fr` et aucun `X-Frame-Options`.

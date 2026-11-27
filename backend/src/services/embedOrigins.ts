@@ -31,7 +31,7 @@ export type EmbedOriginCheck = { origin: string } | { error: EmbedOriginError };
  * The origin to store for what the admin typed: `https://host[:port]`, without path, query,
  * fragment or credentials, the host lowercased and the default port dropped
  * ("https://WWW.Bar.fr:443/" gives "https://www.bar.fr"). A wildcard is refused, and so is
- * plain http except on localhost: an embedding page served over http could be replaced on
+ * plain http except on localhost and 127.0.0.1: an embedding page served over http could be replaced on
  * its way to the guest.
  */
 export function checkEmbedOrigin(input: string): EmbedOriginCheck {

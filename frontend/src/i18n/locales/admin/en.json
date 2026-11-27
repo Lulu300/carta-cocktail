@@ -463,7 +463,7 @@
       "title": "Embed the menu in a website",
       "description": "The public menu can be shown in a frame of your own website. Only the sites listed here may do it; the sign-in and the administration never open in a frame.",
       "origins": "Allowed sites",
-      "originsHint": "One address per line, such as https://www.mon-bar.fr, without a path. Leave empty so that no site can embed the menu.",
+      "originsHint": "One address per line, such as https://www.mon-bar.fr, without a path; http:// only for localhost and 127.0.0.1. Leave empty so that no site can embed the menu.",
       "saved": "Allowed sites updated",
       "menu": "Menu to embed",
       "code": "Code to paste in your website",
