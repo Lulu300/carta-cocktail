@@ -176,6 +176,18 @@ describe('bundle-budget.mjs CLI', () => {
     assert.match(run.stderr, /vendor-react-def\.js contains node_modules\/jszip\/dist\/jszip\.min\.js/);
   });
 
+  it('fails when the OpenAPI viewer of the admin is statically imported', () => {
+    writeCompliantBuild();
+    writeChunk('vendor-react-def.js', {
+      sources: [...VENDOR_MODULES, '../../node_modules/@scalar/api-reference/dist/index.js'],
+    });
+
+    const run = runCli([distDir, '100']);
+
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /vendor-react-def\.js contains node_modules\/@scalar\/api-reference/);
+  });
+
   it('fails when the text JSZip appears in a preloaded chunk, whatever its source map says', () => {
     writeCompliantBuild();
     writeChunk('index-abc.js', { content: 'const zip = new JSZip();\n', sources: PUBLIC_MODULES });

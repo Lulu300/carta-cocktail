@@ -34,6 +34,26 @@ import {
 
 export const ADMIN_USER = { id: 1, email: 'admin@carta.local' };
 
+/** A small OpenAPI document, in the shape of the backend's: one admin route. */
+export const OPENAPI_DOCUMENT = {
+  openapi: '3.1.1',
+  info: { title: 'Carta Cocktail API', version: 'test' },
+  paths: {
+    '/api/units': {
+      get: {
+        operationId: 'listUnits',
+        summary: 'List the units',
+        tags: ['Units'],
+        security: [{ bearerAuth: [] }],
+        responses: { 200: { description: 'OK' } },
+      },
+    },
+  },
+  components: {
+    securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' } },
+  },
+};
+
 function exportedRecipe(name: string): CocktailExportFormat {
   return {
     version: 1,
@@ -294,6 +314,7 @@ const systemHandlers = [
     '/api/system/upgrade-notice/acknowledge',
     () => new HttpResponse(null, { status: 204 }),
   ),
+  http.get('/api/openapi/full.json', () => HttpResponse.json(OPENAPI_DOCUMENT)),
 ];
 
 export const handlers = [

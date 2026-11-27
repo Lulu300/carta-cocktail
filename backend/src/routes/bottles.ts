@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import { z } from 'zod';
 import { Prisma } from '../generated/prisma/client';
 import type { Category } from '../generated/prisma/client';
 import { prisma } from '../lib/prisma';
@@ -17,20 +18,31 @@ import { deleteBottle, isForceRequested } from '../services/deletionService';
 import { syncBottle, syncNewBottles } from '../services/menuSyncService';
 import { categoryTypeNameFor, createMissingCategoryType } from '../services/categoryTypeService';
 import { valid, validate } from '../validation/validate';
-import { deleteRequest, IdParams, idRequest } from '../validation/common';
+import { deleteRequest, DeletionResponse, IdParams, idRequest } from '../validation/common';
 import {
+  Bottle,
   BottleCreate,
   BottleExportQuery,
   BottleListQuery,
   BottleUpdate,
 } from '../validation/bottles';
-import { BottleImportConfirm } from '../validation/bottleImport';
+import {
+  BottleImportConfirm,
+  BottleImportConfirmResponse,
+  BottleImportPreviewResponse,
+  BottlesExport,
+} from '../validation/bottleImport';
+import { apiDocs, FORCED_DELETION } from '../openapi/routeDoc';
 import { importedCategoryTypePath } from '../validation/categories';
 import { CaseInsensitiveIndex, previewMatch } from '../utils/uniqueness';
 import { nameToStore, translationsToStore } from '../utils/storedNames';
 import { caseInsensitiveKey } from '../utils/invisibleCharacters';
 
 const router = Router();
+const doc = apiDocs('Bottles');
+
+const NOT_FOUND = 'No bottle has this id.';
+const IMPORT_FILE_FIELD = 'file';
 
 const importUpload = multer({
   storage: multer.memoryStorage(),
@@ -39,19 +51,29 @@ const importUpload = multer({
 
 const listSchemas = { query: BottleListQuery };
 
-router.get('/', validate(listSchemas), async (_req: AuthRequest, res: Response) => {
-  const { categoryId, type } = valid<typeof listSchemas>(res).query;
-  const where: Prisma.BottleWhereInput = {};
-  if (categoryId) where.categoryId = categoryId;
-  if (type) where.category = { type };
+router.get(
+  '/',
+  doc({
+    operationId: 'listBottles',
+    summary: 'List the bottles',
+    description: 'With their category, by category name then bottle name.',
+    responses: { 200: z.array(Bottle) },
+  }),
+  validate(listSchemas),
+  async (_req: AuthRequest, res: Response) => {
+    const { categoryId, type } = valid<typeof listSchemas>(res).query;
+    const where: Prisma.BottleWhereInput = {};
+    if (categoryId) where.categoryId = categoryId;
+    if (type) where.category = { type };
 
-  const bottles = await prisma.bottle.findMany({
-    where,
-    include: { category: true },
-    orderBy: [{ category: { name: 'asc' } }, { name: 'asc' }],
-  });
-  res.json(parseNameTranslations(bottles));
-});
+    const bottles = await prisma.bottle.findMany({
+      where,
+      include: { category: true },
+      orderBy: [{ category: { name: 'asc' } }, { name: 'asc' }],
+    });
+    res.json(parseNameTranslations(bottles));
+  },
+);
 
 // The confirmation creates the bottles in batches: SQLite caps the parameters of one statement
 const CREATE_BATCH_SIZE = 500;
@@ -88,7 +110,23 @@ function parseUploadedFile(file: Express.Multer.File, language: string): Normali
 
 router.post(
   '/import/preview',
-  importUpload.single('file'),
+  doc({
+    operationId: 'previewBottleImport',
+    summary: 'Preview the import of a bottle file',
+    description:
+      'Reads the file and compares its rows with the stored categories and bottles. Nothing is written: the `payload` of the answer goes back to `POST /api/bottles/import/confirm`.',
+    upload: {
+      field: IMPORT_FILE_FIELD,
+      description:
+        'A `.csv`, `.json` or `.zip` file (an export of `GET /api/bottles/export`), read by its extension.',
+      maxBytes: MAX_BOTTLE_IMPORT_BYTES,
+    },
+    responses: { 200: BottleImportPreviewResponse },
+    errors: {
+      400: 'No file, or a file that cannot be read: `details.code` tells why (format, header, rows).',
+    },
+  }),
+  importUpload.single(IMPORT_FILE_FIELD),
   async (req: AuthRequest, res: Response) => {
     if (!req.file) throw new BadRequestError();
 
@@ -146,6 +184,14 @@ const importConfirmSchemas = { body: BottleImportConfirm };
 
 router.post(
   '/import/confirm',
+  doc({
+    operationId: 'confirmBottleImport',
+    summary: 'Import bottles',
+    description:
+      'Creates the bottles of the previewed payload, with the resolutions of the admin, in one transaction. The body may weigh up to 5 MB.',
+    responses: { 201: BottleImportConfirmResponse },
+    errors: { 409: 'A category name of the file matches several categories ignoring case.' },
+  }),
   validate(importConfirmSchemas),
   async (_req: AuthRequest, res: Response) => {
     const { payload, resolutions } = valid<typeof importConfirmSchemas>(res).body;
@@ -282,112 +328,177 @@ router.post(
 
 const exportSchemas = { query: BottleExportQuery };
 
-router.get('/export', validate(exportSchemas), async (_req: AuthRequest, res: Response) => {
-  const { categoryId, type, location, search, format } = valid<typeof exportSchemas>(res).query;
+router.get(
+  '/export',
+  doc({
+    operationId: 'exportBottles',
+    summary: 'Export the bottles',
+    description: 'As a JSON or CSV file, filtered like the list.',
+    responses: {
+      200: {
+        description: 'The file, `bottles-<date>.json` or `bottles-<date>.csv`.',
+        content: { 'application/json': BottlesExport, 'text/csv': 'text' },
+        headers: { 'Content-Disposition': 'attachment; filename="bottles-<yyyy-mm-dd>.<format>"' },
+      },
+    },
+  }),
+  validate(exportSchemas),
+  async (_req: AuthRequest, res: Response) => {
+    const { categoryId, type, location, search, format } = valid<typeof exportSchemas>(res).query;
 
-  const where: Prisma.BottleWhereInput = {};
-  if (categoryId) where.categoryId = categoryId;
-  if (type) where.category = { type };
-  if (location) where.location = { contains: location };
-  if (search) where.name = { contains: search };
+    const where: Prisma.BottleWhereInput = {};
+    if (categoryId) where.categoryId = categoryId;
+    if (type) where.category = { type };
+    if (location) where.location = { contains: location };
+    if (search) where.name = { contains: search };
 
-  const bottles = await prisma.bottle.findMany({
-    where,
-    include: { category: true },
-    orderBy: [{ category: { name: 'asc' } }, { name: 'asc' }],
-  });
+    const bottles = await prisma.bottle.findMany({
+      where,
+      include: { category: true },
+      orderBy: [{ category: { name: 'asc' } }, { name: 'asc' }],
+    });
 
-  const date = new Date().toISOString().slice(0, 10);
+    const date = new Date().toISOString().slice(0, 10);
 
-  if (format === 'csv') {
-    const csv = buildCsvPayload(bottles);
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="bottles-${date}.csv"`);
-    res.send(csv);
-    return;
-  }
+    if (format === 'csv') {
+      const csv = buildCsvPayload(bottles);
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="bottles-${date}.csv"`);
+      res.send(csv);
+      return;
+    }
 
-  const payload = buildExportPayload(bottles);
-  res.setHeader('Content-Disposition', `attachment; filename="bottles-${date}.json"`);
-  res.json(payload);
-});
+    const payload = buildExportPayload(bottles);
+    res.setHeader('Content-Disposition', `attachment; filename="bottles-${date}.json"`);
+    res.json(payload);
+  },
+);
 
-router.get('/:id', validate(idRequest), async (_req: AuthRequest, res: Response) => {
-  const bottle = await prisma.bottle.findUnique({
-    where: { id: valid<typeof idRequest>(res).params.id },
-    include: { category: true },
-  });
-  if (!bottle) throw new NotFoundError();
-  res.json(parseNameTranslations(bottle));
-});
+router.get(
+  '/:id',
+  doc({
+    operationId: 'getBottle',
+    summary: 'Get a bottle',
+    responses: { 200: Bottle },
+    errors: { 404: NOT_FOUND },
+  }),
+  validate(idRequest),
+  async (_req: AuthRequest, res: Response) => {
+    const bottle = await prisma.bottle.findUnique({
+      where: { id: valid<typeof idRequest>(res).params.id },
+      include: { category: true },
+    });
+    if (!bottle) throw new NotFoundError();
+    res.json(parseNameTranslations(bottle));
+  },
+);
 
 const createSchemas = { body: BottleCreate };
 
-router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Response) => {
-  const { quantity, ...fields } = valid<typeof createSchemas>(res).body;
+router.post(
+  '/',
+  doc({
+    operationId: 'createBottles',
+    summary: 'Create one or more identical bottles',
+    description:
+      'A `quantity` above 1 creates that many bottles and answers them all. The menus of their type follow.',
+    responses: {
+      201: {
+        description: 'The bottle, or the list of bottles for a `quantity` above 1.',
+        content: { 'application/json': z.union([Bottle, z.array(Bottle)]) },
+      },
+    },
+    errors: { 400: 'Invalid request, or the category does not exist.' },
+  }),
+  validate(createSchemas),
+  async (_req: AuthRequest, res: Response) => {
+    const { quantity, ...fields } = valid<typeof createSchemas>(res).body;
 
-  const count = quantity ?? 1;
-  // ?? and not ||: a price or an alcohol percentage of 0 is kept
-  const data = {
-    name: fields.name,
-    categoryId: fields.categoryId,
-    purchasePrice: fields.purchasePrice ?? null,
-    capacityMl: fields.capacityMl,
-    remainingPercent: fields.remainingPercent ?? 100,
-    openedAt: fields.openedAt ?? null,
-    alcoholPercentage: fields.alcoholPercentage ?? null,
-    location: fields.location || null,
-    isApero: fields.isApero ?? false,
-    isDigestif: fields.isDigestif ?? false,
-  };
+    const count = quantity ?? 1;
+    // ?? and not ||: a price or an alcohol percentage of 0 is kept
+    const data = {
+      name: fields.name,
+      categoryId: fields.categoryId,
+      purchasePrice: fields.purchasePrice ?? null,
+      capacityMl: fields.capacityMl,
+      remainingPercent: fields.remainingPercent ?? 100,
+      openedAt: fields.openedAt ?? null,
+      alcoholPercentage: fields.alcoholPercentage ?? null,
+      location: fields.location || null,
+      isApero: fields.isApero ?? false,
+      isDigestif: fields.isDigestif ?? false,
+    };
 
-  // A failed menu sync also cancels the creation of the bottles
-  const bottles = await prisma.$transaction(async (tx) => {
-    const created = await tx.bottle.createManyAndReturn({
-      data: Array.from({ length: count }, () => data),
-      include: { category: true },
+    // A failed menu sync also cancels the creation of the bottles
+    const bottles = await prisma.$transaction(async (tx) => {
+      const created = await tx.bottle.createManyAndReturn({
+        data: Array.from({ length: count }, () => data),
+        include: { category: true },
+      });
+      // Per bottle, not syncNewBottles: the new bottles join the menus in creation order
+      for (const bottle of created) await syncBottle(tx, bottle.id);
+      return created;
     });
-    // Per bottle, not syncNewBottles: the new bottles join the menus in creation order
-    for (const bottle of created) await syncBottle(tx, bottle.id);
-    return created;
-  });
-  res.status(201).json(parseNameTranslations(count === 1 ? bottles[0] : bottles));
-});
+    res.status(201).json(parseNameTranslations(count === 1 ? bottles[0] : bottles));
+  },
+);
 
 const updateSchemas = { params: IdParams, body: BottleUpdate };
 
-router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Response) => {
-  const {
-    params: { id },
-    body,
-  } = valid<typeof updateSchemas>(res);
-  const { location, ...fields } = body;
-  const bottle = await prisma.$transaction(async (tx) => {
-    // Absent fields are undefined, which Prisma leaves untouched
-    const updated = await tx.bottle.update({
-      where: { id },
-      data: {
-        ...fields,
-        ...(location !== undefined && { location: location || null }),
-      },
-      include: { category: true },
+router.put(
+  '/:id',
+  doc({
+    operationId: 'updateBottle',
+    summary: 'Update a bottle',
+    description:
+      'Only the fields present in the body change. The menus of its type follow its aperitif and digestif flags.',
+    responses: { 200: Bottle },
+    errors: { 400: 'Invalid request, or the category does not exist.', 404: NOT_FOUND },
+  }),
+  validate(updateSchemas),
+  async (_req: AuthRequest, res: Response) => {
+    const {
+      params: { id },
+      body,
+    } = valid<typeof updateSchemas>(res);
+    const { location, ...fields } = body;
+    const bottle = await prisma.$transaction(async (tx) => {
+      // Absent fields are undefined, which Prisma leaves untouched
+      const updated = await tx.bottle.update({
+        where: { id },
+        data: {
+          ...fields,
+          ...(location !== undefined && { location: location || null }),
+        },
+        include: { category: true },
+      });
+      // Always: the result must not depend on which fields the client sent
+      await syncBottle(tx, updated.id);
+      return updated;
     });
-    // Always: the result must not depend on which fields the client sent
-    await syncBottle(tx, updated.id);
-    return updated;
-  });
 
-  res.json(parseNameTranslations(bottle));
-});
+    res.json(parseNameTranslations(bottle));
+  },
+);
 
-// Refused while recipes use the bottle as a source, unless ?force=true
-router.delete('/:id', validate(deleteRequest), async (req: AuthRequest, res: Response) => {
-  const {
-    params: { id },
-    query,
-  } = valid<typeof deleteRequest>(res);
-  const impact = await deleteBottle(id, isForceRequested(query.force));
-  res.json({ message: req.t('bottles.deleted'), deleted: true, impact });
-});
+router.delete(
+  '/:id',
+  doc({
+    operationId: 'deleteBottle',
+    summary: 'Delete a bottle',
+    description: FORCED_DELETION.description,
+    responses: { 200: DeletionResponse },
+    errors: { 404: NOT_FOUND, 409: FORCED_DELETION.conflict },
+  }),
+  validate(deleteRequest),
+  async (req: AuthRequest, res: Response) => {
+    const {
+      params: { id },
+      query,
+    } = valid<typeof deleteRequest>(res);
+    const impact = await deleteBottle(id, isForceRequested(query.force));
+    res.json({ message: req.t('bottles.deleted'), deleted: true, impact });
+  },
+);
 
 export default router;

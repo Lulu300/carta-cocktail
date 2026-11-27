@@ -8,7 +8,7 @@
  * <link rel="modulepreload"> chunks; then, in the background, the precache of
  * the service worker (sw.js, vite-plugin-pwa). Fails when:
  *   - one of these chunks contains admin, login or import wizard code, the admin
- *     messages, or jszip;
+ *     messages, jszip, or the OpenAPI viewer of the API page (Scalar);
  *   - one of these chunks contains the text "JSZip" (safety net);
  *   - the total gzip size of the first load exceeds the budget;
  *   - the precache misses index.html, the web manifest or a chunk of the first
@@ -45,6 +45,8 @@ const FORBIDDEN_MODULES = [
   'src/i18n/admin.ts',
   'src/i18n/locales/admin/',
   'node_modules/jszip/',
+  // The OpenAPI viewer of the admin's API page (F-14): about 2 MB, Vue included
+  'node_modules/@scalar/',
 ];
 
 const FORBIDDEN_TEXT = 'JSZip';

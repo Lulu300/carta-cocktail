@@ -18,6 +18,9 @@ const IMAGE_MIME_TYPES = new Map([
 /** Largest cocktail photo accepted, this size included (multer's fileSize, see backend/AGENTS.md). */
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
+/** The media types of the photos a cocktail accepts, each with its file extension. */
+export const ACCEPTED_IMAGE_TYPES = [...new Set(IMAGE_MIME_TYPES.values())];
+
 function extensionOf(file: Express.Multer.File): string {
   return path.extname(file.originalname).toLowerCase();
 }
