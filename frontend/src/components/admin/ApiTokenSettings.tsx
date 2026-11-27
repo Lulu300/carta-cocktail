@@ -5,6 +5,7 @@ import {
   API_TOKEN_LIFETIME_DAYS,
   API_TOKEN_SCOPES,
   DEFAULT_API_TOKEN_LIFETIME_DAYS,
+  MAX_API_TOKEN_NAME_LENGTH,
   type ApiToken,
   type ApiTokenScope,
   type CreatedApiToken,
@@ -189,7 +190,7 @@ export default function ApiTokenSettings() {
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            maxLength={100}
+            maxLength={MAX_API_TOKEN_NAME_LENGTH}
             required
           />
         </Field>

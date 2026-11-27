@@ -262,7 +262,7 @@ Revenir à une version v1.11.x ou plus ancienne demande aussi son propre fichier
 
 ## Rotation de `JWT_SECRET`
 
-`JWT_SECRET` signe les sessions de l'admin. Le changer déconnecte toutes les sessions ouvertes, sur tous les appareils ; les données ne changent pas. Les jetons d'API n'en dépendent pas : révoquez-les dans Paramètres, ou tous à la fois avec « Se déconnecter partout ». À faire si le secret a fuité, et après avoir remis une base à la main (restauration à froid, copie `pre-migrate` ou `pre-restore`).
+`JWT_SECRET` signe les sessions de l'admin. Le changer déconnecte toutes les sessions ouvertes, sur tous les appareils ; les données ne changent pas. Les jetons d'API n'en dépendent pas : révoquez-les dans Paramètres, ou tous à la fois avec « Se déconnecter partout ». À faire si le secret a fuité, et après avoir remis une base à la main (restauration à froid, copie `pre-migrate` ou `pre-restore`). Une base remise à la main ramène aussi les jetons d'API qu'elle contenait (une copie `pre-restore-*.db` garde leurs hash) : révoquez-les ensuite, dans Paramètres ou avec « Se déconnecter partout ».
 
 1. Générer un nouveau secret : `openssl rand -hex 32`.
 2. Remplacer la valeur de `JWT_SECRET` dans `.env`.

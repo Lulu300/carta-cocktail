@@ -35,6 +35,7 @@ export {
   API_TOKEN_LIFETIME_DAYS,
   API_TOKEN_SCOPES,
   DEFAULT_API_TOKEN_LIFETIME_DAYS,
+  MAX_API_TOKEN_NAME_LENGTH,
 } from '../validation/apiTokens';
 
 export type SourceType = z.output<typeof cocktails.SourceType>;

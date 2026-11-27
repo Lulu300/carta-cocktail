@@ -8,6 +8,8 @@ export const API_TOKEN_SCOPES = ['READ_ONLY', 'READ_WRITE'] as const;
 
 export const DEFAULT_API_TOKEN_LIFETIME_DAYS = 90 as const;
 
+export const MAX_API_TOKEN_NAME_LENGTH = 100 as const;
+
 export const MENU_TYPES = ['COCKTAILS', 'APEROS', 'DIGESTIFS'] as const;
 
 export const SOURCE_KEYS = {

@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'crypto';
 import type { z } from 'zod';
-import type { ApiToken as ApiTokenRow } from '../generated/prisma/client';
+import type { ApiToken as ApiTokenRow, PrismaClient } from '../generated/prisma/client';
 import { prisma } from '../lib/prisma';
 import { ConflictError, NotFoundError } from '../errors';
 import type { ApiTokenCreate } from '../validation/apiTokens';
@@ -37,6 +37,17 @@ const API_TOKEN_FIELDS = {
 export interface Principal {
   userId: number;
   canWrite: boolean;
+}
+
+/**
+ * Whether the database has the ApiToken table. After the restore of a backup made before it
+ * existed, the table only comes back with the migrations of the next start (restartRecommended).
+ */
+export async function hasApiTokenTable(client: PrismaClient = prisma): Promise<boolean> {
+  const rows = await client.$queryRawUnsafe<{ name: string }[]>(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'ApiToken'",
+  );
+  return rows.length > 0;
 }
 
 /** Tells an API token from a session JWT, which never starts with this prefix. */

@@ -287,6 +287,18 @@ describe('the OpenAPI documents', () => {
     expect(schemas).not.toContain('BackupRestoreResult');
   });
 
+  it('should leave the API tokens out of the public document', () => {
+    const publicDocument = JSON.stringify(documentOf('public'));
+    const fullDocument = JSON.stringify(documentOf('full'));
+
+    for (const term of ['apiToken', 'carta_', 'SessionOnly', 'ReadOnlyApiToken']) {
+      expect(publicDocument).not.toContain(term);
+      expect(fullDocument).toContain(term);
+    }
+    const publicMenus = documentOf('public').paths['/api/public/menus']?.get as Operation;
+    expect(publicMenus.security).toEqual([{}, { bearerAuth: [] }]);
+  });
+
   it('should describe the error body once and refer to it from every client error response', () => {
     const document = documentOf('full');
     const errorResponses = operationsOf(document).flatMap(({ operation }) =>

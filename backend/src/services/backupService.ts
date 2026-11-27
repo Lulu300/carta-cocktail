@@ -9,6 +9,7 @@ import { PRISMA_DIR, resolveDatabasePath } from '../lib/databasePath';
 import { checkpointWal, configureSqlite, createPrismaClient, prisma } from '../lib/prisma';
 import { BadRequestError, ConflictError } from '../errors';
 import { hasTokenVersionColumn, writeSessionFloor } from './sessionFloor';
+import { hasApiTokenTable } from './apiTokenService';
 import { APP_STATE_ID } from './upgradeNoticeService';
 import { backfillImageVariants } from './cocktail/imageVariants';
 
@@ -68,7 +69,7 @@ async function listTables(client: PrismaClient): Promise<string[]> {
  * existed has nothing to delete.
  */
 async function removeApiTokens(client: PrismaClient): Promise<void> {
-  if (!(await listTables(client)).includes('ApiToken')) return;
+  if (!(await hasApiTokenTable(client))) return;
   // The pragma returns a row, so it needs $queryRaw rather than $executeRaw
   await client.$queryRawUnsafe('PRAGMA secure_delete = ON');
   await client.$executeRawUnsafe('DELETE FROM "ApiToken"');

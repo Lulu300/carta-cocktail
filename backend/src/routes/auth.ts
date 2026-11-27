@@ -1,9 +1,11 @@
 import { Router, Request, Response } from 'express';
+import type { Prisma } from '../generated/prisma/client';
 import { prisma } from '../lib/prisma';
 import { hashPassword, needsRehash, verifyPassword } from '../bootstrap/password';
 import { authenticatedUserId, authMiddleware, AuthRequest, signToken } from '../middleware/auth';
 import { NotFoundError, UnauthorizedError } from '../errors';
 import { apiDocs } from '../openapi/routeDoc';
+import { hasApiTokenTable } from '../services/apiTokenService';
 import { valid, validate } from '../validation/validate';
 import { LoginBody, LoginResponse, User } from '../validation/auth';
 import { MessageResponse } from '../validation/common';
@@ -78,7 +80,9 @@ router.get(
 
 // Revokes every session of the user, including the one sending this request, and deletes
 // every API token (decision of 2026-11-27, F-16): the confirmation in Settings says so.
-// API tokens cannot call it (SESSION_ONLY_ROUTES in app.ts).
+// API tokens cannot call it (SESSION_ONLY_ROUTES in app.ts). Until the restart that follows
+// the restore of a backup older than the tokens, there is no table, and no token to delete:
+// the sessions must still end.
 router.post(
   '/logout-all',
   doc({
@@ -91,10 +95,13 @@ router.post(
   authMiddleware,
   async (req: AuthRequest, res: Response) => {
     const userId = authenticatedUserId(req);
-    await prisma.$transaction([
+    const operations: Prisma.PrismaPromise<unknown>[] = [
       prisma.user.update({ where: { id: userId }, data: { tokenVersion: { increment: 1 } } }),
-      prisma.apiToken.deleteMany({ where: { userId } }),
-    ]);
+    ];
+    if (await hasApiTokenTable()) {
+      operations.push(prisma.apiToken.deleteMany({ where: { userId } }));
+    }
+    await prisma.$transaction(operations);
     res.json({ message: req.t('auth.loggedOutEverywhere') });
   },
 );

@@ -62,7 +62,7 @@
     },
     "apiTokenReadOnly": "This API token is read-only: create a read and write token to change data",
     "apiTokenSessionOnly": "API tokens cannot use this route: sign in to the admin panel instead",
-    "apiTokenLimit": "You already have {{max}} active API tokens: revoke one before creating another"
+    "apiTokenLimit": "You already have {{max, number}} active API tokens: revoke one before creating another"
   },
   "auth": {
     "loginSuccess": "Login successful",

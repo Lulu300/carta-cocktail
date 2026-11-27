@@ -1438,6 +1438,12 @@ describe('backup and API tokens', () => {
     const res = await importBackup(backup);
 
     expect(res.status).toBe(200);
+    // Before the restart: "Sign out everywhere" still ends the sessions, without the table
+    const session = await currentSessionHeader();
+    const logoutAll = await request.post('/api/auth/logout-all').set(session);
+    expect(logoutAll.status).toBe(200);
+    expect(await unitsStatus(session)).toBe(401);
+    // Next start: the migration creates the table, empty
     await applyApiTokensMigration();
     expect(await unitsStatus(header)).toBe(401);
   });

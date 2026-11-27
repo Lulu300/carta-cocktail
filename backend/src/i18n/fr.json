@@ -62,7 +62,7 @@
     },
     "apiTokenReadOnly": "Ce jeton d'API est en lecture seule : créez un jeton en lecture et écriture pour modifier les données",
     "apiTokenSessionOnly": "Les jetons d'API ne peuvent pas utiliser cette route : connectez-vous à l'administration",
-    "apiTokenLimit": "Vous avez déjà {{max}} jetons d'API actifs : révoquez-en un avant d'en créer un autre"
+    "apiTokenLimit": "Vous avez déjà {{max, number}} jetons d'API actifs : révoquez-en un avant d'en créer un autre"
   },
   "auth": {
     "loginSuccess": "Connexion réussie",

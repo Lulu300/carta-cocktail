@@ -9,7 +9,7 @@ export const ApiTokenScope = z.enum(API_TOKEN_SCOPES);
 export const API_TOKEN_LIFETIME_DAYS = [30, 90, 365] as const;
 export const DEFAULT_API_TOKEN_LIFETIME_DAYS = 90;
 
-const MAX_API_TOKEN_NAME_LENGTH = 100;
+export const MAX_API_TOKEN_NAME_LENGTH = 100;
 
 export const ApiTokenCreate = z.object({
   name: RequiredText.max(MAX_API_TOKEN_NAME_LENGTH),
