@@ -11,7 +11,7 @@ depends_on: [F-02]
 touches: [frontend/src/queries/public.ts, frontend/src/queries/public.test.tsx]
 sources: []
 branch: fix/F-12-public-queries-offline-first
-pr:
+pr: 293
 ---
 
 ## Contexte
