@@ -313,7 +313,10 @@ the 2026-07-28 revision, and the stateless form of the 2025 ones (`initialize`);
 - **A tool call** is an HTTP request to the server itself, at the address that received the MCP request
   (`callOperation()`), with the same `Authorization` and `Accept-Language`, and the client address in
   `X-Forwarded-For`: the route runs its own validation, scope check, rate limit and errors. A tool call counts twice
-  against `API_RATE_LIMIT`. The SDK does not validate the arguments (`advertisedOnly()`): an error answers the API's
+  against `API_RATE_LIMIT` (under the backend's own address when `TRUST_PROXY` does not trust it). Before building
+  the URL, the path parameters are checked with the route's `params` schema, and an empty value, `.` or `..` (which
+  the URL would resolve into another route) is refused: 400 in the form of the API's errors. The API request waits
+  `OPERATION_TIMEOUT_MS` (30 s) at most, then the tool answers 504 (`errors.mcpToolTimeout`). The SDK does not validate the arguments (`advertisedOnly()`): an error answers the API's
   status, message and `details` as the text of an `isError` result.
 - **Scope**: a read-only token does not see the tools whose method writes (calling one answers "tool not found"),
   and the API route would refuse it anyway. Deletions, the backup restore and "log out everywhere" are never tools.

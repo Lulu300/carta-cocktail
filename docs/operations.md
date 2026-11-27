@@ -370,7 +370,8 @@ L'instance sert un serveur [MCP](https://modelcontextprotocol.io) (Model Context
 
 - Un jeton en lecture seule ne voit pas les outils d'écriture.
 - Aucun outil ne supprime, ne restaure une sauvegarde ni ne « déconnecte partout » : ces actions restent dans l'admin.
-- Chaque outil appelle une route de l'API avec le même jeton : mêmes contrôles, et mêmes erreurs (statut, message, `details`), dans la langue de l'en-tête `Accept-Language` du client. Un appel d'outil compte pour deux requêtes dans `API_RATE_LIMIT` : celle du client MCP, et celle de l'outil vers l'API.
+- Chaque outil appelle une route de l'API avec le même jeton : mêmes contrôles, et mêmes erreurs (statut, message, `details`), dans la langue de l'en-tête `Accept-Language` du client. Un appel d'outil compte pour deux requêtes dans `API_RATE_LIMIT` : celle du client MCP, et celle de l'outil vers l'API. Avec `TRUST_PROXY=0`, ou une liste qui n'inclut pas l'adresse du backend lui-même, la requête de l'outil vers l'API est comptée sous l'adresse du backend, dans un compteur partagé par tous les clients MCP.
+- Un outil attend la réponse de l'API 30 secondes au plus, puis répond une erreur `504`.
 - Les schémas d'entrée et de sortie des outils sont ceux de l'API (document OpenAPI), écrits en entier, sans référence : un client Code Mode en tire une API TypeScript.
 
 **Claude Code.** Remplacez l'adresse et le jeton :

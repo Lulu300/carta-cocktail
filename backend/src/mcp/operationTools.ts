@@ -34,6 +34,8 @@ export interface OperationTool {
   outputSchema: JsonSchema;
   /** Where each argument goes in the request. */
   argumentParts: Record<string, RequestPart>;
+  /** The route's schema of its path parameters: checked before they go into the URL. */
+  paramsSchema?: z.ZodType;
   /** The response is an array, sent as `{ items }`: a structured result is an object. */
   wrapsItems: boolean;
   annotations: Required<ToolHints> & { idempotentHint: boolean; openWorldHint: boolean };
@@ -132,6 +134,7 @@ export function buildOperationTools(
       inputSchema: input.schema,
       outputSchema: output.schema,
       argumentParts: input.argumentParts,
+      paramsSchema: route.schemas.params,
       wrapsItems: output.wrapsItems,
       annotations: {
         readOnlyHint: tool.hints?.readOnlyHint ?? !writes,

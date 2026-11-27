@@ -61,6 +61,7 @@
       "tooManyBottles": "The import would create more than {{max, number}} bottles: split it into several imports"
     },
     "apiTokenReadOnly": "This API token is read-only: create a read and write token to change data",
+    "mcpToolTimeout": "The API took too long to answer the tool: try again",
     "apiTokenSessionOnly": "API tokens cannot use this route: sign in to the admin panel instead",
     "apiTokenLimit": "You already have {{max, number}} active API tokens: revoke one before creating another"
   },

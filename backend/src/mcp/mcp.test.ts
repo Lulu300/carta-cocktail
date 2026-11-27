@@ -1,3 +1,4 @@
+import http from 'http';
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import {
   Client,
@@ -6,6 +7,7 @@ import {
   StreamableHTTPClientTransport,
 } from '@modelcontextprotocol/client';
 import { appVersion } from '../config';
+import i18next from '../i18n';
 import { resetRateLimits } from '../middleware/rateLimit';
 import {
   setupTestDatabase,
@@ -29,8 +31,8 @@ import {
   prisma,
 } from '../test/helpers';
 import { TOOL_CATALOG } from './catalog';
-import { callOperation } from './callOperation';
-import { operationToolsOf } from './operationTools';
+import { type Caller, callOperation } from './callOperation';
+import { type OperationTool, operationToolsOf } from './operationTools';
 import app from '../app';
 
 let server: ListeningServer;
@@ -93,6 +95,30 @@ const READ_TOOLS = [
   'get_menu',
 ];
 const ALL_TOOLS = TOOL_CATALOG.map((tool) => tool.name);
+
+function toolNamed(name: string): OperationTool {
+  const tool = operationToolsOf(app).find((candidate) => candidate.name === name);
+  if (!tool) throw new Error(`No tool ${name}`);
+  return tool;
+}
+
+/** A caller of callOperation() outside an MCP request, in English. */
+function callerWith(authorization: string, origin = endpoint.origin): Caller {
+  const t = i18next.getFixedT('en');
+  return {
+    origin,
+    authorization,
+    clientIp: '127.0.0.1',
+    translate: (key) => t(key),
+  };
+}
+
+/** The error a tool answered: the JSON of its text content. */
+function errorOf(result: { isError?: boolean; content?: unknown }): unknown {
+  expect(result.isError).toBe(true);
+  const [content] = result.content as { text: string }[];
+  return JSON.parse(content!.text);
+}
 
 /** Walks a JSON value and lists every `$ref`. */
 function refsIn(value: unknown): string[] {
@@ -186,11 +212,9 @@ describe('tokens and scope', () => {
   it('should leave the scope to the API too: its route refuses the write of a read-only token', async () => {
     const bottle = await seedBottle({ remainingPercent: 100 });
     const { header } = await seedApiToken({ scope: 'READ_ONLY' });
-    const updateBottle = operationToolsOf(app).find((tool) => tool.name === 'update_bottle')!;
-
     const response = await callOperation(
-      { origin: endpoint.origin, authorization: header.Authorization!, clientIp: '127.0.0.1' },
-      updateBottle,
+      callerWith(header.Authorization!),
+      toolNamed('update_bottle'),
       { id: bottle.id, remainingPercent: 0 },
     );
 
@@ -388,12 +412,112 @@ describe('tool errors', () => {
       arguments: { id: bottle.id, remainingPercent: 150 },
     });
 
-    expect(result.isError).toBe(true);
-    const [content] = result.content as { text: string }[];
-    expect(JSON.parse(content!.text)).toMatchObject({
+    expect(errorOf(result)).toMatchObject({
       status: 400,
       error: 'Erreur de validation',
       details: [{ path: 'body.remainingPercent', code: 'too_big' }],
     });
+  });
+
+  it.each(['.', '..', '', 'abc', '1/..', '-1'])(
+    'should refuse the path parameter %j before it reaches the URL, as the API would',
+    async (id) => {
+      await seedFullCocktail();
+      const client = await connect(await readOnlyHeader());
+
+      const result = await client.callTool({ name: 'get_cocktail', arguments: { id } });
+
+      // `.` and `..` would otherwise call GET /api/cocktails/ or GET /api/ and answer a list
+      expect(errorOf(result)).toMatchObject({
+        status: 400,
+        error: 'Validation error',
+        details: [{ path: 'params.id' }],
+      });
+    },
+  );
+
+  it('should refuse a missing path parameter, in the language of the request', async () => {
+    const client = await connect({ ...(await readOnlyHeader()), 'Accept-Language': 'fr' });
+
+    const result = await client.callTool({ name: 'get_cocktail', arguments: {} });
+
+    expect(errorOf(result)).toMatchObject({
+      status: 400,
+      error: 'Erreur de validation',
+      details: [{ path: 'params.id' }],
+    });
+  });
+
+  it('should refuse a dot segment even where the schema of the route would take it', async () => {
+    // A string parameter: only the segment check stands between ".." and another route
+    const tool = { ...toolNamed('get_cocktail'), paramsSchema: undefined };
+
+    const response = await callOperation(callerWith(`Bearer ${getAuthToken()}`), tool, {
+      id: '..',
+    });
+
+    expect(response).toEqual({
+      status: 400,
+      body: {
+        error: 'Validation error',
+        details: [{ path: 'params.id', code: 'custom', message: 'Must not be empty, "." or ".."' }],
+      },
+    });
+  });
+
+  describe('an API that does not answer', () => {
+    let silent: ListeningServer;
+
+    beforeAll(async () => {
+      // Accepts the connection and never answers
+      silent = await listenOnLoopback(http.createServer(() => undefined));
+    });
+    afterAll(() => silent.close());
+
+    it('should answer 504 once the timeout of the tool is over', async () => {
+      const caller = callerWith(`Bearer ${getAuthToken()}`, `http://127.0.0.1:${silent.port}`);
+
+      const response = await callOperation(caller, toolNamed('list_units'), {}, undefined, 50);
+
+      expect(response).toEqual({
+        status: 504,
+        body: { error: 'The API took too long to answer the tool: try again' },
+      });
+    });
+
+    it('should let the cancellation of the tool call by the client through', async () => {
+      const caller = callerWith(`Bearer ${getAuthToken()}`, `http://127.0.0.1:${silent.port}`);
+      const cancelled = new AbortController();
+      const call = callOperation(caller, toolNamed('list_units'), {}, cancelled.signal);
+      cancelled.abort();
+
+      await expect(call).rejects.toThrow(/abort/i);
+    });
+  });
+});
+
+describe('requests to the server itself', () => {
+  it('should ignore the host a client claims: the API request goes to the local address', async () => {
+    // Forged headers would send an API request built from them, token included, elsewhere (SSRF)
+    await seedUnit({ name: 'Centiliter' });
+    const { header } = await seedApiToken({ scope: 'READ_ONLY' });
+
+    const res = await request
+      .post('/api/mcp')
+      .set(header)
+      .set('Host', 'attacker.example')
+      .set('X-Forwarded-Host', 'attacker.example')
+      .set('X-Forwarded-Proto', 'https')
+      .set('Accept', 'application/json, text/event-stream')
+      .send({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name: 'list_units', arguments: {} },
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.text).not.toContain('isError');
+    expect(res.text).toContain('Centiliter');
   });
 });

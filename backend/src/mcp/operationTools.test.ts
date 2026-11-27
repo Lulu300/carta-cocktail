@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import express, { Router } from 'express';
 import { z } from 'zod';
 import app from '../app';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware, refuseApiTokens } from '../middleware/auth';
 import { mountApiRouter } from '../openapi/mounts';
 import { collectApiRoutes } from '../openapi/operations';
 import { apiDocs } from '../openapi/routeDoc';
@@ -128,6 +128,23 @@ describe('buildOperationTools', () => {
         ),
       'publicItems',
       /the route is public/,
+    ],
+    [
+      'a route reserved to the session',
+      () =>
+        routesOf(
+          (router) =>
+            router.get(
+              '/',
+              doc({ operationId: 'sessionItems', summary: 'List', responses: { 200: Item } }),
+              ok,
+            ),
+          // As SESSION_ONLY_ROUTES of app.ts: no API token, whatever its scope
+          refuseApiTokens,
+          authMiddleware,
+        ),
+      'sessionItems',
+      /the route is session, not admin/,
     ],
     [
       'a body that is not an object',

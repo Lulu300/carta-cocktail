@@ -137,7 +137,7 @@ export const TOOL_CATALOG: ToolDefinition[] = [
     operationId: 'updateMenu',
     title: 'Update or publish a menu',
     description:
-      'Changes the fields given, and only those. `isPublic` publishes or unpublishes the menu. `cocktails` (or `bottles`, on a personal bottle menu) replaces the whole list of the menu: to add or remove one, read the menu with `get_menu` and send the full new list. The bottles of the aperitif and digestif menus follow their flags: use `exclude_menu_bottles` there. Example: {"id": 3, "isPublic": true, "cocktails": [{"cocktailId": 12}, {"cocktailId": 7, "isHidden": true}]}',
+      'Changes the fields given, and only those. `isPublic` publishes or unpublishes the menu. `cocktails` (or `bottles`, on a personal bottle menu) replaces the whole list of the menu: to add or remove one, read the menu with `get_menu` and send the full new list. The bottles of the aperitif and digestif menus follow their flags: use `exclude_menu_bottles` there. Changing the `slug` of a published menu breaks the links already shared and the printed QR codes: leave it unless the admin asks. Example: {"id": 3, "isPublic": true, "cocktails": [{"cocktailId": 12}, {"cocktailId": 7, "isHidden": true}]}',
     hints: { destructiveHint: true },
   },
   {

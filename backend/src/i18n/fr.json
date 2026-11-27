@@ -61,6 +61,7 @@
       "tooManyBottles": "L'import créerait plus de {{max, number}} bouteilles : répartissez-le en plusieurs imports"
     },
     "apiTokenReadOnly": "Ce jeton d'API est en lecture seule : créez un jeton en lecture et écriture pour modifier les données",
+    "mcpToolTimeout": "L’API a mis trop de temps à répondre à l’outil : réessayez",
     "apiTokenSessionOnly": "Les jetons d'API ne peuvent pas utiliser cette route : connectez-vous à l'administration",
     "apiTokenLimit": "Vous avez déjà {{max, number}} jetons d'API actifs : révoquez-en un avant d'en créer un autre"
   },
