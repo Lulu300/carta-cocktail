@@ -5,13 +5,13 @@ phase: F
 lane: ci
 criticite: basse
 effort: L
-status: todo
+status: done
 owner: agent
 depends_on: [D-08]
-touches: [e2e/, .github/workflows/]
+touches: [e2e/, .github/workflows/, .github/dependabot.yml, AGENTS.md, frontend/AGENTS.md, README.md]
 sources: ["04-tests.md §7"]
-branch:
-pr:
+branch: test/F-04-playwright-e2e
+pr: 297
 ---
 
 ## Contexte
@@ -39,10 +39,10 @@ Le smoke test D-08 vérifie la tuyauterie (nginx, upload, volume) avec `curl`. I
 
 ## Critères d'acceptation
 
-- [ ] `cd e2e && npx playwright test` passe en local contre `docker compose up -d --wait`.
-- [ ] Le workflow E2E tourne sur les PR vers `develop` et publie le rapport en cas d'échec.
-- [ ] Les 6 parcours passent trois fois de suite sans échec intermittent.
-- [ ] Le job dure moins de 15 minutes.
+- [x] `cd e2e && npx playwright test` passe en local contre `docker compose up -d --wait`.
+- [x] Le workflow E2E tourne sur les PR vers `develop` et publie le rapport en cas d'échec.
+- [x] Les 6 parcours passent trois fois de suite sans échec intermittent.
+- [x] Le job dure moins de 15 minutes.
 
 ## Tests à ajouter ou adapter
 
@@ -58,3 +58,4 @@ Le smoke test D-08 vérifie la tuyauterie (nginx, upload, volume) avec `curl`. I
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-11-27 : PR 297 (branche `test/F-04-playwright-e2e`). Faits vérifiés : D-08 fait (`smoke.yml`), `docs/plan` à jour. Choix : pile compose (comme prévu), Chromium seul (le profil Pixel 7 tourne sur Chromium), un seul worker (une base SQLite), aucun retry. Parcours : connexion et déconnexion, jeton invalide ou rejeté en cours de session, catégorie → bouteille → cocktail avec photo, carte avec section publiée et lue par un invité (contexte sans jeton), recherche (accents, aucun résultat), export puis restauration d'une sauvegarde, et les parcours apparus depuis : carte hors ligne (F-02, service worker bloqué = le test échoue), thème clair après rechargement (F-06), page 404 (E-20), carte personnelle de bouteilles (F-08). Les données passent par l'API (`AdminApi`) avec un suffixe unique, la base n'est jamais remise à zéro (les listes sont paginées : le test cherche sa ligne). Une seule connexion par l'API (`auth.setup.ts`) ; le parcours de sauvegarde se reconnecte après la restauration, qui coupe toutes les sessions. Workflow `e2e.yml` : PR vers `develop`, non requis, 15 minutes au plus, rapport Playwright (traces, captures) et journaux compose en artefact en cas d'échec ; `/e2e` ajouté à Dependabot. 19 tests (dont les 5 fichiers publics rejoués en mobile) passent trois fois de suite en local, environ 14 s chacun. Sans notes de version (aucun effet visible). Reste à l'humain : rendre le check obligatoire (D-07) après quelques semaines stables.

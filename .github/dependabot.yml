@@ -56,6 +56,23 @@ updates:
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
 
+  # Playwright journeys (F-04). Every update runs in the E2E workflow.
+  - package-ecosystem: npm
+    directory: /e2e
+    target-branch: develop
+    schedule: { interval: weekly, day: monday, timezone: Europe/Paris }
+    open-pull-requests-limit: 5
+    commit-message: { prefix: "chore(deps)" }
+    labels: [dependencies, ci]
+    groups:
+      e2e-minor-patch:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+
   # Dependabot only updates a `FROM` with a literal tag, not one built from an
   # ARG: the Dockerfiles must keep literal tags.
   - package-ecosystem: docker
