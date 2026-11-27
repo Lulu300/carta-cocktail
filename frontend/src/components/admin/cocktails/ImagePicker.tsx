@@ -1,6 +1,6 @@
 import { useEffect, useId, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getUploadUrl } from '../../../utils/uploads';
+import UploadedPhoto from '../../ui/UploadedPhoto';
 import { exceedsUploadLimit, MAX_IMAGE_BYTES } from '../../../utils/uploadLimits';
 import Card from '../../ui/Card';
 
@@ -9,6 +9,8 @@ interface ImagePickerProps {
   imagePath: string | null;
   onChange: (file: File) => void;
 }
+
+const PHOTO_CLASSES = 'w-24 h-24 object-cover rounded-lg';
 
 export default function ImagePicker({ imagePath, onChange }: ImagePickerProps) {
   const { t } = useTranslation();
@@ -39,15 +41,19 @@ export default function ImagePicker({ imagePath, onChange }: ImagePickerProps) {
     onChange(file);
   };
 
-  const shownUrl = previewUrl ?? getUploadUrl(imagePath);
-
   return (
     <Card>
       <label htmlFor={inputId} className="block text-sm text-fg-muted mb-2">
         {t('cocktails.image')}
       </label>
       <div className="flex items-center gap-4">
-        {shownUrl && <img src={shownUrl} alt="" className="w-24 h-24 object-cover rounded-lg" />}
+        {previewUrl ? (
+          <img src={previewUrl} alt="" className={PHOTO_CLASSES} />
+        ) : (
+          imagePath && (
+            <UploadedPhoto imagePath={imagePath} sizes="6rem" alt="" className={PHOTO_CLASSES} />
+          )
+        )}
         <input
           id={inputId}
           type="file"

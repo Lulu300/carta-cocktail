@@ -58,7 +58,7 @@ frontend/
 │   │   │                       # Cocktails, CocktailForm, Menus, MenuEdit, MenuBottleEdit, Shortages, Settings)
 │   │   ├── auth/
 │   │   │   └── LoginPage.tsx   # Admin login
-│   │   └── public/             # HomePage, MenuPublicPage, CocktailPublicPage and their parts (UploadedPhoto: srcset with fallback)
+│   │   └── public/             # HomePage, MenuPublicPage, CocktailPublicPage and their parts
 │   │                           # (sections, search bar, skeletons, error state, useMenuFilter, useScrollRestoration)
 │   ├── components/
 │   │   ├── admin/              # Shared admin parts: DataTable, TranslationFields, DeletionImpactList,
@@ -70,7 +70,8 @@ frontend/
 │   │   ├── import/             # Cocktail import wizard (upload, resolve, confirm) and bottle import wizard
 │   │   ├── layout/             # AdminLayout, PublicLayout, RouteErrorBoundary, SkipLink, AppVersion, BackHomeLink
 │   │   └── ui/                 # Design system: Button, Field, Input, Select, Modal, ConfirmDialog, Toaster,
-│   │                           # Pagination, SearchInput, SortableHeader, DateInput, LanguageSelector, IconButton…
+│   │                           # Pagination, SearchInput, SortableHeader, DateInput, LanguageSelector, IconButton,
+│   │                       # UploadedPhoto (cocktail photo: srcset, falls back to the photo itself)…
 │   ├── contexts/
 │   │   ├── AuthContext.tsx         # Login/logout, token management, auth state
 │   │   ├── ConfirmContext.tsx      # Confirmation dialog opened from any component

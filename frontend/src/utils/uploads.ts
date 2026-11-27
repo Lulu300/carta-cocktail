@@ -19,7 +19,7 @@ const COPY_WIDTHS = [480, 960];
 /**
  * `srcset` of a stored photo: the browser picks the smallest file that fills the
  * displayed size. A photo stored before the copies existed may still lack them:
- * the <img> then drops this `srcset` and shows the photo itself (UploadedPhoto).
+ * the <img> then drops this `srcset` and shows the photo itself (components/ui/UploadedPhoto).
  */
 export function getUploadSrcSet(
   imagePath: string | null | undefined,

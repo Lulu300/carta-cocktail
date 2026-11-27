@@ -9,7 +9,7 @@ import type { Cocktail, CocktailIngredient } from '../../types';
 import Button from '../../components/ui/Button';
 import UnitConverter from '../../components/ui/UnitConverter';
 import ExportCocktailButton from '../../components/ui/ExportCocktailButton';
-import UploadedPhoto from './UploadedPhoto';
+import UploadedPhoto from '../../components/ui/UploadedPhoto';
 import CocktailSkeleton from './CocktailSkeleton';
 import PublicErrorState from './PublicErrorState';
 import type { CocktailLinkState } from './PublicCocktailItem';
