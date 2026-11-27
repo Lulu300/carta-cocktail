@@ -76,6 +76,7 @@ const samplePreview: BottleImportPreviewResponse = {
     },
   ],
   errors: [],
+  warnings: [],
 };
 
 const importDone: BottleImportConfirmResponse = {
@@ -250,6 +251,7 @@ describe('ImportBottlesWizard', () => {
         },
       ],
       errors: [],
+      warnings: [],
     });
     render(<ImportBottlesWizard onClose={() => undefined} />);
     await user.upload(fileInput(), new File(['x'], 'bottles.json'));

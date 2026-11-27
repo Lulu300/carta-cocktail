@@ -1,5 +1,5 @@
 import { menuSections as menuSectionsApi } from '../../../services/api';
-import type { Menu, MenuSection } from '../../../types';
+import type { MenuDetail, MenuSection } from '../../../types';
 import { orderByIds } from './moveItem';
 import { updateMenu, useMenuMutation, type MenuMutation } from './useMenuMutation';
 
@@ -16,16 +16,16 @@ export interface MenuSectionsMutations {
   reorder: MenuMutation<number[]>;
 }
 
-function withSections(menu: Menu, update: (sections: MenuSection[]) => MenuSection[]): Menu {
-  return { ...menu, sections: update(menu.sections ?? []) };
+function withSections(
+  menu: MenuDetail,
+  update: (sections: MenuSection[]) => MenuSection[],
+): MenuDetail {
+  return { ...menu, sections: update(menu.sections) };
 }
 
 /** Items of a deleted section move out of any section, as the database does (onDelete: SetNull). */
-function withoutSection<T extends { menuSectionId: number | null }>(
-  items: T[] | undefined,
-  sectionId: number,
-) {
-  return items?.map((item) =>
+function withoutSection<T extends { menuSectionId: number | null }>(items: T[], sectionId: number) {
+  return items.map((item) =>
     item.menuSectionId === sectionId ? { ...item, menuSectionId: null } : item,
   );
 }

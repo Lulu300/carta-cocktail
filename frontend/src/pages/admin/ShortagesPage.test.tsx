@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, within } from '../../test/test-utils';
 import userEvent from '@testing-library/user-event';
-import { buildShortage } from '../../test/factories';
+import { buildCategoryType, buildShortage } from '../../test/factories';
 import {
   captureRequest,
   mockApiError,
@@ -58,7 +58,15 @@ describe('ShortagesPage', () => {
       nameTranslations?: Record<string, string>,
     ) =>
       buildShortage({
-        category: { name, type, categoryType: { name: type, nameTranslations, color: 'gray' } },
+        category: {
+          name,
+          type,
+          categoryType: buildCategoryType({
+            name: type,
+            nameTranslations: nameTranslations ?? null,
+            color: 'gray',
+          }),
+        },
       });
 
     it('tells the stored names apart, and labels the empty name', async () => {
@@ -88,16 +96,6 @@ describe('ShortagesPage', () => {
         within(getCard('Rum')).getByText('Spirits – ␣SPIRIT␣ (with spaces)'),
       ).toBeInTheDocument();
       expect(within(getCard('Gin')).getByText('Spirits')).toBeInTheDocument();
-    });
-
-    it('marks the stored name of a category sent without its type', async () => {
-      mockShortages([
-        buildShortage({ category: { name: 'Rum', type: 'X  Y', categoryType: null } }),
-      ]);
-      render(<ShortagesPage />);
-
-      await screen.findByRole('heading', { name: 'Rum' });
-      expect(within(getCard('Rum')).getByText('X␣␣Y (with spaces)')).toBeInTheDocument();
     });
   });
 

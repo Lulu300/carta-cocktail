@@ -5,7 +5,8 @@ import {
   buildAvailability,
   buildBottle,
   buildCategory,
-  buildCategoryType,
+  buildCategoryListItem,
+  buildCategoryTypeListItem,
   buildCocktail,
   buildIngredient,
   buildMenu,
@@ -13,7 +14,7 @@ import {
   buildMenuSection,
   buildPublicCocktail,
   buildPublicMenu,
-  buildPublicMenuSummary,
+  buildMenuSummary,
   buildSiteSettings,
   buildAdminSiteSettings,
   buildUnit,
@@ -93,8 +94,8 @@ const authHandlers = [
 const categoryTypeHandlers = [
   http.get('/api/category-types', () =>
     HttpResponse.json([
-      buildCategoryType({ name: 'SPIRIT', color: 'blue' }),
-      buildCategoryType({ name: 'SYRUP', color: 'purple' }),
+      buildCategoryTypeListItem({ name: 'SPIRIT', color: 'blue' }),
+      buildCategoryTypeListItem({ name: 'SYRUP', color: 'purple' }),
     ]),
   ),
   http.post('/api/category-types', async ({ request }) =>
@@ -116,7 +117,7 @@ const categoryTypeHandlers = [
 
 const categoryHandlers = [
   http.get('/api/categories', () =>
-    HttpResponse.json([buildCategory({ id: 1 }), buildCategory({ id: 2 })]),
+    HttpResponse.json([buildCategoryListItem({ id: 1 }), buildCategoryListItem({ id: 2 })]),
   ),
   http.get('/api/categories/:id', ({ params }) =>
     HttpResponse.json(buildCategory({ id: Number(params.id) })),
@@ -236,7 +237,7 @@ const menuSectionHandlers = [
 ];
 
 const publicHandlers = [
-  http.get('/api/public/menus', () => HttpResponse.json([buildPublicMenuSummary({ id: 1 })])),
+  http.get('/api/public/menus', () => HttpResponse.json([buildMenuSummary({ id: 1 })])),
   http.get('/api/public/menus/:slug', ({ params }) =>
     HttpResponse.json(buildPublicMenu({ id: 1, slug: String(params.slug) })),
   ),

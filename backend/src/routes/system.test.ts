@@ -4,9 +4,11 @@ import os from 'os';
 import path from 'path';
 import { config } from '../config';
 import { recordStartup } from '../services/upgradeNoticeService';
+import { UpgradeNotice } from '../validation/system';
 import {
   authHeader,
   cleanDatabase,
+  expectContract,
   prisma,
   request,
   seedAppState,
@@ -77,7 +79,7 @@ describe('GET /api/system/upgrade-notice', () => {
     const res = await request.get('/api/system/upgrade-notice').set(authHeader());
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({
+    expect(expectContract(UpgradeNotice, res.body)).toEqual({
       from: '1.5.0',
       to: '1.6.0',
       actions: [

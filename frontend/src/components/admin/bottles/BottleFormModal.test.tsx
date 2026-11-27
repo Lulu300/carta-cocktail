@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { buildBottle, buildCategory, buildCategoryType } from '../../../test/factories';
-import type { Bottle, Category } from '../../../types';
+import { buildBottle, buildCategoryListItem, buildCategoryType } from '../../../test/factories';
+import type { Bottle, CategoryListItem } from '../../../types';
 import { useEntityForm } from '../useEntityForm';
 import BottleFormModal from './BottleFormModal';
 import { toBottleForm, type BottleInput } from './bottleForm';
@@ -18,7 +18,7 @@ function BottleFormHarness({
   bottle,
   onSubmit,
 }: {
-  categories: Category[];
+  categories: CategoryListItem[];
   bottle?: Bottle;
   onSubmit: (data: BottleInput) => void;
 }) {
@@ -52,7 +52,7 @@ function dialog() {
 }
 
 describe('BottleFormModal', () => {
-  const categories = [buildCategory({ id: 1 })];
+  const categories = [buildCategoryListItem({ id: 1 })];
 
   it('sends a date typed in French as an ISO date', async () => {
     const onSubmit = vi.fn();
@@ -102,14 +102,14 @@ describe('BottleFormModal', () => {
       type: string,
       nameTranslations?: Record<string, string>,
     ) =>
-      buildCategory({
+      buildCategoryListItem({
         id,
         name,
         type,
-        categoryType: buildCategoryType({ name: type, nameTranslations }),
+        categoryType: buildCategoryType({ name: type, nameTranslations: nameTranslations ?? null }),
       });
 
-    async function categoryOptions(categoryList: Category[]) {
+    async function categoryOptions(categoryList: CategoryListItem[]) {
       await renderOpenForm({ categories: categoryList, onSubmit: vi.fn() });
       return within(dialog().getByLabelText('Catégorie'))
         .getAllByRole('option')
@@ -143,14 +143,6 @@ describe('BottleFormModal', () => {
           categoryOfType(2, 'Gin', 'SPIRIT', nameTranslations),
         ]),
       ).toEqual(['Rum (Spiritueux – ␣SPIRIT␣ (avec espaces))', 'Gin (Spiritueux)']);
-    });
-
-    it('marks the stored name of a category sent without its type', async () => {
-      expect(
-        await categoryOptions([
-          buildCategory({ id: 1, name: 'Rum', type: ' SPIRIT ', categoryType: null }),
-        ]),
-      ).toEqual(['Rum (␣SPIRIT␣ (avec espaces))']);
     });
   });
 });

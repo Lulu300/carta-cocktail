@@ -90,7 +90,8 @@ frontend/
 │   │   └── exportZip.ts          # Batch export cocktails to ZIP
 │   ├── types/
 │   │   ├── generated.ts          # Generated from the backend zod schemas (`npm run contracts:generate` in backend/): never edit
-│   │   └── index.ts              # Import point of every API type: re-exports generated.ts, plus the routes not generated yet
+│   │   ├── importWizard.ts       # The import wizards' own view and editing state (not an API response)
+│   │   └── index.ts              # Import point of every API type: re-exports generated.ts and importWizard.ts only
 │   ├── utils/                  # Pure helpers: colors, dates, localization, translations, unitConverter,
 │   │                           # cocktailSearch, uploads (photo URLs and srcset), chunkReload, bottleGrouping…
 │   ├── test/                   # Test setup, MSW fake backend (msw/), factories, providers, axe

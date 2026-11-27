@@ -49,11 +49,6 @@ export const PublicCocktail = CocktailRow.pick({
   instructions: z.array(CocktailInstruction.pick({ id: true, stepNumber: true, text: true })),
 });
 
-/** A published menu in the list of the home page, with its visible items counted. */
-export const PublicMenuSummary = MenuRow.extend({
-  _count: z.strictObject({ cocktails: z.number().int(), bottles: z.number().int() }),
-});
-
 export const PublicMenuCocktail = MenuItemRow.extend({
   cocktailId: Id,
   cocktail: PublicCocktail,

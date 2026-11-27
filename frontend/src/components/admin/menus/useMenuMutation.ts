@@ -5,15 +5,14 @@ import {
   type QueryClient,
   type UseMutationResult,
 } from '@tanstack/react-query';
-import type { MenuBottleExclusion } from '../../../services/api';
-import type { Menu } from '../../../types';
+import type { MenuBottleExclusion, MenuDetail } from '../../../types';
 import { qk } from '../../../queries/keys';
 import { describeMutationError } from '../../../queries/deletionImpact';
 import { toast } from '../../ui/ToastStore';
 
 /** The cached data of a menu editor; a part never loaded stays undefined. */
 export interface MenuState {
-  menu?: Menu;
+  menu?: MenuDetail;
   exclusions?: MenuBottleExclusion[];
 }
 
@@ -65,7 +64,7 @@ function queuesOf(queryClient: QueryClient): Map<number, ChangeQueue> {
 
 function readState(queryClient: QueryClient, menuId: number): MenuState {
   return {
-    menu: queryClient.getQueryData<Menu>(qk.menu(menuId)),
+    menu: queryClient.getQueryData<MenuDetail>(qk.menu(menuId)),
     exclusions: queryClient.getQueryData<MenuBottleExclusion[]>(qk.menuExclusions(menuId)),
   };
 }
@@ -80,7 +79,7 @@ function shownState(queue: ChangeQueue): MenuState {
 }
 
 /** Applies `update` to the menu only, when it is loaded. */
-export function updateMenu(state: MenuState, update: (menu: Menu) => Menu): MenuState {
+export function updateMenu(state: MenuState, update: (menu: MenuDetail) => MenuDetail): MenuState {
   return state.menu ? { ...state, menu: update(state.menu) } : state;
 }
 

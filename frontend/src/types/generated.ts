@@ -16,12 +16,49 @@ export type SourceType = 'BOTTLE' | 'CATEGORY' | 'INGREDIENT';
 
 export type MenuType = 'COCKTAILS' | 'APEROS' | 'DIGESTIFS';
 
+export type ImportMatchStatus = 'matched' | 'missing' | 'ambiguous';
+
+export type User = {
+  id: number;
+  email: string;
+};
+
+export type LoginResponse = {
+  token: string;
+  user: User;
+};
+
+export type ProfileResponse = {
+  id: number;
+  email: string;
+  token?: string;
+};
+
+export type MessageResponse = {
+  message: string;
+};
+
 export type Unit = {
   id: number;
   name: string;
   nameTranslations: Record<string, string> | null;
   abbreviation: string;
   conversionFactorToMl: number | null;
+};
+
+export type CategoryType = {
+  name: string;
+  nameTranslations: Record<string, string> | null;
+  color: string;
+};
+
+export type CategoryTypeListItem = {
+  name: string;
+  nameTranslations: Record<string, string> | null;
+  color: string;
+  _count: {
+    categories: number;
+  };
 };
 
 export type Category = {
@@ -34,11 +71,44 @@ export type Category = {
   createdAt: string;
 };
 
+export type CategoryListItem = {
+  id: number;
+  name: string;
+  nameTranslations: Record<string, string> | null;
+  type: string;
+  desiredStock: number;
+  minimumPercent: number;
+  createdAt: string;
+  categoryType: CategoryType;
+  _count: {
+    bottles: number;
+  };
+};
+
 export type PublicCategory = {
   type: string;
   id: number;
   name: string;
   nameTranslations: Record<string, string> | null;
+};
+
+export type Shortage = {
+  category: {
+    type: string;
+    id: number;
+    name: string;
+    nameTranslations: Record<string, string> | null;
+    desiredStock: number;
+    minimumPercent: number;
+    categoryType: CategoryType;
+  };
+  /** Sum of the remaining levels of its bottles, each one counting up to 100. */
+  totalPercent: number;
+  /** `(desiredStock - 1) * 100 + minimumPercent`: below it, the category is short. */
+  requiredPercent: number;
+  /** Bottles not empty. */
+  totalUsable: number;
+  isShortage: boolean;
 };
 
 export type Ingredient = {
@@ -55,6 +125,11 @@ export type PublicIngredient = {
   name: string;
   nameTranslations: Record<string, string> | null;
   icon: string | null;
+};
+
+export type BulkAvailabilityResponse = {
+  message: string;
+  updated: number;
 };
 
 export type Bottle = {
@@ -134,11 +209,181 @@ export type Cocktail = {
   instructions: CocktailInstruction[];
 };
 
+export type IngredientAvailability = {
+  name: string;
+  nameTranslations: Record<string, string> | null;
+  cocktailIngredientId: number;
+  sourceType: SourceType;
+  /** The source is gone or unreadable: `name` is empty. */
+  orphan: boolean;
+  icon: string | null;
+  quantity: number;
+  /** Abbreviation of the line's unit. */
+  unit: string;
+  isAvailable: boolean;
+  /** Servings this line's resource allows; null when unlimited or not measured. */
+  availableCount: number | null;
+  /** CATEGORY lines with preferred bottles only: at least one preferred bottle is not empty. */
+  preferredAvailable?: boolean;
+};
+
+export type LowStockResource = {
+  name: string;
+  nameTranslations: Record<string, string> | null;
+  servings: number;
+};
+
+export type CocktailAvailability = {
+  cocktailId: number;
+  isAvailable: boolean;
+  maxServings: number;
+  ingredients: IngredientAvailability[];
+  lowStock: LowStockResource[];
+};
+
+export type CocktailAvailabilities = Record<string, CocktailAvailability>;
+
 export type MenuSection = {
   id: number;
   menuId: number;
   name: string;
   position: number;
+};
+
+export type MenuRow = {
+  id: number;
+  name: string;
+  description: string | null;
+  slug: string;
+  type: MenuType;
+  isPublic: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MenuSummary = {
+  id: number;
+  name: string;
+  description: string | null;
+  slug: string;
+  type: MenuType;
+  isPublic: boolean;
+  createdAt: string;
+  updatedAt: string;
+  _count: {
+    cocktails: number;
+    bottles: number;
+  };
+};
+
+export type MenuBottle = {
+  id: number;
+  menuId: number;
+  menuSectionId: number | null;
+  position: number;
+  isHidden: boolean;
+  bottleId: number;
+  bottle: Bottle;
+};
+
+export type MenuCocktailIngredient = {
+  id: number;
+  category: Category | null;
+  categoryId: number | null;
+  bottleId: number | null;
+  cocktailId: number;
+  quantity: number;
+  unitId: number;
+  unit: Unit;
+  sourceType: SourceType;
+  ingredientId: number | null;
+  ingredient: Ingredient | null;
+  position: number;
+  bottle: {
+    id: number;
+    name: string;
+    categoryId: number;
+    purchasePrice: number | null;
+    capacityMl: number;
+    remainingPercent: number;
+    openedAt: string | null;
+    alcoholPercentage: number | null;
+    location: string | null;
+    isApero: boolean;
+    isDigestif: boolean;
+    createdAt: string;
+  } | null;
+};
+
+export type MenuCocktail = {
+  id: number;
+  menuId: number;
+  menuSectionId: number | null;
+  position: number;
+  isHidden: boolean;
+  cocktailId: number;
+  cocktail: {
+    id: number;
+    name: string;
+    description: string | null;
+    notes: string | null;
+    imagePath: string | null;
+    /** Comma-separated, as stored: the routes accept an array or this string. */
+    tags: string;
+    /** Manual switch set by the admin. */
+    isAvailable: boolean;
+    createdAt: string;
+    updatedAt: string;
+    ingredients: MenuCocktailIngredient[];
+  };
+};
+
+export type MenuDetail = {
+  id: number;
+  name: string;
+  description: string | null;
+  slug: string;
+  type: MenuType;
+  isPublic: boolean;
+  createdAt: string;
+  updatedAt: string;
+  sections: MenuSection[];
+  cocktails: MenuCocktail[];
+  bottles: MenuBottle[];
+};
+
+export type UpdatedMenu = {
+  id: number;
+  name: string;
+  description: string | null;
+  slug: string;
+  type: MenuType;
+  isPublic: boolean;
+  createdAt: string;
+  updatedAt: string;
+  cocktails: {
+    id: number;
+    menuId: number;
+    menuSectionId: number | null;
+    position: number;
+    isHidden: boolean;
+    cocktailId: number;
+    cocktail: CocktailRow;
+  }[];
+  bottles: MenuBottle[];
+};
+
+export type MenuBottleExclusion = {
+  menuId: number;
+  bottleId: number;
+  bottle: Bottle;
+  createdAt: string;
+};
+
+export type MenuSyncResponse = {
+  message: string;
+  added: number;
+  removed: number;
 };
 
 export type PublicIngredientBottle = {
@@ -183,21 +428,6 @@ export type PublicCocktail = {
   }[];
   /** Private: only in the admin preview. */
   notes?: string | null;
-};
-
-export type PublicMenuSummary = {
-  id: number;
-  name: string;
-  description: string | null;
-  slug: string;
-  type: MenuType;
-  isPublic: boolean;
-  createdAt: string;
-  updatedAt: string;
-  _count: {
-    cocktails: number;
-    bottles: number;
-  };
 };
 
 export type PublicMenuCocktail = {
@@ -275,6 +505,321 @@ export type DeletionResponse = {
   impact: DeletionImpact;
 };
 
+export type ExportIngredient = {
+  sourceType: SourceType;
+  /** Empty for a line whose source was deleted before v1.7.0. */
+  sourceName: string;
+  sourceDetail:
+    | {
+        categoryName: string;
+        categoryType: string;
+        categoryNameTranslations: Record<string, string> | null;
+      }
+    | {
+        type: string;
+        nameTranslations: Record<string, string> | null;
+      }
+    | {
+        icon: string | null;
+        nameTranslations: Record<string, string> | null;
+      }
+    | Record<string, never>;
+  quantity: number;
+  unit: {
+    name: string;
+    abbreviation: string;
+    conversionFactorToMl: number | null;
+    nameTranslations: Record<string, string> | null;
+  };
+  position: number;
+  /** Private: only in the admin's export. */
+  preferredBottles?: {
+    name: string;
+    categoryName: string;
+  }[];
+};
+
+export type CocktailExportFormat = {
+  version: 1;
+  exportedAt: string;
+  cocktail: {
+    name: string;
+    description: string | null;
+    tags: string[];
+    ingredients: ExportIngredient[];
+    instructions: {
+      stepNumber: number;
+      text: string;
+    }[];
+    /** Private: only in the admin's export. */
+    notes?: string | null;
+  };
+};
+
+export type CocktailExportFile = {
+  filename: string;
+  data: CocktailExportFormat;
+};
+
+export type ImportPreviewResponse = {
+  cocktail: {
+    name: string;
+    /** As the file gives them: a hand-made file may give a comma-separated string. */
+    tags: string | string[];
+    /** A cocktail of the same name exists, whatever its case: only reported. */
+    alreadyExists: boolean;
+    description?: string | null;
+  };
+  units: {
+    ref: {
+      abbreviation: string;
+      nameTranslations: Record<string, string> | null;
+      name?: string;
+      conversionFactorToMl?: number | null;
+    };
+    existingMatch: Unit | null;
+    status: ImportMatchStatus;
+    /** `ambiguous` only: the rows equal to the name ignoring case, none of them exactly. */
+    ambiguousMatches?: Unit[];
+  }[];
+  categories: {
+    ref: {
+      name: string;
+      type: string;
+      desiredStock: number;
+      nameTranslations?: Record<string, string> | null;
+    };
+    existingMatch: Category | null;
+    status: ImportMatchStatus;
+    /** `ambiguous` only: the rows equal to the name ignoring case, none of them exactly. */
+    ambiguousMatches?: Category[];
+  }[];
+  bottles: {
+    ref: {
+      name: string;
+      categoryName: string;
+      categoryType: string;
+    };
+    existingMatch: Bottle | null;
+    status: ImportMatchStatus;
+    /** `ambiguous` only: the rows equal to the name ignoring case, none of them exactly. */
+    ambiguousMatches?: Bottle[];
+  }[];
+  ingredients: {
+    ref: {
+      name: string;
+      icon: string | null;
+      nameTranslations: Record<string, string> | null;
+    };
+    existingMatch: Ingredient | null;
+    status: ImportMatchStatus;
+    /** `ambiguous` only: the rows equal to the name ignoring case, none of them exactly. */
+    ambiguousMatches?: Ingredient[];
+  }[];
+};
+
+export type BottleImportCategoryRecord = {
+  name: string;
+  type: string;
+  desiredStock: number;
+  minimumPercent: number;
+  nameTranslations: {
+    fr?: string;
+    en?: string;
+  } | null;
+};
+
+export type BottleImportRecord = {
+  name: string;
+  /** Empty when the file gives no category: the admin picks one. */
+  categoryName: string;
+  capacityMl: number;
+  remainingPercent: number;
+  alcoholPercentage: number | null;
+  purchasePrice: number | null;
+  location: string | null;
+  openedAt: string | null;
+  isApero: boolean;
+  isDigestif: boolean;
+  quantity: number;
+};
+
+export type BottleImportPayload = {
+  version: 1;
+  categories: BottleImportCategoryRecord[];
+  bottles: BottleImportRecord[];
+};
+
+export type BottleImportRowErrorCode =
+  'required' | 'outOfRange' | 'invalidDate' | 'invalidNumber' | 'malformedQuotes';
+
+export type BottleImportRowError = {
+  source: 'categories' | 'bottles';
+  line: number;
+  field: string;
+  code: BottleImportRowErrorCode;
+  column?: number;
+};
+
+export type BottleImportRowWarning = {
+  source: 'categories' | 'bottles';
+  line: number;
+  field: string;
+  code: 'lineBreak';
+};
+
+export type BottleCategoryPreview = {
+  ref: BottleImportCategoryRecord;
+  existingMatch: {
+    id: number;
+    name: string;
+    type: string;
+    desiredStock: number;
+  } | null;
+  status: ImportMatchStatus;
+  /** `ambiguous` only: the rows equal to the name ignoring case, none of them exactly. */
+  ambiguousMatches?: {
+    id: number;
+    name: string;
+    type: string;
+    desiredStock: number;
+  }[];
+};
+
+export type BottleDuplicateEntry = {
+  id: number;
+  name: string;
+  capacityMl: number;
+  categoryName: string;
+  remainingPercent: number;
+};
+
+export type BottleRowPreview = {
+  ref: BottleImportRecord;
+  needsCategory: boolean;
+  potentialDuplicates: BottleDuplicateEntry[];
+};
+
+export type BottleImportPreviewResponse = {
+  payload: BottleImportPayload;
+  categories: BottleCategoryPreview[];
+  bottles: BottleRowPreview[];
+  errors: BottleImportRowError[];
+  warnings: BottleImportRowWarning[];
+};
+
+export type BottleImportConfirmResponse = {
+  created: {
+    bottles: number;
+  };
+  duplicatesCreated: number;
+  skippedNoCategory: number;
+};
+
+export type RequiredAction = {
+  version: string;
+  /** Before or after the upgrade, as the release notes say: "before" ones can only be checked now. */
+  when: 'before' | 'after';
+  /** Text of the release notes, in English. */
+  action: string;
+};
+
+export type UpgradeNotice = {
+  from: string;
+  to: string;
+  actions: RequiredAction[];
+};
+
+export type BackupRestoreResult = {
+  message: string;
+  /** Files of uploads/ that were not restored: not an image, or a file name already restored. */
+  skippedFiles: number;
+  /** The backup has an older database schema: the backend applies the missing migrations when it restarts. */
+  restartRecommended: boolean;
+};
+
+export type CategoryTypeInput = {
+  name: string;
+  nameTranslations?: {
+    fr?: string;
+    en?: string;
+  } | null;
+  color?: string;
+};
+
+export type CategoryTypeUpdateInput = {
+  nameTranslations?: {
+    fr?: string;
+    en?: string;
+  } | null;
+  color?: string;
+};
+
+export type CategoryInput = {
+  name: string;
+  type: string;
+  desiredStock?: number;
+  minimumPercent?: number;
+  nameTranslations?: {
+    fr?: string;
+    en?: string;
+  } | null;
+};
+
+export type CategoryUpdateInput = {
+  name?: string;
+  type?: string;
+  desiredStock?: number;
+  minimumPercent?: number;
+  nameTranslations?: {
+    fr?: string;
+    en?: string;
+  } | null;
+};
+
+export type IngredientInput = {
+  name: string;
+  icon?: string | null;
+  nameTranslations?: {
+    fr?: string;
+    en?: string;
+  } | null;
+};
+
+export type IngredientUpdateInput = {
+  name?: string;
+  icon?: string | null;
+  nameTranslations?: {
+    fr?: string;
+    en?: string;
+  } | null;
+  isAvailable?: boolean;
+};
+
+export type BulkAvailabilityInput = {
+  available: boolean;
+};
+
+export type UnitInput = {
+  name: string;
+  abbreviation: string;
+  conversionFactorToMl?: number | null;
+  nameTranslations?: {
+    fr?: string;
+    en?: string;
+  } | null;
+};
+
+export type UnitUpdateInput = {
+  name?: string;
+  abbreviation?: string;
+  conversionFactorToMl?: number | null;
+  nameTranslations?: {
+    fr?: string;
+    en?: string;
+  } | null;
+};
+
 export type CocktailIngredientInput = {
   sourceType: SourceType;
   quantity: number;
@@ -298,6 +843,55 @@ export type CocktailInput = {
         text: string;
       }
   )[];
+};
+
+export type CocktailImportInput = {
+  version: 1;
+  cocktail: {
+    name: string;
+    description?: string | null;
+    notes?: string | null;
+    tags?: string | string[] | null;
+    ingredients?: {
+      sourceType: SourceType;
+      sourceName: string;
+      quantity: number;
+      sourceDetail?: {
+        categoryName?: string;
+        categoryType?: string;
+        categoryNameTranslations?: {
+          fr?: string;
+          en?: string;
+        } | null;
+        type?: string;
+        desiredStock?: number;
+        nameTranslations?: {
+          fr?: string;
+          en?: string;
+        } | null;
+        icon?: string | null;
+      };
+      unit?: {
+        abbreviation: string;
+        name?: string;
+        conversionFactorToMl?: number | null;
+        nameTranslations?: {
+          fr?: string;
+          en?: string;
+        } | null;
+      } | null;
+      position?: number;
+      preferredBottles?: {
+        name: string;
+        categoryName?: string;
+      }[];
+    }[];
+    instructions?: {
+      text: string;
+      stepNumber?: number;
+    }[];
+  };
+  exportedAt?: string;
 };
 
 export type BottleInput = {
@@ -327,6 +921,72 @@ export type BottleUpdateInput = {
   isDigestif?: boolean;
 };
 
+export type BottleCategoryResolutions = Record<
+  string,
+  | {
+      action: 'use_existing';
+      existingId?: number;
+    }
+  | {
+      action: 'create';
+      data?: {
+        name?: string;
+        type?: string;
+        desiredStock?: number;
+        minimumPercent?: number;
+        nameTranslations?: {
+          fr?: string;
+          en?: string;
+        } | null;
+      };
+    }
+>;
+
+export type BottleRowResolutions = Record<
+  string,
+  | {
+      action: 'import';
+      categoryId?: number;
+      categoryName?: string;
+    }
+  | {
+      action: 'skip';
+    }
+>;
+
+export type BottleImportConfirmInput = {
+  payload: {
+    version: 1;
+    bottles: {
+      name: string;
+      categoryName: string;
+      capacityMl: number;
+      remainingPercent?: number;
+      alcoholPercentage?: number | null;
+      purchasePrice?: number | null;
+      location?: string | null;
+      openedAt?: string | null;
+      isApero?: boolean;
+      isDigestif?: boolean;
+      quantity?: number;
+    }[];
+    categories?: {
+      name: string;
+      type: string;
+      desiredStock: number;
+      minimumPercent: number;
+      nameTranslations: {
+        fr?: string;
+        en?: string;
+      } | null;
+    }[];
+  };
+  resolutions?: {
+    categories?: BottleCategoryResolutions;
+    bottles?: BottleRowResolutions;
+  };
+};
+
 export type MenuCreateInput = {
   name: string;
   slug: string;
@@ -353,4 +1013,37 @@ export type MenuUpdateInput = {
     isHidden?: boolean;
     menuSectionId?: number | null;
   }[];
+};
+
+export type MenuSectionInput = {
+  name: string;
+};
+
+export type MenuSectionUpdateInput = {
+  name?: string;
+  position?: number;
+};
+
+export type MenuBottleUpdateInput = {
+  position?: number;
+  isHidden?: boolean;
+  menuSectionId?: number | null;
+};
+
+export type MenuBottleGroupUpdateInput = {
+  ids: number[];
+  menuSectionId?: number | null;
+  isHidden?: boolean;
+};
+
+export type SiteSettingsInput = {
+  siteName?: string;
+  siteIcon?: string;
+  embedOrigins?: string[];
+};
+
+export type ProfileInput = {
+  email?: string;
+  currentPassword?: string;
+  newPassword?: string;
 };

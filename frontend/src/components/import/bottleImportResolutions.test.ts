@@ -32,6 +32,7 @@ function previewOf(categories: BottleCategoryPreview[]): BottleImportPreviewResp
     categories,
     bottles: [],
     errors: [],
+    warnings: [],
   };
 }
 

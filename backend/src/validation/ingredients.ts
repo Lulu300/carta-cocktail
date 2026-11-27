@@ -29,3 +29,9 @@ export const PublicIngredient = Ingredient.pick({
   nameTranslations: true,
   icon: true,
 });
+
+/** Answer of the bulk availability switch: `updated` ingredients were changed. */
+export const BulkAvailabilityResponse = z.strictObject({
+  message: z.string(),
+  updated: z.number().int(),
+});

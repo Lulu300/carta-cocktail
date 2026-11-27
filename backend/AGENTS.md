@@ -215,8 +215,11 @@ router.put('/:id', validate(updateSchemas), async (_req, res) => {
   `Unit`...); those of `routes/public.ts` are in `validation/public.ts`. They are strict
   (`z.strictObject`): a field a route adds, drops or retypes fails the contract tests. Dates are
   `Timestamp` (ISO strings, as JSON sends them), stored translations `StoredTranslations`.
-- `src/routes/responseContracts.test.ts` parses the answer of each covered route with its schema.
-  A route that gets a response schema gets a test there.
+- Every JSON route has a response schema (the backup export answers a ZIP, the link preview pages
+  HTML). `src/routes/responseContracts.test.ts` parses the answer of each route with its schema
+  through `expectContract()` (`src/test/helpers.ts`); the backup restore and the upgrade notice,
+  which need the setup of their own test file, are checked in `backup.test.ts` and
+  `system.test.ts`. A new route gets its schema and its test.
 - `src/contracts/frontendTypes.ts` lists what the frontend gets: `z.output` of the response
   schemas, `z.input` of the request bodies, and the constants of the unions (`SOURCE_TYPES`,
   `MENU_TYPES`). `npm run contracts:generate` writes `frontend/src/types/generated.ts` from it, as

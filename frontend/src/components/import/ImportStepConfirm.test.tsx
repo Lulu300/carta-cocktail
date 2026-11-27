@@ -1,6 +1,14 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import {
+  buildBottleRef,
+  buildCategory,
+  buildCategoryRef,
+  buildIngredientRef,
+  buildUnit,
+  buildUnitRef,
+} from '../../test/factories';
 import type { ImportPreviewResponse } from '../../types';
 import ImportStepConfirm from './ImportStepConfirm';
 import { emptyResolutions } from './importResolutions';
@@ -10,18 +18,22 @@ const preview: ImportPreviewResponse = {
   cocktail: { name: 'Daiquiri', description: 'Fresh and sour', tags: [], alreadyExists: false },
   units: [
     {
-      ref: { name: 'Centilitre', abbreviation: 'cl' },
-      existingMatch: { id: 1, name: 'Centilitre' },
+      ref: buildUnitRef({ name: 'Centilitre', abbreviation: 'cl' }),
+      existingMatch: buildUnit({ id: 1, name: 'Centilitre', abbreviation: 'cl' }),
       status: 'matched',
     },
   ],
   categories: [
-    { ref: { name: 'Rhum' }, existingMatch: { id: 10, name: 'Rhum' }, status: 'matched' },
+    {
+      ref: buildCategoryRef({ name: 'Rhum' }),
+      existingMatch: buildCategory({ id: 10, name: 'Rhum' }),
+      status: 'matched',
+    },
   ],
-  bottles: [
-    { ref: { name: 'Havana 3', categoryName: 'Rhum' }, existingMatch: null, status: 'missing' },
+  bottles: [{ ref: buildBottleRef({ name: 'Havana 3' }), existingMatch: null, status: 'missing' }],
+  ingredients: [
+    { ref: buildIngredientRef({ name: 'Lime' }), existingMatch: null, status: 'missing' },
   ],
-  ingredients: [{ ref: { name: 'Lime' }, existingMatch: null, status: 'missing' }],
 };
 
 const lists: ImportReferenceLists = {

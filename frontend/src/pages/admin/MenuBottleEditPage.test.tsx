@@ -15,8 +15,8 @@ import { axe } from '../../test/axe';
 import { server } from '../../test/msw/server';
 import { errorResponse, pendingResponse, readJsonObject } from '../../test/msw/utils';
 import MenuBottleEditPage from './MenuBottleEditPage';
-import type { Bottle, Menu, MenuBottle } from '../../types';
-import type { MenuBottleExclusion } from '../../services/api';
+import type { Bottle, MenuBottle, MenuDetail } from '../../types';
+import type { MenuBottleExclusion } from '../../types';
 
 const gin = buildCategory({ id: 1, name: 'Gin', minimumPercent: 0 });
 
@@ -69,7 +69,7 @@ function makeEntry(id: number, bottle: Bottle, menuSectionId: number | null = nu
 // --- Fake backend of the editor: it stores the menu and records each request ---
 
 /** What the server stores: a refetch after a change returns the saved state. */
-let stored: { menu: Menu; exclusions: MenuBottleExclusion[]; bottles: Bottle[] };
+let stored: { menu: MenuDetail; exclusions: MenuBottleExclusion[]; bottles: Bottle[] };
 
 /** Requests received, in order. */
 let received: {
@@ -111,7 +111,7 @@ function setEntries(entries: MenuBottle[]) {
   };
 }
 
-function storeMenu(overrides: Partial<Menu> = {}, exclusions: MenuBottleExclusion[] = []) {
+function storeMenu(overrides: Partial<MenuDetail> = {}, exclusions: MenuBottleExclusion[] = []) {
   stored = {
     menu: buildMenu({
       id: 5,
@@ -128,7 +128,7 @@ function storeMenu(overrides: Partial<Menu> = {}, exclusions: MenuBottleExclusio
 }
 
 /** A personal menu of the given type, with Hendricks twice and Lillet unless told otherwise. */
-function storePersonalMenu(overrides: Partial<Menu> = {}) {
+function storePersonalMenu(overrides: Partial<MenuDetail> = {}) {
   storeMenu({ slug: 'summer-aperos', name: 'Summer', ...overrides });
 }
 

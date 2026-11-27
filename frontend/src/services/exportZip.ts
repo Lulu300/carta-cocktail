@@ -1,4 +1,5 @@
-import { cocktails as cocktailsApi, type CocktailExportFile } from './api';
+import type { CocktailExportFile } from '../types';
+import { cocktails as cocktailsApi } from './api';
 import { downloadBlob } from '../utils/downloadBlob';
 
 /**

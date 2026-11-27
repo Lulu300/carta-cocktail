@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import type { MenuBottleExclusion } from '../../../services/api';
-import type { Menu } from '../../../types';
+import type { MenuBottleExclusion, MenuRow } from '../../../types';
 import Card from '../../ui/Card';
 import Spinner from '../../ui/Spinner';
 import LoadError from '../LoadError';
@@ -10,7 +9,7 @@ import { groupExcludedBottles } from './menuBottleGroups';
 import { useMenuExclusions } from './useMenuBottles';
 
 interface ExcludedBottlesProps {
-  menu: Pick<Menu, 'id' | 'type'>;
+  menu: Pick<MenuRow, 'id' | 'type'>;
   /** Shown on a bottle no longer checked for the menu's type: putting it back does not bring it into the menu. */
   uncheckedNote: string;
   /** Receives every removed bottle of a group of identical bottles. */

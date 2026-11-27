@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../../hooks/useLocalizedName';
 import { useBottles } from '../../../queries/bottles';
-import type { Bottle, Menu } from '../../../types';
+import type { Bottle, MenuDetail } from '../../../types';
 import { getBottleSearchText, matchesSearchText } from '../../../utils/cocktailSearch';
 import Card from '../../ui/Card';
 import SearchInput from '../../ui/SearchInput';
@@ -13,7 +13,7 @@ import { isAvailableForMenu } from './bottleMenuType';
 import { groupBottleChoices } from './menuBottleGroups';
 
 interface BottlesToAddProps {
-  menu: Menu;
+  menu: MenuDetail;
   /** What the list offers, for the menu's type. */
   hint: string;
   /** Shown when every bottle checked for the menu's type is already in it. */
@@ -32,7 +32,7 @@ export default function BottlesToAdd({ menu, hint, noChoice, onAdd }: BottlesToA
   const bottlesQuery = useBottles();
   const [search, setSearch] = useState('');
 
-  const inMenu = new Set((menu.bottles ?? []).map((entry) => entry.bottleId));
+  const inMenu = new Set(menu.bottles.map((entry) => entry.bottleId));
   const choices = (bottlesQuery.data ?? []).filter(
     (bottle) => isAvailableForMenu(bottle, menu) && !inMenu.has(bottle.id),
   );

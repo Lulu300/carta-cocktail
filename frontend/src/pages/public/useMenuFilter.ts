@@ -106,11 +106,11 @@ function splitByCategory(
 }
 
 function indexMenu(menu: PublicMenu, localize: LocalizeName, t: TFunction): IndexedMenu {
-  const sections = menu.sections ?? [];
+  const { sections } = menu;
   const searchTexts = new Map<number, string>();
 
   if (isBottleMenu(menu)) {
-    const bottles = (menu.bottles ?? []).filter((item) => !item.isHidden && item.bottle);
+    const bottles = menu.bottles.filter((item) => !item.isHidden);
     bottles.forEach((item) => searchTexts.set(item.id, getBottleSearchText(item.bottle, localize)));
     const bottleBlocks =
       sections.length > 0
@@ -119,9 +119,7 @@ function indexMenu(menu: PublicMenu, localize: LocalizeName, t: TFunction): Inde
     return { cocktailBlocks: [], bottleBlocks, searchTexts };
   }
 
-  const cocktails = (menu.cocktails ?? []).filter(
-    (item) => !item.isHidden && item.cocktail !== undefined,
-  );
+  const cocktails = menu.cocktails.filter((item) => !item.isHidden);
   cocktails.forEach((item) =>
     searchTexts.set(item.id, getCocktailSearchText(item.cocktail, localize)),
   );
@@ -139,7 +137,6 @@ function indexMenu(menu: PublicMenu, localize: LocalizeName, t: TFunction): Inde
 export function groupMenuBottles(bottles: PublicMenuBottle[]): BottleGroupEntry[] {
   const groups = new Map<string, BottleGroupEntry>();
   for (const { bottle } of bottles) {
-    if (!bottle) continue;
     const key = `${bottle.name.toLowerCase()}|${bottle.capacityMl}|${bottle.categoryId}|${bottle.alcoholPercentage ?? ''}`;
     let group = groups.get(key);
     if (!group) {

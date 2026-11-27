@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { fireEvent, screen, waitFor, within } from '../../test/test-utils';
 import { clearToasts, renderWithFeedback } from '../../test/feedback';
-import { buildMenu } from '../../test/factories';
+import { buildMenuSummary } from '../../test/factories';
 import {
   captureRequest,
   mockApiError,
@@ -11,14 +11,14 @@ import {
 } from '../../test/msw/utils';
 import MenusPage from './MenusPage';
 
-const aperitifs = buildMenu({
+const aperitifs = buildMenuSummary({
   id: 1,
   name: 'Apéritifs',
   slug: 'aperitifs',
   type: 'APEROS',
   _count: { cocktails: 0, bottles: 5 },
 });
-const digestifs = buildMenu({
+const digestifs = buildMenuSummary({
   id: 2,
   name: 'Digestifs',
   slug: 'digestifs',
@@ -26,14 +26,14 @@ const digestifs = buildMenu({
   isPublic: false,
   _count: { cocktails: 0, bottles: 2 },
 });
-const summer = buildMenu({
+const summer = buildMenuSummary({
   id: 3,
   name: 'Summer Menu',
   slug: 'summer',
   description: 'Summer cocktails',
   _count: { cocktails: 8, bottles: 0 },
 });
-const summerAperos = buildMenu({
+const summerAperos = buildMenuSummary({
   id: 4,
   name: 'Summer Aperos',
   slug: 'summer-aperos',
@@ -132,7 +132,7 @@ describe('MenusPage', () => {
     mockApiResponse(
       'post',
       '/api/menus',
-      buildMenu({ id: 9, name: 'Winter', slug: 'winter-menu-' }),
+      buildMenuSummary({ id: 9, name: 'Winter', slug: 'winter-menu-' }),
       201,
     );
     await renderLoadedPage();
@@ -160,7 +160,7 @@ describe('MenusPage', () => {
     mockApiResponse(
       'post',
       '/api/menus',
-      buildMenu({ id: 9, name: 'Summer aperitif', slug: 'summer-aperitif', type: 'APEROS' }),
+      buildMenuSummary({ id: 9, name: 'Summer aperitif', slug: 'summer-aperitif', type: 'APEROS' }),
       201,
     );
     await renderLoadedPage();

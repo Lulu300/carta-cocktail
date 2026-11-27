@@ -62,6 +62,7 @@ describe('printTypeAliases', () => {
     expect(
       printSource(`export type Value = {
         names: Record<string, string>;
+        empty: Record<string, never>;
         ids: number[];
         steps: (string | { text: string })[];
         'two words': string;
@@ -69,6 +70,7 @@ describe('printTypeAliases', () => {
     ).toEqual([
       'export type Value = {\n' +
         'names: Record<string, string>;\n' +
+        'empty: Record<string, never>;\n' +
         'ids: number[];\n' +
         'steps: (string | {\ntext: string;\n})[];\n' +
         '"two words": string;\n' +

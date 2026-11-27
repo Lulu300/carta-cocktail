@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { User } from './auth';
 
 export const SiteSettingsUpdate = z.object({
   siteName: z.string().optional(),
@@ -36,3 +37,6 @@ export const AdminSiteSettings = SiteSettings.extend({
   /** Sites allowed to show the public menu in an iframe, e.g. "https://www.mon-bar.fr". */
   embedOrigins: z.array(z.string()),
 });
+
+/** Answer of a profile update. `token` comes when the password changed: the previous one is revoked. */
+export const ProfileResponse = User.extend({ token: z.string().optional() });

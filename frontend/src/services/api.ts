@@ -1,35 +1,62 @@
 import type {
-  Category,
-  CategoryType,
+  AdminSiteSettings,
+  BackupRestoreResult,
   Bottle,
+  BottleImportConfirmInput,
+  BottleImportConfirmResponse,
+  BottleImportPreviewResponse,
   BottleInput,
   BottleUpdateInput,
-  Ingredient,
-  Unit,
+  BulkAvailabilityInput,
+  BulkAvailabilityResponse,
+  Category,
+  CategoryInput,
+  CategoryListItem,
+  CategoryType,
+  CategoryTypeInput,
+  CategoryTypeListItem,
+  CategoryTypeUpdateInput,
+  CategoryUpdateInput,
   Cocktail,
+  CocktailAvailabilities,
+  CocktailExportFile,
+  CocktailImportInput,
+  CocktailInput,
   CocktailRow,
-  Menu,
+  DeletionResponse,
+  EntityResolutionAction,
+  ImportPreviewResponse,
+  Ingredient,
+  IngredientInput,
+  IngredientUpdateInput,
+  LoginResponse,
   MenuBottle,
+  MenuBottleExclusion,
+  MenuBottleGroupUpdateInput,
+  MenuBottleUpdateInput,
   MenuCreateInput,
+  MenuDetail,
+  MenuRow,
   MenuSection,
+  MenuSectionInput,
+  MenuSectionUpdateInput,
+  MenuSummary,
+  MenuSyncResponse,
   MenuUpdateInput,
+  MessageResponse,
+  ProfileInput,
+  ProfileResponse,
   PublicCocktail,
   PublicMenu,
-  PublicMenuSummary,
   Shortage,
-  CocktailInput,
-  CocktailAvailability,
   SiteSettings,
-  AdminSiteSettings,
-  CocktailExportFormat,
-  ImportPreviewResponse,
-  EntityResolutionAction,
-  BottleImportPayload,
-  BottleImportPreviewResponse,
-  BottleImportResolutions,
-  BottleImportConfirmResponse,
-  DeleteOptions,
-  DeletionResponse,
+  SiteSettingsInput,
+  Unit,
+  UnitInput,
+  UnitUpdateInput,
+  UpdatedMenu,
+  UpgradeNotice,
+  User,
 } from '../types';
 
 import i18n from '../i18n';
@@ -243,12 +270,6 @@ function attachmentFilename(res: Response, fallback: string): string {
   return match?.[1] ?? fallback;
 }
 
-/** A cocktail export with the file name chosen by the server. */
-export interface CocktailExportFile {
-  filename: string;
-  data: CocktailExportFormat;
-}
-
 /**
  * The backend names the file (accents removed, `cocktail-<id>.json` when the name has
  * no latin letter): the fallback only covers a response without the header.
@@ -256,6 +277,11 @@ export interface CocktailExportFile {
 async function requestCocktailExport(url: string, id: number): Promise<CocktailExportFile> {
   const res = await send(url);
   return { filename: attachmentFilename(res, `cocktail-${id}.json`), data: await res.json() };
+}
+
+export interface DeleteOptions {
+  /** Also deletes what uses the item: the recipe lines, and the bottles of a category. */
+  force?: boolean;
 }
 
 /** URL of a DELETE that may be forced: `?force=true` also deletes what uses the item. */
@@ -266,13 +292,13 @@ function deletionUrl(path: string, { force = false }: DeleteOptions): string {
 // Auth
 export const auth = {
   login: (email: string, password: string) =>
-    request<{ token: string; user: { id: number; email: string } }>('/auth/login', {
+    request<LoginResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     }),
-  me: () => request<{ id: number; email: string }>('/auth/me'),
+  me: () => request<User>('/auth/me'),
   /** Revokes every token of the admin, the one sending this request included. */
-  logoutAll: () => request<{ message: string }>('/auth/logout-all', { method: 'POST' }),
+  logoutAll: () => request<MessageResponse>('/auth/logout-all', { method: 'POST' }),
 };
 
 /**
@@ -290,26 +316,20 @@ function categoryTypeUrl(name: string): string {
 
 // Category Types
 export const categoryTypes = {
-  list: (signal?: AbortSignal) => request<CategoryType[]>('/category-types', { signal }),
-  create: (data: {
-    name: string;
-    nameTranslations?: Record<string, string> | null;
-    color?: string;
-  }) => request<CategoryType>('/category-types', { method: 'POST', body: JSON.stringify(data) }),
-  update: (
-    name: string,
-    data: { nameTranslations?: Record<string, string> | null; color?: string },
-  ) => request<CategoryType>(categoryTypeUrl(name), { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (name: string) =>
-    request<{ message: string }>(categoryTypeUrl(name), { method: 'DELETE' }),
+  list: (signal?: AbortSignal) => request<CategoryTypeListItem[]>('/category-types', { signal }),
+  create: (data: CategoryTypeInput) =>
+    request<CategoryType>('/category-types', { method: 'POST', body: JSON.stringify(data) }),
+  update: (name: string, data: CategoryTypeUpdateInput) =>
+    request<CategoryType>(categoryTypeUrl(name), { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (name: string) => request<MessageResponse>(categoryTypeUrl(name), { method: 'DELETE' }),
 };
 
 // Categories
 export const categories = {
-  list: (signal?: AbortSignal) => request<Category[]>('/categories', { signal }),
-  create: (data: Partial<Category>) =>
+  list: (signal?: AbortSignal) => request<CategoryListItem[]>('/categories', { signal }),
+  create: (data: CategoryInput) =>
     request<Category>('/categories', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: number, data: Partial<Category>) =>
+  update: (id: number, data: CategoryUpdateInput) =>
     request<Category>(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: number, options: DeleteOptions = {}) =>
     request<DeletionResponse>(deletionUrl(`/categories/${id}`, options), { method: 'DELETE' }),
@@ -354,7 +374,7 @@ export const bottles = {
       body: formData,
     });
   },
-  importConfirm: (data: { payload: BottleImportPayload; resolutions: BottleImportResolutions }) =>
+  importConfirm: (data: BottleImportConfirmInput) =>
     request<BottleImportConfirmResponse>('/bottles/import/confirm', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -364,24 +384,14 @@ export const bottles = {
 // Ingredients
 export const ingredients = {
   list: (signal?: AbortSignal) => request<Ingredient[]>('/ingredients', { signal }),
-  create: (data: {
-    name: string;
-    icon?: string | null;
-    nameTranslations?: Record<string, string> | null;
-  }) => request<Ingredient>('/ingredients', { method: 'POST', body: JSON.stringify(data) }),
-  update: (
-    id: number,
-    data: {
-      name?: string;
-      icon?: string | null;
-      isAvailable?: boolean;
-      nameTranslations?: Record<string, string> | null;
-    },
-  ) => request<Ingredient>(`/ingredients/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  create: (data: IngredientInput) =>
+    request<Ingredient>('/ingredients', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: number, data: IngredientUpdateInput) =>
+    request<Ingredient>(`/ingredients/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: number, options: DeleteOptions = {}) =>
     request<DeletionResponse>(deletionUrl(`/ingredients/${id}`, options), { method: 'DELETE' }),
-  bulkAvailability: (data: { available: boolean }) =>
-    request<{ message: string; updated: number }>('/ingredients/bulk-availability', {
+  bulkAvailability: (data: BulkAvailabilityInput) =>
+    request<BulkAvailabilityResponse>('/ingredients/bulk-availability', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -390,15 +400,11 @@ export const ingredients = {
 // Units
 export const units = {
   list: (signal?: AbortSignal) => request<Unit[]>('/units', { signal }),
-  create: (data: {
-    name: string;
-    abbreviation: string;
-    conversionFactorToMl?: number | null;
-    nameTranslations?: Record<string, string> | null;
-  }) => request<Unit>('/units', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: number, data: Partial<Unit>) =>
+  create: (data: UnitInput) =>
+    request<Unit>('/units', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: number, data: UnitUpdateInput) =>
     request<Unit>(`/units/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (id: number) => request<{ message: string }>(`/units/${id}`, { method: 'DELETE' }),
+  delete: (id: number) => request<MessageResponse>(`/units/${id}`, { method: 'DELETE' }),
 };
 
 // Cocktails
@@ -409,7 +415,7 @@ export const cocktails = {
     request<Cocktail>('/cocktails', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: CocktailInput) =>
     request<Cocktail>(`/cocktails/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (id: number) => request<{ message: string }>(`/cocktails/${id}`, { method: 'DELETE' }),
+  delete: (id: number) => request<MessageResponse>(`/cocktails/${id}`, { method: 'DELETE' }),
   uploadImage: (id: number, file: File) => {
     const formData = new FormData();
     formData.append('image', file);
@@ -425,13 +431,13 @@ export const cocktails = {
       method: 'POST',
       body: JSON.stringify({ ids }),
     }),
-  importPreview: (data: CocktailExportFormat) =>
+  importPreview: (data: CocktailImportInput) =>
     request<ImportPreviewResponse>('/cocktails/import/preview', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
   importConfirm: (data: {
-    recipe: CocktailExportFormat;
+    recipe: CocktailImportInput;
     resolutions: Record<string, Record<string, EntityResolutionAction>>;
   }) =>
     request<Cocktail>('/cocktails/import/confirm', {
@@ -442,59 +448,46 @@ export const cocktails = {
 
 // Menus
 export const menus = {
-  list: (signal?: AbortSignal) => request<Menu[]>('/menus', { signal }),
-  get: (id: number, signal?: AbortSignal) => request<Menu>(`/menus/${id}`, { signal }),
+  list: (signal?: AbortSignal) => request<MenuSummary[]>('/menus', { signal }),
+  get: (id: number, signal?: AbortSignal) => request<MenuDetail>(`/menus/${id}`, { signal }),
   create: (data: MenuCreateInput) =>
-    request<Menu>('/menus', { method: 'POST', body: JSON.stringify(data) }),
+    request<MenuRow>('/menus', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: MenuUpdateInput) =>
-    request<Menu>(`/menus/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (id: number) => request<{ message: string }>(`/menus/${id}`, { method: 'DELETE' }),
+    request<UpdatedMenu>(`/menus/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: number) => request<MessageResponse>(`/menus/${id}`, { method: 'DELETE' }),
 };
-
-/** A bottle removed from a system menu: the sync never adds it back. */
-export interface MenuBottleExclusion {
-  menuId: number;
-  bottleId: number;
-  bottle: Bottle;
-  createdAt: string;
-}
 
 // Menu Bottles
 export const menuBottles = {
-  update: (
-    id: number,
-    data: { position?: number; isHidden?: boolean; menuSectionId?: number | null },
-  ) => request<MenuBottle>(`/menu-bottles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  update: (id: number, data: MenuBottleUpdateInput) =>
+    request<MenuBottle>(`/menu-bottles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   /** Applies the same change to these entries (`MenuBottle.id`) of the menu, all of them or none. */
   updateEntries: (
     menuId: number,
     ids: number[],
-    changes: { isHidden?: boolean; menuSectionId?: number | null },
+    changes: Omit<MenuBottleGroupUpdateInput, 'ids'>,
   ) =>
-    request<{ message: string }>(`/menu-bottles/menu/${menuId}/entries`, {
+    request<MessageResponse>(`/menu-bottles/menu/${menuId}/entries`, {
       method: 'PUT',
       body: JSON.stringify({ ids, ...changes }),
     }),
   /** Adds these bottles at the end of a personal menu, in this order, all of them or none. */
   addBottles: (menuId: number, bottleIds: number[]) =>
-    request<{ message: string }>(`/menu-bottles/menu/${menuId}/entries`, {
+    request<MessageResponse>(`/menu-bottles/menu/${menuId}/entries`, {
       method: 'POST',
       body: JSON.stringify({ bottleIds }),
     }),
   /** Removes these entries (`MenuBottle.id`) of the menu, all of them or none; a system menu keeps them as exclusions. */
   removeEntries: (menuId: number, ids: number[]) =>
-    request<{ message: string }>(`/menu-bottles/menu/${menuId}/entries/remove`, {
+    request<MessageResponse>(`/menu-bottles/menu/${menuId}/entries/remove`, {
       method: 'POST',
       body: JSON.stringify({ ids }),
     }),
   sync: (menuId: number) =>
-    request<{ message: string; added: number; removed: number }>(
-      `/menu-bottles/menu/${menuId}/sync`,
-      { method: 'POST' },
-    ),
+    request<MenuSyncResponse>(`/menu-bottles/menu/${menuId}/sync`, { method: 'POST' }),
   /** `ids` lists every entry (`MenuBottle.id`) of the menu, in the new order: one transaction. */
   reorder: (menuId: number, ids: number[]) =>
-    request<{ message: string }>(`/menu-bottles/menu/${menuId}/reorder`, {
+    request<MessageResponse>(`/menu-bottles/menu/${menuId}/reorder`, {
       method: 'POST',
       body: JSON.stringify({ ids }),
     }),
@@ -502,13 +495,13 @@ export const menuBottles = {
     request<MenuBottleExclusion[]>(`/menu-bottles/menu/${menuId}/exclusions`),
   /** Removes these bottles from a system menu, all of them or none. */
   exclude: (menuId: number, bottleIds: number[]) =>
-    request<{ message: string }>(`/menu-bottles/menu/${menuId}/exclusions`, {
+    request<MessageResponse>(`/menu-bottles/menu/${menuId}/exclusions`, {
       method: 'POST',
       body: JSON.stringify({ bottleIds }),
     }),
   /** Puts these excluded bottles back at the end of the menu, all of them or none. */
   restore: (menuId: number, bottleIds: number[]) =>
-    request<{ message: string }>(`/menu-bottles/menu/${menuId}/exclusions/restore`, {
+    request<MessageResponse>(`/menu-bottles/menu/${menuId}/exclusions/restore`, {
       method: 'POST',
       body: JSON.stringify({ bottleIds }),
     }),
@@ -516,20 +509,20 @@ export const menuBottles = {
 
 // Menu Sections
 export const menuSections = {
-  create: (menuId: number, data: { name: string }) =>
+  create: (menuId: number, data: MenuSectionInput) =>
     request<MenuSection>(`/menu-sections/menu/${menuId}/sections`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  update: (id: number, data: { name?: string; position?: number }) =>
+  update: (id: number, data: MenuSectionUpdateInput) =>
     request<MenuSection>(`/menu-sections/sections/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
   delete: (id: number) =>
-    request<{ message: string }>(`/menu-sections/sections/${id}`, { method: 'DELETE' }),
+    request<MessageResponse>(`/menu-sections/sections/${id}`, { method: 'DELETE' }),
   reorder: (menuId: number, sectionIds: number[]) =>
-    request<{ message: string }>(`/menu-sections/menu/${menuId}/sections/reorder`, {
+    request<MessageResponse>(`/menu-sections/menu/${menuId}/sections/reorder`, {
       method: 'POST',
       body: JSON.stringify({ sectionIds }),
     }),
@@ -537,7 +530,7 @@ export const menuSections = {
 
 // Public
 export const publicApi = {
-  listMenus: (signal?: AbortSignal) => request<PublicMenuSummary[]>('/public/menus', { signal }),
+  listMenus: (signal?: AbortSignal) => request<MenuSummary[]>('/public/menus', { signal }),
   getMenu: (slug: string, signal?: AbortSignal) =>
     request<PublicMenu>(`/public/menus/${slug}`, { signal }),
   getCocktail: (id: number, signal?: AbortSignal) =>
@@ -555,39 +548,22 @@ export const shortages = {
 // Availability
 export const availability = {
   getAllCocktails: (signal?: AbortSignal) =>
-    request<Record<number, CocktailAvailability>>('/availability/cocktails', { signal }),
+    request<CocktailAvailabilities>('/availability/cocktails', { signal }),
 };
 
 // Settings (admin)
 export const settings = {
   get: () => request<AdminSiteSettings>('/settings'),
-  // Absent fields stay as they are
-  update: (data: Partial<Omit<AdminSiteSettings, 'id'>>) =>
+  update: (data: SiteSettingsInput) =>
     request<AdminSiteSettings>('/settings', { method: 'PUT', body: JSON.stringify(data) }),
-  updateProfile: (data: { email?: string; currentPassword?: string; newPassword?: string }) =>
-    // `token` comes back when the password changed: the server revoked the previous one
-    request<{ id: number; email: string; token?: string }>('/settings/profile', {
+  updateProfile: (data: ProfileInput) =>
+    request<ProfileResponse>('/settings/profile', {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
 };
 
 // System (admin)
-export interface RequiredAction {
-  version: string;
-  /** Before or after the upgrade, as the release notes say: "before" ones can only be checked now. */
-  when: 'before' | 'after';
-  /** Text of the release notes, in English. */
-  action: string;
-}
-
-/** Required actions of the versions between `from` and `to`, until the admin confirms them. */
-export interface UpgradeNotice {
-  from: string;
-  to: string;
-  actions: RequiredAction[];
-}
-
 export const system = {
   /** null when there is no notice to show (204). */
   getUpgradeNotice: async (signal?: AbortSignal) =>
@@ -597,14 +573,6 @@ export const system = {
 };
 
 // Backup
-export interface BackupRestoreResult {
-  message: string;
-  /** Files of uploads/ that were not restored: not an image, or a file name already restored. */
-  skippedFiles: number;
-  /** The backup has an older database schema: the backend applies the missing migrations when it restarts. */
-  restartRecommended: boolean;
-}
-
 export const backup = {
   exportBackup: async () => {
     const res = await send('/backup/export');
