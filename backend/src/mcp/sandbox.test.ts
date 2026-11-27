@@ -235,7 +235,8 @@ describe('runInSandbox', () => {
       'async () => JSON.parse("[".repeat(100000) + "]".repeat(100000))',
       'async () => { let o = {}; for (let i = 0; i < 100000; i++) o = { o }; return o }',
     ])('should stop %s with a stack overflow', async (code) => {
-      expect(await run(code)).toMatchObject({
+      // The default limits: building 100,000 objects takes more than the 300 ms of FAST on a slow runner
+      expect(await run(code, {}, SANDBOX_LIMITS)).toMatchObject({
         reason: 'thrown',
         message: expect.stringMatching(/stack overflow/),
       });
