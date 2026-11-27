@@ -69,12 +69,13 @@
     "codeModeUnknownOperation": "No admin operation of the API has this method and path: find one with the search tool",
     "codeModeFileUpload": "This operation takes a file, which Code Mode cannot send",
     "codeModeInvalidPath": "The path must start with / and hold no ?, # or \\: put the query in `query`",
-    "codeModeTooManyRequests": "This run sent as many API requests as it may: see the limits in the description of execute",
+    "codeModeTooManyRequests": "This run made as many calls to the server as it may: see the limits in the description of the tool",
     "codeModeCodeTooLong": "The code is too long: see the limits in the description of the tool",
     "codeModeNotAFunction": "The code must be an async arrow function, such as: async () => { … }",
     "codeModeCpuTime": "The code computed for too long: it was stopped",
     "codeModeWallTime": "The code did not finish in time: it was stopped",
-    "codeModeCrashed": "The code went too deep for the server (recursion, or an object nested too deep): it was stopped"
+    "codeModeCrashed": "The code exhausted the resources of the sandbox (stack or memory): it was stopped",
+    "codeModeBusy": "The server is already running as much code as it may: try again in a moment"
   },
   "auth": {
     "loginSuccess": "Login successful",

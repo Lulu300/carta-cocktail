@@ -18,12 +18,10 @@ import {
   connectMcpClient,
 } from '../test/helpers';
 import { TOOL_CATALOG } from './catalog';
-import {
-  MAX_CODE_LENGTH,
-  MAX_OUTPUT_CHARS,
-  MAX_REQUESTS_PER_RUN,
-  TRUNCATION_MARKER,
-} from './codeMode';
+import i18next from '../i18n';
+import type { Caller } from './callOperation';
+import { MAX_CODE_LENGTH, toolResultOf, TRUNCATION_MARKER } from './codeMode';
+import { MAX_CONCURRENT_RUNS, MAX_QUEUED_RUNS, SANDBOX_LIMITS } from './sandbox';
 
 /*
  * Code Mode through the MCP endpoint, as a client sees it: the setting that shows `search` and
@@ -299,7 +297,7 @@ describe('execute', () => {
     }`;
 
     expect(await valueOf(await readOnly(), 'execute', code)).toEqual({
-      sent: MAX_REQUESTS_PER_RUN,
+      sent: SANDBOX_LIMITS.maxHostCalls,
       status: 429,
     });
   });
@@ -307,7 +305,7 @@ describe('execute', () => {
   it('should cut a huge answer with a mark', async () => {
     const text = textOf(await runTool(await readOnly(), 'execute', 'async () => "x".repeat(1e6)'));
 
-    expect(text.length).toBeLessThan(MAX_OUTPUT_CHARS + 300);
+    expect(text.length).toBeLessThan(SANDBOX_LIMITS.outputChars + 300);
     expect(text).toContain(TRUNCATION_MARKER);
     expect(text.startsWith('"xxx')).toBe(true);
   });
@@ -344,14 +342,82 @@ describe('execute', () => {
     );
   });
 
-  it('should end a run that exhausts the stack of the server, and keep serving', async () => {
+  it('should stop a recursion too deep, and keep serving', async () => {
     const client = await readOnly();
     const deep = 'let o = {}; for (let i = 0; i < 100000; i++) o = { o };';
 
     expect(await errorOf(client, 'execute', `async () => { ${deep} return o }`)).toBe(
-      'Error: The code went too deep for the server (recursion, or an object nested too deep): it was stopped',
+      'Error: InternalError: stack overflow',
     );
     expect(await valueOf(client, 'execute', 'async () => "served"')).toBe('served');
+  });
+
+  it('should refuse a run at once when the sandbox is full, in the form of the API errors', async () => {
+    const client = await readOnly();
+    const accepted = MAX_CONCURRENT_RUNS + MAX_QUEUED_RUNS;
+    const calls = Array.from({ length: accepted + 1 }, () =>
+      runTool(client, 'execute', 'async () => { while (true) {} }'),
+    );
+
+    const refused = await calls[accepted]!;
+    const results = await Promise.all(calls.slice(0, accepted));
+
+    expect(refused.isError).toBe(true);
+    expect(JSON.parse(textOf(refused))).toEqual({
+      status: 429,
+      error: 'The server is already running as much code as it may: try again in a moment',
+    });
+    expect(results.map(textOf)).toEqual(
+      Array(accepted).fill('Error: The code computed for too long: it was stopped'),
+    );
+  });
+
+  it('should keep this server serving other requests while code runs', async () => {
+    const client = await readOnly();
+    const busy = runTool(client, 'execute', 'async () => { while (true) {} }');
+    // Let the run start in its worker
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    const started = Date.now();
+    await request.get('/api/public/settings').expect(200);
+    expect(Date.now() - started).toBeLessThan(200);
+    await busy;
+  });
+});
+
+describe('the answer of a run', () => {
+  const caller: Caller = {
+    origin: 'http://127.0.0.1',
+    authorization: '',
+    clientIp: '127.0.0.1',
+    translate: (key) => i18next.getFixedT('en')(key),
+  };
+  const textOfResult = (result: Parameters<typeof toolResultOf>[1]) =>
+    textOf(toolResultOf(caller, result));
+
+  it('should mark an answer or an error message cut by the sandbox', () => {
+    expect(textOfResult({ ok: true, json: '"short"', length: 7 })).toBe('"short"');
+    expect(textOfResult({ ok: true, json: 'x', length: SANDBOX_LIMITS.outputChars + 1 })).toContain(
+      TRUNCATION_MARKER,
+    );
+    expect(
+      textOfResult({ ok: false, reason: 'thrown', message: 'Error: long', length: 1e6 }),
+    ).toContain(TRUNCATION_MARKER);
+  });
+
+  it.each([
+    ['notAFunction', 'Error: The code must be an async arrow function, such as: async () => { … }'],
+    ['cpuTime', 'Error: The code computed for too long: it was stopped'],
+    ['wallTime', 'Error: The code did not finish in time: it was stopped'],
+    [
+      'crashed',
+      'Error: The code exhausted the resources of the sandbox (stack or memory): it was stopped',
+    ],
+  ] as const)('should explain a run ended by %s', (reason, text) => {
+    const result = toolResultOf(caller, { ok: false, reason });
+
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toBe(text);
   });
 });
 

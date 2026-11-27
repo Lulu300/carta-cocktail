@@ -13,7 +13,14 @@ import {
   type OperationResponse,
   requestOperation,
 } from './callOperation';
-import { HostFunctionError, type HostFunction, runInSandbox, SANDBOX_LIMITS } from './sandbox';
+import {
+  HostFunctionError,
+  type HostFunction,
+  runInSandbox,
+  SANDBOX_LIMITS,
+  type SandboxRequest,
+  type SandboxResult,
+} from './sandbox';
 
 /*
  * Code Mode of the MCP server (F-15), in the form and with the names of Cloudflare's Code Mode
@@ -29,11 +36,10 @@ import { HostFunctionError, type HostFunction, runInSandbox, SANDBOX_LIMITS } fr
 
 /** Longest code a call accepts, in characters. */
 export const MAX_CODE_LENGTH = 20_000;
-/** Longest answer sent back to the agent, in characters: about 6,000 tokens, as Cloudflare's. */
-export const MAX_OUTPUT_CHARS = 24_000;
-/** API requests one run of `execute` may send. */
-export const MAX_REQUESTS_PER_RUN = 50;
-/** Ends an answer cut at MAX_OUTPUT_CHARS, as Cloudflare marks it. */
+/**
+ * Ends an answer cut at SANDBOX_LIMITS.outputChars (24,000 characters, about 6,000 tokens), as
+ * Cloudflare marks it.
+ */
 export const TRUNCATION_MARKER = '--- TRUNCATED ---';
 
 /** An operation of the document, as `codemode.request()` resolves a path against it. */
@@ -222,11 +228,10 @@ function errorBodyOf(response: OperationResponse): { error: string; details?: un
 }
 
 /**
- * `codemode.request()` of one run of `execute`: answers `{ status, body }` of a success, and
- * rejects with the status and body of an error. At most MAX_REQUESTS_PER_RUN requests.
+ * `codemode.request()` of `execute`: answers `{ status, body }` of a success, and rejects with
+ * the status and body of an error. The sandbox bounds the calls of a run (maxHostCalls).
  */
 function requestFunction(api: CodeModeApi, caller: Caller, canWrite: boolean): HostFunction {
-  let sent = 0;
   return async (argument, signal) => {
     const parsed = RequestOptions.safeParse(argument);
     if (!parsed.success) {
@@ -237,12 +242,6 @@ function requestFunction(api: CodeModeApi, caller: Caller, canWrite: boolean): H
       });
     }
     const options = parsed.data;
-    sent += 1;
-    if (sent > MAX_REQUESTS_PER_RUN) {
-      throw refused(requestLabel(options), 429, {
-        error: caller.translate('errors.codeModeTooManyRequests'),
-      });
-    }
     const { operation, params } = resolveOperation(api, caller, canWrite, options);
     const response = await requestOperation(
       caller,
@@ -262,31 +261,54 @@ function requestFunction(api: CodeModeApi, caller: Caller, canWrite: boolean): H
   };
 }
 
-/** The answer cut at MAX_OUTPUT_CHARS, with a mark that tells the agent to ask for less. */
-export function truncated(text: string): string {
-  if (text.length <= MAX_OUTPUT_CHARS) return text;
-  return `${text.slice(0, MAX_OUTPUT_CHARS)}\n\n${TRUNCATION_MARKER}\nThe answer has ${text.length} characters, cut at ${MAX_OUTPUT_CHARS}: return less, such as the fields you need.`;
+/**
+ * The text the sandbox handed back, cut at `outputChars` from `length` characters: a mark then
+ * tells the agent to ask for less.
+ */
+function marked(text: string, length: number): string {
+  const max = SANDBOX_LIMITS.outputChars;
+  if (length <= max) return text;
+  return `${text}\n\n${TRUNCATION_MARKER}\nThe answer has ${length} characters, cut at ${max}: return less, such as the fields you need.`;
 }
 
 function errorResult(message: string): CallToolResult {
-  return { isError: true, content: [{ type: 'text', text: truncated(`Error: ${message}`) }] };
+  return { isError: true, content: [{ type: 'text', text: `Error: ${message}` }] };
 }
 
-/** Runs `code` in the sandbox with `functions` under `codemode`, as a tool result. */
+/** The refusal of a run when the sandbox is full, in the form of the API's errors. */
+function busyResult(caller: Caller): CallToolResult {
+  const error = { status: 429, error: caller.translate('errors.codeModeBusy') };
+  return { isError: true, content: [{ type: 'text', text: JSON.stringify(error) }] };
+}
+
+/** What a host call past the limit of a run rejects with, as an API refusal. */
+function callRefusal(caller: Caller): HostFunctionError {
+  const body = { error: caller.translate('errors.codeModeTooManyRequests') };
+  return refused('codemode', 429, body);
+}
+
+/** Runs `code` in the sandbox with `api` under `codemode`, as a tool result. */
 async function runCode(
   caller: Caller,
   code: unknown,
-  functions: Record<string, HostFunction>,
+  api: Omit<SandboxRequest, 'code' | 'callRefusal'>,
 ): Promise<CallToolResult> {
   if (typeof code !== 'string') return errorResult(caller.translate('errors.codeModeNotAFunction'));
   if (code.length > MAX_CODE_LENGTH) {
     return errorResult(caller.translate('errors.codeModeCodeTooLong'));
   }
-  const result = await runInSandbox(code, functions);
-  if (result.ok) return { content: [{ type: 'text', text: truncated(result.json) }] };
+  return toolResultOf(
+    caller,
+    await runInSandbox({ code, ...api, callRefusal: callRefusal(caller) }),
+  );
+}
+
+/** The result of a run as the agent reads it: the JSON of the value, or why the run failed. */
+export function toolResultOf(caller: Caller, result: SandboxResult): CallToolResult {
+  if (result.ok) return { content: [{ type: 'text', text: marked(result.json, result.length) }] };
   switch (result.reason) {
     case 'thrown':
-      return errorResult(result.message);
+      return errorResult(marked(result.message, result.length));
     case 'notAFunction':
       return errorResult(caller.translate('errors.codeModeNotAFunction'));
     case 'cpuTime':
@@ -295,10 +317,12 @@ async function runCode(
       return errorResult(caller.translate('errors.codeModeWallTime'));
     case 'crashed':
       return errorResult(caller.translate('errors.codeModeCrashed'));
+    case 'busy':
+      return busyResult(caller);
   }
 }
 
-const LIMITS = `Limits of a run: ${SANDBOX_LIMITS.wallTimeMs / 1000} s, ${SANDBOX_LIMITS.cpuTimeMs} ms of computation, ${SANDBOX_LIMITS.memoryBytes / (1024 * 1024)} MB of memory, code of ${MAX_CODE_LENGTH} characters at most; the answer is cut after ${MAX_OUTPUT_CHARS} characters (${TRUNCATION_MARKER}).`;
+const LIMITS = `Limits of a run: ${SANDBOX_LIMITS.wallTimeMs / 1000} s, ${SANDBOX_LIMITS.cpuTimeMs} ms of computation, ${SANDBOX_LIMITS.memoryBytes / (1024 * 1024)} MB of memory, ${SANDBOX_LIMITS.maxHostCalls} calls to the server (codemode.spec() included), code of ${MAX_CODE_LENGTH} characters at most; the answer is cut after ${SANDBOX_LIMITS.outputChars} characters (${TRUNCATION_MARKER}). Few runs at a time: a busy server refuses with the status 429, try again.`;
 
 const SANDBOX = `Your code must be an async arrow function that returns the result. It runs in a sandbox on the server: no fetch, require, process, file system or timers.`;
 
@@ -348,7 +372,7 @@ declare const codemode: {
   request(options: RequestOptions): Promise<{ status: number; body: unknown }>;
 };
 
-Each request goes through the API with the token of this connection: same checks, rate limit and errors. An error answer rejects with an Error whose \`status\` and \`body\` ({ error, details? }) are those of the API. ${scope} At most ${MAX_REQUESTS_PER_RUN} requests per run.
+Each request goes through the API with the token of this connection: same checks, rate limit and errors. An error answer rejects with an Error whose \`status\` and \`body\` ({ error, details? }) are those of the API. ${scope}
 
 ${SANDBOX}
 
@@ -381,7 +405,8 @@ export interface CodeModeTool {
 
 /** `search` and `execute` for `caller`, whose token may write or not. */
 export function codeModeTools(api: CodeModeApi, caller: Caller, canWrite: boolean): CodeModeTool[] {
-  const spec: HostFunction = async () => JSON.parse(api.specJson(canWrite)) as unknown;
+  // A value: the sandbox asks for it once per run, and the code gets the same object after
+  const values = { spec: async () => JSON.parse(api.specJson(canWrite)) as unknown };
   return [
     {
       name: 'search',
@@ -389,7 +414,7 @@ export function codeModeTools(api: CodeModeApi, caller: Caller, canWrite: boolea
       description: SEARCH_DESCRIPTION,
       inputSchema: codeInput('JavaScript async arrow function to search the OpenAPI document'),
       annotations: { readOnlyHint: true, openWorldHint: false },
-      run: (args) => runCode(caller, args.code, { spec }),
+      run: (args) => runCode(caller, args.code, { values }),
     },
     {
       name: 'execute',
@@ -398,7 +423,10 @@ export function codeModeTools(api: CodeModeApi, caller: Caller, canWrite: boolea
       inputSchema: codeInput('JavaScript async arrow function to execute'),
       annotations: { readOnlyHint: !canWrite, destructiveHint: canWrite, openWorldHint: false },
       run: (args) =>
-        runCode(caller, args.code, { spec, request: requestFunction(api, caller, canWrite) }),
+        runCode(caller, args.code, {
+          values,
+          functions: { request: requestFunction(api, caller, canWrite) },
+        }),
     },
   ];
 }

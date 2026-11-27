@@ -69,12 +69,13 @@
     "codeModeUnknownOperation": "Aucune opération admin de l'API n'a cette méthode et ce chemin : cherchez-en une avec l'outil search",
     "codeModeFileUpload": "Cette opération prend un fichier, que Code Mode ne peut pas envoyer",
     "codeModeInvalidPath": "Le chemin doit commencer par / et ne contenir ni ?, ni #, ni \\ : la requête va dans `query`",
-    "codeModeTooManyRequests": "Cette exécution a envoyé autant de requêtes à l'API qu'elle le peut : voir les limites dans la description d'execute",
+    "codeModeTooManyRequests": "Cette exécution a fait autant d'appels au serveur qu'elle le peut : voir les limites dans la description de l'outil",
     "codeModeCodeTooLong": "Le code est trop long : voir les limites dans la description de l’outil",
     "codeModeNotAFunction": "Le code doit être une fonction fléchée asynchrone, par exemple : async () => { … }",
     "codeModeCpuTime": "Le code a calculé trop longtemps : il a été arrêté",
     "codeModeWallTime": "Le code ne s'est pas terminé à temps : il a été arrêté",
-    "codeModeCrashed": "Le code est allé trop profond pour le serveur (récursion, ou objet trop imbriqué) : il a été arrêté"
+    "codeModeCrashed": "Le code a épuisé les ressources du bac à sable (pile ou mémoire) : il a été arrêté",
+    "codeModeBusy": "Le serveur exécute déjà autant de code qu'il le peut : réessayez dans un instant"
   },
   "auth": {
     "loginSuccess": "Connexion réussie",
