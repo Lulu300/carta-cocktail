@@ -114,6 +114,11 @@ Coverage is enforced automatically by CI. Run `npm test -- --coverage` in either
 - Builds and starts `docker-compose.yml`, then runs `scripts/smoke/smoke.sh` through nginx: login, 2.4 MB photo upload, photo still served after the backend container is recreated, backup export, link preview of a public menu for a messaging robot. Then `scripts/smoke/custom-uid.sh` recreates the backend with `CARTA_UID`/`CARTA_GID`: refused on volumes of uid 1000, then started after a `chown`, and `smoke.sh` again
 - Locally, always in a dedicated compose project: `export COMPOSE_PROJECT_NAME=carta-smoke JWT_SECRET=$(openssl rand -hex 32) ADMIN_PASSWORD=$(openssl rand -hex 16)`, then `docker compose -p carta-smoke up -d --build --wait && ./scripts/smoke/smoke.sh`, then `docker compose -p carta-smoke down -v --remove-orphans --rmi local`, all in the same shell call (`smoke.sh` reads `COMPOSE_PROJECT_NAME` to recreate the backend). The default project is your local stack: `down -v` would delete its data (see the header of `smoke.sh`)
 
+**E2E** (`.github/workflows/e2e.yml`, folder `e2e/`) — runs on PRs to `develop` and on demand. Not a required check yet (it becomes one after a few stable weeks):
+- Builds and starts `docker-compose.yml` like Smoke, then runs the Playwright journeys in Chromium (`npm test` in `e2e/`): sign-in and sign-out, expired token, category → bottle → cocktail with a photo, menu with a section published and read by a guest, personal bottle menu, search, light theme, 404 page, offline menu, backup export and restore. The `*.public.spec.ts` files also run on a Pixel 7 profile (Chromium too). A failure uploads the Playwright report (trace and screenshot of each failed test) and the container logs
+- Locally, with a stack started in a dedicated compose project (`docker compose -p carta-e2e up -d --build --wait`, with `JWT_SECRET` and `ADMIN_PASSWORD` in the `.env` next to the compose file, which the config reads): `cd e2e && npm ci && npx playwright install chromium && npm test`, then `docker compose -p carta-e2e down -v --remove-orphans --rmi local`. `BASE_URL` points the tests elsewhere than `http://localhost`
+- Rules for new journeys: the test creates its data through the API (`support/api.ts`, `AdminApi`) with `uniqueName()` and clicks through the interface only for what it is about; the database is never reset and keeps the data of earlier runs, so a list is searched, never read from its first page; no retry (a flaky test is fixed, not retried). The admin signs in once (`auth.setup.ts`, the login route counts failed attempts and the backup routes allow 10 requests per 15 minutes: restart the backend container when a local loop hits them); the backup journey signs in again after the restore, which ends every session
+
 **CodeQL**: GitHub's default setup analyses `main` and the PRs to `main` only, so its check is required on `main` alone.
 
 **Release** (`.github/workflows/release.yml`) — runs on tag push `v*`:
@@ -134,6 +139,7 @@ Coverage is enforced automatically by CI. Run `npm test -- --coverage` in either
 │   ├── plan/               # Action plan: tasks and tracking script
 │   ├── releases/           # Release notes, one file per version
 │   └── review/             # Review reports behind the plan
+├── e2e/                    # Playwright journeys against the compose stack (CI "E2E" job)
 ├── scripts/
 │   ├── smoke/              # Smoke test of the compose stack (CI "Smoke" job)
 │   └── upgrade-test/       # Upgrade bench across released versions

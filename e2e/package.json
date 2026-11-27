@@ -1,0 +1,21 @@
+{
+  "name": "carta-cocktail-e2e",
+  "private": true,
+  "description": "Playwright end-to-end tests of the key journeys, run against the Docker Compose stack",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "@types/node": "^24.0.0",
+    "prettier": "^3.10.1",
+    "typescript": "~5.9.0"
+  }
+}

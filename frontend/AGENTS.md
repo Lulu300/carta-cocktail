@@ -41,6 +41,7 @@ CI runs automatically on PRs (`Frontend` job of `.github/workflows/ci.yml`): `np
 - Real providers and components rather than mocks: wrap in `AppProviders` (`src/test/appProviders.tsx`: the real `AuthProvider` and `SiteSettingsProvider`) when a page or hook reads the session or the site settings; store a token in `localStorage` for the admin case. Mock a component only when it has its own tests and the page only needs its outcome (the import wizards, `exportZip`)
 - A file download goes through `mockDownload()` (`src/test/download.ts`), which records the saved file names. `rejectNextFetch(value)` covers code that guards against a non-Error throw. Both undo their stubs when the test ends
 - Run with coverage locally: `npm test -- --coverage`
+- Journeys that need a real browser and the real backend (nginx, upload, service worker, session expiry) are Playwright tests in `/e2e`, run by the `E2E` workflow (root `AGENTS.md`). They read the English texts and the roles of the interface: a renamed label or button breaks them, so rename it there too. They do not count in the coverage thresholds
 - `vitest.config.ts` pins the reporter, so the console of passing tests (`act(...)` warnings, `[MSW]` messages) shows the same under an AI agent as in a terminal or in CI (Vitest would otherwise pick its `minimal` reporter under an agent)
 - Accessibility: page tests check axe with `expect(await axe(container)).toHaveNoViolations()` (`src/test/axe.ts`, serious and critical violations only). jsdom computes no colors: contrast is checked with Lighthouse in a browser
 

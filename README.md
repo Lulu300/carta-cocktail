@@ -343,7 +343,8 @@ carta-cocktail/
 │   │   ├── i18n/           # EN/FR translations
 │   │   └── types/          # TypeScript interfaces
 │   └── nginx.conf.template # Production nginx: serves the SPA, proxies /api and /uploads
-├── .github/workflows/      # CI, Smoke and Release pipelines
+├── e2e/                    # Playwright journeys against the compose stack
+├── .github/workflows/      # CI, Smoke, E2E and Release pipelines
 ├── docs/operations.md      # Operations guide (French)
 ├── docs/releases/          # Release notes, one file per version
 ├── scripts/                # Smoke test and upgrade test bench
@@ -427,6 +428,8 @@ This project uses a **feature branch** workflow:
 - **Docker build (backend)** and **Docker build (frontend)**: both images are built (`linux/amd64`, not pushed)
 
 **Smoke** (`.github/workflows/smoke.yml`) runs on every PR to `main`/`develop`, and in the Release workflow: it starts `docker-compose.yml` and checks login, photo upload, persistence after a backend recreation and backup export, then runs the backend under another uid.
+
+**E2E** (`.github/workflows/e2e.yml`) runs on every PR to `develop`: it starts the same stack and drives the key journeys (sign-in, catalog, menus, public menu, offline, backup) with Playwright in Chromium (`e2e/`). It is not required yet.
 
 These checks are required to merge into `main` and `develop`; a PR to `main` also needs CodeQL results.
 
