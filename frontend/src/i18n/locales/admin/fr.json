@@ -11,6 +11,7 @@
     "menus": "Cartes",
     "shortages": "Pénuries",
     "settings": "Paramètres",
+    "api": "API",
     "logout": "Déconnexion",
     "menu": "Menu de navigation",
     "admin": "Administration"
@@ -642,5 +643,10 @@
   },
   "appUpdate": {
     "available": "Une nouvelle version est disponible"
+  },
+  "apiDocs": {
+    "title": "API",
+    "intro": "Toutes les routes de l'API, avec ce que chacune accepte et ce qu'elle renvoie. Le bouton de test d'une route envoie la requête avec votre session : il modifie vraiment vos données.",
+    "publicDocument": "Sans session, les scripts et les intégrations lisent les routes publiques à l'adresse"
   }
 }

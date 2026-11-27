@@ -36,6 +36,7 @@ const MenuEditPage = lazyWithAdminMessages(() => import('./pages/admin/MenuEditP
 const MenuBottleEditPage = lazyWithAdminMessages(() => import('./pages/admin/MenuBottleEditPage'));
 const ShortagesPage = lazyWithAdminMessages(() => import('./pages/admin/ShortagesPage'));
 const SettingsPage = lazyWithAdminMessages(() => import('./pages/admin/SettingsPage'));
+const ApiDocsPage = lazyWithAdminMessages(() => import('./pages/admin/ApiDocsPage'));
 
 function RouteFallback() {
   const { t } = useTranslation();
@@ -149,6 +150,7 @@ export default function App() {
             <Route path="menus/:id/bottles" element={<MenuBottleEditPage />} />
             <Route path="shortages" element={<ShortagesPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="api" element={<ApiDocsPage />} />
           </Route>
         </Routes>
       </Suspense>

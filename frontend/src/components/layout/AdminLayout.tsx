@@ -25,6 +25,7 @@ const navItems = [
   { path: '/admin/menus', key: 'menus', icon: '📋' },
   { path: '/admin/shortages', key: 'shortages', icon: '⚠️' },
   { path: '/admin/settings', key: 'settings', icon: '⚙️' },
+  { path: '/admin/api', key: 'api', icon: '📖' },
 ];
 
 export default function AdminLayout() {

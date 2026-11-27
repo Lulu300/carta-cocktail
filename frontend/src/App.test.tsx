@@ -65,6 +65,9 @@ vi.mock('./pages/admin/MenuEditPage', () => ({ default: () => null }));
 vi.mock('./pages/admin/MenuBottleEditPage', () => ({ default: () => null }));
 vi.mock('./pages/admin/ShortagesPage', () => ({ default: () => null }));
 vi.mock('./pages/admin/SettingsPage', () => ({ default: () => null }));
+vi.mock('./pages/admin/ApiDocsPage', () => ({
+  default: () => <div data-testid="api-docs-page" />,
+}));
 vi.mock('./pages/public/HomePage', () => ({ default: () => <div data-testid="home-page" /> }));
 vi.mock('./pages/public/MenuPublicPage', () => ({
   default: function MenuPublicPageStub() {
@@ -220,6 +223,15 @@ describe('route code splitting', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Loading...');
     expect(await screen.findByText('Dashboard')).toBeInTheDocument();
     expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+  });
+
+  it('loads the API page on demand, at /admin/api', async () => {
+    mockUseAuth.mockReturnValue({ user: { id: 1, email: 'admin@test.local' }, isLoading: false });
+
+    renderAt('/admin/api');
+
+    expect(screen.getByRole('status')).toHaveTextContent('Loading...');
+    expect(await screen.findByTestId('api-docs-page')).toBeInTheDocument();
   });
 
   it('renders the public home page without waiting for any chunk', () => {

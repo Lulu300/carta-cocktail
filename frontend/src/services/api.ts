@@ -572,6 +572,13 @@ export const system = {
     request<void>('/system/upgrade-notice/acknowledge', { method: 'POST' }),
 };
 
+// OpenAPI document (admin)
+export const openApi = {
+  /** Every route of the API, as the API page shows them. The viewer reads it as is. */
+  getDocument: (signal?: AbortSignal) =>
+    request<Record<string, unknown>>('/openapi/full.json', { signal }),
+};
+
 // Backup
 export const backup = {
   exportBackup: async () => {

@@ -11,6 +11,7 @@
     "menus": "Menus",
     "shortages": "Shortages",
     "settings": "Settings",
+    "api": "API",
     "logout": "Logout",
     "menu": "Navigation menu",
     "admin": "Administration"
@@ -642,5 +643,10 @@
   },
   "appUpdate": {
     "available": "A new version is available"
+  },
+  "apiDocs": {
+    "title": "API",
+    "intro": "Every route of the API, with what it accepts and what it answers. The test button of a route sends the request with your session: it really changes your data.",
+    "publicDocument": "Without a session, scripts and integrations read the public routes at"
   }
 }
