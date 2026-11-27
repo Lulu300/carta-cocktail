@@ -8,7 +8,7 @@ effort: S
 status: todo
 owner: agent
 depends_on: []
-touches: [backend/src/app.ts, backend/src/openapi/mounts.ts, backend/src/openapi/operations.ts, backend/src/openapi/openapi.test.ts]
+touches: [backend/src/app.ts, backend/src/openapi/mounts.ts, backend/src/openapi/operations.ts, backend/src/middleware/rateLimit.ts, backend/src/openapi/openapi.test.ts]
 sources: []
 branch:
 pr:
@@ -24,23 +24,29 @@ pr:
 
 À la PR de release `develop` → `main` de v1.21.0 (#313), CodeQL a levé 9 alertes `js/missing-rate-limiting` (n° 36 à 44) sur des routes de `apiTokens.ts`, `auth.ts`, `backup.ts`, `public.ts` et `settings.ts`. Toutes passent pourtant par le limiteur global.
 
-Explication probable : CodeQL ne suit plus la chaîne de middlewares quand le montage passe par une fonction qui étale un tableau dans `app.use`. Il ne voit alors plus le limiteur monté avant les routeurs. Les alertes ont été fermées comme faux positifs avec l'accord de l'humain (2026-11-27). Mais chaque nouvelle route montée de cette façon lèvera une nouvelle alerte à la prochaine PR vers `main`, et bloquera la release jusqu'à une nouvelle fermeture manuelle.
+La cause n'est pas encore prouvée. F-14 a changé deux choses que CodeQL peut ne plus suivre :
+
+- **Le montage.** `app.use(path, ...)`, écrit en clair dans `app.ts` jusqu'à v1.20.0, passe maintenant par `mountApiRouter`, qui étale un tableau dans `app.use`.
+- **Le limiteur.** `createRateLimiter()` (`backend/src/middleware/rateLimit.ts`) renvoyait directement `rateLimit({…})` d'`express-rate-limit`. Il range maintenant l'instance dans un ensemble (`limiters.add(limiter)`) avant de la renvoyer, pour que le document OpenAPI décrive les limites.
+
+Les alertes 41 et 42 (`backup.ts`) pèsent pour la seconde cause, ou pour les deux. `/api/backup` reçoit pourtant `backupLimiter` en paramètre explicite de son montage : `mountApiRouter(app, '/api/backup', authMiddleware, backupLimiter, backupRoutes)`. Une troisième explication reste possible. CodeQL ne signale que le code modifié par la PR, et la taille de #313 a pu faire ressortir des alertes que des montages plus anciens auraient déjà levées : « Alerts not introduced by this pull request might have been detected because the code changes were too large ». Les alertes ont été fermées comme faux positifs avec l'accord de l'humain (2026-11-27). Mais chaque nouvelle route montée de cette façon lèvera une nouvelle alerte à la prochaine PR vers `main`, et bloquera la release jusqu'à une nouvelle fermeture manuelle.
 
 ## Ce qu'il faut faire
 
-1. **Reproduire en local** avec le CLI CodeQL : `codeql database create` sur `backend/`, puis la requête `js/missing-rate-limiting` du pack `codeql/javascript-queries`. Les alertes de #313 doivent réapparaître. Sinon, utiliser une PR brouillon vers `main`, fermée sans merge.
-2. **Trouver la forme de montage que CodeQL comprend**, sans perdre ce dont F-14 a besoin (le chemin de montage de chaque routeur, lu par `collectApiRoutes()`). Pistes à comparer :
-   - (a) Des appels `app.use(path, ...middlewares, router)` écrits en clair dans `app.ts`. Le chemin de montage est retenu à part, sans répéter les chemins à la main : par exemple, lu sur la pile d'Express après le montage, si c'est fiable sous Express 5.
-   - (b) Garder `mountApiRouter`, mais avec des paramètres explicites (sans tableau étalé), si cela suffit à CodeQL.
-   - (c) Un limiteur passé explicitement au montage de chaque routeur, si (a) et (b) échouent. Il ne doit pas compter deux fois la même requête (même instance que `apiLimiter`).
-
-   Choisir la plus simple qui fait disparaître les alertes, sans duplication ni changement de comportement.
-3. **Vérifier qu'aucun comportement ne change** : ordre des middlewares, limiteurs, 404 de l'API, CORS, document OpenAPI identique (comparer le JSON avant et après).
-4. Noter dans le Journal la forme retenue, et la requête CodeQL qui le prouve.
+1. **Reproduire en local** avec le CLI CodeQL : `codeql database create` sur `backend/`, puis la requête `js/missing-rate-limiting` du pack `codeql/javascript-queries`.
+   - Les alertes de #313 doivent réapparaître sur `develop`. Sinon, utiliser une PR brouillon vers `main`, fermée sans merge.
+   - Lancer la même requête sur `v1.20.0`, pour savoir si ces routes y étaient déjà signalées. Si oui, la cause est la troisième explication, et la tâche se réduit à trouver une forme que CodeQL reconnaît.
+2. **Isoler la cause par des essais séparés**, chacun relancé avec la requête :
+   - (a) `createRateLimiter()` renvoie l'appel `rateLimit({…})` directement, et l'enregistrement pour le document OpenAPI se fait autrement : par exemple par une fonction appelée sur le résultat, ou par une lecture de la pile d'Express.
+   - (b) Des appels `app.use(path, ...middlewares, router)` écrits en clair dans `app.ts`. Le chemin de montage, lu par `collectApiRoutes()`, est retenu sans répéter les chemins à la main : par exemple lu sur la pile d'Express après le montage, si c'est fiable sous Express 5. Ou bien `mountApiRouter` garde des paramètres explicites, sans tableau étalé.
+   - (a) et (b) ensemble, si aucun ne suffit seul.
+3. **Retenir la forme la plus simple** qui fait disparaître les alertes, sans duplication ni changement de comportement, et garder ce dont F-14 a besoin. Si aucune forme ne suffit, l'écrire dans le Journal avec les essais faits, et rendre la tâche à l'humain : la fermeture manuelle des faux positifs reste alors la règle.
+4. **Vérifier qu'aucun comportement ne change** : ordre des middlewares, limiteurs, 404 de l'API, CORS, document OpenAPI identique (comparer le JSON avant et après).
+5. Noter dans le Journal la cause trouvée, la forme retenue, et la requête CodeQL qui le prouve.
 
 ## Critères d'acceptation
 
-- [ ] La requête `js/missing-rate-limiting` ne lève plus d'alerte sur les routes de l'API montées dans `app.ts`. Le résultat de CodeQL avant et après est dans la PR.
+- [ ] La requête `js/missing-rate-limiting` ne lève plus d'alerte sur les routes de l'API montées dans `app.ts`. La PR contient sa sortie avant et après : la requête locale du CLI CodeQL, ou les alertes d'une PR brouillon vers `main`.
 - [ ] Les documents OpenAPI public et complet sont identiques avant et après.
 - [ ] Les tests de limiteur et de couverture des routes passent sans changement d'attente.
 
