@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { findNewRecipeDefects } from './recipeDefectsService';
-import { IngredientLine } from '../validation/cocktails';
+import { IngredientLine, type SourceType } from '../validation/cocktails';
 
-type SourceType = 'BOTTLE' | 'CATEGORY' | 'INGREDIENT';
 type Line = {
   sourceType: SourceType;
   bottleId: number | null;
