@@ -459,6 +459,20 @@
     "logoutEverywhere": "Sign out everywhere",
     "confirmLogoutEverywhere": "Every device, this one included, will be signed out and will need the password again. Use it when a device was lost or shared.",
     "passwordMismatch": "Passwords do not match",
+    "embed": {
+      "title": "Embed the menu in a website",
+      "description": "The public menu can be shown in a frame of your own website. Only the sites listed here may do it; the sign-in and the administration never open in a frame.",
+      "origins": "Allowed sites",
+      "originsHint": "One address per line, such as https://www.mon-bar.fr, without a path. Leave empty so that no site can embed the menu.",
+      "saved": "Allowed sites updated",
+      "menu": "Menu to embed",
+      "code": "Code to paste in your website",
+      "codeHint": "Works once the site is listed above. If your website uses https://, this instance must be served over https:// too, or browsers block the frame.",
+      "copy": "Copy the code",
+      "copied": "Code copied",
+      "copyFailed": "The code could not be copied: select it in the field and copy it",
+      "noPublicMenu": "Publish a menu to get the code to paste in your website."
+    },
     "backup": {
       "title": "Backup & Restore",
       "description": "Export a complete backup of your database and images, or restore from a previous backup.",

@@ -3,6 +3,8 @@ import { z } from 'zod';
 export const SiteSettingsUpdate = z.object({
   siteName: z.string().optional(),
   siteIcon: z.string().optional(),
+  // Checked one by one by the route, which names the refused origin in a translated message
+  embedOrigins: z.array(z.string()).optional(),
 });
 
 // An empty email keeps the current one, as before. Changing the login email or

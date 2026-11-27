@@ -221,6 +221,32 @@ request GET "/menu/$menu_slug"
 expect_status 200
 grep -q '/assets/' "$BODY" || fail "the menu page is not the single-page app: $(body_excerpt)"
 
+step "Only /menu/ pages can be embedded, by the sites listed in the settings"
+# frame-ancestors of the CSP, and X-Frame-Options ('none' when absent), of a path
+framing() {
+  request GET "$1"
+  expect_status 200
+  local frame_ancestors
+  frame_ancestors="$(header content-security-policy | grep -o "frame-ancestors [^;]*" || true)"
+  printf '%s | %s' "$frame_ancestors" "$(header x-frame-options)"
+}
+not_embeddable="frame-ancestors 'none' | DENY"
+[[ "$(framing "/menu/$menu_slug")" == "$not_embeddable" ]] \
+  || fail "/menu/$menu_slug without allowed sites: got '$(framing "/menu/$menu_slug")'"
+request PUT /api/settings "${auth[@]}" -H 'Content-Type: application/json' \
+  --data '{"embedOrigins":["https://bar.example"]}'
+expect_status 200
+# nginx asks the backend on each load: no restart needed
+embeddable="frame-ancestors 'self' https://bar.example | "
+[[ "$(framing "/menu/$menu_slug")" == "$embeddable" ]] \
+  || fail "/menu/$menu_slug with an allowed site: got '$(framing "/menu/$menu_slug")'"
+for path in / /login /admin /admin/settings /api/public/settings; do
+  [[ "$(framing "$path")" == "$not_embeddable" ]] || fail "$path must stay $not_embeddable, got '$(framing "$path")'"
+done
+# Back to the default: custom-uid.sh runs this script again on the same database
+request PUT /api/settings "${auth[@]}" -H 'Content-Type: application/json' --data '{"embedOrigins":[]}'
+expect_status 200
+
 step "nginx runs as uid 101, not as root"
 # USER 101 in frontend/Dockerfile is the only thing that keeps nginx non-root (rootless Docker,
 # Podman): without it, the master process runs as root and every request above still works.

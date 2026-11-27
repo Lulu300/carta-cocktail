@@ -229,6 +229,12 @@ export interface SiteSettings {
   siteIcon: string;
 }
 
+/** The settings as the admin reads them. */
+export interface AdminSiteSettings extends SiteSettings {
+  /** Sites allowed to show the public menu in an iframe, e.g. "https://www.mon-bar.fr". */
+  embedOrigins: string[];
+}
+
 // Export/Import types
 export interface CocktailExportFormat {
   version: number;

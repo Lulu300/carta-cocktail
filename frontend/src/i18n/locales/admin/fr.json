@@ -459,6 +459,20 @@
     "logoutEverywhere": "Se déconnecter partout",
     "confirmLogoutEverywhere": "Tous les appareils, celui-ci compris, seront déconnectés et devront saisir à nouveau le mot de passe. À utiliser si un appareil a été perdu ou partagé.",
     "passwordMismatch": "Les mots de passe ne correspondent pas",
+    "embed": {
+      "title": "Intégrer la carte dans un site",
+      "description": "La carte publique peut s'afficher dans un cadre de votre propre site. Seuls les sites listés ici peuvent le faire ; la connexion et l'administration ne s'ouvrent jamais dans un cadre.",
+      "origins": "Sites autorisés",
+      "originsHint": "Une adresse par ligne, par exemple https://www.mon-bar.fr, sans chemin. Laissez vide pour qu'aucun site ne puisse intégrer la carte.",
+      "saved": "Sites autorisés mis à jour",
+      "menu": "Carte à intégrer",
+      "code": "Code à coller dans votre site",
+      "codeHint": "Fonctionne une fois le site listé ci-dessus. Si votre site est en https://, cette instance doit l'être aussi, sinon les navigateurs bloquent le cadre.",
+      "copy": "Copier le code",
+      "copied": "Code copié",
+      "copyFailed": "Le code n'a pas pu être copié : sélectionnez-le dans le champ et copiez-le",
+      "noPublicMenu": "Publiez une carte pour obtenir le code à coller dans votre site."
+    },
     "backup": {
       "title": "Sauvegarde & Restauration",
       "description": "Exportez une sauvegarde complète de votre base de données et images, ou restaurez depuis une sauvegarde précédente.",

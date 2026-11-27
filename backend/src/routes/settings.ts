@@ -5,27 +5,33 @@ import { AuthRequest, signToken } from '../middleware/auth';
 import { BadRequestError, NotFoundError } from '../errors';
 import { valid, validate } from '../validation/validate';
 import { EmailAddress, ProfileUpdate, SiteSettingsUpdate } from '../validation/settings';
-import { getOrCreateSettings } from '../services/settingsService';
+import { getOrCreateSettings, toSiteSettingsResponse } from '../services/settingsService';
+import { serializeEmbedOrigins } from '../services/embedOrigins';
 
 const router = Router();
 
 // Get site settings
 router.get('/', async (_req: AuthRequest, res: Response) => {
-  res.json(await getOrCreateSettings());
+  res.json(toSiteSettingsResponse(await getOrCreateSettings()));
 });
 
 // Update site settings
 const siteSettingsSchemas = { body: SiteSettingsUpdate };
 
 router.put('/', validate(siteSettingsSchemas), async (_req: AuthRequest, res: Response) => {
-  const { siteName, siteIcon } = valid<typeof siteSettingsSchemas>(res).body;
+  const { siteName, siteIcon, embedOrigins } = valid<typeof siteSettingsSchemas>(res).body;
   // Absent fields are undefined, which Prisma leaves untouched
+  const data = {
+    siteName,
+    siteIcon,
+    embedOrigins: embedOrigins && serializeEmbedOrigins(embedOrigins),
+  };
   const settings = await prisma.siteSettings.upsert({
     where: { id: 1 },
-    update: { siteName, siteIcon },
-    create: { id: 1, siteName, siteIcon },
+    update: data,
+    create: { id: 1, ...data },
   });
-  res.json(settings);
+  res.json(toSiteSettingsResponse(settings));
 });
 
 // Update admin profile

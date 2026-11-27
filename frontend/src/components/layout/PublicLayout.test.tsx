@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { render, screen, within } from '../../test/test-utils';
 import { axe } from '../../test/axe';
+import { simulateFrame } from '../../test/frame';
 import PublicLayout from './PublicLayout';
 
 const mockUseAuth = vi.fn();
@@ -23,6 +24,10 @@ describe('PublicLayout', () => {
     mockUseAuth.mockReturnValue({ user: null });
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('keeps the sign-in link out of the header, in a discreet footer with the site name', () => {
     render(<PublicLayout />);
 
@@ -42,6 +47,24 @@ describe('PublicLayout', () => {
       within(screen.getByRole('banner')).getByRole('link', { name: 'Dashboard' }),
     ).toHaveAttribute('href', '/admin');
     expect(screen.queryByRole('link', { name: 'Login' })).not.toBeInTheDocument();
+  });
+
+  it('lets the router open the sign-in in a top-level window', () => {
+    render(<PublicLayout />);
+
+    expect(screen.getByRole('link', { name: 'Login' })).not.toHaveAttribute('target');
+  });
+
+  // nginx only lets the menu be embedded: the sign-in and the admin open in the whole tab
+  it('opens the sign-in and the dashboard in the whole tab when the menu is embedded', () => {
+    simulateFrame();
+    const { unmount } = render(<PublicLayout />);
+    expect(screen.getByRole('link', { name: 'Login' })).toHaveAttribute('target', '_top');
+    unmount();
+
+    mockUseAuth.mockReturnValue({ user: { id: 1, email: 'admin@carta.local' } });
+    render(<PublicLayout />);
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('target', '_top');
   });
 
   it('links the site name in the header to the home page', () => {

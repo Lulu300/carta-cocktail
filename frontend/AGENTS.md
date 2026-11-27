@@ -108,8 +108,8 @@ frontend/
 ├── vite.config.ts
 ├── vitest.config.ts
 ├── eslint.config.js
-├── nginx.conf.template           # Production: nginx server, proxies /api and /uploads to the backend (BACKEND_HOST); link preview robots on /menu/ get the backend's Open Graph page
-├── security-headers.conf         # Security headers included by nginx.conf.template
+├── nginx.conf.template           # Production: nginx server, proxies /api and /uploads to the backend (BACKEND_HOST); link preview robots on /menu/ get the backend's Open Graph page; /menu/ asks the backend which sites may embed it (auth_request)
+├── security-headers.conf         # Security headers included by nginx.conf.template; frame-ancestors and X-Frame-Options come from its maps
 └── Dockerfile                    # Vite build, then nginx (non-root, uid 101, port 8080)
 ```
 
@@ -191,6 +191,7 @@ Safari and iOS 16.0+, Chrome and Edge 107+, Firefox 104+ (`build.target` in `vit
 - **Precache**: the public shell only, listed by the `publicShell` plugin of `vite.config.ts` from the chunk graph (the entry chunk and its static imports, the registration chunk, the Latin fonts, the icons). Chunks reached through `import()` (login, admin, jszip) stay out. `bundle-budget.mjs` fails the CI if the precache holds admin code or misses a chunk of the first load.
 - **Runtime caches**: `NetworkFirst` (3 s) on `/api/public/` requests other than page loads (the link preview pages of `/api/public/share/` stay out), `CacheFirst` (200 entries, 30 days) on `/uploads/`, nothing else. A request with an `Authorization` header (the admin) is never cached nor answered from the cache. The first visit loads the menu before the worker exists: `registerServiceWorker.ts` requests those URLs again once the worker controls the page. Its list of cached paths repeats the one of `vite.config.ts`, whose matchers are copied into `sw.js` and cannot import it.
 - **Navigation**: offline, any page but `/admin`, `/login` (`ADMIN_PAGES`, also imported by `vite.config.ts`), `/api/` and `/uploads/` gets the precached `index.html`.
+- **Iframes**: `public/sw-frame-navigations.js`, imported by `sw.js` before the Workbox routes, sends every navigation of a frame to the network. The precached `index.html` carries the headers of `/index.html` (`frame-ancestors 'none'`): served in a frame, it would block an embedded menu (F-10).
 - **nginx**: `/sw.js` and `/manifest.webmanifest` are served with `Cache-Control: no-cache`, the manifest as `application/manifest+json` (`nginx.conf.template`); the smoke test checks both. The CSP needs nothing more: `worker-src` and `manifest-src` fall back to `default-src 'self'`.
 - **Tests**: Vitest does not load the plugin; `vitest.config.ts` points `virtual:pwa-register` to the stand-in `src/test/pwaRegister.ts`.
 - **Icons**: `pwa-icons/icon.svg` and `maskable.svg` (the glass inside the safe zone, 80% of the width), rendered at 512 px with headless Chrome, which cannot render a smaller window: `"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless --hide-scrollbars --window-size=512,512 --screenshot=../public/pwa-512.png icon.svg` from `pwa-icons/` (then `maskable.svg` to `pwa-maskable-512.png`). The 192 px icon and the 180 px `apple-touch-icon.png` are scaled down from `pwa-512.png` (`sips -z 192 192 pwa-512.png --out pwa-192.png` on macOS).

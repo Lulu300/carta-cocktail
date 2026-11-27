@@ -8,7 +8,7 @@ import { ConfirmProvider } from '../../contexts/ConfirmContext';
 import { toast } from '../../components/ui/ToastStore';
 import type { BackupRestoreResult } from '../../services/api';
 import { mockDownload } from '../../test/download';
-import { buildSiteSettings } from '../../test/factories';
+import { buildAdminSiteSettings, buildMenu, buildSiteSettings } from '../../test/factories';
 import { ADMIN_USER } from '../../test/msw/handlers';
 import {
   captureRequest,
@@ -56,8 +56,12 @@ function siteSaveButton() {
   return screen.getAllByText('Save')[0]!;
 }
 
-function profileSaveButton() {
+function embedSaveButton() {
   return screen.getAllByText('Save')[1]!;
+}
+
+function profileSaveButton() {
+  return screen.getAllByText('Save')[2]!;
 }
 
 // MAX_BACKUP_UPLOAD_BYTES of backend/src/services/backupService.ts, the largest archive it accepts
@@ -200,7 +204,7 @@ beforeEach(() => {
   mockApiResponse(
     'get',
     '/api/settings',
-    buildSiteSettings({ siteName: 'My Bar', siteIcon: '🍸' }),
+    buildAdminSiteSettings({ siteName: 'My Bar', siteIcon: '🍸' }),
   );
   mockRestore(restoreResult());
   vi.spyOn(toast, 'success').mockReturnValue('toast-1');
@@ -274,6 +278,99 @@ describe('SettingsPage', () => {
     expect(await screen.findByText('Site settings updated')).toBeInTheDocument();
     // SiteSettingsProvider reloaded the public settings
     await waitFor(() => expect(document.title).toBe('New Bar Name'));
+  });
+
+  describe('sites allowed to embed the menu', () => {
+    const originsField = () => screen.getByLabelText('Allowed sites');
+    const codeField = () => screen.getByLabelText('Code to paste in your website');
+
+    it('shows the stored sites, one per line', async () => {
+      mockApiResponse(
+        'get',
+        '/api/settings',
+        buildAdminSiteSettings({
+          siteName: 'My Bar',
+          embedOrigins: ['https://www.mon-bar.fr', 'https://bar.example'],
+        }),
+      );
+      await renderLoadedPage();
+
+      expect(originsField()).toHaveValue('https://www.mon-bar.fr\nhttps://bar.example');
+    });
+
+    it('saves the typed sites as a list and shows them as the server stored them', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      mockApiResponse(
+        'put',
+        '/api/settings',
+        buildAdminSiteSettings({ embedOrigins: ['https://www.mon-bar.fr'] }),
+      );
+      // After the response: the last handler added answers first, and this one passes on
+      const saved = captureRequest('put', '/api/settings');
+
+      await user.type(originsField(), ' https://WWW.Mon-Bar.fr/ \n\n');
+      await user.click(embedSaveButton());
+
+      expect(await saved.body).toEqual({ embedOrigins: ['https://WWW.Mon-Bar.fr/'] });
+      expect(await screen.findByText('Allowed sites updated')).toBeInTheDocument();
+      expect(originsField()).toHaveValue('https://www.mon-bar.fr');
+    });
+
+    it('shows why the server refused a site', async () => {
+      const user = userEvent.setup();
+      await renderLoadedPage();
+      const refusal = '"http://bar.example" uses http://: only https:// sites can embed the menu';
+      mockApiError('put', '/api/settings', 400, refusal);
+
+      await user.type(originsField(), 'http://bar.example');
+      await user.click(embedSaveButton());
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(refusal);
+    });
+
+    it('gives the code of the first public menu, and of the menu chosen in the list', async () => {
+      const user = userEvent.setup();
+      mockApiResponse('get', '/api/menus', [
+        buildMenu({ id: 1, name: 'Draft', slug: 'draft', isPublic: false }),
+        buildMenu({ id: 2, name: 'Summer', slug: 'summer' }),
+        buildMenu({ id: 3, name: 'Winter', slug: 'winter' }),
+      ]);
+      await renderLoadedPage();
+
+      const origin = window.location.origin;
+      expect(await screen.findByLabelText('Menu to embed')).toHaveValue('summer');
+      expect(screen.queryByRole('option', { name: 'Draft' })).not.toBeInTheDocument();
+      expect(codeField()).toHaveValue(
+        // The title is the site name that guests see, from the public settings
+        `<iframe src="${origin}/menu/summer" title="Carta" loading="lazy" style="width: 100%; height: 80vh; border: 0"></iframe>`,
+      );
+
+      await user.selectOptions(screen.getByLabelText('Menu to embed'), 'winter');
+      expect((codeField() as HTMLTextAreaElement).value).toContain(`src="${origin}/menu/winter"`);
+    });
+
+    it('copies the code', async () => {
+      const user = userEvent.setup();
+      mockApiResponse('get', '/api/menus', [buildMenu({ id: 2, slug: 'summer' })]);
+      await renderLoadedPage();
+      const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue();
+
+      await user.click(await screen.findByRole('button', { name: 'Copy the code' }));
+
+      expect(writeText).toHaveBeenCalledWith(expect.stringContaining('/menu/summer'));
+      expect(toast.success).toHaveBeenCalledWith('Code copied');
+    });
+
+    it('asks for a published menu before giving any code', async () => {
+      mockApiResponse('get', '/api/menus', [buildMenu({ id: 1, isPublic: false })]);
+      await renderLoadedPage();
+
+      expect(
+        await screen.findByText('Publish a menu to get the code to paste in your website.'),
+      ).toBeInTheDocument();
+      expect(screen.queryByLabelText('Code to paste in your website')).not.toBeInTheDocument();
+    });
   });
 
   describe('sign out everywhere', () => {

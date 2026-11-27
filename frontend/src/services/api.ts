@@ -13,6 +13,7 @@ import type {
   MenuInput,
   CocktailAvailability,
   SiteSettings,
+  AdminSiteSettings,
   CocktailExportFormat,
   ImportPreviewResponse,
   EntityResolutionAction,
@@ -552,9 +553,10 @@ export const availability = {
 
 // Settings (admin)
 export const settings = {
-  get: () => request<SiteSettings>('/settings'),
-  update: (data: { siteName: string; siteIcon: string }) =>
-    request<SiteSettings>('/settings', { method: 'PUT', body: JSON.stringify(data) }),
+  get: () => request<AdminSiteSettings>('/settings'),
+  // Absent fields stay as they are
+  update: (data: Partial<Omit<AdminSiteSettings, 'id'>>) =>
+    request<AdminSiteSettings>('/settings', { method: 'PUT', body: JSON.stringify(data) }),
   updateProfile: (data: { email?: string; currentPassword?: string; newPassword?: string }) =>
     // `token` comes back when the password changed: the server revoked the previous one
     request<{ id: number; email: string; token?: string }>('/settings/profile', {
