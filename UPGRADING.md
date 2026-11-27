@@ -22,7 +22,7 @@ The commands below assume the default `docker-compose.prod.yml`, run from its fo
 
 ## v1.21.0
 
-No required action. `docker-compose.prod.yml` has not changed since v1.19.0. Pin both images to `:1.21.0`, or `:1.21` to follow the 1.21.x patch releases (`:1.20` does not move to 1.21.0), then pull and restart. At the first start, the backend copies the database to `backups/pre-migrate-<date>.db` and applies two migrations: `20261127180000_api_tokens` adds an empty table of API tokens, and `20261127200000_site_code_mode` adds the Code Mode setting, off. No existing value changes. This release adds an API page in the admin, API tokens and an MCP server for AI agents. Release notes: [`docs/releases/v1.21.0.md`](docs/releases/v1.21.0.md).
+No required action. `docker-compose.prod.yml` has not changed since v1.19.0. Pin both images to `:1.21.0`, or `:1.21` to follow the 1.21.x patch releases (`:1.20` does not move to 1.21.0), then pull and restart. At the first start, the backend copies the database to `backups/pre-migrate-<date>.db` and applies two migrations: `20261127180000_api_tokens` adds an empty table of API tokens, and `20261127200000_site_code_mode` adds the Code Mode setting, off. No existing value changes. This release adds an API page in the admin, API tokens and an MCP server for AI agents, with an optional Code Mode that is off by default. Release notes: [`docs/releases/v1.21.0.md`](docs/releases/v1.21.0.md).
 
 Instances older than v1.12.0: upgrade to v1.12.0 first, following the [v1.12.0 section](#v1120) (and the sections before it), check that it works, then apply this one.
 
@@ -30,7 +30,7 @@ Instances older than v1.12.0: upgrade to v1.12.0 first, following the [v1.12.0 s
 
 Worth checking after the upgrade:
 
-- **"Sign out everywhere" and backup restores now delete every API token.** Create the tokens of your scripts and agents again afterwards.
+- **"Sign out everywhere" and backup restores now delete every API token**, and a restore also turns Code Mode off. Create the tokens of your scripts and agents again afterwards, and turn Code Mode on again in Settings if you use it.
 - **If the backend does not start**, its log names the failed migration and the `pre-migrate` copy to restore: follow [README › "Recovering from a failed migration"](README.md#recovering-from-a-failed-migration).
 - **Rolling back to v1.20.x.** Restore the `pre-migrate` copy made at the upgrade, then pin the images back to `:1.20`: [`docs/operations.md`](docs/operations.md#retour-arrière) ("Retour arrière") or [README › "Restoring a pre-migration backup"](README.md#restoring-a-pre-migration-backup). What was entered since the upgrade is lost, API tokens included, and the copy brings back its sessions: set a new `JWT_SECRET` afterwards, as in [Signing in after a restore](#signing-in-after-a-restore).
 
