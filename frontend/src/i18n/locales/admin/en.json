@@ -625,5 +625,8 @@
     "after": "To do after the upgrade",
     "acknowledge": "I have done these actions",
     "guideLink": "Upgrade guide (UPGRADING.md)"
+  },
+  "appUpdate": {
+    "available": "A new version is available"
   }
 }

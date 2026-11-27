@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteSettings } from '../../contexts/SiteSettingsContext';
 import { useShortages } from '../../queries/shortages';
+import UpdateAvailableBanner from '../admin/UpdateAvailableBanner';
 import UpgradeNoticeBanner from '../admin/UpgradeNoticeBanner';
 import { cx } from '../ui/classNames';
 import LanguageSelector from '../ui/LanguageSelector';
@@ -173,6 +174,7 @@ export default function AdminLayout() {
         </header>
 
         <UpgradeNoticeBanner />
+        <UpdateAvailableBanner className="mx-6 mt-4" />
 
         <main id={MAIN_CONTENT_ID} tabIndex={-1} className="flex-1 p-6">
           {/* The sidebar and header stay when a page fails: the way out is the dashboard */}
