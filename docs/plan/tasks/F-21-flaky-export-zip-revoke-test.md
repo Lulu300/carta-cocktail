@@ -5,13 +5,13 @@ phase: F
 lane: frontend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: []
 touches: [frontend/src/services/exportZip.test.ts]
 sources: []
-branch:
-pr:
+branch: test/F-21-flaky-export-zip-revoke
+pr: 300
 ---
 
 ## Contexte
@@ -29,8 +29,8 @@ pr:
 
 ## Critères d'acceptation
 
-- [ ] Le test passe 20 fois de suite (`npx vitest run src/services/exportZip.test.ts --repeat 20` ou une boucle).
-- [ ] Aucun autre test ne dépend du tick de `downloadBlob()` sans l'attendre.
+- [x] Le test passe 20 fois de suite (`npx vitest run src/services/exportZip.test.ts --repeat 20` ou une boucle).
+- [x] Aucun autre test ne dépend du tick de `downloadBlob()` sans l'attendre.
 
 ## Tests à ajouter ou adapter
 
@@ -43,3 +43,4 @@ pr:
 ## Journal
 
 - 2026-11-27 : tâche créée pendant F-10 (#299), après le merge de `develop` passé à Node 26 : le test a échoué 2 fois sur 5 en local, sans lien avec F-10.
+- 2026-11-27 : cause confirmée : le test lisait `revokeObjectURL` avant le `setTimeout(…, 0)` de `downloadBlob()` (course entre le tick et l'assertion). Correctif : `vi.waitFor`. Avant : 10 échecs sur 50 exécutions du fichier ; après : 0 sur 50, et 0 sur 5 exécutions de la suite complète (1615 tests). Aucun autre test ne vérifie la révocation d'un téléchargement ; le code de production est inchangé.

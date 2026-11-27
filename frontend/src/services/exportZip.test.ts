@@ -196,6 +196,7 @@ describe('exportCocktailsAsZip', () => {
 
     await exportCocktailsAsZip([1]);
 
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:download');
+    // downloadBlob() revokes the URL on the next tick, so wait for it
+    await vi.waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:download'));
   });
 });
