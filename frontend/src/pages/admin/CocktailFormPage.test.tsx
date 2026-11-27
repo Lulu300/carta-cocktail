@@ -53,7 +53,9 @@ const mojito = buildCocktail({
       categoryId: 1,
       ingredient: null,
       position: 0,
-      preferredBottles: [{ id: 1, cocktailIngredientId: 7, bottleId: 2 }],
+      preferredBottles: [
+        { id: 1, cocktailIngredientId: 7, bottleId: 2, bottle: buildBottle({ id: 2 }) },
+      ],
     }),
   ],
   instructions: [{ id: 1, cocktailId: 42, stepNumber: 1, text: 'Muddle the mint' }],

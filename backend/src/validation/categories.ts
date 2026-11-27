@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Percent, RequiredText, Translations } from './common';
+import { Id, Percent, RequiredText, StoredTranslations, Timestamp, Translations } from './common';
 
 export const DesiredStock = z.number().int().min(0);
 
@@ -27,3 +27,22 @@ export const CategoryCreate = z.object({
 });
 
 export const CategoryUpdate = CategoryCreate.partial();
+
+/** A category as stored, without its relations. */
+export const Category = z.strictObject({
+  id: Id,
+  name: z.string(),
+  nameTranslations: StoredTranslations,
+  type: z.string(),
+  desiredStock: z.number().int(),
+  minimumPercent: z.number().int(),
+  createdAt: Timestamp,
+});
+
+/** What the public pages get of a category: its stock settings stay on the server. */
+export const PublicCategory = Category.pick({
+  id: true,
+  name: true,
+  nameTranslations: true,
+  type: true,
+});

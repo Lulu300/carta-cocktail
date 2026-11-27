@@ -21,3 +21,9 @@ export const ProfileUpdate = z
 
 /** Checked by the route, which answers with a translated message rather than a validation error. */
 export const EmailAddress = z.email();
+
+/** The site name and icon, as the public settings route sends them. */
+export const SiteSettings = z.strictObject({
+  siteName: z.string(),
+  siteIcon: z.string(),
+});

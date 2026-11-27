@@ -1,4 +1,4 @@
-import type { Bottle, Cocktail, CocktailIngredient } from '../types';
+import type { PublicCocktail, PublicCocktailIngredient } from '../types';
 
 type NamedEntity = { name: string; nameTranslations?: Record<string, string> | null };
 
@@ -34,7 +34,16 @@ export function matchesSearchText(searchText: string, query: string): boolean {
   return terms.every((term) => searchText.includes(term));
 }
 
-function getIngredientNames(ingredient: CocktailIngredient, localize: LocalizeName): string[] {
+/**
+ * The fields of a cocktail the search reads: the public cocktail has them, and so does the admin
+ * one, whose recipe lines carry more.
+ */
+type SearchableCocktail = Omit<PublicCocktail, 'available'>;
+
+function getIngredientNames(
+  ingredient: PublicCocktailIngredient,
+  localize: LocalizeName,
+): string[] {
   return [
     ...getEntityNames(ingredient.bottle, localize),
     ...getEntityNames(ingredient.bottle?.category, localize),
@@ -50,7 +59,7 @@ interface CocktailSearchOptions {
 
 /** Searchable text of a bottle: its name and the names of its category. */
 export function getBottleSearchText(
-  bottle: Pick<Bottle, 'name' | 'category'> | undefined,
+  bottle: { name: string; category?: NamedEntity | null } | undefined,
   localize: LocalizeName,
 ): string {
   return buildSearchText([bottle?.name, ...getEntityNames(bottle?.category, localize)]);
@@ -58,7 +67,7 @@ export function getBottleSearchText(
 
 /** Searchable text of a cocktail; compute it once per cocktail when filtering on every keystroke. */
 export function getCocktailSearchText(
-  cocktail: Cocktail,
+  cocktail: SearchableCocktail,
   localize: LocalizeName,
   { includeNotes = false }: CocktailSearchOptions = {},
 ): string {
@@ -76,7 +85,7 @@ export function getCocktailSearchText(
 }
 
 export function matchesCocktailSearch(
-  cocktail: Cocktail,
+  cocktail: SearchableCocktail,
   query: string,
   localize: LocalizeName,
   options: CocktailSearchOptions = {},

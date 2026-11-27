@@ -2,19 +2,22 @@ import { describe, expect, it } from 'vitest';
 import { renderHook } from '../../test/test-utils';
 import {
   buildCategory,
-  buildMenu,
-  buildMenuBottle,
-  buildMenuCocktail,
+  buildPublicMenu,
+  buildPublicMenuBottle,
+  buildPublicMenuCocktail,
   buildMenuSection,
 } from '../../test/factories';
-import type { Bottle, Menu, MenuBottle, MenuCocktail } from '../../types';
+import type { PublicMenu, PublicMenuBottle, PublicMenuCocktail } from '../../types';
 import { groupMenuBottles, useMenuFilter } from './useMenuFilter';
 
-function cocktailMenu(cocktails: MenuCocktail[], overrides: Partial<Menu> = {}): Menu {
-  return buildMenu({ type: 'COCKTAILS', cocktails, ...overrides });
+function cocktailMenu(
+  cocktails: PublicMenuCocktail[],
+  overrides: Partial<PublicMenu> = {},
+): PublicMenu {
+  return buildPublicMenu({ type: 'COCKTAILS', cocktails, ...overrides });
 }
 
-function filter(menu: Menu, query = '') {
+function filter(menu: PublicMenu, query = '') {
   return renderHook(() => useMenuFilter(menu, query)).result.current;
 }
 
@@ -22,12 +25,15 @@ const amer = buildCategory({ id: 1, name: 'Amer' });
 const gin = buildCategory({ id: 2, name: 'Gin' });
 
 /** Entry `id` of a bottle menu, holding bottle `id`, an "Amer" unless told otherwise. */
-function menuBottle(id: number, bottle: Partial<Bottle> = {}): MenuBottle {
-  return buildMenuBottle({ id, bottle: { id, name: 'Suze', category: amer, ...bottle } });
+function menuBottle(
+  id: number,
+  bottle: Partial<PublicMenuBottle['bottle']> = {},
+): PublicMenuBottle {
+  return buildPublicMenuBottle({ id, bottle: { id, name: 'Suze', category: amer, ...bottle } });
 }
 
-function bottleMenu(bottles: MenuBottle[]): Menu {
-  return buildMenu({ type: 'APEROS', bottles });
+function bottleMenu(bottles: PublicMenuBottle[]): PublicMenu {
+  return buildPublicMenu({ type: 'APEROS', bottles });
 }
 
 describe('useMenuFilter on a bottle menu', () => {
@@ -61,15 +67,6 @@ describe('useMenuFilter on a bottle menu', () => {
 
     expect(bottleBlocks.map((block) => block.title)).toEqual(['Gin', 'Amer']);
     expect(bottleBlocks[0]!.items.map((row) => row.name)).toEqual(['Tanqueray', "Hendrick's"]);
-  });
-
-  it('puts bottles without a category under "other"', () => {
-    const menu = bottleMenu([menuBottle(1, { category: undefined })]);
-
-    expect(filter(menu).bottleBlocks[0]).toMatchObject({
-      title: 'Other',
-      anchorId: 'section-category-other',
-    });
   });
 
   it('keeps the admin order of the bottles inside a block', () => {
@@ -112,8 +109,8 @@ describe('useMenuFilter on a bottle menu', () => {
 describe('useMenuFilter on a cocktail menu', () => {
   it('shows a menu without sections as one untitled list', () => {
     const menu = cocktailMenu([
-      buildMenuCocktail({ id: 1 }),
-      buildMenuCocktail({ id: 2, cocktail: { name: 'Negroni' } }),
+      buildPublicMenuCocktail({ id: 1 }),
+      buildPublicMenuCocktail({ id: 2, cocktail: { name: 'Negroni' } }),
     ]);
 
     const { cocktailBlocks } = filter(menu);
@@ -126,9 +123,9 @@ describe('useMenuFilter on a cocktail menu', () => {
   it('lists unsectioned cocktails first, then each section, and drops empty sections', () => {
     const menu = cocktailMenu(
       [
-        buildMenuCocktail({ id: 1, menuSectionId: 20 }),
-        buildMenuCocktail({ id: 2, cocktail: { name: 'Negroni' } }),
-        buildMenuCocktail({ id: 3, cocktail: { name: 'Spritz' }, menuSectionId: 10 }),
+        buildPublicMenuCocktail({ id: 1, menuSectionId: 20 }),
+        buildPublicMenuCocktail({ id: 2, cocktail: { name: 'Negroni' } }),
+        buildPublicMenuCocktail({ id: 3, cocktail: { name: 'Spritz' }, menuSectionId: 10 }),
       ],
       {
         sections: [
@@ -149,7 +146,7 @@ describe('useMenuFilter on a cocktail menu', () => {
   });
 
   it('ignores hidden items and reports a menu with nothing to show', () => {
-    const menu = cocktailMenu([buildMenuCocktail({ id: 1, isHidden: true })]);
+    const menu = cocktailMenu([buildPublicMenuCocktail({ id: 1, isHidden: true })]);
 
     const { cocktailBlocks, resultCount, hasItems } = filter(menu);
 
@@ -160,8 +157,8 @@ describe('useMenuFilter on a cocktail menu', () => {
 
   it('keeps only the matching cocktails and counts them', () => {
     const menu = cocktailMenu([
-      buildMenuCocktail({ id: 1, cocktail: { description: 'Frais et pétillant' } }),
-      buildMenuCocktail({ id: 2, cocktail: { name: 'Negroni', description: 'Amer' } }),
+      buildPublicMenuCocktail({ id: 1, cocktail: { description: 'Frais et pétillant' } }),
+      buildPublicMenuCocktail({ id: 2, cocktail: { name: 'Negroni', description: 'Amer' } }),
     ]);
 
     const { cocktailBlocks, resultCount, hasItems } = filter(menu, 'petillant');

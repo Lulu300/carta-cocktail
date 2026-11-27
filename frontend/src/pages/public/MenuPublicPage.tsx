@@ -5,7 +5,7 @@ import { usePageTitle } from '../../hooks/usePageTitle';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePublicMenu } from '../../queries/public';
 import { useCocktailsAvailability } from '../../queries/cocktails';
-import type { Menu } from '../../types';
+import type { PublicMenu } from '../../types';
 import Button from '../../components/ui/Button';
 import EmptyState from '../../components/ui/EmptyState';
 import Modal from '../../components/ui/Modal';
@@ -45,7 +45,7 @@ export default function MenuPublicPage() {
   return <MenuSkeleton />;
 }
 
-function MenuContent({ menu, slug }: { menu: Menu; slug: string }) {
+function MenuContent({ menu, slug }: { menu: PublicMenu; slug: string }) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');

@@ -3,6 +3,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { config } from '../config';
+import type { SourceType } from '../validation/cocktails';
 import {
   setupTestDatabase,
   teardownTestDatabase,
@@ -525,7 +526,7 @@ describe('PUT /api/cocktails/:id', () => {
 // until v1.7.0) or with a quantity of 0 (a cleared field). The form sends them back as they are.
 describe('PUT /api/cocktails/:id - recipe defects already stored', () => {
   type StoredLine = {
-    sourceType: 'BOTTLE' | 'CATEGORY' | 'INGREDIENT';
+    sourceType: SourceType;
     quantity: number;
     bottleId?: number;
     categoryId?: number;

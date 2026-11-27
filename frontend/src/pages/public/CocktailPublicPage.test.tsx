@@ -5,7 +5,7 @@ import { axe } from '../../test/axe';
 import {
   buildBottle,
   buildCategory,
-  buildCocktail,
+  buildPublicCocktail,
   buildCocktailIngredient,
   buildSiteSettings,
   buildUnit,
@@ -37,7 +37,7 @@ vi.mock('react-router-dom', async () => {
 
 const vermouth = buildCategory({ id: 10, name: 'Vermouth', minimumPercent: 0 });
 
-const negroni = buildCocktail({
+const negroni = buildPublicCocktail({
   id: 42,
   name: 'Negroni',
   description: 'Bitter and bright',
@@ -71,7 +71,7 @@ const negroni = buildCocktail({
       ],
     }),
   ],
-  instructions: [{ id: 1, cocktailId: 42, stepNumber: 1, text: 'Stir with ice.' }],
+  instructions: [{ id: 1, stepNumber: 1, text: 'Stir with ice.' }],
 });
 
 describe('CocktailPublicPage', () => {
