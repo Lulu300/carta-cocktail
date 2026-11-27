@@ -112,7 +112,7 @@ Coverage is enforced automatically by CI. Run `npm test -- --coverage` in either
 - The Node jobs run on Node 26, the version used by the Docker images (`.nvmrc`); `engines` in both `package.json` require Node >= 26
 
 **Smoke** (`.github/workflows/smoke.yml`) — runs on PRs to `main`/`develop`, on demand, and as the `smoke` job of the release workflow:
-- Builds and starts `docker-compose.yml`, then runs `scripts/smoke/smoke.sh` through nginx: login, 2.4 MB photo upload, photo still served after the backend container is recreated, backup export, link preview of a public menu for a messaging robot. Then `scripts/smoke/custom-uid.sh` recreates the backend with `CARTA_UID`/`CARTA_GID`: refused on volumes of uid 1000, then started after a `chown`, and `smoke.sh` again
+- Builds and starts `docker-compose.yml`, then runs `scripts/smoke/smoke.sh` through nginx: login, MCP `initialize` and `tools/list` with a read-only API token, 2.4 MB photo upload, photo still served after the backend container is recreated, backup export, link preview of a public menu for a messaging robot. Then `scripts/smoke/custom-uid.sh` recreates the backend with `CARTA_UID`/`CARTA_GID`: refused on volumes of uid 1000, then started after a `chown`, and `smoke.sh` again
 - Locally, always in a dedicated compose project: `export COMPOSE_PROJECT_NAME=carta-smoke JWT_SECRET=$(openssl rand -hex 32) ADMIN_PASSWORD=$(openssl rand -hex 16)`, then `docker compose -p carta-smoke up -d --build --wait && ./scripts/smoke/smoke.sh`, then `docker compose -p carta-smoke down -v --remove-orphans --rmi local`, all in the same shell call (`smoke.sh` reads `COMPOSE_PROJECT_NAME` to recreate the backend). The default project is your local stack: `down -v` would delete its data (see the header of `smoke.sh`)
 
 **E2E** (`.github/workflows/e2e.yml`, folder `e2e/`) — runs on PRs to `develop` and on demand. Not a required check yet (it becomes one after a few stable weeks):
@@ -203,6 +203,7 @@ cd frontend && npm install && npm run dev
 
 - **Public** (no auth): `/api/auth/login`, `/api/public/*`, `/api/health` (Docker healthcheck: status and version), `/api/openapi.json` (OpenAPI document of these public routes), `/uploads/*` (photos)
 - **Protected** (JWT Bearer): All other `/api/*` routes, `/api/auth/me`, `/api/auth/logout-all` and `/api/openapi/full.json` (OpenAPI document of every route) included
+- **MCP** (`/api/mcp`, F-15): Model Context Protocol over Streamable HTTP, with an API token or the session; each tool calls an API operation (`backend/AGENTS.md`, "MCP server (F-15)")
 - **OpenAPI**: each route carries its declaration (`apiDocs()`, see `backend/AGENTS.md`); the document is generated from the routes and their zod schemas, and the admin reads it on the API page (`/admin/api`)
 - Auth middleware validates the session JWT or an API token (`Bearer carta_…`, created in Settings) and sets `req.userId`. A read-only token may only read; the token, account, `logout-all` and backup routes refuse every token (`SESSION_ONLY_ROUTES`, `backend/src/app.ts`)
 
