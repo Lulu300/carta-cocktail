@@ -6,3 +6,5 @@
 backend/prisma/migrations/
 uploads/
 docs/plan/index.html
+# Vitest file snapshots, written by the tests
+backend/src/**/__snapshots__/

@@ -22,7 +22,8 @@ import {
  */
 export type DocumentScope = 'public' | 'full';
 
-interface DocumentedRoute extends ApiRoute {
+/** A route with its declaration (not excluded). */
+export interface DocumentedRoute extends ApiRoute {
   doc: RouteDoc;
 }
 

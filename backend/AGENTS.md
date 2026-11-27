@@ -58,7 +58,7 @@ backend/
 │   │   ├── serializedAdapter.ts # Queries wait for the open transaction (single connection)
 │   │   └── prisma.ts         # The only PrismaClient factory + SQLite setup (WAL)
 │   ├── middleware/
-│   │   ├── auth.ts           # Bearer validation (session JWT or API token), AuthRequest type, refuseApiTokens
+│   │   ├── auth.ts           # Bearer validation (session JWT or API token), AuthRequest type, refuseApiTokens, protocolAuthMiddleware (MCP)
 │   │   ├── errorHandler.ts   # Maps thrown errors to `{ error, details? }`
 │   │   └── rateLimit.ts      # createRateLimiter() (429 through errorHandler), resetRateLimits() for tests
 │   ├── routes/               # One file per resource
@@ -72,6 +72,7 @@ backend/
 │   │   ├── cocktails.ts      # CRUD + image upload + import/export
 │   │   ├── health.ts         # GET /api/health: status and version, public (Docker healthcheck)
 │   │   ├── ingredients.ts    # CRUD /api/ingredients + bulk availability
+│   │   ├── mcp.ts            # POST /api/mcp: MCP endpoint (Streamable HTTP, no sessions), excluded from the OpenAPI document
 │   │   ├── menuBottles.ts    # /api/menu-bottles + sync and exclusions of system menus
 │   │   ├── menuSections.ts   # /api/menu-sections + reorder
 │   │   ├── menus.ts          # CRUD /api/menus
@@ -107,6 +108,8 @@ backend/
 │   │                         # (errors.ts: the error body of errorHandler)
 │   ├── openapi/              # OpenAPI 3.1 document: route declarations (routeDoc.ts), routes read from the app
 │   │                         # (operations.ts, mounts.ts), zod to JSON Schema (jsonSchemas.ts), the document (document.ts)
+│   ├── mcp/                  # MCP server (F-15): tool catalog (catalog.ts), tools read from the routes
+│   │                         # (operationTools.ts), API request of a tool (callOperation.ts), server (server.ts)
 │   ├── contracts/            # Types generated for the frontend from the schemas (npm run contracts:generate)
 │   ├── test/                 # Test helpers, factories, database lifecycle (globalSetup, setup)
 │   └── i18n/
@@ -182,6 +185,8 @@ export default router;
   from the snapshot with `secure_delete`). `SESSION_ONLY_ROUTES` in `app.ts` lists the routes a token may never call,
   whatever its scope (`refuseApiTokens`, 403 `errors.apiTokenSessionOnly`): `/api/api-tokens`,
   `/api/settings/profile`, `/api/auth/logout-all` and `/api/backup`. A new route of that kind goes in that list
+- The MCP endpoint (`/api/mcp`) sits behind `protocolAuthMiddleware`: same 401 as `authMiddleware`, but a read-only
+  token may POST, since every MCP request is a POST; `req.canWrite` tells the endpoint which tools to list
 - `POST /api/auth/login` allows `LOGIN_RATE_LIMIT` failed attempts (default 10) per client IP in 15 minutes, then
   answers 429. Every `/api` route except `/api/health` allows `API_RATE_LIMIT` requests (default 600) per client IP
   in one minute, counted before the body parsers and `authMiddleware`; `/api/backup` also allows 10 authenticated
@@ -293,6 +298,29 @@ router.get(
   `src/test/documentedResponse.ts`), at least one route of each route file. A new route gets its
   declaration, and a new route file a request in that test.
 
+### MCP server (F-15)
+
+`POST /api/mcp` serves the Model Context Protocol over Streamable HTTP with `@modelcontextprotocol/server` (SDK v2):
+the 2026-07-28 revision, and the stateless form of the 2025 ones (`initialize`); no sessions, so GET and DELETE answer 405. Each request gets its own `McpServer` (`createCartaMcpServer`, `src/mcp/server.ts`).
+
+- **Tools** are API operations: `src/mcp/catalog.ts` lists them by `operationId`, with a name, a title, a
+  description with an example and, when the method does not tell, hints. Nothing else is written there:
+  `buildOperationTools()` (`src/mcp/operationTools.ts`) reads each route from the app (`collectApiRoutes()`, as the
+  OpenAPI document does). The input schema is the path parameters, query and body of `validate()` side by side, the
+  output schema the JSON success response (`{ items }` for a list), both written in full without `$ref`
+  (`inputSchema()`, `standaloneOutputSchema()`). It throws for an unknown operation, a DELETE route, a route that is
+  not admin, or arguments that collide.
+- **A tool call** is an HTTP request to the server itself, at the address that received the MCP request
+  (`callOperation()`), with the same `Authorization` and `Accept-Language`, and the client address in
+  `X-Forwarded-For`: the route runs its own validation, scope check, rate limit and errors. A tool call counts twice
+  against `API_RATE_LIMIT`. The SDK does not validate the arguments (`advertisedOnly()`): an error answers the API's
+  status, message and `details` as the text of an `isError` result.
+- **Scope**: a read-only token does not see the tools whose method writes (calling one answers "tool not found"),
+  and the API route would refuse it anyway. Deletions, the backup restore and "log out everywhere" are never tools.
+- Tests: `src/mcp/mcp.test.ts` (SDK client: handshake, both revisions, scope, every tool, errors) keeps what a client
+  sees in `src/mcp/__snapshots__/tools.json`: after a deliberate change of a schema the tools use, run
+  `npx vitest run src/mcp/mcp.test.ts -u` and commit the file. `operationTools.test.ts` covers the refusals.
+
 ### Translations
 
 Entity names support multi-language via JSON strings stored in SQLite (`'{"fr": "Rhum", "en": "Rum"}'`).
@@ -352,9 +380,9 @@ nginx (`frontend/nginx.conf.template`) limits the whole multipart body, so its `
 
 ## Dependencies
 
-**Runtime**: express 5, express-rate-limit, bcryptjs, cors, helmet, morgan, jsonwebtoken, multer, sharp (photo copies; libvips prebuilt in its optional `@img/sharp-<platform>` packages, no install script), archiver and adm-zip (backups), i18next, i18next-http-middleware, dotenv, zod 4, yaml (front matter of the release notes)
+**Runtime**: express 5, express-rate-limit, bcryptjs, cors, helmet, morgan, jsonwebtoken, multer, @modelcontextprotocol/server (MCP endpoint), sharp (photo copies; libvips prebuilt in its optional `@img/sharp-<platform>` packages, no install script), archiver and adm-zip (backups), i18next, i18next-http-middleware, dotenv, zod 4, yaml (front matter of the release notes)
 **Runtime (database)**: @prisma/client 7, @prisma/adapter-better-sqlite3 7, better-sqlite3 12 (native module, prebuilt for linux x64/arm64 musl), prisma 7 (the CLI applies the migrations when the container starts)
-**Dev**: typescript 5.9, tsx, eslint 10, typescript-eslint, prettier 3, vitest, supertest, @seriousme/openapi-schema-validator (OpenAPI 3.1 check of the generated document)
+**Dev**: typescript 5.9, tsx, eslint 10, typescript-eslint, prettier 3, vitest, supertest, @seriousme/openapi-schema-validator (OpenAPI 3.1 check of the generated document), @modelcontextprotocol/client (MCP tests)
 
 **Install scripts**: npm 12 skips the install scripts of dependencies that `allowScripts` in `package.json` does not list (npm 11.19 only warns). Only `better-sqlite3` is allowed: without its script the native binary is missing. `esbuild`, `prisma`, `@prisma/engines` and `fsevents` are denied (`false`): their binaries come from platform packages or from `prisma generate` (the project `postinstall`). Keys have no version, so a Dependabot bump keeps working. A new dependency whose script is needed must be added to `allowScripts` (`npm install-scripts approve <pkg> --no-allow-scripts-pin`), otherwise denied (`npm install-scripts deny <pkg>`), so that `npm ci` prints no `install-scripts` warning. The `prod-deps` stage of the `Dockerfile` opens `better-sqlite3` and encodes an image with `sharp`, and fails the build when either binary is missing. It prunes with `--omit=dev` only: `--omit=optional` would drop the binary of sharp, so the optional peers of the dev tooling (typescript, magicast) are cut by `docker/prune-unused-deps.mjs` instead.
 

@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import { config } from './config';
 import { i18nMiddleware } from './i18n';
-import { authMiddleware, refuseApiTokens } from './middleware/auth';
+import { authMiddleware, protocolAuthMiddleware, refuseApiTokens } from './middleware/auth';
 import { apiNotFoundHandler, errorHandler } from './middleware/errorHandler';
 import { createRateLimiter } from './middleware/rateLimit';
 import { mountApiRouter } from './openapi/mounts';
@@ -27,6 +27,7 @@ import healthRoutes from './routes/health';
 import systemRoutes from './routes/system';
 import openapiRoutes from './routes/openapi';
 import apiTokenRoutes from './routes/apiTokens';
+import mcpRoutes from './routes/mcp';
 
 const LOGIN_RATE_WINDOW_MS = 15 * 60_000;
 const API_RATE_WINDOW_MS = 60_000;
@@ -121,6 +122,10 @@ mountApiRouter(app, '/api/availability', authMiddleware, availabilityRoutes);
 mountApiRouter(app, '/api/settings', authMiddleware, settingsRoutes);
 mountApiRouter(app, '/api/system', authMiddleware, systemRoutes);
 mountApiRouter(app, '/api/api-tokens', authMiddleware, apiTokenRoutes);
+// MCP clients (F-15): every MCP request is a POST, so the scope of an API token cannot follow
+// from the method. The endpoint hides the tools that write from a read-only token, and each tool
+// calls its API route with the same token, where authMiddleware checks the scope again.
+mountApiRouter(app, '/api/mcp', protocolAuthMiddleware, mcpRoutes);
 // The backup limit counts authenticated requests only: authMiddleware already
 // refuses a request without a token at little cost, and the API limit covers
 // floods without one. Counting them here would let anyone who shares the admin's

@@ -59,6 +59,9 @@ function keyOf(route: ApiRoute): string {
 const EXCLUDED_ROUTES = [
   'GET /api/public/share/menu/{slug}',
   'GET /api/public/share/menu/{slug}/cocktail/{id}',
+  'POST /api/mcp',
+  'GET /api/mcp',
+  'DELETE /api/mcp',
 ];
 
 describe('coverage of the routes', () => {
@@ -145,6 +148,8 @@ describe('coverage of the routes', () => {
     expect(find('GET /api/public/menus')).toMatchObject({ access: 'optional' });
     expect(find('GET /api/units')).toMatchObject({ access: 'admin', rateLimited: true });
     expect(find('GET /api/openapi/full.json')).toMatchObject({ access: 'admin' });
+    // protocolAuthMiddleware: a token is required, its scope is checked by the tools
+    expect(find('POST /api/mcp')).toMatchObject({ access: 'admin', rateLimited: true });
     // SESSION_ONLY_ROUTES of app.ts: refuseApiTokens runs in front of them
     for (const key of [
       'GET /api/api-tokens',
