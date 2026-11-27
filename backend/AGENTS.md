@@ -100,7 +100,8 @@ backend/
 │   │   ├── bottlesImport.ts  # Bottle import parsing (JSON, CSV)
 │   │   ├── html.ts           # escapeHtml(): every value inserted in HTML
 │   │   └── ...               # importDates, records, storedNames, uniqueness
-│   ├── validation/           # zod schemas, one file per resource, validate() and valid()
+│   ├── validation/           # zod schemas of requests and responses, one file per resource, validate() and valid()
+│   ├── contracts/            # Types generated for the frontend from the schemas (npm run contracts:generate)
 │   ├── test/                 # Test helpers, factories, database lifecycle (globalSetup, setup)
 │   └── i18n/
 │       ├── index.ts          # i18next setup + HTTP middleware
@@ -199,14 +200,29 @@ router.put('/:id', validate(updateSchemas), async (_req, res) => {
 ```
 
 - One schema file per resource in `src/validation/`, shared building blocks in `common.ts`
-  (`IdParams`, `Percent`, `RequiredText`, `Translations`...). Schemas never import Prisma: the
-  frontend will share them (task F-05).
+  (`IdParams`, `Percent`, `RequiredText`, `Translations`...). Schemas never import Prisma: they
+  describe the HTTP contract, which the frontend types come from (see below).
 - `z.object` drops unknown keys: the schema is the whitelist of what a request can write.
 - Path and query values are strings: coerce them (`z.coerce.number()`). JSON bodies are not coerced.
 - `req.query` is a getter in Express 5 and cannot be assigned: read it through `valid(res)`.
 - One deliberate exception: `routes/public.ts` reads `req.params` itself. An invalid cocktail id
   answers **404**, not 400, so a guest learns nothing about which ids exist (task A-05); the menu
   slug is only used as a lookup key.
+
+### Response contracts and frontend types (F-05)
+
+- A response schema sits next to the request schemas of its resource (`Bottle`, `Cocktail`,
+  `Unit`...); those of `routes/public.ts` are in `validation/public.ts`. They are strict
+  (`z.strictObject`): a field a route adds, drops or retypes fails the contract tests. Dates are
+  `Timestamp` (ISO strings, as JSON sends them), stored translations `StoredTranslations`.
+- `src/routes/responseContracts.test.ts` parses the answer of each covered route with its schema.
+  A route that gets a response schema gets a test there.
+- `src/contracts/frontendTypes.ts` lists what the frontend gets: `z.output` of the response
+  schemas, `z.input` of the request bodies, and the constants of the unions (`SOURCE_TYPES`,
+  `MENU_TYPES`). `npm run contracts:generate` writes `frontend/src/types/generated.ts` from it, as
+  the TypeScript compiler infers each type. `generateFrontendTypes.test.ts` fails while that file
+  is out of date: after a schema change, run the script and commit both.
+- The frontend never imports zod schemas from here: it validates its forms with its own rules.
 
 ### Translations
 
@@ -247,22 +263,23 @@ nginx (`frontend/nginx.conf.template`) limits the whole multipart body, so its `
 
 ## Scripts
 
-| Command                 | Description                                                |
-| ----------------------- | ---------------------------------------------------------- |
-| `npm run dev`           | Watch mode with tsx (port 3001)                            |
-| `npm run build`         | TypeScript compilation to dist/                            |
-| `npm start`             | Run compiled JS from dist/                                 |
-| `npm run lint`          | ESLint                                                     |
-| `npm run format`        | Prettier, rewrites the files                               |
-| `npm run format:check`  | Prettier check (must stay green, CI runs it)               |
-| `npm test`              | Tests (Vitest)                                             |
-| `npm run test:watch`    | Tests in watch mode                                        |
-| `npm run test:coverage` | Tests with coverage                                        |
-| `npm run db:migrate`    | Create and apply a Prisma migration (`-- --name <name>`)   |
-| `npm run db:deploy`     | Apply pending migrations without creating any              |
-| `npm run db:status`     | Show which migrations are applied                          |
-| `npm run db:check`      | Fail when `schema.prisma` changed without a migration (CI) |
-| `npm run db:seed`       | Seed admin, types, units, menus                            |
+| Command                      | Description                                                |
+| ---------------------------- | ---------------------------------------------------------- |
+| `npm run dev`                | Watch mode with tsx (port 3001)                            |
+| `npm run build`              | TypeScript compilation to dist/                            |
+| `npm start`                  | Run compiled JS from dist/                                 |
+| `npm run lint`               | ESLint                                                     |
+| `npm run format`             | Prettier, rewrites the files                               |
+| `npm run format:check`       | Prettier check (must stay green, CI runs it)               |
+| `npm test`                   | Tests (Vitest)                                             |
+| `npm run test:watch`         | Tests in watch mode                                        |
+| `npm run test:coverage`      | Tests with coverage                                        |
+| `npm run db:migrate`         | Create and apply a Prisma migration (`-- --name <name>`)   |
+| `npm run db:deploy`          | Apply pending migrations without creating any              |
+| `npm run db:status`          | Show which migrations are applied                          |
+| `npm run db:check`           | Fail when `schema.prisma` changed without a migration (CI) |
+| `npm run db:seed`            | Seed admin, types, units, menus                            |
+| `npm run contracts:generate` | Write `frontend/src/types/generated.ts` from the schemas   |
 
 ## Dependencies
 
