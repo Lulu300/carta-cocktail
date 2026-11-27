@@ -1,21 +1,24 @@
 import type {
   Bottle,
   Category,
+  CategoryListItem,
   CategoryType,
+  CategoryTypeListItem,
   Cocktail,
   CocktailIngredient,
   CocktailAvailability,
+  ImportPreviewResponse,
   Ingredient,
-  Menu,
   MenuBottle,
   MenuCocktail,
+  MenuDetail,
   MenuSection,
   PublicCategory,
   PublicCocktail,
   PublicMenu,
   PublicMenuBottle,
   PublicMenuCocktail,
-  PublicMenuSummary,
+  MenuSummary,
   Shortage,
   SiteSettings,
   Unit,
@@ -122,6 +125,13 @@ export function buildCategoryType(overrides: Partial<CategoryType> = {}): Catego
   };
 }
 
+/** A category type as the list of the categories page sends it, used by no category by default. */
+export function buildCategoryTypeListItem(
+  overrides: Partial<CategoryTypeListItem> = {},
+): CategoryTypeListItem {
+  return { ...buildCategoryType(overrides), _count: { categories: 0 }, ...overrides };
+}
+
 export function buildCategory(overrides: Partial<Category> = {}): Category {
   const id = overrides.id ?? nextId('category');
   return {
@@ -133,6 +143,17 @@ export function buildCategory(overrides: Partial<Category> = {}): Category {
     createdAt: CREATED_AT,
     ...overrides,
     id,
+  };
+}
+
+/** A category as the list of the categories page sends it, with its type and no bottle by default. */
+export function buildCategoryListItem(overrides: Partial<CategoryListItem> = {}): CategoryListItem {
+  const { categoryType, _count, ...categoryOverrides } = overrides;
+  const category = buildCategory(categoryOverrides);
+  return {
+    ...category,
+    categoryType: categoryType ?? buildCategoryType({ name: category.type }),
+    _count: _count ?? { bottles: 0 },
   };
 }
 
@@ -249,7 +270,8 @@ function menuRowDefaults(id: number, name = nameFor(MENU_NAMES, id)) {
   };
 }
 
-export function buildMenu(overrides: Partial<Menu> = {}): Menu {
+/** A menu as the admin's editor loads it, with its sections and items. */
+export function buildMenu(overrides: Partial<MenuDetail> = {}): MenuDetail {
   const id = overrides.id ?? nextId('menu');
   return {
     ...menuRowDefaults(id, overrides.name),
@@ -412,9 +434,7 @@ export function buildPublicMenu(overrides: Partial<PublicMenu> = {}): PublicMenu
 }
 
 /** A published menu of the home page list, with its item counts. */
-export function buildPublicMenuSummary(
-  overrides: Partial<PublicMenuSummary> = {},
-): PublicMenuSummary {
+export function buildMenuSummary(overrides: Partial<MenuSummary> = {}): MenuSummary {
   const id = overrides.id ?? nextId('menu');
   return {
     ...menuRowDefaults(id, overrides.name),
@@ -422,6 +442,34 @@ export function buildPublicMenuSummary(
     ...overrides,
     id,
   };
+}
+
+// References of the cocktail import preview, with the defaults the backend gives a recipe file
+// that leaves a field out (services/cocktail/importReferences.ts)
+
+type PreviewRef<Kind extends 'units' | 'categories' | 'bottles' | 'ingredients'> =
+  ImportPreviewResponse[Kind][number]['ref'];
+
+export function buildUnitRef(overrides: Partial<PreviewRef<'units'>> = {}): PreviewRef<'units'> {
+  return { abbreviation: 'cl', nameTranslations: null, ...overrides };
+}
+
+export function buildCategoryRef(
+  overrides: Partial<PreviewRef<'categories'>> = {},
+): PreviewRef<'categories'> {
+  return { name: 'Rhum', type: 'SPIRIT', desiredStock: 1, ...overrides };
+}
+
+export function buildBottleRef(
+  overrides: Partial<PreviewRef<'bottles'>> = {},
+): PreviewRef<'bottles'> {
+  return { name: 'Havana 3', categoryName: 'Rhum', categoryType: 'SPIRIT', ...overrides };
+}
+
+export function buildIngredientRef(
+  overrides: Partial<PreviewRef<'ingredients'>> = {},
+): PreviewRef<'ingredients'> {
+  return { name: 'Citron vert', icon: null, nameTranslations: null, ...overrides };
 }
 
 type ShortageCategory = Shortage['category'];
@@ -442,7 +490,7 @@ export function buildShortage(
     name,
     nameTranslations,
     type,
-    categoryType: { name: type, color: 'blue' },
+    categoryType: buildCategoryType({ name: type, color: 'blue' }),
     desiredStock,
     minimumPercent,
     ...categoryOverrides,

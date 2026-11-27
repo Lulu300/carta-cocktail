@@ -3,7 +3,13 @@ import { http, HttpResponse } from 'msw';
 import { render, screen, fireEvent, waitFor, within } from '../../test/test-utils';
 import userEvent from '@testing-library/user-event';
 import { createQueryClient } from '../../queries/queryClient';
-import { buildCategory, buildCategoryType, buildCocktail } from '../../test/factories';
+import {
+  buildBottleRef,
+  buildCategory,
+  buildCategoryRef,
+  buildCategoryType,
+  buildCocktail,
+} from '../../test/factories';
 import { server } from '../../test/msw/server';
 import {
   captureRequest,
@@ -52,7 +58,11 @@ function matchedPreview(name: string): ImportPreviewResponse {
     cocktail: { name, description: null, tags: [], alreadyExists: false },
     units: [],
     categories: [
-      { ref: { name: 'Rhum' }, existingMatch: { id: 10, name: 'Rhum' }, status: 'matched' },
+      {
+        ref: buildCategoryRef({ name: 'Rhum' }),
+        existingMatch: buildCategory({ id: 10, name: 'Rhum' }),
+        status: 'matched',
+      },
     ],
     bottles: [],
     ingredients: [],
@@ -61,9 +71,7 @@ function matchedPreview(name: string): ImportPreviewResponse {
 
 const bottleToCreatePreview: ImportPreviewResponse = {
   ...matchedPreview('Daiquiri'),
-  bottles: [
-    { ref: { name: 'Havana 3', categoryName: 'Rhum' }, existingMatch: null, status: 'missing' },
-  ],
+  bottles: [{ ref: buildBottleRef({ name: 'Havana 3' }), existingMatch: null, status: 'missing' }],
 };
 
 function nameOf(recipeToPreview: CocktailExportFormat): string {

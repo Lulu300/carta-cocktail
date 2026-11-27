@@ -5,7 +5,12 @@ import { clearToasts, renderWithFeedback } from '../../test/feedback';
 import { qk } from '../../queries/keys';
 import { useShortages } from '../../queries/shortages';
 import { mockDownload } from '../../test/download';
-import { buildBottle, buildCategory, buildShortage } from '../../test/factories';
+import {
+  buildBottle,
+  buildCategoryListItem,
+  buildCategoryType,
+  buildShortage,
+} from '../../test/factories';
 import {
   captureRequest,
   mockApiError,
@@ -27,16 +32,16 @@ vi.mock('../../components/import/ImportBottlesWizard', () => ({
   ),
 }));
 
-const vodka = buildCategory({
+const vodka = buildCategoryListItem({
   id: 1,
   name: 'Vodka',
-  categoryType: { name: 'SPIRIT', color: 'blue' },
+  categoryType: buildCategoryType({ name: 'SPIRIT', color: 'blue' }),
   desiredStock: 2,
 });
-const gin = buildCategory({
+const gin = buildCategoryListItem({
   id: 2,
   name: 'Gin',
-  categoryType: { name: 'SPIRIT', color: 'blue' },
+  categoryType: buildCategoryType({ name: 'SPIRIT', color: 'blue' }),
   desiredStock: 2,
 });
 

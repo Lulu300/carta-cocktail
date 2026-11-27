@@ -4,7 +4,13 @@ import { useTranslation } from 'react-i18next';
 import { useSort } from '../../hooks/useSort';
 import { usePagination } from '../../hooks/usePagination';
 import { menus as menusApi } from '../../services/api';
-import { MENU_TYPES, type Menu, type MenuCreateInput, type MenuType } from '../../types';
+import {
+  MENU_TYPES,
+  type MenuCreateInput,
+  type MenuRow,
+  type MenuSummary,
+  type MenuType,
+} from '../../types';
 import { qk } from '../../queries/keys';
 import { useMenus } from '../../queries/menus';
 import { useCrudMutations } from '../../queries/crud';
@@ -61,12 +67,12 @@ export default function MenusPage() {
   const navigate = useNavigate();
   const confirmDelete = useConfirmDelete();
   const menusQuery = useMenus();
-  const { create, remove } = useCrudMutations<MenuCreateInput, Menu>({
+  const { create, remove } = useCrudMutations<MenuCreateInput, MenuRow>({
     key: qk.menus,
     api: menusApi,
     messages: { created: 'menus.created', deleted: 'menus.deleted' },
   });
-  const menuForm = useEntityForm<Menu, MenuForm>(() => EMPTY_MENU_FORM);
+  const menuForm = useEntityForm<MenuSummary, MenuForm>(() => EMPTY_MENU_FORM);
   const { form, setField } = menuForm;
   const [search, setSearch] = useState('');
 
@@ -77,7 +83,7 @@ export default function MenusPage() {
     );
   }, [menusQuery.data, search]);
 
-  const sort = useSort<Menu>(filteredMenus);
+  const sort = useSort<MenuSummary>(filteredMenus);
   const pagination = usePagination(sort.sortedItems);
 
   // A slug already taken comes back as a 409, shown in the error toast; the form stays open.
@@ -92,11 +98,11 @@ export default function MenusPage() {
     });
   };
 
-  const handleDelete = async (menu: Menu) => {
+  const handleDelete = async (menu: MenuSummary) => {
     if (await confirmDelete(t('menus.confirmDelete'))) remove.mutate(menu.id);
   };
 
-  const columns: Column<Menu>[] = [
+  const columns: Column<MenuSummary>[] = [
     {
       key: 'name',
       header: t('menus.name'),

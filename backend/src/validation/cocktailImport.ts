@@ -1,9 +1,18 @@
 import { z } from 'zod';
-import { Id, Percent, RequiredText, Translations } from './common';
-import { AlcoholPercentage, CapacityMl } from './bottles';
-import { CategoryTypeName, DesiredStock } from './categories';
+import {
+  Id,
+  importMatch,
+  Percent,
+  RequiredText,
+  StoredTranslations,
+  Timestamp,
+  Translations,
+} from './common';
+import { AlcoholPercentage, Bottle, CapacityMl } from './bottles';
+import { Category, CategoryTypeName, DesiredStock } from './categories';
 import { SourceType, Tags } from './cocktails';
-import { ConversionFactorToMl } from './units';
+import { Ingredient } from './ingredients';
+import { ConversionFactorToMl, Unit } from './units';
 
 // Format written by GET /cocktails/:id/export (version 1). Only the fields the
 // import reads are listed; the others are dropped.
@@ -114,4 +123,107 @@ export const ImportResolutions = z.object({
 export const ImportConfirm = z.object({
   recipe: ImportRecipeV1,
   resolutions: ImportResolutions.optional(),
+});
+
+// Responses. The export (services/cocktail/cocktailExport.ts) writes the file the import reads.
+
+const ExportedUnit = z.strictObject({
+  name: z.string(),
+  abbreviation: z.string(),
+  conversionFactorToMl: z.number().nullable(),
+  nameTranslations: StoredTranslations,
+});
+
+/** What the import needs to create the source of a line again; empty for a line whose source is gone. */
+const ExportedSourceDetail = z.union([
+  z.strictObject({
+    categoryName: z.string(),
+    categoryType: z.string(),
+    categoryNameTranslations: StoredTranslations,
+  }),
+  z.strictObject({ type: z.string(), nameTranslations: StoredTranslations }),
+  z.strictObject({ icon: z.string().nullable(), nameTranslations: StoredTranslations }),
+  z.strictObject({}),
+]);
+
+export const ExportIngredient = z.strictObject({
+  sourceType: SourceType,
+  /** Empty for a line whose source was deleted before v1.7.0. */
+  sourceName: z.string(),
+  sourceDetail: ExportedSourceDetail,
+  quantity: z.number(),
+  unit: ExportedUnit,
+  position: z.number().int(),
+  /** Private: only in the admin's export. */
+  preferredBottles: z
+    .array(z.strictObject({ name: z.string(), categoryName: z.string() }))
+    .optional(),
+});
+
+/** A cocktail exported as JSON, format version 1. */
+export const CocktailExportFormat = z.strictObject({
+  version: z.literal(1),
+  exportedAt: Timestamp,
+  cocktail: z.strictObject({
+    name: z.string(),
+    description: z.string().nullable(),
+    /** Private: only in the admin's export. */
+    notes: z.string().nullable().optional(),
+    tags: z.array(z.string()),
+    ingredients: z.array(ExportIngredient),
+    instructions: z.array(z.strictObject({ stepNumber: z.number().int(), text: z.string() })),
+  }),
+});
+
+/** One file of a batch export, named as the single export names it. */
+export const CocktailExportFile = z.strictObject({
+  filename: z.string(),
+  data: CocktailExportFormat,
+});
+
+// What the preview sends back as `ref` for each entity (services/cocktail/importReferences.ts)
+
+const UnitRef = z.strictObject({
+  name: z.string().optional(),
+  abbreviation: z.string(),
+  conversionFactorToMl: z.number().nullable().optional(),
+  nameTranslations: StoredTranslations,
+});
+
+const CategoryRef = z.strictObject({
+  name: z.string(),
+  type: z.string(),
+  desiredStock: z.number().int(),
+  nameTranslations: StoredTranslations.optional(),
+});
+
+const BottleRef = z.strictObject({
+  name: z.string(),
+  categoryName: z.string(),
+  categoryType: z.string(),
+});
+
+const IngredientRef = z.strictObject({
+  name: z.string(),
+  icon: z.string().nullable(),
+  nameTranslations: StoredTranslations,
+});
+
+/**
+ * Each entity the recipe names, with the existing row it matches. The row of a unit is named
+ * after its abbreviation, the value compared.
+ */
+export const ImportPreviewResponse = z.strictObject({
+  cocktail: z.strictObject({
+    name: z.string(),
+    description: z.string().nullish(),
+    /** As the file gives them: a hand-made file may give a comma-separated string. */
+    tags: z.union([z.array(z.string()), z.string()]),
+    /** A cocktail of the same name exists, whatever its case: only reported. */
+    alreadyExists: z.boolean(),
+  }),
+  units: z.array(importMatch(UnitRef, Unit)),
+  categories: z.array(importMatch(CategoryRef, Category)),
+  bottles: z.array(importMatch(BottleRef, Bottle)),
+  ingredients: z.array(importMatch(IngredientRef, Ingredient)),
 });

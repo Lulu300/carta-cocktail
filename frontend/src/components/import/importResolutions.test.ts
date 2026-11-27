@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { buildCategory, buildCategoryType, buildUnit } from '../../test/factories';
+import {
+  buildCategory,
+  buildCategoryRef,
+  buildCategoryType,
+  buildIngredientRef,
+  buildUnit,
+  buildUnitRef,
+} from '../../test/factories';
 import type { CategoryType, ImportPreviewResponse } from '../../types';
 import {
   buildAutoResolutions,
@@ -155,12 +162,14 @@ describe('buildAutoResolutions', () => {
       preview({
         units: [
           {
-            ref: { name: 'Centilitre', abbreviation: 'cl' },
-            existingMatch: { id: 3, name: 'Centilitre' },
+            ref: buildUnitRef({ name: 'Centilitre', abbreviation: 'cl' }),
+            existingMatch: buildUnit({ id: 3, name: 'Centilitre', abbreviation: 'cl' }),
             status: 'matched',
           },
         ],
-        ingredients: [{ ref: { name: 'Mint' }, existingMatch: null, status: 'missing' }],
+        ingredients: [
+          { ref: buildIngredientRef({ name: 'Mint' }), existingMatch: null, status: 'missing' },
+        ],
       }),
     );
 
@@ -176,7 +185,7 @@ describe('buildAutoResolutions', () => {
       preview({
         categories: [
           {
-            ref: { name: 'rhum' },
+            ref: buildCategoryRef({ name: 'rhum' }),
             existingMatch: null,
             status: 'ambiguous',
             ambiguousMatches: [rhum, upperRhum],
@@ -184,7 +193,7 @@ describe('buildAutoResolutions', () => {
         ],
         units: [
           {
-            ref: { abbreviation: 'cl' },
+            ref: buildUnitRef({ abbreviation: 'cl' }),
             existingMatch: null,
             status: 'ambiguous',
             ambiguousMatches: [upperCl, titleCl],
@@ -433,8 +442,8 @@ describe('countIncompleteResolutions', () => {
   it('counts the entities that cannot be sent as they are', () => {
     const recipePreview = preview({
       ingredients: [
-        { ref: { name: 'Mint' }, existingMatch: null, status: 'missing' },
-        { ref: { name: 'Lime' }, existingMatch: null, status: 'missing' },
+        { ref: buildIngredientRef({ name: 'Mint' }), existingMatch: null, status: 'missing' },
+        { ref: buildIngredientRef({ name: 'Lime' }), existingMatch: null, status: 'missing' },
       ],
     });
     const resolutions = buildAutoResolutions(recipePreview);
@@ -447,7 +456,7 @@ describe('countIncompleteResolutions', () => {
   it('counts a category to create under the type with an empty name', () => {
     const recipePreview = preview({
       categories: [
-        { ref: { name: 'Rhum', type: 'SPIRIT' }, existingMatch: null, status: 'missing' },
+        { ref: buildCategoryRef({ name: 'Rhum' }), existingMatch: null, status: 'missing' },
       ],
     });
     const resolutions = buildAutoResolutions(recipePreview);
@@ -464,7 +473,7 @@ describe('countIncompleteResolutions', () => {
     const recipePreview = preview({
       categories: [
         {
-          ref: { name: 'rhum' },
+          ref: buildCategoryRef({ name: 'rhum' }),
           existingMatch: null,
           status: 'ambiguous',
           ambiguousMatches: [rhum, upperRhum],

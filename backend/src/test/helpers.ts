@@ -3,6 +3,8 @@ import type { AddressInfo } from 'net';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import supertest from 'supertest';
+import { expect } from 'vitest';
+import type { z } from 'zod';
 import { Prisma } from '../generated/prisma/client';
 import app from '../app';
 import { prisma } from '../lib/prisma';
@@ -443,4 +445,15 @@ export interface AppStateData {
 /** Sets the single AppState row, as the start of `lastRunVersion` left it (upgradeNoticeService). */
 export async function seedAppState(data: AppStateData) {
   return prisma.appState.upsert({ where: { id: 1 }, create: { id: 1, ...data }, update: data });
+}
+
+/**
+ * Parses a response body with its strict schema (task F-05); a failure lists the fields that
+ * differ. Contract tests live in routes/responseContracts.test.ts, except those whose route
+ * needs the setup of its own test file (backup restore, upgrade notice).
+ */
+export function expectContract<S extends z.ZodType>(schema: S, body: unknown): z.output<S> {
+  const result = schema.safeParse(body);
+  expect(result.error?.issues ?? []).toEqual([]);
+  return result.data as z.output<S>;
 }

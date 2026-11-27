@@ -6,7 +6,7 @@ import SettingsPage from './SettingsPage';
 import { AppProviders } from '../../test/appProviders';
 import { ConfirmProvider } from '../../contexts/ConfirmContext';
 import { toast } from '../../components/ui/ToastStore';
-import type { BackupRestoreResult } from '../../services/api';
+import type { BackupRestoreResult } from '../../types';
 import { mockDownload } from '../../test/download';
 import { buildSiteSettings } from '../../test/factories';
 import { ADMIN_USER } from '../../test/msw/handlers';

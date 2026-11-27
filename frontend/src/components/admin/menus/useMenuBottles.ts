@@ -1,9 +1,9 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import { menuBottles as menuBottlesApi, type MenuBottleExclusion } from '../../../services/api';
-import type { Bottle, MenuBottle } from '../../../types';
+import { menuBottles as menuBottlesApi } from '../../../services/api';
+import type { Bottle, MenuBottle, MenuBottleExclusion } from '../../../types';
 import { qk } from '../../../queries/keys';
 import { isAvailableForMenu } from './bottleMenuType';
-import { isSavedEntry, type MenuBottleEntry } from './menuBottleGroups';
+import { isSavedEntry } from './menuBottleGroups';
 import { orderByIds } from './moveItem';
 import {
   updateExclusions,
@@ -28,9 +28,9 @@ export interface MenuBottlesMutations {
   /** Adds a group of bottles at the end of a personal menu, in one request. */
   add: MenuMutation<Bottle[]>;
   /** Removes a group of bottles from a personal menu, in one request. */
-  remove: MenuMutation<MenuBottleEntry[]>;
+  remove: MenuMutation<MenuBottle[]>;
   /** Removes a group of bottles from a system menu, in one request. */
-  exclude: MenuMutation<MenuBottleEntry[]>;
+  exclude: MenuMutation<MenuBottle[]>;
   /** Puts a group of removed bottles back, in one request. */
   restore: MenuMutation<MenuBottleExclusion[]>;
 }
@@ -70,7 +70,7 @@ function orderForServer(chosenIds: number[], confirmed: MenuState): number[] {
 /** Added or restored bottles, shown at the end of the menu with a temporary id until the server gives theirs. */
 function appendBottles(state: MenuState, menuId: number, bottles: Bottle[]): MenuState {
   return updateMenu(state, (menu) => {
-    const entries = menu.bottles ?? [];
+    const entries = menu.bottles;
     const appended = bottles.map((bottle, index) => ({
       id: -bottle.id,
       menuId,
@@ -85,7 +85,7 @@ function appendBottles(state: MenuState, menuId: number, bottles: Bottle[]): Men
 }
 
 function filterEntries(state: MenuState, keep: (entry: MenuBottle) => boolean): MenuState {
-  return updateMenu(state, (menu) => ({ ...menu, bottles: menu.bottles?.filter(keep) }));
+  return updateMenu(state, (menu) => ({ ...menu, bottles: menu.bottles.filter(keep) }));
 }
 
 /** Changes to the bottles of a menu, saved at once. */
@@ -96,7 +96,7 @@ export function useMenuBottles(menuId: number): MenuBottlesMutations {
     applyOptimistic: (state, { entryIds, changes }) =>
       updateMenu(state, (menu) => ({
         ...menu,
-        bottles: menu.bottles?.map((entry) =>
+        bottles: menu.bottles.map((entry) =>
           entryIds.includes(entry.id) ? { ...entry, ...changes } : entry,
         ),
       })),
@@ -107,7 +107,7 @@ export function useMenuBottles(menuId: number): MenuBottlesMutations {
     mutationFn: (ids, confirmed) => menuBottlesApi.reorder(menuId, orderForServer(ids, confirmed)),
     applyOptimistic: (state, ids) =>
       updateMenu(state, (menu) => {
-        const entries = menu.bottles ?? [];
+        const entries = menu.bottles;
         return {
           ...menu,
           bottles: orderByIds(
@@ -131,7 +131,7 @@ export function useMenuBottles(menuId: number): MenuBottlesMutations {
     applyOptimistic: (state, bottles) => appendBottles(state, menuId, bottles),
   });
 
-  const remove = useMenuMutation<MenuBottleEntry[]>({
+  const remove = useMenuMutation<MenuBottle[]>({
     menuId,
     mutationFn: (entries) =>
       menuBottlesApi.removeEntries(
@@ -144,7 +144,7 @@ export function useMenuBottles(menuId: number): MenuBottlesMutations {
     },
   });
 
-  const exclude = useMenuMutation<MenuBottleEntry[]>({
+  const exclude = useMenuMutation<MenuBottle[]>({
     menuId,
     mutationFn: (entries) =>
       menuBottlesApi.exclude(

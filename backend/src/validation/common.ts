@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 // Schemas in this folder never import Prisma: they describe the HTTP contract only.
 // The frontend gets their types from frontend/src/types/generated.ts, generated from
-// frontendContracts.ts by `npm run contracts:generate` (task F-05).
+// src/contracts/frontendTypes.ts by `npm run contracts:generate` (task F-05).
 
 /** Database id sent in a JSON body. The UI always sends numbers, never strings. */
 export const Id = z.number().int().positive();
@@ -85,3 +85,19 @@ export const DeletionResponse = z.strictObject({
   deleted: z.boolean(),
   impact: DeletionImpact,
 });
+
+export const ImportMatchStatus = z.enum(['matched', 'missing', 'ambiguous']);
+
+/**
+ * How an entity an import names compares with the existing rows (`previewMatch`,
+ * utils/uniqueness.ts): `ref` as the file gives it, and the row found, if any.
+ */
+export function importMatch<Ref extends z.ZodType, Row extends z.ZodType>(ref: Ref, row: Row) {
+  return z.strictObject({
+    ref,
+    existingMatch: row.nullable(),
+    status: ImportMatchStatus,
+    /** `ambiguous` only: the rows equal to the name ignoring case, none of them exactly. */
+    ambiguousMatches: z.array(row).optional(),
+  });
+}

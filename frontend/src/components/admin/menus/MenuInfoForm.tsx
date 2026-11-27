@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Menu } from '../../../types';
+import type { MenuRow } from '../../../types';
 import Button from '../../ui/Button';
 import Card from '../../ui/Card';
 import Field from '../../ui/Field';
@@ -19,14 +19,14 @@ export interface MenuInfoValues {
 type MenuInfoField = keyof MenuInfoValues;
 
 interface MenuInfoFormProps {
-  menu: Menu;
+  menu: MenuRow;
   /** Shown read-only and never sent, e.g. the slug of a system menu. */
   lockedFields?: MenuInfoField[];
   onSave: (values: Partial<MenuInfoValues>) => void;
   isSaving: boolean;
 }
 
-function initialValues(menu: Menu): MenuInfoValues {
+function initialValues(menu: MenuRow): MenuInfoValues {
   return {
     name: menu.name,
     slug: menu.slug,

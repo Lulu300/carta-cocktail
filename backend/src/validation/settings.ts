@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { User } from './auth';
+import { Id } from './common';
 
 export const SiteSettingsUpdate = z.object({
   siteName: z.string().optional(),
@@ -27,3 +29,9 @@ export const SiteSettings = z.strictObject({
   siteName: z.string(),
   siteIcon: z.string(),
 });
+
+/** The settings row, as the admin settings routes send it. */
+export const SiteSettingsRow = SiteSettings.extend({ id: Id });
+
+/** Answer of a profile update. `token` comes when the password changed: the previous one is revoked. */
+export const ProfileResponse = User.extend({ token: z.string().optional() });

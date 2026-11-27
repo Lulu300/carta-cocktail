@@ -6,7 +6,7 @@ import {
   settings as settingsApi,
   backup as backupApi,
 } from '../../services/api';
-import type { BackupRestoreResult } from '../../services/api';
+import type { BackupRestoreResult } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteSettings } from '../../contexts/SiteSettingsContext';
 import { useConfirm } from '../../contexts/ConfirmContext';

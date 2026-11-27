@@ -13,7 +13,7 @@ import {
 import { server } from '../../test/msw/server';
 import { errorResponse, mockApiResponse, pendingResponse } from '../../test/msw/utils';
 import MenuEditPage from './MenuEditPage';
-import type { Cocktail, Menu, MenuCocktail, MenuSection, MenuUpdateInput } from '../../types';
+import type { Cocktail, MenuCocktail, MenuDetail, MenuSection, MenuUpdateInput } from '../../types';
 
 const classics = buildMenuSection({ id: 7, menuId: 3, name: 'Classics', position: 0 });
 
@@ -29,7 +29,7 @@ const mojito = buildCocktail({ id: 1, name: 'Mojito' });
 const negroni = buildCocktail({ id: 2, name: 'Negroni' });
 const spritz = buildCocktail({ id: 3, name: 'Spritz' });
 
-function makeMenu(cocktails: MenuCocktail[], sections: MenuSection[] = [classics]): Menu {
+function makeMenu(cocktails: MenuCocktail[], sections: MenuSection[] = [classics]): MenuDetail {
   return buildMenu({ id: 3, name: 'Summer', slug: 'summer', isPublic: false, sections, cocktails });
 }
 
@@ -38,7 +38,7 @@ const ALL_COCKTAILS = [mojito, negroni, spritz];
 // --- Fake backend of the editor: it stores the menu and records each request ---
 
 /** What the server stores: a refetch after a save returns the saved composition. */
-let storedMenu: Menu;
+let storedMenu: MenuDetail;
 
 /** Requests received, in order: the id of each menu read and the body of each update. */
 let received: { menuReads: number[]; updates: MenuUpdateInput[] };

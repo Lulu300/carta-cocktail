@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { Id, Percent, RequiredText, StoredTranslations, Timestamp, Translations } from './common';
+import { CategoryType } from './categoryTypes';
 
 export const DesiredStock = z.number().int().min(0);
 
@@ -45,4 +46,22 @@ export const PublicCategory = Category.pick({
   name: true,
   nameTranslations: true,
   type: true,
+});
+
+/** A category in the list of the categories page, with its type and its number of bottles. */
+export const CategoryListItem = Category.extend({
+  categoryType: CategoryType,
+  _count: z.strictObject({ bottles: z.number().int() }),
+});
+
+/** A category whose bottles fall short of its desired stock (GET /shortages). */
+export const Shortage = z.strictObject({
+  category: Category.omit({ createdAt: true }).extend({ categoryType: CategoryType }),
+  /** Sum of the remaining levels of its bottles, each one counting up to 100. */
+  totalPercent: z.number().int(),
+  /** `(desiredStock - 1) * 100 + minimumPercent`: below it, the category is short. */
+  requiredPercent: z.number().int(),
+  /** Bottles not empty. */
+  totalUsable: z.number().int(),
+  isShortage: z.boolean(),
 });

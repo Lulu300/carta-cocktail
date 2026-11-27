@@ -5,7 +5,7 @@ import { useCategoryTypeName } from '../../hooks/useCategoryTypeName';
 import { useSort } from '../../hooks/useSort';
 import { usePagination } from '../../hooks/usePagination';
 import { categories as categoriesApi } from '../../services/api';
-import type { Category } from '../../types';
+import type { CategoryListItem } from '../../types';
 import { qk } from '../../queries/keys';
 import { useCategories } from '../../queries/categories';
 import { useCategoryTypes } from '../../queries/categoryTypes';
@@ -45,7 +45,7 @@ export default function CategoriesPage() {
       deleted: 'categories.deleted',
     },
   });
-  const categoryForm = useEntityForm((category?: Category) =>
+  const categoryForm = useEntityForm((category?: CategoryListItem) =>
     toCategoryForm(categoryTypes, category),
   );
   const [showTypesManager, setShowTypesManager] = useState(false);
@@ -58,7 +58,7 @@ export default function CategoriesPage() {
     );
   }, [categoriesQuery.data, search, localize]);
 
-  const sort = useSort<Category>(filteredCategories);
+  const sort = useSort<CategoryListItem>(filteredCategories);
   const pagination = usePagination(sort.sortedItems);
 
   const handleSubmit = (data: CategoryInput) => {
@@ -67,11 +67,11 @@ export default function CategoriesPage() {
     else create.mutate(data, options);
   };
 
-  const handleDelete = async (category: Category) => {
+  const handleDelete = async (category: CategoryListItem) => {
     if (await confirmDelete(t('categories.confirmDelete'))) await deleteCategory(category.id);
   };
 
-  const columns: Column<Category>[] = [
+  const columns: Column<CategoryListItem>[] = [
     {
       key: 'name',
       header: t('categories.name'),

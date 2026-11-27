@@ -10,7 +10,8 @@ import {
 import { useInvalidateQueries } from '../../queries/invalidate';
 import { describeMutationError, readDeletionImpact } from '../../queries/deletionImpact';
 import { qk } from '../../queries/keys';
-import type { DeleteOptions, DeletionImpact, DeletionResponse } from '../../types';
+import type { DeleteOptions } from '../../services/api';
+import type { DeletionImpact, DeletionResponse } from '../../types';
 import { toast } from '../ui/ToastStore';
 import DeletionImpactList from './DeletionImpactList';
 

@@ -1,6 +1,6 @@
 import { useId, useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Category, CategoryType } from '../../../types';
+import type { CategoryListItem, CategoryType } from '../../../types';
 import Button from '../../ui/Button';
 import Field from '../../ui/Field';
 import Input from '../../ui/Input';
@@ -12,7 +12,7 @@ import { OTHER_TYPE, toCategoryInput, type CategoryForm, type CategoryInput } fr
 import { useCategoryTypeName } from '../../../hooks/useCategoryTypeName';
 
 interface CategoryFormModalProps {
-  entityForm: EntityForm<Category, CategoryForm>;
+  entityForm: EntityForm<CategoryListItem, CategoryForm>;
   categoryTypes: CategoryType[];
   isSaving: boolean;
   onSubmit: (data: CategoryInput) => void;

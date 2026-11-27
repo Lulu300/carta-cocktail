@@ -634,7 +634,7 @@ describe('categories API', () => {
     expect(mockFetch.mock.calls[0]![0]!).toBe('/api/categories');
 
     mockOk({});
-    await api.categories.create({ name: 'Vodka' });
+    await api.categories.create({ name: 'Vodka', type: 'SPIRIT' });
     expect(mockFetch.mock.calls[1]![1]!.method).toBe('POST');
 
     mockOk({});

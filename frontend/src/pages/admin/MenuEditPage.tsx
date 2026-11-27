@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import type { Cocktail, Menu, MenuCocktail } from '../../types';
+import type { Cocktail, MenuCocktail, MenuDetail } from '../../types';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import AddCocktailModal from '../../components/admin/menus/AddCocktailModal';
@@ -26,12 +26,11 @@ export default function MenuEditPage() {
 }
 
 /** The cocktails of the menu: every change is saved at once. */
-function MenuCocktails({ menu }: { menu: Menu }) {
+function MenuCocktails({ menu }: { menu: MenuDetail }) {
   const { t } = useTranslation();
   const save = useSaveMenuCocktails(menu.id);
   const [isAdding, setIsAdding] = useState(false);
-  const cocktails = menu.cocktails ?? [];
-  const sections = menu.sections ?? [];
+  const { cocktails, sections } = menu;
 
   const add = (cocktail: Cocktail) => {
     setIsAdding(false);

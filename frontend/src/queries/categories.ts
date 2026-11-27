@@ -1,8 +1,8 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { categories as categoriesApi } from '../services/api';
-import type { Category } from '../types';
+import type { CategoryListItem } from '../types';
 import { qk } from './keys';
 
-export function useCategories(): UseQueryResult<Category[], Error> {
+export function useCategories(): UseQueryResult<CategoryListItem[], Error> {
   return useQuery({ queryKey: qk.categories, queryFn: ({ signal }) => categoriesApi.list(signal) });
 }

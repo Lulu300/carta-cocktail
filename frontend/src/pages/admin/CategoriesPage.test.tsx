@@ -4,7 +4,7 @@ import { createTestQueryClient, fireEvent, screen, waitFor, within } from '../..
 import { clearToasts, renderWithFeedback } from '../../test/feedback';
 import { qk } from '../../queries/keys';
 import { axe } from '../../test/axe';
-import { buildCategory, buildCategoryType } from '../../test/factories';
+import { buildCategoryListItem, buildCategoryTypeListItem } from '../../test/factories';
 import type { CategoryType } from '../../types';
 import {
   captureRequest,
@@ -15,10 +15,18 @@ import {
 } from '../../test/msw/utils';
 import CategoriesPage from './CategoriesPage';
 
-const spirit = buildCategoryType({ name: 'SPIRIT', color: 'blue', _count: { categories: 1 } });
-const syrup = buildCategoryType({ name: 'SYRUP', color: 'red', _count: { categories: 1 } });
-const garnish = buildCategoryType({ name: 'GARNISH', color: 'green', _count: { categories: 0 } });
-const vodka = buildCategory({
+const spirit = buildCategoryTypeListItem({
+  name: 'SPIRIT',
+  color: 'blue',
+  _count: { categories: 1 },
+});
+const syrup = buildCategoryTypeListItem({ name: 'SYRUP', color: 'red', _count: { categories: 1 } });
+const garnish = buildCategoryTypeListItem({
+  name: 'GARNISH',
+  color: 'green',
+  _count: { categories: 0 },
+});
+const vodka = buildCategoryListItem({
   id: 1,
   name: 'Vodka',
   type: 'SPIRIT',
@@ -26,7 +34,7 @@ const vodka = buildCategory({
   desiredStock: 2,
   _count: { bottles: 3 },
 });
-const grenadine = buildCategory({
+const grenadine = buildCategoryListItem({
   id: 2,
   name: 'Grenadine',
   type: 'SYRUP',
@@ -34,29 +42,45 @@ const grenadine = buildCategory({
   _count: { bottles: 1 },
 });
 // Data older than v1.9.0 can hold these names: HTML would show ' SPIRIT ' as 'SPIRIT', and '' as nothing.
-const spacedSpirit = buildCategoryType({
+const spacedSpirit = buildCategoryTypeListItem({
   name: ' SPIRIT ',
   color: 'gray',
   _count: { categories: 1 },
 });
-const unnamed = buildCategoryType({ name: '', color: 'gray', _count: { categories: 0 } });
+const unnamed = buildCategoryTypeListItem({ name: '', color: 'gray', _count: { categories: 0 } });
 const SPACED_SPIRIT_LABEL = '␣SPIRIT␣ (with spaces)';
 // Data older than v1.15.0 can hold these: HTML shows each of them as 'X Y'.
-const doubleSpaced = buildCategoryType({ name: 'X  Y', color: 'gray', _count: { categories: 1 } });
-const singleSpaced = buildCategoryType({ name: 'X Y', color: 'gray', _count: { categories: 0 } });
-const tabbed = buildCategoryType({ name: 'X\tY', color: 'gray', _count: { categories: 0 } });
+const doubleSpaced = buildCategoryTypeListItem({
+  name: 'X  Y',
+  color: 'gray',
+  _count: { categories: 1 },
+});
+const singleSpaced = buildCategoryTypeListItem({
+  name: 'X Y',
+  color: 'gray',
+  _count: { categories: 0 },
+});
+const tabbed = buildCategoryTypeListItem({
+  name: 'X\tY',
+  color: 'gray',
+  _count: { categories: 0 },
+});
 const DOUBLE_SPACED_LABEL = 'X␣␣Y (with spaces)';
 // HTML shows a zero-width space as nothing: 'X\u200BY' looks exactly like 'XY'.
-const zeroWidth = buildCategoryType({ name: 'X\u200BY', color: 'gray', _count: { categories: 1 } });
-const joined = buildCategoryType({ name: 'XY', color: 'gray', _count: { categories: 0 } });
+const zeroWidth = buildCategoryTypeListItem({
+  name: 'X\u200BY',
+  color: 'gray',
+  _count: { categories: 1 },
+});
+const joined = buildCategoryTypeListItem({ name: 'XY', color: 'gray', _count: { categories: 0 } });
 const ZERO_WIDTH_LABEL = 'X[U+200B]Y (with invisible characters)';
 // HTML shows 'E' and a combining grave accent (U+0300) exactly like the composed 'È' (U+00C8).
-const decomposed = buildCategoryType({
+const decomposed = buildCategoryTypeListItem({
   name: 'CRE\u0300ME',
   color: 'gray',
   _count: { categories: 1 },
 });
-const composed = buildCategoryType({
+const composed = buildCategoryTypeListItem({
   name: 'CR\u00C8ME',
   color: 'gray',
   _count: { categories: 0 },
@@ -133,11 +157,8 @@ describe('CategoriesPage', () => {
     }
 
     /** A category of the given type, which the categories list sends with it. */
-    const categoryOfType = (
-      name: string,
-      categoryType: CategoryType | null,
-      type = categoryType?.name ?? '',
-    ) => buildCategory({ name, type, categoryType });
+    const categoryOfType = (name: string, categoryType: CategoryType) =>
+      buildCategoryListItem({ name, type: categoryType.name, categoryType });
 
     it('tells the stored names apart, and labels the empty name', async () => {
       mockApiResponse('get', '/api/categories', [
@@ -166,19 +187,6 @@ describe('CategoriesPage', () => {
       expect(await typeCell('Rum')).toHaveAccessibleName(`Spirits – ${SPACED_SPIRIT_LABEL}`);
       expect(await typeCell('Gin')).toHaveAccessibleName('Spirits');
       expect(await typeCell('Water')).toHaveAccessibleName('Spirits – (no name)');
-    });
-
-    it('marks the stored name of a category sent without its type', async () => {
-      mockApiResponse('get', '/api/categories', [
-        categoryOfType('Rum', null, ' SPIRIT '),
-        categoryOfType('Gin', null, 'SPIRIT'),
-        categoryOfType('Water', null, ''),
-      ]);
-      renderPage();
-
-      expect(await typeCell('Rum')).toHaveAccessibleName(SPACED_SPIRIT_LABEL);
-      expect(await typeCell('Gin')).toHaveAccessibleName('SPIRIT');
-      expect(await typeCell('Water')).toHaveAccessibleName('(no name)');
     });
   });
 
@@ -346,14 +354,14 @@ describe('CategoriesPage', () => {
     // Data older than v1.9.0 can hold ' SPIRIT ' next to 'SPIRIT': the edit sends the type as stored.
     it('keeps a type with surrounding spaces when a category is saved', async () => {
       const user = userEvent.setup();
-      const spacedSpirit = buildCategoryType({
+      const spacedSpirit = buildCategoryTypeListItem({
         name: ' SPIRIT ',
         color: 'gray',
         _count: { categories: 1 },
       });
       mockApiResponse('get', '/api/category-types', [spirit, spacedSpirit]);
       mockApiResponse('get', '/api/categories', [
-        buildCategory({
+        buildCategoryListItem({
           id: 3,
           name: 'Rum',
           type: ' SPIRIT ',
@@ -374,10 +382,9 @@ describe('CategoriesPage', () => {
     it('shows a type missing from the list as a custom type', async () => {
       const user = userEvent.setup();
       mockApiResponse('get', '/api/categories', [
-        buildCategory({
+        buildCategoryListItem({
           name: 'Water',
           type: 'UNKNOWN',
-          categoryType: null,
           _count: { bottles: 0 },
         }),
       ]);
@@ -505,7 +512,7 @@ describe('CategoriesPage', () => {
     });
 
     describe('a category whose type has an empty name', () => {
-      const water = buildCategory({
+      const water = buildCategoryListItem({
         id: 4,
         name: 'Water',
         type: '',

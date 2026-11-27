@@ -1,5 +1,6 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import { system as systemApi, type UpgradeNotice } from '../services/api';
+import { system as systemApi } from '../services/api';
+import type { UpgradeNotice } from '../types';
 import { useEntityMutation, type EntityMutation } from './crud';
 import { qk } from './keys';
 

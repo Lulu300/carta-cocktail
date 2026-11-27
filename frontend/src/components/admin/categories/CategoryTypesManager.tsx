@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import type { CategoryType } from '../../../types';
+import type { CategoryTypeListItem } from '../../../types';
 import { CATEGORY_TYPE_COLORS, getDotClasses } from '../../../utils/colors';
 import Button from '../../ui/Button';
 import Field from '../../ui/Field';
@@ -15,11 +15,11 @@ import { useCategoryTypeName } from '../../../hooks/useCategoryTypeName';
 interface CategoryTypesManagerProps {
   open: boolean;
   onClose: () => void;
-  categoryTypes: CategoryType[];
+  categoryTypes: CategoryTypeListItem[];
 }
 
-function categoryCount(categoryType: CategoryType): number {
-  return categoryType._count?.categories ?? 0;
+function categoryCount(categoryType: CategoryTypeListItem): number {
+  return categoryType._count.categories;
 }
 
 /** Modal listing the category types, with a form to add one or edit the one picked. */
@@ -38,7 +38,7 @@ export default function CategoryTypesManager({
   );
 }
 
-function CategoryTypesPanel({ categoryTypes }: { categoryTypes: CategoryType[] }) {
+function CategoryTypesPanel({ categoryTypes }: { categoryTypes: CategoryTypeListItem[] }) {
   const { t } = useTranslation();
   const { visibleName, localizedName } = useCategoryTypeName();
   const confirmDelete = useConfirmDelete();

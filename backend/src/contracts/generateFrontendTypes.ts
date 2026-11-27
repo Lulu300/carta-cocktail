@@ -84,6 +84,8 @@ class TypePrinter {
       return this.checker.typeToString(type);
     }
     if (flags & (ts.TypeFlags.Unknown | ts.TypeFlags.Any)) return 'unknown';
+    // An empty strict object (`z.strictObject({})`) is `Record<string, never>`
+    if (flags & ts.TypeFlags.Never) return 'never';
     return null;
   }
 

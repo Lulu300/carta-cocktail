@@ -2,7 +2,7 @@ import { useId, useRef, type FormEvent, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../../hooks/useLocalizedName';
 import { useCategoryTypeName } from '../../../hooks/useCategoryTypeName';
-import type { Bottle, Category } from '../../../types';
+import type { Bottle, CategoryListItem } from '../../../types';
 import Button from '../../ui/Button';
 import DateInput from '../../ui/DateInput';
 import Field from '../../ui/Field';
@@ -14,7 +14,7 @@ import { clampQuantity, toBottleInput, type BottleForm, type BottleInput } from 
 
 interface BottleFormModalProps {
   entityForm: EntityForm<Bottle, BottleForm>;
-  categories: Category[];
+  categories: CategoryListItem[];
   isSaving: boolean;
   /** `duplicate` asks to keep the form open with the same values, for the next identical bottle. */
   onSubmit: (data: BottleInput, duplicate: boolean) => void;
@@ -50,7 +50,7 @@ export default function BottleFormModal({
     submitIntent.current = 'save';
   };
 
-  const categoryLabel = (category: Category) => {
+  const categoryLabel = (category: CategoryListItem) => {
     return `${localize(category)} (${categoryTypeLabel(category.type, category.categoryType)})`;
   };
 
