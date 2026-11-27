@@ -39,6 +39,8 @@ export default defineConfig({
         'src/scripts/seed.ts',
         'src/scripts/check-integrity.ts',
         'src/scripts/migration-state.ts',
+        // Runs in a worker thread, out of reach of the coverage: its logic is in sandboxGuest.ts
+        'src/mcp/sandboxWorker.ts',
         'src/**/*.test.ts',
         'src/**/*.d.ts',
       ],

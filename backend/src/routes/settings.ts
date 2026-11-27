@@ -4,7 +4,12 @@ import { hashPassword, MIN_PASSWORD_LENGTH, verifyPassword } from '../bootstrap/
 import { AuthRequest, signToken } from '../middleware/auth';
 import { BadRequestError, NotFoundError } from '../errors';
 import { valid, validate } from '../validation/validate';
-import { EmailAddress, ProfileUpdate, SiteSettingsUpdate } from '../validation/settings';
+import {
+  CodeModeUpdate,
+  EmailAddress,
+  ProfileUpdate,
+  SiteSettingsUpdate,
+} from '../validation/settings';
 import { getOrCreateSettings, toSiteSettingsResponse } from '../services/settingsService';
 import { serializeEmbedOrigins } from '../services/embedOrigins';
 import { apiDocs } from '../openapi/routeDoc';
@@ -48,6 +53,31 @@ router.put(
       where: { id: 1 },
       update: data,
       create: { id: 1, ...data },
+    });
+    res.json(toSiteSettingsResponse(settings));
+  },
+);
+
+const codeModeSchemas = { body: CodeModeUpdate };
+
+// Session only (SESSION_ONLY_ROUTES in app.ts): with Code Mode on, an API token runs code on the
+// server, so no token may turn it on, not even one that reads and writes.
+router.put(
+  '/code-mode',
+  doc({
+    operationId: 'updateCodeMode',
+    summary: 'Turn Code Mode of the MCP server on or off',
+    description:
+      'With Code Mode on, the MCP server also lists `search` and `execute`, which run JavaScript written by the AI agent in a sandbox on the server, with the rights of its token. Off by default.',
+    responses: { 200: AdminSiteSettings },
+  }),
+  validate(codeModeSchemas),
+  async (_req: AuthRequest, res: Response) => {
+    const { enabled } = valid<typeof codeModeSchemas>(res).body;
+    const settings = await prisma.siteSettings.upsert({
+      where: { id: 1 },
+      update: { codeModeEnabled: enabled },
+      create: { id: 1, codeModeEnabled: enabled },
     });
     res.json(toSiteSettingsResponse(settings));
   },

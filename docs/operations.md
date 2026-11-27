@@ -405,7 +405,7 @@ claude mcp add --transport http carta https://carte.mon-bar.fr/api/mcp \
 
 L'en-tête s'écrit sans espace après `Authorization:`, et le jeton passe par `env` : `mcp-remote` documente cette forme, car Claude Desktop coupe mal les arguments qui contiennent une espace sous Windows.
 
-**Client Code Mode (Cloudflare Agents SDK).** Le modèle écrit du code qui appelle les outils, exécuté dans un bac à sable de Cloudflare (Worker Loader) ; le serveur Carta reste un serveur MCP ordinaire. Dans un agent :
+**Client Code Mode (Cloudflare Agents SDK).** Sans [Code Mode côté serveur](#code-mode-côté-serveur-search-et-execute), le modèle écrit du code qui appelle les outils, exécuté dans un bac à sable de Cloudflare (Worker Loader) ; le serveur Carta reste un serveur MCP ordinaire. Dans un agent :
 
 ```ts
 import { Agent } from 'agents';
@@ -435,6 +435,68 @@ export class BarAgent extends Agent<Env> {
 ```
 
 Avec, dans `wrangler.jsonc`, `"compatibility_flags": ["nodejs_compat"]` et `"worker_loaders": [{ "binding": "LOADER" }]`, et le jeton en secret : `npx wrangler secret put CARTA_MCP_TOKEN`. L'outil rendu par `codeTool()` se donne au modèle comme tout outil du SDK AI (`streamText({ tools: { codemode } })`). Le SDK Code Mode est marqué expérimental par Cloudflare : vérifiez sa documentation.
+
+Quand [Code Mode côté serveur](#code-mode-côté-serveur-search-et-execute) est activé, le code tourne chez Carta : l'agent n'a plus besoin de `createCodeTool`, ni de Worker Loader ni de `DynamicWorkerExecutor`. Il donne au modèle les outils du serveur, `search` et `execute` compris :
+
+```ts
+const result = streamText({
+  model,
+  tools: this.mcp.getAITools({ serverId: 'carta' }),
+  prompt: 'Which spirits are almost empty?',
+});
+```
+
+### Code Mode côté serveur (`search` et `execute`)
+
+En plus des outils ci-dessus, le serveur peut exposer les deux outils du [Code Mode de Cloudflare](https://developers.cloudflare.com/agents/model-context-protocol/codemode/), avec les mêmes noms : l'agent écrit une courte fonction JavaScript, et le serveur l'exécute.
+
+- `search({ code })` : le code lit le document OpenAPI des opérations que ce jeton peut appeler, avec `await codemode.spec()` (références `$ref` déjà résolues), et ne renvoie que ce qu'il cherche. Pas de réseau.
+- `execute({ code })` : le code appelle l'API avec `await codemode.request({ method, path, query, body })`, qui répond `{ status, body }`. Une réponse d'erreur rejette la promesse avec une `Error` qui porte le `status` et le `body` de l'API (`{ error, details }`).
+
+**Désactivé par défaut.** Admin > Paramètres > « Serveur MCP : Code Mode » l'active, après confirmation, et le désactive. Le changement vaut dès la requête MCP suivante : désactivé, `search` et `execute` disparaissent de la liste des outils, et les appeler échoue. Seule la session de l'admin peut changer ce réglage (`PUT /api/settings/code-mode`) : aucun jeton d'API, même en lecture et écriture, ne peut activer l'exécution de code.
+
+**Risques.** Le code écrit par l'agent s'exécute sur le serveur, avec les droits de son jeton. Il tourne dans un bac à sable, [QuickJS](https://github.com/justjake/quickjs-emscripten) compilé en WebAssembly, jamais dans le moteur de Node : il n'a ni `require`, ni `process`, ni `fetch`, ni système de fichiers, ni minuteries. Chaque exécution a son propre fil d'exécution (worker thread de Node), arrêté à la fin ou dès qu'une limite est atteinte, où que soit le code : le serveur continue de répondre pendant que le code calcule. `codemode.request()` est sa seule sortie, et elle a le même périmètre que les outils :
+
+- les opérations admin du document OpenAPI seulement, sans les routes qui prennent un fichier (photo, import de bouteilles) ;
+- jamais de `DELETE`, ni les routes réservées à la session (jetons, compte, « Se déconnecter partout », sauvegardes, ce réglage), même avec la session de l'admin ;
+- un jeton en lecture seule n'écrit pas ;
+- chaque requête passe par l'API avec le même jeton : mêmes contrôles, même limite `API_RATE_LIMIT` (un appel d'`execute` compte pour une requête, plus une par `codemode.request()`), mêmes erreurs, et 30 secondes au plus par requête.
+
+Activez-le seulement pour des agents de confiance, et gardez des jetons en lecture seule quand ils n'ont pas à écrire.
+
+**Limites d'une exécution.**
+
+| Limite | Valeur | Au-delà |
+| --- | --- | --- |
+| Durée | 10 s, démarrage et attente des requêtes compris | Erreur, l'exécution est arrêtée et ses requêtes annulées |
+| Calcul | 1 s de calcul du code (hors attente des requêtes) | Erreur, l'exécution est arrêtée, même dans une fonction native de QuickJS |
+| Mémoire | 64 Mo pour QuickJS, 96 Mo au plus de mémoire WebAssembly | `out of memory` dans le code |
+| Pile | 128 Kio | `stack overflow` dans le code ; une récursion que QuickJS ne contrôle pas arrête l'exécution |
+| Code reçu | 20 000 caractères | Erreur, rien n'est exécuté |
+| Appels au serveur | 50 par exécution, `codemode.spec()` compris (le document ne passe qu'une fois) | Les suivants rejettent avec le statut `429` |
+| Argument d'un appel | 5 Mo de JSON | L'appel rejette, sans être envoyé |
+| Réponse | 24 000 caractères (environ 6 000 tokens, comme chez Cloudflare) | Coupée, avec la marque `--- TRUNCATED ---` |
+| Exécutions simultanées | 2, et 4 en attente | Les suivantes sont refusées aussitôt : erreur `429` (« Le serveur exécute déjà autant de code qu'il le peut »), à réessayer |
+
+Chaque exécution démarre son fil d'exécution : environ 20 ms avant que le code ne tourne (mesuré dans l'image sur un processeur arm64 récent ; davantage sur une machine lente).
+
+**Exemples d'appel.** Arguments de `search`, pour lister les opérations :
+
+```json
+{
+  "code": "async () => { const spec = await codemode.spec(); return Object.entries(spec.paths).flatMap(([path, methods]) => Object.keys(methods).map((method) => `${method.toUpperCase()} ${path}`)); }"
+}
+```
+
+Arguments d'`execute`, pour les spiritueux presque vides :
+
+```json
+{
+  "code": "async () => { const { body } = await codemode.request({ method: 'GET', path: '/api/bottles', query: { type: 'SPIRIT' } }); return body.filter((b) => b.remainingPercent < 20).map(({ id, name, remainingPercent }) => ({ id, name, remainingPercent })); }"
+}
+```
+
+Le réglage est enregistré dans la base, mais une restauration le désactive toujours, quelle que soit la valeur de la sauvegarde : comme les jetons d'API, qu'elle supprime, un réglage qui permet d'exécuter du code ne revient pas en silence depuis une autre instance. Réactivez-le dans Paramètres si besoin.
 
 ## Intégrer la carte dans le site du bar
 

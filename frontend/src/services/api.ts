@@ -25,6 +25,7 @@ import type {
   CocktailImportInput,
   CocktailInput,
   CocktailRow,
+  CodeModeInput,
   CreatedApiToken,
   DeletionResponse,
   EntityResolutionAction,
@@ -561,6 +562,12 @@ export const settings = {
     request<AdminSiteSettings>('/settings', { method: 'PUT', body: JSON.stringify(data) }),
   updateProfile: (data: ProfileInput) =>
     request<ProfileResponse>('/settings/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  // Session only: no API token may turn Code Mode on
+  updateCodeMode: (data: CodeModeInput) =>
+    request<AdminSiteSettings>('/settings/code-mode', {
       method: 'PUT',
       body: JSON.stringify(data),
     }),

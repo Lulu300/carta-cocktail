@@ -13,7 +13,7 @@ A cocktail menu management system with admin panel and public-facing menu displa
 - **Multi-language** UI (English / French) with i18next
 - **Public pages** for displaying menus and cocktail details to guests
 - **API tokens** for scripts and MCP clients: named, read-only or read and write, expiring, revocable one by one in Settings (`docs/operations.md`, "Jetons d'API")
-- **MCP server** at `/api/mcp` for AI agents (Claude Code, Claude Desktop, Code Mode clients): typed tools over the API, read-only or read and write with the scope of the API token ([MCP server](#mcp-server))
+- **MCP server** at `/api/mcp` for AI agents (Claude Code, Claude Desktop, Code Mode clients): typed tools over the API, read-only or read and write with the scope of the API token, and optionally Code Mode's `search` and `execute`, run in a sandbox on the server ([MCP server](#mcp-server))
 
 ## Tech Stack
 
@@ -504,7 +504,7 @@ Calling the API with `curl`, with an API token or a session token: [`docs/operat
 | `/api/menu-sections/*` | Yes | Menu sections and their order |
 | `GET /api/shortages` | Yes | Stock shortage analysis |
 | `GET /api/availability/*` | Yes | Cocktail availability |
-| `GET/PUT /api/settings` | Yes | Site settings; `PUT /api/settings/profile` (email, password) needs the session |
+| `GET/PUT /api/settings` | Yes | Site settings; `PUT /api/settings/profile` (email, password) and `PUT /api/settings/code-mode` ([Code Mode](#code-mode-on-the-server)) need the session |
 | `GET/POST/DELETE /api/api-tokens` | Session | API tokens of scripts and MCP clients |
 | `GET /api/backup/export`, `POST /api/backup/import` | Session | Backup (database and photos as a ZIP) and restore |
 | `POST /api/mcp` | Yes | MCP endpoint for AI agents ([MCP server](#mcp-server)); a read-only token gets the tools that read |
@@ -573,6 +573,21 @@ export class BarAgent extends Agent<Env> {
 ```
 
 It needs `"compatibility_flags": ["nodejs_compat"]` and `"worker_loaders": [{ "binding": "LOADER" }]` in `wrangler.jsonc`, and the token as a secret (`npx wrangler secret put CARTA_MCP_TOKEN`).
+
+With [Code Mode on the server](#code-mode-on-the-server) turned on, the code runs on Carta instead: the agent needs neither `createCodeTool` nor a Worker Loader, and hands the model the tools of the server, `search` and `execute` included (`streamText({ model, tools: this.mcp.getAITools({ serverId: 'carta' }) })`).
+
+#### Code Mode on the server
+
+Off by default. Settings > "MCP server: Code Mode" turns it on, after a confirmation, for the admin's session only: no API token can turn it on. The MCP server then also lists the two tools of [Cloudflare's Code Mode](https://developers.cloudflare.com/agents/model-context-protocol/codemode/), with the same names, whose `code` is an async arrow function:
+
+- `search({ code })`: the code reads the OpenAPI document of the operations this token may call, with `await codemode.spec()` (`$ref` resolved inline), and returns what it looked for. No network.
+- `execute({ code })`: the code calls the API with `await codemode.request({ method, path, query, body })`, which answers `{ status, body }`; an error answer rejects with an `Error` carrying the `status` and `body` of the API.
+
+```json
+{ "code": "async () => (await codemode.request({ method: 'GET', path: '/api/bottles', query: { type: 'SPIRIT' } })).body.filter((b) => b.remainingPercent < 20)" }
+```
+
+**Risks and limits.** The agent's code runs on the server with the rights of its token, in a sandbox: [QuickJS](https://github.com/justjake/quickjs-emscripten) compiled to WebAssembly, without `require`, `process`, `fetch`, file system or timers, in a worker thread of its own per run that the server ends at the first limit reached, wherever the code is: the server keeps answering while the code computes. `codemode.request()` reaches the admin operations of the OpenAPI document only, never a `DELETE`, a session-only route (tokens, account, sign out everywhere, backups, this setting) or a route that takes a file, even with the admin's session; a read-only token only reads. Each request goes through the API with the same token, rate limit and errors. A run stops after 10 s, 1 s of computation, 96 MB of WebAssembly memory (64 MB for QuickJS), a 128 KiB stack or 50 calls to the server (`codemode.spec()` included); the code may hold 20,000 characters, and the answer is cut after 24,000 characters (about 6,000 tokens) with `--- TRUNCATED ---`. Two runs at a time and four waiting: the next ones get a 429 error. A backup restore turns Code Mode off. Turn it on only for agents you trust. Details and examples: [`docs/operations.md`](docs/operations.md#code-mode-côté-serveur-search-et-execute) (French).
 
 ## License
 

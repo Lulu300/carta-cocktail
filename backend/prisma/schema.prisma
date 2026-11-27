@@ -256,6 +256,9 @@ model SiteSettings {
   // Sites allowed to show the public menu in an iframe: origins separated by one space, the
   // format of a CSP source list (services/embedOrigins.ts). Empty: no site.
   embedOrigins String @default("")
+  // Code Mode of the MCP server (F-15): the `search` and `execute` tools, which run code written
+  // by an AI agent in a sandbox on the server. Off until the admin turns it on in Settings.
+  codeModeEnabled Boolean @default(false)
 }
 
 // State of the instance itself, not of its content: a single row (id = 1). A

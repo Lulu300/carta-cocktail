@@ -493,6 +493,8 @@ export type AdminSiteSettings = {
   id: number;
   /** Sites allowed to show the public menu in an iframe, e.g. "https://www.mon-bar.fr". */
   embedOrigins: string[];
+  /** The MCP server lists `search` and `execute`, which run an AI agent's code in a sandbox. */
+  codeModeEnabled: boolean;
 };
 
 export type DeletionImpact = {
@@ -1079,6 +1081,10 @@ export type ProfileInput = {
   email?: string;
   currentPassword?: string;
   newPassword?: string;
+};
+
+export type CodeModeInput = {
+  enabled: boolean;
 };
 
 export type ApiTokenInput = {

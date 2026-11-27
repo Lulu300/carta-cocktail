@@ -78,7 +78,7 @@ backend/
 │   │   ├── menus.ts          # CRUD /api/menus
 │   │   ├── openapi.ts        # GET /api/openapi.json (public routes), GET /api/openapi/full.json (admin)
 │   │   ├── public.ts         # Public read-only endpoints (no auth), link preview pages (/share/menu/...), embedding sites for nginx (/embed-origins)
-│   │   ├── settings.ts       # GET/PUT site settings + admin profile
+│   │   ├── settings.ts       # GET/PUT site settings + admin profile + Code Mode of the MCP server (session only)
 │   │   ├── shortages.ts      # GET /api/shortages
 │   │   ├── system.ts         # GET /api/system/upgrade-notice + acknowledge (in-app upgrade guide)
 │   │   └── units.ts          # CRUD /api/units
@@ -109,7 +109,9 @@ backend/
 │   ├── openapi/              # OpenAPI 3.1 document: route declarations (routeDoc.ts), routes read from the app
 │   │                         # (operations.ts, mounts.ts), zod to JSON Schema (jsonSchemas.ts), the document (document.ts)
 │   ├── mcp/                  # MCP server (F-15): tool catalog (catalog.ts), tools read from the routes
-│   │                         # (operationTools.ts), API request of a tool (callOperation.ts), server (server.ts)
+│   │                         # (operationTools.ts), API request of a tool (callOperation.ts), server (server.ts),
+│   │                         # Code Mode's search and execute (codeMode.ts), their sandbox: a worker thread per
+│   │                         # run (sandbox.ts) running QuickJS (sandboxGuest.ts, entry sandboxWorker.ts)
 │   ├── contracts/            # Types generated for the frontend from the schemas (npm run contracts:generate)
 │   ├── test/                 # Test helpers, factories, database lifecycle (globalSetup, setup)
 │   └── i18n/
@@ -184,7 +186,7 @@ export default router;
   `POST /api/auth/logout-all` deletes them all, and so does a backup restore. An export never carries them (deleted
   from the snapshot with `secure_delete`). `SESSION_ONLY_ROUTES` in `app.ts` lists the routes a token may never call,
   whatever its scope (`refuseApiTokens`, 403 `errors.apiTokenSessionOnly`): `/api/api-tokens`,
-  `/api/settings/profile`, `/api/auth/logout-all` and `/api/backup`. A new route of that kind goes in that list
+  `/api/settings/profile`, `/api/settings/code-mode`, `/api/auth/logout-all` and `/api/backup`. A new route of that kind goes in that list
 - The MCP endpoint (`/api/mcp`) sits behind `protocolAuthMiddleware`: same 401 as `authMiddleware`, but a read-only
   token may POST, since every MCP request is a POST; `req.canWrite` tells the endpoint which tools to list
 - `POST /api/auth/login` allows `LOGIN_RATE_LIMIT` failed attempts (default 10) per client IP in 15 minutes, then
@@ -323,6 +325,48 @@ the 2026-07-28 revision, and the stateless form of the 2025 ones (`initialize`);
 - Tests: `src/mcp/mcp.test.ts` (SDK client: handshake, both revisions, scope, every tool, errors) keeps what a client
   sees in `src/mcp/__snapshots__/tools.json`: after a deliberate change of a schema the tools use, run
   `npx vitest run src/mcp/mcp.test.ts -u` and commit the file. `operationTools.test.ts` covers the refusals.
+  `connectMcpClient()` (`src/test/helpers.ts`) connects an SDK client to the app listening on loopback.
+
+#### Code Mode (`search` and `execute`)
+
+`SiteSettings.codeModeEnabled`, off by default, adds Cloudflare's two Code Mode tools (`src/mcp/codeMode.ts`), with the
+names and shapes of `openApiMcpServer()`: `search({ code })` runs the agent's async arrow function with
+`codemode.spec()` (the OpenAPI document of what the token may call, `$ref` resolved inline), `execute({ code })` also
+with `codemode.request({ method, path, query, body })`. `routes/mcp.ts` reads the setting at each request; only the
+session may change it (`PUT /api/settings/code-mode`, in `SESSION_ONLY_ROUTES`).
+
+- **Reach**: `codemode.request()` resolves the method and path against the documented routes, in Express's order, and
+  refuses (in the form of the API's errors) any `DELETE`, a session-only route, a route that is not admin, a route that
+  takes a file, a write of a read-only token, and a path with `?`, `#` or `\`, whatever the token, the session
+  included. The request then goes through `requestOperation()` (`callOperation.ts`), like a tool call: path parameter
+  check, same headers, `OPERATION_TIMEOUT_MS`.
+- **Sandbox**: QuickJS compiled to WebAssembly (`quickjs-emscripten-core` with the
+  `@jitl/quickjs-wasmfile-release-sync` variant), never Node's `vm`, in a **worker thread per run**
+  (`runInSandbox()`, `src/mcp/sandbox.ts`). The main thread holds every limit of time and ends the worker with
+  `terminate()`, which stops it wherever it is, in a native function of QuickJS that never checks for an interruption
+  too (`"a".repeat(2 ** 24).indexOf(…)`): the event loop of the server never waits for the code. CPU time is the time
+  the worker is busy, from a message of the main thread to its next `idle`. `SANDBOX_LIMITS`: wall time (10 s), CPU
+  (1 s), QuickJS heap (64 MB), WebAssembly memory (96 MB, a `WebAssembly.Memory` with a maximum: some allocations of
+  QuickJS escape its own limit), stack (128 KiB, on a worker stack of 4 MB), 50 host calls per run
+  (`codemode.spec()` included), 24,000 characters of answer and 5 MB of argument. `MAX_CONCURRENT_RUNS` (2) run at
+  once and `MAX_QUEUED_RUNS` (4) wait; the next ones are refused at once (`busy`, 429 `errors.codeModeBusy`), and a
+  queued run whose tool call the client cancels leaves the queue without running. A worker starts with an empty
+  environment (`SANDBOX_WORKER_OPTIONS`): it never holds `JWT_SECRET` or `ADMIN_PASSWORD`. The
+  image runs `dist/mcp/sandboxWorker.js`; from the TypeScript sources (tests, `npm run dev`) the worker loads
+  `sandboxWorker.ts` with `--import tsx`.
+- **Guest side** (`src/mcp/sandboxGuest.ts`, run by the thin entry `sandboxWorker.ts`, excluded from the coverage):
+  the code sees the built-ins and `codemode` only. A prelude, run first, keeps the host's `call` and `done` and the
+  built-ins it uses, then evaluates the code, awaits it and hands `done` the JSON of its result (or the description of
+  its error) cut at `outputChars`. The host reads strings only, and only short enough ones (`stringOf()`): never a
+  promise, a getter or `dump` of the guest's objects. Host calls cross as JSON messages; a value such as
+  `codemode.spec()` crosses once per run; past `maxHostCalls`, or once the run is over, nothing crosses any more. The
+  JavaScript heap of a worker keeps Node's defaults: a worker past a heap limit can take the process down, so what
+  crosses from QuickJS is bounded instead. `GuestRun` is tested in the test process (`sandboxGuest.test.ts`).
+- A backup restore turns Code Mode off (`turnCodeModeOff()`, `backupService.ts`), as it deletes the API tokens.
+- Tests: `sandbox.test.ts` (hostile code through real workers: loops, a native search, getters and `toJSON` that loop,
+  a `then` of the guest, memory measured in the worker, recursion, globals, prototypes, promises that never settle,
+  host calls, concurrency; each checks that the event loop kept turning) and `codeMode.test.ts` (through the MCP
+  endpoint: the setting, `search`, `execute`, requests outside the reach above, a full sandbox).
 
 ### Translations
 
@@ -383,7 +427,7 @@ nginx (`frontend/nginx.conf.template`) limits the whole multipart body, so its `
 
 ## Dependencies
 
-**Runtime**: express 5, express-rate-limit, bcryptjs, cors, helmet, morgan, jsonwebtoken, multer, @modelcontextprotocol/server (MCP endpoint), sharp (photo copies; libvips prebuilt in its optional `@img/sharp-<platform>` packages, no install script), archiver and adm-zip (backups), i18next, i18next-http-middleware, dotenv, zod 4, yaml (front matter of the release notes)
+**Runtime**: express 5, express-rate-limit, bcryptjs, cors, helmet, morgan, jsonwebtoken, multer, @modelcontextprotocol/server (MCP endpoint), quickjs-emscripten-core and @jitl/quickjs-wasmfile-release-sync (Code Mode sandbox, WebAssembly: no native binary, no install script; run in worker threads), sharp (photo copies; libvips prebuilt in its optional `@img/sharp-<platform>` packages, no install script), archiver and adm-zip (backups), i18next, i18next-http-middleware, dotenv, zod 4, yaml (front matter of the release notes)
 **Runtime (database)**: @prisma/client 7, @prisma/adapter-better-sqlite3 7, better-sqlite3 12 (native module, prebuilt for linux x64/arm64 musl), prisma 7 (the CLI applies the migrations when the container starts)
 **Dev**: typescript 5.9, tsx, eslint 10, typescript-eslint, prettier 3, vitest, supertest, @seriousme/openapi-schema-validator (OpenAPI 3.1 check of the generated document), @modelcontextprotocol/client (MCP tests)
 

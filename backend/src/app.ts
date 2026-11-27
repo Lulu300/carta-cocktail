@@ -73,12 +73,14 @@ const apiLimiter = createRateLimiter({
 });
 app.use('/api', apiLimiter);
 // Routes an API token may never call, whatever its scope (F-16): the tokens themselves, the
-// admin account, signing out everywhere and the backups (a backup holds the password hash,
-// a restore replaces everything). Matched by Express like the routers below, case and
-// trailing slash included. Before the body parsers: refused without reading the body.
+// admin account, signing out everywhere, the backups (a backup holds the password hash,
+// a restore replaces everything) and Code Mode of the MCP server (it runs a token's code on the
+// server). Matched by Express like the routers below, case and trailing slash included. Before
+// the body parsers: refused without reading the body.
 const SESSION_ONLY_ROUTES = [
   '/api/api-tokens',
   '/api/settings/profile',
+  '/api/settings/code-mode',
   '/api/auth/logout-all',
   '/api/backup',
 ];

@@ -24,6 +24,7 @@ import {
 import Alert from '../../components/ui/Alert';
 import EmbedMenuSettings from '../../components/admin/EmbedMenuSettings';
 import ApiTokenSettings from '../../components/admin/ApiTokenSettings';
+import CodeModeSettings from '../../components/admin/CodeModeSettings';
 
 const ICON_OPTIONS = [
   '',
@@ -114,6 +115,7 @@ export default function SettingsPage() {
   const [siteName, setSiteName] = useState('');
   const [siteIcon, setSiteIcon] = useState('');
   const [embedOrigins, setEmbedOrigins] = useState<string[]>([]);
+  const [codeModeEnabled, setCodeModeEnabled] = useState(false);
   const [siteLoading, setSiteLoading] = useState(true);
   const [siteMessage, setSiteMessage] = useState('');
   const [siteError, setSiteError] = useState('');
@@ -154,6 +156,7 @@ export default function SettingsPage() {
         setSiteName(data.siteName);
         setSiteIcon(data.siteIcon);
         setEmbedOrigins(data.embedOrigins);
+        setCodeModeEnabled(data.codeModeEnabled);
         setSiteLoading(false);
       })
       .catch(() => setSiteLoading(false));
@@ -450,6 +453,8 @@ export default function SettingsPage() {
       </form>
 
       <ApiTokenSettings />
+
+      <CodeModeSettings initialEnabled={codeModeEnabled} />
 
       {/* Backup & Restore */}
       <div className="bg-surface border border-line rounded-xl p-6">

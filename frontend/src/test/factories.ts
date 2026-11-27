@@ -534,7 +534,13 @@ export function buildSiteSettings(overrides: Partial<SiteSettings> = {}): SiteSe
 export function buildAdminSiteSettings(
   overrides: Partial<AdminSiteSettings> = {},
 ): AdminSiteSettings {
-  return { ...buildSiteSettings(), id: 1, embedOrigins: [], ...overrides };
+  return {
+    ...buildSiteSettings(),
+    id: 1,
+    embedOrigins: [],
+    codeModeEnabled: false,
+    ...overrides,
+  };
 }
 
 /** A token as GET /api/api-tokens lists it: never its secret. Read only, never used. */

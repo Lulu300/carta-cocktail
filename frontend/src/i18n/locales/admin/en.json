@@ -505,6 +505,18 @@
       "confirmRevoke": "Scripts and MCP clients that use \"{{name}}\" will be refused from now on. This cannot be undone.",
       "revoked": "Token revoked"
     },
+    "codeMode": {
+      "title": "MCP server: Code Mode",
+      "description": "Code Mode adds two tools to the MCP server (/api/mcp), search and execute: the AI agent writes JavaScript that searches the documentation of the API or calls the API, and the server runs it. Off by default.",
+      "warningTitle": "Code written by the agent runs on this server",
+      "warning": "It runs in a sandbox (QuickJS in WebAssembly), without file system, network or access to the server, and its time, memory and number of API requests are limited. It has the rights of the agent's token: a read-only token only reads, a read and write token can change your recipes, stock and menus. It can never delete anything, nor use the tokens, the account or the backups. Turn it on only for agents you trust, with read-only tokens when they do not need to write.",
+      "toggle": "Code Mode",
+      "confirmTitle": "Turn on Code Mode",
+      "confirmEnable": "The agents connected to the MCP server will be able to run code on this server, with the rights of their token. Continue?",
+      "enable": "Turn on",
+      "enabled": "Code Mode is on: MCP clients get search and execute at their next request.",
+      "disabled": "Code Mode is off: MCP clients no longer get search and execute."
+    },
     "backup": {
       "title": "Backup & Restore",
       "description": "Export a complete backup of your database and images, or restore from a previous backup.",

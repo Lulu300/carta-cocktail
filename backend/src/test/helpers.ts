@@ -4,6 +4,11 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import supertest from 'supertest';
 import { expect } from 'vitest';
+import {
+  Client,
+  type ClientOptions,
+  StreamableHTTPClientTransport,
+} from '@modelcontextprotocol/client';
 import type { z } from 'zod';
 import { Prisma } from '../generated/prisma/client';
 import app from '../app';
@@ -49,6 +54,22 @@ export async function listenOnLoopback(
       server.close();
     },
   };
+}
+
+/**
+ * An MCP client of `endpoint` (the app listening on loopback), connected with `headers`. It is
+ * added to `clients` before it connects: the test closes them all, those that failed included.
+ */
+export async function connectMcpClient(
+  endpoint: URL,
+  headers: Record<string, string>,
+  clients: Client[],
+  options: ClientOptions = {},
+): Promise<Client> {
+  const client = new Client({ name: 'carta-test', version: '1.0.0' }, options);
+  clients.push(client);
+  await client.connect(new StreamableHTTPClientTransport(endpoint, { requestInit: { headers } }));
+  return client;
 }
 
 /**
