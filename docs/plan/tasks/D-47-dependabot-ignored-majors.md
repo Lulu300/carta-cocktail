@@ -10,8 +10,8 @@ owner: mixed
 depends_on: [C-15, D-21]
 touches: [AGENTS.md, README.md, docs/plan/README.md, backend/package.json, backend/package-lock.json, frontend/package.json, frontend/package-lock.json, .github/dependabot.yml, .nvmrc, backend/Dockerfile, frontend/Dockerfile]
 sources: []
-branch:
-pr:
+branch: chore/D-47-node-26
+pr: 296
 ---
 
 ## Contexte
