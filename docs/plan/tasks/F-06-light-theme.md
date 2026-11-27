@@ -11,7 +11,7 @@ depends_on: [E-03, E-09]
 touches: [frontend/src/index.css, frontend/src/components/, frontend/index.html, frontend/public/theme-init.js, frontend/vite.config.ts, .github/scripts/bundle-budget.mjs]
 sources: ["06-frontend-ux-perf.md §2"]
 branch: feature/F-06-light-theme
-pr: 
+pr: 292
 ---
 
 ## Contexte
