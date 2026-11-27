@@ -12,6 +12,7 @@ import type {
 
 export { MENU_TYPES, SOURCE_KEYS, SOURCE_TYPES } from './generated';
 export type {
+  AdminSiteSettings,
   Bottle,
   BottleInput,
   BottleUpdateInput,

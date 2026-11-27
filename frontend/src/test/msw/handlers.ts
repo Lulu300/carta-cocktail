@@ -15,6 +15,7 @@ import {
   buildPublicMenu,
   buildPublicMenuSummary,
   buildSiteSettings,
+  buildAdminSiteSettings,
   buildUnit,
 } from '../factories';
 
@@ -264,7 +265,7 @@ const stockHandlers = [
 ];
 
 const settingsHandlers = [
-  http.get('/api/settings', () => HttpResponse.json(buildSiteSettings())),
+  http.get('/api/settings', () => HttpResponse.json(buildAdminSiteSettings())),
   http.put('/api/settings', async ({ request }) =>
     HttpResponse.json({ ...(await readJsonObject(request)), id: 1 }),
   ),

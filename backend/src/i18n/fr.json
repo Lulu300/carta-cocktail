@@ -41,6 +41,12 @@
     "importUnresolved": "La recette ne peut pas être importée : certaines unités, bouteilles, catégories ou certains ingrédients ne sont ni associés à un élément existant ni créés (une nouvelle bouteille a aussi besoin de sa catégorie)",
     "ambiguousCategoryName": "Plusieurs catégories correspondent à « {{name}} » sans tenir compte de la casse, et aucune exactement : {{matches}}. Utilisez l’une d’elles, ou renommez-les pour que leurs noms diffèrent autrement que par la casse",
     "ambiguousUnitAbbreviation": "Plusieurs unités correspondent à l’abréviation « {{name}} » sans tenir compte de la casse, et aucune exactement : {{matches}}. Utilisez l’une d’elles, ou changez leurs abréviations pour qu’elles diffèrent autrement que par la casse",
+    "embedOrigin": {
+      "notAnOrigin": "« {{origin}} » n’est pas une adresse de site : écrivez-la sous la forme https://www.exemple.fr, sans chemin",
+      "wildcard": "« {{origin}} » : le joker * n’est pas accepté, indiquez chaque site en entier",
+      "insecure": "« {{origin}} » utilise http:// : seuls les sites en https:// peuvent intégrer la carte (http:// est accepté pour localhost et 127.0.0.1 uniquement)",
+      "tooMany": "{{max, number}} sites au plus peuvent intégrer la carte"
+    },
     "import": {
       "missingColumn": "Le fichier CSV doit avoir une colonne name et une colonne capacityMl",
       "malformedHeader": "Les noms de colonnes de {{file}} (sa première ligne) contiennent un guillemet mal placé",

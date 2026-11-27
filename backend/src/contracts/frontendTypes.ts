@@ -48,6 +48,7 @@ export type PublicMenuCocktail = z.output<typeof publicResponses.PublicMenuCockt
 export type PublicMenuBottle = z.output<typeof publicResponses.PublicMenuBottle>;
 export type PublicMenu = z.output<typeof publicResponses.PublicMenu>;
 export type SiteSettings = z.output<typeof settings.SiteSettings>;
+export type AdminSiteSettings = z.output<typeof settings.AdminSiteSettings>;
 export type DeletionImpact = z.output<typeof common.DeletionImpact>;
 export type DeletionResponse = z.output<typeof common.DeletionResponse>;
 

@@ -9,6 +9,7 @@ import { buildPublicCocktailSelect, CATEGORY_PUBLIC_SELECT } from '../services/c
 import { exportCocktail } from '../services/cocktail/cocktailExport';
 import { previewImageName } from '../services/cocktail/imageVariants';
 import { getOrCreateSettings } from '../services/settingsService';
+import { EMBED_ORIGINS_HEADER, parseEmbedOrigins } from '../services/embedOrigins';
 import { renderSharePage } from '../services/sharePreview';
 import { config } from '../config';
 
@@ -131,6 +132,15 @@ router.get('/menus/:slug', async (req: AuthRequest, res: Response) => {
 router.get('/settings', async (_req: Request, res: Response) => {
   const settings = await getOrCreateSettings();
   res.json({ siteName: settings.siteName, siteIcon: settings.siteIcon });
+});
+
+// Sites allowed to show the public menu in an iframe, for nginx: it asks on each load of a
+// /menu/ page (auth_request in frontend/nginx.conf.template) and copies the header into the
+// frame-ancestors directive of that page. Empty when no site is allowed. Not secret: every
+// /menu/ page sends the same list in its CSP.
+router.get('/embed-origins', async (_req: Request, res: Response) => {
+  const { embedOrigins } = await getOrCreateSettings();
+  res.set(EMBED_ORIGINS_HEADER, parseEmbedOrigins(embedOrigins).join(' ')).status(204).end();
 });
 
 // Export public cocktail as JSON

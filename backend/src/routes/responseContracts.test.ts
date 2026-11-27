@@ -24,7 +24,7 @@ import { DeletionResponse, MessageResponse } from '../validation/common';
 import { Bottle } from '../validation/bottles';
 import { Cocktail, CocktailRow } from '../validation/cocktails';
 import { PublicCocktail, PublicMenu, PublicMenuSummary } from '../validation/public';
-import { SiteSettings } from '../validation/settings';
+import { AdminSiteSettings, SiteSettings } from '../validation/settings';
 import { Unit } from '../validation/units';
 
 /*
@@ -152,6 +152,20 @@ describe('response contracts of the public routes', () => {
 
     expect(res.status).toBe(200);
     expectContract(SiteSettings, res.body);
+  });
+
+  it('GET and PUT /api/settings answer AdminSiteSettings', async () => {
+    const read = await request.get('/api/settings').set(authHeader());
+    const saved = await request
+      .put('/api/settings')
+      .set(authHeader())
+      .send({ embedOrigins: ['https://www.mon-bar.fr'] });
+
+    expect([read.status, saved.status]).toEqual([200, 200]);
+    expectContract(AdminSiteSettings, read.body);
+    expect(expectContract(AdminSiteSettings, saved.body).embedOrigins).toEqual([
+      'https://www.mon-bar.fr',
+    ]);
   });
 
   it('GET /api/public/units answers Unit[]', async () => {

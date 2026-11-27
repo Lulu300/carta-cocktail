@@ -247,6 +247,14 @@ export type SiteSettings = {
   siteIcon: string;
 };
 
+export type AdminSiteSettings = {
+  siteName: string;
+  siteIcon: string;
+  id: number;
+  /** Sites allowed to show the public menu in an iframe, e.g. "https://www.mon-bar.fr". */
+  embedOrigins: string[];
+};
+
 export type DeletionImpact = {
   /** Recipes that use the item: a forced deletion removes `removedLines` lines from each. */
   cocktails: {

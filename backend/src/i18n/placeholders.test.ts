@@ -12,6 +12,7 @@ import {
   seedUnit,
 } from '../test/helpers';
 import { messageAt, placeholders, type Messages } from '../test/messages';
+import { MAX_EMBED_ORIGINS } from '../services/embedOrigins';
 import { MAX_ZIP_ENTRY_BYTES } from '../utils/bottlesImport';
 import { MAX_IMPORT_BOTTLES, MAX_IMPORT_ROWS } from '../validation/bottleImport';
 import en from './en.json';
@@ -40,8 +41,23 @@ const previewBottles = (file: Buffer, filename: string, language: Language) =>
 const csvOfRows = (rows: string[]) =>
   Buffer.from(['name,categoryName,capacityMl', ...rows].join('\n'));
 
+const putEmbedOrigins = (embedOrigins: string[], language: Language) =>
+  request
+    .put('/api/settings')
+    .set(authHeader())
+    .set('Accept-Language', language)
+    .send({ embedOrigins });
+
 /** Each case makes the real code throw the error of one message that has placeholders. */
 const CASES: Record<string, (language: Language) => Promise<Response>> = {
+  'errors.embedOrigin.notAnOrigin': (language) => putEmbedOrigins(['bar.example'], language),
+  'errors.embedOrigin.wildcard': (language) => putEmbedOrigins(['https://*.example'], language),
+  'errors.embedOrigin.insecure': (language) => putEmbedOrigins(['http://bar.example'], language),
+  'errors.embedOrigin.tooMany': (language) =>
+    putEmbedOrigins(
+      Array.from({ length: MAX_EMBED_ORIGINS + 1 }, (_, i) => `https://site${i}.example`),
+      language,
+    ),
   'errors.import.malformedHeader': (language) => {
     const zip = new AdmZip();
     zip.addFile('bottles.csv', Buffer.from('name,capacityMl\nHavana,700'));
