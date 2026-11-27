@@ -1,5 +1,5 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import { system as systemApi } from '../services/api';
+import { openApi, system as systemApi } from '../services/api';
 import type { UpgradeNotice } from '../types';
 import { useEntityMutation, type EntityMutation } from './crud';
 import { qk } from './keys';
@@ -9,6 +9,14 @@ export function useUpgradeNotice(): UseQueryResult<UpgradeNotice | null, Error> 
   return useQuery({
     queryKey: qk.upgradeNotice,
     queryFn: ({ signal }) => systemApi.getUpgradeNotice(signal),
+  });
+}
+
+/** The OpenAPI document of every route, for the API page. */
+export function useOpenApiDocument(): UseQueryResult<Record<string, unknown>, Error> {
+  return useQuery({
+    queryKey: qk.openApiDocument,
+    queryFn: ({ signal }) => openApi.getDocument(signal),
   });
 }
 

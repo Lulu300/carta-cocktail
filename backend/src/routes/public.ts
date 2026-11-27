@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { z } from 'zod';
 import { Prisma } from '../generated/prisma/client';
 import { prisma } from '../lib/prisma';
 import { parseNameTranslations } from '../utils/translations';
@@ -12,8 +13,23 @@ import { getOrCreateSettings } from '../services/settingsService';
 import { EMBED_ORIGINS_HEADER, parseEmbedOrigins } from '../services/embedOrigins';
 import { renderSharePage } from '../services/sharePreview';
 import { config } from '../config';
+import { apiDocs, excludedFromApiDocs } from '../openapi/routeDoc';
+import { IdParams } from '../validation/common';
+import { CocktailExportFormat } from '../validation/cocktailImport';
+import { MenuSummary } from '../validation/menus';
+import { PublicCocktail, PublicMenu } from '../validation/public';
+import { SiteSettings } from '../validation/settings';
+import { Unit } from '../validation/units';
 
 const router = Router();
+const doc = apiDocs('Public');
+
+// An invalid id answers 404 like an unknown one: a guest learns nothing about which ids exist
+const COCKTAIL_NOT_FOUND =
+  'No cocktail visible in a published menu has this id (any cocktail for the admin).';
+const ADMIN_PREVIEW = 'With the admin token, also the private fields (preview).';
+const SHARE_PAGE_EXCLUSION =
+  'Link preview page (HTML) that nginx serves to the robots of messaging apps on /menu/ (task F-03): not an API for clients.';
 
 // Bottles of a bottle menu: inventory fields stay on the server (see includes.ts)
 const MENU_BOTTLE_PUBLIC_SELECT = {
@@ -74,110 +90,185 @@ async function withPublicAvailability<T extends { id: number; isAvailable: boole
 
 router.use(optionalAuth);
 
-// List all public menus
-router.get('/menus', async (_req: Request, res: Response) => {
-  const menus = await prisma.menu.findMany({
-    where: { isPublic: true },
-    include: {
-      _count: {
-        select: {
-          cocktails: { where: VISIBLE_MENU_COCKTAIL_WHERE },
-          bottles: { where: VISIBLE_MENU_BOTTLE_WHERE },
+router.get(
+  '/menus',
+  doc({
+    operationId: 'listPublicMenus',
+    summary: 'List the published menus',
+    description: 'With their number of visible items, the most recently updated first.',
+    responses: { 200: z.array(MenuSummary) },
+  }),
+  async (_req: Request, res: Response) => {
+    const menus = await prisma.menu.findMany({
+      where: { isPublic: true },
+      include: {
+        _count: {
+          select: {
+            cocktails: { where: VISIBLE_MENU_COCKTAIL_WHERE },
+            bottles: { where: VISIBLE_MENU_BOTTLE_WHERE },
+          },
         },
       },
-    },
-    orderBy: { updatedAt: 'desc' },
-  });
-  res.json(menus);
-});
+      orderBy: { updatedAt: 'desc' },
+    });
+    res.json(menus);
+  },
+);
 
-// Get public menu by slug (or admin preview)
-router.get('/menus/:slug', async (req: AuthRequest, res: Response) => {
-  const isAdmin = isAdminRequest(req);
-  const menu = await prisma.menu.findUnique({
-    where: { slug: String(req.params.slug) },
-    include: {
-      sections: {
-        orderBy: { position: 'asc' },
-      },
-      cocktails: {
-        where: VISIBLE_MENU_COCKTAIL_WHERE,
-        include: {
-          cocktail: { select: buildPublicCocktailSelect(isAdmin) },
+router.get(
+  '/menus/:slug',
+  doc({
+    operationId: 'getPublicMenu',
+    summary: 'Get a published menu',
+    description: `Its sections and its visible items; empty bottles are left out. The admin also gets an unpublished menu (preview). ${ADMIN_PREVIEW}`,
+    responses: { 200: PublicMenu },
+    errors: { 404: 'No published menu has this slug (no menu at all for the admin).' },
+  }),
+  async (req: AuthRequest, res: Response) => {
+    const isAdmin = isAdminRequest(req);
+    const menu = await prisma.menu.findUnique({
+      where: { slug: String(req.params.slug) },
+      include: {
+        sections: {
+          orderBy: { position: 'asc' },
         },
-        orderBy: { position: 'asc' },
-      },
-      bottles: {
-        where: VISIBLE_MENU_BOTTLE_WHERE,
-        include: {
-          bottle: { select: MENU_BOTTLE_PUBLIC_SELECT },
+        cocktails: {
+          where: VISIBLE_MENU_COCKTAIL_WHERE,
+          include: {
+            cocktail: { select: buildPublicCocktailSelect(isAdmin) },
+          },
+          orderBy: { position: 'asc' },
         },
-        orderBy: { position: 'asc' },
+        bottles: {
+          where: VISIBLE_MENU_BOTTLE_WHERE,
+          include: {
+            bottle: { select: MENU_BOTTLE_PUBLIC_SELECT },
+          },
+          orderBy: { position: 'asc' },
+        },
       },
-    },
-  });
+    });
 
-  // Unpublished menus are only visible to a verified admin (preview)
-  if (!menu || (!menu.isPublic && !isAdmin)) throw new NotFoundError();
+    // Unpublished menus are only visible to a verified admin (preview)
+    if (!menu || (!menu.isPublic && !isAdmin)) throw new NotFoundError();
 
-  const cocktails = await withPublicAvailability(menu.cocktails.map(({ cocktail }) => cocktail));
-  const menuCocktails = menu.cocktails.map((menuCocktail, index) => ({
-    ...menuCocktail,
-    cocktail: cocktails[index],
-  }));
-  res.json(parseNameTranslations({ ...menu, cocktails: menuCocktails }));
-});
+    const cocktails = await withPublicAvailability(menu.cocktails.map(({ cocktail }) => cocktail));
+    const menuCocktails = menu.cocktails.map((menuCocktail, index) => ({
+      ...menuCocktail,
+      cocktail: cocktails[index],
+    }));
+    res.json(parseNameTranslations({ ...menu, cocktails: menuCocktails }));
+  },
+);
 
-// Get site settings (public)
-router.get('/settings', async (_req: Request, res: Response) => {
-  const settings = await getOrCreateSettings();
-  res.json({ siteName: settings.siteName, siteIcon: settings.siteIcon });
-});
+router.get(
+  '/settings',
+  doc({
+    operationId: 'getPublicSiteSettings',
+    summary: 'Get the name and the icon of the site',
+    responses: { 200: SiteSettings },
+  }),
+  async (_req: Request, res: Response) => {
+    const settings = await getOrCreateSettings();
+    res.json({ siteName: settings.siteName, siteIcon: settings.siteIcon });
+  },
+);
 
 // Sites allowed to show the public menu in an iframe, for nginx: it asks on each load of a
 // /menu/ page (auth_request in frontend/nginx.conf.template) and copies the header into the
 // frame-ancestors directive of that page. Empty when no site is allowed. Not secret: every
 // /menu/ page sends the same list in its CSP.
-router.get('/embed-origins', async (_req: Request, res: Response) => {
-  const { embedOrigins } = await getOrCreateSettings();
-  res.set(EMBED_ORIGINS_HEADER, parseEmbedOrigins(embedOrigins).join(' ')).status(204).end();
-});
+router.get(
+  '/embed-origins',
+  doc({
+    operationId: 'getEmbedOrigins',
+    summary: 'Get the sites allowed to show the menu in a frame',
+    description:
+      'Asked by nginx on each load of a /menu/ page. Not secret: the CSP of the page sends the same list.',
+    responses: {
+      204: {
+        description: 'The list is in the header.',
+        headers: {
+          [EMBED_ORIGINS_HEADER]: 'The allowed origins, separated by spaces; empty when none.',
+        },
+      },
+    },
+  }),
+  async (_req: Request, res: Response) => {
+    const { embedOrigins } = await getOrCreateSettings();
+    res.set(EMBED_ORIGINS_HEADER, parseEmbedOrigins(embedOrigins).join(' ')).status(204).end();
+  },
+);
 
-// Export public cocktail as JSON
-router.get('/cocktails/:id/export', async (req: AuthRequest, res: Response) => {
-  const id = parseCocktailId(req.params.id);
-  if (id === null) throw new NotFoundError();
+router.get(
+  '/cocktails/:id/export',
+  doc({
+    operationId: 'exportPublicCocktail',
+    summary: 'Export a cocktail as a JSON file',
+    description: `The file the admin imports. ${ADMIN_PREVIEW}`,
+    pathParams: IdParams,
+    responses: {
+      200: {
+        description: 'The recipe, as a file to save.',
+        content: { 'application/json': CocktailExportFormat },
+        headers: { 'Content-Disposition': 'attachment; filename="<cocktail name>.json"' },
+      },
+    },
+    errors: { 404: COCKTAIL_NOT_FOUND },
+  }),
+  async (req: AuthRequest, res: Response) => {
+    const id = parseCocktailId(req.params.id);
+    if (id === null) throw new NotFoundError();
 
-  const isAdmin = isAdminRequest(req);
-  const exported = await exportCocktail(buildPublicCocktailWhere(id, isAdmin), {
-    includePrivate: isAdmin,
-  });
-  if (!exported) throw new NotFoundError();
-  res.attachment(exported.filename).json(exported.payload);
-});
+    const isAdmin = isAdminRequest(req);
+    const exported = await exportCocktail(buildPublicCocktailWhere(id, isAdmin), {
+      includePrivate: isAdmin,
+    });
+    if (!exported) throw new NotFoundError();
+    res.attachment(exported.filename).json(exported.payload);
+  },
+);
 
-// List all units (public, needed for unit conversion on public pages)
-router.get('/units', async (_req: Request, res: Response) => {
-  const units = await prisma.unit.findMany({ orderBy: { name: 'asc' } });
-  res.json(parseNameTranslations(units));
-});
+router.get(
+  '/units',
+  doc({
+    operationId: 'listPublicUnits',
+    summary: 'List the units',
+    description: 'The public pages convert the quantities of the recipes with them.',
+    responses: { 200: z.array(Unit) },
+  }),
+  async (_req: Request, res: Response) => {
+    const units = await prisma.unit.findMany({ orderBy: { name: 'asc' } });
+    res.json(parseNameTranslations(units));
+  },
+);
 
-// Get public cocktail detail
-router.get('/cocktails/:id', async (req: AuthRequest, res: Response) => {
-  const id = parseCocktailId(req.params.id);
-  if (id === null) throw new NotFoundError();
+router.get(
+  '/cocktails/:id',
+  doc({
+    operationId: 'getPublicCocktail',
+    summary: 'Get a cocktail of a published menu',
+    description: `Its recipe and whether it is available (switch on and enough stock). ${ADMIN_PREVIEW}`,
+    pathParams: IdParams,
+    responses: { 200: PublicCocktail },
+    errors: { 404: COCKTAIL_NOT_FOUND },
+  }),
+  async (req: AuthRequest, res: Response) => {
+    const id = parseCocktailId(req.params.id);
+    if (id === null) throw new NotFoundError();
 
-  const isAdmin = isAdminRequest(req);
-  const cocktail = await prisma.cocktail.findFirst({
-    where: buildPublicCocktailWhere(id, isAdmin),
-    select: buildPublicCocktailSelect(isAdmin),
-  });
+    const isAdmin = isAdminRequest(req);
+    const cocktail = await prisma.cocktail.findFirst({
+      where: buildPublicCocktailWhere(id, isAdmin),
+      select: buildPublicCocktailSelect(isAdmin),
+    });
 
-  if (!cocktail) throw new NotFoundError();
+    if (!cocktail) throw new NotFoundError();
 
-  const [publicCocktail] = await withPublicAvailability([cocktail]);
-  res.json(parseNameTranslations(publicCocktail));
-});
+    const [publicCocktail] = await withPublicAvailability([cocktail]);
+    res.json(parseNameTranslations(publicCocktail));
+  },
+);
 
 /** What a link preview shows of a menu or a cocktail. */
 interface SharedPage {
@@ -214,45 +305,53 @@ async function sendSharePage(req: Request, res: Response, page: SharedPage, page
 // Link previews of /menu/:slug and /menu/:slug/cocktail/:id. nginx sends the preview robots of
 // messaging apps here (frontend/nginx.conf.template). Guest rules only, even with an admin
 // token: an unpublished menu, a hidden item or a cocktail outside the menu answers 404.
-router.get('/share/menu/:slug', async (req: Request, res: Response) => {
-  const slug = String(req.params.slug);
-  const menu = await prisma.menu.findFirst({
-    where: { slug, isPublic: true },
-    select: {
-      name: true,
-      description: true,
-      // The photo of the first illustrated cocktail stands for the menu
-      cocktails: {
-        where: { ...VISIBLE_MENU_COCKTAIL_WHERE, cocktail: { imagePath: { not: null } } },
-        orderBy: { position: 'asc' },
-        take: 1,
-        select: { cocktail: { select: { imagePath: true } } },
+router.get(
+  '/share/menu/:slug',
+  excludedFromApiDocs(SHARE_PAGE_EXCLUSION),
+  async (req: Request, res: Response) => {
+    const slug = String(req.params.slug);
+    const menu = await prisma.menu.findFirst({
+      where: { slug, isPublic: true },
+      select: {
+        name: true,
+        description: true,
+        // The photo of the first illustrated cocktail stands for the menu
+        cocktails: {
+          where: { ...VISIBLE_MENU_COCKTAIL_WHERE, cocktail: { imagePath: { not: null } } },
+          orderBy: { position: 'asc' },
+          take: 1,
+          select: { cocktail: { select: { imagePath: true } } },
+        },
       },
-    },
-  });
-  if (!menu) throw new NotFoundError();
+    });
+    if (!menu) throw new NotFoundError();
 
-  const imagePath = menu.cocktails[0]?.cocktail.imagePath ?? null;
-  await sendSharePage(req, res, { ...menu, imagePath }, `/menu/${encodeURIComponent(slug)}`);
-});
+    const imagePath = menu.cocktails[0]?.cocktail.imagePath ?? null;
+    await sendSharePage(req, res, { ...menu, imagePath }, `/menu/${encodeURIComponent(slug)}`);
+  },
+);
 
-router.get('/share/menu/:slug/cocktail/:id', async (req: Request, res: Response) => {
-  const id = parseCocktailId(req.params.id);
-  if (id === null) throw new NotFoundError();
+router.get(
+  '/share/menu/:slug/cocktail/:id',
+  excludedFromApiDocs(SHARE_PAGE_EXCLUSION),
+  async (req: Request, res: Response) => {
+    const id = parseCocktailId(req.params.id);
+    if (id === null) throw new NotFoundError();
 
-  const slug = String(req.params.slug);
-  const menuCocktail = await prisma.menuCocktail.findFirst({
-    where: { ...VISIBLE_MENU_COCKTAIL_WHERE, cocktailId: id, menu: { slug, isPublic: true } },
-    select: { cocktail: { select: { name: true, description: true, imagePath: true } } },
-  });
-  if (!menuCocktail) throw new NotFoundError();
+    const slug = String(req.params.slug);
+    const menuCocktail = await prisma.menuCocktail.findFirst({
+      where: { ...VISIBLE_MENU_COCKTAIL_WHERE, cocktailId: id, menu: { slug, isPublic: true } },
+      select: { cocktail: { select: { name: true, description: true, imagePath: true } } },
+    });
+    if (!menuCocktail) throw new NotFoundError();
 
-  await sendSharePage(
-    req,
-    res,
-    menuCocktail.cocktail,
-    `/menu/${encodeURIComponent(slug)}/cocktail/${id}`,
-  );
-});
+    await sendSharePage(
+      req,
+      res,
+      menuCocktail.cocktail,
+      `/menu/${encodeURIComponent(slug)}/cocktail/${id}`,
+    );
+  },
+);
 
 export default router;

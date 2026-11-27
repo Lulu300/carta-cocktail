@@ -75,6 +75,7 @@ backend/
 │   │   ├── menuBottles.ts    # /api/menu-bottles + sync and exclusions of system menus
 │   │   ├── menuSections.ts   # /api/menu-sections + reorder
 │   │   ├── menus.ts          # CRUD /api/menus
+│   │   ├── openapi.ts        # GET /api/openapi.json (public routes), GET /api/openapi/full.json (admin)
 │   │   ├── public.ts         # Public read-only endpoints (no auth), link preview pages (/share/menu/...), embedding sites for nginx (/embed-origins)
 │   │   ├── settings.ts       # GET/PUT site settings + admin profile
 │   │   ├── shortages.ts      # GET /api/shortages
@@ -103,6 +104,9 @@ backend/
 │   │   ├── html.ts           # escapeHtml(): every value inserted in HTML
 │   │   └── ...               # importDates, records, storedNames, uniqueness
 │   ├── validation/           # zod schemas of requests and responses, one file per resource, validate() and valid()
+│   │                         # (errors.ts: the error body of errorHandler)
+│   ├── openapi/              # OpenAPI 3.1 document: route declarations (routeDoc.ts), routes read from the app
+│   │                         # (operations.ts, mounts.ts), zod to JSON Schema (jsonSchemas.ts), the document (document.ts)
 │   ├── contracts/            # Types generated for the frontend from the schemas (npm run contracts:generate)
 │   ├── test/                 # Test helpers, factories, database lifecycle (globalSetup, setup)
 │   └── i18n/
@@ -238,6 +242,55 @@ router.put('/:id', validate(updateSchemas), async (_req, res) => {
   is out of date: after a schema change, run the script and commit both.
 - The frontend never imports zod schemas from here: it validates its forms with its own rules.
 
+### OpenAPI document (F-14)
+
+Every route declares its documentation in the route itself, with the middleware `doc()` built by
+`apiDocs(tag)` (`src/openapi/routeDoc.ts`), which does nothing but carry it:
+
+```typescript
+const doc = apiDocs('Units');
+
+router.get(
+  '/:id',
+  doc({
+    operationId: 'getUnit',
+    summary: 'Get a unit',
+    responses: { 200: Unit },
+    errors: { 404: 'No unit has this id.' },
+  }),
+  validate(idRequest),
+  async (_req, res) => {
+    /* ... */
+  },
+);
+```
+
+- The rest comes from the app as Express runs it (`collectApiRoutes()`, `src/openapi/operations.ts`):
+  the method and the path, the request schemas of `validate()`, the access (`authMiddleware`,
+  `optionalAuth`) and the rate limits (`createRateLimiter()`) of the middleware in front of the
+  route. Mount every router with `mountApiRouter(app, path, ...middleware, router)` (`app.ts`):
+  Express keeps no trace of a mount path, and a router mounted with `app.use` makes the document fail.
+- `responses`: a zod schema answers JSON; `{ description, content, headers }` anything else (a
+  file, CSV, no body for a 204). `errors`: the statuses of the route itself and what they mean
+  there; 400 (validation), 401 (token), 413 (body) and 429 (limit) follow from the middleware.
+  A file sent as `multipart/form-data` is declared with `upload` and its limit constant (see File
+  Uploads). A route that `validate()` does not check (`routes/public.ts`) declares `pathParams`.
+- Response schemas exported by `src/validation/` become components named after their export
+  (`Unit`, `PublicMenu`); request schemas are written in full (`io: 'input'`). zod 4's own
+  `z.toJSONSchema` converts them: no other library. Every error answer refers to the one
+  `ApiError` schema (`validation/errors.ts`). The document is in English.
+- `GET /api/openapi.json` answers the routes a client can call without a session (public, or with
+  an optional token): `/api/public/*`, the sign-in, the health check and the document itself.
+  `GET /api/openapi/full.json` answers every route, to the admin. Two URLs, so that no cache mixes
+  them up. A route left out on purpose (the link preview pages of `/api/public/share/`, HTML for
+  robots) is declared with `excludedFromApiDocs(reason)`.
+- Tests: `src/openapi/openapi.test.ts` fails when a route has no declaration, when the excluded
+  routes change, or when the document is not a valid OpenAPI 3.1 document
+  (`@seriousme/openapi-schema-validator`); `src/openapi/documentedResponses.test.ts` checks real
+  answers against the declaration of their route (`expectDocumentedResponse()`,
+  `src/test/documentedResponse.ts`), at least one route of each route file. A new route gets its
+  declaration, and a new route file a request in that test.
+
 ### Translations
 
 Entity names support multi-language via JSON strings stored in SQLite (`'{"fr": "Rhum", "en": "Rum"}'`).
@@ -299,7 +352,7 @@ nginx (`frontend/nginx.conf.template`) limits the whole multipart body, so its `
 
 **Runtime**: express 5, express-rate-limit, bcryptjs, cors, helmet, morgan, jsonwebtoken, multer, sharp (photo copies; libvips prebuilt in its optional `@img/sharp-<platform>` packages, no install script), archiver and adm-zip (backups), i18next, i18next-http-middleware, dotenv, zod 4, yaml (front matter of the release notes)
 **Runtime (database)**: @prisma/client 7, @prisma/adapter-better-sqlite3 7, better-sqlite3 12 (native module, prebuilt for linux x64/arm64 musl), prisma 7 (the CLI applies the migrations when the container starts)
-**Dev**: typescript 5.9, tsx, eslint 10, typescript-eslint, prettier 3, vitest, supertest
+**Dev**: typescript 5.9, tsx, eslint 10, typescript-eslint, prettier 3, vitest, supertest, @seriousme/openapi-schema-validator (OpenAPI 3.1 check of the generated document)
 
 **Install scripts**: npm 12 skips the install scripts of dependencies that `allowScripts` in `package.json` does not list (npm 11.19 only warns). Only `better-sqlite3` is allowed: without its script the native binary is missing. `esbuild`, `prisma`, `@prisma/engines` and `fsevents` are denied (`false`): their binaries come from platform packages or from `prisma generate` (the project `postinstall`). Keys have no version, so a Dependabot bump keeps working. A new dependency whose script is needed must be added to `allowScripts` (`npm install-scripts approve <pkg> --no-allow-scripts-pin`), otherwise denied (`npm install-scripts deny <pkg>`), so that `npm ci` prints no `install-scripts` warning. The `prod-deps` stage of the `Dockerfile` opens `better-sqlite3` and encodes an image with `sharp`, and fails the build when either binary is missing. It prunes with `--omit=dev` only: `--omit=optional` would drop the binary of sharp, so the optional peers of the dev tooling (typescript, magicast) are cut by `docker/prune-unused-deps.mjs` instead.
 

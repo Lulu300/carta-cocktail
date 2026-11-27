@@ -163,6 +163,32 @@ Puis, avec `crontab -e` (root) :
 
 Pensez à mettre à jour `CARTA_PASSWORD` quand vous changez le mot de passe admin : chaque échec de connexion compte dans la limite de `LOGIN_RATE_LIMIT` (10 échecs en 15 minutes par adresse) ; au-delà, toute connexion venant de la même adresse est refusée pendant 15 minutes au plus.
 
+## Appeler l'API
+
+La page **API** de l'admin documente chaque route : ce qu'elle accepte, ce qu'elle renvoie et ses erreurs. Son bouton de test envoie la requête avec la session ouverte : la requête est réelle et modifie les données. La page lit un document OpenAPI 3.1, que des outils (générateurs de clients, Postman, Insomnia…) savent aussi importer :
+
+- `GET /api/openapi.json`, sans connexion : les routes qu'un client appelle sans session (cartes publiées, connexion, état de santé) ;
+- `GET /api/openapi/full.json`, avec un jeton : toutes les routes.
+
+Les routes de l'admin demandent un jeton de session (JWT), donné par `POST /api/auth/login` et envoyé dans l'en-tête `Authorization: Bearer <jeton>`. Avec `curl` et `jq`, et les variables `CARTA_URL`, `CARTA_EMAIL` et `CARTA_PASSWORD` du script de sauvegarde ci-dessus :
+
+```sh
+LOGIN=$(jq -n --arg email "$CARTA_EMAIL" --arg password "$CARTA_PASSWORD" '{email: $email, password: $password}')
+TOKEN=$(curl -fsS -X POST -H 'Content-Type: application/json' -d "$LOGIN" "$CARTA_URL/api/auth/login" | jq -r .token)
+
+# Read: the units, then the document of every route
+curl -fsS -H "Authorization: Bearer $TOKEN" "$CARTA_URL/api/units"
+curl -fsS -H "Authorization: Bearer $TOKEN" -o carta-openapi.json "$CARTA_URL/api/openapi/full.json"
+
+# Write: a JSON body, as the document describes it
+curl -fsS -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"name": "Lime", "icon": "🍋"}' "$CARTA_URL/api/ingredients"
+```
+
+- Le jeton vaut une session de l'admin, avec tous ses droits : gardez-le comme le mot de passe. Il expire au bout de `JWT_EXPIRES_IN` (7 jours par défaut) et prend fin plus tôt quand le mot de passe change, avec « Se déconnecter partout » ou après la restauration d'une sauvegarde : le script se reconnecte alors.
+- Une erreur répond toujours en JSON `{ "error": "…", "details": … }` : `error` est un message dans la langue de l'en-tête `Accept-Language` (anglais par défaut), `details` précise certaines erreurs (champs refusés d'une requête invalide, éléments qui bloquent une suppression).
+- Les limites de requêtes s'appliquent comme dans l'interface (`API_RATE_LIMIT` par minute et par adresse, 10 sauvegardes en 15 minutes) : au-delà, l'API répond 429 avec l'en-tête `Retry-After`, en secondes.
+
 ## Mise à jour
 
 1. Lire les sections d'[`UPGRADING.md`](../UPGRADING.md) de toutes les versions entre la vôtre et la nouvelle, et faire leurs actions « Before upgrading ». Ce guide ne les recopie pas.
