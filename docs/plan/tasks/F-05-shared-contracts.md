@@ -5,12 +5,12 @@ phase: F
 lane: backend
 criticite: basse
 effort: L
-status: todo
+status: done
 owner: agent
 depends_on: [C-04, E-06]
-touches: [backend/src/validation/, backend/src/contracts/, backend/src/routes/responseContracts.test.ts, backend/src/test/helpers.ts, backend/package.json, backend/AGENTS.md, frontend/src/types/, frontend/src/test/, frontend/src/services/api.ts, frontend/src/queries/, frontend/src/pages/public/, frontend/src/utils/cocktailSearch.ts, frontend/src/components/admin/cocktails/, frontend/src/pages/admin/MenusPage.tsx, frontend/src/i18n/locales/public/, frontend/AGENTS.md]
+touches: [backend/src/validation/, backend/src/contracts/, backend/src/routes/responseContracts.test.ts, backend/src/test/helpers.ts, backend/package.json, backend/AGENTS.md, frontend/src/types/, frontend/src/test/, frontend/src/services/api.ts, frontend/src/queries/, frontend/src/pages/public/, frontend/src/utils/cocktailSearch.ts, frontend/src/components/admin/cocktails/, frontend/src/pages/admin/, frontend/src/components/admin/, frontend/src/components/import/, frontend/src/services/exportZip.ts, frontend/src/utils/menuType.ts, frontend/src/i18n/locales/public/, frontend/AGENTS.md, backend/src/routes/backup.test.ts, backend/src/routes/system.test.ts, backend/src/routes/cocktails.test.ts]
 sources: ["05-frontend-archi.md §3.3", "04-tests.md §7"]
-branch:
+branch: feature/F-05-shared-contracts-2
 pr:
 ---
 
@@ -44,7 +44,7 @@ Choix à valider avant de commencer :
 - [x] Les unions `SourceType` et `MenuType` n'existent qu'à un endroit.
 - [x] Les dérives listées ci-dessus sont corrigées.
 - [x] Les tests backend valident la forme des réponses des routes publiques et cocktails.
-- [ ] Builds Docker, CI et smoke D-08 verts.
+- [x] Builds Docker, CI et smoke D-08 verts.
 
 ## Tests à ajouter ou adapter
 
@@ -64,3 +64,4 @@ Choix à valider avant de commencer :
 - 2026-11-27 : décision de l'humain, troisième option : les schémas zod restent dans `backend/src/validation/`, un script génère les types du frontend (`frontend/src/types/generated.ts`) à partir de `z.infer`, un test échoue si le fichier généré n'est pas à jour ; aucun changement Docker ni workspace npm ; le frontend ne réutilise pas les schémas pour valider ses formulaires. `shared/` sort donc de `touches`.
 - 2026-11-27 : premier lot, branche `feature/F-05-shared-contracts`, PR #298. Schémas de réponse stricts (`z.strictObject`) des routes publiques, des cocktails et des bouteilles ; tests de contrat dans `backend/src/routes/responseContracts.test.ts` ; générateur `backend/src/contracts/` (`npm run contracts:generate`), qui imprime les types inférés par le compilateur TypeScript depuis `frontendTypes.ts`, et son test de fraîcheur, exécuté par le job Backend de la CI. `SourceType` et `MenuType` déclarés une seule fois ; DTO d'entrée générés (cocktail, ligne de recette, bouteille, menu). Dérives corrigées : `menuSectionId` (corps de mise à jour de menu généré), `tags` (lecture et écriture issues du contrat), `sourceType` de la disponibilité et de l'export, réponse de l'envoi de photo (cocktail sans recette, typée `Cocktail` jusque-là). Le bloc « Autres » du menu public de bouteilles est retiré avec sa traduction : la route publique envoie toujours la catégorie.
 - Étape suivante (deuxième lot) : schémas de réponse et tests de contrat des autres routes (menus admin, sections, bouteilles de menu, catégories, types de catégorie, ingrédients, unités admin, disponibilité, pénuries, réglages, imports et exports), puis remplacement des interfaces restantes de `frontend/src/types/index.ts` par des réexports. La tâche reste en `todo` jusque-là ; le dernier critère (Docker, CI, smoke) se coche avec ce dernier lot.
+- 2026-11-27 : deuxième lot, branche `feature/F-05-shared-contracts-2`. Décision de l'humain rappelée : les schémas zod restent dans le backend, le frontend n'a que les types générés (`z.strictObject`, vérifiés en CI). Schémas de réponse et tests de contrat de toutes les routes JSON restantes : catégories (liste, détail, pénuries), types de catégorie, ingrédients, unités admin, cartes admin (liste, détail de l'éditeur, création, mise à jour), sections, bouteilles de carte (exclusions, synchronisation), disponibilité, profil, auth, système (notice de mise à jour), santé, imports et exports de cocktails et de bouteilles, restauration de sauvegarde. L'export de sauvegarde (ZIP) et les pages d'aperçu de lien (HTML) n'ont pas de schéma JSON. `/api/settings` garde le schéma `AdminSiteSettings` de F-10. `expectContract()` passe dans `src/test/helpers.ts` ; la restauration et la notice sont vérifiées dans `backup.test.ts` et `system.test.ts`, qui ont leur mise en place. `frontend/src/types/index.ts` ne fait plus que réexporter ; `types/importWizard.ts` garde l'état propre aux assistants d'import (vue commune des quatre sortes d'entités, nombres vidés à `null` pendant la saisie), plus large ou plus étroit que le contrat. Les listes de catégories et de types ont leurs propres types (`CategoryListItem`, `CategoryTypeListItem`), le menu admin `MenuSummary`, `MenuDetail`, `MenuRow`, `UpdatedMenu` à la place de l'unique `Menu` aux champs optionnels. Nits de #298 : en-tête de `common.ts`, gardes devenues inutiles retirées (`useMenuFilter.ts`, et `hasBottle`/`MenuBottleEntry` et les `?? []` de l'éditeur de cartes), `SOURCE_TYPES` dans `cocktails.test.ts`. Le générateur imprime `Record<string, never>` pour un objet strict vide. Deux tests de page qui envoyaient une catégorie sans type, cas que le contrat exclut, sont retirés : `useCategoryTypeName.test.ts` couvre ce repli.
