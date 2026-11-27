@@ -51,7 +51,7 @@ const FORBIDDEN_TEXT = 'JSZip';
 
 const SERVICE_WORKER = 'sw.js';
 // Without them in the precache, an offline visit has no page to start from.
-const REQUIRED_IN_PRECACHE = ['index.html', 'manifest.webmanifest'];
+const REQUIRED_IN_PRECACHE = ['index.html', 'manifest.webmanifest', 'theme-init.js'];
 
 // Rolldown's CJS interop helpers: generated code only, emitted without a source map.
 const GENERATED_CHUNK = /^assets\/rolldown-runtime-[\w-]+\.js$/;
@@ -208,8 +208,9 @@ function findPrecacheViolations(distDir, initialChunks, precache) {
   const violations = [...REQUIRED_IN_PRECACHE, ...initialPaths]
     .filter((path) => !precached.has(path))
     .map((path) => `${SERVICE_WORKER} does not precache ${path}: the menu would not open offline.`);
+  // Only the built chunks: the files of public/ (theme-init.js) have no source map to read.
   const otherChunks = precache
-    .filter((path) => path.endsWith('.js') && !initialPaths.includes(path))
+    .filter((path) => path.startsWith('assets/') && path.endsWith('.js') && !initialPaths.includes(path))
     .map((path) => inspectChunk(distDir, { path, role: 'precache' }));
   return [...violations, ...otherChunks.flatMap((chunk) => chunkViolations(chunk, PRECACHE))];
 }

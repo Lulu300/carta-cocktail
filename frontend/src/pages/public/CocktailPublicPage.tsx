@@ -16,7 +16,7 @@ import type { CocktailLinkState } from './PublicCocktailItem';
 import { useScrollRestoration } from './useScrollRestoration';
 
 const SECTION_TITLE_CLASSES =
-  'text-sm font-serif font-bold uppercase tracking-wider text-accent/80 print:text-gray-800';
+  'text-sm font-serif font-bold uppercase tracking-wider text-accent print:text-gray-800';
 
 function isModifiedClick(event: MouseEvent) {
   return event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
@@ -115,7 +115,7 @@ function CocktailRecipe({ cocktail, menuPath }: { cocktail: Cocktail; menuPath: 
           {user && cocktail.notes && (
             <div className="mb-6 rounded-xl border border-accent/20 bg-accent/5 p-4 print:border-gray-300 print:bg-gray-50">
               <h2 className={`${SECTION_TITLE_CLASSES} mb-2`}>{t('cocktails.notes')}</h2>
-              <p className="text-sm leading-6 text-gray-300 print:text-black whitespace-pre-wrap">
+              <p className="text-sm leading-6 text-fg-soft print:text-black whitespace-pre-wrap">
                 {cocktail.notes}
               </p>
             </div>
@@ -135,7 +135,7 @@ function CocktailRecipe({ cocktail, menuPath }: { cocktail: Cocktail; menuPath: 
                         aria-hidden="true"
                         className="w-1.5 h-1.5 bg-accent print:bg-gray-800 rounded-full flex-shrink-0"
                       />
-                      <span className="text-gray-300 print:text-black">
+                      <span className="text-fg-soft print:text-black">
                         <UnitConverter
                           quantity={ing.quantity}
                           unit={ing.unit?.abbreviation || ''}
@@ -152,7 +152,7 @@ function CocktailRecipe({ cocktail, menuPath }: { cocktail: Cocktail; menuPath: 
                         {ing.preferredBottles.map((preferredBottle) => (
                           <span
                             key={preferredBottle.id}
-                            className="rounded-full border border-accent/20 bg-accent/10 px-2.5 py-1 text-xs text-amber-200 print:border-gray-300 print:bg-gray-100 print:text-gray-800"
+                            className="rounded-full border border-accent/20 bg-accent/10 px-2.5 py-1 text-xs text-accent-pale print:border-gray-300 print:bg-gray-100 print:text-gray-800"
                           >
                             {preferredBottle.bottle?.name || ''}
                           </span>
@@ -176,7 +176,7 @@ function CocktailRecipe({ cocktail, menuPath }: { cocktail: Cocktail; menuPath: 
                     <span className="flex-shrink-0 w-6 h-6 bg-accent/10 print:bg-gray-100 text-accent print:text-gray-800 rounded-full flex items-center justify-center text-xs font-bold">
                       {inst.stepNumber}
                     </span>
-                    <span className="text-gray-300 print:text-black pt-0.5">{inst.text}</span>
+                    <span className="text-fg-soft print:text-black pt-0.5">{inst.text}</span>
                   </li>
                 ))}
               </ol>

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteSettings } from '../../contexts/SiteSettingsContext';
 import LanguageSelector from '../ui/LanguageSelector';
+import ThemeToggle from '../ui/ThemeToggle';
 import SiteName from './SiteName';
 import SkipLink, { MAIN_CONTENT_ID } from './SkipLink';
 
@@ -31,7 +32,8 @@ export default function PublicLayout() {
             )}
             <SiteName />
           </Link>
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-3 shrink-0">
+            <ThemeToggle />
             <LanguageSelector />
             {user && (
               <Link

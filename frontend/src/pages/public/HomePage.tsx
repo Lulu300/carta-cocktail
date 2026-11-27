@@ -68,7 +68,7 @@ function MenuCard({ menu }: { menu: Menu }) {
       to={`/menu/${menu.slug}`}
       className="group bg-surface border border-line rounded-xl p-6 hover:border-accent/50 transition-all motion-reduce:transition-none hover:shadow-lg hover:shadow-accent/5"
     >
-      <h2 className="text-xl font-bold font-serif text-white group-hover:text-accent transition-colors mb-2">
+      <h2 className="text-xl font-bold font-serif text-fg-strong group-hover:text-accent transition-colors mb-2">
         {menu.name}
       </h2>
       {menu.description && (

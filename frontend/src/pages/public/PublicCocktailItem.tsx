@@ -102,17 +102,17 @@ function PublicCocktailItem({
               <span
                 className={`text-xs px-2 py-1 rounded font-medium ${
                   availability.maxServings === 0
-                    ? 'bg-red-500/20 text-red-400'
+                    ? 'bg-danger/20 text-danger'
                     : availability.maxServings < 3
-                      ? 'bg-yellow-500/20 text-yellow-400'
-                      : 'bg-green-500/20 text-green-400'
+                      ? 'bg-warning/20 text-warning'
+                      : 'bg-success/20 text-success'
                 }`}
               >
                 {t('public.servings', { count: availability.maxServings })}
               </span>
             )}
             {isUnavailable && (
-              <span className="text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded">
+              <span className="text-xs text-danger bg-danger/10 px-2 py-1 rounded">
                 {t('public.unavailable')}
               </span>
             )}

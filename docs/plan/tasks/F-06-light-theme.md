@@ -5,13 +5,13 @@ phase: F
 lane: frontend
 criticite: basse
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [E-03, E-09]
-touches: [frontend/src/index.css, frontend/src/components/, frontend/index.html]
+touches: [frontend/src/index.css, frontend/src/components/, frontend/index.html, frontend/public/theme-init.js, frontend/vite.config.ts, .github/scripts/bundle-budget.mjs]
 sources: ["06-frontend-ux-perf.md §2"]
-branch:
-pr:
+branch: feature/F-06-light-theme
+pr: 
 ---
 
 ## Contexte
@@ -49,11 +49,11 @@ Choix à valider avant de commencer :
 
 ## Critères d'acceptation
 
-- [ ] Le choix du thème persiste après rechargement.
-- [ ] Aucun flash du mauvais thème au chargement.
-- [ ] Contraste ≥ 4,5:1 pour le texte normal dans les deux thèmes (axe ou Lighthouse).
-- [ ] Les contrôles natifs (select, checkbox) suivent le thème.
-- [ ] L'impression de la fiche cocktail est inchangée.
+- [x] Le choix du thème persiste après rechargement.
+- [x] Aucun flash du mauvais thème au chargement.
+- [x] Contraste ≥ 4,5:1 pour le texte normal dans les deux thèmes (axe ou Lighthouse).
+- [x] Les contrôles natifs (select, checkbox) suivent le thème.
+- [x] L'impression de la fiche cocktail est inchangée.
 
 ## Tests à ajouter ou adapter
 
@@ -70,3 +70,7 @@ Choix à valider avant de commencer :
 ## Journal
 
 - 2026-10-08 : tâche créée à partir de la revue.
+- 2026-11-27 : décisions de l'humain pour les trois choix à valider : périmètre = la carte publique seule (l'admin reste sombre) ; thème par défaut = sombre ; choix par chaque visiteur, bouton mémorisé dans `localStorage` (clé `theme`), sans réglage admin ni migration.
+- 2026-11-27 : implémentation. Jetons clairs sous `:root[data-theme='light']` (`index.css`), accent `amber-800` (`amber-700` donnait 4,37:1 sur les pastilles teintées). Nouveaux jetons `fg-soft`, `fg-strong`, `accent-pale` pour remplacer les `text-gray-300`, `text-white`, `text-amber-200` des pages publiques ; badges de disponibilité sur les jetons `danger`, `warning`, `success`. `text-accent/80` des titres de la fiche devient `text-accent` (3,6:1 sinon). Script anti-flash `public/theme-init.js` (fichier synchrone, CSP inchangée), ajouté au précache (`vite.config.ts`) et exigé par `bundle-budget.mjs`. `theme-color` suit le thème. `PublicLayout` pose `data-theme` sur `<html>` tant qu'il est monté et le retire en le quittant : l'admin et `/login` restent sombres (le script ignore ces chemins). `touches` complété.
+- 2026-11-27 : vérifié sur un build avec Chrome sans interface (puppeteer-core, axe-core, sur le serveur servi avec la CSP de nginx) : carte et fiche à 390 et 1280 px dans les deux thèmes, 0 violation `color-contrast` ; persistance après rechargement ; premier rendu clair avec le script d'entrée retenu 1,5 s ; impression identique dans les deux thèmes ; bundle public 138,1 kB gzip (budget 140).
+- 2026-11-27 : Notes de version : nouveauté, un bouton soleil dans l'en-tête de la carte publique bascule entre thème sombre (par défaut) et thème clair, choix mémorisé par navigateur ; l'admin reste sombre ; aucune action requise.

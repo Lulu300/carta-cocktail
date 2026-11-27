@@ -41,7 +41,7 @@ describe('bundle-budget.mjs CLI', () => {
     writeFileSync(join(distDir, 'index.html'), html);
   }
 
-  const PRECACHED_FILES = ['index.html', 'manifest.webmanifest', 'assets/index-abc.js', 'assets/vendor-react-def.js'];
+  const PRECACHED_FILES = ['index.html', 'manifest.webmanifest', 'theme-init.js', 'assets/index-abc.js', 'assets/vendor-react-def.js'];
 
   /** sw.js as vite-plugin-pwa writes it (minified Workbox), precaching these dist-relative paths. */
   function writeServiceWorker(urls = PRECACHED_FILES) {
@@ -94,7 +94,7 @@ describe('bundle-budget.mjs CLI', () => {
     assert.match(run.stdout, /assets\/vendor-react-def\.js \(preload\)/);
     assert.match(run.stdout, /Budget\s+100\.00 kB/);
     assert.match(run.stdout, /within the 100 kB budget/);
-    assert.match(run.stdout, /The sw\.js precache \(5 files\) holds the initial load and no admin code/);
+    assert.match(run.stdout, /The sw\.js precache \(6 files\) holds the initial load and no admin code/);
     // Lazy chunks and stylesheets are not part of the initial load.
     assert.doesNotMatch(run.stdout, /DashboardPage|jszip|registerServiceWorker|\.css/);
   });
@@ -297,7 +297,7 @@ describe('bundle-budget.mjs CLI', () => {
     assert.match(run.stderr, /jszip\.min-mno\.js contains the text "JSZip": jszip must stay out of the precache/);
   });
 
-  it('fails when the precache misses the page, the web manifest or a chunk of the initial load', () => {
+  it('fails when the precache misses the page, the web manifest, the theme script or a chunk of the initial load', () => {
     writeCompliantBuild();
     writeServiceWorker(['assets/index-abc.js']);
 
@@ -306,6 +306,7 @@ describe('bundle-budget.mjs CLI', () => {
     assert.equal(run.status, 1);
     assert.match(run.stderr, /sw\.js does not precache index\.html: the menu would not open offline/);
     assert.match(run.stderr, /sw\.js does not precache manifest\.webmanifest/);
+    assert.match(run.stderr, /sw\.js does not precache theme-init\.js/);
     assert.match(run.stderr, /sw\.js does not precache assets\/vendor-react-def\.js/);
     assert.doesNotMatch(run.stderr, /does not precache assets\/index-abc\.js/);
   });
