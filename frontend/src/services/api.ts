@@ -1,5 +1,7 @@
 import type {
   AdminSiteSettings,
+  ApiToken,
+  ApiTokenInput,
   BackupRestoreResult,
   Bottle,
   BottleImportConfirmInput,
@@ -23,6 +25,7 @@ import type {
   CocktailImportInput,
   CocktailInput,
   CocktailRow,
+  CreatedApiToken,
   DeletionResponse,
   EntityResolutionAction,
   ImportPreviewResponse,
@@ -561,6 +564,15 @@ export const settings = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+};
+
+// API tokens of scripts and MCP clients (admin session only)
+export const apiTokens = {
+  list: (signal?: AbortSignal) => request<ApiToken[]>('/api-tokens', { signal }),
+  /** The only answer that carries the token itself: it is never readable again. */
+  create: (data: ApiTokenInput) =>
+    request<CreatedApiToken>('/api-tokens', { method: 'POST', body: JSON.stringify(data) }),
+  revoke: (id: number) => request<MessageResponse>(`/api-tokens/${id}`, { method: 'DELETE' }),
 };
 
 // System (admin)
