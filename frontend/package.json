@@ -33,8 +33,8 @@
     "zod": "^4.6.7"
   },
   "overrides": {
-    "glob": {
-      "minimatch": "^11.0.1"
+    "workbox-build": {
+      "glob": "^14.0.6"
     }
   },
   "devDependencies": {
