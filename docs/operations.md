@@ -1,6 +1,6 @@
 # Guide d'exploitation
 
-Ce guide décrit l'exploitation de Carta Cocktail v1.18 avec les images publiées (`docker-compose.prod.yml`) : installation, sauvegardes, mises à jour, retour arrière, secrets et HTTPS. Les commandes se lancent depuis le dossier qui contient `docker-compose.prod.yml` et `.env`.
+Ce guide décrit l'exploitation de Carta Cocktail v1.19 avec les images publiées (`docker-compose.prod.yml`) : installation, sauvegardes, mises à jour, retour arrière, secrets et HTTPS. Les commandes se lancent depuis le dossier qui contient `docker-compose.prod.yml` et `.env`.
 
 Références :
 
@@ -22,14 +22,14 @@ Références :
 
    ```bash
    mkdir carta-cocktail && cd carta-cocktail
-   curl -fsSLO https://raw.githubusercontent.com/Lulu300/carta-cocktail/v1.18.0/docker-compose.prod.yml
+   curl -fsSLO https://raw.githubusercontent.com/Lulu300/carta-cocktail/v1.19.0/docker-compose.prod.yml
    ```
 
-2. Épingler la version : dans `docker-compose.prod.yml`, remplacer `:latest` par `:1.18` sur les deux lignes `image:`. `:1.18` suit les correctifs 1.18.x ; `:1.18.0` ne bouge jamais. Avec `:latest`, un `pull` peut installer une version dont vous n'avez pas lu les actions obligatoires.
+2. Épingler la version : dans `docker-compose.prod.yml`, remplacer `:latest` par `:1.19` sur les deux lignes `image:`. `:1.19` suit les correctifs 1.19.x ; `:1.19.0` ne bouge jamais. Avec `:latest`, un `pull` peut installer une version dont vous n'avez pas lu les actions obligatoires.
 
    ```yaml
-   image: ghcr.io/lulu300/carta-cocktail/backend:1.18
-   image: ghcr.io/lulu300/carta-cocktail/frontend:1.18
+   image: ghcr.io/lulu300/carta-cocktail/backend:1.19
+   image: ghcr.io/lulu300/carta-cocktail/frontend:1.19
    ```
 
 3. Créer `.env` à côté du fichier compose. `JWT_SECRET` (32 caractères au moins) et `ADMIN_PASSWORD` (12 caractères au moins) sont obligatoires : `docker compose` refuse de démarrer sans `JWT_SECRET`, et le backend refuse un secret trop court ou connu.
@@ -58,7 +58,7 @@ Références :
    curl -s http://localhost/api/health
    ```
 
-   Réponse attendue : `{"status":"ok","version":"1.18.0"}`. Le site répond sur le port 80 de l'hôte. Pour un autre port, changer `"80:8080"` en `"<port>:8080"` dans le service `carta-cocktail-frontend` : nginx écoute sur 8080 dans le conteneur.
+   Réponse attendue : `{"status":"ok","version":"1.19.0"}`. Le site répond sur le port 80 de l'hôte. Pour un autre port, changer `"80:8080"` en `"<port>:8080"` dans le service `carta-cocktail-frontend` : nginx écoute sur 8080 dans le conteneur.
 
 Le backend tourne sous l'uid 1000, le frontend (nginx) sous l'uid 101. Les volumes nommés n'ont besoin de rien. Pour des dossiers de l'hôte ou un partage réseau (SMB/NFS) à la place des volumes, voir [README › "Data folders and the node user"](../README.md#data-folders-and-the-node-user) et `SQLITE_WAL=false` dans [README › "Database files and network shares"](../README.md#database-files-and-network-shares).
 
@@ -166,7 +166,7 @@ Pensez à mettre à jour `CARTA_PASSWORD` quand vous changez le mot de passe adm
 
 1. Lire les sections d'[`UPGRADING.md`](../UPGRADING.md) de toutes les versions entre la vôtre et la nouvelle, et faire leurs actions « Before upgrading ». Ce guide ne les recopie pas.
 2. Sauvegarder : export depuis l'admin, ou [sauvegarde à froid](#sauvegarde-à-froid-des-volumes).
-3. Changer le tag des deux lignes `image:` de `docker-compose.prod.yml` (par exemple `:1.17` → `:1.18`). Avec un tag `:X.Y`, les correctifs de la même mineure arrivent par un simple `pull`. Si la version demande un nouveau fichier compose, téléchargez celui de son tag et remettez-y vos modifications (port, volumes). Les variables facultatives (`SQLITE_WAL`, `TRUST_PROXY`, limites de débit…) restent dans `.env` : si vous les aviez ajoutées à la liste `environment` d'un fichier compose de la v1.15.0 ou plus ancien, mettez-les dans `.env` au lieu de les remettre dans le nouveau fichier.
+3. Changer le tag des deux lignes `image:` de `docker-compose.prod.yml` (par exemple `:1.18` → `:1.19`). Avec un tag `:X.Y`, les correctifs de la même mineure arrivent par un simple `pull`. Si la version demande un nouveau fichier compose, téléchargez celui de son tag et remettez-y vos modifications (port, volumes). Les variables facultatives (`SQLITE_WAL`, `TRUST_PROXY`, limites de débit…) restent dans `.env` : si vous les aviez ajoutées à la liste `environment` d'un fichier compose de la v1.15.0 ou plus ancien, mettez-les dans `.env` au lieu de les remettre dans le nouveau fichier.
 4. Télécharger et redémarrer :
 
    ```bash
