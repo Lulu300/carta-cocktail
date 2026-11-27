@@ -93,7 +93,13 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         // The Latin fonts cover English and French; other subsets fall back offline.
-        globPatterns: ['index.html', 'assets/*.{js,css}', 'assets/*-latin-wght-normal-*.woff2'],
+        // theme-init.js is a blocking script of index.html: without it offline, the light theme would flash.
+        globPatterns: [
+          'index.html',
+          'theme-init.js',
+          'assets/*.{js,css}',
+          'assets/*-latin-wght-normal-*.woff2',
+        ],
         manifestTransforms: [
           async (entries) => ({
             manifest: entries.filter(

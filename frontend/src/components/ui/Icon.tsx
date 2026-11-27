@@ -10,6 +10,7 @@ const ICON_PATHS = {
   'chevron-down': 'M19 9l-7 7-7-7',
   download: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4',
   plus: 'M12 4v16m8-8H4',
+  sun: 'M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z',
 } as const;
 
 export type IconName = keyof typeof ICON_PATHS;

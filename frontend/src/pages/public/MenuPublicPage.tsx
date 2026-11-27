@@ -172,7 +172,7 @@ function MenuContent({ menu, slug }: { menu: Menu; slug: string }) {
               key={location.name}
               className="flex items-center justify-between px-3 py-2 bg-canvas rounded-lg"
             >
-              <span className="text-gray-300">{location.name}</span>
+              <span className="text-fg-soft">{location.name}</span>
               <span className="text-accent font-medium">{location.count}</span>
             </li>
           ))}
@@ -209,7 +209,7 @@ function ViewModeToggle({
               'rounded-md px-3 py-2 text-sm transition-colors',
               value === mode.value
                 ? 'bg-accent text-on-accent font-semibold'
-                : 'text-fg-muted hover:text-white',
+                : 'text-fg-muted hover:text-fg-strong',
             )}
           >
             {t(mode.labelKey)}

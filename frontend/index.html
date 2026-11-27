@@ -11,10 +11,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0f0f1a" />
     <meta name="color-scheme" content="dark" />
+    <!-- Sets the light theme of a guest who chose it before the first paint (a file: the CSP forbids inline scripts) -->
+    <script src="/theme-init.js"></script>
     <meta name="description" content="Cocktail menu" />
     <title>Carta Cocktail</title>
     <style>
-      /* Shown until React mounts: the dark page, with a small spinner, instead of a white flash */
+      /* Shown until React mounts: the page in the guest's theme, with a small spinner, instead of a flash */
+      body {
+        margin: 0;
+        background: #0f0f1a;
+        color: #f3f4f6;
+      }
+      :root[data-theme='light'] body {
+        background: #faf7f2;
+        color: #111827;
+      }
       @keyframes boot-spin {
         to {
           transform: rotate(360deg);
@@ -35,6 +46,10 @@
         border-top-color: #fbbf24;
         animation: boot-spin 0.8s linear infinite;
       }
+      :root[data-theme='light'] .boot::after {
+        border-color: #e5e7eb;
+        border-top-color: #92400e;
+      }
       @media (prefers-reduced-motion: reduce) {
         .boot::after {
           animation: none;
@@ -42,7 +57,7 @@
       }
     </style>
   </head>
-  <body style="margin: 0; background: #0f0f1a; color: #f3f4f6">
+  <body>
     <div id="root"><div class="boot" aria-hidden="true"></div></div>
     <noscript>
       <p style="padding: 1rem; text-align: center">

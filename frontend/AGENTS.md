@@ -2,7 +2,7 @@
 
 ## Overview
 
-React 19 SPA with Vite 8, TailwindCSS 4, React Router 7, and react-i18next. Dark theme UI with admin panel and public menu display.
+React 19 SPA with Vite 8, TailwindCSS 4, React Router 7, and react-i18next. Dark UI with an admin panel and a public menu display. The public menu also has a light theme, picked by each guest with `ThemeToggle` (`localStorage` key `theme`, applied to `<html data-theme>` by `utils/theme.ts` and, before the first paint, by `public/theme-init.js`: a file, as the CSP forbids inline scripts). The light tokens are in `index.css`; the admin side never gets them. New public colors go through the tokens, never `text-white` or `text-gray-*`.
 
 ## Development Workflow
 
