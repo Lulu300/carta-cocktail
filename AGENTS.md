@@ -108,7 +108,7 @@ Coverage is enforced automatically by CI. Run `npm test -- --coverage` in either
 - **Backend**: `npm ci` (postinstall: `prisma generate`) → `npm audit --omit=dev --audit-level=high` → `npm run db:check` (migrations match `schema.prisma`) → `npm run typecheck` → `npm run lint` → `npm run format:check` → `npm run build` → tests of `.github/scripts` → `npm run test:coverage` → delta coverage (80%, PRs only)
 - **Frontend**: `npm ci` → `npm audit --omit=dev --audit-level=high` → `tsc -b` → `npm run lint` → `npm run format:check` → `npm run build` → bundle budget of the public menu and admin-free service worker precache (`.github/scripts/bundle-budget.mjs`, 140 kB gzip) → CSS media queries readable by Safari 16 → `npm run test:coverage` → delta coverage (80%, PRs only)
 - **Docker build (backend)** and **Docker build (frontend)**: build each image for `linux/amd64`, without pushing it. The `linux/arm64` build only runs at release
-- The Node jobs run on Node 24, the version used by the Docker images (`.nvmrc`); `engines` in both `package.json` require Node >= 24
+- The Node jobs run on Node 26, the version used by the Docker images (`.nvmrc`); `engines` in both `package.json` require Node >= 26
 
 **Smoke** (`.github/workflows/smoke.yml`) — runs on PRs to `main`/`develop`, on demand, and as the `smoke` job of the release workflow:
 - Builds and starts `docker-compose.yml`, then runs `scripts/smoke/smoke.sh` through nginx: login, 2.4 MB photo upload, photo still served after the backend container is recreated, backup export, link preview of a public menu for a messaging robot. Then `scripts/smoke/custom-uid.sh` recreates the backend with `CARTA_UID`/`CARTA_GID`: refused on volumes of uid 1000, then started after a `chown`, and `smoke.sh` again

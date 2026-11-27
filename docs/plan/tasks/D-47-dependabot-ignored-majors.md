@@ -8,7 +8,7 @@ effort: M
 status: todo
 owner: mixed
 depends_on: [C-15, D-21]
-touches: [backend/package.json, backend/package-lock.json, frontend/package.json, frontend/package-lock.json, .github/dependabot.yml, .nvmrc, backend/Dockerfile, frontend/Dockerfile]
+touches: [AGENTS.md, README.md, docs/plan/README.md, backend/package.json, backend/package-lock.json, frontend/package.json, frontend/package-lock.json, .github/dependabot.yml, .nvmrc, backend/Dockerfile, frontend/Dockerfile]
 sources: []
 branch:
 pr:
@@ -81,3 +81,5 @@ La suite existante (backend : adapter, transactions sérialisées, migrations) ;
 ## Journal
 
 - 2026-11-25 : tâche créée par D-21 (PR #220) pour suivre les majeures que Dependabot ignore. D-46 est réservé à une autre tâche du même lot (D-23), d'où le numéro 47. Élargie à la relecture de la PR #220 (décision du coordinateur) : Node et `@types/node`, puis retrait de `@types/bcryptjs`, en plus de Prisma et `better-sqlite3`.
+- 2026-11-27 : volet 1 fait (`@types/bcryptjs` retiré du backend, le lockfile ne perd que cette entrée et la majeure d'`undici-types` qui suit `@types/node`). Volet 3 fait sur décision de l'humain (2026-11-27) : passage à Node 26 LTS, remplaçant la décision du 2026-10-10. `.nvmrc`, `node:26.13-alpine` (épinglé sur la mineure) dans les deux Dockerfiles, `engines.node` `>=26` et `@types/node` `^26.6.11` dans les deux paquets, README, AGENTS.md et décision de `docs/plan/README.md`. Les `ignore` Dependabot de `node` (docker) et de `@types/node` (npm) restent : ils portent désormais sur la majeure 27. Volet 2 revérifié (veille) : `prisma@latest` = 8.0.0-rc.36, la stable reste 7.10.1 (dist-tag `prev`) ; pas de 8.x stable, on ne passe pas sur une pré-version. La tâche reste `todo` pour ce volet.
+- 2026-11-27 : Notes de version : l'image tourne désormais sous Node 26 (LTS), sans action requise ; le développement hors Docker demande Node 26 ou plus (`engines`). `breaking: false`.
