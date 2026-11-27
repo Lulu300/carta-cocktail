@@ -4,7 +4,7 @@
 # ($BUILDPLATFORM): the compiled JavaScript and the generated Prisma client do
 # not depend on the CPU, so the multi-platform release build compiles once,
 # natively, instead of once per platform under QEMU emulation.
-FROM --platform=$BUILDPLATFORM node:24.22-alpine AS build
+FROM --platform=$BUILDPLATFORM node:26.13-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 # The postinstall script generates the Prisma client from prisma/schema.prisma
@@ -30,7 +30,7 @@ RUN node_modules/.bin/esbuild prisma.config.ts --bundle --platform=node --packag
 # Pruning keeps what `npm ci` installed and built without a second download.
 # No --omit=optional: sharp gets its libvips binary from an optional dependency, one
 # per platform. The optional peers that only the dev tooling uses are cut below instead.
-FROM node:24.22-alpine AS prod-deps
+FROM node:26.13-alpine AS prod-deps
 WORKDIR /app
 COPY package*.json ./
 COPY prisma/schema.prisma ./prisma/schema.prisma
@@ -95,7 +95,7 @@ RUN node -e "const sharp = require('sharp'); \
     Promise.all([pixel().webp().toBuffer(), pixel().jpeg().toBuffer()]).catch((error) => { \
       console.error(error); process.exit(1); })"
 
-FROM node:24.22-alpine AS runtime
+FROM node:26.13-alpine AS runtime
 # tini forwards SIGTERM to the entrypoint, then to Node once the entrypoint has exec'd it
 RUN apk add --no-cache tini
 ENV NODE_ENV=production
