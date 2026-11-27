@@ -37,7 +37,9 @@ test('the API page shows every route under the CSP of nginx, and tries one with 
   await expect(documentTitle).toBeVisible();
 
   // The test request of an admin route goes out with the session token: the route answers 200
-  // The viewer renders an operation once it is shown: go to it from its sidebar
+  // The viewer renders an operation once it is shown: go to it from its sidebar. The sidebar
+  // only opens the first tag ("API tokens" in alphabetical order): open the one of the route.
+  await page.getByRole('button', { name: 'Open Group - Auth' }).click();
   await page.getByRole('link', { name: /^Get the signed-in admin/ }).click();
   await page.getByRole('button', { name: 'Test Request (get /api/auth/me)' }).click();
   const answer = page.waitForResponse(
