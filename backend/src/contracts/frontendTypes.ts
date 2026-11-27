@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import type * as apiTokens from '../validation/apiTokens';
 import type * as auth from '../validation/auth';
 import type * as availability from '../validation/availability';
 import type * as backup from '../validation/backup';
@@ -30,9 +31,15 @@ import type * as units from '../validation/units';
 
 export { SOURCE_KEYS, SOURCE_TYPES } from '../validation/cocktails';
 export { MENU_TYPES } from '../validation/menus';
+export {
+  API_TOKEN_LIFETIME_DAYS,
+  API_TOKEN_SCOPES,
+  DEFAULT_API_TOKEN_LIFETIME_DAYS,
+} from '../validation/apiTokens';
 
 export type SourceType = z.output<typeof cocktails.SourceType>;
 export type MenuType = z.output<typeof menus.MenuType>;
+export type ApiTokenScope = z.output<typeof apiTokens.ApiTokenScope>;
 export type ImportMatchStatus = z.output<typeof common.ImportMatchStatus>;
 
 // Responses
@@ -99,6 +106,8 @@ export type BottleImportConfirmResponse = z.output<typeof bottleImport.BottleImp
 export type RequiredAction = z.output<typeof system.RequiredAction>;
 export type UpgradeNotice = z.output<typeof system.UpgradeNotice>;
 export type BackupRestoreResult = z.output<typeof backup.BackupRestoreResult>;
+export type ApiToken = z.output<typeof apiTokens.ApiToken>;
+export type CreatedApiToken = z.output<typeof apiTokens.CreatedApiToken>;
 
 // Request bodies
 
@@ -127,3 +136,4 @@ export type MenuBottleUpdateInput = z.input<typeof menuBottles.MenuBottleUpdate>
 export type MenuBottleGroupUpdateInput = z.input<typeof menuBottles.MenuBottleGroupUpdate>;
 export type SiteSettingsInput = z.input<typeof settings.SiteSettingsUpdate>;
 export type ProfileInput = z.input<typeof settings.ProfileUpdate>;
+export type ApiTokenInput = z.input<typeof apiTokens.ApiTokenCreate>;

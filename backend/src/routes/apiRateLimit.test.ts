@@ -6,6 +6,7 @@ import {
   seedRequiredData,
   request,
   authHeader,
+  seedApiToken,
 } from '../test/helpers';
 import { resetRateLimits } from '../middleware/rateLimit';
 
@@ -85,6 +86,17 @@ describe(`API rate limit (API_RATE_LIMIT=${API_LIMIT})`, () => {
     expect(await statusesOf(API_LIMIT, withoutToken)).toEqual(Array(API_LIMIT).fill(401));
 
     expect((await getUnits('203.0.113.3')).status).toBe(429);
+  });
+
+  it('limits the requests of an API token like those of a session', async () => {
+    const { header } = await seedApiToken({ scope: 'READ_ONLY' });
+    const withApiToken = () =>
+      request.get('/api/units').set('X-Forwarded-For', '203.0.113.8').set(header);
+    expect(await statusesOf(API_LIMIT, withApiToken)).toEqual(Array(API_LIMIT).fill(200));
+
+    const blocked = await withApiToken();
+    expect(blocked.status).toBe(429);
+    expect(blocked.body.error).toBe('Too many requests: try again in a few minutes');
   });
 
   it('refuses a request beyond the limit before reading its body', async () => {

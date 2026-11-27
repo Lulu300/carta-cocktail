@@ -10,8 +10,10 @@ import {
   authHeader,
   seedCategory,
   seedUnit,
+  seedApiToken,
 } from '../test/helpers';
 import { messageAt, placeholders, type Messages } from '../test/messages';
+import { MAX_ACTIVE_API_TOKENS } from '../services/apiTokenService';
 import { MAX_EMBED_ORIGINS } from '../services/embedOrigins';
 import { MAX_ZIP_ENTRY_BYTES } from '../utils/bottlesImport';
 import { MAX_IMPORT_BOTTLES, MAX_IMPORT_ROWS } from '../validation/bottleImport';
@@ -83,6 +85,14 @@ const CASES: Record<string, (language: Language) => Promise<Response>> = {
       'bottles.csv',
       language,
     );
+  },
+  'errors.apiTokenLimit': async (language) => {
+    for (let index = 0; index < MAX_ACTIVE_API_TOKENS; index++) await seedApiToken();
+    return request
+      .post('/api/api-tokens')
+      .set(authHeader())
+      .set('Accept-Language', language)
+      .send({ name: 'One too many' });
   },
   'errors.ambiguousCategoryName': async (language) => {
     await seedCategory({ name: 'Rum' });

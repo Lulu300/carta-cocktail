@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { hashPassword, needsRehash, verifyPassword } from '../bootstrap/password';
-import { authMiddleware, AuthRequest, signToken } from '../middleware/auth';
+import { authenticatedUserId, authMiddleware, AuthRequest, signToken } from '../middleware/auth';
 import { NotFoundError, UnauthorizedError } from '../errors';
 import { valid, validate } from '../validation/validate';
 import { LoginBody } from '../validation/auth';
@@ -50,12 +50,15 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
   res.json(user);
 });
 
-// Revokes every token of the user, including the one sending this request
+// Revokes every session of the user, including the one sending this request, and deletes
+// every API token (decision of 2026-11-27, F-16): the confirmation in Settings says so.
+// API tokens cannot call it (SESSION_ONLY_ROUTES in app.ts).
 router.post('/logout-all', authMiddleware, async (req: AuthRequest, res: Response) => {
-  await prisma.user.update({
-    where: { id: req.userId },
-    data: { tokenVersion: { increment: 1 } },
-  });
+  const userId = authenticatedUserId(req);
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: userId }, data: { tokenVersion: { increment: 1 } } }),
+    prisma.apiToken.deleteMany({ where: { userId } }),
+  ]);
   res.json({ message: req.t('auth.loggedOutEverywhere') });
 });
 

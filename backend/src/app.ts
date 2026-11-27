@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import { config } from './config';
 import { i18nMiddleware } from './i18n';
-import { authMiddleware } from './middleware/auth';
+import { authMiddleware, refuseApiTokens } from './middleware/auth';
 import { apiNotFoundHandler, errorHandler } from './middleware/errorHandler';
 import { createRateLimiter } from './middleware/rateLimit';
 import authRoutes from './routes/auth';
@@ -24,6 +24,7 @@ import settingsRoutes from './routes/settings';
 import backupRoutes from './routes/backup';
 import healthRoutes from './routes/health';
 import systemRoutes from './routes/system';
+import apiTokenRoutes from './routes/apiTokens';
 
 const LOGIN_RATE_WINDOW_MS = 15 * 60_000;
 const API_RATE_WINDOW_MS = 60_000;
@@ -68,6 +69,17 @@ const apiLimiter = createRateLimiter({
   messageKey: 'errors.tooManyRequests',
 });
 app.use('/api', apiLimiter);
+// Routes an API token may never call, whatever its scope (F-16): the tokens themselves, the
+// admin account, signing out everywhere and the backups (a backup holds the password hash,
+// a restore replaces everything). Matched by Express like the routers below, case and
+// trailing slash included. Before the body parsers: refused without reading the body.
+const SESSION_ONLY_ROUTES = [
+  '/api/api-tokens',
+  '/api/settings/profile',
+  '/api/auth/logout-all',
+  '/api/backup',
+];
+app.use(SESSION_ONLY_ROUTES, refuseApiTokens);
 // The confirmation of a bottle import sends back up to 2,000 rows and their resolutions: about
 // 2 MB at most, far above the default 100 kB. Read here, before the global parser (which skips a
 // body already read) and before authMiddleware: the limit stays at a few MB, under nginx's 20 MB.
@@ -104,6 +116,7 @@ app.use('/api/shortages', authMiddleware, shortageRoutes);
 app.use('/api/availability', authMiddleware, availabilityRoutes);
 app.use('/api/settings', authMiddleware, settingsRoutes);
 app.use('/api/system', authMiddleware, systemRoutes);
+app.use('/api/api-tokens', authMiddleware, apiTokenRoutes);
 // The backup limit counts authenticated requests only: authMiddleware already
 // refuses a request without a token at little cost, and the API limit covers
 // floods without one. Counting them here would let anyone who shares the admin's
