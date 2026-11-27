@@ -9,3 +9,10 @@ export const MenuSectionUpdate = z.object({
 });
 
 export const MenuSectionReorder = z.object({ sectionIds: z.array(Id) });
+
+export const MenuSection = z.strictObject({
+  id: Id,
+  menuId: Id,
+  name: z.string(),
+  position: z.number().int(),
+});

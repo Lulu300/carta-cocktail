@@ -2,7 +2,11 @@ import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
-import type { CocktailAvailability, CocktailIngredient, PublicMenuCocktail } from '../../types';
+import type {
+  CocktailAvailability,
+  PublicCocktailIngredient,
+  PublicMenuCocktail,
+} from '../../types';
 import UploadedPhoto from '../../components/ui/UploadedPhoto';
 import { cx } from '../../components/ui/classNames';
 import { parseTags } from '../../utils/parseTags';
@@ -47,7 +51,7 @@ function PublicCocktailItem({
   const hiddenIngredientCount = ingredients.length - MAX_VISIBLE_INGREDIENTS;
   const linkState: CocktailLinkState = { fromMenu: true };
 
-  const ingredientName = (ingredient: CocktailIngredient) =>
+  const ingredientName = (ingredient: PublicCocktailIngredient) =>
     ingredient.bottle?.name ||
     (ingredient.category ? localize(ingredient.category) : null) ||
     (ingredient.ingredient ? localize(ingredient.ingredient) : null);

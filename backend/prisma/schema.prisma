@@ -231,6 +231,9 @@ model SiteSettings {
   id       Int    @id @default(1)
   siteName String @default("Carta Cocktail")
   siteIcon String @default("")
+  // Sites allowed to show the public menu in an iframe: origins separated by one space, the
+  // format of a CSP source list (services/embedOrigins.ts). Empty: no site.
+  embedOrigins String @default("")
 }
 
 // State of the instance itself, not of its content: a single row (id = 1). A

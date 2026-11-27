@@ -6,7 +6,7 @@ import {
   settings as settingsApi,
   backup as backupApi,
 } from '../../services/api';
-import type { BackupRestoreResult } from '../../services/api';
+import type { BackupRestoreResult } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteSettings } from '../../contexts/SiteSettingsContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
@@ -22,6 +22,7 @@ import {
   openSignInAfterRestore,
 } from '../../utils/signInAfterRestore';
 import Alert from '../../components/ui/Alert';
+import EmbedMenuSettings from '../../components/admin/EmbedMenuSettings';
 
 const ICON_OPTIONS = [
   '',
@@ -111,6 +112,7 @@ export default function SettingsPage() {
   // Site settings
   const [siteName, setSiteName] = useState('');
   const [siteIcon, setSiteIcon] = useState('');
+  const [embedOrigins, setEmbedOrigins] = useState<string[]>([]);
   const [siteLoading, setSiteLoading] = useState(true);
   const [siteMessage, setSiteMessage] = useState('');
   const [siteError, setSiteError] = useState('');
@@ -150,6 +152,7 @@ export default function SettingsPage() {
       .then((data) => {
         setSiteName(data.siteName);
         setSiteIcon(data.siteIcon);
+        setEmbedOrigins(data.embedOrigins);
         setSiteLoading(false);
       })
       .catch(() => setSiteLoading(false));
@@ -374,6 +377,8 @@ export default function SettingsPage() {
           {t('common.save')}
         </Button>
       </form>
+
+      <EmbedMenuSettings initialOrigins={embedOrigins} />
 
       {/* Profile Settings */}
       <form

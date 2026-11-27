@@ -13,7 +13,7 @@ import {
 import { server } from '../../test/msw/server';
 import { errorResponse, mockApiResponse, pendingResponse } from '../../test/msw/utils';
 import MenuEditPage from './MenuEditPage';
-import type { Cocktail, Menu, MenuCocktail, MenuInput, MenuSection } from '../../types';
+import type { Cocktail, MenuCocktail, MenuDetail, MenuSection, MenuUpdateInput } from '../../types';
 
 const classics = buildMenuSection({ id: 7, menuId: 3, name: 'Classics', position: 0 });
 
@@ -29,7 +29,7 @@ const mojito = buildCocktail({ id: 1, name: 'Mojito' });
 const negroni = buildCocktail({ id: 2, name: 'Negroni' });
 const spritz = buildCocktail({ id: 3, name: 'Spritz' });
 
-function makeMenu(cocktails: MenuCocktail[], sections: MenuSection[] = [classics]): Menu {
+function makeMenu(cocktails: MenuCocktail[], sections: MenuSection[] = [classics]): MenuDetail {
   return buildMenu({ id: 3, name: 'Summer', slug: 'summer', isPublic: false, sections, cocktails });
 }
 
@@ -38,18 +38,18 @@ const ALL_COCKTAILS = [mojito, negroni, spritz];
 // --- Fake backend of the editor: it stores the menu and records each request ---
 
 /** What the server stores: a refetch after a save returns the saved composition. */
-let storedMenu: Menu;
+let storedMenu: MenuDetail;
 
 /** Requests received, in order: the id of each menu read and the body of each update. */
-let received: { menuReads: number[]; updates: Partial<MenuInput>[] };
+let received: { menuReads: number[]; updates: MenuUpdateInput[] };
 
 /** How the server answers an update; the default stores it. A test replaces it to refuse or hold one. */
-let answerUpdate: (data: Partial<MenuInput>) => Promise<Response>;
+let answerUpdate: (data: MenuUpdateInput) => Promise<Response>;
 
 /** How the server answers a read of the menu. */
 let answerRead: () => Promise<Response>;
 
-function storeCocktails(items: NonNullable<Partial<MenuInput>['cocktails']>) {
+function storeCocktails(items: NonNullable<MenuUpdateInput['cocktails']>) {
   storedMenu = {
     ...storedMenu,
     cocktails: items.flatMap((item, index) =>
@@ -61,13 +61,13 @@ function storeCocktails(items: NonNullable<Partial<MenuInput>['cocktails']>) {
   };
 }
 
-function storeUpdate(data: Partial<MenuInput>): Response {
+function storeUpdate(data: MenuUpdateInput): Response {
   if (data.cocktails) storeCocktails(data.cocktails);
   return HttpResponse.json(storedMenu);
 }
 
 /** The menu fields the editor sends. */
-function isMenuUpdate(body: unknown): body is Partial<MenuInput> {
+function isMenuUpdate(body: unknown): body is MenuUpdateInput {
   return typeof body === 'object' && body !== null && !Array.isArray(body);
 }
 

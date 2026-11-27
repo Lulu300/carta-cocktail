@@ -30,7 +30,6 @@
     "bottleSearchPlaceholder": "Rechercher une bouteille...",
     "cocktailSearchPlaceholder": "Rechercher dans les recettes...",
     "withoutSection": "Sans section",
-    "other": "Autres",
     "servings_one": "{{count}} dose",
     "servings_other": "{{count}} doses",
     "ingredients": "Ingrédients",
@@ -89,5 +88,10 @@
   "errors": {
     "pageLoadFailed": "Impossible d'afficher cette page",
     "reload": "Recharger"
+  },
+  "frame": {
+    "adminTitle": "L'administration ne s'ouvre pas dans un autre site",
+    "adminDescription": "Cette page est intégrée dans un autre site. Ouvrez-la dans toute la fenêtre pour vous connecter.",
+    "openOutside": "Ouvrir dans toute la fenêtre"
   }
 }

@@ -3,6 +3,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { config } from '../config';
+import type { SourceType } from '../validation/cocktails';
 import {
   setupTestDatabase,
   teardownTestDatabase,
@@ -24,7 +25,7 @@ import type { CocktailExportFile } from '../services/cocktail/cocktailExport';
 import { MAX_IMAGE_BYTES } from '../services/cocktail/cocktailImage';
 import { derivedVariantNames } from '../services/cocktail/imageVariants';
 import { jpegOfSize, testImage } from '../test/images';
-import { MAX_EXPORT_BATCH } from '../validation/cocktails';
+import { MAX_EXPORT_BATCH, SOURCE_TYPES } from '../validation/cocktails';
 
 beforeAll(async () => {
   await setupTestDatabase();
@@ -525,7 +526,7 @@ describe('PUT /api/cocktails/:id', () => {
 // until v1.7.0) or with a quantity of 0 (a cleared field). The form sends them back as they are.
 describe('PUT /api/cocktails/:id - recipe defects already stored', () => {
   type StoredLine = {
-    sourceType: 'BOTTLE' | 'CATEGORY' | 'INGREDIENT';
+    sourceType: SourceType;
     quantity: number;
     bottleId?: number;
     categoryId?: number;
@@ -565,7 +566,7 @@ describe('PUT /api/cocktails/:id - recipe defects already stored', () => {
     });
   }
 
-  it.each(['BOTTLE', 'CATEGORY', 'INGREDIENT'] as const)(
+  it.each(SOURCE_TYPES)(
     'should rename a cocktail whose %s line lost its source and keep the line',
     async (sourceType) => {
       const { id } = await seedLegacyCocktail({ sourceType, quantity: 2 });

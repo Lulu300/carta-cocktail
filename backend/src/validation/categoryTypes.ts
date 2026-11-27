@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RequiredText, Translations } from './common';
+import { RequiredText, StoredTranslations, Translations } from './common';
 
 // The name in the path is the key of an existing type, kept as stored: it is not trimmed.
 // Data older than v1.9.0 can hold ' SPIRIT ' next to 'SPIRIT', and a trimmed key would
@@ -17,3 +17,15 @@ export const CategoryTypeCreate = z.object({
 });
 
 export const CategoryTypeUpdate = CategoryTypeCreate.omit({ name: true });
+
+/** A category type as stored. Its name is its key. */
+export const CategoryType = z.strictObject({
+  name: z.string(),
+  nameTranslations: StoredTranslations,
+  color: z.string(),
+});
+
+/** A category type in the list of the categories page, with the number of categories of that type. */
+export const CategoryTypeListItem = CategoryType.extend({
+  _count: z.strictObject({ categories: z.number().int() }),
+});

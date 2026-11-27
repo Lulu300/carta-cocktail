@@ -8,10 +8,10 @@ effort: M
 status: todo
 owner: mixed
 depends_on: [C-15, D-21]
-touches: [backend/package.json, backend/package-lock.json, frontend/package.json, frontend/package-lock.json, .github/dependabot.yml, .nvmrc, backend/Dockerfile, frontend/Dockerfile]
+touches: [AGENTS.md, README.md, docs/plan/README.md, backend/package.json, backend/package-lock.json, frontend/package.json, frontend/package-lock.json, .github/dependabot.yml, .nvmrc, backend/Dockerfile, frontend/Dockerfile]
 sources: []
-branch:
-pr:
+branch: chore/D-47-node-26
+pr: 296
 ---
 
 ## Contexte
@@ -81,3 +81,6 @@ La suite existante (backend : adapter, transactions sérialisées, migrations) ;
 ## Journal
 
 - 2026-11-25 : tâche créée par D-21 (PR #220) pour suivre les majeures que Dependabot ignore. D-46 est réservé à une autre tâche du même lot (D-23), d'où le numéro 47. Élargie à la relecture de la PR #220 (décision du coordinateur) : Node et `@types/node`, puis retrait de `@types/bcryptjs`, en plus de Prisma et `better-sqlite3`.
+- 2026-11-27 : volet 1 fait (`@types/bcryptjs` retiré du backend, le lockfile ne perd que cette entrée et la majeure d'`undici-types` qui suit `@types/node`). Volet 3 fait sur décision de l'humain (2026-11-27) : passage à Node 26 LTS, remplaçant la décision du 2026-10-10. `.nvmrc`, `node:26.13-alpine` (épinglé sur la mineure) dans les deux Dockerfiles, `engines.node` `>=26` et `@types/node` `^26.6.11` dans les deux paquets, README, AGENTS.md et décision de `docs/plan/README.md`. Les `ignore` Dependabot de `node` (docker) et de `@types/node` (npm) restent : ils portent désormais sur la majeure 27. Volet 2 revérifié (veille) : `prisma@latest` = 8.0.0-rc.36, la stable reste 7.10.1 (dist-tag `prev`) ; pas de 8.x stable, on ne passe pas sur une pré-version. La tâche reste `todo` pour ce volet.
+- 2026-11-27 : Notes de version : l'image tourne désormais sous Node 26 (LTS), sans action requise ; le développement hors Docker demande Node 26 ou plus (`engines`). `breaking: false`.
+- 2026-11-27 : la release `v1.20.0-rc.1` échoue sur l'image backend arm64 (run 45998038764, deux fois) : `prisma generate` du `postinstall`, dans l'étage `prod-deps` construit sous QEMU, renvoie `Unable to parse JSON` (`getDmmf`). Cause : V8 14 (Node 26) compile le `memory.copy` WebAssembly en instructions FEAT_MOPS quand le CPU les annonce ; le CPU `max` que QEMU émule par défaut (QEMU 9.2.2 et 10.2.3, celui de `tonistiigi/binfmt:latest`) les annonce, et le module de schéma de Prisma rend alors un JSON corrompu. Reproduit hors buildx (QEMU en mode utilisateur sur une machine amd64) : passe en natif arm64, avec Node 24 (V8 13.6, sans MOPS), avec QEMU 8.1.5, avec `--liftoff-only`, avec tout modèle nommé (`cortex-a53` à `neoverse-n2`) et en masquant seulement le bit MOPS de `AT_HWCAP2` ; `allowScripts` et npm hors de cause. Pas vérifié sur du matériel MOPS réel (le Mac M5 n'a pas MOPS). Correctif (PR #304) : `ENV QEMU_CPU=cortex-a53` dans l'étage `prod-deps`, et job CI `Docker build (backend arm64 dependencies)` qui construit cet étage en arm64 sous QEMU à chaque push (il échouait sans le correctif). Aucune note de version : rien ne change pour l'utilisateur.

@@ -6,6 +6,7 @@ import { ApiError } from './services/api';
 import Button from './components/ui/Button';
 import EmptyState from './components/ui/EmptyState';
 import BackHomeLink from './components/layout/BackHomeLink';
+import OutsideFrameOnly from './components/layout/OutsideFrameOnly';
 import PublicLayout from './components/layout/PublicLayout';
 import RouteErrorBoundary from './components/layout/RouteErrorBoundary';
 import HomePage from './pages/public/HomePage';
@@ -115,15 +116,24 @@ export default function App() {
           </Route>
 
           {/* Auth */}
-          <Route path="/login" element={<LoginPage />} />
+          <Route
+            path="/login"
+            element={
+              <OutsideFrameOnly>
+                <LoginPage />
+              </OutsideFrameOnly>
+            }
+          />
 
           {/* Admin routes */}
           <Route
             path="/admin"
             element={
-              <ProtectedRoute>
-                <AdminLayout />
-              </ProtectedRoute>
+              <OutsideFrameOnly>
+                <ProtectedRoute>
+                  <AdminLayout />
+                </ProtectedRoute>
+              </OutsideFrameOnly>
             }
           >
             <Route index element={<DashboardPage />} />

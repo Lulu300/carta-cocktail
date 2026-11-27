@@ -5,7 +5,7 @@ import { clearToasts, renderWithFeedback } from '../../../test/feedback';
 import { qk } from '../../../queries/keys';
 import { buildMenu, buildMenuCocktail, buildMenuSection } from '../../../test/factories';
 import { captureRequest, mockApiError, mockApiResponse } from '../../../test/msw/utils';
-import type { Menu, MenuSection } from '../../../types';
+import type { MenuDetail, MenuSection } from '../../../types';
 import MenuSectionsManager from './MenuSectionsManager';
 
 const starters = buildMenuSection({ id: 1, menuId: 3, name: 'Starters', position: 0 });
@@ -86,7 +86,7 @@ describe('MenuSectionsManager', () => {
     expect((await renamed.url).pathname).toBe('/api/menu-sections/sections/1');
     expect(await renamed.body).toEqual({ name: 'Openers' });
     await waitFor(() =>
-      expect(queryClient.getQueryData<Menu>(qk.menu(3))?.sections?.[0]!.name).toBe('Openers'),
+      expect(queryClient.getQueryData<MenuDetail>(qk.menu(3))?.sections?.[0]!.name).toBe('Openers'),
     );
   });
 
@@ -116,9 +116,9 @@ describe('MenuSectionsManager', () => {
 
     expect((await deleted.url).pathname).toBe('/api/menu-sections/sections/1');
     await waitFor(() =>
-      expect(queryClient.getQueryData<Menu>(qk.menu(3))?.sections).toHaveLength(1),
+      expect(queryClient.getQueryData<MenuDetail>(qk.menu(3))?.sections).toHaveLength(1),
     );
-    const cached = queryClient.getQueryData<Menu>(qk.menu(3));
+    const cached = queryClient.getQueryData<MenuDetail>(qk.menu(3));
     expect(cached?.sections?.map((section) => section.id)).toEqual([2]);
     expect(cached?.cocktails?.[0]!.menuSectionId).toBeNull();
   });
@@ -148,7 +148,7 @@ describe('MenuSectionsManager', () => {
     expect((await reordered.url).pathname).toBe('/api/menu-sections/menu/3/sections/reorder');
     expect(await reordered.body).toEqual({ sectionIds: [2, 1] });
     expect(
-      queryClient.getQueryData<Menu>(qk.menu(3))?.sections?.map((section) => section.name),
+      queryClient.getQueryData<MenuDetail>(qk.menu(3))?.sections?.map((section) => section.name),
     ).toEqual(['Classics', 'Starters']);
   });
 
@@ -168,7 +168,7 @@ describe('MenuSectionsManager', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('The new order must list every item'),
     );
     expect(
-      queryClient.getQueryData<Menu>(qk.menu(3))?.sections?.map((section) => section.id),
+      queryClient.getQueryData<MenuDetail>(qk.menu(3))?.sections?.map((section) => section.id),
     ).toEqual([1, 2]);
   });
 });

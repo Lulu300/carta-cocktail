@@ -1,7 +1,7 @@
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAcknowledgeUpgradeNotice, useUpgradeNotice } from '../../queries/system';
-import type { RequiredAction } from '../../services/api';
+import type { RequiredAction } from '../../types';
 import Button from '../ui/Button';
 
 /** The reference for every upgrade: the banner is only a reminder of it. */

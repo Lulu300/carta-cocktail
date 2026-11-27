@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { Id, MenuIdParams, PathId, Position } from './common';
+import { Id, MenuIdParams, PathId, Position, Timestamp } from './common';
+import { Bottle } from './bottles';
 
 export const MenuBottleCreate = z.object({
   menuId: Id,
@@ -46,3 +47,18 @@ export const MenuBottleGroupUpdate = MenuBottleUpdate.omit({ position: true }).e
 );
 
 export const MenuBottleExclusionParams = MenuIdParams.extend({ bottleId: PathId });
+
+/** A bottle removed from a system menu: the sync never adds it back. */
+export const MenuBottleExclusion = z.strictObject({
+  menuId: Id,
+  bottleId: Id,
+  bottle: Bottle,
+  createdAt: Timestamp,
+});
+
+/** Answer of the sync of a system menu with the bottles' flags. */
+export const MenuSyncResponse = z.strictObject({
+  message: z.string(),
+  added: z.number().int(),
+  removed: z.number().int(),
+});

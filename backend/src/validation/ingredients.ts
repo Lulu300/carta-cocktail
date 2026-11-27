@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RequiredText, Translations } from './common';
+import { Id, RequiredText, StoredTranslations, Timestamp, Translations } from './common';
 
 export const IngredientCreate = z.object({
   name: RequiredText,
@@ -12,3 +12,26 @@ export const IngredientUpdate = IngredientCreate.partial().extend({
 });
 
 export const BulkAvailability = z.object({ available: z.boolean() });
+
+export const Ingredient = z.strictObject({
+  id: Id,
+  name: z.string(),
+  nameTranslations: StoredTranslations,
+  icon: z.string().nullable(),
+  isAvailable: z.boolean(),
+  createdAt: Timestamp,
+});
+
+/** What the public pages get of an ingredient: its stock switch stays on the server. */
+export const PublicIngredient = Ingredient.pick({
+  id: true,
+  name: true,
+  nameTranslations: true,
+  icon: true,
+});
+
+/** Answer of the bulk availability switch: `updated` ingredients were changed. */
+export const BulkAvailabilityResponse = z.strictObject({
+  message: z.string(),
+  updated: z.number().int(),
+});

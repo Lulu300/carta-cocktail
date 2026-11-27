@@ -1,5 +1,7 @@
 import { z } from 'zod';
-import { Id, NullableDate, OptionalIntQuery, Percent, RequiredText } from './common';
+import { Id, NullableDate, OptionalIntQuery, Percent, RequiredText, Timestamp } from './common';
+import { Category } from './categories';
+import { CategoryType } from './categoryTypes';
 
 export const CapacityMl = z.number().int().positive();
 export const AlcoholPercentage = z.number().min(0).max(100).nullable();
@@ -42,3 +44,28 @@ export const BottleCreate = BottleFields.extend({
 });
 
 export const BottleUpdate = BottleFields.partial();
+
+/** A bottle as stored, without its relations. */
+export const BottleRow = z.strictObject({
+  id: Id,
+  name: z.string(),
+  categoryId: Id,
+  purchasePrice: z.number().nullable(),
+  capacityMl: z.number().int(),
+  remainingPercent: z.number().int(),
+  openedAt: Timestamp.nullable(),
+  alcoholPercentage: z.number().nullable(),
+  location: z.string().nullable(),
+  isApero: z.boolean(),
+  isDigestif: z.boolean(),
+  createdAt: Timestamp,
+});
+
+/** A bottle as the admin routes send it, always with its category. */
+export const Bottle = BottleRow.extend({ category: Category });
+
+/** One category with its type and its bottles (GET /categories/:id). Here, as categories.ts cannot import bottles.ts. */
+export const CategoryDetail = Category.extend({
+  categoryType: CategoryType,
+  bottles: z.array(BottleRow),
+});

@@ -10,11 +10,41 @@ import {
   getAllConversions,
 } from './unitConverter';
 
-const mlUnit: Unit = { id: 1, name: 'Millilitre', abbreviation: 'ml', conversionFactorToMl: 1 };
-const clUnit: Unit = { id: 2, name: 'Centilitre', abbreviation: 'cl', conversionFactorToMl: 10 };
-const ozUnit: Unit = { id: 3, name: 'Ounce', abbreviation: 'oz', conversionFactorToMl: 29.5735 };
-const pieceUnit: Unit = { id: 4, name: 'Piece', abbreviation: 'pce', conversionFactorToMl: null };
-const dashUnit: Unit = { id: 5, name: 'Dash', abbreviation: 'dash', conversionFactorToMl: 0.6 };
+const mlUnit: Unit = {
+  id: 1,
+  name: 'Millilitre',
+  nameTranslations: null,
+  abbreviation: 'ml',
+  conversionFactorToMl: 1,
+};
+const clUnit: Unit = {
+  id: 2,
+  name: 'Centilitre',
+  nameTranslations: null,
+  abbreviation: 'cl',
+  conversionFactorToMl: 10,
+};
+const ozUnit: Unit = {
+  id: 3,
+  name: 'Ounce',
+  nameTranslations: null,
+  abbreviation: 'oz',
+  conversionFactorToMl: 29.5735,
+};
+const pieceUnit: Unit = {
+  id: 4,
+  name: 'Piece',
+  nameTranslations: null,
+  abbreviation: 'pce',
+  conversionFactorToMl: null,
+};
+const dashUnit: Unit = {
+  id: 5,
+  name: 'Dash',
+  nameTranslations: null,
+  abbreviation: 'dash',
+  conversionFactorToMl: 0.6,
+};
 
 describe('isConvertible', () => {
   it('should return true for unit with conversionFactorToMl', () => {

@@ -1,4 +1,4 @@
-import type { Menu } from '../../../types';
+import type { MenuRow } from '../../../types';
 
 /**
  * Slugs of the menus the backend creates by itself (the aperitifs and digestifs
@@ -7,6 +7,6 @@ import type { Menu } from '../../../types';
  */
 const SYSTEM_MENU_SLUGS: readonly string[] = ['aperitifs', 'digestifs'];
 
-export function isSystemMenu(menu: Pick<Menu, 'slug'>): boolean {
+export function isSystemMenu(menu: Pick<MenuRow, 'slug'>): boolean {
   return SYSTEM_MENU_SLUGS.includes(menu.slug);
 }

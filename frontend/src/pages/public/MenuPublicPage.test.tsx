@@ -9,9 +9,9 @@ import {
   buildAvailability,
   buildCocktailIngredient,
   buildIngredient,
-  buildMenu,
-  buildMenuBottle,
-  buildMenuCocktail,
+  buildPublicMenu,
+  buildPublicMenuBottle,
+  buildPublicMenuCocktail,
   buildMenuSection,
   buildSiteSettings,
 } from '../../test/factories';
@@ -22,7 +22,7 @@ import {
   mockApiResponse,
   mockNetworkError,
 } from '../../test/msw/utils';
-import type { Bottle, Menu, MenuBottle, MenuCocktail } from '../../types';
+import type { PublicMenu, PublicMenuBottle, PublicMenuCocktail } from '../../types';
 import { axe } from '../../test/axe';
 import { SiteSettingsProvider } from '../../contexts/SiteSettingsContext';
 import MenuPublicPage from './MenuPublicPage';
@@ -44,35 +44,47 @@ const lime = buildCocktailIngredient({
 });
 
 /** Entry `id` of the apéritifs menu, holding bottle `id`, a Suze unless told otherwise. */
-function menuBottle(id: number, bottle: Partial<Bottle> = {}): MenuBottle {
-  return buildMenuBottle({ id, bottle: { id, name: 'Suze', alcoholPercentage: 20, ...bottle } });
+function menuBottle(
+  id: number,
+  bottle: Partial<PublicMenuBottle['bottle']> = {},
+): PublicMenuBottle {
+  return buildPublicMenuBottle({
+    id,
+    bottle: { id, name: 'Suze', alcoholPercentage: 20, ...bottle },
+  });
 }
 
-function bottleMenu(bottles: MenuBottle[]): Menu {
-  return buildMenu({ id: 1, name: 'Apéritifs', slug: 'aperitifs', type: 'APEROS', bottles });
+function bottleMenu(bottles: PublicMenuBottle[]): PublicMenu {
+  return buildPublicMenu({ id: 1, name: 'Apéritifs', slug: 'aperitifs', type: 'APEROS', bottles });
 }
 
-function cocktailMenu(cocktails: MenuCocktail[], overrides: Partial<Menu> = {}): Menu {
-  return buildMenu({ id: 2, name: 'Cocktails', slug: 'cocktails', cocktails, ...overrides });
+function cocktailMenu(
+  cocktails: PublicMenuCocktail[],
+  overrides: Partial<PublicMenu> = {},
+): PublicMenu {
+  return buildPublicMenu({ id: 2, name: 'Cocktails', slug: 'cocktails', cocktails, ...overrides });
 }
 
-function mockMenu(menu: Menu) {
+function mockMenu(menu: PublicMenu) {
   mockApiResponse('get', '/api/public/menus/:slug', menu);
 }
 
 const suzeMenu = bottleMenu([1, 2].map((id) => menuBottle(id, { location: 'B57' })));
 
 const mojitoMenu = cocktailMenu([
-  buildMenuCocktail({
+  buildPublicMenuCocktail({
     id: 1,
     cocktail: {
       description: 'Frais et pétillant',
       tags: 'rhum,tiki',
       ingredients: [lime],
-      instructions: [{ id: 1, cocktailId: 1, stepNumber: 1, text: 'Shaker avec de la glace' }],
+      instructions: [{ id: 1, stepNumber: 1, text: 'Shaker avec de la glace' }],
     },
   }),
-  buildMenuCocktail({ id: 2, cocktail: { name: 'Negroni', description: 'Amer', tags: 'gin' } }),
+  buildPublicMenuCocktail({
+    id: 2,
+    cocktail: { name: 'Negroni', description: 'Amer', tags: 'gin' },
+  }),
 ]);
 
 function signIn(isAdmin: boolean) {
@@ -192,12 +204,12 @@ describe('MenuPublicPage', () => {
 
     it('shows a personal digestifs menu as a bottle menu, like the system ones', async () => {
       mockMenu(
-        buildMenu({
+        buildPublicMenu({
           id: 3,
           name: 'After dinner',
           slug: 'after-dinner',
           type: 'DIGESTIFS',
-          bottles: [menuBottle(1, { name: 'Chartreuse', isApero: false, isDigestif: true })],
+          bottles: [menuBottle(1, { name: 'Chartreuse' })],
         }),
       );
       renderMenu('after-dinner');
@@ -331,9 +343,9 @@ describe('MenuPublicPage', () => {
       mockMenu(
         cocktailMenu(
           [
-            buildMenuCocktail({ id: 1, menuSectionId: 10 }),
-            buildMenuCocktail({ id: 2, cocktail: { name: 'Negroni' }, menuSectionId: 20 }),
-            buildMenuCocktail({ id: 3, cocktail: { name: 'Spritz' }, menuSectionId: 30 }),
+            buildPublicMenuCocktail({ id: 1, menuSectionId: 10 }),
+            buildPublicMenuCocktail({ id: 2, cocktail: { name: 'Negroni' }, menuSectionId: 20 }),
+            buildPublicMenuCocktail({ id: 3, cocktail: { name: 'Spritz' }, menuSectionId: 30 }),
           ],
           {
             sections: [
@@ -357,7 +369,7 @@ describe('MenuPublicPage', () => {
 
     it('has no section navigation with a single section', async () => {
       mockMenu(
-        cocktailMenu([buildMenuCocktail({ id: 1, menuSectionId: 10 })], {
+        cocktailMenu([buildPublicMenuCocktail({ id: 1, menuSectionId: 10 })], {
           sections: [
             buildMenuSection({ id: 10, name: 'Classics' }),
             buildMenuSection({ id: 20, name: 'Empty' }),
@@ -407,7 +419,7 @@ describe('MenuPublicPage accessibility', () => {
     mockMenu(
       cocktailMenu([
         ...mojitoMenu.cocktails!,
-        buildMenuCocktail({
+        buildPublicMenuCocktail({
           id: 3,
           cocktail: { name: 'Daiquiri', isAvailable: true, available: false },
         }),

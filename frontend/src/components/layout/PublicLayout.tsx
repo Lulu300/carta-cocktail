@@ -6,6 +6,7 @@ import LanguageSelector from '../ui/LanguageSelector';
 import ThemeToggle from '../ui/ThemeToggle';
 import SiteName from './SiteName';
 import SkipLink, { MAIN_CONTENT_ID } from './SkipLink';
+import { outsideFrameTarget } from '../../utils/frame';
 
 /**
  * `--header-h` is the height of the sticky header: the menu toolbar sticks right
@@ -38,6 +39,7 @@ export default function PublicLayout() {
             {user && (
               <Link
                 to="/admin"
+                target={outsideFrameTarget()}
                 className="text-sm text-accent hover:text-accent-soft px-3 py-1.5 rounded-lg border border-accent/30 hover:bg-accent/10 transition-colors"
               >
                 {t('nav.dashboard')}
@@ -55,7 +57,11 @@ export default function PublicLayout() {
           <SiteName />
         </span>
         {!user && (
-          <Link to="/login" className="shrink-0 hover:text-fg transition-colors">
+          <Link
+            to="/login"
+            target={outsideFrameTarget()}
+            className="shrink-0 hover:text-fg transition-colors"
+          >
             {t('nav.login')}
           </Link>
         )}

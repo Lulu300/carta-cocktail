@@ -19,6 +19,7 @@
     "db:status": "prisma migrate status",
     "db:check": "DATABASE_URL=file:./db-check.db prisma migrate diff --from-migrations prisma/migrations --to-schema prisma/schema.prisma --exit-code",
     "db:seed": "tsx src/scripts/seed.ts",
+    "contracts:generate": "tsx src/contracts/generateFrontendTypes.ts",
     "postinstall": "prisma generate"
   },
   "keywords": [],
@@ -26,7 +27,7 @@
   "license": "MIT",
   "type": "commonjs",
   "engines": {
-    "node": ">=24"
+    "node": ">=26"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "7.10.1",
@@ -61,13 +62,12 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/archiver": "^8.0.0",
-    "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
     "@types/multer": "^2.0.0",
-    "@types/node": "^24.19.2",
+    "@types/node": "^26.6.11",
     "@types/supertest": "^7.2.1",
     "@vitest/coverage-v8": "^5.1.1",
     "esbuild": "^0.28.2",

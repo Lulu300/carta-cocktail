@@ -4,7 +4,13 @@ import { useTranslation } from 'react-i18next';
 import { useSort } from '../../hooks/useSort';
 import { usePagination } from '../../hooks/usePagination';
 import { menus as menusApi } from '../../services/api';
-import type { Menu, MenuInput } from '../../types';
+import {
+  MENU_TYPES,
+  type MenuCreateInput,
+  type MenuRow,
+  type MenuSummary,
+  type MenuType,
+} from '../../types';
 import { qk } from '../../queries/keys';
 import { useMenus } from '../../queries/menus';
 import { useCrudMutations } from '../../queries/crud';
@@ -35,7 +41,7 @@ interface MenuForm {
   description: string;
   isPublic: boolean;
   /** Fixed at the creation: the backend refuses to change it later. */
-  type: Menu['type'];
+  type: MenuType;
 }
 
 const EMPTY_MENU_FORM: MenuForm = {
@@ -46,16 +52,14 @@ const EMPTY_MENU_FORM: MenuForm = {
   type: 'COCKTAILS',
 };
 
-const TYPE_BADGES: Record<Menu['type'], { labelKey: string; color: string }> = {
+const TYPE_BADGES: Record<MenuType, { labelKey: string; color: string }> = {
   COCKTAILS: { labelKey: 'menus.types.cocktails', color: 'purple' },
   APEROS: { labelKey: 'menus.types.aperos', color: 'yellow' },
   DIGESTIFS: { labelKey: 'menus.types.digestifs', color: 'orange' },
 };
 
-const MENU_TYPES = Object.keys(TYPE_BADGES) as Menu['type'][];
-
-function isMenuType(value: string): value is Menu['type'] {
-  return (MENU_TYPES as string[]).includes(value);
+function isMenuType(value: string): value is MenuType {
+  return (MENU_TYPES as readonly string[]).includes(value);
 }
 
 export default function MenusPage() {
@@ -63,12 +67,12 @@ export default function MenusPage() {
   const navigate = useNavigate();
   const confirmDelete = useConfirmDelete();
   const menusQuery = useMenus();
-  const { create, remove } = useCrudMutations<MenuInput, Menu>({
+  const { create, remove } = useCrudMutations<MenuCreateInput, MenuRow>({
     key: qk.menus,
     api: menusApi,
     messages: { created: 'menus.created', deleted: 'menus.deleted' },
   });
-  const menuForm = useEntityForm<Menu, MenuForm>(() => EMPTY_MENU_FORM);
+  const menuForm = useEntityForm<MenuSummary, MenuForm>(() => EMPTY_MENU_FORM);
   const { form, setField } = menuForm;
   const [search, setSearch] = useState('');
 
@@ -79,7 +83,7 @@ export default function MenusPage() {
     );
   }, [menusQuery.data, search]);
 
-  const sort = useSort<Menu>(filteredMenus);
+  const sort = useSort<MenuSummary>(filteredMenus);
   const pagination = usePagination(sort.sortedItems);
 
   // A slug already taken comes back as a 409, shown in the error toast; the form stays open.
@@ -94,11 +98,11 @@ export default function MenusPage() {
     });
   };
 
-  const handleDelete = async (menu: Menu) => {
+  const handleDelete = async (menu: MenuSummary) => {
     if (await confirmDelete(t('menus.confirmDelete'))) remove.mutate(menu.id);
   };
 
-  const columns: Column<Menu>[] = [
+  const columns: Column<MenuSummary>[] = [
     {
       key: 'name',
       header: t('menus.name'),

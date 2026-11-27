@@ -4,7 +4,7 @@
 # ($BUILDPLATFORM): the compiled JavaScript and the generated Prisma client do
 # not depend on the CPU, so the multi-platform release build compiles once,
 # natively, instead of once per platform under QEMU emulation.
-FROM --platform=$BUILDPLATFORM node:24.22-alpine AS build
+FROM --platform=$BUILDPLATFORM node:26.13-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 # The postinstall script generates the Prisma client from prisma/schema.prisma
@@ -30,7 +30,16 @@ RUN node_modules/.bin/esbuild prisma.config.ts --bundle --platform=node --packag
 # Pruning keeps what `npm ci` installed and built without a second download.
 # No --omit=optional: sharp gets its libvips binary from an optional dependency, one
 # per platform. The optional peers that only the dev tooling uses are cut below instead.
-FROM node:24.22-alpine AS prod-deps
+FROM node:26.13-alpine AS prod-deps
+# The release builds this stage for arm64 under QEMU, which emulates by default
+# its "max" CPU, with the memory copy instructions of FEAT_MOPS. V8 14 (Node 26)
+# compiles WebAssembly memory.copy to them when the CPU has them, and under QEMU
+# 9.2 and 10.2 the Prisma schema module then returns corrupted JSON: prisma
+# generate fails with "Unable to parse JSON". The Cortex-A53 (Raspberry Pi 3),
+# the oldest 64-bit core the images support, has no MOPS, and the native module
+# checks below then also run on it. Every emulated process reads QEMU_CPU at
+# start; a native build ignores it, and the runtime stage does not inherit it.
+ENV QEMU_CPU=cortex-a53
 WORKDIR /app
 COPY package*.json ./
 COPY prisma/schema.prisma ./prisma/schema.prisma
@@ -95,7 +104,7 @@ RUN node -e "const sharp = require('sharp'); \
     Promise.all([pixel().webp().toBuffer(), pixel().jpeg().toBuffer()]).catch((error) => { \
       console.error(error); process.exit(1); })"
 
-FROM node:24.22-alpine AS runtime
+FROM node:26.13-alpine AS runtime
 # tini forwards SIGTERM to the entrypoint, then to Node once the entrypoint has exec'd it
 RUN apk add --no-cache tini
 ENV NODE_ENV=production

@@ -1,7 +1,7 @@
 import { Navigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { menus as menusApi, menuBottles as menuBottlesApi } from '../../services/api';
-import type { Menu } from '../../types';
+import type { MenuDetail } from '../../types';
 import { isBottleMenu, type BottleMenuType } from '../../utils/menuType';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import Button from '../../components/ui/Button';
@@ -17,7 +17,6 @@ import { menuEditorPath } from '../../components/admin/menus/bottleMenuType';
 import { isSystemMenu } from '../../components/admin/menus/isSystemMenu';
 import {
   groupMenuBottles,
-  hasBottle,
   type MenuBottleGroup,
 } from '../../components/admin/menus/menuBottleGroups';
 import { useMenuBottles, type EntryChanges } from '../../components/admin/menus/useMenuBottles';
@@ -41,7 +40,7 @@ interface MenuTypeTexts {
   unchecked: string;
 }
 
-type BottleMenu = Menu & { type: BottleMenuType };
+type BottleMenu = MenuDetail & { type: BottleMenuType };
 
 const TYPE_TEXTS: Record<BottleMenuType, MenuTypeTexts> = {
   APEROS: {
@@ -112,7 +111,7 @@ function MenuBottles({ menu }: { menu: BottleMenu }) {
   const mutations = useMenuBottles(menu.id);
   // Queued with the other changes of the menu. The menu read after the sync becomes the
   // confirmed state, so a change sent next already counts the bottles it added.
-  const sync = useMenuMutation<void, Menu>({
+  const sync = useMenuMutation<void, MenuDetail>({
     menuId: menu.id,
     mutationFn: async () => {
       await menuBottlesApi.sync(menu.id);
@@ -121,8 +120,8 @@ function MenuBottles({ menu }: { menu: BottleMenu }) {
     applyConfirmed: (state, _variables, syncedMenu) => ({ ...state, menu: syncedMenu }),
   });
   const isSystem = isSystemMenu(menu);
-  const sections = menu.sections ?? [];
-  const groups = groupMenuBottles((menu.bottles ?? []).filter(hasBottle));
+  const { sections } = menu;
+  const groups = groupMenuBottles(menu.bottles);
   // A bottle put back in the menu has no id yet: the new order cannot name it.
   const canReorder = groups.every((group) => group.isSaved);
   const typeTexts = TYPE_TEXTS[menu.type];

@@ -1,16 +1,12 @@
-import type { MenuBottleExclusion } from '../../../services/api';
-import type { Bottle, MenuBottle } from '../../../types';
+import type { Bottle, MenuBottle, MenuBottleExclusion } from '../../../types';
 import { bottleGroupKey } from '../../../utils/bottleGrouping';
-
-/** An entry of a menu with its bottle, as the menu endpoint returns it. */
-export type MenuBottleEntry = MenuBottle & { bottle: Bottle };
 
 /** Identical bottles of one section of a menu, shown and changed as one row. */
 export interface MenuBottleGroup {
   key: string;
   /** The first bottle of the group, for its name, category and strength. */
   bottle: Bottle;
-  entries: MenuBottleEntry[];
+  entries: MenuBottle[];
   menuSectionId: number | null;
   /** Hidden only when every bottle of the group is. */
   isHidden: boolean;
@@ -36,10 +32,6 @@ export interface BottleChoiceGroup {
   isEmpty: boolean;
 }
 
-export function hasBottle(entry: MenuBottle): entry is MenuBottleEntry {
-  return entry.bottle !== undefined;
-}
-
 /** Entries not saved yet get a temporary negative id (see useMenuBottles). */
 export function isSavedEntry(entry: MenuBottle): boolean {
   return entry.id > 0;
@@ -62,8 +54,8 @@ function groupByKey<T>(items: T[], keyOf: (item: T) => string): [string, [T, ...
 }
 
 /** Groups identical bottles of the same section. */
-export function groupMenuBottles(entries: MenuBottleEntry[]): MenuBottleGroup[] {
-  const sectionAndBottle = (entry: MenuBottleEntry) =>
+export function groupMenuBottles(entries: MenuBottle[]): MenuBottleGroup[] {
+  const sectionAndBottle = (entry: MenuBottle) =>
     `${bottleGroupKey(entry.bottle)}|${entry.menuSectionId ?? ''}`;
 
   return groupByKey(entries, sectionAndBottle).map(([key, groupEntries]) => ({

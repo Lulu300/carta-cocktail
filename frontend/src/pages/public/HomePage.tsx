@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import SiteName from '../../components/layout/SiteName';
 import { useSiteSettings } from '../../contexts/SiteSettingsContext';
 import { usePublicMenus } from '../../queries/public';
-import type { Menu } from '../../types';
+import type { MenuSummary } from '../../types';
 import EmptyState from '../../components/ui/EmptyState';
 import Skeleton from '../../components/ui/Skeleton';
 import PublicErrorState from './PublicErrorState';
@@ -57,7 +57,7 @@ export default function HomePage() {
   );
 }
 
-function MenuCard({ menu }: { menu: Menu }) {
+function MenuCard({ menu }: { menu: MenuSummary }) {
   const { t } = useTranslation();
   const countLabel = isBottleMenu(menu)
     ? t('menus.bottleCount', { count: menu._count?.bottles ?? 0 })

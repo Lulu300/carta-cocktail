@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
-// Schemas in this folder never import Prisma: they describe the HTTP contract only,
-// so the frontend can share them later (task F-05).
+// Schemas in this folder never import Prisma: they describe the HTTP contract only.
+// The frontend gets their types from frontend/src/types/generated.ts, generated from
+// src/contracts/frontendTypes.ts by `npm run contracts:generate` (task F-05).
 
 /** Database id sent in a JSON body. The UI always sends numbers, never strings. */
 export const Id = z.number().int().positive();
@@ -55,3 +56,48 @@ export const NullableDate = z
   .refine((value) => value === '' || isParsableDate(value), { message: 'Invalid date' })
   .nullable()
   .transform((value) => (value ? new Date(value) : null));
+
+// Response building blocks. Response schemas are strict: a field the backend starts sending
+// fails the contract tests until the schema, and so the frontend types, list it.
+
+/** A date as a response sends it: JSON turns Prisma's DateTime into an ISO string. */
+export const Timestamp = z.iso.datetime();
+
+/**
+ * Translated names as a response sends them (`parseNameTranslations`). Rows written before
+ * the `Translations` schema may hold other languages: any language key is kept.
+ */
+export const StoredTranslations = z.record(z.string(), z.string()).nullable();
+
+/** Answer of a deletion that reports nothing else. */
+export const MessageResponse = z.strictObject({ message: z.string() });
+
+/** What a deletion breaks: `details` of a deletion refused with a 409, `impact` once it is done. */
+export const DeletionImpact = z.strictObject({
+  /** Recipes that use the item: a forced deletion removes `removedLines` lines from each. */
+  cocktails: z.array(z.strictObject({ id: Id, name: z.string(), removedLines: z.number().int() })),
+  /** Bottles of a category, deleted with it. */
+  bottles: z.array(z.strictObject({ id: Id, name: z.string() })),
+});
+
+export const DeletionResponse = z.strictObject({
+  message: z.string(),
+  deleted: z.boolean(),
+  impact: DeletionImpact,
+});
+
+export const ImportMatchStatus = z.enum(['matched', 'missing', 'ambiguous']);
+
+/**
+ * How an entity an import names compares with the existing rows (`previewMatch`,
+ * utils/uniqueness.ts): `ref` as the file gives it, and the row found, if any.
+ */
+export function importMatch<Ref extends z.ZodType, Row extends z.ZodType>(ref: Ref, row: Row) {
+  return z.strictObject({
+    ref,
+    existingMatch: row.nullable(),
+    status: ImportMatchStatus,
+    /** `ambiguous` only: the rows equal to the name ignoring case, none of them exactly. */
+    ambiguousMatches: z.array(row).optional(),
+  });
+}

@@ -104,15 +104,21 @@ Coverage is enforced automatically by CI. Run `npm test -- --coverage` in either
 
 ## CI/CD (GitHub Actions)
 
-**CI** (`.github/workflows/ci.yml`) — runs on PRs and pushes to `main`/`develop`, and is called by the release workflow (`workflow_call`). Four jobs run in parallel:
+**CI** (`.github/workflows/ci.yml`) — runs on PRs and pushes to `main`/`develop`, and is called by the release workflow (`workflow_call`). Five jobs run in parallel:
 - **Backend**: `npm ci` (postinstall: `prisma generate`) → `npm audit --omit=dev --audit-level=high` → `npm run db:check` (migrations match `schema.prisma`) → `npm run typecheck` → `npm run lint` → `npm run format:check` → `npm run build` → tests of `.github/scripts` → `npm run test:coverage` → delta coverage (80%, PRs only)
 - **Frontend**: `npm ci` → `npm audit --omit=dev --audit-level=high` → `tsc -b` → `npm run lint` → `npm run format:check` → `npm run build` → bundle budget of the public menu and admin-free service worker precache (`.github/scripts/bundle-budget.mjs`, 140 kB gzip) → CSS media queries readable by Safari 16 → `npm run test:coverage` → delta coverage (80%, PRs only)
-- **Docker build (backend)** and **Docker build (frontend)**: build each image for `linux/amd64`, without pushing it. The `linux/arm64` build only runs at release
-- The Node jobs run on Node 24, the version used by the Docker images (`.nvmrc`); `engines` in both `package.json` require Node >= 24
+- **Docker build (backend)** and **Docker build (frontend)**: build each image for `linux/amd64`, without pushing it
+- **Docker build (backend arm64 dependencies)**: builds the `prod-deps` stage of the backend image for `linux/arm64` under QEMU, as the release does (`npm ci` with `prisma generate`, native module checks), from the cache when nothing changed. The full `linux/arm64` images are only built at release. Not a required check yet (the rulesets are the human's)
+- The Node jobs run on Node 26, the version used by the Docker images (`.nvmrc`); `engines` in both `package.json` require Node >= 26
 
 **Smoke** (`.github/workflows/smoke.yml`) — runs on PRs to `main`/`develop`, on demand, and as the `smoke` job of the release workflow:
 - Builds and starts `docker-compose.yml`, then runs `scripts/smoke/smoke.sh` through nginx: login, 2.4 MB photo upload, photo still served after the backend container is recreated, backup export, link preview of a public menu for a messaging robot. Then `scripts/smoke/custom-uid.sh` recreates the backend with `CARTA_UID`/`CARTA_GID`: refused on volumes of uid 1000, then started after a `chown`, and `smoke.sh` again
 - Locally, always in a dedicated compose project: `export COMPOSE_PROJECT_NAME=carta-smoke JWT_SECRET=$(openssl rand -hex 32) ADMIN_PASSWORD=$(openssl rand -hex 16)`, then `docker compose -p carta-smoke up -d --build --wait && ./scripts/smoke/smoke.sh`, then `docker compose -p carta-smoke down -v --remove-orphans --rmi local`, all in the same shell call (`smoke.sh` reads `COMPOSE_PROJECT_NAME` to recreate the backend). The default project is your local stack: `down -v` would delete its data (see the header of `smoke.sh`)
+
+**E2E** (`.github/workflows/e2e.yml`, folder `e2e/`) — runs on PRs to `develop` and on demand. Not a required check yet (it becomes one after a few stable weeks):
+- Builds and starts `docker-compose.yml` like Smoke, then runs the Playwright journeys in Chromium (`npm test` in `e2e/`): sign-in and sign-out, expired token, category → bottle → cocktail with a photo, menu with a section published and read by a guest, personal bottle menu, search, light theme, 404 page, offline menu, backup export and restore. The `*.public.spec.ts` files also run on a Pixel 7 profile (Chromium too). A failure uploads the Playwright report (trace and screenshot of each failed test) and the container logs
+- Locally, with a stack started in a dedicated compose project (`docker compose -p carta-e2e up -d --build --wait`, with `JWT_SECRET` and `ADMIN_PASSWORD` in the `.env` next to the compose file, which the config reads): `cd e2e && npm ci && npx playwright install chromium && npm test`, then `docker compose -p carta-e2e down -v --remove-orphans --rmi local`. `BASE_URL` points the tests elsewhere than `http://localhost`
+- Rules for new journeys: the test creates its data through the API (`support/api.ts`, `AdminApi`) with `uniqueName()` and clicks through the interface only for what it is about; the database is never reset and keeps the data of earlier runs, so a list is searched, never read from its first page; no retry (a flaky test is fixed, not retried). The admin signs in once (`auth.setup.ts`, the login route counts failed attempts and the backup routes allow 10 requests per 15 minutes: restart the backend container when a local loop hits them); the backup journey signs in again after the restore, which ends every session
 
 **CodeQL**: GitHub's default setup analyses `main` and the PRs to `main` only, so its check is required on `main` alone.
 
@@ -134,6 +140,7 @@ Coverage is enforced automatically by CI. Run `npm test -- --coverage` in either
 │   ├── plan/               # Action plan: tasks and tracking script
 │   ├── releases/           # Release notes, one file per version
 │   └── review/             # Review reports behind the plan
+├── e2e/                    # Playwright journeys against the compose stack (CI "E2E" job)
 ├── scripts/
 │   ├── smoke/              # Smoke test of the compose stack (CI "Smoke" job)
 │   └── upgrade-test/       # Upgrade bench across released versions

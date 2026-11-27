@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "engines": {
-    "node": ">=24"
+    "node": ">=26"
   },
   "scripts": {
     "dev": "vite",
@@ -39,7 +39,7 @@
     "@testing-library/jest-dom": "^8.0.0",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.13",
-    "@types/node": "^24.19.2",
+    "@types/node": "^26.6.11",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.3.0",

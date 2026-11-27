@@ -30,7 +30,6 @@
     "bottleSearchPlaceholder": "Search for a bottle...",
     "cocktailSearchPlaceholder": "Search recipes...",
     "withoutSection": "Without a section",
-    "other": "Other",
     "servings_one": "{{count}} serving",
     "servings_other": "{{count}} servings",
     "ingredients": "Ingredients",
@@ -89,5 +88,10 @@
   "errors": {
     "pageLoadFailed": "This page could not be displayed",
     "reload": "Reload"
+  },
+  "frame": {
+    "adminTitle": "The administration does not open inside another website",
+    "adminDescription": "This page is embedded in another site. Open it in the whole window to sign in.",
+    "openOutside": "Open in the whole window"
   }
 }

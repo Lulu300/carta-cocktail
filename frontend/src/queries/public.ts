@@ -1,7 +1,7 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { ApiError, publicApi } from '../services/api';
-import type { Cocktail, Menu } from '../types';
+import type { PublicCocktail, PublicMenu, MenuSummary } from '../types';
 import { qk, type PublicViewer } from './keys';
 
 // A menu rarely changes during an evening: a guest coming back from a cocktail
@@ -38,7 +38,7 @@ export function isNotFoundError(error: Error | null): boolean {
   return error instanceof ApiError && error.status === 404;
 }
 
-export function usePublicMenus(): UseQueryResult<Menu[], Error> {
+export function usePublicMenus(): UseQueryResult<MenuSummary[], Error> {
   const viewer = usePublicViewer();
   return useQuery({
     queryKey: qk.publicMenus,
@@ -48,7 +48,7 @@ export function usePublicMenus(): UseQueryResult<Menu[], Error> {
   });
 }
 
-export function usePublicMenu(slug: string): UseQueryResult<Menu, Error> {
+export function usePublicMenu(slug: string): UseQueryResult<PublicMenu, Error> {
   const viewer = usePublicViewer();
   return useQuery({
     queryKey: qk.publicMenu(slug, viewer),
@@ -58,7 +58,7 @@ export function usePublicMenu(slug: string): UseQueryResult<Menu, Error> {
   });
 }
 
-export function usePublicCocktail(id: number): UseQueryResult<Cocktail, Error> {
+export function usePublicCocktail(id: number): UseQueryResult<PublicCocktail, Error> {
   const viewer = usePublicViewer();
   return useQuery({
     queryKey: qk.publicCocktail(id, viewer),

@@ -20,6 +20,7 @@ import {
   getAuthToken,
   listenWithShortTimeouts,
   seedAppState,
+  expectContract,
 } from '../test/helpers';
 import app from '../app';
 import { configureSqlite, createPrismaClient } from '../lib/prisma';
@@ -27,6 +28,7 @@ import { resetRateLimits } from '../middleware/rateLimit';
 import { resolveDatabasePath } from '../lib/databasePath';
 import { config } from '../config';
 import { beginExport, latestAppMigration, restoreBackup } from '../services/backupService';
+import { BackupRestoreResult } from '../validation/backup';
 import {
   applySessionFloor,
   hasTokenVersionColumn,
@@ -455,7 +457,7 @@ describe('backup restore', () => {
     const res = await importBackup(backup);
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({
+    expect(expectContract(BackupRestoreResult, res.body)).toEqual({
       message: 'Backup restored successfully',
       skippedFiles: 0,
       restartRecommended: true,

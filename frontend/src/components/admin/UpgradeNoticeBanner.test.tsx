@@ -5,7 +5,7 @@ import { render, screen, waitFor, within } from '../../test/test-utils';
 import { axe } from '../../test/axe';
 import { server } from '../../test/msw/server';
 import { captureRequest, mockApiError, mockApiResponse } from '../../test/msw/utils';
-import type { UpgradeNotice } from '../../services/api';
+import type { UpgradeNotice } from '../../types';
 import Toaster from '../ui/Toaster';
 import UpgradeNoticeBanner, { UPGRADING_GUIDE_URL } from './UpgradeNoticeBanner';
 

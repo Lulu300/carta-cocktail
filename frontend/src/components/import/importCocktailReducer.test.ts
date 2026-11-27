@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { buildIngredientRef } from '../../test/factories';
 import type { CocktailExportFormat, ImportPreviewResponse } from '../../types';
 import {
   canGoBack,
@@ -22,7 +23,9 @@ const preview: ImportPreviewResponse = {
   units: [],
   categories: [],
   bottles: [],
-  ingredients: [{ ref: { name: 'Mint' }, existingMatch: null, status: 'missing' }],
+  ingredients: [
+    { ref: buildIngredientRef({ name: 'Mint' }), existingMatch: null, status: 'missing' },
+  ],
 };
 
 function run(state: CocktailImportState, ...actions: CocktailImportAction[]): CocktailImportState {

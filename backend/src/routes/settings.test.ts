@@ -65,6 +65,68 @@ describe('PUT /api/settings', () => {
   });
 });
 
+describe('Sites allowed to embed the public menu', () => {
+  const putOrigins = (embedOrigins: unknown, language = 'en') =>
+    request
+      .put('/api/settings')
+      .set(authHeader())
+      .set('Accept-Language', language)
+      .send({ embedOrigins });
+  const storedOrigins = async () =>
+    (await prisma.siteSettings.findUniqueOrThrow({ where: { id: 1 } })).embedOrigins;
+
+  it('lists none by default', async () => {
+    const res = await request.get('/api/settings').set(authHeader());
+    expect(res.body.embedOrigins).toEqual([]);
+  });
+
+  it('stores the normalized origins and sends them back as a list', async () => {
+    const res = await putOrigins([
+      'https://WWW.Mon-Bar.fr/',
+      'https://www.mon-bar.fr',
+      'http://localhost:8081',
+    ]);
+    expect(res.status).toBe(200);
+    expect(res.body.embedOrigins).toEqual(['https://www.mon-bar.fr', 'http://localhost:8081']);
+    expect(await storedOrigins()).toBe('https://www.mon-bar.fr http://localhost:8081');
+
+    const read = await request.get('/api/settings').set(authHeader());
+    expect(read.body.embedOrigins).toEqual(['https://www.mon-bar.fr', 'http://localhost:8081']);
+  });
+
+  it('keeps the origins when another setting is saved, and empties them on an empty list', async () => {
+    await putOrigins(['https://www.mon-bar.fr']);
+    await request.put('/api/settings').set(authHeader()).send({ siteName: 'Bar' });
+    expect(await storedOrigins()).toBe('https://www.mon-bar.fr');
+
+    const res = await putOrigins([]);
+    expect(res.body.embedOrigins).toEqual([]);
+    expect(await storedOrigins()).toBe('');
+  });
+
+  it.each([
+    ['en', 'http://www.mon-bar.fr', 'uses http://'],
+    ['fr', 'http://www.mon-bar.fr', 'utilise http://'],
+    ['en', 'https://*.mon-bar.fr', 'wildcard'],
+    ['fr', 'https://*.mon-bar.fr', 'joker'],
+    ['en', 'https://www.mon-bar.fr/carte', 'not a site address'],
+    ['fr', 'https://www.mon-bar.fr/carte', 'pas une adresse de site'],
+  ])('refuses in %s %j, names it and keeps the stored list', async (language, origin, reason) => {
+    await putOrigins(['https://ok.example']);
+    const res = await putOrigins(['https://other.example', origin], language);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain(reason);
+    expect(res.body.error).toContain(origin);
+    expect(await storedOrigins()).toBe('https://ok.example');
+  });
+
+  it('refuses a list that is not made of strings', async () => {
+    const res = await putOrigins('https://www.mon-bar.fr');
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].path).toBe('body.embedOrigins');
+  });
+});
+
 describe('PUT /api/settings/profile', () => {
   const CURRENT_PASSWORD = 'testpass123';
   const NEW_PASSWORD = 'new-password-456';

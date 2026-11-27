@@ -28,7 +28,7 @@ A cocktail menu management system with admin panel and public-facing menu displa
 
 ### Prerequisites
 
-- Node.js 24 or newer (`.nvmrc`; `nvm use` picks it up), required by `engines` in both packages
+- Node.js 26 or newer (`.nvmrc`; `nvm use` picks it up), required by `engines` in both packages
 - npm
 
 ### Development
@@ -102,11 +102,11 @@ docker build --build-context releases=./docs/releases -t carta-cocktail-backend 
 
 Use `docker-compose.prod.yml` to deploy with pre-built images from GitHub Container Registry. The operations guide, [`docs/operations.md`](docs/operations.md) (in French), covers installation, backups, upgrades, rollback, secret rotation and HTTPS step by step.
 
-1. **Pin a version.** In `docker-compose.prod.yml`, replace `:latest` with a version, so that an upgrade only happens after you have read [`UPGRADING.md`](UPGRADING.md). `:<major>.<minor>` (from v1.12.0, such as `:1.19`) follows the patch releases of that minor version; `:<major>.<minor>.<patch>` never moves:
+1. **Pin a version.** In `docker-compose.prod.yml`, replace `:latest` with a version, so that an upgrade only happens after you have read [`UPGRADING.md`](UPGRADING.md). `:<major>.<minor>` (from v1.12.0, such as `:1.20`) follows the patch releases of that minor version; `:<major>.<minor>.<patch>` never moves:
 
    ```yaml
-   image: ghcr.io/lulu300/carta-cocktail/backend:1.19
-   image: ghcr.io/lulu300/carta-cocktail/frontend:1.19
+   image: ghcr.io/lulu300/carta-cocktail/backend:1.20
+   image: ghcr.io/lulu300/carta-cocktail/frontend:1.20
    ```
 
 2. **Create a `.env` file** alongside the compose file, before the first start:
@@ -343,7 +343,8 @@ carta-cocktail/
 │   │   ├── i18n/           # EN/FR translations
 │   │   └── types/          # TypeScript interfaces
 │   └── nginx.conf.template # Production nginx: serves the SPA, proxies /api and /uploads
-├── .github/workflows/      # CI, Smoke and Release pipelines
+├── e2e/                    # Playwright journeys against the compose stack
+├── .github/workflows/      # CI, Smoke, E2E and Release pipelines
 ├── docs/operations.md      # Operations guide (French)
 ├── docs/releases/          # Release notes, one file per version
 ├── scripts/                # Smoke test and upgrade test bench
@@ -421,12 +422,15 @@ This project uses a **feature branch** workflow:
 
 ## CI/CD
 
-**CI** (`.github/workflows/ci.yml`) runs on every PR and push to `main`/`develop`, in four jobs:
+**CI** (`.github/workflows/ci.yml`) runs on every PR and push to `main`/`develop`, in five jobs:
 - **Backend**: audit of the production dependencies, Prisma migrations in sync with `schema.prisma` (`npm run db:check`), TypeScript, ESLint, build, tests with coverage, delta coverage on PRs (80% of the changed lines)
 - **Frontend**: audit of the production dependencies, TypeScript (`tsc -b`), ESLint, build, size budget of the public menu, CSS readable by Safari 16, tests with coverage, delta coverage on PRs
 - **Docker build (backend)** and **Docker build (frontend)**: both images are built (`linux/amd64`, not pushed)
+- **Docker build (backend arm64 dependencies)**: the backend runtime dependencies (`prod-deps` stage) are built for `linux/arm64` under QEMU, as the release builds them
 
 **Smoke** (`.github/workflows/smoke.yml`) runs on every PR to `main`/`develop`, and in the Release workflow: it starts `docker-compose.yml` and checks login, photo upload, persistence after a backend recreation and backup export, then runs the backend under another uid.
+
+**E2E** (`.github/workflows/e2e.yml`) runs on every PR to `develop`: it starts the same stack and drives the key journeys (sign-in, catalog, menus, public menu, offline, backup) with Playwright in Chromium (`e2e/`). It is not required yet.
 
 These checks are required to merge into `main` and `develop`; a PR to `main` also needs CodeQL results.
 
@@ -439,7 +443,7 @@ The **Release** workflow (`.github/workflows/release.yml`) runs on version tags 
 | `vX.Y.Z-rc.N` (pre-release) | a commit of `develop` | `:X.Y.Z-rc.N` only, `latest` does not move | marked as pre-release |
 | `vX.Y.Z` (final) | a commit of `main` | `:X.Y.Z`, `:X.Y`, `:X` and `latest`, each one only if this version is the highest of its minor, its major, or overall | normal release, marked as latest only if this version is the highest |
 
-Before pushing any image, the workflow runs the whole CI (`ci.yml`) and the compose smoke (`smoke.yml`) on the tagged commit, in parallel. The smoke builds the stack for `linux/amd64` from the tagged code: it stops the publication of a stack that does not start, but does not test the multi-architecture images pushed afterwards. Images are built for `linux/amd64` and `linux/arm64` (the CI builds `amd64` only, so the `arm64` build is first tested here), with SBOM and provenance attestations, and carry their version (`APP_VERSION`, shown in the admin and by `/api/health`; `dev` in any other build).
+Before pushing any image, the workflow runs the whole CI (`ci.yml`) and the compose smoke (`smoke.yml`) on the tagged commit, in parallel. The smoke builds the stack for `linux/amd64` from the tagged code: it stops the publication of a stack that does not start, but does not test the multi-architecture images pushed afterwards. Images are built for `linux/amd64` and `linux/arm64` (the CI builds the `amd64` images and only the backend dependencies stage for `arm64`, so the full `arm64` images are first built here), with SBOM and provenance attestations, and carry their version (`APP_VERSION`, shown in the admin and by `/api/health`; `dev` in any other build).
 
 1. **Notes first.** On `develop`, copy `docs/releases/TEMPLATE.md` to `docs/releases/vX.Y.Z.md` (summary, detailed changes, required actions before and after the upgrade, `breaking`), and add the version's section to `UPGRADING.md`. A pre-release uses the notes of its target version, unless `docs/releases/vX.Y.Z-rc.N.md` exists.
 2. **Pre-release.** Push `develop`, then tag it: `git tag vX.Y.Z-rc.N origin/develop && git push origin vX.Y.Z-rc.N`.
@@ -459,8 +463,8 @@ The GitHub Release contains the notes file (without its front matter), the list 
 Prefer `:<major>.<minor>`, which follows the patch releases (see [Docker (production with pre-built images)](#docker-production-with-pre-built-images)):
 
 ```bash
-docker pull ghcr.io/lulu300/carta-cocktail/backend:1.19
-docker pull ghcr.io/lulu300/carta-cocktail/frontend:1.19
+docker pull ghcr.io/lulu300/carta-cocktail/backend:1.20
+docker pull ghcr.io/lulu300/carta-cocktail/frontend:1.20
 ```
 
 ## API Overview

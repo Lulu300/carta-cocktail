@@ -1,26 +1,19 @@
 import { z } from 'zod';
-import type {
-  Cocktail,
-  CocktailIngredient,
-  CocktailIngredientInput,
-  CocktailInput,
-  Ingredient,
-  Unit,
+import {
+  SOURCE_KEYS,
+  SOURCE_TYPES,
+  type Cocktail,
+  type CocktailIngredient,
+  type CocktailIngredientInput,
+  type CocktailInput,
+  type Ingredient,
+  type Unit,
 } from '../../../types';
 import { parseTags } from '../../../utils/parseTags';
 
 // Error messages are i18n keys, translated where the error is shown.
-// Rules follow the backend schema (backend/src/validation/cocktails.ts) until F-05 shares it.
-
-export const SOURCE_TYPES = ['BOTTLE', 'CATEGORY', 'INGREDIENT'] as const;
-export type SourceType = (typeof SOURCE_TYPES)[number];
-
-/** The id a line of each source type points to; the other two stay empty. */
-export const SOURCE_KEYS = {
-  BOTTLE: 'bottleId',
-  CATEGORY: 'categoryId',
-  INGREDIENT: 'ingredientId',
-} as const satisfies Record<SourceType, string>;
+// Rules follow the backend schema (backend/src/validation/cocktails.ts): the frontend gets its
+// types and its source types from it (F-05), not its rules, which speak to the admin here.
 
 // A select left on its empty option holds null.
 const OptionalId = z.number().int().positive().nullable();

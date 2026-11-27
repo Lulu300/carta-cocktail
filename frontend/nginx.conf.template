@@ -7,6 +7,23 @@ map $http_user_agent $is_preview_bot {
     "~*(facebookexternalhit|facebot|whatsapp|twitterbot|slackbot|telegrambot|discordbot|linkedinbot|skypeuripreview)" 1;
 }
 
+# Sites allowed to show the public menu in an iframe: a setting of the admin, kept in the
+# database, so location /menu/ asks the backend for it (auth_request) and sets
+# $menu_embed_origins. Unset on every other route, and empty when no site is listed: the
+# response then keeps frame-ancestors 'none' and X-Frame-Options DENY (security-headers.conf).
+# The backend only sends origins checked as CSP host sources (backend/src/services/embedOrigins.ts).
+# volatile: computed when the headers go out, after auth_request has set the variable.
+map $menu_embed_origins $frame_ancestors {
+    volatile;
+    ""      "'none'";
+    default "'self' $menu_embed_origins";
+}
+map $menu_embed_origins $x_frame_options {
+    volatile;
+    ""      "DENY";
+    default "";
+}
+
 server {
     # Unprivileged port: nginx runs as a non-root user (also under rootless Docker and Podman).
     listen 8080;
@@ -104,6 +121,13 @@ server {
         include /etc/nginx/snippets/security-headers.conf;
     }
 
+    # Imported by sw.js (vite.config.ts): revalidated like it, so that an update reaches the
+    # browser's check of the worker's imported scripts.
+    location = /sw-frame-navigations.js {
+        add_header Cache-Control "no-cache";
+        include /etc/nginx/snippets/security-headers.conf;
+    }
+
     # Web app manifest: the mime.types of nginx does not know the .webmanifest extension.
     location = /manifest.webmanifest {
         default_type application/manifest+json;
@@ -121,13 +145,40 @@ server {
 
     # Public menu and cocktail pages. Preview robots get a small HTML page with the Open Graph
     # tags of the menu or the cocktail, built by the backend (/api/public/share/menu/...); every
-    # other client gets the SPA, as on any other route. "rewrite ... last" is one of the uses of
-    # "if" in a location that nginx documents as safe.
+    # other client gets the SPA, revalidated on every load as in location = /index.html. Only
+    # these pages may be embedded in an iframe, by the sites the admin listed: the subrequest
+    # asks the backend for them. "rewrite ... last" is one of the uses of "if" in a location
+    # that nginx documents as safe.
     location /menu/ {
         if ($is_preview_bot) {
             rewrite ^ /api/public/share$uri last;
         }
-        try_files $uri $uri/ /index.html;
+        auth_request /internal/embed-origins;
+        auth_request_set $menu_embed_origins $upstream_http_x_embed_origins;
+        # A failed subrequest (backend down or restarting, rate limit) is a 500: serve the SPA
+        # anyway, through location = /index.html, which keeps frame-ancestors 'none'.
+        error_page 500 = /index.html;
+        # Served here rather than through an internal redirect to location = /index.html,
+        # whose headers would not depend on the menu.
+        try_files /index.html =404;
+        add_header Cache-Control "no-cache";
+        include /etc/nginx/snippets/security-headers.conf;
+    }
+
+    # The backend's answer only matters for its X-Embed-Origins header. Neither the client's
+    # headers (token, Content-Length of a body that is not passed) nor its body go to the
+    # backend; the proxy_set_header of the server block still do, so the request counts in the
+    # rate limit of the client's address, as the SPA's own API requests do.
+    # Short timeouts: a backend that no longer answers would otherwise hold each menu page for
+    # nginx's default 60 s before the fallback above serves it, not embeddable.
+    location = /internal/embed-origins {
+        internal;
+        proxy_pass_request_body off;
+        proxy_pass_request_headers off;
+        proxy_connect_timeout 3s;
+        proxy_read_timeout 3s;
+        proxy_send_timeout 3s;
+        proxy_pass $backend/api/public/embed-origins;
     }
 
     # SPA fallback

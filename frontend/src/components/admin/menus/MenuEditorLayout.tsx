@@ -2,7 +2,7 @@ import { useRef, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { menus as menusApi } from '../../../services/api';
-import type { Menu } from '../../../types';
+import type { MenuDetail } from '../../../types';
 import { useMenu } from '../../../queries/menus';
 import Button from '../../ui/Button';
 import Spinner from '../../ui/Spinner';
@@ -16,9 +16,9 @@ interface MenuEditorLayoutProps {
   menuId: number;
   /** What the menu holds, for the texts of the sections. */
   itemLabel: 'cocktails' | 'bottles';
-  title: (menu: Menu) => string;
+  title: (menu: MenuDetail) => string;
   /** The composition of the menu. */
-  children: (menu: Menu) => ReactNode;
+  children: (menu: MenuDetail) => ReactNode;
 }
 
 function BackToList() {
@@ -94,7 +94,7 @@ export default function MenuEditorLayout({
         onSave={submitInfo}
         isSaving={saveInfo.isPending}
       />
-      <MenuSectionsManager menuId={menu.id} sections={menu.sections ?? []} itemLabel={itemLabel} />
+      <MenuSectionsManager menuId={menu.id} sections={menu.sections} itemLabel={itemLabel} />
       {children(menu)}
       <div className="mt-6">
         <BackToList />

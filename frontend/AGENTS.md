@@ -37,10 +37,11 @@ CI runs automatically on PRs (`Frontend` job of `.github/workflows/ci.yml`): `np
 - i18n is the real instance, loaded as the app has it once the admin is open (`i18n/index.ts` and `i18n/admin.ts`, so both bundles), in English at the start of each test: never mock `react-i18next`. Assertions read the English texts the user sees, by role and accessible name where possible (`getByRole('button', { name: 'Add Unit' })`), not translation keys. Props that carry a key for the component to translate (`messages: { created: 'units.created' }`) keep the key. A plural is checked with the form the test's count picks (`'1 bottle'`, `'5 bottles'`). A text shared by two elements is told apart by role, `within` or position. A test of another language switches the real instance (`await i18n.changeLanguage('fr')`, in a `beforeEach`) and reads the French texts; `setup.ts` goes back to English after each test. A key found in no bundle fails the test that displays it (`src/test/missingKeys.ts`); only `missingKeys.test.ts` may invent one. The one local mock left, `LanguageSelectorFallback.test.tsx`, fakes `i18n.language` for values the real instance never yields
 - Environment: jsdom via Vitest
 - API calls go through the real `services/api.ts` to an MSW fake backend (`src/test/msw/handlers.ts`, one default handler per endpoint). Do not `vi.mock('services/api')`: set the answers a test needs with `mockApiResponse`, `mockApiError`, `mockApiPending`, `mockNetworkError`, `holdApiResponse` (answers when the test releases it), `mockItemInUse` (a DELETE refused with the impact of an item in use, accepted with `?force=true`), and check what the page sent with `captureRequest` (`src/test/msw/utils.ts`), called after the answers of the same endpoint (MSW tries the handler added last first). A request without a handler fails the test. A stateful page (menu editors, import wizards) gets its own `server.use(...)` handlers that store the data and record each request, built with the shared `readJsonObject`, `errorResponse` and `pendingResponse` of `src/test/msw/utils.ts`
-- Build test data with the typed factories of `src/test/factories.ts` (`buildBottle`, `buildCategory`…), never with `as never` casts
+- Build test data with the typed factories of `src/test/factories.ts` (`buildBottle`, `buildCategory`…), never with `as never` casts. The public routes send other shapes than the admin ones: build them with `buildPublicMenu`, `buildPublicMenuCocktail`, `buildPublicMenuBottle`, `buildPublicCocktail`, `buildPublicMenuSummary`
 - Real providers and components rather than mocks: wrap in `AppProviders` (`src/test/appProviders.tsx`: the real `AuthProvider` and `SiteSettingsProvider`) when a page or hook reads the session or the site settings; store a token in `localStorage` for the admin case. Mock a component only when it has its own tests and the page only needs its outcome (the import wizards, `exportZip`)
 - A file download goes through `mockDownload()` (`src/test/download.ts`), which records the saved file names. `rejectNextFetch(value)` covers code that guards against a non-Error throw. Both undo their stubs when the test ends
 - Run with coverage locally: `npm test -- --coverage`
+- Journeys that need a real browser and the real backend (nginx, upload, service worker, session expiry) are Playwright tests in `/e2e`, run by the `E2E` workflow (root `AGENTS.md`). They read the English texts and the roles of the interface: a renamed label or button breaks them, so rename it there too. They do not count in the coverage thresholds
 - `vitest.config.ts` pins the reporter, so the console of passing tests (`act(...)` warnings, `[MSW]` messages) shows the same under an AI agent as in a terminal or in CI (Vitest would otherwise pick its `minimal` reporter under an agent)
 - Accessibility: page tests check axe with `expect(await axe(container)).toHaveNoViolations()` (`src/test/axe.ts`, serious and critical violations only). jsdom computes no colors: contrast is checked with Lighthouse in a browser
 
@@ -88,7 +89,9 @@ frontend/
 │   │   ├── api.ts                 # Centralized API client with typed endpoints
 │   │   └── exportZip.ts          # Batch export cocktails to ZIP
 │   ├── types/
-│   │   └── index.ts              # TypeScript interfaces for all entities
+│   │   ├── generated.ts          # Generated from the backend zod schemas (`npm run contracts:generate` in backend/): never edit
+│   │   ├── importWizard.ts       # The import wizards' own view and editing state (not an API response)
+│   │   └── index.ts              # Import point of every API type: re-exports generated.ts and importWizard.ts only
 │   ├── utils/                  # Pure helpers: colors, dates, localization, translations, unitConverter,
 │   │                           # cocktailSearch, uploads (photo URLs and srcset), chunkReload, bottleGrouping…
 │   ├── test/                   # Test setup, MSW fake backend (msw/), factories, providers, axe
@@ -108,8 +111,8 @@ frontend/
 ├── vite.config.ts
 ├── vitest.config.ts
 ├── eslint.config.js
-├── nginx.conf.template           # Production: nginx server, proxies /api and /uploads to the backend (BACKEND_HOST); link preview robots on /menu/ get the backend's Open Graph page
-├── security-headers.conf         # Security headers included by nginx.conf.template
+├── nginx.conf.template           # Production: nginx server, proxies /api and /uploads to the backend (BACKEND_HOST); link preview robots on /menu/ get the backend's Open Graph page; /menu/ asks the backend which sites may embed it (auth_request)
+├── security-headers.conf         # Security headers included by nginx.conf.template; frame-ancestors and X-Frame-Options come from its maps
 └── Dockerfile                    # Vite build, then nginx (non-root, uid 101, port 8080)
 ```
 
@@ -191,6 +194,7 @@ Safari and iOS 16.0+, Chrome and Edge 107+, Firefox 104+ (`build.target` in `vit
 - **Precache**: the public shell only, listed by the `publicShell` plugin of `vite.config.ts` from the chunk graph (the entry chunk and its static imports, the registration chunk, the Latin fonts, the icons). Chunks reached through `import()` (login, admin, jszip) stay out. `bundle-budget.mjs` fails the CI if the precache holds admin code or misses a chunk of the first load.
 - **Runtime caches**: `NetworkFirst` (3 s) on `/api/public/` requests other than page loads (the link preview pages of `/api/public/share/` stay out), `CacheFirst` (200 entries, 30 days) on `/uploads/`, nothing else. A request with an `Authorization` header (the admin) is never cached nor answered from the cache. The first visit loads the menu before the worker exists: `registerServiceWorker.ts` requests those URLs again once the worker controls the page. Its list of cached paths repeats the one of `vite.config.ts`, whose matchers are copied into `sw.js` and cannot import it.
 - **Navigation**: offline, any page but `/admin`, `/login` (`ADMIN_PAGES`, also imported by `vite.config.ts`), `/api/` and `/uploads/` gets the precached `index.html`.
+- **Iframes**: `public/sw-frame-navigations.js`, imported by `sw.js` before the Workbox routes, sends every navigation of a frame to the network. The precached `index.html` carries the headers of `/index.html` (`frame-ancestors 'none'`): served in a frame, it would block an embedded menu (F-10).
 - **nginx**: `/sw.js` and `/manifest.webmanifest` are served with `Cache-Control: no-cache`, the manifest as `application/manifest+json` (`nginx.conf.template`); the smoke test checks both. The CSP needs nothing more: `worker-src` and `manifest-src` fall back to `default-src 'self'`.
 - **Tests**: Vitest does not load the plugin; `vitest.config.ts` points `virtual:pwa-register` to the stand-in `src/test/pwaRegister.ts`.
 - **Icons**: `pwa-icons/icon.svg` and `maskable.svg` (the glass inside the safe zone, 80% of the width), rendered at 512 px with headless Chrome, which cannot render a smaller window: `"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless --hide-scrollbars --window-size=512,512 --screenshot=../public/pwa-512.png icon.svg` from `pwa-icons/` (then `maskable.svg` to `pwa-maskable-512.png`). The 192 px icon and the 180 px `apple-touch-icon.png` are scaled down from `pwa-512.png` (`sips -z 192 192 pwa-512.png --out pwa-192.png` on macOS).
