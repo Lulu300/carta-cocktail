@@ -11,7 +11,7 @@ depends_on: [F-14]
 touches: [backend/prisma/schema.prisma, backend/prisma/migrations/, backend/src/app.ts, backend/src/middleware/auth.ts, backend/src/routes/, backend/src/services/apiTokenService.ts, backend/src/services/backupService.ts, backend/src/validation/, backend/src/contracts/frontendTypes.ts, backend/src/test/, backend/src/i18n/, backend/AGENTS.md, frontend/src/types/, frontend/src/services/api.ts, frontend/src/queries/, frontend/src/components/admin/ApiTokenSettings.tsx, frontend/src/components/admin/EmbedMenuSettings.tsx, frontend/src/components/ui/CopyButton.tsx, frontend/src/pages/admin/SettingsPage.tsx, frontend/src/test/, frontend/src/i18n/locales/admin/, frontend/AGENTS.md, AGENTS.md, README.md, docs/operations.md]
 sources: []
 branch: feature/F-16-api-tokens
-pr:
+pr: 307
 ---
 
 ## Décisions
