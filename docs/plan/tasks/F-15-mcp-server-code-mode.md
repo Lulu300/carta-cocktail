@@ -11,7 +11,7 @@ depends_on: [F-14, F-16]
 touches: [mcp/, backend/src/mcp/, backend/src/middleware/auth.ts, backend/src/openapi/, backend/src/test/helpers.ts, backend/AGENTS.md, AGENTS.md, scripts/smoke/smoke.sh, .prettierignore, backend/src/app.ts, backend/src/routes/, backend/package.json, backend/package-lock.json, README.md, docs/operations.md, .github/workflows/ci.yml, .github/workflows/release.yml]
 sources: []
 branch: feature/F-15-mcp-tools
-pr:
+pr: 309
 ---
 
 ## Décisions
