@@ -14,6 +14,14 @@ export interface RateLimiterOptions {
 // tests need to reach every store to reset the counters.
 const stores: MemoryStore[] = [];
 
+// Every limiter built here, so that the OpenAPI document tells which routes may answer 429
+const limiters = new WeakSet<RequestHandler>();
+
+/** Whether `handler` is a limiter built by `createRateLimiter`. */
+export function isRateLimiter(handler: unknown): boolean {
+  return typeof handler === 'function' && limiters.has(handler as RequestHandler);
+}
+
 // An IPv6 client counts for its /64, the network of one LAN, like the devices
 // behind one IPv4 address. Per address, a client would get around the limits by
 // picking new addresses in its /64; the library's /56 would make a guest VLAN
@@ -33,7 +41,7 @@ export function createRateLimiter({
 }: RateLimiterOptions): RequestHandler {
   const store = new MemoryStore();
   stores.push(store);
-  return rateLimit({
+  const limiter = rateLimit({
     windowMs,
     limit,
     skipSuccessfulRequests,
@@ -45,6 +53,8 @@ export function createRateLimiter({
     // Through errorHandler, so that the 429 is translated JSON like any other error
     handler: (_req, _res, next) => next(new HttpError(429, messageKey)),
   });
+  limiters.add(limiter);
+  return limiter;
 }
 
 /** Empties the counters of every limiter, so that each test starts with none. */

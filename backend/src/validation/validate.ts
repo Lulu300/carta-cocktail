@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { RequestHandler, Response } from 'express';
 import { BadRequestError } from '../errors';
+import type { ValidationIssue as ValidationIssueSchema } from './errors';
 
 const REQUEST_PARTS = ['params', 'query', 'body'] as const;
 
@@ -11,11 +12,7 @@ export type Validated<S extends Schemas> = {
   [K in keyof S]: S[K] extends z.ZodType ? z.output<S[K]> : never;
 };
 
-export interface ValidationIssue {
-  path: string;
-  code: string;
-  message: string;
-}
+export type ValidationIssue = z.output<typeof ValidationIssueSchema>;
 
 /** A zod issue as sent in `details`, its path prefixed with where the parsed value sits in the request. */
 export function toValidationIssue(prefix: PropertyKey[], issue: z.core.$ZodIssue): ValidationIssue {
@@ -26,13 +23,23 @@ export function toValidationIssue(prefix: PropertyKey[], issue: z.core.$ZodIssue
   };
 }
 
+// The schemas of each middleware built by `validate`, read by the OpenAPI document
+const schemasByMiddleware = new WeakMap<RequestHandler, Schemas>();
+
+/** The schemas `handler` validates, when it was built by `validate`. */
+export function validatedSchemas(handler: unknown): Schemas | undefined {
+  return typeof handler === 'function'
+    ? schemasByMiddleware.get(handler as RequestHandler)
+    : undefined;
+}
+
 /**
  * Parses the request parts against their schemas. On success the parsed values are
  * stored in `res.locals.valid` (read them with `valid(res)`); on failure the request
  * ends with a 400 whose `details` lists every issue of every part.
  */
 export function validate(schemas: Schemas): RequestHandler {
-  return (req, res, next) => {
+  const middleware: RequestHandler = (req, res, next) => {
     const parsed: Record<string, unknown> = {};
     const issues: ValidationIssue[] = [];
     for (const part of REQUEST_PARTS) {
@@ -54,6 +61,8 @@ export function validate(schemas: Schemas): RequestHandler {
     if ('body' in parsed) req.body = parsed.body;
     next();
   };
+  schemasByMiddleware.set(middleware, schemas);
+  return middleware;
 }
 
 /** Returns the request parts parsed by the `validate` middleware of the route. */
