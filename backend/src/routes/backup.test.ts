@@ -1449,6 +1449,59 @@ describe('backup and API tokens', () => {
   });
 });
 
+describe('backup and the Code Mode setting', () => {
+  const CODE_MODE_MIGRATION = path.resolve(
+    __dirname,
+    '../../prisma/migrations/20261127200000_site_code_mode/migration.sql',
+  );
+
+  async function codeModeColumns(): Promise<number> {
+    const columns = await prisma.$queryRawUnsafe<{ name: string }[]>(
+      `SELECT name FROM pragma_table_info('SiteSettings') WHERE name = 'codeModeEnabled'`,
+    );
+    return columns.length;
+  }
+
+  /** What the next start does: the migration adds the column, off. */
+  async function applyCodeModeMigration(): Promise<void> {
+    await prisma.$executeRawUnsafe(fs.readFileSync(CODE_MODE_MIGRATION, 'utf8'));
+  }
+
+  async function codeModeEnabled(): Promise<boolean> {
+    const res = await request.get('/api/settings').set(await currentSessionHeader());
+    expect(res.status).toBe(200);
+    return res.body.codeModeEnabled as boolean;
+  }
+
+  afterEach(async () => {
+    // The next tests need the column, even when an assertion failed before the migration
+    if ((await codeModeColumns()) === 0) await applyCodeModeMigration();
+  });
+
+  it('should bring back the setting of the backup, as the other settings', async () => {
+    await prisma.siteSettings.update({ where: { id: 1 }, data: { codeModeEnabled: true } });
+    const backup = await exportBackup();
+    await prisma.siteSettings.update({ where: { id: 1 }, data: { codeModeEnabled: false } });
+
+    expect((await importBackup(backup)).status).toBe(200);
+
+    expect(await codeModeEnabled()).toBe(true);
+  });
+
+  it('should keep Code Mode off after restoring a backup made before the setting existed', async () => {
+    await prisma.siteSettings.update({ where: { id: 1 }, data: { codeModeEnabled: true } });
+    const backup = await withDatabaseChanged(await exportBackup(), [
+      'ALTER TABLE "SiteSettings" DROP COLUMN "codeModeEnabled"',
+    ]);
+
+    expect((await importBackup(backup)).status).toBe(200);
+    expect(await codeModeColumns()).toBe(0);
+    // Next start: the migration adds the column, off
+    await applyCodeModeMigration();
+    expect(await codeModeEnabled()).toBe(false);
+  });
+});
+
 describe('backup import validation', () => {
   const validMetadata = JSON.stringify({ version: 1 });
 

@@ -183,6 +183,16 @@ describe('response contracts of the public routes', () => {
     ]);
   });
 
+  it('PUT /api/settings/code-mode answers AdminSiteSettings', async () => {
+    const res = await request
+      .put('/api/settings/code-mode')
+      .set(authHeader())
+      .send({ enabled: true });
+
+    expect(res.status).toBe(200);
+    expect(expectContract(AdminSiteSettings, res.body).codeModeEnabled).toBe(true);
+  });
+
   it('GET /api/public/units answers Unit[]', async () => {
     await seedRecipe();
 

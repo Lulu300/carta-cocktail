@@ -137,4 +137,5 @@ export type MenuBottleUpdateInput = z.input<typeof menuBottles.MenuBottleUpdate>
 export type MenuBottleGroupUpdateInput = z.input<typeof menuBottles.MenuBottleGroupUpdate>;
 export type SiteSettingsInput = z.input<typeof settings.SiteSettingsUpdate>;
 export type ProfileInput = z.input<typeof settings.ProfileUpdate>;
+export type CodeModeInput = z.input<typeof settings.CodeModeUpdate>;
 export type ApiTokenInput = z.input<typeof apiTokens.ApiTokenCreate>;

@@ -36,7 +36,12 @@ export const AdminSiteSettings = SiteSettings.extend({
   id: z.number().int(),
   /** Sites allowed to show the public menu in an iframe, e.g. "https://www.mon-bar.fr". */
   embedOrigins: z.array(z.string()),
+  /** The MCP server lists `search` and `execute`, which run an AI agent's code in a sandbox. */
+  codeModeEnabled: z.boolean(),
 });
+
+/** Turns Code Mode of the MCP server on or off (session only). */
+export const CodeModeUpdate = z.object({ enabled: z.boolean() });
 
 /** Answer of a profile update. `token` comes when the password changed: the previous one is revoked. */
 export const ProfileResponse = User.extend({ token: z.string().optional() });

@@ -1,11 +1,6 @@
 import http from 'http';
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
-import {
-  Client,
-  type ClientOptions,
-  SdkHttpError,
-  StreamableHTTPClientTransport,
-} from '@modelcontextprotocol/client';
+import { type Client, type ClientOptions, SdkHttpError } from '@modelcontextprotocol/client';
 import { appVersion } from '../config';
 import i18next from '../i18n';
 import { resetRateLimits } from '../middleware/rateLimit';
@@ -29,6 +24,7 @@ import {
   listenOnLoopback,
   type ListeningServer,
   prisma,
+  connectMcpClient,
 } from '../test/helpers';
 import { TOOL_CATALOG } from './catalog';
 import { type Caller, callOperation } from './callOperation';
@@ -60,11 +56,8 @@ afterEach(async () => {
 type Headers = Record<string, string>;
 
 /** An MCP client of the endpoint, connected with these headers (the 2025 handshake by default). */
-async function connect(headers: Headers, options: ClientOptions = {}): Promise<Client> {
-  const client = new Client({ name: 'carta-test', version: '1.0.0' }, options);
-  clients.push(client);
-  await client.connect(new StreamableHTTPClientTransport(endpoint, { requestInit: { headers } }));
-  return client;
+function connect(headers: Headers, options: ClientOptions = {}): Promise<Client> {
+  return connectMcpClient(endpoint, headers, clients, options);
 }
 
 async function readOnlyHeader(): Promise<Headers> {

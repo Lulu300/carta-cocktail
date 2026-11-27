@@ -63,7 +63,18 @@
     "apiTokenReadOnly": "This API token is read-only: create a read and write token to change data",
     "mcpToolTimeout": "The API took too long to answer the tool: try again",
     "apiTokenSessionOnly": "API tokens cannot use this route: sign in to the admin panel instead",
-    "apiTokenLimit": "You already have {{max, number}} active API tokens: revoke one before creating another"
+    "apiTokenLimit": "You already have {{max, number}} active API tokens: revoke one before creating another",
+    "codeModeDeletion": "Code Mode cannot delete anything: the admin deletes in the app",
+    "codeModeSessionOnly": "Code Mode cannot use this route: the admin uses it in the app",
+    "codeModeUnknownOperation": "No admin operation of the API has this method and path: find one with the search tool",
+    "codeModeFileUpload": "This operation takes a file, which Code Mode cannot send",
+    "codeModeInvalidPath": "The path must start with / and hold no ?, # or \\: put the query in `query`",
+    "codeModeTooManyRequests": "This run sent as many API requests as it may: see the limits in the description of execute",
+    "codeModeCodeTooLong": "The code is too long: see the limits in the description of the tool",
+    "codeModeNotAFunction": "The code must be an async arrow function, such as: async () => { … }",
+    "codeModeCpuTime": "The code computed for too long: it was stopped",
+    "codeModeWallTime": "The code did not finish in time: it was stopped",
+    "codeModeCrashed": "The code went too deep for the server (recursion, or an object nested too deep): it was stopped"
   },
   "auth": {
     "loginSuccess": "Login successful",
