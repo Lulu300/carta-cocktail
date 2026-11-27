@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
 import type { CocktailAvailability, CocktailIngredient, PublicMenuCocktail } from '../../types';
-import UploadedPhoto from './UploadedPhoto';
+import UploadedPhoto from '../../components/ui/UploadedPhoto';
 import { cx } from '../../components/ui/classNames';
 import { parseTags } from '../../utils/parseTags';
 

@@ -21,6 +21,14 @@ describe('ImagePicker', () => {
     expect(container.querySelector('img')?.getAttribute('src')).toContain('mojito.jpg');
   });
 
+  it('shows the stored image in its smallest copy', () => {
+    const { container } = render(<ImagePicker imagePath="mojito.webp" onChange={vi.fn()} />);
+    expect(container.querySelector('img')).toHaveAttribute(
+      'srcset',
+      expect.stringContaining('mojito-480.webp 480w'),
+    );
+  });
+
   it('previews the picked file and reports it', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
