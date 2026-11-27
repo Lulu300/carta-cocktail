@@ -11,7 +11,7 @@ depends_on: [C-04, E-06]
 touches: [backend/src/validation/, backend/src/contracts/, backend/src/routes/responseContracts.test.ts, backend/src/test/helpers.ts, backend/package.json, backend/AGENTS.md, frontend/src/types/, frontend/src/test/, frontend/src/services/api.ts, frontend/src/queries/, frontend/src/pages/public/, frontend/src/utils/cocktailSearch.ts, frontend/src/components/admin/cocktails/, frontend/src/pages/admin/, frontend/src/components/admin/, frontend/src/components/import/, frontend/src/services/exportZip.ts, frontend/src/utils/menuType.ts, frontend/src/i18n/locales/public/, frontend/AGENTS.md, backend/src/routes/backup.test.ts, backend/src/routes/system.test.ts, backend/src/routes/cocktails.test.ts]
 sources: ["05-frontend-archi.md §3.3", "04-tests.md §7"]
 branch: feature/F-05-shared-contracts-2
-pr:
+pr: 301
 ---
 
 ## Contexte
