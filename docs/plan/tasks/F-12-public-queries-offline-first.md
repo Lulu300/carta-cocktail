@@ -5,12 +5,12 @@ phase: F
 lane: frontend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: [F-02]
 touches: [frontend/src/queries/public.ts, frontend/src/queries/public.test.tsx]
 sources: []
-branch:
+branch: fix/F-12-public-queries-offline-first
 pr:
 ---
 
@@ -31,9 +31,9 @@ F-02 ajoute un service worker : la carte, les fiches cocktail déjà vues et leu
 
 ## Critères d'acceptation
 
-- [ ] Après un événement `offline`, une fiche cocktail gardée par le service worker s'affiche.
-- [ ] Une fiche jamais vue affiche l'état d'erreur public, pas le squelette.
-- [ ] Les requêtes de l'admin gardent le mode par défaut.
+- [x] Après un événement `offline`, une fiche cocktail gardée par le service worker s'affiche.
+- [x] Une fiche jamais vue affiche l'état d'erreur public, pas le squelette.
+- [x] Les requêtes de l'admin gardent le mode par défaut.
 
 ## Tests à ajouter ou adapter
 
@@ -46,3 +46,5 @@ F-02 ajoute un service worker : la carte, les fiches cocktail déjà vues et leu
 ## Journal
 
 - 2026-11-26 : tâche créée pendant F-02.
+- 2026-11-27 : terminée. `networkMode: 'offlineFirst'` sur les trois requêtes publiques (`frontend/src/queries/public.ts`). Découverte pendant la vérification : hors ligne, la première erreur déclenchait une nouvelle tentative qui se mettait en pause, donc le squelette restait affiché ; `shouldRetryQuery` (règle de nouvelle tentative partagée) ne réessaie plus quand `onlineManager` est hors ligne. Effet de bord limité : une requête de l'admin qui échoue pendant une coupure réseau affiche son erreur au lieu de reprendre seule au retour du réseau ; son `networkMode` ne change pas. Vérifié dans Chrome sans interface, build du compose `carta-f-12`, frontend arrêté et `setOfflineMode(true)` pendant la visite : la fiche déjà vue s'affiche, une fiche jamais vue donne l'erreur « Impossible de charger le cocktail » avec « Réessayer » ; sans le correctif, les deux restent sur « Chargement... ». Bundle de la carte : 137,79 kB gzip (budget 140 kB).
+- 2026-11-27 : Notes de version : si le réseau tombe pendant la visite de la carte, les fiches déjà vues restent consultables et une fiche jamais vue affiche une erreur avec « Réessayer » au lieu d'un chargement sans fin ; aucune action requise, `breaking: false`.

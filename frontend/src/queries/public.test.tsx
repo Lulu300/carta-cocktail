@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider, onlineManager, type UseQueryResult } from '@tanstack/react-query';
 import { renderHook } from '@testing-library/react';
 import { ApiError } from '../services/api';
 import { AppProviders } from '../test/appProviders';
 import { buildCocktail, buildMenu } from '../test/factories';
-import { captureRequest, mockApiResponse } from '../test/msw/utils';
+import { captureRequest, mockApiResponse, mockNetworkError } from '../test/msw/utils';
 import { createTestQueryClient, waitFor } from '../test/test-utils';
 import { qk } from './keys';
+import { createQueryClient } from './queryClient';
 import { isNotFoundError, usePublicCocktail, usePublicMenu, usePublicMenus } from './public';
 
 const summer = buildMenu({ id: 1, name: 'Summer', slug: 'summer' });
@@ -30,6 +31,7 @@ function renderPublicHook<Result>(hook: () => Result, queryClient = createTestQu
 }
 
 beforeEach(() => {
+  onlineManager.setOnline(true);
   signIn(null);
   mockApiResponse('get', '/api/public/menus', []);
   mockApiResponse('get', '/api/public/menus/:slug', summer);
@@ -96,6 +98,31 @@ describe('public query hooks', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect((await request.url).pathname).toBe('/api/public/cocktails/7');
     expect(queryClient.getQueryData(qk.publicCocktail(7, 'guest'))).toEqual(daiquiri);
+  });
+});
+
+describe('public query hooks when the network drops during the visit', () => {
+  beforeEach(() => onlineManager.setOnline(false));
+
+  it.each<[string, () => UseQueryResult<unknown, Error>]>([
+    ['menu list', () => usePublicMenus()],
+    ['menu', () => usePublicMenu('summer')],
+    ['cocktail', () => usePublicCocktail(7)],
+  ])(
+    'still sends the %s request, which the service worker answers from its cache',
+    async (_name, hook) => {
+      const { result } = renderPublicHook(hook);
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    },
+  );
+
+  it('shows the error state, not an endless loading, when nothing is cached', async () => {
+    mockNetworkError('get', '/api/public/cocktails/:id');
+    const { result } = renderPublicHook(() => usePublicCocktail(7), createQueryClient());
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.fetchStatus).toBe('idle');
   });
 });
 
