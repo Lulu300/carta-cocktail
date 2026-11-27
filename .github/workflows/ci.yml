@@ -182,9 +182,9 @@ jobs:
   # Builds both images without pushing them, so a broken Dockerfile fails the
   # pull request instead of the release. The release workflow reads the cache
   # scope written here, and writes its own (<service>-release). Builds amd64
-  # only: the arm64 image is first built by the release. Only pushes write the
-  # cache: pull requests read the cache of their base branch, and writing
-  # their own layers would evict it (10 GB quota).
+  # only: the arm64 part that can break is built by the docker-arm64 job below.
+  # Only pushes write the cache: pull requests read the cache of their base
+  # branch, and writing their own layers would evict it (10 GB quota).
   docker:
     name: Docker build (${{ matrix.service }})
     runs-on: ubuntu-latest
@@ -210,3 +210,40 @@ jobs:
           outputs: type=cacheonly
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: ${{ github.event_name == 'push' && format('type=gha,mode=max,scope={0}', matrix.service) || '' }}
+
+  # Builds the arm64 runtime dependencies of the backend (stage prod-deps) under
+  # QEMU, as the release does. That stage runs npm ci, the Prisma generation and
+  # the native module checks on the target platform: it is the part of the arm64
+  # image that the amd64 build cannot test (the other arm64 steps copy files or
+  # install tini). Runs on every push, not only when the backend dependencies
+  # change: the base image tag also moves with Node patch releases. When nothing
+  # changed, every layer comes from the cache.
+  docker-arm64:
+    name: Docker build (backend arm64 dependencies)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # Reads the arm64 layers of the last push (backend-arm64) and of the last
+      # release (backend-release); writes on pushes only, as above.
+      - name: Build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ./backend
+          target: prod-deps
+          platforms: linux/arm64
+          push: false
+          outputs: type=cacheonly
+          cache-from: |
+            type=gha,scope=backend-arm64
+            type=gha,scope=backend-release
+          cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max,scope=backend-arm64' || '' }}
