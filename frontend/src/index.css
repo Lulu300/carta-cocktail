@@ -26,14 +26,19 @@
   --color-success: var(--color-green-400);
   --color-warning: var(--color-yellow-400);
   --color-info: var(--color-blue-400);
+  /* Base of the tinted badges (bg-danger-bg/20 behind text-danger): the same in both themes */
+  --color-danger-bg: var(--color-red-500);
+  --color-warning-bg: var(--color-yellow-500);
+  --color-success-bg: var(--color-green-500);
 }
 
 /*
  * The light theme of the public menu, set on <html> by public/theme-init.js and PublicLayout
  * (src/utils/theme.ts). The admin side never gets it. The accent is amber-800: the dark
  * theme's amber-400 fails a 4.5:1 contrast on white, and amber-700 fails it as text on the
- * tinted accent chips (4.4:1). Native controls
- * (select, checkbox, scrollbars) follow color-scheme.
+ * tinted accent chips (4.4:1). Native controls (select, checkbox, scrollbars) follow
+ * color-scheme. The status colors are 800 shades: as text on their own 20% tint (the
+ * availability badges of a signed-in admin), the 700 shades stay under 4.5:1.
  */
 :root {
   color-scheme: dark;
@@ -55,8 +60,8 @@
   --color-accent-pale: var(--color-amber-900);
   --color-on-accent: #fff;
   --color-danger: var(--color-red-700);
-  --color-success: var(--color-green-700);
-  --color-warning: var(--color-yellow-700);
+  --color-success: var(--color-green-800);
+  --color-warning: var(--color-yellow-800);
   --color-info: var(--color-blue-700);
 }
 
