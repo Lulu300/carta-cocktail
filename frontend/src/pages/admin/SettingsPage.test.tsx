@@ -281,6 +281,20 @@ describe('SettingsPage', () => {
     await waitFor(() => expect(document.title).toBe('New Bar Name'));
   });
 
+  it('shows the stored Code Mode setting of the MCP server', async () => {
+    mockApiResponse(
+      'get',
+      '/api/settings',
+      buildAdminSiteSettings({ siteName: 'My Bar', codeModeEnabled: true }),
+    );
+    await renderLoadedPage();
+
+    expect(screen.getByRole('switch', { name: 'Code Mode' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+  });
+
   describe('sites allowed to embed the menu', () => {
     const originsField = () => screen.getByLabelText('Allowed sites');
     const codeField = () => screen.getByLabelText('Code to paste in your website');

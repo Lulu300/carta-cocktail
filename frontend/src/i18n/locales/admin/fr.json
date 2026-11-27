@@ -505,6 +505,18 @@
       "confirmRevoke": "Les scripts et clients MCP qui utilisent « {{name}} » seront refusés à partir de maintenant. Cette action est définitive.",
       "revoked": "Jeton révoqué"
     },
+    "codeMode": {
+      "title": "Serveur MCP : Code Mode",
+      "description": "Code Mode ajoute deux outils au serveur MCP (/api/mcp), search et execute : l'agent IA écrit du JavaScript qui cherche dans la documentation de l'API ou appelle l'API, et le serveur l'exécute. Désactivé par défaut.",
+      "warningTitle": "Le code écrit par l'agent s'exécute sur ce serveur",
+      "warning": "Il tourne dans un bac à sable (QuickJS en WebAssembly), sans système de fichiers, sans réseau ni accès au serveur, et son temps, sa mémoire et son nombre de requêtes à l'API sont limités. Il a les droits du jeton de l'agent : un jeton en lecture seule ne fait que lire, un jeton en lecture et écriture peut modifier vos recettes, votre stock et vos cartes. Il ne peut jamais rien supprimer, ni utiliser les jetons, le compte ou les sauvegardes. Ne l'activez que pour des agents de confiance, avec des jetons en lecture seule quand ils n'ont pas à écrire.",
+      "toggle": "Code Mode",
+      "confirmTitle": "Activer Code Mode",
+      "confirmEnable": "Les agents connectés au serveur MCP pourront exécuter du code sur ce serveur, avec les droits de leur jeton. Continuer ?",
+      "enable": "Activer",
+      "enabled": "Code Mode est activé : les clients MCP reçoivent search et execute à leur prochaine requête.",
+      "disabled": "Code Mode est désactivé : les clients MCP ne reçoivent plus search et execute."
+    },
     "backup": {
       "title": "Sauvegarde & Restauration",
       "description": "Exportez une sauvegarde complète de votre base de données et images, ou restaurez depuis une sauvegarde précédente.",

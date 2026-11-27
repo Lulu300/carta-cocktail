@@ -64,7 +64,7 @@ frontend/
 │   ├── components/
 │   │   ├── admin/              # Shared admin parts: DataTable, TranslationFields, DeletionImpactList,
 │   │   │   │                   # LoadError, useConfirmDelete, useEntityForm, useForcedDelete,
-│   │   │   │                   # sections of the settings page (EmbedMenuSettings, ApiTokenSettings)
+│   │   │   │                   # sections of the settings page (EmbedMenuSettings, ApiTokenSettings, CodeModeSettings)
 │   │   │   ├── bottles/        # Bottle form modal, rows, history, export menu, filters
 │   │   │   ├── categories/     # Category form modal, category types manager
 │   │   │   ├── cocktails/      # Cocktail editor (react-hook-form + zod), list items, filters, selection

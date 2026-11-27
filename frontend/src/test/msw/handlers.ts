@@ -290,6 +290,10 @@ const settingsHandlers = [
   http.put('/api/settings', async ({ request }) =>
     HttpResponse.json({ ...(await readJsonObject(request)), id: 1 }),
   ),
+  http.put('/api/settings/code-mode', async ({ request }) => {
+    const { enabled } = await readJsonObject(request);
+    return HttpResponse.json(buildAdminSiteSettings({ codeModeEnabled: enabled === true }));
+  }),
   http.put('/api/settings/profile', async ({ request }) => {
     const body = await readJsonObject(request);
     return HttpResponse.json({
