@@ -12,10 +12,11 @@ import {
   seedCocktail,
   prisma,
 } from '../../test/helpers';
-import { testImage, uploadedFile, writeStoredPhoto } from '../../test/images';
+import { blackPng, testImage, uploadedFile, writeStoredPhoto } from '../../test/images';
 import {
   backfillImageVariants,
   derivedVariantNames,
+  MAX_INPUT_PIXELS,
   previewImageName,
   storeUploadedImage,
   type ImageVariantsDb,
@@ -132,6 +133,21 @@ describe('storeUploadedImage', () => {
 
   it('should refuse a file that is not a readable image, and write nothing', async () => {
     await expect(storeUploadedImage(Buffer.from('fake-png-data'))).rejects.toThrow(
+      new BadRequestError('errors.invalidImage'),
+    );
+    expect(uploadDirContent()).toEqual([]);
+  });
+
+  it('should accept a photo of exactly the pixel limit', async () => {
+    const imagePath = await storeUploadedImage(blackPng(10_000, MAX_INPUT_PIXELS / 10_000));
+
+    expect((await storedMetadata(imagePath)).width).toBe(1600);
+  });
+
+  it('should refuse a photo over the pixel limit, and write nothing', async () => {
+    const upload = blackPng(10_000, MAX_INPUT_PIXELS / 10_000 + 1);
+
+    await expect(storeUploadedImage(upload)).rejects.toThrow(
       new BadRequestError('errors.invalidImage'),
     );
     expect(uploadDirContent()).toEqual([]);

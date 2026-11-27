@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import zlib from 'zlib';
 import sharp from 'sharp';
 import { config } from '../config';
 
@@ -40,6 +41,35 @@ export async function testImage(options: TestImageOptions = {}): Promise<Buffer>
 export async function jpegOfSize(size: number): Promise<Buffer> {
   const image = await testImage();
   return Buffer.concat([image, Buffer.alloc(size - image.length)]);
+}
+
+function pngChunk(type: string, data: Buffer): Buffer {
+  const typeAndData = Buffer.concat([Buffer.from(type, 'latin1'), data]);
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(zlib.crc32(typeAndData));
+  return Buffer.concat([length, typeAndData, crc]);
+}
+
+/**
+ * A valid black grayscale PNG of `width` x `height`: a few hundred kB for 100 Mpx,
+ * where sharp would need gigabytes of memory to create the same picture.
+ */
+export function blackPng(width: number, height: number): Buffer {
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  // 8 bits per sample, grayscale, default compression, filter and interlace
+  header.set([8, 0, 0, 0, 0], 8);
+  // Each row: filter byte 0, then one zero byte per pixel
+  const pixels = zlib.deflateSync(Buffer.alloc((width + 1) * height));
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pngChunk('IHDR', header),
+    pngChunk('IDAT', pixels),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ]);
 }
 
 /** Writes a photo to the upload folder, as uploads stored it before the smaller copies existed. */

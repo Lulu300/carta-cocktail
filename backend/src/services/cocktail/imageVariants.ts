@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import sharp from 'sharp';
+import sharp, { type Channels, type OutputInfo } from 'sharp';
 import type { PrismaClient } from '../../generated/prisma/client';
 import { config } from '../../config';
 import { BadRequestError } from '../../errors';
@@ -78,12 +78,34 @@ export function previewImageName(imagePath: string): string {
 }
 
 /**
- * Encodes one copy. `rotate()` applies the EXIF orientation, so a portrait photo
- * stays upright; sharp writes no metadata unless asked to, so the EXIF block and
- * its GPS position are gone from every copy.
+ * Largest image decoded, in pixels. A PNG of a few MB can declare far more, and
+ * decoding it would exhaust the memory of a small server. 100 Mpx leaves room
+ * above the 48 to 50 Mpx of phone cameras.
  */
-function renderVariant(input: Buffer, variant: ImageVariant): Promise<Buffer> {
-  const resized = sharp(input).rotate().resize({ width: variant.width, withoutEnlargement: true });
+export const MAX_INPUT_PIXELS = 100_000_000;
+
+interface DecodedImage {
+  data: Buffer;
+  info: OutputInfo;
+}
+
+/**
+ * Decodes a photo once, upright and at most as wide as the stored photo, into
+ * raw pixels that every copy is encoded from. `rotate()` applies the EXIF
+ * orientation, so a portrait photo stays upright; raw pixels carry no metadata,
+ * so the EXIF block and its GPS position are gone from every copy.
+ */
+function decodeUpright(input: Buffer): Promise<DecodedImage> {
+  return sharp(input, { limitInputPixels: MAX_INPUT_PIXELS })
+    .rotate()
+    .resize({ width: MAIN_IMAGE.width, withoutEnlargement: true })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+}
+
+function encodeVariant({ data, info }: DecodedImage, variant: ImageVariant): Promise<Buffer> {
+  const raw = { width: info.width, height: info.height, channels: info.channels as Channels };
+  const resized = sharp(data, { raw }).resize({ width: variant.width, withoutEnlargement: true });
   if (variant.format === 'webp') return resized.webp({ quality: QUALITY }).toBuffer();
   // JPEG has no transparency: a transparent PNG gets a white background, not a black one
   return resized.flatten({ background: '#ffffff' }).jpeg({ quality: QUALITY }).toBuffer();
@@ -108,15 +130,18 @@ async function writeFileAtomically(fileName: string, content: Buffer): Promise<v
 
 /**
  * Stores an uploaded photo under a new random name, with all its copies, and
- * returns that name. Nothing is written when the file is not a readable image
- * (400); a write that fails halfway removes what it wrote.
+ * returns that name. The upload itself is not kept: the stored photo is its
+ * WebP copy, 1600 px wide at most. Nothing is written when the file is not a
+ * readable image or exceeds MAX_INPUT_PIXELS (400); a write that fails halfway
+ * removes what it wrote.
  */
 export async function storeUploadedImage(upload: Buffer): Promise<string> {
   const imagePath = `${crypto.randomUUID()}${FILE_EXTENSIONS[MAIN_IMAGE.format]}`;
   const variants = [MAIN_IMAGE, ...DERIVED_VARIANTS];
   let encoded: Buffer[];
   try {
-    encoded = await Promise.all(variants.map((variant) => renderVariant(upload, variant)));
+    const decoded = await decodeUpright(upload);
+    encoded = await Promise.all(variants.map((variant) => encodeVariant(decoded, variant)));
   } catch {
     throw new BadRequestError('errors.invalidImage');
   }
@@ -143,11 +168,11 @@ async function addMissingVariants(imagePath: string, photoPath: string): Promise
   );
   if (missing.length === 0) return 0;
   // The photo is read, never rewritten: it may be the only full-size copy
-  const original = await fs.promises.readFile(photoPath);
+  const decoded = await decodeUpright(await fs.promises.readFile(photoPath));
   for (const variant of missing) {
     await writeFileAtomically(
       variantName(imagePath, variant),
-      await renderVariant(original, variant),
+      await encodeVariant(decoded, variant),
     );
   }
   return missing.length;
