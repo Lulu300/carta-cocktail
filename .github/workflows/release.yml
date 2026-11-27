@@ -198,6 +198,8 @@ jobs:
       # arm64 is built under emulation. The Dockerfiles compile on the runner's
       # own platform, so QEMU only runs the arm64 runtime stages (backend
       # runtime dependencies with their native binaries, base image setup).
+      # The backend dependencies stage picks the emulated CPU (QEMU_CPU in
+      # backend/Dockerfile); the CI builds that stage for arm64 too.
       - name: Set up QEMU
         uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
         with:
