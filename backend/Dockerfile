@@ -31,6 +31,15 @@ RUN node_modules/.bin/esbuild prisma.config.ts --bundle --platform=node --packag
 # No --omit=optional: sharp gets its libvips binary from an optional dependency, one
 # per platform. The optional peers that only the dev tooling uses are cut below instead.
 FROM node:26.13-alpine AS prod-deps
+# The release builds this stage for arm64 under QEMU, which emulates by default
+# its "max" CPU, with the memory copy instructions of FEAT_MOPS. V8 14 (Node 26)
+# compiles WebAssembly memory.copy to them when the CPU has them, and under QEMU
+# 9.2 and 10.2 the Prisma schema module then returns corrupted JSON: prisma
+# generate fails with "Unable to parse JSON". The Cortex-A53 (Raspberry Pi 3),
+# the oldest 64-bit core the images support, has no MOPS, and the native module
+# checks below then also run on it. Every emulated process reads QEMU_CPU at
+# start; a native build ignores it, and the runtime stage does not inherit it.
+ENV QEMU_CPU=cortex-a53
 WORKDIR /app
 COPY package*.json ./
 COPY prisma/schema.prisma ./prisma/schema.prisma
