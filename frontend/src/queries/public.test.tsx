@@ -3,15 +3,15 @@ import { QueryClientProvider, onlineManager, type UseQueryResult } from '@tansta
 import { renderHook } from '@testing-library/react';
 import { ApiError } from '../services/api';
 import { AppProviders } from '../test/appProviders';
-import { buildCocktail, buildMenu } from '../test/factories';
+import { buildPublicCocktail, buildPublicMenu } from '../test/factories';
 import { captureRequest, mockApiResponse, mockNetworkError } from '../test/msw/utils';
 import { createTestQueryClient, waitFor } from '../test/test-utils';
 import { qk } from './keys';
 import { createQueryClient } from './queryClient';
 import { isNotFoundError, usePublicCocktail, usePublicMenu, usePublicMenus } from './public';
 
-const summer = buildMenu({ id: 1, name: 'Summer', slug: 'summer' });
-const daiquiri = buildCocktail({ id: 7, name: 'Daiquiri' });
+const summer = buildPublicMenu({ id: 1, name: 'Summer', slug: 'summer' });
+const daiquiri = buildPublicCocktail({ id: 7, name: 'Daiquiri' });
 
 /** The viewer follows the stored token: the real AuthProvider reads it when the hook mounts. */
 function signIn(token: string | null) {

@@ -691,7 +691,7 @@ describe('bottles API', () => {
   it('should call CRUD endpoints', async () => {
     const api = await getApi();
     mockOk({});
-    await api.bottles.create({ name: 'Test' });
+    await api.bottles.create({ name: 'Test', categoryId: 1, capacityMl: 700 });
     expect(mockFetch.mock.calls[0]![1]!.method).toBe('POST');
 
     mockOk({});

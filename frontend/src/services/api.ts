@@ -2,15 +2,22 @@ import type {
   Category,
   CategoryType,
   Bottle,
+  BottleInput,
+  BottleUpdateInput,
   Ingredient,
   Unit,
   Cocktail,
+  CocktailRow,
   Menu,
   MenuBottle,
+  MenuCreateInput,
   MenuSection,
+  MenuUpdateInput,
+  PublicCocktail,
+  PublicMenu,
+  PublicMenuSummary,
   Shortage,
   CocktailInput,
-  MenuInput,
   CocktailAvailability,
   SiteSettings,
   AdminSiteSettings,
@@ -317,9 +324,9 @@ export const bottles = {
     const query = searchParams.toString();
     return request<Bottle[]>(`/bottles${query ? `?${query}` : ''}`, { signal });
   },
-  create: (data: Partial<Bottle> & { quantity?: number }) =>
+  create: (data: BottleInput) =>
     request<Bottle | Bottle[]>('/bottles', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: number, data: Partial<Bottle>) =>
+  update: (id: number, data: BottleUpdateInput) =>
     request<Bottle>(`/bottles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: number, options: DeleteOptions = {}) =>
     request<DeletionResponse>(deletionUrl(`/bottles/${id}`, options), { method: 'DELETE' }),
@@ -406,7 +413,7 @@ export const cocktails = {
   uploadImage: (id: number, file: File) => {
     const formData = new FormData();
     formData.append('image', file);
-    return request<Cocktail>(`/cocktails/${id}/image`, {
+    return request<CocktailRow>(`/cocktails/${id}/image`, {
       method: 'POST',
       body: formData,
     });
@@ -437,9 +444,9 @@ export const cocktails = {
 export const menus = {
   list: (signal?: AbortSignal) => request<Menu[]>('/menus', { signal }),
   get: (id: number, signal?: AbortSignal) => request<Menu>(`/menus/${id}`, { signal }),
-  create: (data: MenuInput) =>
+  create: (data: MenuCreateInput) =>
     request<Menu>('/menus', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: number, data: Partial<MenuInput>) =>
+  update: (id: number, data: MenuUpdateInput) =>
     request<Menu>(`/menus/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: number) => request<{ message: string }>(`/menus/${id}`, { method: 'DELETE' }),
 };
@@ -530,11 +537,11 @@ export const menuSections = {
 
 // Public
 export const publicApi = {
-  listMenus: (signal?: AbortSignal) => request<Menu[]>('/public/menus', { signal }),
+  listMenus: (signal?: AbortSignal) => request<PublicMenuSummary[]>('/public/menus', { signal }),
   getMenu: (slug: string, signal?: AbortSignal) =>
-    request<Menu>(`/public/menus/${slug}`, { signal }),
+    request<PublicMenu>(`/public/menus/${slug}`, { signal }),
   getCocktail: (id: number, signal?: AbortSignal) =>
-    request<Cocktail>(`/public/cocktails/${id}`, { signal }),
+    request<PublicCocktail>(`/public/cocktails/${id}`, { signal }),
   exportCocktail: (id: number) => requestCocktailExport(`/public/cocktails/${id}/export`, id),
   getSettings: () => request<SiteSettings>('/public/settings'),
   listUnits: () => request<Unit[]>('/public/units'),

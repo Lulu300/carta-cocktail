@@ -7,6 +7,8 @@ import { Prisma } from '../generated/prisma/client';
 import app from '../app';
 import { prisma } from '../lib/prisma';
 import { configureServerTimeouts } from '../serverTimeouts';
+import type { SourceType } from '../validation/cocktails';
+import type { MenuType } from '../validation/menus';
 
 // Tests and routes share the server's client, as in production
 export { prisma };
@@ -269,7 +271,7 @@ export async function seedCocktail(
 }
 
 export interface RecipeLineSource {
-  sourceType: 'BOTTLE' | 'CATEGORY' | 'INGREDIENT';
+  sourceType: SourceType;
   bottleId?: number;
   categoryId?: number;
   ingredientId?: number;
@@ -358,7 +360,7 @@ export async function seedMenu(
   overrides: Partial<{
     name: string;
     slug: string;
-    type: 'COCKTAILS' | 'APEROS' | 'DIGESTIFS';
+    type: MenuType;
     isPublic: boolean;
     description: string | null;
   }> = {},

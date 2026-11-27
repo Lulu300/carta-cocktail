@@ -9,8 +9,13 @@ import type {
   Menu,
   MenuBottle,
   MenuCocktail,
-  PublicMenuCocktail,
   MenuSection,
+  PublicCategory,
+  PublicCocktail,
+  PublicMenu,
+  PublicMenuBottle,
+  PublicMenuCocktail,
+  PublicMenuSummary,
   Shortage,
   SiteSettings,
   AdminSiteSettings,
@@ -22,7 +27,10 @@ import { CATEGORY_TYPE_COLORS } from '../utils/colors';
  * Typed builders for API payloads. Each one returns a complete entity with
  * realistic defaults and takes partial overrides; ids grow per entity so two
  * built objects never share one. No type assertion here: when a type of
- * `types/index.ts` changes, this file stops compiling.
+ * `types/index.ts` or of the generated contracts changes, this file stops compiling.
+ *
+ * The admin routes and the public ones send different shapes: `buildPublic*` builds the
+ * public ones (no inventory data, `available` on cocktails).
  */
 
 const CREATED_AT = '2026-01-15T10:00:00.000Z';
@@ -87,7 +95,7 @@ const COCKTAIL_NAMES: readonly string[] = [
 ];
 const MENU_NAMES: readonly string[] = ['Carte d’été', 'Carte d’hiver', 'Soirée tiki'];
 const SECTION_NAMES: readonly string[] = ['Classiques', 'Signatures', 'Sans alcool'];
-const UNIT_DEFAULTS: readonly Omit<Unit, 'id'>[] = [
+const UNIT_DEFAULTS: readonly Omit<Unit, 'id' | 'nameTranslations'>[] = [
   { name: 'Centilitre', abbreviation: 'cl', conversionFactorToMl: 10 },
   { name: 'Millilitre', abbreviation: 'ml', conversionFactorToMl: 1 },
   { name: 'Trait', abbreviation: 'dash', conversionFactorToMl: 0.6 },
@@ -129,11 +137,17 @@ export function buildCategory(overrides: Partial<Category> = {}): Category {
   };
 }
 
+/**
+ * A bottle with its category: category 1 unless `category` or `categoryId` says otherwise.
+ * Building that category uses up no category number.
+ */
 export function buildBottle(overrides: Partial<Bottle> = {}): Bottle {
   const id = overrides.id ?? nextId('bottle');
+  const category = overrides.category ?? buildCategory({ id: overrides.categoryId ?? 1 });
   return {
     name: nameFor(BOTTLE_NAMES, id),
-    categoryId: overrides.category?.id ?? 1,
+    categoryId: category.id,
+    category,
     purchasePrice: 25,
     capacityMl: 700,
     remainingPercent: 100,
@@ -177,6 +191,7 @@ export function buildUnit(overrides: Partial<Unit> = {}): Unit {
 /**
  * A line of a recipe, a free ingredient by default (2 of unit 1). Given an `id`,
  * the line and its ingredient share it unless `ingredient` says otherwise.
+ * Building its unit uses up no unit number.
  */
 export function buildCocktailIngredient(
   overrides: Partial<CocktailIngredient> = {},
@@ -184,16 +199,21 @@ export function buildCocktailIngredient(
   const id = overrides.id ?? nextId('cocktailIngredient');
   const ingredient =
     overrides.ingredient === undefined ? buildIngredient({ id }) : overrides.ingredient;
+  const unit = overrides.unit ?? buildUnit({ id: overrides.unitId ?? 1 });
   return {
     cocktailId: 1,
     quantity: 2,
-    unitId: 1,
+    unitId: unit.id,
+    unit,
     sourceType: 'INGREDIENT',
     bottleId: null,
+    bottle: null,
     categoryId: null,
+    category: null,
     ingredientId: ingredient?.id ?? null,
     ingredient,
     position: id,
+    preferredBottles: [],
     ...overrides,
     id,
   };
@@ -217,17 +237,23 @@ export function buildCocktail(overrides: Partial<Cocktail> = {}): Cocktail {
   };
 }
 
-export function buildMenu(overrides: Partial<Menu> = {}): Menu {
-  const id = overrides.id ?? nextId('menu');
-  const name = overrides.name ?? nameFor(MENU_NAMES, id);
+/** The stored fields of a published cocktail menu, named after the n-th menu unless `name` is given. */
+function menuRowDefaults(id: number, name = nameFor(MENU_NAMES, id)) {
   return {
     name,
     description: null,
     slug: slugify(name),
-    type: 'COCKTAILS',
+    type: 'COCKTAILS' as const,
     isPublic: true,
     createdAt: CREATED_AT,
     updatedAt: CREATED_AT,
+  };
+}
+
+export function buildMenu(overrides: Partial<Menu> = {}): Menu {
+  const id = overrides.id ?? nextId('menu');
+  return {
+    ...menuRowDefaults(id, overrides.name),
     sections: [],
     cocktails: [],
     bottles: [],
@@ -247,6 +273,11 @@ export function buildMenuSection(overrides: Partial<MenuSection> = {}): MenuSect
   };
 }
 
+/** The fields shared by the cocktails and the bottles of a menu, for the n-th entry. */
+function menuEntryDefaults(id: number) {
+  return { menuId: 1, menuSectionId: null, position: id, isHidden: false };
+}
+
 /**
  * A cocktail of a menu. `cocktail` overrides are merged into a built cocktail,
  * so `buildMenuCocktail({ cocktail: { name: 'Negroni' } })` is enough. Given an
@@ -254,7 +285,7 @@ export function buildMenuSection(overrides: Partial<MenuSection> = {}): MenuSect
  */
 export function buildMenuCocktail(
   overrides: Partial<Omit<MenuCocktail, 'cocktail'>> & { cocktail?: Partial<Cocktail> } = {},
-): PublicMenuCocktail {
+): MenuCocktail & { cocktail: Cocktail } {
   const { cocktail: cocktailOverrides, ...entryOverrides } = overrides;
   const id = entryOverrides.id ?? nextId('menuCocktail');
   const cocktail = buildCocktail({
@@ -262,12 +293,9 @@ export function buildMenuCocktail(
     ...cocktailOverrides,
   });
   return {
-    menuId: 1,
+    ...menuEntryDefaults(id),
     cocktailId: cocktail.id,
     cocktail,
-    menuSectionId: null,
-    position: id,
-    isHidden: false,
     ...entryOverrides,
     id,
   };
@@ -279,7 +307,7 @@ export function buildMenuCocktail(
  */
 export function buildMenuBottle(
   overrides: Partial<Omit<MenuBottle, 'bottle'>> & { bottle?: Partial<Bottle> } = {},
-): MenuBottle {
+): MenuBottle & { bottle: Bottle } {
   const { bottle: bottleOverrides, ...entryOverrides } = overrides;
   const id = entryOverrides.id ?? nextId('menuBottle');
   const bottle = buildBottle({
@@ -288,13 +316,111 @@ export function buildMenuBottle(
     ...bottleOverrides,
   });
   return {
-    menuId: 1,
+    ...menuEntryDefaults(id),
     bottleId: bottle.id,
     bottle,
-    menuSectionId: null,
-    position: id,
-    isHidden: false,
     ...entryOverrides,
+    id,
+  };
+}
+
+/**
+ * A cocktail as the public routes send it, available by default. Its recipe lines may be
+ * built with `buildCocktailIngredient`: an admin line holds every field of a public one.
+ */
+export function buildPublicCocktail(overrides: Partial<PublicCocktail> = {}): PublicCocktail {
+  const { name, description, imagePath, tags, isAvailable, ingredients, instructions, id } =
+    buildCocktail({ id: overrides.id });
+  return {
+    id,
+    name,
+    description,
+    imagePath,
+    tags,
+    isAvailable,
+    available: true,
+    ingredients,
+    instructions,
+    ...overrides,
+  };
+}
+
+/** A cocktail of a public menu, built like `buildMenuCocktail`. */
+export function buildPublicMenuCocktail(
+  overrides: Partial<Omit<PublicMenuCocktail, 'cocktail'>> & {
+    cocktail?: Partial<PublicCocktail>;
+  } = {},
+): PublicMenuCocktail {
+  const { cocktail: cocktailOverrides, ...entryOverrides } = overrides;
+  const id = entryOverrides.id ?? nextId('menuCocktail');
+  const cocktail = buildPublicCocktail({
+    id: entryOverrides.id ?? cocktailOverrides?.id,
+    ...cocktailOverrides,
+  });
+  return {
+    ...menuEntryDefaults(id),
+    cocktailId: cocktail.id,
+    cocktail,
+    ...entryOverrides,
+    id,
+  };
+}
+
+function toPublicCategory({ id, name, nameTranslations, type }: Category): PublicCategory {
+  return { id, name, nameTranslations, type };
+}
+
+/** A bottle of a public menu, without its inventory data, built like `buildMenuBottle`. */
+export function buildPublicMenuBottle(
+  overrides: Partial<Omit<PublicMenuBottle, 'bottle'>> & {
+    bottle?: Partial<PublicMenuBottle['bottle']>;
+  } = {},
+): PublicMenuBottle {
+  const { bottle: bottleOverrides, ...entryOverrides } = overrides;
+  const id = entryOverrides.id ?? nextId('menuBottle');
+  const built = buildBottle({ id: entryOverrides.id ?? bottleOverrides?.id });
+  const category = bottleOverrides?.category ?? toPublicCategory(built.category);
+  const bottle = {
+    id: built.id,
+    name: built.name,
+    capacityMl: built.capacityMl,
+    alcoholPercentage: built.alcoholPercentage,
+    location: built.location,
+    ...bottleOverrides,
+    categoryId: bottleOverrides?.categoryId ?? category.id,
+    category,
+  };
+  return {
+    ...menuEntryDefaults(id),
+    bottleId: bottle.id,
+    bottle,
+    ...entryOverrides,
+    id,
+  };
+}
+
+/** A published menu as GET /api/public/menus/:slug sends it, a cocktail menu by default. */
+export function buildPublicMenu(overrides: Partial<PublicMenu> = {}): PublicMenu {
+  const id = overrides.id ?? nextId('menu');
+  return {
+    ...menuRowDefaults(id, overrides.name),
+    sections: [],
+    cocktails: [],
+    bottles: [],
+    ...overrides,
+    id,
+  };
+}
+
+/** A published menu of the home page list, with its item counts. */
+export function buildPublicMenuSummary(
+  overrides: Partial<PublicMenuSummary> = {},
+): PublicMenuSummary {
+  const id = overrides.id ?? nextId('menu');
+  return {
+    ...menuRowDefaults(id, overrides.name),
+    _count: { cocktails: 0, bottles: 0 },
+    ...overrides,
     id,
   };
 }
@@ -348,7 +474,6 @@ export function buildAvailability(
 
 export function buildSiteSettings(overrides: Partial<SiteSettings> = {}): SiteSettings {
   return {
-    id: 1,
     siteName: 'Carta',
     siteIcon: '🍸',
     ...overrides,
@@ -359,5 +484,5 @@ export function buildSiteSettings(overrides: Partial<SiteSettings> = {}): SiteSe
 export function buildAdminSiteSettings(
   overrides: Partial<AdminSiteSettings> = {},
 ): AdminSiteSettings {
-  return { ...buildSiteSettings(), embedOrigins: [], ...overrides };
+  return { ...buildSiteSettings(), id: 1, embedOrigins: [], ...overrides };
 }

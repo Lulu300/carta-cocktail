@@ -1,8 +1,13 @@
 import { z } from 'zod';
-import { Id, RequiredText } from './common';
+import { Id, RequiredText, Timestamp } from './common';
+import { Bottle } from './bottles';
+import { Category } from './categories';
+import { Ingredient } from './ingredients';
+import { Unit } from './units';
 
 export const SOURCE_TYPES = ['BOTTLE', 'CATEGORY', 'INGREDIENT'] as const;
 export const SourceType = z.enum(SOURCE_TYPES);
+export type SourceType = z.output<typeof SourceType>;
 
 // The foreign key each source type points to. The other two must stay empty.
 export const SOURCE_KEYS = {
@@ -108,4 +113,58 @@ export const MAX_EXPORT_BATCH = 500;
 /** Cocktails to export, in the order of the files of the response. */
 export const CocktailExportBatch = z.object({
   ids: z.array(Id).min(1).max(MAX_EXPORT_BATCH),
+});
+
+// Responses of the admin routes (cocktailInclude)
+
+/** A cocktail as stored, without its recipe: the photo upload answers with it. */
+export const CocktailRow = z.strictObject({
+  id: Id,
+  name: z.string(),
+  description: z.string().nullable(),
+  notes: z.string().nullable(),
+  imagePath: z.string().nullable(),
+  /** Comma-separated, as stored: the routes accept an array or this string. */
+  tags: z.string(),
+  /** Manual switch set by the admin. */
+  isAvailable: z.boolean(),
+  createdAt: Timestamp,
+  updatedAt: Timestamp,
+});
+
+export const CocktailPreferredBottle = z.strictObject({
+  id: Id,
+  cocktailIngredientId: Id,
+  bottleId: Id,
+  bottle: Bottle,
+});
+
+/** A recipe line. Only the source of its `sourceType` is set; it is null when that source was deleted. */
+export const CocktailIngredient = z.strictObject({
+  id: Id,
+  cocktailId: Id,
+  quantity: z.number(),
+  unitId: Id,
+  unit: Unit,
+  sourceType: SourceType,
+  bottleId: Id.nullable(),
+  bottle: Bottle.nullable(),
+  categoryId: Id.nullable(),
+  category: Category.nullable(),
+  ingredientId: Id.nullable(),
+  ingredient: Ingredient.nullable(),
+  position: z.number().int(),
+  preferredBottles: z.array(CocktailPreferredBottle),
+});
+
+export const CocktailInstruction = z.strictObject({
+  id: Id,
+  cocktailId: Id,
+  stepNumber: z.number().int(),
+  text: z.string(),
+});
+
+export const Cocktail = CocktailRow.extend({
+  ingredients: z.array(CocktailIngredient),
+  instructions: z.array(CocktailInstruction),
 });

@@ -44,7 +44,7 @@
     "embedOrigin": {
       "notAnOrigin": "\"{{origin}}\" is not a site address: write it as https://www.example.com, without a path",
       "wildcard": "\"{{origin}}\": the * wildcard is not accepted, list each site in full",
-      "insecure": "\"{{origin}}\" uses http://: only https:// sites can embed the menu (http:// is accepted for localhost only)",
+      "insecure": "\"{{origin}}\" uses http://: only https:// sites can embed the menu (http:// is accepted for localhost and 127.0.0.1 only)",
       "tooMany": "At most {{max, number}} sites can embed the menu"
     },
     "import": {

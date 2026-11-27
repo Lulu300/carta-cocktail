@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Cocktail } from '../../../types';
+import type { Cocktail, SourceType } from '../../../types';
+import { buildBottle, buildCocktailIngredient } from '../../../test/factories';
 import {
   EMPTY_COCKTAIL_FORM,
   cocktailFormSchema,
@@ -8,7 +9,6 @@ import {
   toCocktailInput,
   type CocktailFormValues,
   type IngredientRowValues,
-  type SourceType,
   isKeptStoredDefect,
 } from './cocktailFormSchema';
 
@@ -159,29 +159,27 @@ describe('fromCocktail', () => {
     createdAt: '2024-01-01',
     updatedAt: '2024-01-01',
     ingredients: [
-      {
+      buildCocktailIngredient({
         id: 7,
-        cocktailId: 1,
         quantity: 5,
         unitId: 2,
         sourceType: 'CATEGORY',
-        bottleId: null,
         categoryId: 4,
         ingredientId: null,
+        ingredient: null,
         position: 0,
-        preferredBottles: [{ id: 1, cocktailIngredientId: 7, bottleId: 3 }],
-      },
-      {
+        preferredBottles: [
+          { id: 1, cocktailIngredientId: 7, bottleId: 3, bottle: buildBottle({ id: 3 }) },
+        ],
+      }),
+      buildCocktailIngredient({
         id: 8,
-        cocktailId: 1,
         quantity: 1,
         unitId: 3,
         sourceType: 'INGREDIENT',
-        bottleId: null,
-        categoryId: null,
         ingredientId: 5,
         position: 1,
-      },
+      }),
     ],
     instructions: [{ id: 1, cocktailId: 1, stepNumber: 1, text: 'Muddle' }],
   };
@@ -223,7 +221,7 @@ describe('fromCocktail', () => {
     const values = fromCocktail({
       ...cocktail,
       notes: null,
-      ingredients: undefined,
+      ingredients: [],
       instructions: [],
     });
     expect(values.notes).toBe('');
@@ -235,8 +233,25 @@ describe('fromCocktail', () => {
 describe('newIngredientRow', () => {
   it('starts on the first ingredient and the first unit', () => {
     const row = newIngredientRow(
-      [{ id: 5, name: 'Lime', icon: null, isAvailable: true, createdAt: '2024-01-01' }],
-      [{ id: 2, name: 'Centilitre', abbreviation: 'cl', conversionFactorToMl: 10 }],
+      [
+        {
+          id: 5,
+          name: 'Lime',
+          nameTranslations: null,
+          icon: null,
+          isAvailable: true,
+          createdAt: '2024-01-01',
+        },
+      ],
+      [
+        {
+          id: 2,
+          name: 'Centilitre',
+          nameTranslations: null,
+          abbreviation: 'cl',
+          conversionFactorToMl: 10,
+        },
+      ],
     );
     expect(row).toMatchObject({
       sourceType: 'INGREDIENT',
@@ -305,40 +320,32 @@ describe('lines stored with a defect (C-21)', () => {
       createdAt: '2024-01-01',
       updatedAt: '2024-01-01',
       ingredients: [
-        {
+        buildCocktailIngredient({
           id: 1,
-          cocktailId: 1,
           quantity: 0,
-          unitId: 1,
           sourceType: 'INGREDIENT',
-          bottleId: null,
-          categoryId: null,
           ingredientId: 5,
           position: 0,
-        },
-        {
+        }),
+        buildCocktailIngredient({
           id: 2,
-          cocktailId: 1,
           quantity: 2,
-          unitId: 1,
           sourceType: 'BOTTLE',
-          bottleId: null,
-          categoryId: null,
           ingredientId: null,
+          ingredient: null,
           position: 1,
-        },
-        {
+        }),
+        buildCocktailIngredient({
           id: 3,
-          cocktailId: 1,
           quantity: 2,
-          unitId: 1,
           sourceType: 'BOTTLE',
           bottleId: 3,
-          categoryId: null,
           ingredientId: null,
+          ingredient: null,
           position: 2,
-        },
+        }),
       ],
+      instructions: [],
     });
     expect(values.ingredients.map((row) => row.storedLine !== null)).toEqual([true, true, false]);
     expect(errorsOf({ ...values, name: 'Old' })).toEqual({});

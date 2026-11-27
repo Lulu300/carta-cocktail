@@ -23,3 +23,16 @@ export const ProfileUpdate = z
 
 /** Checked by the route, which answers with a translated message rather than a validation error. */
 export const EmailAddress = z.email();
+
+/** The site name and icon, as the public settings route sends them. */
+export const SiteSettings = z.strictObject({
+  siteName: z.string(),
+  siteIcon: z.string(),
+});
+
+/** The settings as the admin routes send them (GET and PUT /api/settings). */
+export const AdminSiteSettings = SiteSettings.extend({
+  id: z.number().int(),
+  /** Sites allowed to show the public menu in an iframe, e.g. "https://www.mon-bar.fr". */
+  embedOrigins: z.array(z.string()),
+});

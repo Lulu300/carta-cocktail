@@ -5,13 +5,8 @@ import { useLocalizedName } from '../../../hooks/useLocalizedName';
 import IconButton from '../../ui/IconButton';
 import Input from '../../ui/Input';
 import Select from '../../ui/Select';
-import {
-  SOURCE_KEYS,
-  SOURCE_TYPES,
-  isKeptStoredDefect,
-  type CocktailFormValues,
-  type SourceType,
-} from './cocktailFormSchema';
+import { SOURCE_KEYS, SOURCE_TYPES, type SourceType } from '../../../types';
+import { isKeptStoredDefect, type CocktailFormValues } from './cocktailFormSchema';
 import { hasStock, type RecipeLists } from './recipeLists';
 import { useErrorText } from './useErrorText';
 

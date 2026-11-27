@@ -44,7 +44,7 @@
     "embedOrigin": {
       "notAnOrigin": "« {{origin}} » n’est pas une adresse de site : écrivez-la sous la forme https://www.exemple.fr, sans chemin",
       "wildcard": "« {{origin}} » : le joker * n’est pas accepté, indiquez chaque site en entier",
-      "insecure": "« {{origin}} » utilise http:// : seuls les sites en https:// peuvent intégrer la carte (http:// est accepté pour localhost uniquement)",
+      "insecure": "« {{origin}} » utilise http:// : seuls les sites en https:// peuvent intégrer la carte (http:// est accepté pour localhost et 127.0.0.1 uniquement)",
       "tooMany": "{{max, number}} sites au plus peuvent intégrer la carte"
     },
     "import": {

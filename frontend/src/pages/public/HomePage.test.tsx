@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { render, screen } from '../../test/test-utils';
 import { AppProviders } from '../../test/appProviders';
-import { buildMenu, buildSiteSettings } from '../../test/factories';
+import { buildPublicMenuSummary, buildSiteSettings } from '../../test/factories';
 import {
   mockApiPending,
   mockApiResponse,
@@ -37,13 +37,13 @@ beforeEach(() => {
 describe('HomePage', () => {
   it('lists the public menus with a pluralized count of cocktails or bottles', async () => {
     mockMenus([
-      buildMenu({
+      buildPublicMenuSummary({
         slug: 'summer',
         name: 'Summer',
         description: 'Fresh drinks',
         _count: { cocktails: 1, bottles: 0 },
       }),
-      buildMenu({
+      buildPublicMenuSummary({
         slug: 'aperitifs',
         name: 'Apéritifs',
         type: 'APEROS',
@@ -64,7 +64,7 @@ describe('HomePage', () => {
   });
 
   it('counts zero when the API sends no count', async () => {
-    mockMenus([buildMenu()]);
+    mockMenus([buildPublicMenuSummary()]);
 
     renderHome();
 
@@ -88,7 +88,7 @@ describe('HomePage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load the menus');
     expect(screen.queryByText('No menus available at the moment')).not.toBeInTheDocument();
 
-    mockMenus([buildMenu({ name: 'Summer' })]);
+    mockMenus([buildPublicMenuSummary({ name: 'Summer' })]);
 
     await user.click(screen.getByRole('button', { name: 'Retry' }));
 
@@ -110,7 +110,7 @@ describe('HomePage', () => {
       '/api/public/settings',
       buildSiteSettings({ siteName: 'Chez Lulu', siteIcon: '🍹' }),
     );
-    mockMenus([buildMenu({ name: 'Summer' })]);
+    mockMenus([buildPublicMenuSummary({ name: 'Summer' })]);
 
     await user.click(screen.getByRole('button', { name: 'Retry' }));
 
@@ -132,7 +132,7 @@ describe('HomePage', () => {
 
 describe('HomePage accessibility', () => {
   it('has no serious accessibility violation', async () => {
-    mockMenus([buildMenu({ slug: 'summer', name: 'Summer' })]);
+    mockMenus([buildPublicMenuSummary({ slug: 'summer', name: 'Summer' })]);
     const { container } = renderHome();
     await screen.findByRole('link', { name: /Summer/ });
 
