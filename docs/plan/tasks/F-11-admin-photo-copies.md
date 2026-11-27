@@ -11,7 +11,7 @@ depends_on: [F-01]
 touches: [frontend/src/components/admin/cocktails/CocktailThumbnail.tsx, frontend/src/components/admin/cocktails/ImagePicker.tsx, frontend/src/components/ui/UploadedPhoto.tsx]
 sources: []
 branch: fix/F-11-admin-photo-copies
-pr:
+pr: 291
 ---
 
 ## Contexte
