@@ -36,7 +36,14 @@ function recipe(name: string): CocktailExportFormat {
   return {
     version: 1,
     exportedAt: '2024-01-01',
-    cocktail: { name, description: null, notes: null, tags: ['rum'], ingredients: [], instructions: [] },
+    cocktail: {
+      name,
+      description: null,
+      notes: null,
+      tags: ['rum'],
+      ingredients: [],
+      instructions: [],
+    },
   };
 }
 
@@ -53,7 +60,9 @@ function mockServerFiles(...files: { id: number; filename: string; name: string 
       requestedBatches.push(batch);
       const found = batch.map((id) => files.find((candidate) => candidate.id === id));
       if (found.some((file) => !file)) return errorResponse(404, 'Resource not found');
-      return HttpResponse.json(found.map((file) => file && { filename: file.filename, data: recipe(file.name) }));
+      return HttpResponse.json(
+        found.map((file) => file && { filename: file.filename, data: recipe(file.name) }),
+      );
     }),
   );
 }
@@ -69,7 +78,10 @@ describe('exportCocktailsAsZip', () => {
     await exportCocktailsAsZip([1]);
 
     expect(requestedBatches).toEqual([[1]]);
-    expect(mockFile).toHaveBeenCalledWith('cocktail-mojito.json', JSON.stringify(recipe('Mojito'), null, 2));
+    expect(mockFile).toHaveBeenCalledWith(
+      'cocktail-mojito.json',
+      JSON.stringify(recipe('Mojito'), null, 2),
+    );
     expect(mockGenerateAsync).toHaveBeenCalledWith({ type: 'blob' });
   });
 
@@ -86,8 +98,13 @@ describe('exportCocktailsAsZip', () => {
   });
 
   it(`should split a selection of more than ${EXPORT_BATCH_SIZE} cocktails into batches, keeping its order`, async () => {
-    const ids = Array.from({ length: EXPORT_BATCH_SIZE + 1 }, (_, index) => EXPORT_BATCH_SIZE + 1 - index);
-    mockServerFiles(...ids.map((id) => ({ id, filename: `cocktail-${id}.json`, name: `Cocktail ${id}` })));
+    const ids = Array.from(
+      { length: EXPORT_BATCH_SIZE + 1 },
+      (_, index) => EXPORT_BATCH_SIZE + 1 - index,
+    );
+    mockServerFiles(
+      ...ids.map((id) => ({ id, filename: `cocktail-${id}.json`, name: `Cocktail ${id}` })),
+    );
 
     await exportCocktailsAsZip(ids);
 
@@ -114,7 +131,11 @@ describe('exportCocktailsAsZip', () => {
 
     await exportCocktailsAsZip([1, 2, 3]);
 
-    expect(zippedFilenames()).toEqual(['cocktail-mojito.json', 'cocktail-mojito-2.json', 'cocktail-mojito-3.json']);
+    expect(zippedFilenames()).toEqual([
+      'cocktail-mojito.json',
+      'cocktail-mojito-2.json',
+      'cocktail-mojito-3.json',
+    ]);
   });
 
   it('should build an archive that holds every recipe of a batch with duplicate names', async () => {
@@ -127,7 +148,9 @@ describe('exportCocktailsAsZip', () => {
     await exportCocktailsAsZip([1, 2, 42]);
 
     // Replays the entries into a real archive and reads it back like the import step does
-    const { default: RealJSZip } = await vi.importActual<{ default: typeof import('jszip') }>('jszip');
+    const { default: RealJSZip } = await vi.importActual<{ default: typeof import('jszip') }>(
+      'jszip',
+    );
     const archive = new RealJSZip();
     for (const [filename, content] of mockFile.mock.calls) archive.file(filename, content);
     const reloaded = await RealJSZip.loadAsync(await archive.generateAsync({ type: 'uint8array' }));
@@ -144,7 +167,11 @@ describe('exportCocktailsAsZip', () => {
 
     await exportCocktailsAsZip([1, 2, 3]);
 
-    expect(zippedFilenames()).toEqual(['cocktail-mojito.json', 'cocktail-mojito-2.json', 'cocktail-mojito-3.json']);
+    expect(zippedFilenames()).toEqual([
+      'cocktail-mojito.json',
+      'cocktail-mojito-2.json',
+      'cocktail-mojito-3.json',
+    ]);
   });
 
   it('should keep the id-based name of a cocktail with no latin letter', async () => {

@@ -9,6 +9,7 @@ import type {
   Menu,
   MenuBottle,
   MenuCocktail,
+  PublicMenuCocktail,
   MenuSection,
   Shortage,
   SiteSettings,
@@ -56,15 +57,33 @@ export function resetFactories(): void {
  * repeat with a number, so two built entities never share a name either.
  */
 function nameFor(pool: readonly string[], id: number): string {
-  const name = pool[(id - 1) % pool.length];
+  const name = pool[(id - 1) % pool.length]!;
   return id > pool.length ? `${name} ${id}` : name;
 }
 
 const CATEGORY_TYPE_NAMES: readonly string[] = ['SPIRIT', 'SYRUP', 'SOFT', 'LIQUEUR'];
 const CATEGORY_NAMES: readonly string[] = ['Gin', 'Vodka', 'Rhum blanc', 'Tequila', 'Whisky'];
-const BOTTLE_NAMES: readonly string[] = ['Tanqueray', 'Absolut', 'Havana Club 3', 'Olmeca', 'Lagavulin 16'];
-const INGREDIENT_NAMES: readonly string[] = ['Citron vert', 'Menthe', 'Sucre de canne', 'Glaçons', 'Orange'];
-const COCKTAIL_NAMES: readonly string[] = ['Mojito', 'Negroni', 'Daiquiri', 'Margarita', 'Old Fashioned'];
+const BOTTLE_NAMES: readonly string[] = [
+  'Tanqueray',
+  'Absolut',
+  'Havana Club 3',
+  'Olmeca',
+  'Lagavulin 16',
+];
+const INGREDIENT_NAMES: readonly string[] = [
+  'Citron vert',
+  'Menthe',
+  'Sucre de canne',
+  'Glaçons',
+  'Orange',
+];
+const COCKTAIL_NAMES: readonly string[] = [
+  'Mojito',
+  'Negroni',
+  'Daiquiri',
+  'Margarita',
+  'Old Fashioned',
+];
 const MENU_NAMES: readonly string[] = ['Carte d’été', 'Carte d’hiver', 'Soirée tiki'];
 const SECTION_NAMES: readonly string[] = ['Classiques', 'Signatures', 'Sans alcool'];
 const UNIT_DEFAULTS: readonly Omit<Unit, 'id'>[] = [
@@ -90,7 +109,7 @@ export function buildCategoryType(overrides: Partial<CategoryType> = {}): Catego
   return {
     name: nameFor(CATEGORY_TYPE_NAMES, index),
     nameTranslations: null,
-    color: CATEGORY_TYPE_COLORS[(index - 1) % CATEGORY_TYPE_COLORS.length],
+    color: CATEGORY_TYPE_COLORS[(index - 1) % CATEGORY_TYPE_COLORS.length]!,
     ...overrides,
   };
 }
@@ -147,8 +166,8 @@ export function buildUnit(overrides: Partial<Unit> = {}): Unit {
   return {
     name: nameFor(UNIT_NAMES, id),
     nameTranslations: null,
-    abbreviation: unit.abbreviation,
-    conversionFactorToMl: unit.conversionFactorToMl,
+    abbreviation: unit!.abbreviation,
+    conversionFactorToMl: unit!.conversionFactorToMl,
     ...overrides,
     id,
   };
@@ -158,9 +177,12 @@ export function buildUnit(overrides: Partial<Unit> = {}): Unit {
  * A line of a recipe, a free ingredient by default (2 of unit 1). Given an `id`,
  * the line and its ingredient share it unless `ingredient` says otherwise.
  */
-export function buildCocktailIngredient(overrides: Partial<CocktailIngredient> = {}): CocktailIngredient {
+export function buildCocktailIngredient(
+  overrides: Partial<CocktailIngredient> = {},
+): CocktailIngredient {
   const id = overrides.id ?? nextId('cocktailIngredient');
-  const ingredient = overrides.ingredient === undefined ? buildIngredient({ id }) : overrides.ingredient;
+  const ingredient =
+    overrides.ingredient === undefined ? buildIngredient({ id }) : overrides.ingredient;
   return {
     cocktailId: 1,
     quantity: 2,
@@ -231,10 +253,13 @@ export function buildMenuSection(overrides: Partial<MenuSection> = {}): MenuSect
  */
 export function buildMenuCocktail(
   overrides: Partial<Omit<MenuCocktail, 'cocktail'>> & { cocktail?: Partial<Cocktail> } = {},
-): MenuCocktail {
+): PublicMenuCocktail {
   const { cocktail: cocktailOverrides, ...entryOverrides } = overrides;
   const id = entryOverrides.id ?? nextId('menuCocktail');
-  const cocktail = buildCocktail({ id: entryOverrides.id ?? cocktailOverrides?.id, ...cocktailOverrides });
+  const cocktail = buildCocktail({
+    id: entryOverrides.id ?? cocktailOverrides?.id,
+    ...cocktailOverrides,
+  });
   return {
     menuId: 1,
     cocktailId: cocktail.id,
@@ -256,7 +281,11 @@ export function buildMenuBottle(
 ): MenuBottle {
   const { bottle: bottleOverrides, ...entryOverrides } = overrides;
   const id = entryOverrides.id ?? nextId('menuBottle');
-  const bottle = buildBottle({ id: entryOverrides.id ?? bottleOverrides?.id, isApero: true, ...bottleOverrides });
+  const bottle = buildBottle({
+    id: entryOverrides.id ?? bottleOverrides?.id,
+    isApero: true,
+    ...bottleOverrides,
+  });
   return {
     menuId: 1,
     bottleId: bottle.id,
@@ -279,7 +308,9 @@ export function buildShortage(
   overrides: Partial<Omit<Shortage, 'category'>> & { category?: Partial<ShortageCategory> } = {},
 ): Shortage {
   const { category: categoryOverrides, ...shortageOverrides } = overrides;
-  const { id, name, nameTranslations, type, desiredStock, minimumPercent } = buildCategory({ desiredStock: 2 });
+  const { id, name, nameTranslations, type, desiredStock, minimumPercent } = buildCategory({
+    desiredStock: 2,
+  });
   const category: ShortageCategory = {
     id,
     name,
@@ -301,7 +332,9 @@ export function buildShortage(
 }
 
 /** A cocktail that can be served, with no ingredient detail. */
-export function buildAvailability(overrides: Partial<CocktailAvailability> = {}): CocktailAvailability {
+export function buildAvailability(
+  overrides: Partial<CocktailAvailability> = {},
+): CocktailAvailability {
   return {
     cocktailId: 1,
     isAvailable: true,

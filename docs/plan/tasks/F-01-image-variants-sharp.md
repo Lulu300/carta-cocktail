@@ -5,13 +5,13 @@ phase: F
 lane: backend
 criticite: basse
 effort: M
-status: todo
+status: done
 owner: agent
 depends_on: [A-01, C-09, C-15]
-touches: [backend/src/services/cocktail, backend/package.json, backend/package-lock.json, frontend/src/pages/public/, frontend/src/utils/uploads.ts]
+touches: [backend/src/services/cocktail, backend/package.json, backend/package-lock.json, frontend/src/pages/public/, frontend/src/utils/uploads.ts, backend/src/routes/public.ts, backend/src/services/backupService.ts, backend/src/index.ts, backend/src/services/uploadsCheck.ts, backend/src/i18n/, backend/src/test/, backend/Dockerfile, backend/AGENTS.md, frontend/AGENTS.md, docs/operations.md, scripts/smoke/smoke.sh]
 sources: ["06-frontend-ux-perf.md §1"]
-branch:
-pr:
+branch: feature/F-01-optimized-images
+pr: 287
 ---
 
 ## Contexte
@@ -40,13 +40,13 @@ Les invités consultent la carte sur leur téléphone, souvent sur le wifi du ba
 
 ## Critères d'acceptation
 
-- [ ] Un upload JPEG de 4 Mo produit trois fichiers WebP, le plus grand fait moins de 400 Ko.
-- [ ] Les fichiers produits ne contiennent plus de bloc EXIF ni de GPS (`exiftool` ou `sharp(...).metadata()`).
-- [ ] Une photo prise en portrait s'affiche dans le bon sens.
-- [ ] La carte publique charge la variante 480 sur un viewport mobile (onglet Réseau).
-- [ ] Supprimer un cocktail supprime ses trois fichiers.
-- [ ] Les images importées avant la tâche s'affichent toujours, avec ou sans rattrapage.
-- [ ] Tests, `tsc` et couverture OK dans les deux paquets.
+- [x] Un upload JPEG de 4 Mo produit trois fichiers WebP, le plus grand fait moins de 400 Ko.
+- [x] Les fichiers produits ne contiennent plus de bloc EXIF ni de GPS (`exiftool` ou `sharp(...).metadata()`).
+- [x] Une photo prise en portrait s'affiche dans le bon sens.
+- [x] La carte publique charge la variante 480 sur un viewport mobile (onglet Réseau).
+- [x] Supprimer un cocktail supprime ses trois fichiers.
+- [x] Les images importées avant la tâche s'affichent toujours, avec ou sans rattrapage.
+- [x] Tests, `tsc` et couverture OK dans les deux paquets.
 
 ## Tests à ajouter ou adapter
 
@@ -70,3 +70,6 @@ Les invités consultent la carte sur leur téléphone, souvent sur le wifi du ba
 
 - 2026-10-08 : tâche créée à partir de la revue.
 - 2026-10-08 : suivi des revues de la phase A. Point d'attention ajouté : images de cocktails hors carte toujours servies par `/uploads/<fichier>` ; base de nom non devinable à prévoir avec le nouveau nommage.
+- 2026-11-26 : fait (PR #287). Décisions du coordinateur appliquées : variante JPEG `<base>-og.jpg` (1200 px) en plus des WebP, `og:image` de F-03 pointe dessus (repli sur la photo tant qu'elle manque) ; originaux existants jamais supprimés ni réécrits ; rattrapage idempotent qui n'ajoute que les copies manquantes. Choix restants : l'envoi lui-même n'est pas gardé (il garderait le GPS dans un fichier servi par `/uploads/`) ; limite de 5 Mio inchangée (décision produit non prise). Upload : multer en `memoryStorage`, sharp `rotate()` sans métadonnées, `<uuid>.webp` (1600 px, nom stocké), `-960.webp`, `-480.webp`, `-og.jpg`, qualité 80, écriture atomique (`.<nom>.partial` puis renommage), 400 `errors.invalidImage` pour un fichier illisible. Rattrapage (`backfillImageVariants`) en arrière-plan au démarrage et après une restauration, exécutions en file ; pas de commande `dist/scripts/` (la tâche laissait le choix, et la restauration a besoin du rattrapage dans le processus). Frontend : `getUploadSrcSet`, composant `UploadedPhoto` (`sizes`, `decoding="async"`, `onError` qui retire le `srcset` et affiche la photo elle-même), `loading="lazy"` sur les cartes, `fetchPriority="high"` sur la page cocktail. Critère « variante 480 sur mobile » : vrai en vue liste ; en vue grille la carte fait toute la largeur, un téléphone 2x charge la 960 et un 3x la 1600 (`sizes` décrit la vraie mise en page). Dockerfile : `--omit=optional` supprimait le binaire libvips de sharp (paquet optionnel `@img/sharp-linuxmusl-*`, échec vérifié) ; élagage en `--omit=dev` et coupe des pairs optionnels de l'outillage (typescript, magicast) par `prune-unused-deps.mjs` ; étape de build qui encode un WebP et un JPEG. `allowScripts` inchangé : sharp 0.35.5 n'a pas de script d'installation. Image backend : 135 → 143 Mo (amd64) et 134 → 143 Mo (arm64) compressés. Vérifié : image amd64 seule (JPEG de 3,9 Mo en portrait avec GPS → 186 Ko, droit, sans EXIF ; ancienne photo rattrapée au redémarrage ; sauvegarde sans copies restaurée puis rattrapée), smoke compose complet en arm64 natif (`carta-f-01`). Bundle public 137,61 kB (137,31 sur develop). Sondes de sabotage : toutes détectées sauf un mutant équivalent. `touches` complété (route publique, restauration, démarrage, i18n, helpers de test, Dockerfile, smoke, docs). F-11 créée (vignettes de l'admin).
+- 2026-11-27 : décision de l'humain : on ne garde que les versions réduites. Le fichier envoyé n'est pas conservé, et une nouvelle photo fait au plus 1600 px (WebP). Suites de la relecture (approuvée sans bloquant) : `limitInputPixels` explicite à 100 Mpx (`MAX_INPUT_PIXELS`), testé à la limite et à la limite + 1 ligne de pixels (400, rien d'écrit ; sonde : sans la limite, le test échoue) ; l'entrée est décodée une seule fois, redressée et ramenée à 1600 px en pixels bruts, et les quatre fichiers (ou les copies manquantes du rattrapage) sont encodés depuis ce résultat, sans double compression.
+- Notes de version : une nouvelle photo est enregistrée en WebP de 1600 px de large au plus, sans EXIF ni position GPS ; le fichier envoyé n'est pas gardé, ni sur le serveur ni dans les sauvegardes. Les photos existantes ne changent pas. Les aperçus de liens utilisent une copie JPEG. Un fichier illisible avec une extension acceptée (JPEG tronqué, HEIC renommé en `.jpg`) ou de plus de 100 Mpx reçoit maintenant un 400 avec un message clair, alors qu'il était stocké tel quel avant. Au premier démarrage, le backend ajoute en arrière-plan les copies réduites des photos existantes (environ 350 Ko par photo), sans toucher aux originaux ; de même après la restauration d'une sauvegarde plus ancienne. L'image backend grossit d'environ 9 Mo. Aucune action requise, `breaking: false`.

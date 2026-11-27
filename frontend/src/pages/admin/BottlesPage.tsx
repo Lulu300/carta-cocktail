@@ -7,7 +7,8 @@ import type { Bottle } from '../../types';
 import { qk } from '../../queries/keys';
 import { useBottles } from '../../queries/bottles';
 import { useCategories } from '../../queries/categories';
-import { useCrudMutations, useInvalidateQueries } from '../../queries/crud';
+import { useForcedDeleteCrudMutations } from '../../components/admin/useForcedDelete';
+import { useInvalidateQueries } from '../../queries/invalidate';
 import { groupBottles, isGroup, type BottleGroup } from '../../utils/bottleGrouping';
 import Button from '../../components/ui/Button';
 import CategoryFilterInput from '../../components/ui/CategoryFilterInput';
@@ -16,7 +17,6 @@ import SearchInput from '../../components/ui/SearchInput';
 import ImportBottlesWizard from '../../components/import/ImportBottlesWizard';
 import DataTable, { type Column } from '../../components/admin/DataTable';
 import { useConfirmDelete } from '../../components/admin/useConfirmDelete';
-import { useForcedDelete } from '../../components/admin/useForcedDelete';
 import { useEntityForm } from '../../components/admin/useEntityForm';
 import BottleFormModal from '../../components/admin/bottles/BottleFormModal';
 import BottleGroupRow from '../../components/admin/bottles/BottleGroupRow';
@@ -24,7 +24,10 @@ import BottleHistoryTable from '../../components/admin/bottles/BottleHistoryTabl
 import BottleRow from '../../components/admin/bottles/BottleRow';
 import ExportMenu from '../../components/admin/bottles/ExportMenu';
 import { toBottleForm, type BottleInput } from '../../components/admin/bottles/bottleForm';
-import { useBottleFilters, type ListedBottle } from '../../components/admin/bottles/useBottleFilters';
+import {
+  useBottleFilters,
+  type ListedBottle,
+} from '../../components/admin/bottles/useBottleFilters';
 
 // Stock levels feed the shortages and the cocktail availability; the apéritif and
 // digestif flags fill the system menus; categories count their bottles.
@@ -40,16 +43,19 @@ export default function BottlesPage() {
   const invalidateQueries = useInvalidateQueries();
   const bottlesQuery = useBottles();
   const categories = useCategories().data ?? [];
-  const { create, update } = useCrudMutations<BottleInput>({
+  const {
+    create,
+    update,
+    remove: deleteBottle,
+  } = useForcedDeleteCrudMutations<BottleInput>({
     key: qk.bottles,
     api: bottlesApi,
     invalidates: BOTTLE_DEPENDENT_KEYS,
-    messages: { created: 'bottles.created', updated: 'bottles.updated', deleted: 'bottles.deleted' },
-  });
-  const deleteBottle = useForcedDelete({
-    deleteItem: bottlesApi.delete,
-    invalidates: [qk.bottles, ...BOTTLE_DEPENDENT_KEYS],
-    deletedMessage: 'bottles.deleted',
+    messages: {
+      created: 'bottles.created',
+      updated: 'bottles.updated',
+      deleted: 'bottles.deleted',
+    },
   });
   const bottleForm = useEntityForm((bottle?: Bottle) => toBottleForm(categories, bottle));
   const filters = useBottleFilters(bottlesQuery.data);
@@ -85,9 +91,17 @@ export default function BottlesPage() {
 
   const rowActions = { onEdit: bottleForm.open, onDelete: handleDelete };
 
-  const renderRow = (item: BottleListItem) => (isGroup(item)
-    ? <BottleGroupRow group={item} expanded={expandedGroups.has(item.key)} onToggle={toggleGroup} {...rowActions} />
-    : <BottleRow bottle={item} {...rowActions} />);
+  const renderRow = (item: BottleListItem) =>
+    isGroup(item) ? (
+      <BottleGroupRow
+        group={item}
+        expanded={expandedGroups.has(item.key)}
+        onToggle={toggleGroup}
+        {...rowActions}
+      />
+    ) : (
+      <BottleRow bottle={item} {...rowActions} />
+    );
 
   const columns: Column<BottleListItem>[] = [
     { key: 'name', header: t('bottles.name'), sortable: true },
@@ -105,7 +119,9 @@ export default function BottlesPage() {
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <h1 className="text-2xl font-bold font-serif text-accent">{t('bottles.title')}</h1>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={() => setShowImportWizard(true)}>{t('bottles.import')}</Button>
+          <Button variant="secondary" onClick={() => setShowImportWizard(true)}>
+            {t('bottles.import')}
+          </Button>
           <ExportMenu filters={filters.exportFilters} />
           <Button
             onClick={() => bottleForm.open()}
@@ -118,7 +134,12 @@ export default function BottlesPage() {
       </div>
 
       <div className="flex flex-col lg:flex-row gap-3 mb-4">
-        <SearchInput value={filters.search} onChange={filters.setSearch} label={t('bottles.search')} className="lg:w-64" />
+        <SearchInput
+          value={filters.search}
+          onChange={filters.setSearch}
+          label={t('bottles.search')}
+          className="lg:w-64"
+        />
         <CategoryFilterInput
           categories={categories}
           value={filters.categoryText}

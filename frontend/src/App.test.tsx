@@ -48,7 +48,7 @@ vi.mock('./components/layout/PublicLayout', () => ({ default: () => <Outlet /> }
 vi.mock('./pages/admin/DashboardPage', () => ({
   default: function DashboardPageStub() {
     loadEvents.push('DashboardPage');
-    return <h1>dashboard.title</h1>;
+    return <h1>Dashboard</h1>;
   },
 }));
 vi.mock('./pages/admin/CategoriesPage', () => ({ default: () => null }));
@@ -108,7 +108,7 @@ describe('ProtectedRoute', () => {
 
     renderAt('/admin/bottles');
 
-    expect(await screen.findByRole('status')).toHaveTextContent('common.loading');
+    expect(await screen.findByRole('status')).toHaveTextContent('Loading...');
     expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
     expect(screen.queryByTestId('admin-layout')).not.toBeInTheDocument();
   });
@@ -119,7 +119,13 @@ describe('ProtectedRoute', () => {
     const rateLimited = () => new ApiError(429, 'Too many requests: try again in a few minutes');
 
     function failSessionCheck(sessionError: Error) {
-      mockUseAuth.mockReturnValue({ user: null, isLoading: false, sessionError, retrySession, logout });
+      mockUseAuth.mockReturnValue({
+        user: null,
+        isLoading: false,
+        sessionError,
+        retrySession,
+        logout,
+      });
     }
 
     it('shows the backend message of a rate limit with Retry, without sending the admin to /login', async () => {
@@ -128,13 +134,14 @@ describe('ProtectedRoute', () => {
       const { container } = renderAt('/admin/bottles');
 
       const alert = await screen.findByRole('alert');
-      expect(alert).toHaveTextContent('auth.sessionCheckFailed');
-      expect(alert).toHaveTextContent('Too many requests: try again in a few minutes');
+      expect(alert).toHaveTextContent('Your session could not be checked');
+      expect(alert).not.toHaveTextContent('Retry');
+      expect(screen.getByText('Too many requests: try again in a few minutes')).toBeInTheDocument();
       expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
       expect(screen.queryByTestId('admin-layout')).not.toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
 
-      await userEvent.click(screen.getByRole('button', { name: 'common.retry' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
       expect(retrySession).toHaveBeenCalledTimes(1);
       expect(logout).not.toHaveBeenCalled();
     });
@@ -156,7 +163,7 @@ describe('ProtectedRoute', () => {
       });
       renderAt('/admin/bottles');
 
-      await userEvent.click(await screen.findByRole('button', { name: 'auth.signInAgain' }));
+      await userEvent.click(await screen.findByRole('button', { name: 'Sign in again' }));
 
       expect(logout).toHaveBeenCalledTimes(1);
       expect(retrySession).not.toHaveBeenCalled();
@@ -168,7 +175,7 @@ describe('ProtectedRoute', () => {
       failSessionCheck(rateLimited());
       renderAt('/admin/bottles');
 
-      await userEvent.click(await screen.findByRole('link', { name: 'public.backHome' }));
+      await userEvent.click(await screen.findByRole('link', { name: 'Back to home' }));
 
       expect(screen.getByTestId('home-page')).toBeInTheDocument();
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -182,9 +189,9 @@ describe('ProtectedRoute', () => {
       renderAt('/admin');
 
       const alert = await screen.findByRole('alert');
-      expect(alert).toHaveTextContent('auth.sessionCheckFailed');
-      expect(alert).toHaveTextContent('public.loadErrorHint');
-      expect(alert).not.toHaveTextContent('Failed to fetch');
+      expect(alert).toHaveTextContent('Your session could not be checked');
+      expect(screen.getByText('Check your connection and try again.')).toBeInTheDocument();
+      expect(screen.queryByText('Failed to fetch')).not.toBeInTheDocument();
     });
 
     it('renders the admin layout when the admin signed in after a failed check', async () => {
@@ -210,9 +217,9 @@ describe('route code splitting', () => {
     renderAt('/admin');
 
     // The fallback shows first, announced to screen readers, then the dashboard chunk resolves
-    expect(screen.getByRole('status')).toHaveTextContent('common.loading');
-    expect(await screen.findByText('dashboard.title')).toBeInTheDocument();
-    expect(screen.queryByText('common.loading')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading...');
+    expect(await screen.findByText('Dashboard')).toBeInTheDocument();
+    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
   });
 
   it('renders the public home page without waiting for any chunk', () => {
@@ -222,8 +229,25 @@ describe('route code splitting', () => {
 
     // Synchronous query: the public pages are in the entry chunk, nothing suspends
     expect(screen.getByTestId('home-page')).toBeInTheDocument();
-    expect(screen.queryByText('common.loading')).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
   });
+});
+
+describe('unknown addresses', () => {
+  beforeEach(() => {
+    mockUseAuth.mockReturnValue({ user: null, isLoading: false });
+  });
+
+  it.each(['/nimporte-quoi', '/menu/summer/unknown/segments', '/admin/nope'])(
+    'shows the not-found page for %s instead of redirecting home',
+    (path) => {
+      renderAt(path);
+
+      expect(screen.getByRole('alert')).toHaveTextContent('Page not found');
+      expect(screen.getByRole('link', { name: 'Back to home' })).toHaveAttribute('href', '/');
+      expect(screen.queryByTestId('home-page')).not.toBeInTheDocument();
+    },
+  );
 });
 
 describe('route error boundary', () => {
@@ -240,20 +264,20 @@ describe('route error boundary', () => {
   it('shows the error screen instead of a blank page when a chunk cannot be loaded', async () => {
     renderAt('/admin/units');
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('errors.pageLoadFailed');
-    expect(screen.getByRole('button', { name: 'errors.reload' })).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('This page could not be displayed');
+    expect(screen.getByRole('button', { name: 'Reload' })).toBeInTheDocument();
   });
 
   it('shows the error screen when a page throws while rendering', () => {
     renderAt('/menu/house');
 
-    expect(screen.getByRole('alert')).toHaveTextContent('errors.pageLoadFailed');
+    expect(screen.getByRole('alert')).toHaveTextContent('This page could not be displayed');
   });
 
   it('lets the visitor reach another page after an error', async () => {
     renderAt('/menu/house');
 
-    await userEvent.click(screen.getByRole('link', { name: 'public.backHome' }));
+    await userEvent.click(screen.getByRole('link', { name: 'Back to home' }));
 
     expect(screen.getByTestId('home-page')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -271,7 +295,7 @@ describe('admin messages', () => {
 
     const adminChunks = [...appSource.matchAll(/import\('([^']+)'\)/g)]
       .map((match) => match[1])
-      .filter((path) => /^\.\/pages\/(admin|auth)\/|\/AdminLayout$/.test(path));
+      .filter((path) => /^\.\/pages\/(admin|auth)\/|\/AdminLayout$/.test(path!));
     expect(adminChunks).toEqual(
       expect.arrayContaining(['./components/layout/AdminLayout', './pages/auth/LoginPage']),
     );
@@ -304,7 +328,7 @@ describe('admin messages', () => {
 
     renderAt('/admin');
 
-    expect(await screen.findByText('dashboard.title')).toBeInTheDocument();
+    expect(await screen.findByText('Dashboard')).toBeInTheDocument();
     expectRegisteredBeforeFirstRender('AdminLayout');
     expectRegisteredBeforeFirstRender('DashboardPage');
   });

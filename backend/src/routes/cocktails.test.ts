@@ -4,18 +4,38 @@ import os from 'os';
 import path from 'path';
 import { config } from '../config';
 import {
-  setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
-  request, authHeader, prisma, seedCategory, seedUnit, seedBottle, seedIngredient, seedCocktail,
-  seedFullCocktail, lineOfSource,
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+  request,
+  authHeader,
+  prisma,
+  seedCategory,
+  seedUnit,
+  seedBottle,
+  seedIngredient,
+  seedCocktail,
+  seedFullCocktail,
+  lineOfSource,
 } from '../test/helpers';
 import type { CocktailIngredient } from '../generated/prisma/client';
 import type { CocktailExportFile } from '../services/cocktail/cocktailExport';
 import { MAX_IMAGE_BYTES } from '../services/cocktail/cocktailImage';
+import { derivedVariantNames } from '../services/cocktail/imageVariants';
+import { jpegOfSize, testImage } from '../test/images';
 import { MAX_EXPORT_BATCH } from '../validation/cocktails';
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
-beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
+beforeEach(async () => {
+  await cleanDatabase();
+  await seedRequiredData();
+});
 
 describe('GET /api/cocktails', () => {
   it('should return 401 without auth', async () => {
@@ -60,8 +80,7 @@ describe('POST /api/cocktails', () => {
   });
 
   it('should create a simple cocktail with no ingredients', async () => {
-    const res = await request.post('/api/cocktails').set(authHeader())
-      .send({ name: 'Simple' });
+    const res = await request.post('/api/cocktails').set(authHeader()).send({ name: 'Simple' });
     expect(res.status).toBe(201);
     expect(res.body.name).toBe('Simple');
     expect(res.body.ingredients).toHaveLength(0);
@@ -72,10 +91,13 @@ describe('POST /api/cocktails', () => {
     const cat = await seedCategory();
     const bottle = await seedBottle({ categoryId: cat.id });
 
-    const res = await request.post('/api/cocktails').set(authHeader()).send({
-      name: 'Bottle Cocktail',
-      ingredients: [{ quantity: 4, unitId: unit.id, sourceType: 'BOTTLE', bottleId: bottle.id }],
-    });
+    const res = await request
+      .post('/api/cocktails')
+      .set(authHeader())
+      .send({
+        name: 'Bottle Cocktail',
+        ingredients: [{ quantity: 4, unitId: unit.id, sourceType: 'BOTTLE', bottleId: bottle.id }],
+      });
     expect(res.status).toBe(201);
     expect(res.body.ingredients[0].sourceType).toBe('BOTTLE');
     expect(res.body.ingredients[0].bottleId).toBe(bottle.id);
@@ -85,10 +107,13 @@ describe('POST /api/cocktails', () => {
     const unit = await seedUnit();
     const cat = await seedCategory();
 
-    const res = await request.post('/api/cocktails').set(authHeader()).send({
-      name: 'Category Cocktail',
-      ingredients: [{ quantity: 4, unitId: unit.id, sourceType: 'CATEGORY', categoryId: cat.id }],
-    });
+    const res = await request
+      .post('/api/cocktails')
+      .set(authHeader())
+      .send({
+        name: 'Category Cocktail',
+        ingredients: [{ quantity: 4, unitId: unit.id, sourceType: 'CATEGORY', categoryId: cat.id }],
+      });
     expect(res.status).toBe(201);
     expect(res.body.ingredients[0].sourceType).toBe('CATEGORY');
     expect(res.body.ingredients[0].categoryId).toBe(cat.id);
@@ -98,19 +123,27 @@ describe('POST /api/cocktails', () => {
     const unit = await seedUnit();
     const ing = await seedIngredient({ name: 'Lime Juice' });
 
-    const res = await request.post('/api/cocktails').set(authHeader()).send({
-      name: 'Ing Cocktail',
-      ingredients: [{ quantity: 1, unitId: unit.id, sourceType: 'INGREDIENT', ingredientId: ing.id }],
-    });
+    const res = await request
+      .post('/api/cocktails')
+      .set(authHeader())
+      .send({
+        name: 'Ing Cocktail',
+        ingredients: [
+          { quantity: 1, unitId: unit.id, sourceType: 'INGREDIENT', ingredientId: ing.id },
+        ],
+      });
     expect(res.status).toBe(201);
     expect(res.body.ingredients[0].sourceType).toBe('INGREDIENT');
   });
 
   it('should create with instructions', async () => {
-    const res = await request.post('/api/cocktails').set(authHeader()).send({
-      name: 'Steps',
-      instructions: [{ text: 'Muddle' }, { text: 'Shake' }, { text: 'Strain' }],
-    });
+    const res = await request
+      .post('/api/cocktails')
+      .set(authHeader())
+      .send({
+        name: 'Steps',
+        instructions: [{ text: 'Muddle' }, { text: 'Shake' }, { text: 'Strain' }],
+      });
     expect(res.status).toBe(201);
     expect(res.body.instructions).toHaveLength(3);
     expect(res.body.instructions[0].stepNumber).toBe(1);
@@ -120,22 +153,31 @@ describe('POST /api/cocktails', () => {
   it('should return 400 for a BOTTLE line without bottleId', async () => {
     const unit = await seedUnit();
 
-    const res = await request.post('/api/cocktails').set(authHeader()).send({
-      name: 'Broken',
-      ingredients: [{ quantity: 4, unitId: unit.id, sourceType: 'BOTTLE' }],
-    });
+    const res = await request
+      .post('/api/cocktails')
+      .set(authHeader())
+      .send({
+        name: 'Broken',
+        ingredients: [{ quantity: 4, unitId: unit.id, sourceType: 'BOTTLE' }],
+      });
     expect(res.status).toBe(400);
-    expect(res.body.details[0]).toMatchObject({ path: 'body.ingredients.0.bottleId', code: 'custom' });
+    expect(res.body.details[0]).toMatchObject({
+      path: 'body.ingredients.0.bottleId',
+      code: 'custom',
+    });
     expect(await prisma.cocktail.count()).toBe(0);
   });
 
   it('should return 400 for an unknown sourceType', async () => {
     const unit = await seedUnit();
 
-    const res = await request.post('/api/cocktails').set(authHeader()).send({
-      name: 'Broken',
-      ingredients: [{ quantity: 4, unitId: unit.id, sourceType: 'GARNISH' }],
-    });
+    const res = await request
+      .post('/api/cocktails')
+      .set(authHeader())
+      .send({
+        name: 'Broken',
+        ingredients: [{ quantity: 4, unitId: unit.id, sourceType: 'GARNISH' }],
+      });
     expect(res.status).toBe(400);
     expect(res.body.details[0].path).toBe('body.ingredients.0.sourceType');
   });
@@ -144,31 +186,43 @@ describe('POST /api/cocktails', () => {
     const unit = await seedUnit();
     const bottle = await seedBottle();
 
-    const res = await request.post('/api/cocktails').set(authHeader()).send({
-      name: 'Broken',
-      ingredients: [{ quantity: 0, unitId: unit.id, sourceType: 'BOTTLE', bottleId: bottle.id }],
-    });
+    const res = await request
+      .post('/api/cocktails')
+      .set(authHeader())
+      .send({
+        name: 'Broken',
+        ingredients: [{ quantity: 0, unitId: unit.id, sourceType: 'BOTTLE', bottleId: bottle.id }],
+      });
     expect(res.status).toBe(400);
-    expect(res.body.details[0]).toMatchObject({ path: 'body.ingredients.0.quantity', code: 'too_small' });
+    expect(res.body.details[0]).toMatchObject({
+      path: 'body.ingredients.0.quantity',
+      code: 'too_small',
+    });
     expect(await prisma.cocktail.count()).toBe(0);
   });
 
   it('should return 400 for an instruction with an empty text', async () => {
-    const res = await request.post('/api/cocktails').set(authHeader())
+    const res = await request
+      .post('/api/cocktails')
+      .set(authHeader())
       .send({ name: 'Steps', instructions: [{ text: '' }] });
     expect(res.status).toBe(400);
     expect(await prisma.cocktail.count()).toBe(0);
   });
 
   it('should accept instructions sent as plain strings', async () => {
-    const res = await request.post('/api/cocktails').set(authHeader())
+    const res = await request
+      .post('/api/cocktails')
+      .set(authHeader())
       .send({ name: 'Steps', instructions: ['Muddle', { text: 'Shake' }] });
     expect(res.status).toBe(201);
     expect(res.body.instructions.map((i: { text: string }) => i.text)).toEqual(['Muddle', 'Shake']);
   });
 
   it('should handle tags as array', async () => {
-    const res = await request.post('/api/cocktails').set(authHeader())
+    const res = await request
+      .post('/api/cocktails')
+      .set(authHeader())
       .send({ name: 'Tagged', tags: ['classic', 'fruity'] });
     expect(res.status).toBe(201);
     expect(res.body.tags).toBe('classic,fruity');
@@ -177,10 +231,15 @@ describe('POST /api/cocktails', () => {
   it('should return 400 unknownReference with the line and the field for a unit that does not exist', async () => {
     const lime = await seedIngredient({ name: 'Lime' });
 
-    const res = await request.post('/api/cocktails').set(authHeader()).send({
-      name: 'Broken',
-      ingredients: [{ quantity: 1, unitId: 99999, sourceType: 'INGREDIENT', ingredientId: lime.id }],
-    });
+    const res = await request
+      .post('/api/cocktails')
+      .set(authHeader())
+      .send({
+        name: 'Broken',
+        ingredients: [
+          { quantity: 1, unitId: 99999, sourceType: 'INGREDIENT', ingredientId: lime.id },
+        ],
+      });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/does not exist/);
     expect(res.body.details).toEqual([{ line: 0, field: 'unitId', id: 99999 }]);
@@ -192,18 +251,24 @@ describe('POST /api/cocktails', () => {
     ['bottleId', () => ({ sourceType: 'BOTTLE', bottleId: 99999 })],
     ['categoryId', () => ({ sourceType: 'CATEGORY', categoryId: 99999 })],
     ['ingredientId', () => ({ sourceType: 'INGREDIENT', ingredientId: 99999 })],
-    ['preferredBottleIds', (categoryId: number) => ({ sourceType: 'CATEGORY', categoryId, preferredBottleIds: [99999] })],
+    [
+      'preferredBottleIds',
+      (categoryId: number) => ({ sourceType: 'CATEGORY', categoryId, preferredBottleIds: [99999] }),
+    ],
   ])('should return 400 unknownReference for a %s that does not exist', async (field, sourceOf) => {
     const unit = await seedUnit();
     const category = await seedCategory();
 
-    const res = await request.post('/api/cocktails').set(authHeader()).send({
-      name: 'Broken',
-      ingredients: [
-        { quantity: 1, unitId: unit.id, sourceType: 'CATEGORY', categoryId: category.id },
-        { quantity: 1, unitId: unit.id, ...sourceOf(category.id) },
-      ],
-    });
+    const res = await request
+      .post('/api/cocktails')
+      .set(authHeader())
+      .send({
+        name: 'Broken',
+        ingredients: [
+          { quantity: 1, unitId: unit.id, sourceType: 'CATEGORY', categoryId: category.id },
+          { quantity: 1, unitId: unit.id, ...sourceOf(category.id) },
+        ],
+      });
     expect(res.status).toBe(400);
     expect(res.body.details).toEqual([{ line: 1, field, id: 99999 }]);
     expect(await prisma.cocktail.count()).toBe(0);
@@ -213,7 +278,9 @@ describe('POST /api/cocktails', () => {
 describe('PUT /api/cocktails/:id', () => {
   it('should update cocktail name', async () => {
     const cocktail = await seedCocktail({ name: 'Old' });
-    const res = await request.put(`/api/cocktails/${cocktail.id}`).set(authHeader())
+    const res = await request
+      .put(`/api/cocktails/${cocktail.id}`)
+      .set(authHeader())
       .send({ name: 'New' });
     expect(res.status).toBe(200);
     expect(res.body.name).toBe('New');
@@ -224,16 +291,20 @@ describe('PUT /api/cocktails/:id', () => {
     const cat = await seedCategory();
     const bottle = await seedBottle({ categoryId: cat.id });
 
-    const createRes = await request.post('/api/cocktails').set(authHeader()).send({
-      name: 'Replace Test',
-      ingredients: [{ quantity: 2, unitId: unit.id, sourceType: 'BOTTLE', bottleId: bottle.id }],
-    });
+    const createRes = await request
+      .post('/api/cocktails')
+      .set(authHeader())
+      .send({
+        name: 'Replace Test',
+        ingredients: [{ quantity: 2, unitId: unit.id, sourceType: 'BOTTLE', bottleId: bottle.id }],
+      });
 
-    const res = await request.put(`/api/cocktails/${createRes.body.id}`).set(authHeader()).send({
-      ingredients: [
-        { quantity: 3, unitId: unit.id, sourceType: 'CATEGORY', categoryId: cat.id },
-      ],
-    });
+    const res = await request
+      .put(`/api/cocktails/${createRes.body.id}`)
+      .set(authHeader())
+      .send({
+        ingredients: [{ quantity: 3, unitId: unit.id, sourceType: 'CATEGORY', categoryId: cat.id }],
+      });
     expect(res.status).toBe(200);
     expect(res.body.ingredients).toHaveLength(1);
     expect(res.body.ingredients[0].sourceType).toBe('CATEGORY');
@@ -245,18 +316,24 @@ describe('PUT /api/cocktails/:id', () => {
     const unit = await seedUnit();
     const cat = await seedCategory();
     const bottle = await seedBottle({ categoryId: cat.id });
-    const res = await request.post('/api/cocktails').set(authHeader()).send({
-      name: 'Full Recipe',
-      tags: ['rhum', 'frais'],
-      ingredients: [
-        { quantity: 4, unitId: unit.id, sourceType: 'BOTTLE', bottleId: bottle.id },
-        {
-          quantity: 2, unitId: unit.id, sourceType: 'CATEGORY', categoryId: cat.id,
-          preferredBottleIds: [bottle.id],
-        },
-      ],
-      instructions: [{ text: 'Shake' }, { text: 'Strain' }],
-    });
+    const res = await request
+      .post('/api/cocktails')
+      .set(authHeader())
+      .send({
+        name: 'Full Recipe',
+        tags: ['rhum', 'frais'],
+        ingredients: [
+          { quantity: 4, unitId: unit.id, sourceType: 'BOTTLE', bottleId: bottle.id },
+          {
+            quantity: 2,
+            unitId: unit.id,
+            sourceType: 'CATEGORY',
+            categoryId: cat.id,
+            preferredBottleIds: [bottle.id],
+          },
+        ],
+        instructions: [{ text: 'Shake' }, { text: 'Strain' }],
+      });
     expect(res.status).toBe(201);
     return { id: res.body.id as number, unit };
   }
@@ -277,7 +354,9 @@ describe('PUT /api/cocktails/:id', () => {
   it('should keep ingredients, instructions, tags and preferred bottles on a partial update', async () => {
     const { id } = await createFullCocktail();
 
-    const res = await request.put(`/api/cocktails/${id}`).set(authHeader())
+    const res = await request
+      .put(`/api/cocktails/${id}`)
+      .set(authHeader())
       .send({ isAvailable: false });
 
     expect(res.status).toBe(200);
@@ -317,7 +396,10 @@ describe('PUT /api/cocktails/:id', () => {
   it('should clear ingredients but keep instructions when ingredients is an empty array', async () => {
     const { id } = await createFullCocktail();
 
-    const res = await request.put(`/api/cocktails/${id}`).set(authHeader()).send({ ingredients: [] });
+    const res = await request
+      .put(`/api/cocktails/${id}`)
+      .set(authHeader())
+      .send({ ingredients: [] });
 
     expect(res.status).toBe(200);
     expect(res.body.ingredients).toHaveLength(0);
@@ -329,11 +411,16 @@ describe('PUT /api/cocktails/:id', () => {
     const { id } = await createFullCocktail();
     const lime = await seedIngredient({ name: 'Lime' });
 
-    const res = await request.put(`/api/cocktails/${id}`).set(authHeader()).send({
-      name: 'Should Not Be Saved',
-      ingredients: [{ quantity: 1, unitId: 99999, sourceType: 'INGREDIENT', ingredientId: lime.id }],
-      instructions: [{ text: 'Replaced' }],
-    });
+    const res = await request
+      .put(`/api/cocktails/${id}`)
+      .set(authHeader())
+      .send({
+        name: 'Should Not Be Saved',
+        ingredients: [
+          { quantity: 1, unitId: 99999, sourceType: 'INGREDIENT', ingredientId: lime.id },
+        ],
+        instructions: [{ text: 'Replaced' }],
+      });
     expect(res.status).toBe(400);
     expect(res.body.details).toEqual([{ line: 0, field: 'unitId', id: 99999 }]);
 
@@ -346,12 +433,20 @@ describe('PUT /api/cocktails/:id', () => {
     const { id, unit } = await createFullCocktail();
     const cat = await seedCategory({ name: 'Other' });
 
-    const res = await request.put(`/api/cocktails/${id}`).set(authHeader()).send({
-      ingredients: [{
-        quantity: 1, unitId: unit.id, sourceType: 'CATEGORY', categoryId: cat.id,
-        preferredBottleIds: [99999],
-      }],
-    });
+    const res = await request
+      .put(`/api/cocktails/${id}`)
+      .set(authHeader())
+      .send({
+        ingredients: [
+          {
+            quantity: 1,
+            unitId: unit.id,
+            sourceType: 'CATEGORY',
+            categoryId: cat.id,
+            preferredBottleIds: [99999],
+          },
+        ],
+      });
     expect(res.status).toBe(400);
     expect(res.body.details).toEqual([{ line: 0, field: 'preferredBottleIds', id: 99999 }]);
 
@@ -367,20 +462,31 @@ describe('PUT /api/cocktails/:id', () => {
   it('should return 404 for a non-existent cocktail even when a line names a missing unit', async () => {
     const lime = await seedIngredient({ name: 'Lime' });
 
-    const res = await request.put('/api/cocktails/99999').set(authHeader()).send({
-      ingredients: [{ quantity: 1, unitId: 99999, sourceType: 'INGREDIENT', ingredientId: lime.id }],
-    });
+    const res = await request
+      .put('/api/cocktails/99999')
+      .set(authHeader())
+      .send({
+        ingredients: [
+          { quantity: 1, unitId: 99999, sourceType: 'INGREDIENT', ingredientId: lime.id },
+        ],
+      });
     expect(res.status).toBe(404);
   });
 
   it('should return 400 and leave the recipe untouched for a BOTTLE line without bottleId', async () => {
     const { id, unit } = await createFullCocktail();
 
-    const res = await request.put(`/api/cocktails/${id}`).set(authHeader()).send({
-      ingredients: [{ quantity: 1, unitId: unit.id, sourceType: 'BOTTLE', bottleId: null }],
-    });
+    const res = await request
+      .put(`/api/cocktails/${id}`)
+      .set(authHeader())
+      .send({
+        ingredients: [{ quantity: 1, unitId: unit.id, sourceType: 'BOTTLE', bottleId: null }],
+      });
     expect(res.status).toBe(400);
-    expect(res.body.details[0]).toMatchObject({ path: 'body.ingredients.0.bottleId', code: 'custom' });
+    expect(res.body.details[0]).toMatchObject({
+      path: 'body.ingredients.0.bottleId',
+      code: 'custom',
+    });
 
     const after = await request.get(`/api/cocktails/${id}`).set(authHeader());
     expectRecipeIntact(after.body);
@@ -389,7 +495,9 @@ describe('PUT /api/cocktails/:id', () => {
   it('should return 400 for an instruction with an empty text', async () => {
     const { id } = await createFullCocktail();
 
-    const res = await request.put(`/api/cocktails/${id}`).set(authHeader())
+    const res = await request
+      .put(`/api/cocktails/${id}`)
+      .set(authHeader())
       .send({ instructions: [{ text: '' }] });
     expect(res.status).toBe(400);
     expect(res.body.details[0].path).toBe('body.instructions.0');
@@ -401,7 +509,9 @@ describe('PUT /api/cocktails/:id', () => {
   it('should return 400 and leave the recipe untouched for a non-string instruction', async () => {
     const { id } = await createFullCocktail();
 
-    const res = await request.put(`/api/cocktails/${id}`).set(authHeader())
+    const res = await request
+      .put(`/api/cocktails/${id}`)
+      .set(authHeader())
       .send({ instructions: [{ text: 42 }] });
     expect(res.status).toBe(400);
     expect(res.body.details[0].path).toBe('body.instructions.0');
@@ -425,7 +535,10 @@ describe('PUT /api/cocktails/:id - recipe defects already stored', () => {
   async function seedLegacyCocktail(line: StoredLine) {
     const unit = await seedUnit();
     const cocktail = await prisma.cocktail.create({
-      data: { name: 'Legacy', ingredients: { create: [{ ...line, unitId: unit.id, position: 0 }] } },
+      data: {
+        name: 'Legacy',
+        ingredients: { create: [{ ...line, unitId: unit.id, position: 0 }] },
+      },
     });
     return { id: cocktail.id, unitId: unit.id };
   }
@@ -446,7 +559,10 @@ describe('PUT /api/cocktails/:id - recipe defects already stored', () => {
   }
 
   async function storedLines(id: number) {
-    return prisma.cocktailIngredient.findMany({ where: { cocktailId: id }, orderBy: { position: 'asc' } });
+    return prisma.cocktailIngredient.findMany({
+      where: { cocktailId: id },
+      orderBy: { position: 'asc' },
+    });
   }
 
   it.each(['BOTTLE', 'CATEGORY', 'INGREDIENT'] as const)(
@@ -455,7 +571,9 @@ describe('PUT /api/cocktails/:id - recipe defects already stored', () => {
       const { id } = await seedLegacyCocktail({ sourceType, quantity: 2 });
 
       const ingredients = await formLines(id);
-      const res = await request.put(`/api/cocktails/${id}`).set(authHeader())
+      const res = await request
+        .put(`/api/cocktails/${id}`)
+        .set(authHeader())
         .send({ name: 'Renamed', ingredients });
       expect(res.status).toBe(200);
       expect(res.body.name).toBe('Renamed');
@@ -467,10 +585,16 @@ describe('PUT /api/cocktails/:id - recipe defects already stored', () => {
 
   it('should rename a cocktail with a quantity-0 line and keep the line', async () => {
     const bottle = await seedBottle();
-    const { id } = await seedLegacyCocktail({ sourceType: 'BOTTLE', bottleId: bottle.id, quantity: 0 });
+    const { id } = await seedLegacyCocktail({
+      sourceType: 'BOTTLE',
+      bottleId: bottle.id,
+      quantity: 0,
+    });
 
     const ingredients = await formLines(id);
-    const res = await request.put(`/api/cocktails/${id}`).set(authHeader())
+    const res = await request
+      .put(`/api/cocktails/${id}`)
+      .set(authHeader())
       .send({ name: 'Renamed', ingredients });
     expect(res.status).toBe(200);
     expect(await storedLines(id)).toMatchObject([{ bottleId: bottle.id, quantity: 0 }]);
@@ -480,55 +604,92 @@ describe('PUT /api/cocktails/:id - recipe defects already stored', () => {
     const { id, unitId } = await seedLegacyCocktail({ sourceType: 'BOTTLE', quantity: 2 });
     const newLine = { sourceType: 'BOTTLE', bottleId: null, quantity: 1, unitId };
 
-    const ingredients = [...await formLines(id), newLine];
+    const ingredients = [...(await formLines(id)), newLine];
     const res = await request.put(`/api/cocktails/${id}`).set(authHeader()).send({ ingredients });
     expect(res.status).toBe(400);
     expect(res.body.details).toEqual([
-      { path: 'body.ingredients.1.bottleId', code: 'custom', message: 'Required when sourceType is BOTTLE' },
+      {
+        path: 'body.ingredients.1.bottleId',
+        code: 'custom',
+        message: 'Required when sourceType is BOTTLE',
+      },
     ]);
     expect(await storedLines(id)).toHaveLength(1);
   });
 
   it('should return 400 and keep the recipe when a new line has a quantity of 0', async () => {
     const bottle = await seedBottle();
-    const { id, unitId } = await seedLegacyCocktail({ sourceType: 'BOTTLE', bottleId: bottle.id, quantity: 0 });
+    const { id, unitId } = await seedLegacyCocktail({
+      sourceType: 'BOTTLE',
+      bottleId: bottle.id,
+      quantity: 0,
+    });
     const newLine = { sourceType: 'BOTTLE', bottleId: bottle.id, quantity: 0, unitId };
 
-    const ingredients = [...await formLines(id), newLine];
+    const ingredients = [...(await formLines(id)), newLine];
     const res = await request.put(`/api/cocktails/${id}`).set(authHeader()).send({ ingredients });
     expect(res.status).toBe(400);
     expect(res.body.details).toHaveLength(1);
-    expect(res.body.details[0]).toMatchObject({ path: 'body.ingredients.1.quantity', code: 'too_small' });
+    expect(res.body.details[0]).toMatchObject({
+      path: 'body.ingredients.1.quantity',
+      code: 'too_small',
+    });
     expect(await storedLines(id)).toHaveLength(1);
   });
 
   it('should return 400 for a line without source on a cocktail that has no stored defect', async () => {
     const bottle = await seedBottle();
-    const { id, unitId } = await seedLegacyCocktail({ sourceType: 'BOTTLE', bottleId: bottle.id, quantity: 2 });
+    const { id, unitId } = await seedLegacyCocktail({
+      sourceType: 'BOTTLE',
+      bottleId: bottle.id,
+      quantity: 2,
+    });
 
-    const res = await request.put(`/api/cocktails/${id}`).set(authHeader())
-      .send({ ingredients: [{ sourceType: 'INGREDIENT', ingredientId: null, quantity: 1, unitId }] });
+    const res = await request
+      .put(`/api/cocktails/${id}`)
+      .set(authHeader())
+      .send({
+        ingredients: [{ sourceType: 'INGREDIENT', ingredientId: null, quantity: 1, unitId }],
+      });
     expect(res.status).toBe(400);
-    expect(res.body.details[0]).toMatchObject({ path: 'body.ingredients.0.ingredientId', code: 'custom' });
+    expect(res.body.details[0]).toMatchObject({
+      path: 'body.ingredients.0.ingredientId',
+      code: 'custom',
+    });
     expect(await storedLines(id)).toMatchObject([{ bottleId: bottle.id }]);
   });
 
   it('should return 400 for a quantity of 0 on a cocktail that has no stored defect', async () => {
     const bottle = await seedBottle();
-    const { id, unitId } = await seedLegacyCocktail({ sourceType: 'BOTTLE', bottleId: bottle.id, quantity: 2 });
+    const { id, unitId } = await seedLegacyCocktail({
+      sourceType: 'BOTTLE',
+      bottleId: bottle.id,
+      quantity: 2,
+    });
 
-    const res = await request.put(`/api/cocktails/${id}`).set(authHeader())
+    const res = await request
+      .put(`/api/cocktails/${id}`)
+      .set(authHeader())
       .send({ ingredients: [{ sourceType: 'BOTTLE', bottleId: bottle.id, quantity: 0, unitId }] });
     expect(res.status).toBe(400);
-    expect(res.body.details[0]).toMatchObject({ path: 'body.ingredients.0.quantity', code: 'too_small' });
+    expect(res.body.details[0]).toMatchObject({
+      path: 'body.ingredients.0.quantity',
+      code: 'too_small',
+    });
     expect(await storedLines(id)).toMatchObject([{ quantity: 2 }]);
   });
 
   it('should still return 400 for a negative quantity on a cocktail with a quantity-0 line', async () => {
     const bottle = await seedBottle();
-    const { id, unitId } = await seedLegacyCocktail({ sourceType: 'BOTTLE', bottleId: bottle.id, quantity: 0 });
+    const { id, unitId } = await seedLegacyCocktail({
+      sourceType: 'BOTTLE',
+      bottleId: bottle.id,
+      quantity: 0,
+    });
 
-    const res = await request.put(`/api/cocktails/${id}`).set(authHeader())
+    const res = await request
+      .put(`/api/cocktails/${id}`)
+      .set(authHeader())
       .send({ ingredients: [{ sourceType: 'BOTTLE', bottleId: bottle.id, quantity: -1, unitId }] });
     expect(res.status).toBe(400);
     expect(res.body.details[0].path).toBe('body.ingredients.0.quantity');
@@ -563,7 +724,10 @@ describe('GET /api/cocktails/:id/export', () => {
 
 describe('POST /api/cocktails/export', () => {
   function exportBatch(body: unknown) {
-    return request.post('/api/cocktails/export').set(authHeader()).send(body as object);
+    return request
+      .post('/api/cocktails/export')
+      .set(authHeader())
+      .send(body as object);
   }
 
   /** The single export of a cocktail, as the batch must repeat it. */
@@ -589,7 +753,9 @@ describe('POST /api/cocktails/export', () => {
     const daiquiri = await seedFullCocktail({
       name: 'Daiquiri',
       tags: 'classic,sour',
-      ingredients: [{ sourceType: 'CATEGORY', categoryId: rum.id, preferredBottleIds: [havana.id] }],
+      ingredients: [
+        { sourceType: 'CATEGORY', categoryId: rum.id, preferredBottleIds: [havana.id] },
+      ],
     });
     const mojito = await seedFullCocktail({ name: 'Mojito' });
     const pinaColada = await seedCocktail({ name: 'Piña Colada' });
@@ -602,9 +768,11 @@ describe('POST /api/cocktails/export', () => {
     expect(res.body.map(withoutExportTime)).toEqual(expected.map(withoutExportTime));
     expect(res.body[0].filename).toBe('cocktail-pina-colada.json');
     // Private fields included, as in the admin's single export
-    const daiquiriLines: CocktailExportFile['payload']['cocktail']['ingredients'] = res.body[1].data.cocktail.ingredients;
-    expect(lineOfSource(daiquiriLines, 'CATEGORY').preferredBottles)
-      .toEqual([{ name: 'Havana 3 Ans', categoryName: 'Rum' }]);
+    const daiquiriLines: CocktailExportFile['payload']['cocktail']['ingredients'] =
+      res.body[1].data.cocktail.ingredients;
+    expect(lineOfSource(daiquiriLines, 'CATEGORY').preferredBottles).toEqual([
+      { name: 'Havana 3 Ans', categoryName: 'Rum' },
+    ]);
   });
 
   it('should give cocktails with the same name the same file name, as the single export does', async () => {
@@ -614,8 +782,10 @@ describe('POST /api/cocktails/export', () => {
     const res = await exportBatch({ ids: [first.id, second.id] });
 
     expect(res.status).toBe(200);
-    expect(res.body.map((file: { filename: string }) => file.filename))
-      .toEqual(['cocktail-mojito.json', 'cocktail-mojito.json']);
+    expect(res.body.map((file: { filename: string }) => file.filename)).toEqual([
+      'cocktail-mojito.json',
+      'cocktail-mojito.json',
+    ]);
   });
 
   it('should return 404 when one of the cocktails does not exist', async () => {
@@ -650,20 +820,26 @@ describe('POST /api/cocktails/export', () => {
 
 describe('POST /api/cocktails/import/preview', () => {
   it('should return 400 for invalid version', async () => {
-    const res = await request.post('/api/cocktails/import/preview').set(authHeader())
+    const res = await request
+      .post('/api/cocktails/import/preview')
+      .set(authHeader())
       .send({ version: 2, cocktail: { name: 'Test' } });
     expect(res.status).toBe(400);
   });
 
   it('should return 400 for missing cocktail name', async () => {
-    const res = await request.post('/api/cocktails/import/preview').set(authHeader())
+    const res = await request
+      .post('/api/cocktails/import/preview')
+      .set(authHeader())
       .send({ version: 1, cocktail: {} });
     expect(res.status).toBe(400);
   });
 
   it('should detect if cocktail name already exists', async () => {
     await seedCocktail({ name: 'Existing' });
-    const res = await request.post('/api/cocktails/import/preview').set(authHeader())
+    const res = await request
+      .post('/api/cocktails/import/preview')
+      .set(authHeader())
       .send({ version: 1, cocktail: { name: 'Existing', ingredients: [], instructions: [] } });
     expect(res.status).toBe(200);
     expect(res.body.cocktail.alreadyExists).toBe(true);
@@ -672,7 +848,9 @@ describe('POST /api/cocktails/import/preview', () => {
   it('should identify matched and missing entities', async () => {
     await seedUnit({ name: 'Centilitre', abbreviation: 'cl' });
 
-    const res = await request.post('/api/cocktails/import/preview').set(authHeader())
+    const res = await request
+      .post('/api/cocktails/import/preview')
+      .set(authHeader())
       .send({
         version: 1,
         cocktail: {
@@ -707,18 +885,27 @@ describe('GET /api/cocktails/:id/export - rich data with all source types', () =
     const ing = await seedIngredient({ name: 'Lime Juice' });
 
     // Create cocktail via API so all relations are created properly
-    const createRes = await request.post('/api/cocktails').set(authHeader()).send({
-      name: 'Rich Export',
-      description: 'A great cocktail',
-      notes: 'Shake hard',
-      tags: ['classic', 'fruity'],
-      ingredients: [
-        { quantity: 4, unitId: unit.id, sourceType: 'BOTTLE', bottleId: bottle.id },
-        { quantity: 2, unitId: unit.id, sourceType: 'CATEGORY', categoryId: cat.id, preferredBottleIds: [bottle.id] },
-        { quantity: 1, unitId: unit.id, sourceType: 'INGREDIENT', ingredientId: ing.id },
-      ],
-      instructions: [{ text: 'Shake' }],
-    });
+    const createRes = await request
+      .post('/api/cocktails')
+      .set(authHeader())
+      .send({
+        name: 'Rich Export',
+        description: 'A great cocktail',
+        notes: 'Shake hard',
+        tags: ['classic', 'fruity'],
+        ingredients: [
+          { quantity: 4, unitId: unit.id, sourceType: 'BOTTLE', bottleId: bottle.id },
+          {
+            quantity: 2,
+            unitId: unit.id,
+            sourceType: 'CATEGORY',
+            categoryId: cat.id,
+            preferredBottleIds: [bottle.id],
+          },
+          { quantity: 1, unitId: unit.id, sourceType: 'INGREDIENT', ingredientId: ing.id },
+        ],
+        instructions: [{ text: 'Shake' }],
+      });
     expect(createRes.status).toBe(201);
 
     const res = await request.get(`/api/cocktails/${createRes.body.id}/export`).set(authHeader());
@@ -728,7 +915,8 @@ describe('GET /api/cocktails/:id/export - rich data with all source types', () =
     expect(res.body.cocktail.notes).toBe('Shake hard');
     expect(res.body.cocktail.tags).toEqual(['classic', 'fruity']);
 
-    const ings: CocktailExportFile['payload']['cocktail']['ingredients'] = res.body.cocktail.ingredients;
+    const ings: CocktailExportFile['payload']['cocktail']['ingredients'] =
+      res.body.cocktail.ingredients;
     expect(ings).toHaveLength(3);
 
     // BOTTLE branch
@@ -753,7 +941,9 @@ describe('GET /api/cocktails/:id/export - rich data with all source types', () =
 
 describe('POST /api/cocktails/import/confirm', () => {
   it('should return 400 for invalid payload', async () => {
-    const res = await request.post('/api/cocktails/import/confirm').set(authHeader())
+    const res = await request
+      .post('/api/cocktails/import/confirm')
+      .set(authHeader())
       .send({ recipe: { version: 2, cocktail: { name: 'X' } }, resolutions: {} });
     expect(res.status).toBe(400);
   });
@@ -762,39 +952,42 @@ describe('POST /api/cocktails/import/confirm', () => {
     const unit = await seedUnit({ name: 'Centilitre', abbreviation: 'cl' });
     const cat = await seedCategory({ name: 'Rum', type: 'SPIRIT' });
 
-    const res = await request.post('/api/cocktails/import/confirm').set(authHeader()).send({
-      recipe: {
-        version: 1,
-        cocktail: {
-          name: 'Import Confirm Test',
-          description: 'Imported',
-          notes: 'Good',
-          tags: ['tropical'],
-          ingredients: [
-            {
-              sourceType: 'CATEGORY',
-              sourceName: 'Rum',
-              sourceDetail: { type: 'SPIRIT', desiredStock: 1 },
-              quantity: 4,
-              unit: { name: 'Centilitre', abbreviation: 'cl', conversionFactorToMl: 10 },
-              position: 0,
-              preferredBottles: [],
-            },
-          ],
-          instructions: [{ text: 'Mix it', stepNumber: 1 }],
+    const res = await request
+      .post('/api/cocktails/import/confirm')
+      .set(authHeader())
+      .send({
+        recipe: {
+          version: 1,
+          cocktail: {
+            name: 'Import Confirm Test',
+            description: 'Imported',
+            notes: 'Good',
+            tags: ['tropical'],
+            ingredients: [
+              {
+                sourceType: 'CATEGORY',
+                sourceName: 'Rum',
+                sourceDetail: { type: 'SPIRIT', desiredStock: 1 },
+                quantity: 4,
+                unit: { name: 'Centilitre', abbreviation: 'cl', conversionFactorToMl: 10 },
+                position: 0,
+                preferredBottles: [],
+              },
+            ],
+            instructions: [{ text: 'Mix it', stepNumber: 1 }],
+          },
         },
-      },
-      resolutions: {
-        units: {
-          cl: { action: 'use_existing', existingId: unit.id },
+        resolutions: {
+          units: {
+            cl: { action: 'use_existing', existingId: unit.id },
+          },
+          categories: {
+            rum: { action: 'use_existing', existingId: cat.id },
+          },
+          bottles: {},
+          ingredients: {},
         },
-        categories: {
-          rum: { action: 'use_existing', existingId: cat.id },
-        },
-        bottles: {},
-        ingredients: {},
-      },
-    });
+      });
 
     expect(res.status).toBe(201);
     expect(res.body.name).toBe('Import Confirm Test');
@@ -807,45 +1000,58 @@ describe('POST /api/cocktails/import/confirm', () => {
   });
 
   it('should create cocktail with create resolutions (new unit + new category with auto categoryType)', async () => {
-    const res = await request.post('/api/cocktails/import/confirm').set(authHeader()).send({
-      recipe: {
-        version: 1,
-        cocktail: {
-          name: 'Full Create Import',
-          description: null,
-          notes: null,
-          tags: [],
-          ingredients: [
-            {
-              sourceType: 'CATEGORY',
-              sourceName: 'Tequila',
-              sourceDetail: { type: 'CUSTOM_AGAVE', desiredStock: 2 },
-              quantity: 5,
-              unit: { name: 'Millilitre', abbreviation: 'ml', conversionFactorToMl: 1 },
-              position: 0,
-              preferredBottles: [],
+    const res = await request
+      .post('/api/cocktails/import/confirm')
+      .set(authHeader())
+      .send({
+        recipe: {
+          version: 1,
+          cocktail: {
+            name: 'Full Create Import',
+            description: null,
+            notes: null,
+            tags: [],
+            ingredients: [
+              {
+                sourceType: 'CATEGORY',
+                sourceName: 'Tequila',
+                sourceDetail: { type: 'CUSTOM_AGAVE', desiredStock: 2 },
+                quantity: 5,
+                unit: { name: 'Millilitre', abbreviation: 'ml', conversionFactorToMl: 1 },
+                position: 0,
+                preferredBottles: [],
+              },
+            ],
+            instructions: [],
+          },
+        },
+        resolutions: {
+          units: {
+            ml: {
+              action: 'create',
+              data: {
+                name: 'Millilitre',
+                abbreviation: 'ml',
+                conversionFactorToMl: 1,
+                nameTranslations: null,
+              },
             },
-          ],
-          instructions: [],
-        },
-      },
-      resolutions: {
-        units: {
-          ml: {
-            action: 'create',
-            data: { name: 'Millilitre', abbreviation: 'ml', conversionFactorToMl: 1, nameTranslations: null },
           },
-        },
-        categories: {
-          tequila: {
-            action: 'create',
-            data: { name: 'Tequila', type: 'CUSTOM_AGAVE', desiredStock: 2, nameTranslations: null },
+          categories: {
+            tequila: {
+              action: 'create',
+              data: {
+                name: 'Tequila',
+                type: 'CUSTOM_AGAVE',
+                desiredStock: 2,
+                nameTranslations: null,
+              },
+            },
           },
+          bottles: {},
+          ingredients: {},
         },
-        bottles: {},
-        ingredients: {},
-      },
-    });
+      });
 
     expect(res.status).toBe(201);
     expect(res.body.name).toBe('Full Create Import');
@@ -859,38 +1065,50 @@ describe('POST /api/cocktails/import/confirm', () => {
   });
 
   it('should ignore id, createdAt and purchasePrice slipped into resolution data', async () => {
-    const res = await request.post('/api/cocktails/import/confirm').set(authHeader()).send({
-      recipe: {
-        version: 1,
-        cocktail: {
-          name: 'Mass Assignment',
-          ingredients: [
-            {
-              sourceType: 'BOTTLE',
-              sourceName: 'Havana',
-              sourceDetail: { categoryName: 'Rum', categoryType: 'SPIRIT' },
-              quantity: 4,
-              unit: { name: 'u', abbreviation: 'u2' },
-            },
-          ],
-        },
-      },
-      resolutions: {
-        units: {
-          u2: { action: 'create', data: { id: 999, name: 'u', abbreviation: 'u2' } },
-        },
-        categories: {
-          rum: { action: 'create', data: { id: 998, name: 'Rum', createdAt: '2000-01-01T00:00:00.000Z' } },
-        },
-        bottles: {
-          havana: {
-            action: 'create',
-            data: { id: 997, name: 'Havana', categoryName: 'Rum', capacityMl: 700, purchasePrice: 1234 },
+    const res = await request
+      .post('/api/cocktails/import/confirm')
+      .set(authHeader())
+      .send({
+        recipe: {
+          version: 1,
+          cocktail: {
+            name: 'Mass Assignment',
+            ingredients: [
+              {
+                sourceType: 'BOTTLE',
+                sourceName: 'Havana',
+                sourceDetail: { categoryName: 'Rum', categoryType: 'SPIRIT' },
+                quantity: 4,
+                unit: { name: 'u', abbreviation: 'u2' },
+              },
+            ],
           },
         },
-        ingredients: {},
-      },
-    });
+        resolutions: {
+          units: {
+            u2: { action: 'create', data: { id: 999, name: 'u', abbreviation: 'u2' } },
+          },
+          categories: {
+            rum: {
+              action: 'create',
+              data: { id: 998, name: 'Rum', createdAt: '2000-01-01T00:00:00.000Z' },
+            },
+          },
+          bottles: {
+            havana: {
+              action: 'create',
+              data: {
+                id: 997,
+                name: 'Havana',
+                categoryName: 'Rum',
+                capacityMl: 700,
+                purchasePrice: 1234,
+              },
+            },
+          },
+          ingredients: {},
+        },
+      });
 
     expect(res.status).toBe(201);
     const unit = await prisma.unit.findUniqueOrThrow({ where: { abbreviation: 'u2' } });
@@ -906,35 +1124,43 @@ describe('POST /api/cocktails/import/confirm', () => {
   });
 
   it('should fall back on the names of the file when the admin clears them in the wizard', async () => {
-    const res = await request.post('/api/cocktails/import/confirm').set(authHeader()).send({
-      recipe: {
-        version: 1,
-        cocktail: {
-          name: 'Blank Names',
-          ingredients: [
-            {
-              sourceType: 'BOTTLE',
-              sourceName: 'Havana Club',
-              sourceDetail: { categoryName: 'Rhum Ambré', categoryType: 'SPIRIT' },
-              quantity: 4,
-              unit: { name: 'Centilitre', abbreviation: 'cL' },
-            },
-            {
-              sourceType: 'INGREDIENT',
-              sourceName: 'Citron Vert',
-              quantity: 1,
-              unit: { name: 'Centilitre', abbreviation: 'cL' },
-            },
-          ],
+    const res = await request
+      .post('/api/cocktails/import/confirm')
+      .set(authHeader())
+      .send({
+        recipe: {
+          version: 1,
+          cocktail: {
+            name: 'Blank Names',
+            ingredients: [
+              {
+                sourceType: 'BOTTLE',
+                sourceName: 'Havana Club',
+                sourceDetail: { categoryName: 'Rhum Ambré', categoryType: 'SPIRIT' },
+                quantity: 4,
+                unit: { name: 'Centilitre', abbreviation: 'cL' },
+              },
+              {
+                sourceType: 'INGREDIENT',
+                sourceName: 'Citron Vert',
+                quantity: 1,
+                unit: { name: 'Centilitre', abbreviation: 'cL' },
+              },
+            ],
+          },
         },
-      },
-      resolutions: {
-        units: { cl: { action: 'create', data: { name: '', abbreviation: '  ' } } },
-        categories: { 'rhum ambré': { action: 'create', data: { name: ' ', type: 'SPIRIT' } } },
-        bottles: { 'havana club': { action: 'create', data: { name: '', categoryName: 'Rhum Ambré', capacityMl: 700 } } },
-        ingredients: { 'citron vert': { action: 'create', data: { name: '' } } },
-      },
-    });
+        resolutions: {
+          units: { cl: { action: 'create', data: { name: '', abbreviation: '  ' } } },
+          categories: { 'rhum ambré': { action: 'create', data: { name: ' ', type: 'SPIRIT' } } },
+          bottles: {
+            'havana club': {
+              action: 'create',
+              data: { name: '', categoryName: 'Rhum Ambré', capacityMl: 700 },
+            },
+          },
+          ingredients: { 'citron vert': { action: 'create', data: { name: '' } } },
+        },
+      });
 
     expect(res.status).toBe(201);
     const unit = await prisma.unit.findUniqueOrThrow({ where: { abbreviation: 'cL' } });
@@ -945,21 +1171,29 @@ describe('POST /api/cocktails/import/confirm', () => {
   });
 
   it('should name a unit after its abbreviation when neither the admin nor the file gives a name', async () => {
-    const res = await request.post('/api/cocktails/import/confirm').set(authHeader()).send({
-      recipe: {
-        version: 1,
-        cocktail: {
-          name: 'Hand Made',
-          ingredients: [
-            { sourceType: 'CATEGORY', sourceName: 'Rum', quantity: 4, unit: { abbreviation: 'Dash' } },
-          ],
+    const res = await request
+      .post('/api/cocktails/import/confirm')
+      .set(authHeader())
+      .send({
+        recipe: {
+          version: 1,
+          cocktail: {
+            name: 'Hand Made',
+            ingredients: [
+              {
+                sourceType: 'CATEGORY',
+                sourceName: 'Rum',
+                quantity: 4,
+                unit: { abbreviation: 'Dash' },
+              },
+            ],
+          },
         },
-      },
-      resolutions: {
-        units: { dash: { action: 'create', data: { name: '' } } },
-        categories: { rum: { action: 'create', data: { name: 'Rum' } } },
-      },
-    });
+        resolutions: {
+          units: { dash: { action: 'create', data: { name: '' } } },
+          categories: { rum: { action: 'create', data: { name: 'Rum' } } },
+        },
+      });
 
     expect(res.status).toBe(201);
     const unit = await prisma.unit.findUniqueOrThrow({ where: { abbreviation: 'Dash' } });
@@ -968,16 +1202,26 @@ describe('POST /api/cocktails/import/confirm', () => {
   });
 
   it('should return 400 importUnresolved naming the unit when it is not resolved', async () => {
-    const res = await request.post('/api/cocktails/import/confirm').set(authHeader()).send({
-      recipe: {
-        version: 1,
-        cocktail: {
-          name: 'No Unit',
-          ingredients: [{ sourceType: 'INGREDIENT', sourceName: 'Lime', quantity: 1, unit: { abbreviation: 'cl' } }],
+    const res = await request
+      .post('/api/cocktails/import/confirm')
+      .set(authHeader())
+      .send({
+        recipe: {
+          version: 1,
+          cocktail: {
+            name: 'No Unit',
+            ingredients: [
+              {
+                sourceType: 'INGREDIENT',
+                sourceName: 'Lime',
+                quantity: 1,
+                unit: { abbreviation: 'cl' },
+              },
+            ],
+          },
         },
-      },
-      resolutions: { ingredients: { lime: { action: 'create', data: { name: 'Lime' } } } },
-    });
+        resolutions: { ingredients: { lime: { action: 'create', data: { name: 'Lime' } } } },
+      });
 
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/cannot be imported/);
@@ -987,14 +1231,20 @@ describe('POST /api/cocktails/import/confirm', () => {
   });
 
   it('should return 400 for a created bottle with remainingPercent above 100', async () => {
-    const res = await request.post('/api/cocktails/import/confirm').set(authHeader()).send({
-      recipe: { version: 1, cocktail: { name: 'Bounds' } },
-      resolutions: {
-        bottles: {
-          havana: { action: 'create', data: { name: 'Havana', categoryName: 'Rum', capacityMl: 700, remainingPercent: 150 } },
+    const res = await request
+      .post('/api/cocktails/import/confirm')
+      .set(authHeader())
+      .send({
+        recipe: { version: 1, cocktail: { name: 'Bounds' } },
+        resolutions: {
+          bottles: {
+            havana: {
+              action: 'create',
+              data: { name: 'Havana', categoryName: 'Rum', capacityMl: 700, remainingPercent: 150 },
+            },
+          },
         },
-      },
-    });
+      });
 
     expect(res.status).toBe(400);
     expect(res.body.details[0].path).toBe('body.resolutions.bottles.havana.data.remainingPercent');
@@ -1004,42 +1254,45 @@ describe('POST /api/cocktails/import/confirm', () => {
   it('should create cocktail with INGREDIENT resolution via create', async () => {
     const unit = await seedUnit({ name: 'Centilitre', abbreviation: 'cl' });
 
-    const res = await request.post('/api/cocktails/import/confirm').set(authHeader()).send({
-      recipe: {
-        version: 1,
-        cocktail: {
-          name: 'Ingredient Import',
-          description: null,
-          notes: null,
-          tags: [],
-          ingredients: [
-            {
-              sourceType: 'INGREDIENT',
-              sourceName: 'Fresh Mint',
-              sourceDetail: { icon: null, nameTranslations: null },
-              quantity: 3,
-              unit: { name: 'Centilitre', abbreviation: 'cl', conversionFactorToMl: 10 },
-              position: 0,
-              preferredBottles: [],
-            },
-          ],
-          instructions: [],
-        },
-      },
-      resolutions: {
-        units: {
-          cl: { action: 'use_existing', existingId: unit.id },
-        },
-        categories: {},
-        bottles: {},
-        ingredients: {
-          'fresh mint': {
-            action: 'create',
-            data: { name: 'Fresh Mint', icon: null, nameTranslations: null },
+    const res = await request
+      .post('/api/cocktails/import/confirm')
+      .set(authHeader())
+      .send({
+        recipe: {
+          version: 1,
+          cocktail: {
+            name: 'Ingredient Import',
+            description: null,
+            notes: null,
+            tags: [],
+            ingredients: [
+              {
+                sourceType: 'INGREDIENT',
+                sourceName: 'Fresh Mint',
+                sourceDetail: { icon: null, nameTranslations: null },
+                quantity: 3,
+                unit: { name: 'Centilitre', abbreviation: 'cl', conversionFactorToMl: 10 },
+                position: 0,
+                preferredBottles: [],
+              },
+            ],
+            instructions: [],
           },
         },
-      },
-    });
+        resolutions: {
+          units: {
+            cl: { action: 'use_existing', existingId: unit.id },
+          },
+          categories: {},
+          bottles: {},
+          ingredients: {
+            'fresh mint': {
+              action: 'create',
+              data: { name: 'Fresh Mint', icon: null, nameTranslations: null },
+            },
+          },
+        },
+      });
 
     expect(res.status).toBe(201);
     expect(res.body.ingredients[0].sourceType).toBe('INGREDIENT');
@@ -1049,16 +1302,26 @@ describe('POST /api/cocktails/import/confirm', () => {
   it('should return 400 for a category to create under the empty name, and create nothing', async () => {
     await prisma.categoryType.create({ data: { name: '', color: 'red' } });
 
-    const res = await request.post('/api/cocktails/import/confirm').set(authHeader()).send({
-      recipe: {
-        version: 1,
-        cocktail: { name: 'Mezcal Sour', ingredients: [{ sourceType: 'CATEGORY', sourceName: 'Mezcal', quantity: 2 }] },
-      },
-      resolutions: { categories: { mezcal: { action: 'create', data: { name: 'Mezcal', type: '' } } } },
-    });
+    const res = await request
+      .post('/api/cocktails/import/confirm')
+      .set(authHeader())
+      .send({
+        recipe: {
+          version: 1,
+          cocktail: {
+            name: 'Mezcal Sour',
+            ingredients: [{ sourceType: 'CATEGORY', sourceName: 'Mezcal', quantity: 2 }],
+          },
+        },
+        resolutions: {
+          categories: { mezcal: { action: 'create', data: { name: 'Mezcal', type: '' } } },
+        },
+      });
 
     expect(res.status).toBe(400);
-    expect(res.body.details).toMatchObject([{ path: 'body.resolutions.categories.mezcal.data.type', code: 'too_small' }]);
+    expect(res.body.details).toMatchObject([
+      { path: 'body.resolutions.categories.mezcal.data.type', code: 'too_small' },
+    ]);
     expect(await prisma.category.count()).toBe(0);
     expect(await prisma.cocktail.count()).toBe(0);
   });
@@ -1070,18 +1333,21 @@ describe('POST /api/cocktails - with preferredBottleIds', () => {
     const cat = await seedCategory();
     const bottle = await seedBottle({ categoryId: cat.id });
 
-    const res = await request.post('/api/cocktails').set(authHeader()).send({
-      name: 'Preferred Bottles Test',
-      ingredients: [
-        {
-          quantity: 3,
-          unitId: unit.id,
-          sourceType: 'CATEGORY',
-          categoryId: cat.id,
-          preferredBottleIds: [bottle.id],
-        },
-      ],
-    });
+    const res = await request
+      .post('/api/cocktails')
+      .set(authHeader())
+      .send({
+        name: 'Preferred Bottles Test',
+        ingredients: [
+          {
+            quantity: 3,
+            unitId: unit.id,
+            sourceType: 'CATEGORY',
+            categoryId: cat.id,
+            preferredBottleIds: [bottle.id],
+          },
+        ],
+      });
 
     expect(res.status).toBe(201);
     expect(res.body.ingredients[0].preferredBottles).toHaveLength(1);
@@ -1096,23 +1362,26 @@ describe('PUT /api/cocktails/:id - full data update', () => {
     const bottle = await seedBottle({ categoryId: cat.id });
     const cocktail = await seedCocktail({ name: 'Update Target' });
 
-    const res = await request.put(`/api/cocktails/${cocktail.id}`).set(authHeader()).send({
-      name: 'Updated Name',
-      description: 'Updated desc',
-      notes: 'Updated notes',
-      tags: 'sour,citrus',
-      isAvailable: false,
-      ingredients: [
-        {
-          quantity: 2,
-          unitId: unit.id,
-          sourceType: 'CATEGORY',
-          categoryId: cat.id,
-          preferredBottleIds: [bottle.id],
-        },
-      ],
-      instructions: [{ text: 'Step 1' }, { text: 'Step 2' }],
-    });
+    const res = await request
+      .put(`/api/cocktails/${cocktail.id}`)
+      .set(authHeader())
+      .send({
+        name: 'Updated Name',
+        description: 'Updated desc',
+        notes: 'Updated notes',
+        tags: 'sour,citrus',
+        isAvailable: false,
+        ingredients: [
+          {
+            quantity: 2,
+            unitId: unit.id,
+            sourceType: 'CATEGORY',
+            categoryId: cat.id,
+            preferredBottleIds: [bottle.id],
+          },
+        ],
+        instructions: [{ text: 'Step 1' }, { text: 'Step 2' }],
+      });
 
     expect(res.status).toBe(200);
     expect(res.body.name).toBe('Updated Name');
@@ -1151,24 +1420,35 @@ describe('POST /api/cocktails/import/confirm - unit that several units hold igno
     await seedUnit({ abbreviation: 'CL' });
     await seedUnit({ abbreviation: 'Cl' });
 
-    const res = await request.post('/api/cocktails/import/confirm').set(authHeader()).set('Accept-Language', 'en').send({
-      recipe: {
-        version: 1,
-        cocktail: {
-          name: 'Daiquiri',
-          ingredients: [{ sourceType: 'INGREDIENT', sourceName: 'Lime', quantity: 2, unit: { abbreviation: 'cl' } }],
+    const res = await request
+      .post('/api/cocktails/import/confirm')
+      .set(authHeader())
+      .set('Accept-Language', 'en')
+      .send({
+        recipe: {
+          version: 1,
+          cocktail: {
+            name: 'Daiquiri',
+            ingredients: [
+              {
+                sourceType: 'INGREDIENT',
+                sourceName: 'Lime',
+                quantity: 2,
+                unit: { abbreviation: 'cl' },
+              },
+            ],
+          },
         },
-      },
-      resolutions: {
-        units: { cl: { action: 'create', data: { name: 'Centilitre', abbreviation: 'cl' } } },
-        ingredients: { lime: { action: 'create', data: { name: 'Lime' } } },
-      },
-    });
+        resolutions: {
+          units: { cl: { action: 'create', data: { name: 'Centilitre', abbreviation: 'cl' } } },
+          ingredients: { lime: { action: 'create', data: { name: 'Lime' } } },
+        },
+      });
 
     expect(res.status).toBe(409);
     expect(res.body.error).toBe(
-      'Several units match the abbreviation "cl" when case is ignored, and none exactly: CL, Cl. '
-      + 'Use one of them, or change their abbreviations so that they differ by more than case',
+      'Several units match the abbreviation "cl" when case is ignored, and none exactly: CL, Cl. ' +
+        'Use one of them, or change their abbreviations so that they differ by more than case',
     );
     expect(await prisma.unit.count()).toBe(2);
     expect(await prisma.cocktail.count()).toBe(0);
@@ -1177,6 +1457,8 @@ describe('POST /api/cocktails/import/confirm - unit that several units hold igno
 });
 
 describe('POST /api/cocktails/:id/image - upload replacing existing', () => {
+  beforeEach(emptyUploadDir);
+
   it('should return 400 when no file is uploaded', async () => {
     const cocktail = await seedCocktail({ name: 'No Image Cocktail' });
     const res = await request.post(`/api/cocktails/${cocktail.id}/image`).set(authHeader());
@@ -1195,7 +1477,10 @@ describe('POST /api/cocktails/:id/image - upload replacing existing', () => {
     const res = await request
       .post(`/api/cocktails/${cocktail.id}/image`)
       .set(authHeader())
-      .attach('image', Buffer.from('fake-png-data'), { filename: 'test.png', contentType: 'image/png' });
+      .attach('image', await testImage({ format: 'png' }), {
+        filename: 'test.png',
+        contentType: 'image/png',
+      });
 
     expect(res.status).toBe(200);
     expect(res.body.imagePath).toBeDefined();
@@ -1205,24 +1490,16 @@ describe('POST /api/cocktails/:id/image - upload replacing existing', () => {
     expect(fs.existsSync(path.join(config.uploadDir, res.body.imagePath))).toBe(true);
   });
 
-  it('should delete the previous image file from disk when a new one is uploaded', async () => {
+  it('should delete the previous photo and its copies from disk when a new one is uploaded', async () => {
     const cocktail = await seedCocktail({ name: 'Old File Cocktail' });
-    const oldFileName = 'old-image-on-disk.png';
-    const oldFilePath = path.join(config.uploadDir, oldFileName);
-    fs.writeFileSync(oldFilePath, 'old-png-data');
-    await prisma.cocktail.update({
-      where: { id: cocktail.id },
-      data: { imagePath: oldFileName },
-    });
+    const previous = await uploadImage(cocktail.id, 'old.png', 'image/png');
+    expect(uploadedFiles()).toEqual(storedFiles(previous.body.imagePath));
 
-    const res = await request
-      .post(`/api/cocktails/${cocktail.id}/image`)
-      .set(authHeader())
-      .attach('image', Buffer.from('new-png-data'), { filename: 'new.png', contentType: 'image/png' });
+    const res = await uploadImage(cocktail.id, 'new.png', 'image/png');
 
     expect(res.status).toBe(200);
-    expect(fs.existsSync(oldFilePath)).toBe(false);
-    expect(fs.existsSync(path.join(config.uploadDir, res.body.imagePath))).toBe(true);
+    // Only the new photo and its copies are left
+    expect(uploadedFiles()).toEqual(storedFiles(res.body.imagePath));
   });
 });
 
@@ -1231,7 +1508,9 @@ describe('GET /api/cocktails/:id/export - file name', () => {
     const cocktail = await seedCocktail({ name: 'Piña Colada' });
     const res = await request.get(`/api/cocktails/${cocktail.id}/export`).set(authHeader());
     expect(res.status).toBe(200);
-    expect(res.headers['content-disposition']).toBe('attachment; filename=cocktail-pina-colada.json');
+    expect(res.headers['content-disposition']).toBe(
+      'attachment; filename=cocktail-pina-colada.json',
+    );
   });
 
   it('should name a cocktail without latin letters after its id', async () => {
@@ -1241,18 +1520,29 @@ describe('GET /api/cocktails/:id/export - file name', () => {
   });
 });
 
-function uploadedFiles(): string[] {
-  return fs.existsSync(config.uploadDir) ? fs.readdirSync(config.uploadDir) : [];
+function emptyUploadDir(): void {
+  fs.rmSync(config.uploadDir, { recursive: true, force: true });
 }
 
-function uploadImage(id: number, filename: string, contentType: string, content = Buffer.from('image-data')) {
+function uploadedFiles(): string[] {
+  return fs.existsSync(config.uploadDir) ? fs.readdirSync(config.uploadDir).sort() : [];
+}
+
+/** The photo an upload stores and its smaller copies, sorted as uploadedFiles() lists them. */
+function storedFiles(imagePath: string): string[] {
+  return [imagePath, ...derivedVariantNames(imagePath)].sort();
+}
+
+async function uploadImage(id: number, filename: string, contentType: string, content?: Buffer) {
   return request
     .post(`/api/cocktails/${id}/image`)
     .set(authHeader())
-    .attach('image', content, { filename, contentType });
+    .attach('image', content ?? (await testImage()), { filename, contentType });
 }
 
 describe('POST /api/cocktails/:id/image - file checks', () => {
+  beforeEach(emptyUploadDir);
+
   it('should return 404 and keep no file for a cocktail that does not exist', async () => {
     const before = uploadedFiles();
 
@@ -1280,34 +1570,56 @@ describe('POST /api/cocktails/:id/image - file checks', () => {
   it.each([
     ['one byte under the limit', MAX_IMAGE_BYTES - 1],
     ['exactly the limit', MAX_IMAGE_BYTES],
-  ])('should store a photo of %s, whole', async (_case, size) => {
+  ])('should accept a photo of %s', async (_case, size) => {
     const cocktail = await seedCocktail();
 
-    const res = await uploadImage(cocktail.id, 'photo.jpg', 'image/jpeg', Buffer.alloc(size));
+    const res = await uploadImage(cocktail.id, 'photo.jpg', 'image/jpeg', await jpegOfSize(size));
 
     expect(res.status).toBe(200);
-    expect(fs.statSync(path.join(config.uploadDir, res.body.imagePath)).size).toBe(size);
+    expect(uploadedFiles()).toEqual(storedFiles(res.body.imagePath));
+  });
+
+  it('should answer 400 and keep no file for a file that is not a readable image', async () => {
+    const cocktail = await seedCocktail();
+
+    const res = await uploadImage(
+      cocktail.id,
+      'photo.png',
+      'image/png',
+      Buffer.from('fake-png-data'),
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('The photo cannot be read: send a JPEG, PNG or WebP image');
+    expect(uploadedFiles()).toEqual([]);
   });
 
   it('should answer 413 and keep no file for a photo one byte over the limit', async () => {
     const cocktail = await seedCocktail();
     const before = uploadedFiles();
 
-    const res = await uploadImage(cocktail.id, 'photo.jpg', 'image/jpeg', Buffer.alloc(MAX_IMAGE_BYTES + 1));
+    const res = await uploadImage(
+      cocktail.id,
+      'photo.jpg',
+      'image/jpeg',
+      Buffer.alloc(MAX_IMAGE_BYTES + 1),
+    );
 
     expect(res.status).toBe(413);
     expect(uploadedFiles()).toEqual(before);
-    expect((await prisma.cocktail.findUniqueOrThrow({ where: { id: cocktail.id } })).imagePath).toBeNull();
+    expect(
+      (await prisma.cocktail.findUniqueOrThrow({ where: { id: cocktail.id } })).imagePath,
+    ).toBeNull();
   });
 
-  it('should store the image under a random name with the lowercased extension', async () => {
+  it('should store the photo as WebP under a random name, with its smaller copies', async () => {
     const cocktail = await seedCocktail();
 
     const res = await uploadImage(cocktail.id, '../My Photo.JPEG', 'image/jpeg');
 
     expect(res.status).toBe(200);
-    expect(res.body.imagePath).toMatch(/^[0-9a-f-]{36}\.jpeg$/);
-    expect(fs.existsSync(path.join(config.uploadDir, res.body.imagePath))).toBe(true);
+    expect(res.body.imagePath).toMatch(/^[0-9a-f-]{36}\.webp$/);
+    expect(uploadedFiles()).toEqual(storedFiles(res.body.imagePath));
   });
 });
 
@@ -1334,22 +1646,28 @@ describe('POST /api/cocktails/:id/image - failed update', () => {
 });
 
 describe('DELETE /api/cocktails/:id - image file', () => {
+  beforeEach(emptyUploadDir);
+
   it('should return 404 for a cocktail that does not exist', async () => {
     const res = await request.delete('/api/cocktails/99999').set(authHeader());
     expect(res.status).toBe(404);
   });
 
-  it('should delete the image file with the cocktail', async () => {
+  it('should delete the photo and its smaller copies with the cocktail', async () => {
     const cocktail = await seedCocktail();
-    const upload = await uploadImage(cocktail.id, 'photo.webp', 'image/webp');
-    const imageFile = path.join(config.uploadDir, upload.body.imagePath);
-    expect(fs.existsSync(imageFile)).toBe(true);
+    const upload = await uploadImage(
+      cocktail.id,
+      'photo.webp',
+      'image/webp',
+      await testImage({ format: 'webp' }),
+    );
+    expect(uploadedFiles()).toEqual(storedFiles(upload.body.imagePath));
 
     const res = await request.delete(`/api/cocktails/${cocktail.id}`).set(authHeader());
 
     expect(res.status).toBe(200);
     expect(await prisma.cocktail.findUnique({ where: { id: cocktail.id } })).toBeNull();
-    expect(fs.existsSync(imageFile)).toBe(false);
+    expect(uploadedFiles()).toEqual([]);
   });
 
   it('should keep the image file when the cocktail cannot be deleted', async () => {
@@ -1375,7 +1693,10 @@ describe('DELETE /api/cocktails/:id - image file', () => {
     fs.writeFileSync(witness, 'keep me');
     try {
       const cocktail = await seedCocktail();
-      await prisma.cocktail.update({ where: { id: cocktail.id }, data: { imagePath: `../${path.basename(witness)}` } });
+      await prisma.cocktail.update({
+        where: { id: cocktail.id },
+        data: { imagePath: `../${path.basename(witness)}` },
+      });
 
       const res = await request.delete(`/api/cocktails/${cocktail.id}`).set(authHeader());
 

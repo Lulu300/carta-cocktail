@@ -23,7 +23,9 @@ describe('resolveDatabasePath', () => {
   });
 
   it('should drop the URL parameters of a relative path', () => {
-    expect(resolveDatabasePath('file:./x.db?connection_limit=1')).toBe(path.join(PRISMA_DIR, 'x.db'));
+    expect(resolveDatabasePath('file:./x.db?connection_limit=1')).toBe(
+      path.join(PRISMA_DIR, 'x.db'),
+    );
   });
 
   it('should drop the URL parameters of an absolute path', () => {

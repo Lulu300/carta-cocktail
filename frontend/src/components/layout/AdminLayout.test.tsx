@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { lazy, Suspense } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { render, screen, waitFor, within } from '../../test/test-utils';
@@ -6,7 +7,12 @@ import { axe } from '../../test/axe';
 import { AppProviders } from '../../test/appProviders';
 import { buildShortage, buildSiteSettings } from '../../test/factories';
 import { ADMIN_USER } from '../../test/msw/handlers';
-import { captureRequest, mockApiError, mockApiResponse, type CapturedRequest } from '../../test/msw/utils';
+import {
+  captureRequest,
+  mockApiError,
+  mockApiResponse,
+  type CapturedRequest,
+} from '../../test/msw/utils';
 import AdminLayout from './AdminLayout';
 
 const twoShortages = [buildShortage(), buildShortage()];
@@ -25,6 +31,35 @@ function renderLayout() {
           <Route path="units" element={<p>units page</p>} />
         </Route>
         <Route path="/login" element={<p>login page</p>} />
+      </Routes>
+    </AppProviders>,
+  );
+}
+
+function BrokenPage(): never {
+  throw new Error('render failed');
+}
+
+// A page whose chunk cannot be loaded, behind a Suspense like the one of App.tsx
+const MissingChunkPage = lazy(() => Promise.reject(new Error('chunk missing')));
+
+function renderLayoutWithBrokenPages() {
+  return render(
+    <AppProviders>
+      <Routes>
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<p>dashboard page</p>} />
+          <Route path="units" element={<p>units page</p>} />
+          <Route path="categories" element={<BrokenPage />} />
+          <Route
+            path="bottles"
+            element={
+              <Suspense fallback={null}>
+                <MissingChunkPage />
+              </Suspense>
+            }
+          />
+        </Route>
       </Routes>
     </AppProviders>,
   );
@@ -53,9 +88,9 @@ describe('AdminLayout shortages badge', () => {
   it('shows the number of shortages in the sidebar and the header', async () => {
     renderLayout();
 
-    const navLink = screen.getByRole('link', { name: /nav\.shortages/ });
+    const navLink = screen.getByRole('link', { name: /Shortages/ });
     expect(await within(navLink).findByText('2')).toBeInTheDocument();
-    expect(screen.getByText('dashboard.shortageAlert')).toBeInTheDocument();
+    expect(screen.getByText('2 shortages detected')).toBeInTheDocument();
   });
 
   it('shows no badge when there is no shortage', async () => {
@@ -63,7 +98,7 @@ describe('AdminLayout shortages badge', () => {
     renderLayout();
 
     await waitForLayoutData();
-    expect(screen.queryByText('dashboard.shortageAlert')).not.toBeInTheDocument();
+    expect(screen.queryByText('2 shortages detected')).not.toBeInTheDocument();
   });
 
   it('shows no badge when the request fails', async () => {
@@ -71,15 +106,15 @@ describe('AdminLayout shortages badge', () => {
     renderLayout();
 
     await waitForLayoutData();
-    expect(screen.queryByText('dashboard.shortageAlert')).not.toBeInTheDocument();
+    expect(screen.queryByText('2 shortages detected')).not.toBeInTheDocument();
   });
 
   it('does not reload the shortages on a route change: mutations refresh them', async () => {
     const user = userEvent.setup();
     renderLayout();
-    await screen.findByText('dashboard.shortageAlert');
+    await screen.findByText('2 shortages detected');
 
-    await user.click(screen.getByRole('link', { name: /nav\.units/ }));
+    await user.click(screen.getByRole('link', { name: /Units/ }));
 
     expect(screen.getByText('units page')).toBeInTheDocument();
     expect(shortagesRequests.count()).toBe(1);
@@ -92,7 +127,7 @@ describe('AdminLayout logout', () => {
     renderLayout();
     await waitForLayoutData();
 
-    await user.click(screen.getByRole('button', { name: 'nav.logout' }));
+    await user.click(screen.getByRole('button', { name: 'Logout' }));
 
     expect(await screen.findByText('login page')).toBeInTheDocument();
     expect(localStorage.getItem('token')).toBeNull();
@@ -101,7 +136,7 @@ describe('AdminLayout logout', () => {
 
 describe('AdminLayout accessibility', () => {
   function getMenuButton() {
-    return screen.getByRole('button', { name: 'nav.menu' });
+    return screen.getByRole('button', { name: 'Navigation menu' });
   }
 
   it('starts with a skip link to the main content', async () => {
@@ -110,7 +145,7 @@ describe('AdminLayout accessibility', () => {
 
     await user.tab();
 
-    const skipLink = screen.getByRole('link', { name: 'nav.skipToContent' });
+    const skipLink = screen.getByRole('link', { name: 'Skip to content' });
     expect(skipLink).toHaveFocus();
     expect(skipLink).toHaveAttribute('href', `#${screen.getByRole('main').id}`);
     await waitForLayoutData();
@@ -118,10 +153,15 @@ describe('AdminLayout accessibility', () => {
 
   it('marks the current page in the navigation and hides the emojis', async () => {
     renderLayout();
-    const nav = screen.getByRole('navigation', { name: 'nav.admin' });
+    const nav = screen.getByRole('navigation', { name: 'Administration' });
 
-    expect(within(nav).getByRole('link', { name: 'nav.categories' })).toHaveAttribute('aria-current', 'page');
-    expect(within(nav).getByRole('link', { name: 'nav.dashboard' })).not.toHaveAttribute('aria-current');
+    expect(within(nav).getByRole('link', { name: 'Categories' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(within(nav).getByRole('link', { name: 'Dashboard' })).not.toHaveAttribute(
+      'aria-current',
+    );
     expect(within(nav).getByText('🏷️')).toHaveAttribute('aria-hidden', 'true');
     await waitForLayoutData();
   });
@@ -196,7 +236,7 @@ describe('AdminLayout accessibility', () => {
     await waitForLayoutData();
     await user.click(getMenuButton());
 
-    await user.click(screen.getByRole('link', { name: /nav\.units/ }));
+    await user.click(screen.getByRole('link', { name: /Units/ }));
 
     expect(getMenuButton()).toHaveAttribute('aria-expanded', 'false');
   });
@@ -236,10 +276,81 @@ describe('AdminLayout upgrade notice', () => {
     });
     renderLayout();
 
-    expect(await screen.findByRole('heading', { name: 'upgradeNotice.title' })).toBeInTheDocument();
-    await user.click(screen.getByRole('link', { name: /nav\.units/ }));
+    expect(
+      await screen.findByRole('heading', { name: /^Upgrade from v.+ to v.+$/ }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('link', { name: /Units/ }));
 
     expect(await screen.findByText('units page')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'upgradeNotice.title' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /^Upgrade from v.+ to v.+$/ })).toBeInTheDocument();
+  });
+});
+
+// jsdom computes no layout: these classes keep a wide table from stretching the page (checked in a browser)
+describe('AdminLayout width', () => {
+  it('keeps the sidebar at its width and lets the content column shrink below its content', async () => {
+    renderLayout();
+    await waitForLayoutData();
+
+    expect(screen.getByRole('navigation', { name: 'Administration' }).closest('aside')).toHaveClass(
+      'lg:shrink-0',
+    );
+    expect(screen.getByRole('main').parentElement).toHaveClass('min-w-0');
+  });
+});
+
+describe('AdminLayout page error', () => {
+  beforeEach(() => {
+    // React reports every error a boundary catches on the console
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  it.each([
+    ['throws while rendering', '/admin/categories'],
+    ['cannot be loaded', '/admin/bottles'],
+  ])('keeps the sidebar and the header when a page %s', async (_case, path) => {
+    window.history.pushState({}, '', path);
+    const { container } = renderLayoutWithBrokenPages();
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('This page could not be displayed');
+    expect(alert).toHaveFocus();
+    expect(screen.getByRole('navigation', { name: 'Administration' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Logout' })).toBeInTheDocument();
+    expect(screen.getByRole('main')).toContainElement(alert);
+    expect(
+      within(screen.getByRole('main')).getByRole('link', { name: 'Dashboard' }),
+    ).toHaveAttribute('href', '/admin');
+    // The site name of the sidebar is empty until the settings arrive
+    await screen.findByRole('link', { name: /Chez Lulu/ });
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('goes on with another page from the sidebar, without reloading', async () => {
+    window.history.pushState({}, '', '/admin/categories');
+    renderLayoutWithBrokenPages();
+    await screen.findByRole('alert');
+
+    await userEvent.click(
+      within(screen.getByRole('navigation', { name: 'Administration' })).getByRole('link', {
+        name: /Units/,
+      }),
+    );
+
+    expect(await screen.findByText('units page')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('returns to the dashboard with the link of the error screen', async () => {
+    window.history.pushState({}, '', '/admin/categories');
+    renderLayoutWithBrokenPages();
+    await screen.findByRole('alert');
+
+    await userEvent.click(
+      within(screen.getByRole('main')).getByRole('link', { name: 'Dashboard' }),
+    );
+
+    expect(await screen.findByText('dashboard page')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

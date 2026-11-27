@@ -8,14 +8,14 @@ import { qk } from './keys';
 const RECIPE_KEYS = [qk.cocktails, qk.availability];
 
 export function useCocktails(): UseQueryResult<Cocktail[], Error> {
-  return useQuery({ queryKey: qk.cocktails, queryFn: () => cocktailsApi.list() });
+  return useQuery({ queryKey: qk.cocktails, queryFn: ({ signal }) => cocktailsApi.list(signal) });
 }
 
 /** One cocktail; nothing is requested without an id, e.g. on the creation form. */
 export function useCocktail(id: number | undefined): UseQueryResult<Cocktail, Error> {
   return useQuery({
     queryKey: qk.cocktail(id ?? 0),
-    queryFn: () => cocktailsApi.get(id as number),
+    queryFn: ({ signal }) => cocktailsApi.get(id as number, signal),
     enabled: id !== undefined,
   });
 }
@@ -32,10 +32,14 @@ interface AvailabilityQueryOptions {
 }
 
 /** Availability of every cocktail, keyed by cocktail id. */
-export function useCocktailsAvailability(
-  { enabled = true }: AvailabilityQueryOptions = {},
-): UseQueryResult<Record<number, CocktailAvailability>, Error> {
-  return useQuery({ queryKey: qk.availability, queryFn: () => availabilityApi.getAllCocktails(), enabled });
+export function useCocktailsAvailability({
+  enabled = true,
+}: AvailabilityQueryOptions = {}): UseQueryResult<Record<number, CocktailAvailability>, Error> {
+  return useQuery({
+    queryKey: qk.availability,
+    queryFn: ({ signal }) => availabilityApi.getAllCocktails(signal),
+    enabled,
+  });
 }
 
 export function useCreateCocktail(): EntityMutation<CocktailInput, Cocktail> {

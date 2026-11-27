@@ -57,6 +57,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Check formatting
+        run: npm run format:check
+
       - name: Build
         run: npm run build
 
@@ -126,6 +129,9 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
 
       # Hidden source maps tell the bundle budget which modules each chunk holds.
       # They do not change the emitted JavaScript, and the Docker image build

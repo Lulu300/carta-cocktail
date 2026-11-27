@@ -81,7 +81,10 @@ export async function deleteBottle(id: number, force: boolean): Promise<Deletion
 
 export async function deleteIngredient(id: number, force: boolean): Promise<DeletionImpact> {
   return prisma.$transaction(async (tx) => {
-    const impact = { cocktails: await findImpactedCocktails(tx, { ingredientId: id }), bottles: [] };
+    const impact = {
+      cocktails: await findImpactedCocktails(tx, { ingredientId: id }),
+      bottles: [],
+    };
     refuseUnlessForced(impact, force, 'errors.inUseByCocktails');
     await tx.cocktailIngredient.deleteMany({ where: { ingredientId: id } });
     await tx.ingredient.delete({ where: { id } });
@@ -101,7 +104,11 @@ export async function deleteCategory(id: number, force: boolean): Promise<Deleti
       OR: [{ categoryId: id }, { bottleId: { in: bottleIds } }],
     });
     const impact = { cocktails, bottles };
-    refuseUnlessForced(impact, force, bottles.length > 0 ? 'errors.categoryNotEmpty' : 'errors.inUseByCocktails');
+    refuseUnlessForced(
+      impact,
+      force,
+      bottles.length > 0 ? 'errors.categoryNotEmpty' : 'errors.inUseByCocktails',
+    );
 
     await deleteBottleReferences(tx, bottleIds);
     await tx.bottle.deleteMany({ where: { categoryId: id } });

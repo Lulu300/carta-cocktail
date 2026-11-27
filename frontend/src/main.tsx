@@ -16,9 +16,23 @@ import { createQueryClient } from './queries/queryClient';
 
 registerChunkReloadHandler();
 
+// Production only: the dev server builds no service worker. Loaded after the page, from a
+// chunk of its own, so that the first load of the public menu does not carry it. Offline,
+// before the precache holds that chunk, the page simply runs without a service worker.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    import('./pwa/registerServiceWorker')
+      .then(({ registerServiceWorker }) => registerServiceWorker())
+      .catch(() => undefined);
+  });
+}
+
 const queryClient = createQueryClient();
 
-createRoot(document.getElementById('root')!).render(
+const rootElement = document.getElementById('root');
+if (!rootElement) throw new Error('The #root element is missing from index.html');
+
+createRoot(rootElement).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>

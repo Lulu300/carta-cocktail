@@ -12,14 +12,22 @@ const starters = buildMenuSection({ id: 1, menuId: 3, name: 'Starters', position
 const classics = buildMenuSection({ id: 2, menuId: 3, name: 'Classics', position: 1 });
 
 const menu = buildMenu({
-  id: 3, name: 'Summer', slug: 'summer', isPublic: false, sections: [starters, classics],
-  cocktails: [buildMenuCocktail({ id: 9, menuId: 3, cocktail: { id: 4 }, menuSectionId: 1, position: 0 })],
+  id: 3,
+  name: 'Summer',
+  slug: 'summer',
+  isPublic: false,
+  sections: [starters, classics],
+  cocktails: [
+    buildMenuCocktail({ id: 9, menuId: 3, cocktail: { id: 4 }, menuSectionId: 1, position: 0 }),
+  ],
 });
 
 function renderManager(sections: MenuSection[] = [starters, classics]) {
   const queryClient = createTestQueryClient();
   queryClient.setQueryData(qk.menu(3), menu);
-  renderWithFeedback(<MenuSectionsManager menuId={3} sections={sections} itemLabel="cocktails" />, { queryClient });
+  renderWithFeedback(<MenuSectionsManager menuId={3} sections={sections} itemLabel="cocktails" />, {
+    queryClient,
+  });
   return queryClient;
 }
 
@@ -30,7 +38,12 @@ function rowOf(name: string): HTMLElement {
 }
 
 beforeEach(() => {
-  mockApiResponse('post', '/api/menu-sections/menu/:menuId/sections', buildMenuSection({ id: 5, menuId: 3, name: 'Tiki', position: 2 }), 201);
+  mockApiResponse(
+    'post',
+    '/api/menu-sections/menu/:menuId/sections',
+    buildMenuSection({ id: 5, menuId: 3, name: 'Tiki', position: 2 }),
+    201,
+  );
   mockApiResponse('put', '/api/menu-sections/sections/:id', { ...starters, name: 'Openers' });
 });
 
@@ -40,7 +53,9 @@ describe('MenuSectionsManager', () => {
   it('says how a menu without sections is shown', () => {
     renderManager([]);
 
-    expect(screen.getByText('menus.sections.empty.cocktails')).toBeInTheDocument();
+    expect(
+      screen.getByText('No custom section. Cocktails are shown without grouping.'),
+    ).toBeInTheDocument();
   });
 
   it('creates a section from the modal', async () => {
@@ -48,10 +63,10 @@ describe('MenuSectionsManager', () => {
     const created = captureRequest('post', '/api/menu-sections/menu/:menuId/sections');
     renderManager();
 
-    await user.click(screen.getByRole('button', { name: 'menus.sections.add' }));
+    await user.click(screen.getByRole('button', { name: 'Add a section' }));
     const dialog = await screen.findByRole('dialog');
-    await user.type(within(dialog).getByLabelText(/menus.sections.name/), '  Tiki ');
-    await user.click(within(dialog).getByRole('button', { name: 'common.create' }));
+    await user.type(within(dialog).getByLabelText(/Section name/), '  Tiki ');
+    await user.click(within(dialog).getByRole('button', { name: 'Create' }));
 
     expect((await created.url).pathname).toBe('/api/menu-sections/menu/3/sections');
     expect(await created.body).toEqual({ name: 'Tiki' });
@@ -63,14 +78,16 @@ describe('MenuSectionsManager', () => {
     const renamed = captureRequest('put', '/api/menu-sections/sections/:id');
     const queryClient = renderManager();
 
-    await user.click(within(rowOf('Starters')).getByRole('button', { name: 'menus.sections.rename' }));
-    const field = screen.getByRole('textbox', { name: 'menus.sections.name' });
+    await user.click(within(rowOf('Starters')).getByRole('button', { name: /^Rename .+$/ }));
+    const field = screen.getByRole('textbox', { name: 'Section name' });
     await user.clear(field);
     await user.type(field, 'Openers{Enter}');
 
     expect((await renamed.url).pathname).toBe('/api/menu-sections/sections/1');
     expect(await renamed.body).toEqual({ name: 'Openers' });
-    await waitFor(() => expect(queryClient.getQueryData<Menu>(qk.menu(3))?.sections?.[0].name).toBe('Openers'));
+    await waitFor(() =>
+      expect(queryClient.getQueryData<Menu>(qk.menu(3))?.sections?.[0]!.name).toBe('Openers'),
+    );
   });
 
   it('leaves the name unchanged when the rename is cancelled', async () => {
@@ -78,8 +95,8 @@ describe('MenuSectionsManager', () => {
     const renamed = captureRequest('put', '/api/menu-sections/sections/:id');
     renderManager();
 
-    await user.click(within(rowOf('Starters')).getByRole('button', { name: 'menus.sections.rename' }));
-    await user.click(screen.getByRole('button', { name: 'common.cancel' }));
+    await user.click(within(rowOf('Starters')).getByRole('button', { name: /^Rename .+$/ }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(renamed.count()).toBe(0);
     expect(screen.getByText('Starters')).toBeInTheDocument();
@@ -90,16 +107,20 @@ describe('MenuSectionsManager', () => {
     const deleted = captureRequest('delete', '/api/menu-sections/sections/:id');
     const queryClient = renderManager();
 
-    await user.click(within(rowOf('Starters')).getByRole('button', { name: 'menus.sections.delete' }));
+    await user.click(within(rowOf('Starters')).getByRole('button', { name: /^Delete .+$/ }));
     const confirmation = await screen.findByRole('alertdialog');
-    expect(confirmation).toHaveAccessibleDescription('menus.sections.confirmDelete.cocktails');
-    await user.click(within(confirmation).getByRole('button', { name: 'common.delete' }));
+    expect(confirmation).toHaveAccessibleDescription(
+      /^Delete the section ".+"\? Its cocktails move to "No section"\.$/,
+    );
+    await user.click(within(confirmation).getByRole('button', { name: 'Delete' }));
 
     expect((await deleted.url).pathname).toBe('/api/menu-sections/sections/1');
-    await waitFor(() => expect(queryClient.getQueryData<Menu>(qk.menu(3))?.sections).toHaveLength(1));
+    await waitFor(() =>
+      expect(queryClient.getQueryData<Menu>(qk.menu(3))?.sections).toHaveLength(1),
+    );
     const cached = queryClient.getQueryData<Menu>(qk.menu(3));
     expect(cached?.sections?.map((section) => section.id)).toEqual([2]);
-    expect(cached?.cocktails?.[0].menuSectionId).toBeNull();
+    expect(cached?.cocktails?.[0]!.menuSectionId).toBeNull();
   });
 
   it('keeps a section when the deletion is cancelled', async () => {
@@ -107,8 +128,10 @@ describe('MenuSectionsManager', () => {
     const deleted = captureRequest('delete', '/api/menu-sections/sections/:id');
     renderManager();
 
-    await user.click(within(rowOf('Starters')).getByRole('button', { name: 'menus.sections.delete' }));
-    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'common.cancel' }));
+    await user.click(within(rowOf('Starters')).getByRole('button', { name: /^Delete .+$/ }));
+    await user.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Cancel' }),
+    );
 
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(deleted.count()).toBe(0);
@@ -119,22 +142,33 @@ describe('MenuSectionsManager', () => {
     const reordered = captureRequest('post', '/api/menu-sections/menu/:menuId/sections/reorder');
     const queryClient = renderManager();
 
-    expect(within(rowOf('Starters')).getByRole('button', { name: 'menus.moveUp' })).toBeDisabled();
-    await user.click(within(rowOf('Classics')).getByRole('button', { name: 'menus.moveUp' }));
+    expect(within(rowOf('Starters')).getByRole('button', { name: /^Move .+ up$/ })).toBeDisabled();
+    await user.click(within(rowOf('Classics')).getByRole('button', { name: /^Move .+ up$/ }));
 
     expect((await reordered.url).pathname).toBe('/api/menu-sections/menu/3/sections/reorder');
     expect(await reordered.body).toEqual({ sectionIds: [2, 1] });
-    expect(queryClient.getQueryData<Menu>(qk.menu(3))?.sections?.map((section) => section.name)).toEqual(['Classics', 'Starters']);
+    expect(
+      queryClient.getQueryData<Menu>(qk.menu(3))?.sections?.map((section) => section.name),
+    ).toEqual(['Classics', 'Starters']);
   });
 
   it('restores the sections and shows the error when the server refuses the order', async () => {
     const user = userEvent.setup();
-    mockApiError('post', '/api/menu-sections/menu/:menuId/sections/reorder', 400, 'The new order must list every item of the menu');
+    mockApiError(
+      'post',
+      '/api/menu-sections/menu/:menuId/sections/reorder',
+      400,
+      'The new order must list every item of the menu',
+    );
     const queryClient = renderManager();
 
-    await user.click(within(rowOf('Starters')).getByRole('button', { name: 'menus.moveDown' }));
+    await user.click(within(rowOf('Starters')).getByRole('button', { name: /^Move .+ down$/ }));
 
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('The new order must list every item'));
-    expect(queryClient.getQueryData<Menu>(qk.menu(3))?.sections?.map((section) => section.id)).toEqual([1, 2]);
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('The new order must list every item'),
+    );
+    expect(
+      queryClient.getQueryData<Menu>(qk.menu(3))?.sections?.map((section) => section.id),
+    ).toEqual([1, 2]);
   });
 });

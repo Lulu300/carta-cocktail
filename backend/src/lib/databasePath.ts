@@ -21,7 +21,9 @@ export const PRISMA_DIR = path.resolve(__dirname, '../../prisma');
  */
 export function resolveDatabasePath(url: string = process.env.DATABASE_URL ?? ''): string {
   if (!url.startsWith('file:')) {
-    throw new Error('DATABASE_URL must be a SQLite file: URL, for example file:./carta_cocktail.db');
+    throw new Error(
+      'DATABASE_URL must be a SQLite file: URL, for example file:./carta_cocktail.db',
+    );
   }
   const filePath = url.slice('file:'.length).split('?')[0];
   return path.resolve(PRISMA_DIR, filePath);

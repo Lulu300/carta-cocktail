@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { CocktailExportFormat } from '../../types';
 import Button from '../ui/Button';
 import FileDropzone from './FileDropzone';
+import Alert from '../ui/Alert';
 
 interface ImportStepUploadProps {
   recipes: CocktailExportFormat[];
@@ -14,10 +15,12 @@ interface ImportStepUploadProps {
 function isRecipe(data: unknown): data is CocktailExportFormat {
   if (!data || typeof data !== 'object') return false;
   const { version, cocktail } = data as { version?: unknown; cocktail?: Record<string, unknown> };
-  return version === 1
-    && !!cocktail?.name
-    && Array.isArray(cocktail.ingredients)
-    && Array.isArray(cocktail.instructions);
+  return (
+    version === 1 &&
+    !!cocktail?.name &&
+    Array.isArray(cocktail.ingredients) &&
+    Array.isArray(cocktail.instructions)
+  );
 }
 
 function parseRecipe(text: string): CocktailExportFormat | null {
@@ -61,12 +64,14 @@ export default function ImportStepUpload({ recipes, onLoaded, onNext }: ImportSt
       // Loaded on demand: only ZIP imports need it
       const { default: JSZip } = await import('jszip');
       const zip = await JSZip.loadAsync(file);
-      const jsonNames = Object.keys(zip.files).filter((name) => name.endsWith('.json') && !zip.files[name].dir);
-      if (jsonNames.length === 0) {
+      const jsonFiles = Object.entries(zip.files).filter(
+        ([name, entry]) => name.endsWith('.json') && !entry.dir,
+      );
+      if (jsonFiles.length === 0) {
         setError(t('cocktails.importWizard.zipNoRecipes'));
         return;
       }
-      const texts = await Promise.all(jsonNames.map((name) => zip.files[name].async('text')));
+      const texts = await Promise.all(jsonFiles.map(([, entry]) => entry.async('text')));
       // Invalid files of the archive are left out; the others are imported
       const validRecipes = texts.map(parseRecipe).filter((recipe) => recipe !== null);
       if (validRecipes.length === 0) setError(t('cocktails.importWizard.zipNoValidRecipes'));
@@ -84,8 +89,8 @@ export default function ImportStepUpload({ recipes, onLoaded, onNext }: ImportSt
 
   const handleFile = (file: File) => {
     setError(null);
-    if (file.name.toLowerCase().endsWith('.zip')) loadZip(file);
-    else loadJson(file);
+    if (file.name.toLowerCase().endsWith('.zip')) void loadZip(file);
+    else void loadJson(file);
   };
 
   const handleReject = () => {
@@ -105,11 +110,7 @@ export default function ImportStepUpload({ recipes, onLoaded, onNext }: ImportSt
         fileName={fileName}
       />
 
-      {error && (
-        <div role="alert" className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg p-3 text-sm">
-          {error}
-        </div>
-      )}
+      {error && <Alert tone="danger">{error}</Alert>}
 
       {isBatch && (
         <div className="bg-canvas border border-gray-700 rounded-xl p-5 space-y-3">
@@ -122,7 +123,11 @@ export default function ImportStepUpload({ recipes, onLoaded, onNext }: ImportSt
                 <span className="text-accent font-mono text-xs w-5 text-right">#{i + 1}</span>
                 <span className="font-serif">{r.cocktail.name}</span>
                 <span className="text-fg-muted text-xs">
-                  ({t('cocktails.importWizard.ingredientCount', { count: r.cocktail.ingredients.length })})
+                  (
+                  {t('cocktails.importWizard.ingredientCount', {
+                    count: r.cocktail.ingredients.length,
+                  })}
+                  )
                 </span>
               </li>
             ))}
@@ -142,13 +147,23 @@ export default function ImportStepUpload({ recipes, onLoaded, onNext }: ImportSt
             )}
           </div>
           <div className="flex gap-4 text-sm text-fg-muted">
-            <span>{t('cocktails.importWizard.ingredientCount', { count: recipe.cocktail.ingredients.length })}</span>
-            <span>{t('cocktails.importWizard.instructionCount', { count: recipe.cocktail.instructions.length })}</span>
+            <span>
+              {t('cocktails.importWizard.ingredientCount', {
+                count: recipe.cocktail.ingredients.length,
+              })}
+            </span>
+            <span>
+              {t('cocktails.importWizard.instructionCount', {
+                count: recipe.cocktail.instructions.length,
+              })}
+            </span>
           </div>
           {recipe.cocktail.tags && recipe.cocktail.tags.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {recipe.cocktail.tags.map((tag, i) => (
-                <span key={i} className="bg-accent/10 text-accent text-xs px-2 py-0.5 rounded-full">{tag}</span>
+                <span key={i} className="bg-accent/10 text-accent text-xs px-2 py-0.5 rounded-full">
+                  {tag}
+                </span>
               ))}
             </div>
           )}

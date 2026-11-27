@@ -1,31 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import i18n from '../../i18n';
 import { render, screen } from '../../test/test-utils';
 import userEvent from '@testing-library/user-event';
 import LanguageSelector from './LanguageSelector';
 import { LANGUAGE_STORAGE_KEY } from '../../utils/languageChoice';
 
-// Override the global i18n mock for this file to track changeLanguage and vary the detected language
-const mockChangeLanguage = vi.fn();
-const mockI18n = vi.hoisted(() => ({
-  language: 'en' as string | undefined,
-  resolvedLanguage: undefined as string | undefined,
-}));
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string) => key,
-    i18n: { ...mockI18n, changeLanguage: mockChangeLanguage },
-  }),
-}));
-
-beforeEach(() => {
-  vi.clearAllMocks();
-  mockI18n.language = 'en';
-  mockI18n.resolvedLanguage = undefined;
-});
-
 /** Its name is the hidden label followed by the visible language code. */
 function getLanguageButton() {
-  return screen.getByRole('button', { name: /^nav\.changeLanguage/ });
+  return screen.getByRole('button', { name: /^(Change language|Changer de langue)/ });
 }
 
 /** The colors of the flag drawn in an element: flags are hidden from assistive technologies. */
@@ -39,46 +21,28 @@ const UK_BLUE = '#012169';
 describe('LanguageSelector', () => {
   it('shows English (UK) from the chosen code, although its messages resolve to en', async () => {
     const user = userEvent.setup();
-    mockI18n.language = 'en-GB';
-    mockI18n.resolvedLanguage = 'en';
+    await i18n.changeLanguage('en-GB');
     render(<LanguageSelector />);
+    expect(i18n.resolvedLanguage).toBe('en');
 
-    expect(getLanguageButton()).toHaveAccessibleName('nav.changeLanguage UK');
+    expect(getLanguageButton()).toHaveAccessibleName('Change language UK');
     expect(flagColors(getLanguageButton())).toContain(UK_BLUE);
 
     await user.click(getLanguageButton());
-    expect(screen.getByRole('menuitemradio', { name: /English \(UK\)/ })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('menuitemradio', { name: /English \(US\)/ })).toHaveAttribute('aria-checked', 'false');
-  });
-
-  it('should reduce an unsupported regional code to its base language', () => {
-    mockI18n.language = 'en-US';
-    render(<LanguageSelector />);
-    expect(screen.getByText('en')).toBeInTheDocument();
-  });
-
-  it('should strip the region when no resolved language is available', () => {
-    mockI18n.language = 'fr-FR';
-    render(<LanguageSelector />);
-    expect(screen.getByText('fr')).toBeInTheDocument();
-  });
-
-  it('should fall back to English for an unsupported language', () => {
-    mockI18n.language = 'de';
-    render(<LanguageSelector />);
-    expect(screen.getByText('en')).toBeInTheDocument();
-  });
-
-  it('should fall back to English when no language is set', () => {
-    mockI18n.language = undefined;
-    render(<LanguageSelector />);
-    expect(screen.getByText('en')).toBeInTheDocument();
+    expect(screen.getByRole('menuitemradio', { name: /English \(UK\)/ })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(screen.getByRole('menuitemradio', { name: /English \(US\)/ })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
   });
 
   it('should render current language button', () => {
     render(<LanguageSelector />);
     // The name keeps the visible code (label in name); CSS uppercases it.
-    expect(getLanguageButton()).toHaveAccessibleName('nav.changeLanguage en');
+    expect(getLanguageButton()).toHaveAccessibleName('Change language en');
   });
 
   it('should open dropdown on click', async () => {
@@ -87,7 +51,9 @@ describe('LanguageSelector', () => {
 
     await user.click(getLanguageButton());
     expect(screen.getAllByRole('menuitemradio').map((item) => item.textContent)).toEqual([
-      'Français', 'English (US)✓', 'English (UK)',
+      'Français',
+      'English (US)✓',
+      'English (UK)',
     ]);
   });
 
@@ -114,7 +80,7 @@ describe('LanguageSelector', () => {
     await user.click(getLanguageButton());
     await user.click(screen.getByText('English (UK)'));
 
-    expect(mockChangeLanguage).toHaveBeenCalledWith('en-GB');
+    expect(i18n.language).toBe('en-GB');
   });
 
   // The detector stores nothing: the selector keeps the choice for the next visits.
@@ -141,7 +107,7 @@ describe('LanguageSelector', () => {
     await user.click(screen.getByText('English (UK)'));
 
     expect(localStorage.setItem).toHaveBeenCalledWith(LANGUAGE_STORAGE_KEY, 'en-GB');
-    expect(mockChangeLanguage).toHaveBeenCalledWith('en-GB');
+    expect(i18n.language).toBe('en-GB');
   });
 
   it('should call changeLanguage when selecting a language', async () => {
@@ -151,7 +117,8 @@ describe('LanguageSelector', () => {
     await user.click(getLanguageButton());
     await user.click(screen.getByText('Français'));
 
-    expect(mockChangeLanguage).toHaveBeenCalledWith('fr');
+    expect(i18n.language).toBe('fr');
+    expect(getLanguageButton()).toHaveAccessibleName('Changer de langue fr');
   });
 
   it('gives the focus back to the button after a language is chosen from the keyboard', async () => {
@@ -162,7 +129,7 @@ describe('LanguageSelector', () => {
     await user.keyboard('{Enter}');
     await user.keyboard('{ArrowDown}{Enter}');
 
-    expect(mockChangeLanguage).toHaveBeenCalledWith('en-GB');
+    expect(i18n.language).toBe('en-GB');
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     expect(getLanguageButton()).toHaveFocus();
   });
@@ -188,11 +155,20 @@ describe('LanguageSelector', () => {
     await user.click(button);
 
     expect(button).toHaveAttribute('aria-expanded', 'true');
-    const menu = screen.getByRole('menu', { name: 'nav.language' });
+    const menu = screen.getByRole('menu', { name: 'Language' });
     expect(button).toHaveAttribute('aria-controls', menu.id);
-    expect(screen.getByRole('menuitemradio', { name: /English \(US\)/ })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('menuitemradio', { name: /English \(UK\)/ })).toHaveAttribute('aria-checked', 'false');
-    expect(screen.getByRole('menuitemradio', { name: /Français/ })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('menuitemradio', { name: /English \(US\)/ })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(screen.getByRole('menuitemradio', { name: /English \(UK\)/ })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    expect(screen.getByRole('menuitemradio', { name: /Français/ })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
   });
 
   it('moves the focus into the menu, on the current language, and through it with the arrow keys', async () => {

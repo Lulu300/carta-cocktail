@@ -16,7 +16,12 @@ interface LocationAutocompleteProps {
 }
 
 export default function LocationAutocomplete({
-  value, onChange, locations, label, placeholder, className = '',
+  value,
+  onChange,
+  locations,
+  label,
+  placeholder,
+  className = '',
 }: LocationAutocompleteProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -51,13 +56,23 @@ export default function LocationAutocomplete({
         ref={inputRef}
         type="text"
         value={value}
-        onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+        }}
         onFocus={() => setOpen(true)}
         aria-label={label}
         placeholder={placeholder}
         className="text-sm pr-10"
       />
-      {value && <ClearButton label={t('common.clear')} onClick={() => select('')} fieldRef={inputRef} className="right-1" />}
+      {value && (
+        <ClearButton
+          label={t('common.clear')}
+          onClick={() => select('')}
+          fieldRef={inputRef}
+          className="right-1"
+        />
+      )}
       {isListShown && (
         <ComboboxListbox
           combobox={combobox}

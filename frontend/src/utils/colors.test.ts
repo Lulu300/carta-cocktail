@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
-  CATEGORY_TYPE_COLORS, COLOR_BADGE_CLASSES, COLOR_DOT_CLASSES, getBadgeClasses, getDotClasses,
+  CATEGORY_TYPE_COLORS,
+  COLOR_BADGE_CLASSES,
+  COLOR_DOT_CLASSES,
+  getBadgeClasses,
+  getDotClasses,
 } from './colors';
 
 describe('CATEGORY_TYPE_COLORS', () => {

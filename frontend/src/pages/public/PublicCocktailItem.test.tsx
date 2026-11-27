@@ -1,18 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { buildCocktailIngredient, buildIngredient, buildMenuCocktail } from '../../test/factories';
 import type { CocktailIngredient } from '../../types';
 import PublicCocktailItem from './PublicCocktailItem';
-
-vi.mock('react-i18next', async (importOriginal) => {
-  const { translateWithValues } = await import('../../test/translateWithValues');
-  return {
-    ...await importOriginal<typeof import('react-i18next')>(),
-    useTranslation: () => ({ t: translateWithValues, i18n: { language: 'en' } }),
-  };
-});
 
 function ingredient(id: number, name: string): CocktailIngredient {
   return buildCocktailIngredient({ id, ingredient: buildIngredient({ id, name }) });
@@ -29,7 +21,14 @@ function renderItem(item = buildMenuCocktail({ id: 1, cocktail: { name: 'Mojito'
       <Routes>
         <Route
           path="/menu/summer"
-          element={<PublicCocktailItem menuCocktail={item} menuSlug="summer" viewMode="grid" showAvailability={false} />}
+          element={
+            <PublicCocktailItem
+              menuCocktail={item}
+              menuSlug="summer"
+              viewMode="grid"
+              showAvailability={false}
+            />
+          }
         />
         <Route path="/menu/summer/cocktail/:id" element={<CocktailPageProbe />} />
       </Routes>
@@ -40,12 +39,23 @@ function renderItem(item = buildMenuCocktail({ id: 1, cocktail: { name: 'Mojito'
 describe('PublicCocktailItem', () => {
   it('shows four ingredients and sums up the others', () => {
     const names = ['Rum', 'Lime', 'Mint', 'Sugar', 'Soda', 'Ice'];
-    renderItem(buildMenuCocktail({ id: 1, cocktail: { ingredients: names.map((name, index) => ingredient(index + 1, name)) } }));
+    renderItem(
+      buildMenuCocktail({
+        id: 1,
+        cocktail: { ingredients: names.map((name, index) => ingredient(index + 1, name)) },
+      }),
+    );
 
     expect(screen.getByText('Sugar')).toBeInTheDocument();
     expect(screen.queryByText('Soda')).not.toBeInTheDocument();
-    expect(screen.getByText('public.moreIngredients(2)')).toHaveClass('sr-only');
+    expect(screen.getByText('2 more ingredients')).toHaveClass('sr-only');
     expect(screen.getByText('+2')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('shows one badge per tag and none for a blank entry', () => {
+    renderItem(buildMenuCocktail({ id: 1, cocktail: { tags: 'rum, ,mint' } }));
+
+    expect(screen.getAllByText(/^#/).map((badge) => badge.textContent)).toEqual(['#rum', '#mint']);
   });
 
   it('tells the cocktail page that the guest comes from the menu', async () => {
@@ -63,7 +73,7 @@ describe('PublicCocktailItem', () => {
 
     const link = screen.getByRole('link', { name: /Mojito/ });
     expect(link).toHaveClass('grayscale');
-    expect(screen.getByText('public.unavailable')).toBeInTheDocument();
+    expect(screen.getByText('Currently unavailable')).toBeInTheDocument();
 
     await user.click(link);
     expect(screen.queryByText(/cocktail page/)).not.toBeInTheDocument();
@@ -76,7 +86,7 @@ describe('PublicCocktailItem', () => {
     expect(link).not.toHaveClass('grayscale');
     expect(link).not.toHaveAttribute('aria-disabled');
     expect(link).not.toHaveAttribute('tabindex');
-    expect(screen.queryByText('public.unavailable')).not.toBeInTheDocument();
+    expect(screen.queryByText('Currently unavailable')).not.toBeInTheDocument();
   });
 
   it('takes an unavailable cocktail out of the tab order and announces it as disabled', () => {
@@ -89,7 +99,24 @@ describe('PublicCocktailItem', () => {
 
   it('treats the photo as decoration: the heading already names the link', () => {
     renderItem(buildMenuCocktail({ id: 1, cocktail: { imagePath: 'mojito.jpg' } }));
-    expect(screen.getByRole('link', { name: /Mojito/ }).querySelector('img')).toHaveAttribute('alt', '');
+    expect(screen.getByRole('link', { name: /Mojito/ }).querySelector('img')).toHaveAttribute(
+      'alt',
+      '',
+    );
+  });
+
+  it('loads the smallest copy of the photo that fills the card, lazily', () => {
+    renderItem(buildMenuCocktail({ id: 1, cocktail: { imagePath: 'mojito.webp' } }));
+    const photo = screen.getByRole('link', { name: /Mojito/ }).querySelector('img');
+
+    expect(photo).toHaveAttribute('src', '/uploads/mojito.webp');
+    expect(photo).toHaveAttribute(
+      'srcset',
+      '/uploads/mojito-480.webp 480w, /uploads/mojito-960.webp 960w, /uploads/mojito.webp 1600w',
+    );
+    expect(photo).toHaveAttribute('sizes', expect.stringContaining('calc(100vw - 2rem)'));
+    expect(photo).toHaveAttribute('loading', 'lazy');
+    expect(photo).toHaveAttribute('decoding', 'async');
   });
 
   it('hides the placeholder emoji from screen readers', () => {

@@ -50,18 +50,21 @@ export function isEmptyBottle(bottle: Bottle): boolean {
 }
 
 /** Groups the items by key, keeping the order of the first item of each group. */
-function groupByKey<T>(items: T[], keyOf: (item: T) => string): [string, T[]][] {
-  const groups = new Map<string, T[]>();
+function groupByKey<T>(items: T[], keyOf: (item: T) => string): [string, [T, ...T[]]][] {
+  const groups = new Map<string, [T, ...T[]]>();
   for (const item of items) {
     const key = keyOf(item);
-    groups.set(key, [...(groups.get(key) ?? []), item]);
+    const group = groups.get(key);
+    if (group) group.push(item);
+    else groups.set(key, [item]);
   }
   return [...groups];
 }
 
 /** Groups identical bottles of the same section. */
 export function groupMenuBottles(entries: MenuBottleEntry[]): MenuBottleGroup[] {
-  const sectionAndBottle = (entry: MenuBottleEntry) => `${bottleGroupKey(entry.bottle)}|${entry.menuSectionId ?? ''}`;
+  const sectionAndBottle = (entry: MenuBottleEntry) =>
+    `${bottleGroupKey(entry.bottle)}|${entry.menuSectionId ?? ''}`;
 
   return groupByKey(entries, sectionAndBottle).map(([key, groupEntries]) => ({
     key,
@@ -76,12 +79,14 @@ export function groupMenuBottles(entries: MenuBottleEntry[]): MenuBottleGroup[] 
 
 /** Groups identical removed bottles. */
 export function groupExcludedBottles(exclusions: MenuBottleExclusion[]): ExcludedBottleGroup[] {
-  return groupByKey(exclusions, (exclusion) => bottleGroupKey(exclusion.bottle)).map(([key, groupExclusions]) => ({
-    key,
-    bottle: groupExclusions[0].bottle,
-    exclusions: groupExclusions,
-    isEmpty: groupExclusions.every((exclusion) => isEmptyBottle(exclusion.bottle)),
-  }));
+  return groupByKey(exclusions, (exclusion) => bottleGroupKey(exclusion.bottle)).map(
+    ([key, groupExclusions]) => ({
+      key,
+      bottle: groupExclusions[0].bottle,
+      exclusions: groupExclusions,
+      isEmpty: groupExclusions.every((exclusion) => isEmptyBottle(exclusion.bottle)),
+    }),
+  );
 }
 
 /** Groups identical bottles to add to a menu. */

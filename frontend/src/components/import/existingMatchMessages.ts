@@ -15,7 +15,9 @@ export function existingMatchMessages<Row>(
     case 'found':
       return { hint: t('importMatches.usedAsItIs', { name: label(match.row) }) };
     case 'ambiguous':
-      return { error: t('importMatches.ambiguousName', { names: match.rows.map(label).join(', ') }) };
+      return {
+        error: t('importMatches.ambiguousName', { names: match.rows.map(label).join(', ') }),
+      };
     case 'none':
       return {};
   }

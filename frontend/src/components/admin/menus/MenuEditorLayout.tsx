@@ -24,14 +24,22 @@ interface MenuEditorLayoutProps {
 function BackToList() {
   const { t } = useTranslation();
   return (
-    <Link to="/admin/menus" className={cx('text-sm text-fg-muted hover:text-fg rounded', focusRingClasses)}>
+    <Link
+      to="/admin/menus"
+      className={cx('text-sm text-fg-muted hover:text-fg rounded', focusRingClasses)}
+    >
       ← {t('menus.backToList')}
     </Link>
   );
 }
 
 /** Loads a menu and shows what both menu editors share: info form, sections, link back to the list. */
-export default function MenuEditorLayout({ menuId, itemLabel, title, children }: MenuEditorLayoutProps) {
+export default function MenuEditorLayout({
+  menuId,
+  itemLabel,
+  title,
+  children,
+}: MenuEditorLayoutProps) {
   const { t } = useTranslation();
   const menuQuery = useMenu(menuId);
   // Queued with the composition changes of the menu, so its refetch never hides one of them.
@@ -47,18 +55,28 @@ export default function MenuEditorLayout({ menuId, itemLabel, title, children }:
   const submitInfo = (values: Partial<MenuInfoValues>) => {
     if (isSavingInfo.current) return;
     isSavingInfo.current = true;
-    saveInfo.mutate(values, { onSettled: () => { isSavingInfo.current = false; } });
+    saveInfo.mutate(values, {
+      onSettled: () => {
+        isSavingInfo.current = false;
+      },
+    });
   };
 
   if (menuQuery.isPending) {
-    return <div className="flex justify-center py-12"><Spinner /></div>;
+    return (
+      <div className="flex justify-center py-12">
+        <Spinner />
+      </div>
+    );
   }
 
   if (menuQuery.isError) {
     return (
       <div role="alert" className="flex flex-col items-center gap-3 py-12 text-center">
         <p className="text-danger">{t('menus.loadError')}</p>
-        <Button variant="secondary" size="sm" onClick={() => menuQuery.refetch()}>{t('common.retry')}</Button>
+        <Button variant="secondary" size="sm" onClick={() => menuQuery.refetch()}>
+          {t('common.retry')}
+        </Button>
         <BackToList />
       </div>
     );

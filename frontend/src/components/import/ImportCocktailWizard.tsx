@@ -3,14 +3,19 @@ import { useTranslation } from 'react-i18next';
 import { useMutation } from '@tanstack/react-query';
 import { cocktails as api } from '../../services/api';
 import type { CocktailExportFormat } from '../../types';
-import { useInvalidateQueries } from '../../queries/crud';
+import { useInvalidateQueries } from '../../queries/invalidate';
 import { refusalDetails } from '../../utils/refusalDetails';
 import Spinner from '../ui/Spinner';
 import WizardModal from './WizardModal';
 import ImportStepUpload from './ImportStepUpload';
 import ImportStepResolve from './ImportStepResolve';
 import ImportStepConfirm from './ImportStepConfirm';
-import { BatchProgress, ImportBatchSummary, ImportFailure, ImportSuccess } from './ImportCocktailResults';
+import {
+  BatchProgress,
+  ImportBatchSummary,
+  ImportFailure,
+  ImportSuccess,
+} from './ImportCocktailResults';
 import {
   canGoBack,
   currentRecipe,
@@ -42,7 +47,10 @@ const STEP_INDICATOR_INDEX: Partial<Record<CocktailImportStep, number>> = {
 
 // The backend's message, and the recipe rows or inputs its refusal names
 function refusalOf(error: unknown, fallback: string): ImportRefusal {
-  return { message: error instanceof Error ? error.message : fallback, details: refusalDetails(error) };
+  return {
+    message: error instanceof Error ? error.message : fallback,
+    details: refusalDetails(error),
+  };
 }
 
 export default function ImportCocktailWizard({ onClose }: ImportCocktailWizardProps) {
@@ -80,10 +88,14 @@ export default function ImportCocktailWizard({ onClose }: ImportCocktailWizardPr
 
   const handleConfirm = () => {
     if (!recipe || confirmMutation.isPending) return;
-    confirmMutation.mutate({ recipe, resolutions: state.resolutions }, {
-      onSuccess: (cocktail) => dispatch({ type: 'CONFIRM_OK', cocktail }),
-      onError: (error) => dispatch({ type: 'CONFIRM_FAILED', ...refusalOf(error, fallbackError) }),
-    });
+    confirmMutation.mutate(
+      { recipe, resolutions: state.resolutions },
+      {
+        onSuccess: (cocktail) => dispatch({ type: 'CONFIRM_OK', cocktail }),
+        onError: (error) =>
+          dispatch({ type: 'CONFIRM_FAILED', ...refusalOf(error, fallbackError) }),
+      },
+    );
   };
 
   const goBack = () => dispatch({ type: 'BACK' });
@@ -99,29 +111,37 @@ export default function ImportCocktailWizard({ onClose }: ImportCocktailWizardPr
           />
         );
       case 'previewing':
-        return <div className="flex justify-center py-12"><Spinner /></div>;
+        return (
+          <div className="flex justify-center py-12">
+            <Spinner />
+          </div>
+        );
       case 'resolve':
-        return state.preview && (
-          <ImportStepResolve
-            preview={state.preview}
-            resolutions={state.resolutions}
-            onChange={(resolutions) => dispatch({ type: 'RESOLUTIONS_CHANGED', resolutions })}
-            lists={lists}
-            canGoBack={canGoBack(state)}
-            onBack={goBack}
-            onNext={() => dispatch({ type: 'NEXT' })}
-          />
+        return (
+          state.preview && (
+            <ImportStepResolve
+              preview={state.preview}
+              resolutions={state.resolutions}
+              onChange={(resolutions) => dispatch({ type: 'RESOLUTIONS_CHANGED', resolutions })}
+              lists={lists}
+              canGoBack={canGoBack(state)}
+              onBack={goBack}
+              onNext={() => dispatch({ type: 'NEXT' })}
+            />
+          )
         );
       case 'confirm':
-        return state.preview && (
-          <ImportStepConfirm
-            preview={state.preview}
-            resolutions={state.resolutions}
-            lists={lists}
-            isLoading={confirmMutation.isPending}
-            onBack={goBack}
-            onConfirm={handleConfirm}
-          />
+        return (
+          state.preview && (
+            <ImportStepConfirm
+              preview={state.preview}
+              resolutions={state.resolutions}
+              lists={lists}
+              isLoading={confirmMutation.isPending}
+              onBack={goBack}
+              onConfirm={handleConfirm}
+            />
+          )
         );
       case 'success':
         return <ImportSuccess result={state.results[state.currentIndex]} onClose={onClose} />;

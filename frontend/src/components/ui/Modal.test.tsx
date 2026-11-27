@@ -25,14 +25,20 @@ function getDialogElement(container: HTMLElement): HTMLDialogElement {
   return dialog;
 }
 
-function pressAndRelease(pressTarget: Element, releaseTarget: Element, point: { clientX: number; clientY: number }) {
+function pressAndRelease(
+  pressTarget: Element,
+  releaseTarget: Element,
+  point: { clientX: number; clientY: number },
+) {
   fireEvent.pointerDown(pressTarget, point);
   fireEvent.click(releaseTarget, point);
 }
 
 describe('Modal', () => {
   beforeEach(() => {
-    vi.spyOn(HTMLDialogElement.prototype, 'getBoundingClientRect').mockReturnValue(DIALOG_BOX as DOMRect);
+    vi.spyOn(HTMLDialogElement.prototype, 'getBoundingClientRect').mockReturnValue(
+      DIALOG_BOX as DOMRect,
+    );
   });
 
   afterEach(() => {
@@ -100,7 +106,7 @@ describe('Modal', () => {
   it('calls onClose from the close button', async () => {
     const user = userEvent.setup();
     const { onClose } = renderModal();
-    await user.click(screen.getByRole('button', { name: 'common.close' }));
+    await user.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
@@ -162,7 +168,9 @@ describe('Modal', () => {
       };
       return (
         <>
-          <button type="button" onClick={() => setOpen(true)}>Open</button>
+          <button type="button" onClick={() => setOpen(true)}>
+            Open
+          </button>
           <Modal open={open} onClose={close} title="Harness">
             <p>Harness body</p>
           </Modal>
@@ -176,7 +184,7 @@ describe('Modal', () => {
     expect(dialog.open).toBe(true);
     expect(document.body.style.overflow).toBe('hidden');
 
-    fireEvent.click(screen.getByRole('button', { name: 'common.close' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(dialog.open).toBe(false);
     // The close event fired by dialog.close() must not report the closing twice.
     expect(closeSpy).toHaveBeenCalledTimes(1);
@@ -188,8 +196,12 @@ describe('Modal', () => {
     document.body.style.overflow = 'scroll';
     const { rerender } = render(
       <>
-        <Modal open onClose={vi.fn()} title="First"><p>First</p></Modal>
-        <Modal open onClose={vi.fn()} title="Second"><p>Second</p></Modal>
+        <Modal open onClose={vi.fn()} title="First">
+          <p>First</p>
+        </Modal>
+        <Modal open onClose={vi.fn()} title="Second">
+          <p>Second</p>
+        </Modal>
       </>,
     );
     expect(document.body.style.overflow).toBe('hidden');
@@ -197,16 +209,24 @@ describe('Modal', () => {
     // Close the first opened modal first: the second one still needs the lock.
     rerender(
       <>
-        <Modal open={false} onClose={vi.fn()} title="First"><p>First</p></Modal>
-        <Modal open onClose={vi.fn()} title="Second"><p>Second</p></Modal>
+        <Modal open={false} onClose={vi.fn()} title="First">
+          <p>First</p>
+        </Modal>
+        <Modal open onClose={vi.fn()} title="Second">
+          <p>Second</p>
+        </Modal>
       </>,
     );
     expect(document.body.style.overflow).toBe('hidden');
 
     rerender(
       <>
-        <Modal open={false} onClose={vi.fn()} title="First"><p>First</p></Modal>
-        <Modal open={false} onClose={vi.fn()} title="Second"><p>Second</p></Modal>
+        <Modal open={false} onClose={vi.fn()} title="First">
+          <p>First</p>
+        </Modal>
+        <Modal open={false} onClose={vi.fn()} title="Second">
+          <p>Second</p>
+        </Modal>
       </>,
     );
     expect(document.body.style.overflow).toBe('scroll');

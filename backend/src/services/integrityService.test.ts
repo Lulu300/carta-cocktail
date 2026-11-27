@@ -1,15 +1,33 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
-  setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
-  prisma, seedCategory, seedUnit, seedCocktail, seedCocktailUsing,
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+  prisma,
+  seedCategory,
+  seedUnit,
+  seedCocktail,
+  seedCocktailUsing,
 } from '../test/helpers';
 import {
-  findIntegrityIssues, hasBlockingIssues, countIssues, formatIntegrityReport, IntegrityIssues,
+  findIntegrityIssues,
+  hasBlockingIssues,
+  countIssues,
+  formatIntegrityReport,
+  IntegrityIssues,
 } from './integrityService';
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
-beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
+beforeEach(async () => {
+  await cleanDatabase();
+  await seedRequiredData();
+});
 
 const NO_ISSUES: IntegrityIssues = {
   duplicateCategoryNames: [],
@@ -55,7 +73,9 @@ describe('findIntegrityIssues', () => {
       expect(hasBlockingIssues(issues)).toBe(true);
     } finally {
       await prisma.unit.deleteMany();
-      await prisma.$executeRawUnsafe('CREATE UNIQUE INDEX "Unit_abbreviation_key" ON "Unit"("abbreviation")');
+      await prisma.$executeRawUnsafe(
+        'CREATE UNIQUE INDEX "Unit_abbreviation_key" ON "Unit"("abbreviation")',
+      );
     }
   });
 
@@ -79,7 +99,10 @@ describe('findIntegrityIssues', () => {
 
     const issues = await findIntegrityIssues(prisma);
 
-    expect(issues.duplicateCategoryNames).toEqual([{ value: 'cr\u00E8me', count: 2 }, { value: '\u00E9corce', count: 2 }]);
+    expect(issues.duplicateCategoryNames).toEqual([
+      { value: 'cr\u00E8me', count: 2 },
+      { value: '\u00E9corce', count: 2 },
+    ]);
     expect(hasBlockingIssues(issues)).toBe(true);
   });
 
@@ -110,7 +133,10 @@ describe('findIntegrityIssues', () => {
 
     const issues = await findIntegrityIssues(prisma);
 
-    expect(issues.duplicateCocktailNames).toEqual([{ value: 'mojito', count: 2 }, { value: 'zombie', count: 2 }]);
+    expect(issues.duplicateCocktailNames).toEqual([
+      { value: 'mojito', count: 2 },
+      { value: 'zombie', count: 2 },
+    ]);
   });
 
   it('lists duplicate cocktail names without blocking', async () => {
@@ -148,7 +174,9 @@ describe('findIntegrityIssues', () => {
     const issues = await findIntegrityIssues(prisma);
 
     expect(issues.unknownCategoryTypes).toEqual(['JUICE']);
-    expect(issues.foreignKeyViolations).toEqual([{ table: 'Category', rowid: expect.any(Number), parent: 'CategoryType' }]);
+    expect(issues.foreignKeyViolations).toEqual([
+      { table: 'Category', rowid: expect.any(Number), parent: 'CategoryType' },
+    ]);
   });
 });
 

@@ -37,23 +37,35 @@ export default function CocktailForm({ id }: CocktailFormProps) {
   // Only a first load that fails replaces the form. A failed background refetch keeps
   // the loaded data in TanStack Query, and the form stays with what the admin typed.
   if (isEdit && hasFailedWithoutData(cocktailQuery)) {
-    if (!isNotFoundError(cocktailQuery.error)) return <LoadError onRetry={() => cocktailQuery.refetch()} />;
+    if (!isNotFoundError(cocktailQuery.error))
+      return <LoadError onRetry={() => cocktailQuery.refetch()} />;
     return (
       <EmptyState
         icon="🍸"
         role="alert"
         title={t('cocktails.notFound')}
-        action={<Link to="/admin/cocktails" className="text-accent hover:text-accent-soft underline underline-offset-4">{t('cocktails.backToList')}</Link>}
+        action={
+          <Link
+            to="/admin/cocktails"
+            className="text-accent hover:text-accent-soft underline underline-offset-4"
+          >
+            {t('cocktails.backToList')}
+          </Link>
+        }
       />
     );
   }
   const failedLists = listQueries.filter(hasFailedWithoutData);
   if (failedLists.length > 0) {
-    return <LoadError onRetry={() => failedLists.forEach((query) => query.refetch())} />;
+    return <LoadError onRetry={() => failedLists.forEach((query) => void query.refetch())} />;
   }
   // The selects only show a stored id once their options exist: the form waits for every list.
   if ((isEdit && cocktailQuery.isPending) || listQueries.some((query) => query.isPending)) {
-    return <p role="status" className="text-center py-12 text-fg-muted">{t('common.loading')}</p>;
+    return (
+      <p role="status" className="text-center py-12 text-fg-muted">
+        {t('common.loading')}
+      </p>
+    );
   }
 
   return (

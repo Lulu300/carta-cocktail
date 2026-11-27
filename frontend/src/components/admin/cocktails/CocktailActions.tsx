@@ -22,12 +22,20 @@ export default function CocktailActions({ cocktail, onDelete, className }: Cockt
         to={`/admin/cocktails/${cocktail.id}`}
         aria-label={t('common.edit')}
         title={t('common.edit')}
-        className={cx('text-accent hover:text-accent-soft transition-colors p-1 rounded-lg', focusRingClasses)}
+        className={cx(
+          'text-accent hover:text-accent-soft transition-colors p-1 rounded-lg',
+          focusRingClasses,
+        )}
       >
         <Icon name="edit" />
       </Link>
       <ExportCocktailButton cocktailId={cocktail.id} />
-      <IconButton icon="delete" label={t('common.delete')} variant="danger" onClick={() => onDelete(cocktail)} />
+      <IconButton
+        icon="delete"
+        label={t('common.delete')}
+        variant="danger"
+        onClick={() => onDelete(cocktail)}
+      />
     </div>
   );
 }

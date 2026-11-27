@@ -1,14 +1,30 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
-  setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData, prisma,
-  seedBottle, seedMenu, seedMenuSection, seedCocktail, addBottleToMenu, addCocktailToMenu,
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+  prisma,
+  seedBottle,
+  seedMenu,
+  seedMenuSection,
+  seedCocktail,
+  addBottleToMenu,
+  addCocktailToMenu,
 } from '../test/helpers';
 import { BadRequestError, NotFoundError } from '../errors';
 import { assertSectionInMenu, nextPosition, reorder } from './positions';
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
-beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
+beforeEach(async () => {
+  await cleanDatabase();
+  await seedRequiredData();
+});
 
 async function sectionPositions(menuId: number): Promise<Record<number, number>> {
   const sections = await prisma.menuSection.findMany({ where: { menuId } });
@@ -55,7 +71,10 @@ describe('nextPosition', () => {
 
 describe('reorder', () => {
   it('gives the positions 0..n-1 in the order of the list', async () => {
-    const { menu, ids: [a, b, c] } = await seedMenuWithSections();
+    const {
+      menu,
+      ids: [a, b, c],
+    } = await seedMenuWithSections();
 
     await prisma.$transaction((tx) => reorder(tx, 'menuSection', menu.id, [c, a, b]));
 
@@ -64,12 +83,19 @@ describe('reorder', () => {
 
   it('reorders the cocktails of a menu', async () => {
     const menu = await seedMenu();
-    const first = await addCocktailToMenu(menu.id, (await seedCocktail({ name: 'First' })).id, { position: 0 });
-    const second = await addCocktailToMenu(menu.id, (await seedCocktail({ name: 'Second' })).id, { position: 1 });
+    const first = await addCocktailToMenu(menu.id, (await seedCocktail({ name: 'First' })).id, {
+      position: 0,
+    });
+    const second = await addCocktailToMenu(menu.id, (await seedCocktail({ name: 'Second' })).id, {
+      position: 1,
+    });
 
     await prisma.$transaction((tx) => reorder(tx, 'menuCocktail', menu.id, [second.id, first.id]));
 
-    const entries = await prisma.menuCocktail.findMany({ where: { menuId: menu.id }, orderBy: { position: 'asc' } });
+    const entries = await prisma.menuCocktail.findMany({
+      where: { menuId: menu.id },
+      orderBy: { position: 'asc' },
+    });
     expect(entries.map((entry) => entry.id)).toEqual([second.id, first.id]);
   });
 
@@ -88,12 +114,17 @@ describe('reorder', () => {
   });
 
   it('refuses an id of another menu and writes nothing in either menu', async () => {
-    const { menu, ids: [a, b] } = await seedMenuWithSections();
+    const {
+      menu,
+      ids: [a, b],
+    } = await seedMenuWithSections();
     const other = await seedMenu();
     const foreign = await seedMenuSection(other.id, { position: 7 });
     const before = await sectionPositions(menu.id);
 
-    const attempt = prisma.$transaction((tx) => reorder(tx, 'menuSection', menu.id, [b, a, foreign.id]));
+    const attempt = prisma.$transaction((tx) =>
+      reorder(tx, 'menuSection', menu.id, [b, a, foreign.id]),
+    );
 
     await expect(attempt).rejects.toThrow('errors.reorderForeignIds');
     expect(await sectionPositions(menu.id)).toEqual(before);
@@ -107,7 +138,9 @@ describe('reorder', () => {
 
   it('accepts an empty list for a menu without items', async () => {
     const menu = await seedMenu();
-    await expect(prisma.$transaction((tx) => reorder(tx, 'menuSection', menu.id, []))).resolves.toBeUndefined();
+    await expect(
+      prisma.$transaction((tx) => reorder(tx, 'menuSection', menu.id, [])),
+    ).resolves.toBeUndefined();
   });
 });
 
@@ -126,7 +159,11 @@ describe('assertSectionInMenu', () => {
     const other = await seedMenu();
     const foreign = await seedMenuSection(other.id);
 
-    await expect(assertSectionInMenu(prisma, foreign.id, menu.id)).rejects.toThrow('errors.sectionNotInMenu');
-    await expect(assertSectionInMenu(prisma, 9999, menu.id)).rejects.toThrow('errors.sectionNotInMenu');
+    await expect(assertSectionInMenu(prisma, foreign.id, menu.id)).rejects.toThrow(
+      'errors.sectionNotInMenu',
+    );
+    await expect(assertSectionInMenu(prisma, 9999, menu.id)).rejects.toThrow(
+      'errors.sectionNotInMenu',
+    );
   });
 });

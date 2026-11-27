@@ -5,7 +5,12 @@ import userEvent from '@testing-library/user-event';
 import CocktailsPage from './CocktailsPage';
 import { qk } from '../../queries/keys';
 import { buildAvailability, buildCocktail } from '../../test/factories';
-import { captureRequest, holdApiResponse, mockApiResponse, mockNetworkError } from '../../test/msw/utils';
+import {
+  captureRequest,
+  holdApiResponse,
+  mockApiResponse,
+  mockNetworkError,
+} from '../../test/msw/utils';
 import type { Cocktail, IngredientAvailability } from '../../types';
 
 // Builds a ZIP of every selected recipe: services/exportZip.test.ts covers it.
@@ -24,20 +29,37 @@ vi.mock('../../components/import/ImportCocktailWizard', () => ({
 
 import { exportCocktailsAsZip } from '../../services/exportZip';
 
-const mojito = buildCocktail({ id: 1, name: 'Mojito', description: 'Classic', notes: 'Jus de citron frais', tags: 'rum,lime' });
+const mojito = buildCocktail({
+  id: 1,
+  name: 'Mojito',
+  description: 'Classic',
+  notes: 'Jus de citron frais',
+  tags: 'rum,lime',
+});
 const negroni = buildCocktail({ id: 2, name: 'Negroni', imagePath: 'negroni.jpg' });
 
 function missingLine(id: number, name: string): IngredientAvailability {
   return {
-    cocktailIngredientId: id, sourceType: 'INGREDIENT', name, nameTranslations: null, orphan: false,
-    icon: null, quantity: 1, unit: 'cl', isAvailable: false, availableCount: 0,
+    cocktailIngredientId: id,
+    sourceType: 'INGREDIENT',
+    name,
+    nameTranslations: null,
+    orphan: false,
+    icon: null,
+    quantity: 1,
+    unit: 'cl',
+    isAvailable: false,
+    availableCount: 0,
   };
 }
 
 const mockAvailabilities = {
   1: buildAvailability({ cocktailId: 1, maxServings: 5 }),
   2: buildAvailability({
-    cocktailId: 2, isAvailable: false, maxServings: 0, ingredients: [missingLine(5, 'Campari')],
+    cocktailId: 2,
+    isAvailable: false,
+    maxServings: 0,
+    ingredients: [missingLine(5, 'Campari')],
   }),
 };
 
@@ -64,12 +86,12 @@ describe('CocktailsPage', () => {
       expect(screen.getByText('Mojito')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('cocktails.title')).toBeInTheDocument();
-    expect(screen.getByText('cocktails.batchExport')).toBeInTheDocument();
-    expect(screen.getByText('cocktails.import')).toBeInTheDocument();
-    expect(screen.getByText('cocktails.add')).toBeInTheDocument();
+    expect(screen.getByText('Cocktails')).toBeInTheDocument();
+    expect(screen.getByText('Batch export')).toBeInTheDocument();
+    expect(screen.getByText('Import')).toBeInTheDocument();
+    expect(screen.getByText('Add Cocktail')).toBeInTheDocument();
     // The real export button of each card
-    expect(screen.getAllByTitle('cocktails.export')).toHaveLength(2);
+    expect(screen.getAllByTitle('Export')).toHaveLength(2);
   });
 
   it('displays cocktail cards after loading', async () => {
@@ -97,12 +119,12 @@ describe('CocktailsPage', () => {
     expect(screen.getByTestId('cocktails-grid-view')).toBeInTheDocument();
     expect(screen.queryByTestId('cocktails-list-view')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'cocktails.viewList' }));
+    await user.click(screen.getByRole('button', { name: 'List view' }));
 
     expect(screen.getByTestId('cocktails-list-view')).toBeInTheDocument();
     expect(screen.queryByTestId('cocktails-grid-view')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'cocktails.viewGrid' }));
+    await user.click(screen.getByRole('button', { name: 'Grid view' }));
 
     expect(screen.getByTestId('cocktails-grid-view')).toBeInTheDocument();
   });
@@ -111,7 +133,7 @@ describe('CocktailsPage', () => {
     const user = userEvent.setup();
     render(<CocktailsPage />);
 
-    const search = await screen.findByPlaceholderText('common.search');
+    const search = await screen.findByPlaceholderText('Search...');
     await user.type(search, 'rum citron');
 
     expect(screen.getByText('Mojito')).toBeInTheDocument();
@@ -124,7 +146,7 @@ describe('CocktailsPage', () => {
     render(<CocktailsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('common.noResults')).toBeInTheDocument();
+      expect(screen.getByText('No results')).toBeInTheDocument();
     });
   });
 
@@ -136,10 +158,10 @@ describe('CocktailsPage', () => {
     });
 
     // Mojito: 5 doses (green badge)
-    expect(screen.getByText('cocktails.doses')).toBeInTheDocument();
+    expect(screen.getByText('5 servings')).toBeInTheDocument();
 
     // Negroni: unavailable (red badge)
-    expect(screen.getByText('cocktails.unavailable')).toBeInTheDocument();
+    expect(screen.getByText('Unavailable')).toBeInTheDocument();
   });
 
   it('still lists cocktails, without availability badges, when availability fails to load', async () => {
@@ -148,26 +170,26 @@ describe('CocktailsPage', () => {
     render(<CocktailsPage />);
 
     await screen.findAllByText('Mojito');
-    const retry = await screen.findByRole('button', { name: 'common.retry' });
+    const retry = await screen.findByRole('button', { name: 'Retry' });
     mockApiResponse('get', '/api/availability/cocktails', mockAvailabilities);
     await user.click(retry);
 
-    expect(await screen.findByText('cocktails.doses')).toBeInTheDocument();
-    expect(screen.getByText('cocktails.unavailable')).toBeInTheDocument();
+    expect(await screen.findByText('5 servings')).toBeInTheDocument();
+    expect(screen.getByText('Unavailable')).toBeInTheDocument();
   });
 
   it('hides availability while it reloads after an import', async () => {
     const user = userEvent.setup();
     render(<CocktailsPage />);
-    expect(await screen.findByText('cocktails.doses')).toBeInTheDocument();
+    expect(await screen.findByText('5 servings')).toBeInTheDocument();
 
     const releaseReload = holdApiResponse('get', '/api/availability/cocktails', mockAvailabilities);
-    await user.click(screen.getByText('cocktails.import'));
+    await user.click(screen.getByText('Import'));
     await user.click(screen.getByText('close'));
 
-    expect(screen.queryByText('cocktails.doses')).not.toBeInTheDocument();
+    expect(screen.queryByText('5 servings')).not.toBeInTheDocument();
     releaseReload();
-    expect(await screen.findByText('cocktails.doses')).toBeInTheDocument();
+    expect(await screen.findByText('5 servings')).toBeInTheDocument();
   });
 
   it('shows missing ingredients warning on unavailable cocktails', async () => {
@@ -188,11 +210,11 @@ describe('CocktailsPage', () => {
       expect(screen.getByText('Mojito')).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText('cocktails.batchExport'));
+    await user.click(screen.getByText('Batch export'));
 
     // Select all checkbox and export ZIP button should appear
-    expect(screen.getByText('cocktails.selectAll')).toBeInTheDocument();
-    expect(screen.getByText(/cocktails.exportZip/)).toBeInTheDocument();
+    expect(screen.getByText('Select all')).toBeInTheDocument();
+    expect(screen.getByText(/Export ZIP \(.+\)/)).toBeInTheDocument();
 
     // Card checkboxes should be visible (one per cocktail card)
     const checkboxes = screen.getAllByRole('checkbox');
@@ -206,17 +228,17 @@ describe('CocktailsPage', () => {
     mockCocktails([mojito, negroni, daiquiri]);
     render(<CocktailsPage />);
 
-    const search = await screen.findByPlaceholderText('common.search');
+    const search = await screen.findByPlaceholderText('Search...');
     await screen.findByText('Daiquiri');
     await user.type(search, 'rum citron');
     expect(screen.queryByText('Daiquiri')).not.toBeInTheDocument();
 
-    await user.click(screen.getByText('cocktails.batchExport'));
-    const selectAll = screen.getByLabelText('cocktails.selectAll');
+    await user.click(screen.getByText('Batch export'));
+    const selectAll = screen.getByLabelText('Select all');
     await user.click(selectAll);
     expect(selectAll).toBeChecked();
 
-    await user.click(screen.getByText(/cocktails.exportZip/));
+    await user.click(screen.getByText(/Export ZIP \(.+\)/));
 
     await waitFor(() => {
       expect(exportCocktailsAsZip).toHaveBeenCalledWith([1]);
@@ -228,15 +250,15 @@ describe('CocktailsPage', () => {
     render(<CocktailsPage />);
 
     await screen.findByText('Negroni');
-    await user.click(screen.getByText('cocktails.batchExport'));
+    await user.click(screen.getByText('Batch export'));
 
     // Select Negroni while it is visible, then filter it out
     const negroniCard = screen.getByText('Negroni').closest('div.rounded-xl');
     if (!(negroniCard instanceof HTMLElement)) throw new Error('No card for Negroni');
     await user.click(negroniCard);
 
-    await user.type(screen.getByPlaceholderText('common.search'), 'rum citron');
-    const selectAll = screen.getByLabelText('cocktails.selectAll');
+    await user.type(screen.getByPlaceholderText('Search...'), 'rum citron');
+    const selectAll = screen.getByLabelText('Select all');
     expect(selectAll).not.toBeChecked();
 
     await user.click(selectAll);
@@ -245,7 +267,7 @@ describe('CocktailsPage', () => {
     expect(selectAll).not.toBeChecked();
 
     // Negroni stays selected: the export button still counts one cocktail
-    await user.click(screen.getByText(/cocktails.exportZip/));
+    await user.click(screen.getByText(/Export ZIP \(.+\)/));
     await waitFor(() => {
       expect(exportCocktailsAsZip).toHaveBeenCalledWith([2]);
     });
@@ -257,7 +279,7 @@ describe('CocktailsPage', () => {
 
     expect(screen.queryByTestId('import-wizard')).not.toBeInTheDocument();
 
-    await user.click(screen.getByText('cocktails.import'));
+    await user.click(screen.getByText('Import'));
 
     expect(screen.getByTestId('import-wizard')).toBeInTheDocument();
 
@@ -278,7 +300,7 @@ describe('CocktailsPage', () => {
     const cocktailsReloaded = captureRequest('get', '/api/cocktails');
     const availabilityReloaded = captureRequest('get', '/api/availability/cocktails');
 
-    await user.click(screen.getByText('cocktails.import'));
+    await user.click(screen.getByText('Import'));
     await user.click(screen.getByText('close'));
 
     const refreshed = invalidate.mock.calls.map(([filters]) => filters?.queryKey);
@@ -303,14 +325,18 @@ describe('CocktailsPage', () => {
     const deleted = captureRequest('delete', '/api/cocktails/:id');
     const reloaded = captureRequest('get', '/api/cocktails');
 
-    await user.click(screen.getAllByRole('button', { name: 'common.delete' })[0]);
-    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.cancel' }));
+    await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }),
+    );
     expect(deleted.count()).toBe(0);
 
-    await user.click(screen.getAllByRole('button', { name: 'common.delete' })[0]);
-    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.delete' }));
+    await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }),
+    );
 
-    expect(await screen.findByText('cocktails.deleted')).toBeInTheDocument();
+    expect(await screen.findByText('Cocktail deleted')).toBeInTheDocument();
     expect((await deleted.url).pathname).toBe('/api/cocktails/1');
     await waitFor(() => expect(reloaded.count()).toBe(1));
   });
@@ -321,9 +347,9 @@ describe('CocktailsPage', () => {
     render(<CocktailsPage />);
     await screen.findByText('Mojito');
 
-    await user.click(screen.getByText('cocktails.batchExport'));
+    await user.click(screen.getByText('Batch export'));
     await user.click(screen.getByRole('checkbox', { name: 'Mojito' }));
-    await user.click(screen.getByText(/cocktails.exportZip/));
+    await user.click(screen.getByText(/Export ZIP \(.+\)/));
 
     expect(await screen.findByText('Export failed')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Mojito' })).toBeChecked();
@@ -334,10 +360,10 @@ describe('CocktailsPage', () => {
     render(<CocktailsPage />);
     await screen.findByText('Mojito');
 
-    await user.click(screen.getByText('cocktails.batchExport'));
+    await user.click(screen.getByText('Batch export'));
     await user.click(screen.getByRole('checkbox', { name: 'Mojito' }));
-    await user.click(screen.getByRole('button', { name: 'common.cancel' }));
-    await user.click(screen.getByText('cocktails.batchExport'));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByText('Batch export'));
 
     expect(screen.getByRole('checkbox', { name: 'Mojito' })).not.toBeChecked();
   });
@@ -346,11 +372,11 @@ describe('CocktailsPage', () => {
     const user = userEvent.setup();
     render(<CocktailsPage />);
     await screen.findByText('Mojito');
-    await user.click(screen.getByRole('button', { name: 'cocktails.viewList' }));
-    await user.click(screen.getByText('cocktails.batchExport'));
+    await user.click(screen.getByRole('button', { name: 'List view' }));
+    await user.click(screen.getByText('Batch export'));
 
     await user.click(screen.getByText('Negroni'));
-    await user.click(screen.getByText(/cocktails.exportZip/));
+    await user.click(screen.getByText(/Export ZIP \(.+\)/));
 
     await waitFor(() => {
       expect(exportCocktailsAsZip).toHaveBeenCalledWith([2]);
@@ -364,12 +390,21 @@ describe('CocktailsPage', () => {
         ...mockAvailabilities[1],
         lowStock: [{ name: 'Rum', nameTranslations: null, servings: 2 }],
         ingredients: [
-          { ...missingLine(1, 'Mint'), },
+          { ...missingLine(1, 'Mint') },
           { ...missingLine(2, 'Lime') },
           { ...missingLine(3, 'Soda') },
           {
-            cocktailIngredientId: 4, sourceType: 'CATEGORY', name: 'White rum', nameTranslations: null, orphan: false,
-            icon: null, quantity: 5, unit: 'cl', isAvailable: true, availableCount: 5, preferredAvailable: false,
+            cocktailIngredientId: 4,
+            sourceType: 'CATEGORY',
+            name: 'White rum',
+            nameTranslations: null,
+            orphan: false,
+            icon: null,
+            quantity: 5,
+            unit: 'cl',
+            isAvailable: true,
+            availableCount: 5,
+            preferredAvailable: false,
           },
         ],
       },
@@ -377,19 +412,23 @@ describe('CocktailsPage', () => {
     render(<CocktailsPage />);
 
     expect(await screen.findByText('White rum')).toBeInTheDocument();
-    expect(screen.getByText('⚠️ cocktails.noPreferredAvailable')).toBeInTheDocument();
-    expect(screen.getByText('⚠️ cocktails.lowStock')).toBeInTheDocument();
-    expect(screen.getByText('cocktails.lowStockItem')).toBeInTheDocument();
-    expect(screen.getByText('cocktails.moreMissing')).toBeInTheDocument();
+    expect(screen.getByText('⚠️ No preferred bottle available')).toBeInTheDocument();
+    expect(screen.getByText('⚠️ Low stock')).toBeInTheDocument();
+    expect(screen.getByText('Rum: only 2 servings left')).toBeInTheDocument();
+    expect(screen.getByText('+1 more')).toBeInTheDocument();
   });
 
   it('filters the cocktails by tag, ignoring case', async () => {
     const user = userEvent.setup();
-    mockCocktails([mojito, { ...negroni, tags: 'Bitter, RUM' }, buildCocktail({ id: 3, name: 'Spritz', tags: 'bitter' })]);
+    mockCocktails([
+      mojito,
+      { ...negroni, tags: 'Bitter, RUM' },
+      buildCocktail({ id: 3, name: 'Spritz', tags: 'bitter' }),
+    ]);
     render(<CocktailsPage />);
     await screen.findByText('Spritz');
 
-    await user.click(screen.getByRole('button', { name: 'cocktails.filterByTags' }));
+    await user.click(screen.getByRole('button', { name: 'Filter by tags' }));
     await user.click(screen.getByRole('checkbox', { name: 'rum' }));
 
     expect(screen.getByText('Mojito')).toBeInTheDocument();
@@ -401,8 +440,8 @@ describe('CocktailsPage', () => {
     const user = userEvent.setup();
     render(<CocktailsPage />);
     await screen.findByText('Mojito');
-    await user.click(screen.getByRole('button', { name: 'cocktails.viewList' }));
-    await user.click(screen.getByText('cocktails.batchExport'));
+    await user.click(screen.getByRole('button', { name: 'List view' }));
+    await user.click(screen.getByText('Batch export'));
 
     const checkbox = screen.getByRole('checkbox', { name: 'Mojito' });
     await user.click(checkbox);
@@ -416,7 +455,7 @@ describe('CocktailsPage', () => {
     mockNetworkError('get', '/api/cocktails');
     render(<CocktailsPage />);
 
-    const retry = await screen.findByRole('button', { name: 'common.retry' });
+    const retry = await screen.findByRole('button', { name: 'Retry' });
     mockCocktails([mojito, negroni]);
     await user.click(retry);
 

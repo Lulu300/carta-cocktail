@@ -9,9 +9,21 @@ async function main() {
 
   // Seed default CategoryTypes
   const defaultCategoryTypes = [
-    { name: 'SPIRIT', nameTranslations: JSON.stringify({ fr: 'Alcool', en: 'Spirit' }), color: 'blue' },
-    { name: 'SYRUP', nameTranslations: JSON.stringify({ fr: 'Sirop', en: 'Syrup' }), color: 'purple' },
-    { name: 'SOFT', nameTranslations: JSON.stringify({ fr: 'Sans alcool', en: 'Non-alcoholic' }), color: 'green' },
+    {
+      name: 'SPIRIT',
+      nameTranslations: JSON.stringify({ fr: 'Alcool', en: 'Spirit' }),
+      color: 'blue',
+    },
+    {
+      name: 'SYRUP',
+      nameTranslations: JSON.stringify({ fr: 'Sirop', en: 'Syrup' }),
+      color: 'purple',
+    },
+    {
+      name: 'SOFT',
+      nameTranslations: JSON.stringify({ fr: 'Sans alcool', en: 'Non-alcoholic' }),
+      color: 'green',
+    },
   ];
   for (const ct of defaultCategoryTypes) {
     await prisma.categoryType.upsert({

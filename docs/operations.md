@@ -1,6 +1,6 @@
 # Guide d'exploitation
 
-Ce guide décrit l'exploitation de Carta Cocktail v1.18 avec les images publiées (`docker-compose.prod.yml`) : installation, sauvegardes, mises à jour, retour arrière, secrets et HTTPS. Les commandes se lancent depuis le dossier qui contient `docker-compose.prod.yml` et `.env`.
+Ce guide décrit l'exploitation de Carta Cocktail v1.19 avec les images publiées (`docker-compose.prod.yml`) : installation, sauvegardes, mises à jour, retour arrière, secrets et HTTPS. Les commandes se lancent depuis le dossier qui contient `docker-compose.prod.yml` et `.env`.
 
 Références :
 
@@ -22,14 +22,14 @@ Références :
 
    ```bash
    mkdir carta-cocktail && cd carta-cocktail
-   curl -fsSLO https://raw.githubusercontent.com/Lulu300/carta-cocktail/v1.18.0/docker-compose.prod.yml
+   curl -fsSLO https://raw.githubusercontent.com/Lulu300/carta-cocktail/v1.19.0/docker-compose.prod.yml
    ```
 
-2. Épingler la version : dans `docker-compose.prod.yml`, remplacer `:latest` par `:1.18` sur les deux lignes `image:`. `:1.18` suit les correctifs 1.18.x ; `:1.18.0` ne bouge jamais. Avec `:latest`, un `pull` peut installer une version dont vous n'avez pas lu les actions obligatoires.
+2. Épingler la version : dans `docker-compose.prod.yml`, remplacer `:latest` par `:1.19` sur les deux lignes `image:`. `:1.19` suit les correctifs 1.19.x ; `:1.19.0` ne bouge jamais. Avec `:latest`, un `pull` peut installer une version dont vous n'avez pas lu les actions obligatoires.
 
    ```yaml
-   image: ghcr.io/lulu300/carta-cocktail/backend:1.18
-   image: ghcr.io/lulu300/carta-cocktail/frontend:1.18
+   image: ghcr.io/lulu300/carta-cocktail/backend:1.19
+   image: ghcr.io/lulu300/carta-cocktail/frontend:1.19
    ```
 
 3. Créer `.env` à côté du fichier compose. `JWT_SECRET` (32 caractères au moins) et `ADMIN_PASSWORD` (12 caractères au moins) sont obligatoires : `docker compose` refuse de démarrer sans `JWT_SECRET`, et le backend refuse un secret trop court ou connu.
@@ -58,7 +58,7 @@ Références :
    curl -s http://localhost/api/health
    ```
 
-   Réponse attendue : `{"status":"ok","version":"1.18.0"}`. Le site répond sur le port 80 de l'hôte. Pour un autre port, changer `"80:8080"` en `"<port>:8080"` dans le service `carta-cocktail-frontend` : nginx écoute sur 8080 dans le conteneur.
+   Réponse attendue : `{"status":"ok","version":"1.19.0"}`. Le site répond sur le port 80 de l'hôte. Pour un autre port, changer `"80:8080"` en `"<port>:8080"` dans le service `carta-cocktail-frontend` : nginx écoute sur 8080 dans le conteneur.
 
 Le backend tourne sous l'uid 1000, le frontend (nginx) sous l'uid 101. Les volumes nommés n'ont besoin de rien. Pour des dossiers de l'hôte ou un partage réseau (SMB/NFS) à la place des volumes, voir [README › "Data folders and the node user"](../README.md#data-folders-and-the-node-user) et `SQLITE_WAL=false` dans [README › "Database files and network shares"](../README.md#database-files-and-network-shares).
 
@@ -117,7 +117,7 @@ L'archive restaure les fichiers avec leur propriétaire d'origine (uid 1000). Un
 Dans Paramètres > Sauvegarde & Restauration (Settings > Backup & Restore) :
 
 - **Exporter la sauvegarde** télécharge un ZIP : une copie cohérente de la base, prise sans arrêter le backend, et toutes les photos. Le backend reste disponible.
-- **Restaurer une sauvegarde** remplace la base et les photos par celles du ZIP.
+- **Restaurer une sauvegarde** remplace la base et les photos par celles du ZIP. Les photos d'une sauvegarde plus ancienne n'ont pas encore leurs copies réduites (WebP pour la carte, JPEG pour les aperçus de liens) : le backend les crée en arrière-plan juste après, et la carte affiche la photo d'origine en attendant.
 
 > **Attention : destructif.** La restauration remplace **toutes** les données actuelles. Le backend garde une copie de la base remplacée dans `/app/data/backups/pre-restore-<date>.db`, mais pas des photos : exportez d'abord une sauvegarde.
 
@@ -166,7 +166,7 @@ Pensez à mettre à jour `CARTA_PASSWORD` quand vous changez le mot de passe adm
 
 1. Lire les sections d'[`UPGRADING.md`](../UPGRADING.md) de toutes les versions entre la vôtre et la nouvelle, et faire leurs actions « Before upgrading ». Ce guide ne les recopie pas.
 2. Sauvegarder : export depuis l'admin, ou [sauvegarde à froid](#sauvegarde-à-froid-des-volumes).
-3. Changer le tag des deux lignes `image:` de `docker-compose.prod.yml` (par exemple `:1.17` → `:1.18`). Avec un tag `:X.Y`, les correctifs de la même mineure arrivent par un simple `pull`. Si la version demande un nouveau fichier compose, téléchargez celui de son tag et remettez-y vos modifications (port, volumes). Les variables facultatives (`SQLITE_WAL`, `TRUST_PROXY`, limites de débit…) restent dans `.env` : si vous les aviez ajoutées à la liste `environment` d'un fichier compose de la v1.15.0 ou plus ancien, mettez-les dans `.env` au lieu de les remettre dans le nouveau fichier.
+3. Changer le tag des deux lignes `image:` de `docker-compose.prod.yml` (par exemple `:1.18` → `:1.19`). Avec un tag `:X.Y`, les correctifs de la même mineure arrivent par un simple `pull`. Si la version demande un nouveau fichier compose, téléchargez celui de son tag et remettez-y vos modifications (port, volumes). Les variables facultatives (`SQLITE_WAL`, `TRUST_PROXY`, limites de débit…) restent dans `.env` : si vous les aviez ajoutées à la liste `environment` d'un fichier compose de la v1.15.0 ou plus ancien, mettez-les dans `.env` au lieu de les remettre dans le nouveau fichier.
 4. Télécharger et redémarrer :
 
    ```bash
@@ -262,6 +262,34 @@ carte.monbar.fr {
 - **Aperçus de liens** : renseignez `PUBLIC_BASE_URL=https://carte.monbar.fr` dans `.env`, puis recréez le backend. Les aperçus d'une carte partagée dans une messagerie (titre, description, photo) ont besoin d'adresses absolues, et derrière le proxy le backend ne voit que `http`.
 - **HSTS** s'active sur le proxy, ou dans le conteneur (ligne `Strict-Transport-Security` en commentaire de `frontend/security-headers.conf`) une fois HTTPS en place devant lui, jamais quand le site est servi en HTTP. Une fois activé, les navigateurs refusent le HTTP pour ce domaine pendant toute la durée de `max-age` : activez-le quand HTTPS fonctionne.
 - Ne publiez pas le port 3001 du backend : nginx l'atteint par le réseau compose (`docker-compose.prod.yml` ne le publie pas).
+- Le reverse proxy ne doit pas mettre en cache `/sw.js` : il transmet tel quel son `Cache-Control: no-cache` (voir [Carte hors ligne](#carte-hors-ligne-et-installation)).
+
+## Carte hors ligne et installation
+
+Le frontend installe un service worker (`/sw.js`) dans le navigateur des invités. Une fois la carte ouverte, elle se rouvre sans réseau : l'application publique, les cartes et les fiches cocktail déjà consultées, et leurs photos. Elle s'installe aussi sur l'écran d'accueil (« Ajouter à l'écran d'accueil »), avec l'icône de l'application.
+
+- **HTTPS obligatoire.** Les navigateurs n'activent un service worker qu'en HTTPS, ou sur `localhost`. Une instance servie en HTTP sur une adresse du réseau local (`http://192.168.1.10`) fonctionne comme avant, sans mode hors ligne ni installation : voir [HTTPS](#https).
+- **Données à jour.** Les réponses de `/api/public/` viennent du réseau quand il répond en moins de 3 secondes, du cache sinon. Aucune autre route `/api/` n'est gardée, et l'admin connecté lit toujours le serveur : ses requêtes portent son jeton, que le service worker laisse passer sans les garder. Les pages `/admin` et `/login` se chargent toujours depuis le serveur.
+- **Mise à jour.** Après une mise à jour de l'instance, le navigateur trouve le nouveau `/sw.js` au chargement suivant d'une page : le nouveau service worker prend la main, dans tous les onglets du site. Une page publique se recharge d'elle-même sur la nouvelle version. Une page de l'admin ou de connexion ne se recharge pas, pour ne pas perdre une saisie en cours : elle affiche « Une nouvelle version est disponible » avec un bouton « Recharger ». nginx sert `/sw.js` avec `Cache-Control: no-cache` pour qu'aucun cache ne garde l'ancien.
+
+### Désinscrire un service worker bloqué
+
+Si un navigateur reste sur une ancienne version ou affiche une page cassée que le rechargement ne corrige pas :
+
+1. Vérifier que le serveur sert la bonne version : `curl -sI http://localhost/sw.js` répond `200` avec `Cache-Control: no-cache`. Un reverse proxy ou un CDN qui le met en cache bloque la mise à jour pour tous les invités : corrigez sa configuration, puis rechargez la page.
+2. Sur le navigateur concerné, effacer les données du site, ce qui désinscrit le service worker et vide ses caches :
+   - **Chrome, Edge (ordinateur)** : outils de développement (F12) > Application > Storage > « Clear site data ». Ou `chrome://serviceworker-internals` > « Unregister » sur la ligne du site ;
+   - **Firefox** : `about:serviceworkers` > « Unregister », puis Paramètres > Vie privée et sécurité > Cookies et données de sites > Gérer les données > supprimer le site ;
+   - **Chrome Android** : Paramètres > Paramètres des sites > Tous les sites > le site > « Effacer et réinitialiser » ;
+   - **Safari iOS et iPadOS** : Réglages > Apps > Safari > Avancé > Données de sites web > supprimer le site (sur iOS 17 et plus ancien : Réglages > Safari > Avancé). Une carte ajoutée à l'écran d'accueil garde ses propres données : supprimez l'icône, puis ajoutez-la de nouveau.
+3. Recharger la page : elle vient du serveur, et un nouveau service worker s'installe.
+
+Depuis la console du navigateur (F12 > Console, sur une page du site), ces deux lignes font la même chose que l'étape 2 :
+
+```js
+navigator.serviceWorker.getRegistrations().then((list) => list.forEach((r) => r.unregister()));
+caches.keys().then((names) => names.forEach((name) => caches.delete(name)));
+```
 
 ## Mise à jour depuis une ancienne version
 

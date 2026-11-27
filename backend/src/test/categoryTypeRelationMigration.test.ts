@@ -83,7 +83,9 @@ describe('category_type_relation migration', () => {
 
     expect(await select(ALL_CATEGORIES)).toEqual(categoriesBefore);
     expect(await select('SELECT "categoryId" FROM "Bottle"')).toEqual([{ categoryId: 2 }]);
-    expect(await select('SELECT "categoryId" FROM "CocktailIngredient"')).toEqual([{ categoryId: 2 }]);
+    expect(await select('SELECT "categoryId" FROM "CocktailIngredient"')).toEqual([
+      { categoryId: 2 },
+    ]);
     expect(await select('PRAGMA foreign_key_check')).toEqual([]);
     expect(await select('PRAGMA integrity_check')).toEqual([{ integrity_check: 'ok' }]);
   });
@@ -102,16 +104,20 @@ describe('category_type_relation migration', () => {
   it('should refuse a category of an unknown type and the deletion of a used type', async () => {
     await migrate();
 
-    await expect(run(`INSERT INTO "Category" ("name", "type") VALUES ('Tonic', 'MIXER')`))
-      .rejects.toThrow('ForeignKeyConstraintViolation');
-    await expect(run(`DELETE FROM "CategoryType" WHERE "name" = 'JUICE'`))
-      .rejects.toThrow('ForeignKeyConstraintViolation');
+    await expect(
+      run(`INSERT INTO "Category" ("name", "type") VALUES ('Tonic', 'MIXER')`),
+    ).rejects.toThrow('ForeignKeyConstraintViolation');
+    await expect(run(`DELETE FROM "CategoryType" WHERE "name" = 'JUICE'`)).rejects.toThrow(
+      'ForeignKeyConstraintViolation',
+    );
   });
 
   it('should carry a type rename to its categories', async () => {
     await migrate();
 
-    await db.executeScript(`UPDATE "CategoryType" SET "name" = 'FRUIT JUICE' WHERE "name" = 'JUICE'`);
+    await db.executeScript(
+      `UPDATE "CategoryType" SET "name" = 'FRUIT JUICE' WHERE "name" = 'JUICE'`,
+    );
 
     expect(await select('SELECT "id", "type" FROM "Category" ORDER BY "id"')).toEqual([
       { id: 1, type: 'SPIRIT' },

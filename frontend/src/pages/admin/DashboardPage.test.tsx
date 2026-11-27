@@ -4,8 +4,19 @@ import { render, screen, waitFor, within } from '../../test/test-utils';
 import AdminLayout from '../../components/layout/AdminLayout';
 import { AppProviders } from '../../test/appProviders';
 import { createQueryClient } from '../../queries/queryClient';
-import { buildBottle, buildCategory, buildCocktail, buildMenu, buildShortage } from '../../test/factories';
-import { captureRequest, mockApiError, mockApiPending, mockApiResponse } from '../../test/msw/utils';
+import {
+  buildBottle,
+  buildCategory,
+  buildCocktail,
+  buildMenu,
+  buildShortage,
+} from '../../test/factories';
+import {
+  captureRequest,
+  mockApiError,
+  mockApiPending,
+  mockApiResponse,
+} from '../../test/msw/utils';
 import DashboardPage from './DashboardPage';
 
 afterEach(() => {
@@ -15,11 +26,32 @@ afterEach(() => {
 
 const getCard = (label: RegExp) => screen.getByRole('link', { name: label });
 
-function mockCounts(counts: { categories: number; bottles: number; cocktails: number; menus: number }) {
-  mockApiResponse('get', '/api/categories', Array.from({ length: counts.categories }, () => buildCategory()));
-  mockApiResponse('get', '/api/bottles', Array.from({ length: counts.bottles }, () => buildBottle()));
-  mockApiResponse('get', '/api/cocktails', Array.from({ length: counts.cocktails }, () => buildCocktail()));
-  mockApiResponse('get', '/api/menus', Array.from({ length: counts.menus }, () => buildMenu()));
+function mockCounts(counts: {
+  categories: number;
+  bottles: number;
+  cocktails: number;
+  menus: number;
+}) {
+  mockApiResponse(
+    'get',
+    '/api/categories',
+    Array.from({ length: counts.categories }, () => buildCategory()),
+  );
+  mockApiResponse(
+    'get',
+    '/api/bottles',
+    Array.from({ length: counts.bottles }, () => buildBottle()),
+  );
+  mockApiResponse(
+    'get',
+    '/api/cocktails',
+    Array.from({ length: counts.cocktails }, () => buildCocktail()),
+  );
+  mockApiResponse(
+    'get',
+    '/api/menus',
+    Array.from({ length: counts.menus }, () => buildMenu()),
+  );
 }
 
 describe('DashboardPage', () => {
@@ -29,7 +61,7 @@ describe('DashboardPage', () => {
     // Production client: its stale time is what this test is about
     const queryClient = createQueryClient();
     const staleTime = Number(queryClient.getDefaultOptions().queries?.staleTime);
-    const getCategoriesCard = () => getCard(/dashboard\.stats\.categories/);
+    const getCategoriesCard = () => getCard(/Categories/);
 
     const firstVisit = render(<DashboardPage />, { queryClient });
     await waitFor(() => expect(screen.queryAllByRole('status')).toHaveLength(0));
@@ -57,12 +89,12 @@ describe('DashboardPage', () => {
 
     render(<DashboardPage />);
 
-    expect(screen.getByRole('heading', { name: 'dashboard.title' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
     const cards = [
-      { label: /dashboard\.stats\.categories/, count: '3', path: '/admin/categories' },
-      { label: /dashboard\.stats\.bottles/, count: '2', path: '/admin/bottles' },
-      { label: /dashboard\.stats\.cocktails/, count: '4', path: '/admin/cocktails' },
-      { label: /dashboard\.stats\.menus/, count: '1', path: '/admin/menus' },
+      { label: /Categories/, count: '3', path: '/admin/categories' },
+      { label: /Bottles/, count: '2', path: '/admin/bottles' },
+      { label: /Cocktails/, count: '4', path: '/admin/cocktails' },
+      { label: /Menus/, count: '1', path: '/admin/menus' },
     ];
     for (const card of cards) {
       expect(await within(getCard(card.label)).findByText(card.count)).toBeInTheDocument();
@@ -75,7 +107,7 @@ describe('DashboardPage', () => {
 
     render(<DashboardPage />);
 
-    const alert = await screen.findByRole('link', { name: /dashboard\.shortageAlert/ });
+    const alert = await screen.findByRole('link', { name: /2 shortages detected/ });
     expect(alert).toHaveAttribute('href', '/admin/shortages');
   });
 
@@ -83,7 +115,7 @@ describe('DashboardPage', () => {
     render(<DashboardPage />);
 
     await waitFor(() => expect(screen.queryAllByRole('status')).toHaveLength(0));
-    expect(screen.queryByText(/dashboard\.shortageAlert/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/2 shortages detected/)).not.toBeInTheDocument();
   });
 
   it('shows a spinner, not 0, on each card while its count loads', () => {
@@ -103,11 +135,11 @@ describe('DashboardPage', () => {
 
     render(<DashboardPage />);
 
-    const bottlesCard = getCard(/dashboard\.stats\.bottles/);
-    expect(await within(bottlesCard).findByText('common.error')).toBeInTheDocument();
+    const bottlesCard = getCard(/Bottles/);
+    expect(await within(bottlesCard).findByText('An error occurred')).toBeInTheDocument();
     expect(within(bottlesCard).getByText('–')).toBeInTheDocument();
     expect(within(bottlesCard).queryByText('0')).not.toBeInTheDocument();
-    expect(within(getCard(/dashboard\.stats\.categories/)).getByText('3')).toBeInTheDocument();
+    expect(within(getCard(/Categories/)).getByText('3')).toBeInTheDocument();
   });
 
   it('sends a single shortages request when rendered inside AdminLayout', async () => {
@@ -127,7 +159,7 @@ describe('DashboardPage', () => {
 
     // Layout badge and dashboard alert both show the count from the same request
     await waitFor(() => {
-      expect(screen.getAllByText(/dashboard\.shortageAlert/)).toHaveLength(2);
+      expect(screen.getAllByText(/1 shortage detected/)).toHaveLength(2);
     });
     expect(shortagesRequests.count()).toBe(1);
     await waitFor(() => expect(document.title).toBe('Carta'));

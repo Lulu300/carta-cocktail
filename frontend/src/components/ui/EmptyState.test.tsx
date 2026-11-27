@@ -23,4 +23,26 @@ describe('EmptyState', () => {
     expect(screen.getByText('Create your first cocktail')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create' })).toBeInTheDocument();
   });
+
+  it('puts the title attributes on the title alone, so an alert does not announce the action', () => {
+    render(
+      <EmptyState
+        title="Failed"
+        titleProps={{ role: 'alert', tabIndex: -1 }}
+        action={<button type="button">Retry</button>}
+      />,
+    );
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent(/^Failed$/);
+    expect(alert).toHaveAttribute('tabindex', '-1');
+    expect(alert).toHaveClass('text-lg');
+  });
+
+  it('puts the other attributes on the container', () => {
+    render(<EmptyState title="Failed" data-testid="empty" role="region" />);
+
+    expect(screen.getByTestId('empty')).toHaveAttribute('role', 'region');
+    expect(screen.getByText('Failed')).not.toHaveAttribute('role');
+  });
 });

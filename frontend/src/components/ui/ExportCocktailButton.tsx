@@ -1,5 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { cocktails as cocktailsApi, publicApi } from '../../services/api';
+import { toast } from './ToastStore';
+import { downloadBlob } from '../../utils/downloadBlob';
 
 interface ExportCocktailButtonProps {
   cocktailId: number;
@@ -7,7 +9,11 @@ interface ExportCocktailButtonProps {
   className?: string;
 }
 
-export default function ExportCocktailButton({ cocktailId, isPublic, className }: ExportCocktailButtonProps) {
+export default function ExportCocktailButton({
+  cocktailId,
+  isPublic,
+  className,
+}: ExportCocktailButtonProps) {
   const { t } = useTranslation();
 
   const handleExport = async (e: React.MouseEvent) => {
@@ -20,16 +26,9 @@ export default function ExportCocktailButton({ cocktailId, isPublic, className }
 
       const json = JSON.stringify(data, null, 2);
       const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, filename);
     } catch (error) {
-      console.error('Export failed:', error);
+      toast.error(error);
     }
   };
 
@@ -40,7 +39,12 @@ export default function ExportCocktailButton({ cocktailId, isPublic, className }
       className={className || 'text-gray-400 hover:text-amber-400 text-sm transition-colors'}
     >
       <svg className="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+        />
       </svg>
     </button>
   );

@@ -2,7 +2,7 @@
 
 ## Overview
 
-React 19 SPA with Vite 8, TailwindCSS 4, React Router 7, and react-i18next. Dark theme UI with admin panel and public menu display.
+React 19 SPA with Vite 8, TailwindCSS 4, React Router 7, and react-i18next. Dark UI with an admin panel and a public menu display. The public menu also has a light theme, picked by each guest with `ThemeToggle` (`localStorage` key `theme`, applied to `<html data-theme>` by `utils/theme.ts` and, before the first paint, by `public/theme-init.js`: a file, as the CSP forbids inline scripts). The light tokens are in `index.css`; the admin side never gets them. New public colors go through the tokens, never `text-white` or `text-gray-*`.
 
 ## Development Workflow
 
@@ -17,7 +17,7 @@ Before committing any change:
 7. **Verify coverage thresholds are met**: `npm test -- --coverage`
 8. Commit, push, open PR to `develop`
 
-CI runs automatically on PRs (`Frontend` job of `.github/workflows/ci.yml`): `npm audit --omit=dev --audit-level=high` → `tsc -b` → lint → build → bundle budget (140 kB gzip for the first load of the public menu, `.github/scripts/bundle-budget.mjs`) → CSS media queries readable by Safari 16 → tests with coverage → delta coverage (80%). The `Docker build (frontend)` job builds the nginx image, and the `Smoke` workflow starts it with the backend (see the root `AGENTS.md`).
+CI runs automatically on PRs (`Frontend` job of `.github/workflows/ci.yml`): `npm audit --omit=dev --audit-level=high` → `tsc -b` → lint → build → bundle budget (140 kB gzip for the first load of the public menu, and no admin code in the service worker precache, `.github/scripts/bundle-budget.mjs`) → CSS media queries readable by Safari 16 → tests with coverage → delta coverage (80%). The `Docker build (frontend)` job builds the nginx image, and the `Smoke` workflow starts it with the backend (see the root `AGENTS.md`).
 
 ## Testing Requirements
 
@@ -33,14 +33,15 @@ CI runs automatically on PRs (`Frontend` job of `.github/workflows/ci.yml`): `np
 
 - Test files live next to their source: `utils/colors.test.ts`, `pages/admin/BottlesPage.test.tsx`
 - Use the shared test utilities from `src/test/test-utils.tsx` (custom render with BrowserRouter)
-- Setup file `src/test/setup.ts` provides jest-dom matchers, i18n mock, and matchMedia mock, starts the MSW server and resets handlers, factory ids and `localStorage` after each test
+- Setup file `src/test/setup.ts` provides jest-dom matchers and a matchMedia mock, loads the real i18next instance, starts the MSW server and resets handlers, factory ids and `localStorage` after each test
+- i18n is the real instance, loaded as the app has it once the admin is open (`i18n/index.ts` and `i18n/admin.ts`, so both bundles), in English at the start of each test: never mock `react-i18next`. Assertions read the English texts the user sees, by role and accessible name where possible (`getByRole('button', { name: 'Add Unit' })`), not translation keys. Props that carry a key for the component to translate (`messages: { created: 'units.created' }`) keep the key. A plural is checked with the form the test's count picks (`'1 bottle'`, `'5 bottles'`). A text shared by two elements is told apart by role, `within` or position. A test of another language switches the real instance (`await i18n.changeLanguage('fr')`, in a `beforeEach`) and reads the French texts; `setup.ts` goes back to English after each test. A key found in no bundle fails the test that displays it (`src/test/missingKeys.ts`); only `missingKeys.test.ts` may invent one. The one local mock left, `LanguageSelectorFallback.test.tsx`, fakes `i18n.language` for values the real instance never yields
 - Environment: jsdom via Vitest
 - API calls go through the real `services/api.ts` to an MSW fake backend (`src/test/msw/handlers.ts`, one default handler per endpoint). Do not `vi.mock('services/api')`: set the answers a test needs with `mockApiResponse`, `mockApiError`, `mockApiPending`, `mockNetworkError`, `holdApiResponse` (answers when the test releases it), `mockItemInUse` (a DELETE refused with the impact of an item in use, accepted with `?force=true`), and check what the page sent with `captureRequest` (`src/test/msw/utils.ts`), called after the answers of the same endpoint (MSW tries the handler added last first). A request without a handler fails the test. A stateful page (menu editors, import wizards) gets its own `server.use(...)` handlers that store the data and record each request, built with the shared `readJsonObject`, `errorResponse` and `pendingResponse` of `src/test/msw/utils.ts`
 - Build test data with the typed factories of `src/test/factories.ts` (`buildBottle`, `buildCategory`…), never with `as never` casts
 - Real providers and components rather than mocks: wrap in `AppProviders` (`src/test/appProviders.tsx`: the real `AuthProvider` and `SiteSettingsProvider`) when a page or hook reads the session or the site settings; store a token in `localStorage` for the admin case. Mock a component only when it has its own tests and the page only needs its outcome (the import wizards, `exportZip`)
 - A file download goes through `mockDownload()` (`src/test/download.ts`), which records the saved file names. `rejectNextFetch(value)` covers code that guards against a non-Error throw. Both undo their stubs when the test ends
 - Run with coverage locally: `npm test -- --coverage`
-- Under an AI agent, Vitest picks its `minimal` reporter, which hides the console of passing tests (`act(...)` warnings, `[MSW]` messages): run `npx vitest run --silent=false` to see it
+- `vitest.config.ts` pins the reporter, so the console of passing tests (`act(...)` warnings, `[MSW]` messages) shows the same under an AI agent as in a terminal or in CI (Vitest would otherwise pick its `minimal` reporter under an agent)
 - Accessibility: page tests check axe with `expect(await axe(container)).toHaveNoViolations()` (`src/test/axe.ts`, serious and critical violations only). jsdom computes no colors: contrast is checked with Lighthouse in a browser
 
 ## Structure
@@ -69,7 +70,8 @@ frontend/
 │   │   ├── import/             # Cocktail import wizard (upload, resolve, confirm) and bottle import wizard
 │   │   ├── layout/             # AdminLayout, PublicLayout, RouteErrorBoundary, SkipLink, AppVersion, BackHomeLink
 │   │   └── ui/                 # Design system: Button, Field, Input, Select, Modal, ConfirmDialog, Toaster,
-│   │                           # Pagination, SearchInput, SortableHeader, DateInput, LanguageSelector, IconButton…
+│   │                           # Pagination, SearchInput, SortableHeader, DateInput, LanguageSelector, IconButton,
+│   │                       # UploadedPhoto (cocktail photo: srcset, falls back to the photo itself)…
 │   ├── contexts/
 │   │   ├── AuthContext.tsx         # Login/logout, token management, auth state
 │   │   ├── ConfirmContext.tsx      # Confirmation dialog opened from any component
@@ -80,6 +82,7 @@ frontend/
 │   │   ├── useLocalizedName.ts    # Get localized name from translation object
 │   │   ├── usePageTitle.ts        # Tab title: page parts before the site name
 │   │   └── useSort.ts
+│   ├── pwa/                    # Service worker registration, loaded after the page (see "Progressive web app")
 │   ├── queries/                # TanStack Query: query keys (keys.ts), query client, one file per resource
 │   ├── services/
 │   │   ├── api.ts                 # Centralized API client with typed endpoints
@@ -87,7 +90,7 @@ frontend/
 │   ├── types/
 │   │   └── index.ts              # TypeScript interfaces for all entities
 │   ├── utils/                  # Pure helpers: colors, dates, localization, translations, unitConverter,
-│   │                           # cocktailSearch, uploads (photo URLs), chunkReload, bottleGrouping…
+│   │                           # cocktailSearch, uploads (photo URLs and srcset), chunkReload, bottleGrouping…
 │   ├── test/                   # Test setup, MSW fake backend (msw/), factories, providers, axe
 │   └── i18n/
 │       ├── index.ts              # i18next + browser language detector, public messages
@@ -96,6 +99,8 @@ frontend/
 │           ├── public/           # en.json, fr.json: keys used by the first load (public pages, shared components)
 │           └── admin/            # en.json, fr.json: every other key (login page and admin)
 ├── index.html                    # Vite entry page
+├── public/                       # Copied as is to dist/: app icons of the web manifest, apple-touch-icon
+├── pwa-icons/                    # SVG sources of the app icons
 ├── package.json
 ├── tsconfig.json                 # Project references only: check types with `tsc -b`
 ├── tsconfig.app.json             # src/
@@ -110,25 +115,25 @@ frontend/
 
 ## Routing
 
-| Path | Component | Access |
-|------|-----------|--------|
-| `/` | HomePage | Public |
-| `/menu/:slug` | MenuPublicPage | Public |
-| `/menu/:slug/cocktail/:id` | CocktailPublicPage | Public |
-| `/login` | LoginPage | Public |
-| `/admin` | DashboardPage | Protected |
-| `/admin/categories` | CategoriesPage | Protected |
-| `/admin/bottles` | BottlesPage | Protected |
-| `/admin/ingredients` | IngredientsPage | Protected |
-| `/admin/units` | UnitsPage | Protected |
-| `/admin/cocktails` | CocktailsPage | Protected |
-| `/admin/cocktails/new` | CocktailFormPage | Protected |
-| `/admin/cocktails/:id` | CocktailFormPage | Protected |
-| `/admin/menus` | MenusPage | Protected |
-| `/admin/menus/:id` | MenuEditPage | Protected |
+| Path                       | Component          | Access    |
+| -------------------------- | ------------------ | --------- |
+| `/`                        | HomePage           | Public    |
+| `/menu/:slug`              | MenuPublicPage     | Public    |
+| `/menu/:slug/cocktail/:id` | CocktailPublicPage | Public    |
+| `/login`                   | LoginPage          | Public    |
+| `/admin`                   | DashboardPage      | Protected |
+| `/admin/categories`        | CategoriesPage     | Protected |
+| `/admin/bottles`           | BottlesPage        | Protected |
+| `/admin/ingredients`       | IngredientsPage    | Protected |
+| `/admin/units`             | UnitsPage          | Protected |
+| `/admin/cocktails`         | CocktailsPage      | Protected |
+| `/admin/cocktails/new`     | CocktailFormPage   | Protected |
+| `/admin/cocktails/:id`     | CocktailFormPage   | Protected |
+| `/admin/menus`             | MenusPage          | Protected |
+| `/admin/menus/:id`         | MenuEditPage       | Protected |
 | `/admin/menus/:id/bottles` | MenuBottleEditPage | Protected |
-| `/admin/shortages` | ShortagesPage | Protected |
-| `/admin/settings` | SettingsPage | Protected |
+| `/admin/shortages`         | ShortagesPage      | Protected |
+| `/admin/settings`          | SettingsPage       | Protected |
 
 Protected routes use `ProtectedRoute` wrapper in `App.tsx` which checks `AuthContext`.
 
@@ -148,6 +153,7 @@ Protected routes use `ProtectedRoute` wrapper in `App.tsx` which checks `AuthCon
 ### Translation Pattern
 
 Entity names are stored as JSON translation objects. The `useLocalizedName` hook resolves the correct language:
+
 ```tsx
 const getLocalizedName = useLocalizedName();
 const name = getLocalizedName(entity.name, entity.nameTranslations);
@@ -156,6 +162,7 @@ const name = getLocalizedName(entity.name, entity.nameTranslations);
 ### Page Pattern
 
 Admin pages are self-contained with inline forms and modals. Each page:
+
 1. Reads server data through the TanStack Query hooks of `src/queries/`, which call `services/api.ts`; query keys come from `queries/keys.ts` only
 2. Manages local UI state with `useState`
 3. Uses `useTranslation()` for all UI text
@@ -177,6 +184,18 @@ Uses `@import "tailwindcss"` syntax (not `@tailwind` directives). Dark theme wit
 
 Safari and iOS 16.0+, Chrome and Edge 107+, Firefox 104+ (`build.target` in `vite.config.ts`, the targets of v1.11; Vite 8's default would require Safari 16.4). Old tablets serve as menu displays and for the admin. Do not remove the target: Tailwind writes its breakpoints as range media queries (`width>=40rem`), which Safari before 16.4 ignores, and only this target makes the minifier rewrite them as `min-width`. CI checks the built CSS with `.github/scripts/css-media-ranges.mjs`. The target lowers syntax, not APIs: guard a browser API newer than any of these targets (`URL.canParse`, `Object.groupBy`, `Promise.withResolvers`, or `Array.prototype.toSorted`: Chrome 110, Firefox 115…) or avoid it.
 
+### Progressive web app
+
+`vite-plugin-pwa` (`vite.config.ts`) writes `dist/manifest.webmanifest` and a Workbox service worker, `dist/sw.js`, in `autoUpdate` mode: a new deployment's worker takes over at once, in every tab. `src/pwa/registerServiceWorker.ts` then reloads a public page, but never an admin or login page (`ADMIN_PAGES`, `src/pwa/adminPages.ts`), where a form may be in progress: there `UpdateAvailableBanner` (`components/admin/`, rendered by `AdminLayout` and `LoginPage`) offers a Reload button, through the small store of `src/pwa/updateAvailable.ts`. `main.tsx` imports that module after the `load` event, so the first load of the public menu carries none of it, and only in production (`npm run dev` has no service worker).
+
+- **Precache**: the public shell only, listed by the `publicShell` plugin of `vite.config.ts` from the chunk graph (the entry chunk and its static imports, the registration chunk, the Latin fonts, the icons). Chunks reached through `import()` (login, admin, jszip) stay out. `bundle-budget.mjs` fails the CI if the precache holds admin code or misses a chunk of the first load.
+- **Runtime caches**: `NetworkFirst` (3 s) on `/api/public/` requests other than page loads (the link preview pages of `/api/public/share/` stay out), `CacheFirst` (200 entries, 30 days) on `/uploads/`, nothing else. A request with an `Authorization` header (the admin) is never cached nor answered from the cache. The first visit loads the menu before the worker exists: `registerServiceWorker.ts` requests those URLs again once the worker controls the page. Its list of cached paths repeats the one of `vite.config.ts`, whose matchers are copied into `sw.js` and cannot import it.
+- **Navigation**: offline, any page but `/admin`, `/login` (`ADMIN_PAGES`, also imported by `vite.config.ts`), `/api/` and `/uploads/` gets the precached `index.html`.
+- **nginx**: `/sw.js` and `/manifest.webmanifest` are served with `Cache-Control: no-cache`, the manifest as `application/manifest+json` (`nginx.conf.template`); the smoke test checks both. The CSP needs nothing more: `worker-src` and `manifest-src` fall back to `default-src 'self'`.
+- **Tests**: Vitest does not load the plugin; `vitest.config.ts` points `virtual:pwa-register` to the stand-in `src/test/pwaRegister.ts`.
+- **Icons**: `pwa-icons/icon.svg` and `maskable.svg` (the glass inside the safe zone, 80% of the width), rendered at 512 px with headless Chrome, which cannot render a smaller window: `"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless --hide-scrollbars --window-size=512,512 --screenshot=../public/pwa-512.png icon.svg` from `pwa-icons/` (then `maskable.svg` to `pwa-maskable-512.png`). The 192 px icon and the 180 px `apple-touch-icon.png` are scaled down from `pwa-512.png` (`sips -z 192 192 pwa-512.png --out pwa-192.png` on macOS).
+- **Stuck worker**: `docs/operations.md` ("Carte hors ligne et installation") gives the steps to unregister it in each browser. A service worker needs HTTPS (or `localhost`).
+
 ### Import/Export
 
 - Single cocktail: JSON export/import with dependency resolution wizard
@@ -185,21 +204,22 @@ Safari and iOS 16.0+, Chrome and Edge 107+, Firefox 104+ (`build.target` in `vit
 
 ## Scripts
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Vite dev server (port 5173, proxies /api to :3001) |
-| `npm run build` | TypeScript check + Vite production build |
-| `npm run lint` | ESLint |
-| `npm run format:check` | Prettier check (fails until the repository reformat) |
-| `npm run preview` | Preview production build |
-| `npm test` | Tests (Vitest) |
-| `npm run test:watch` | Tests in watch mode |
-| `npm run test:coverage` | Tests with coverage |
+| Command                 | Description                                        |
+| ----------------------- | -------------------------------------------------- |
+| `npm run dev`           | Vite dev server (port 5173, proxies /api to :3001) |
+| `npm run build`         | TypeScript check + Vite production build           |
+| `npm run lint`          | ESLint                                             |
+| `npm run format`        | Prettier, rewrites the files                       |
+| `npm run format:check`  | Prettier check (must stay green, CI runs it)       |
+| `npm run preview`       | Preview production build                           |
+| `npm test`              | Tests (Vitest)                                     |
+| `npm run test:watch`    | Tests in watch mode                                |
+| `npm run test:coverage` | Tests with coverage                                |
 
 ## Dependencies
 
 **Runtime**: react 19, react-dom 19, react-router-dom 7, @tanstack/react-query 5, react-hook-form 7, @hookform/resolvers, zod 4, i18next 27, react-i18next 18, i18next-browser-languagedetector 8, jszip 3
-**Dev**: vite 8, @vitejs/plugin-react 6, tailwindcss 4, @tailwindcss/vite, typescript 5.9, eslint 10, eslint-plugin-i18next, prettier 3, vitest, jsdom, @testing-library/*, msw, vitest-axe
+**Dev**: vite 8, @vitejs/plugin-react 6, vite-plugin-pwa 2 (Workbox 7), tailwindcss 4, @tailwindcss/vite, typescript 5.9, eslint 10, eslint-plugin-i18next, prettier 3, vitest, jsdom, @testing-library/*, msw, vitest-axe
 
 **Install scripts**: npm 12 skips the install scripts of dependencies that `allowScripts` in `package.json` does not list (npm 11.19 only warns). None is needed here: `fsevents` (optional, macOS) is denied because its binary ships prebuilt in the package. A new dependency whose script is needed must be added to `allowScripts` (`npm install-scripts approve <pkg> --no-allow-scripts-pin`, no version so that a Dependabot bump keeps working), otherwise denied (`npm install-scripts deny <pkg>`), so that `npm ci` prints no `install-scripts` warning.
 

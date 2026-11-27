@@ -3,6 +3,7 @@
     "dashboard": "Tableau de bord",
     "login": "Connexion",
     "language": "Langue",
+    "lightTheme": "Thème clair",
     "changeLanguage": "Changer de langue",
     "main": "Navigation principale",
     "skipToContent": "Aller au contenu"
@@ -37,6 +38,7 @@
     "print": "Imprimer",
     "back": "Retour à la carte",
     "backHome": "Retour à l'accueil",
+    "pageNotFound": "Page introuvable",
     "menuLoadError": "Impossible de charger la carte",
     "cocktailLoadError": "Impossible de charger le cocktail",
     "loadErrorHint": "Vérifiez votre connexion puis réessayez.",

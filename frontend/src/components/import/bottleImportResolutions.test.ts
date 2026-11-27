@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { buildCategory } from '../../test/factories';
-import type { BottleCategoryPreview, BottleImportPreviewResponse, BottleImportResolutions } from '../../types';
+import type {
+  BottleCategoryPreview,
+  BottleImportPreviewResponse,
+  BottleImportResolutions,
+} from '../../types';
 import {
   buildAutoCategoryResolutions,
   countCategoriesToCreate,
@@ -23,21 +27,33 @@ function categoryRef(name: string) {
 }
 
 function previewOf(categories: BottleCategoryPreview[]): BottleImportPreviewResponse {
-  return { payload: { version: 1, categories: categories.map((entry) => entry.ref), bottles: [] }, categories, bottles: [], errors: [] };
+  return {
+    payload: { version: 1, categories: categories.map((entry) => entry.ref), bottles: [] },
+    categories,
+    bottles: [],
+    errors: [],
+  };
 }
 
 const ambiguousRhum: BottleCategoryPreview = {
   ref: categoryRef('rhum'),
   existingMatch: null,
   status: 'ambiguous',
-  ambiguousMatches: [{ id: 1, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 }, { id: 2, name: 'RHUM', type: 'SPIRIT', desiredStock: 1 }],
+  ambiguousMatches: [
+    { id: 1, name: 'Rhum', type: 'SPIRIT', desiredStock: 1 },
+    { id: 2, name: 'RHUM', type: 'SPIRIT', desiredStock: 1 },
+  ],
 };
 const matchedGin: BottleCategoryPreview = {
   ref: categoryRef('Gin'),
   existingMatch: { id: 3, name: 'Gin', type: 'SPIRIT', desiredStock: 1 },
   status: 'matched',
 };
-const missingVodka: BottleCategoryPreview = { ref: categoryRef('Vodka'), existingMatch: null, status: 'missing' };
+const missingVodka: BottleCategoryPreview = {
+  ref: categoryRef('Vodka'),
+  existingMatch: null,
+  status: 'missing',
+};
 
 function creating(name: string) {
   return { action: 'create' as const, data: { ...defaultCategoryData(categoryRef(name)), name } };
@@ -45,7 +61,9 @@ function creating(name: string) {
 
 describe('buildAutoCategoryResolutions', () => {
   it('uses the match, creates the missing category, and leaves an ambiguous one for the admin', () => {
-    expect(buildAutoCategoryResolutions(previewOf([ambiguousRhum, matchedGin, missingVodka]))).toEqual({
+    expect(
+      buildAutoCategoryResolutions(previewOf([ambiguousRhum, matchedGin, missingVodka])),
+    ).toEqual({
       gin: { action: 'use_existing', existingId: 3 },
       vodka: { action: 'create', data: defaultCategoryData(missingVodka.ref) },
     });
@@ -54,23 +72,44 @@ describe('buildAutoCategoryResolutions', () => {
 
 describe('existingCategoryFor', () => {
   it('compares the trimmed name, or the file name the resolution key holds when it is blank', () => {
-    expect(existingCategoryFor('vodka', creating(' gin '), existing)).toEqual({ status: 'found', row: gin });
-    expect(existingCategoryFor('rhum', creating('  '), existing)).toEqual({ status: 'ambiguous', rows: [rhum, upperRhum] });
-    expect(existingCategoryFor('rhum', creating('Rhum blanc'), existing)).toEqual({ status: 'none' });
+    expect(existingCategoryFor('vodka', creating(' gin '), existing)).toEqual({
+      status: 'found',
+      row: gin,
+    });
+    expect(existingCategoryFor('rhum', creating('  '), existing)).toEqual({
+      status: 'ambiguous',
+      rows: [rhum, upperRhum],
+    });
+    expect(existingCategoryFor('rhum', creating('Rhum blanc'), existing)).toEqual({
+      status: 'none',
+    });
   });
 });
 
 describe('countCategoriesToResolve', () => {
   const preview = previewOf([ambiguousRhum, matchedGin]);
-  const resolve = (rhumResolution?: BottleImportResolutions['categories'][string]): BottleImportResolutions => ({
-    categories: { gin: { action: 'use_existing', existingId: 3 }, ...(rhumResolution && { rhum: rhumResolution }) },
+  const resolve = (
+    rhumResolution?: BottleImportResolutions['categories'][string],
+  ): BottleImportResolutions => ({
+    categories: {
+      gin: { action: 'use_existing', existingId: 3 },
+      ...(rhumResolution && { rhum: rhumResolution }),
+    },
     bottles: {},
   });
 
   it('counts an ambiguous category until one of its matches is picked', () => {
     expect(countCategoriesToResolve(preview, resolve(), existing)).toBe(1);
-    expect(countCategoriesToResolve(preview, resolve({ action: 'use_existing' }), existing)).toBe(1);
-    expect(countCategoriesToResolve(preview, resolve({ action: 'use_existing', existingId: 2 }), existing)).toBe(0);
+    expect(countCategoriesToResolve(preview, resolve({ action: 'use_existing' }), existing)).toBe(
+      1,
+    );
+    expect(
+      countCategoriesToResolve(
+        preview,
+        resolve({ action: 'use_existing', existingId: 2 }),
+        existing,
+      ),
+    ).toBe(0);
   });
 
   it('counts a category to create under a name several categories hold ignoring case', () => {
@@ -83,7 +122,11 @@ describe('countCategoriesToResolve', () => {
 describe('countCategoriesToCreate', () => {
   it('leaves out a category to create that exists ignoring case: the backend uses it', () => {
     const resolutions: BottleImportResolutions = {
-      categories: { gin: creating('GIN'), vodka: creating('Vodka'), rhum: { action: 'use_existing', existingId: 1 } },
+      categories: {
+        gin: creating('GIN'),
+        vodka: creating('Vodka'),
+        rhum: { action: 'use_existing', existingId: 1 },
+      },
       bottles: {},
     };
     expect(countCategoriesToCreate(resolutions, existing)).toBe(1);
@@ -92,7 +135,9 @@ describe('countCategoriesToCreate', () => {
   it('counts once two categories of the file created under names equal ignoring case, as the rows step offers them', () => {
     const categories = { mezcal: creating('Mezcal'), 'mezcal joven': creating('MEZCAL') };
     expect(countCategoriesToCreate({ categories, bottles: {} }, existing)).toBe(1);
-    expect(rowCategories(existing, categories).options.filter((option) => option.isNew)).toEqual([newCategory('Mezcal', 'mezcal')]);
+    expect(rowCategories(existing, categories).options.filter((option) => option.isNew)).toEqual([
+      newCategory('Mezcal', 'mezcal'),
+    ]);
   });
 });
 
@@ -105,8 +150,17 @@ describe('countRowsWithoutCategory', () => {
     ...previewOf([]),
     bottles: ['', '', 'Gin'].map((categoryName) => ({
       ref: {
-        name: 'Havana', categoryName, capacityMl: 700, remainingPercent: 100, alcoholPercentage: null, purchasePrice: null,
-        location: null, openedAt: null, isApero: false, isDigestif: false, quantity: 1,
+        name: 'Havana',
+        categoryName,
+        capacityMl: 700,
+        remainingPercent: 100,
+        alcoholPercentage: null,
+        purchasePrice: null,
+        location: null,
+        openedAt: null,
+        isApero: false,
+        isDigestif: false,
+        quantity: 1,
       },
       needsCategory: categoryName === '',
       potentialDuplicates: [],
@@ -114,9 +168,17 @@ describe('countRowsWithoutCategory', () => {
   };
 
   it('counts the imported rows that name no category and pick none by id', () => {
-    const bottles = { 0: { action: 'import' as const, categoryId: 1 }, 1: { action: 'import' as const } };
+    const bottles = {
+      0: { action: 'import' as const, categoryId: 1 },
+      1: { action: 'import' as const },
+    };
     expect(countRowsWithoutCategory(rowsPreview, { categories: {}, bottles })).toBe(1);
-    expect(countRowsWithoutCategory(rowsPreview, { categories: {}, bottles: { ...bottles, 1: { action: 'skip' } } })).toBe(0);
+    expect(
+      countRowsWithoutCategory(rowsPreview, {
+        categories: {},
+        bottles: { ...bottles, 1: { action: 'skip' } },
+      }),
+    ).toBe(0);
   });
 });
 
@@ -131,7 +193,9 @@ describe('rowCategories', () => {
   }
 
   it('shows a row in the existing category its name matches ignoring case', () => {
-    const categories = rowCategories([rhum, gin], { rhum: { action: 'use_existing', existingId: 1 } });
+    const categories = rowCategories([rhum, gin], {
+      rhum: { action: 'use_existing', existingId: 1 },
+    });
     expect(categoryOfName(categories, 'rhum')).toEqual(existingRhum);
     expect(categoryOfName(categories, ' RHUM ')).toEqual(existingRhum);
     expect(categoryOfName(categories, '')).toBeUndefined();
@@ -162,7 +226,12 @@ describe('rowCategories', () => {
     const categories = rowCategories(existing, { gin: creating('GIN'), vodka: creating('Vodka') });
     expect(categoryOfName(categories, 'gin')).toEqual(existingGin);
     expect(categoryOfName(categories, 'vodka')).toEqual(newCategory('Vodka', 'vodka'));
-    expect(categories.options).toEqual([existingRhum, existingUpperRhum, existingGin, newCategory('Vodka', 'vodka')]);
+    expect(categories.options).toEqual([
+      existingRhum,
+      existingUpperRhum,
+      existingGin,
+      newCategory('Vodka', 'vodka'),
+    ]);
   });
 
   it('shows a row in a category created under another name, and offers the existing one of the file name by its id', () => {
@@ -175,23 +244,44 @@ describe('rowCategories', () => {
 
   // C-68: before, `Rhum` was no option, since a row naming it goes in `Rhum agricole`
   it('shows a row in the existing category its file category is created as, which another one of the file names', () => {
-    const categories = rowCategories([rhum, gin], { rhum: creating('Rhum agricole'), gin: creating('Rhum') });
+    const categories = rowCategories([rhum, gin], {
+      rhum: creating('Rhum agricole'),
+      gin: creating('Rhum'),
+    });
     expect(categoryOfName(categories, 'gin')).toEqual(existingRhum);
-    expect(categories.options).toEqual([existingRhum, existingGin, newCategory('Rhum agricole', 'rhum')]);
+    expect(categories.options).toEqual([
+      existingRhum,
+      existingGin,
+      newCategory('Rhum agricole', 'rhum'),
+    ]);
   });
 
   it('offers a category to create under the key that creates it, as its name is the key of another one', () => {
-    const categories = rowCategories([], { mezcal: creating('Tequila'), tequila: creating('Sotol') });
-    expect(categories.options).toEqual([newCategory('Tequila', 'mezcal'), newCategory('Sotol', 'tequila')]);
+    const categories = rowCategories([], {
+      mezcal: creating('Tequila'),
+      tequila: creating('Sotol'),
+    });
+    expect(categories.options).toEqual([
+      newCategory('Tequila', 'mezcal'),
+      newCategory('Sotol', 'tequila'),
+    ]);
     // A row naming `Tequila` goes in the category resolved for `tequila`
     expect(categoryOfName(categories, 'Tequila')).toEqual(newCategory('Sotol', 'tequila'));
   });
 
   it('creates once a name two categories of the file share ignoring case, and the file name of a blank one', () => {
-    const categories = rowCategories([gin], { vodka: creating('Vodka'), wodka: creating('VODKA'), rye: creating('  ') });
+    const categories = rowCategories([gin], {
+      vodka: creating('Vodka'),
+      wodka: creating('VODKA'),
+      rye: creating('  '),
+    });
     expect(categoryOfName(categories, 'wodka')).toEqual(newCategory('Vodka', 'vodka'));
     expect(categoryOfName(categories, 'rye')).toEqual(newCategory('rye', 'rye'));
-    expect(categories.options).toEqual([existingGin, newCategory('Vodka', 'vodka'), newCategory('rye', 'rye')]);
+    expect(categories.options).toEqual([
+      existingGin,
+      newCategory('Vodka', 'vodka'),
+      newCategory('rye', 'rye'),
+    ]);
   });
 
   it('shows no category for a name to create that several categories hold: the confirmation refuses it', () => {

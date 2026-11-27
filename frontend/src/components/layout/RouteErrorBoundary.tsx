@@ -1,30 +1,44 @@
-import { Component, type ReactNode } from 'react';
+import { Component, useEffect, useRef, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import Button from '../ui/Button';
 import EmptyState from '../ui/EmptyState';
+import { cx } from '../ui/classNames';
 import BackHomeLink from './BackHomeLink';
 
-function RouteErrorScreen() {
+interface RouteErrorDisplay {
+  /** Fills the whole window, for an error outside any layout. */
+  fullScreen: boolean;
+  backLink: ReactNode;
+}
+
+function RouteErrorScreen({ fullScreen, backLink }: RouteErrorDisplay) {
   const { t } = useTranslation();
+  const titleRef = useRef<HTMLParagraphElement>(null);
+
+  // The link that was clicked is gone with the failed page: restart the keyboard from here.
+  useEffect(() => {
+    titleRef.current?.focus();
+  }, []);
+
   return (
-    <div className="min-h-screen bg-canvas flex items-center justify-center">
+    <div className={cx('flex items-center justify-center', fullScreen && 'min-h-screen bg-canvas')}>
       <EmptyState
         icon="⚠️"
         title={t('errors.pageLoadFailed')}
-        role="alert"
-        action={(
+        titleProps={{ role: 'alert', tabIndex: -1, ref: titleRef, className: 'outline-none' }}
+        action={
           <div className="flex flex-wrap items-center justify-center gap-4">
             <Button onClick={() => window.location.reload()}>{t('errors.reload')}</Button>
-            <BackHomeLink />
+            {backLink}
           </div>
-        )}
+        }
       />
     </div>
   );
 }
 
-interface ErrorBoundaryProps {
+interface ErrorBoundaryProps extends RouteErrorDisplay {
   /** A new value clears the error, so the next page renders. */
   resetKey: string;
   children: ReactNode;
@@ -51,16 +65,34 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 
   render() {
-    return this.state.hasError ? <RouteErrorScreen /> : this.props.children;
+    const { fullScreen, backLink, children } = this.props;
+    return this.state.hasError ? (
+      <RouteErrorScreen fullScreen={fullScreen} backLink={backLink} />
+    ) : (
+      children
+    );
   }
+}
+
+interface RouteErrorBoundaryProps extends Partial<RouteErrorDisplay> {
+  children: ReactNode;
 }
 
 /**
  * Replaces a page that failed to render, or whose chunk is still missing after the
  * automatic reload of utils/chunkReload.ts, with a way out instead of a blank screen.
- * Navigating to another page clears the error without reloading.
+ * Any navigation clears the error without reloading, a link to the current page too
+ * (it gets a new location key).
  */
-export default function RouteErrorBoundary({ children }: { children: ReactNode }) {
-  const { pathname } = useLocation();
-  return <ErrorBoundary resetKey={pathname}>{children}</ErrorBoundary>;
+export default function RouteErrorBoundary({
+  fullScreen = true,
+  backLink = <BackHomeLink />,
+  children,
+}: RouteErrorBoundaryProps) {
+  const { key } = useLocation();
+  return (
+    <ErrorBoundary resetKey={key} fullScreen={fullScreen} backLink={backLink}>
+      {children}
+    </ErrorBoundary>
+  );
 }

@@ -1,7 +1,8 @@
 import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useMutation, useQueryClient, type QueryKey, type UseMutationResult } from '@tanstack/react-query';
+import { useMutation, type QueryKey, type UseMutationResult } from '@tanstack/react-query';
 import { toast } from '../components/ui/ToastStore';
+import { useInvalidateQueries } from './invalidate';
 import { describeMutationError } from './deletionImpact';
 
 interface EntityMutationOptions<Variables, Result> {
@@ -21,15 +22,11 @@ interface EntityMutationOptions<Variables, Result> {
 }
 
 /** `Result` is what the request returns, e.g. the created entity. */
-export type EntityMutation<Variables, Result = unknown> = UseMutationResult<Result, Error, Variables>;
-
-/** Refreshes every query shown under one of the given keys. */
-export function useInvalidateQueries(): (keys: QueryKey[]) => void {
-  const queryClient = useQueryClient();
-  return (keys) => {
-    for (const queryKey of keys) queryClient.invalidateQueries({ queryKey });
-  };
-}
+export type EntityMutation<Variables, Result = unknown> = UseMutationResult<
+  Result,
+  Error,
+  Variables
+>;
 
 /**
  * A mutation that refreshes the given queries and reports its outcome in a toast.
@@ -72,7 +69,6 @@ export function useEntityMutation<Variables, Result = unknown>({
 interface CrudApi<Input, Entity> {
   create(data: Input): Promise<Entity>;
   update(id: number, data: Partial<Input>): Promise<unknown>;
-  delete(id: number): Promise<unknown>;
 }
 
 export interface UpdateVariables<Input> {
@@ -80,29 +76,24 @@ export interface UpdateVariables<Input> {
   data: Partial<Input>;
 }
 
-interface CrudMutationsOptions<Input, Entity> {
+export interface CrudMutationsOptions<Input, Entity> {
   key: QueryKey;
   api: CrudApi<Input, Entity>;
   /** Other queries that show this entity, e.g. the cocktail availability. */
   invalidates?: QueryKey[];
-  /** i18n keys of the success toasts, and of the hint shown when a deletion is refused because the item is in use. */
-  messages: { created: string; updated: string; deleted: string; inUse?: string };
 }
 
 /** `Entity` is what a creation returns, e.g. to open the new item. */
-export interface CrudMutations<Input, Entity = unknown> {
+export interface CreateUpdateMutations<Input, Entity> {
   create: EntityMutation<Input, Entity>;
   update: EntityMutation<UpdateVariables<Input>>;
-  remove: EntityMutation<number>;
 }
 
-/** Create, update and delete mutations of an admin list page. */
-export function useCrudMutations<Input, Entity = unknown>({
-  key,
-  api,
-  invalidates = [],
-  messages,
-}: CrudMutationsOptions<Input, Entity>): CrudMutations<Input, Entity> {
+/** Messages are the i18n keys of the success toasts; `updated` is left out when the page never updates. */
+export function useCreateUpdateMutations<Input, Entity>(
+  { key, api, invalidates = [] }: CrudMutationsOptions<Input, Entity>,
+  messages: { created: string; updated?: string },
+): CreateUpdateMutations<Input, Entity> {
   const refreshed = [key, ...invalidates];
 
   const create = useEntityMutation<Input, Entity>({
@@ -117,9 +108,25 @@ export function useCrudMutations<Input, Entity = unknown>({
     successMessage: messages.updated,
     ignoreWhilePending: true,
   });
+
+  return { create, update };
+}
+
+interface SimpleDeleteOptions<Input, Entity> extends CrudMutationsOptions<Input, Entity> {
+  api: CrudApi<Input, Entity> & { delete(id: number): Promise<unknown> };
+  /** i18n keys of the success toasts, and of the hint shown when a deletion is refused because the item is in use. */
+  messages: { created: string; updated?: string; deleted: string; inUse?: string };
+}
+
+/** Create, update and delete mutations of an admin list page, the deletion being refused while the item is in use. */
+export function useCrudMutations<Input, Entity = unknown>(
+  options: SimpleDeleteOptions<Input, Entity>,
+): CreateUpdateMutations<Input, Entity> & { remove: EntityMutation<number> } {
+  const { api, messages } = options;
+  const { create, update } = useCreateUpdateMutations(options, messages);
   const remove = useEntityMutation<number>({
     mutationFn: (id) => api.delete(id),
-    invalidates: refreshed,
+    invalidates: [options.key, ...(options.invalidates ?? [])],
     successMessage: messages.deleted,
     inUseHint: messages.inUse,
   });

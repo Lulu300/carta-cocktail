@@ -18,6 +18,14 @@ function usePublicViewer(): PublicViewer {
 }
 
 /**
+ * The service worker answers these requests from its cache. TanStack Query only learns that
+ * the network went down from the `offline` event: in the default `online` mode, a request made
+ * after that event would never start, though the service worker has the answer. `offlineFirst`
+ * sends it once and shows the error state when nothing is cached (see `shouldRetryQuery`).
+ */
+const OFFLINE_FIRST = { networkMode: 'offlineFirst' } as const;
+
+/**
  * Admin pages do not invalidate the public queries: an admin previewing a menu
  * they just edited sees the cached version at once, refreshed in the background.
  */
@@ -34,8 +42,9 @@ export function usePublicMenus(): UseQueryResult<Menu[], Error> {
   const viewer = usePublicViewer();
   return useQuery({
     queryKey: qk.publicMenus,
-    queryFn: () => publicApi.listMenus(),
+    queryFn: ({ signal }) => publicApi.listMenus(signal),
     staleTime: staleTimeFor(viewer),
+    ...OFFLINE_FIRST,
   });
 }
 
@@ -43,8 +52,9 @@ export function usePublicMenu(slug: string): UseQueryResult<Menu, Error> {
   const viewer = usePublicViewer();
   return useQuery({
     queryKey: qk.publicMenu(slug, viewer),
-    queryFn: () => publicApi.getMenu(slug),
+    queryFn: ({ signal }) => publicApi.getMenu(slug, signal),
     staleTime: staleTimeFor(viewer),
+    ...OFFLINE_FIRST,
   });
 }
 
@@ -52,7 +62,8 @@ export function usePublicCocktail(id: number): UseQueryResult<Cocktail, Error> {
   const viewer = usePublicViewer();
   return useQuery({
     queryKey: qk.publicCocktail(id, viewer),
-    queryFn: () => publicApi.getCocktail(id),
+    queryFn: ({ signal }) => publicApi.getCocktail(id, signal),
     staleTime: staleTimeFor(viewer),
+    ...OFFLINE_FIRST,
   });
 }

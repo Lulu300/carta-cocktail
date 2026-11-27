@@ -7,6 +7,7 @@ import { NotFoundError } from '../errors';
 import { calculateAvailabilities } from '../services/availabilityService';
 import { buildPublicCocktailSelect, CATEGORY_PUBLIC_SELECT } from '../services/cocktail/includes';
 import { exportCocktail } from '../services/cocktail/cocktailExport';
+import { previewImageName } from '../services/cocktail/imageVariants';
 import { getOrCreateSettings } from '../services/settingsService';
 import { renderSharePage } from '../services/sharePreview';
 import { config } from '../config';
@@ -15,7 +16,12 @@ const router = Router();
 
 // Bottles of a bottle menu: inventory fields stay on the server (see includes.ts)
 const MENU_BOTTLE_PUBLIC_SELECT = {
-  id: true, name: true, capacityMl: true, categoryId: true, alcoholPercentage: true, location: true,
+  id: true,
+  name: true,
+  capacityMl: true,
+  categoryId: true,
+  alcoholPercentage: true,
+  location: true,
   category: { select: CATEGORY_PUBLIC_SELECT },
 } satisfies Prisma.BottleSelect;
 
@@ -55,7 +61,10 @@ function isAdminRequest(req: AuthRequest): boolean {
 async function withPublicAvailability<T extends { id: number; isAvailable: boolean }>(
   cocktails: T[],
 ): Promise<(T & { available: boolean })[]> {
-  const availabilities = await calculateAvailabilities(prisma, cocktails.map(({ id }) => id));
+  const availabilities = await calculateAvailabilities(
+    prisma,
+    cocktails.map(({ id }) => id),
+  );
   return cocktails.map((cocktail) => {
     const maxServings = availabilities.get(cocktail.id)?.maxServings ?? 0;
     return { ...cocktail, available: cocktail.isAvailable && maxServings > 0 };
@@ -111,7 +120,10 @@ router.get('/menus/:slug', async (req: AuthRequest, res: Response) => {
   if (!menu || (!menu.isPublic && !isAdmin)) throw new NotFoundError();
 
   const cocktails = await withPublicAvailability(menu.cocktails.map(({ cocktail }) => cocktail));
-  const menuCocktails = menu.cocktails.map((menuCocktail, index) => ({ ...menuCocktail, cocktail: cocktails[index] }));
+  const menuCocktails = menu.cocktails.map((menuCocktail, index) => ({
+    ...menuCocktail,
+    cocktail: cocktails[index],
+  }));
   res.json(parseNameTranslations({ ...menu, cocktails: menuCocktails }));
 });
 
@@ -127,7 +139,9 @@ router.get('/cocktails/:id/export', async (req: AuthRequest, res: Response) => {
   if (id === null) throw new NotFoundError();
 
   const isAdmin = isAdminRequest(req);
-  const exported = await exportCocktail(buildPublicCocktailWhere(id, isAdmin), { includePrivate: isAdmin });
+  const exported = await exportCocktail(buildPublicCocktailWhere(id, isAdmin), {
+    includePrivate: isAdmin,
+  });
   if (!exported) throw new NotFoundError();
   res.attachment(exported.filename).json(exported.payload);
 });
@@ -179,7 +193,9 @@ async function sendSharePage(req: Request, res: Response, page: SharedPage, page
     siteName,
     description: page.description,
     pageUrl: `${baseUrl}${pagePath}`,
-    imageUrl: page.imagePath ? `${baseUrl}/uploads/${encodeURIComponent(page.imagePath)}` : null,
+    imageUrl: page.imagePath
+      ? `${baseUrl}/uploads/${encodeURIComponent(previewImageName(page.imagePath))}`
+      : null,
   });
   // nginx answers the same URL with the SPA to every other client: a cache must not mix them up
   res.set({ 'Cache-Control': 'no-cache', Vary: 'User-Agent' }).type('html').send(html);
@@ -221,7 +237,12 @@ router.get('/share/menu/:slug/cocktail/:id', async (req: Request, res: Response)
   });
   if (!menuCocktail) throw new NotFoundError();
 
-  await sendSharePage(req, res, menuCocktail.cocktail, `/menu/${encodeURIComponent(slug)}/cocktail/${id}`);
+  await sendSharePage(
+    req,
+    res,
+    menuCocktail.cocktail,
+    `/menu/${encodeURIComponent(slug)}/cocktail/${id}`,
+  );
 });
 
 export default router;

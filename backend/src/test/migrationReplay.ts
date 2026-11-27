@@ -19,7 +19,8 @@ export function migrationScript(name: string): string {
 
 /** The migrations that run before `name`, in their order. */
 export function migrationsBefore(name: string): string[] {
-  return fs.readdirSync(MIGRATIONS_DIR, { withFileTypes: true })
+  return fs
+    .readdirSync(MIGRATIONS_DIR, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && entry.name < name)
     .map((entry) => entry.name)
     .sort();
@@ -27,5 +28,7 @@ export function migrationsBefore(name: string): string[] {
 
 export async function selectRows(db: Connection, sql: string): Promise<Row[]> {
   const result = await db.queryRaw({ sql, args: [], argTypes: [] });
-  return result.rows.map((values) => Object.fromEntries(result.columnNames.map((column, i) => [column, values[i]])));
+  return result.rows.map((values) =>
+    Object.fromEntries(result.columnNames.map((column, i) => [column, values[i]])),
+  );
 }

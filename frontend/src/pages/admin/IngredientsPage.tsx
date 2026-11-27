@@ -7,8 +7,13 @@ import { ingredients as ingredientsApi } from '../../services/api';
 import type { Ingredient } from '../../types';
 import { qk } from '../../queries/keys';
 import { useIngredients } from '../../queries/ingredients';
-import { useCrudMutations, useEntityMutation } from '../../queries/crud';
-import { buildNameTranslations, toTranslationForm, type TranslationForm } from '../../utils/translations';
+import { useEntityMutation } from '../../queries/crud';
+import { useForcedDeleteCrudMutations } from '../../components/admin/useForcedDelete';
+import {
+  buildNameTranslations,
+  toTranslationForm,
+  type TranslationForm,
+} from '../../utils/translations';
 import Button from '../../components/ui/Button';
 import Field from '../../components/ui/Field';
 import IconButton from '../../components/ui/IconButton';
@@ -23,7 +28,6 @@ import { cx } from '../../components/ui/classNames';
 import LoadError from '../../components/admin/LoadError';
 import TranslationFields from '../../components/admin/TranslationFields';
 import { useConfirmDelete } from '../../components/admin/useConfirmDelete';
-import { useForcedDelete } from '../../components/admin/useForcedDelete';
 import { useEntityForm } from '../../components/admin/useEntityForm';
 
 type AvailabilityFilter = 'all' | 'available' | 'unavailable';
@@ -72,19 +76,23 @@ export default function IngredientsPage() {
   const confirmDelete = useConfirmDelete();
   const ingredientsQuery = useIngredients();
   const ingredients = ingredientsQuery.data;
-  const { create, update } = useCrudMutations<IngredientInput>({
+  const {
+    create,
+    update,
+    remove: deleteIngredient,
+  } = useForcedDeleteCrudMutations<IngredientInput>({
     key: qk.ingredients,
     api: ingredientsApi,
     invalidates: [qk.availability],
-    messages: { created: 'ingredients.created', updated: 'ingredients.updated', deleted: 'ingredients.deleted' },
-  });
-  const deleteIngredient = useForcedDelete({
-    deleteItem: ingredientsApi.delete,
-    invalidates: REFRESHED_KEYS,
-    deletedMessage: 'ingredients.deleted',
+    messages: {
+      created: 'ingredients.created',
+      updated: 'ingredients.updated',
+      deleted: 'ingredients.deleted',
+    },
   });
   const toggleAvailability = useEntityMutation<Ingredient>({
-    mutationFn: (ingredient) => ingredientsApi.update(ingredient.id, { isAvailable: !ingredient.isAvailable }),
+    mutationFn: (ingredient) =>
+      ingredientsApi.update(ingredient.id, { isAvailable: !ingredient.isAvailable }),
     invalidates: REFRESHED_KEYS,
   });
   const setAllAvailability = useEntityMutation<boolean>({
@@ -99,8 +107,10 @@ export default function IngredientsPage() {
 
   const filteredIngredients = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return (ingredients ?? []).filter((ingredient) =>
-      matchesAvailability(ingredient, filter) && localize(ingredient).toLowerCase().includes(query),
+    return (ingredients ?? []).filter(
+      (ingredient) =>
+        matchesAvailability(ingredient, filter) &&
+        localize(ingredient).toLowerCase().includes(query),
     );
   }, [ingredients, filter, search, localize]);
 
@@ -127,9 +137,13 @@ export default function IngredientsPage() {
     if (ingredientsQuery.isPending) {
       return (
         <>
-          <p role="status" className="sr-only">{t('common.loading')}</p>
+          <p role="status" className="sr-only">
+            {t('common.loading')}
+          </p>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {Array.from({ length: SKELETON_CARDS }, (_, index) => <Skeleton key={index} className="h-40 rounded-xl" />)}
+            {Array.from({ length: SKELETON_CARDS }, (_, index) => (
+              <Skeleton key={index} className="h-40 rounded-xl" />
+            ))}
           </div>
         </>
       );
@@ -159,8 +173,20 @@ export default function IngredientsPage() {
                 onClick={() => toggleAvailability.mutate(ingredient)}
                 className="block w-full rounded-lg cursor-pointer"
               >
-                <span aria-hidden="true" className={cx('absolute top-2 right-2 w-3 h-3 rounded-full', ingredient.isAvailable ? 'bg-success' : 'bg-danger')} />
-                <span aria-hidden="true" className={cx('text-4xl mb-3 h-12 flex items-center justify-center', !ingredient.isAvailable && 'grayscale opacity-60')}>
+                <span
+                  aria-hidden="true"
+                  className={cx(
+                    'absolute top-2 right-2 w-3 h-3 rounded-full',
+                    ingredient.isAvailable ? 'bg-success' : 'bg-danger',
+                  )}
+                />
+                <span
+                  aria-hidden="true"
+                  className={cx(
+                    'text-4xl mb-3 h-12 flex items-center justify-center',
+                    !ingredient.isAvailable && 'grayscale opacity-60',
+                  )}
+                >
                   {ingredient.icon || '📦'}
                 </span>
                 <span className="block text-center mb-3">
@@ -202,9 +228,9 @@ export default function IngredientsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-bold font-serif text-accent">{t('ingredients.title')}</h1>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <Button variant="secondary" size="sm" onClick={() => setAllAvailability.mutate(true)}>
             {t('ingredients.allAvailable')}
           </Button>
@@ -216,7 +242,12 @@ export default function IngredientsPage() {
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <SearchInput value={search} onChange={setSearch} label={t('ingredients.search')} className="sm:max-w-sm" />
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          label={t('ingredients.search')}
+          className="sm:max-w-sm"
+        />
         <div className="flex gap-2">
           {(['all', 'available', 'unavailable'] as const).map((status) => (
             <button
@@ -238,7 +269,9 @@ export default function IngredientsPage() {
         </div>
       </div>
 
-      <LiveResultCount count={ingredientsQuery.isSuccess && isFiltered ? filteredIngredients.length : null} />
+      <LiveResultCount
+        count={ingredientsQuery.isSuccess && isFiltered ? filteredIngredients.length : null}
+      />
       {renderContent()}
 
       <Modal
@@ -261,8 +294,12 @@ export default function IngredientsPage() {
             <IconPicker value={form.icon} onChange={(icon) => setField('icon', icon)} />
           </div>
           <div className="flex justify-end gap-3 pt-4">
-            <Button variant="ghost" onClick={ingredientForm.close}>{t('common.cancel')}</Button>
-            <Button type="submit" loading={isSaving}>{t('common.save')}</Button>
+            <Button variant="ghost" onClick={ingredientForm.close}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="submit" loading={isSaving}>
+              {t('common.save')}
+            </Button>
           </div>
         </form>
       </Modal>

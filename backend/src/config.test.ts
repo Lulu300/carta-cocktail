@@ -3,13 +3,21 @@ import fs from 'fs';
 import path from 'path';
 import jwt from 'jsonwebtoken';
 import {
-  appVersion, assertJwtSecret, parseJwtExpiresIn, parsePositiveInteger, parsePublicBaseUrl, parseTrustProxy, resolveReleasesDir,
+  appVersion,
+  assertJwtSecret,
+  parseJwtExpiresIn,
+  parsePositiveInteger,
+  parsePublicBaseUrl,
+  parseTrustProxy,
+  resolveReleasesDir,
   resolveUploadDir,
 } from './config';
 
 describe('resolveReleasesDir', () => {
   it('should use RELEASES_DIR when it is set', () => {
-    expect(resolveReleasesDir({ RELEASES_DIR: '/app/releases' })).toBe(path.resolve('/app/releases'));
+    expect(resolveReleasesDir({ RELEASES_DIR: '/app/releases' })).toBe(
+      path.resolve('/app/releases'),
+    );
   });
 
   it('should default to docs/releases of the repository, found from this file and not from the cwd', () => {
@@ -91,8 +99,9 @@ describe('parsePositiveInteger', () => {
     });
 
     it.each(['0', '-1', '2.5', 'ten'])('should reject %s', (value) => {
-      expect(() => parsePositiveInteger('LOGIN_RATE_LIMIT', { LOGIN_RATE_LIMIT: value }))
-        .toThrow(`LOGIN_RATE_LIMIT must be a positive integer, got '${value}'`);
+      expect(() => parsePositiveInteger('LOGIN_RATE_LIMIT', { LOGIN_RATE_LIMIT: value })).toThrow(
+        `LOGIN_RATE_LIMIT must be a positive integer, got '${value}'`,
+      );
     });
   });
 
@@ -106,8 +115,9 @@ describe('parsePositiveInteger', () => {
     });
 
     it.each(['0', '-1', 'abc', '1.5'])('should reject %s', (value) => {
-      expect(() => parsePositiveInteger('API_RATE_LIMIT', { API_RATE_LIMIT: value }))
-        .toThrow(`API_RATE_LIMIT must be a positive integer, got '${value}'`);
+      expect(() => parsePositiveInteger('API_RATE_LIMIT', { API_RATE_LIMIT: value })).toThrow(
+        `API_RATE_LIMIT must be a positive integer, got '${value}'`,
+      );
     });
   });
 });
@@ -165,7 +175,12 @@ describe('parsePublicBaseUrl', () => {
     expect(parsePublicBaseUrl('http://192.168.1.10:8080')).toBe('http://192.168.1.10:8080');
   });
 
-  it.each(['carte.example.com', 'ftp://carte.example.com', 'javascript:alert(1)'])('should reject %s', (value) => {
-    expect(() => parsePublicBaseUrl(value)).toThrow(`PUBLIC_BASE_URL must be an http or https address`);
-  });
+  it.each(['carte.example.com', 'ftp://carte.example.com', 'javascript:alert(1)'])(
+    'should reject %s',
+    (value) => {
+      expect(() => parsePublicBaseUrl(value)).toThrow(
+        `PUBLIC_BASE_URL must be an http or https address`,
+      );
+    },
+  );
 });

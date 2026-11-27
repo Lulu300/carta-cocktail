@@ -20,7 +20,9 @@ export const SUPPORTED_LANGUAGES: readonly string[] = [...TRANSLATED_LANGUAGES, 
  * case of the region ("en-gb"), so the match ignores it.
  */
 function toSupportedLanguage(code: string): string {
-  const supported = SUPPORTED_LANGUAGES.find((language) => language.toLowerCase() === code.toLowerCase());
+  const supported = SUPPORTED_LANGUAGES.find(
+    (language) => language.toLowerCase() === code.toLowerCase(),
+  );
   return supported ?? getBaseLanguage(code);
 }
 
@@ -42,7 +44,7 @@ i18n.on('languageChanged', (language) => {
   document.documentElement.lang = language || FALLBACK_LANGUAGE;
 });
 
-i18n
+void i18n
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({

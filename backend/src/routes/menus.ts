@@ -6,7 +6,11 @@ import { BadRequestError, ForbiddenError, NotFoundError } from '../errors';
 import { valid, validate } from '../validation/validate';
 import { IdParams, idRequest } from '../validation/common';
 import { MenuCreate, MenuUpdate } from '../validation/menus';
-import { assertBottlesAllowed, assertCocktailsAllowed, isSystemMenu } from '../services/menuSyncService';
+import {
+  assertBottlesAllowed,
+  assertCocktailsAllowed,
+  isSystemMenu,
+} from '../services/menuSyncService';
 import { parseNameTranslations } from '../utils/translations';
 
 const router = Router();
@@ -20,7 +24,11 @@ function normalizeSlug(slug: string): string {
 }
 
 // Sending back the current slug or type is allowed, so a form that posts every field still works.
-function changesSystemMenuIdentity(menu: Pick<Menu, 'slug' | 'type'>, slug?: string, type?: string): boolean {
+function changesSystemMenuIdentity(
+  menu: Pick<Menu, 'slug' | 'type'>,
+  slug?: string,
+  type?: string,
+): boolean {
   const slugChanged = !!slug && normalizeSlug(slug) !== menu.slug;
   const typeChanged = !!type && type !== menu.type;
   return slugChanged || typeChanged;
@@ -107,14 +115,18 @@ router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Respons
 const updateSchemas = { params: IdParams, body: MenuUpdate };
 
 router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Response) => {
-  const { params: { id: menuId }, body } = valid<typeof updateSchemas>(res);
+  const {
+    params: { id: menuId },
+    body,
+  } = valid<typeof updateSchemas>(res);
   const { name, description, slug, isPublic, type, cocktails, bottles } = body;
 
   const existing = await prisma.menu.findUnique({ where: { id: menuId } });
   if (!existing) throw new NotFoundError();
 
   if (isSystemMenu(existing)) {
-    if (changesSystemMenuIdentity(existing, slug, type)) throw new ForbiddenError('errors.cannotModifySystemMenu');
+    if (changesSystemMenuIdentity(existing, slug, type))
+      throw new ForbiddenError('errors.cannotModifySystemMenu');
     // Its bottles follow their flags: removing one goes through an exclusion
     if (bottles) throw new BadRequestError('errors.systemMenuBottlesManaged');
   } else if (type && type !== existing.type) {
@@ -127,7 +139,12 @@ router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Respo
   const menu = await prisma.$transaction(async (tx) => {
     await assertSectionsBelongToMenu(tx, menuId, [...(cocktails ?? []), ...(bottles ?? [])]);
     if (cocktails) assertCocktailsAllowed(existing, cocktails);
-    if (bottles) await assertBottlesAllowed(tx, existing, bottles.map((b) => b.bottleId));
+    if (bottles)
+      await assertBottlesAllowed(
+        tx,
+        existing,
+        bottles.map((b) => b.bottleId),
+      );
 
     if (cocktails) {
       await tx.menuCocktail.deleteMany({ where: { menuId } });

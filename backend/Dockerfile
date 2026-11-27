@@ -28,14 +28,14 @@ RUN node_modules/.bin/esbuild prisma.config.ts --bundle --platform=node --packag
 # repeat those of the build stage on purpose: when both platforms are the same
 # (local and CI builds), BuildKit runs them only once.
 # Pruning keeps what `npm ci` installed and built without a second download.
-# The runtime tree has no optional dependency of its own: --omit=optional drops the
-# optional peers that only the dev tooling uses (typescript, for @prisma/client and i18next).
+# No --omit=optional: sharp gets its libvips binary from an optional dependency, one
+# per platform. The optional peers that only the dev tooling uses are cut below instead.
 FROM node:24.22-alpine AS prod-deps
 WORKDIR /app
 COPY package*.json ./
 COPY prisma/schema.prisma ./prisma/schema.prisma
 RUN npm ci
-RUN npm prune --omit=dev --omit=optional
+RUN npm prune --omit=dev
 # The entrypoint and the documented recovery commands need the Prisma CLI
 # (migrate deploy, diff, resolve, status) and its schema engine. The CLI also
 # brings what only `prisma studio` (a web UI built with React) and `prisma dev`
@@ -44,6 +44,8 @@ RUN npm prune --omit=dev --omit=optional
 # need none of the dependencies cut below. Only Studio imports the MySQL and
 # Postgres drivers.
 # better-sqlite3 only runs prebuild-install during `npm ci`, to get its binary.
+# typescript and magicast (with its Babel parser) are optional peers, installed for
+# the dev tooling: nothing in the image loads them.
 COPY docker/prune-unused-deps.mjs /tmp/
 RUN node /tmp/prune-unused-deps.mjs \
     '@prisma/studio-core:*' \
@@ -57,7 +59,12 @@ RUN node /tmp/prune-unused-deps.mjs \
     @prisma/dev:foreground-child \
     prisma:mysql2 \
     prisma:postgres \
-    better-sqlite3:prebuild-install
+    better-sqlite3:prebuild-install \
+    @prisma/client:typescript \
+    i18next:typescript \
+    prisma:typescript \
+    valibot:typescript \
+    c12:magicast
 # Files of the kept packages that nothing loads at runtime. Each path is removed
 # without -f and the maps are searched first, so the build stops when an update
 # renames or drops one of them and this list is stale.
@@ -81,6 +88,12 @@ RUN --network=none CHECKPOINT_DISABLE=1 node_modules/.bin/prisma --version
 # blocks the scripts missing from allowScripts in package.json): otherwise the
 # image builds and only fails at the first database access.
 RUN node -e "new (require('better-sqlite3'))(':memory:').close()"
+# Same for sharp, whose libvips binary comes in a platform package (@img/sharp-linuxmusl-*):
+# encodes a WebP and a JPEG, the formats of the photo copies, so a missing codec fails here too.
+RUN node -e "const sharp = require('sharp'); \
+    const pixel = () => sharp({ create: { width: 1, height: 1, channels: 3, background: '#000' } }); \
+    Promise.all([pixel().webp().toBuffer(), pixel().jpeg().toBuffer()]).catch((error) => { \
+      console.error(error); process.exit(1); })"
 
 FROM node:24.22-alpine AS runtime
 # tini forwards SIGTERM to the entrypoint, then to Node once the entrypoint has exec'd it

@@ -8,7 +8,7 @@ describe('TranslationFields', () => {
     const user = userEvent.setup();
     render(<TranslationFields value={{ fr: '', en: '' }} onChange={vi.fn()} />);
 
-    const toggle = screen.getByRole('button', { name: 'common.translations' });
+    const toggle = screen.getByRole('button', { name: 'Translations' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByLabelText('Français')).not.toBeInTheDocument();
 
@@ -20,7 +20,14 @@ describe('TranslationFields', () => {
   });
 
   it('starts expanded when asked, with the base name as placeholder', () => {
-    render(<TranslationFields value={{ fr: 'Citron', en: '' }} onChange={vi.fn()} placeholder="Lemon" defaultOpen />);
+    render(
+      <TranslationFields
+        value={{ fr: 'Citron', en: '' }}
+        onChange={vi.fn()}
+        placeholder="Lemon"
+        defaultOpen
+      />,
+    );
 
     expect(screen.getByLabelText('Français')).toHaveValue('Citron');
     expect(screen.getByLabelText('English')).toHaveAttribute('placeholder', 'Lemon');

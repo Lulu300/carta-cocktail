@@ -1,0 +1,6 @@
+# Revisions that only reformat code. `git blame` skips them when configured with:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# GitHub reads this file by itself.
+
+# style: format the repository with Prettier (B-14)
+3b35109f6d83682b9108fb3266bb731180e769d5

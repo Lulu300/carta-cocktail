@@ -43,7 +43,7 @@ export function toBottleForm(categories: Category[], bottle?: Bottle): BottleFor
     purchasePrice: bottle?.purchasePrice?.toString() ?? '',
     capacityMl: bottle?.capacityMl ?? DEFAULT_CAPACITY_ML,
     remainingPercent: bottle?.remainingPercent ?? 100,
-    openedAt: bottle?.openedAt ? bottle.openedAt.split('T')[0] : '',
+    openedAt: bottle?.openedAt ? (bottle.openedAt.split('T')[0] ?? '') : '',
     alcoholPercentage: bottle?.alcoholPercentage?.toString() ?? '',
     location: bottle?.location ?? '',
     isApero: bottle?.isApero ?? false,

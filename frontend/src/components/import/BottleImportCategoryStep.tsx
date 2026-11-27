@@ -1,5 +1,11 @@
 import { useTranslation } from 'react-i18next';
-import type { BottleCategoryPreview, BottleCategoryResolution, Category, CategoryType, ImportMatchStatus } from '../../types';
+import type {
+  BottleCategoryPreview,
+  BottleCategoryResolution,
+  Category,
+  CategoryType,
+  ImportMatchStatus,
+} from '../../types';
 import Field from '../ui/Field';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
@@ -47,11 +53,17 @@ export default function BottleImportCategoryStep({
           const resolution = resolutions[key];
           const isAmbiguous = entry.status === 'ambiguous';
           // An ambiguous category has no resolution until the admin picks one of its matches
-          const choice = resolution?.action ?? (entry.status === 'missing' ? 'create' : 'use_existing');
+          const choice =
+            resolution?.action ?? (entry.status === 'missing' ? 'create' : 'use_existing');
           const match = entry.existingMatch;
-          const nameMessages = resolution?.action === 'create'
-            ? existingMatchMessages(t, existingCategoryFor(key, resolution, existingCategories), (category) => category.name)
-            : {};
+          const nameMessages =
+            resolution?.action === 'create'
+              ? existingMatchMessages(
+                  t,
+                  existingCategoryFor(key, resolution, existingCategories),
+                  (category) => category.name,
+                )
+              : {};
           return (
             <div key={key} className="border border-gray-700 rounded-lg p-3 space-y-2">
               <div className="flex items-center gap-2">
@@ -72,7 +84,9 @@ export default function BottleImportCategoryStep({
                 )}
                 <ChoiceButton
                   selected={choice === 'create'}
-                  onClick={() => onChange(key, { action: 'create', data: defaultCategoryData(entry.ref) })}
+                  onClick={() =>
+                    onChange(key, { action: 'create', data: defaultCategoryData(entry.ref) })
+                  }
                 >
                   {t('bottles.importWizard.createNew')}
                 </ChoiceButton>
@@ -80,33 +94,57 @@ export default function BottleImportCategoryStep({
               {isAmbiguous && choice === 'use_existing' && (
                 <Field label={t('importMatches.existingEntry')} hideLabel>
                   <Select
-                    value={resolution?.action === 'use_existing' ? resolution.existingId ?? '' : ''}
-                    onChange={(e) => onChange(key, { action: 'use_existing', existingId: Number(e.target.value) })}
+                    value={
+                      resolution?.action === 'use_existing' ? (resolution.existingId ?? '') : ''
+                    }
+                    onChange={(e) =>
+                      onChange(key, { action: 'use_existing', existingId: Number(e.target.value) })
+                    }
                   >
-                    <option value="" disabled>{t('importMatches.pickMatch')}</option>
+                    <option value="" disabled>
+                      {t('importMatches.pickMatch')}
+                    </option>
                     {(entry.ambiguousMatches ?? []).map((category) => (
-                      <option key={category.id} value={category.id}>{category.name}</option>
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
                     ))}
                   </Select>
                 </Field>
               )}
               {resolution?.action === 'create' && (
                 <div className="grid grid-cols-2 gap-2">
-                  <Field label={t('categories.name')} hideLabel hint={nameMessages.hint} error={nameMessages.error}>
+                  <Field
+                    label={t('categories.name')}
+                    hideLabel
+                    hint={nameMessages.hint}
+                    error={nameMessages.error}
+                  >
                     <Input
                       value={resolution.data.name}
-                      onChange={(e) => onChange(key, { ...resolution, data: { ...resolution.data, name: e.target.value } })}
+                      onChange={(e) =>
+                        onChange(key, {
+                          ...resolution,
+                          data: { ...resolution.data, name: e.target.value },
+                        })
+                      }
                       placeholder={t('categories.name')}
                     />
                   </Field>
                   <Field
                     label={t('categories.type')}
                     hideLabel
-                    error={isMissingCategoryType(resolution.data.type, categoryTypes) ? t('categories.typeRequired') : undefined}
+                    error={
+                      isMissingCategoryType(resolution.data.type, categoryTypes)
+                        ? t('categories.typeRequired')
+                        : undefined
+                    }
                   >
                     <CategoryTypeSelect
                       value={resolution.data.type}
-                      onChange={(type) => onChange(key, { ...resolution, data: { ...resolution.data, type } })}
+                      onChange={(type) =>
+                        onChange(key, { ...resolution, data: { ...resolution.data, type } })
+                      }
                       categoryTypes={categoryTypes}
                     />
                   </Field>

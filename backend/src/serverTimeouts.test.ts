@@ -12,7 +12,9 @@ function sendIncompleteHeaders(port: number): Promise<string> {
   return new Promise((resolve, reject) => {
     const socket = net.connect(port, '127.0.0.1');
     let answer = '';
-    socket.on('data', (chunk) => { answer += chunk; });
+    socket.on('data', (chunk) => {
+      answer += chunk;
+    });
     socket.on('close', () => resolve(answer.split('\r\n')[0]));
     socket.on('error', reject);
     socket.write('GET /api/health HTTP/1.1\r\nHost: localhost\r\n');

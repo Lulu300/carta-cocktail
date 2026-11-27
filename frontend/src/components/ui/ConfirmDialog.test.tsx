@@ -7,7 +7,13 @@ function renderDialog(props: Partial<React.ComponentProps<typeof ConfirmDialog>>
   const onConfirm = vi.fn();
   const onCancel = vi.fn();
   const utils = render(
-    <ConfirmDialog open title="Delete the category?" onConfirm={onConfirm} onCancel={onCancel} {...props} />,
+    <ConfirmDialog
+      open
+      title="Delete the category?"
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+      {...props}
+    />,
   );
   return { onConfirm, onCancel, ...utils };
 }
@@ -21,8 +27,8 @@ describe('ConfirmDialog', () => {
 
   it('uses the generic labels by default and focuses "Confirm" for a default tone', () => {
     renderDialog();
-    expect(screen.getByRole('button', { name: 'common.cancel' })).toBeInTheDocument();
-    const confirmButton = screen.getByRole('button', { name: 'common.confirm' });
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    const confirmButton = screen.getByRole('button', { name: 'Confirm' });
     expect(confirmButton).toHaveFocus();
     expect(confirmButton.className).toContain('bg-accent');
   });
@@ -37,35 +43,42 @@ describe('ConfirmDialog', () => {
     const user = userEvent.setup();
     const { onConfirm, onCancel } = renderDialog();
 
-    await user.click(screen.getByRole('button', { name: 'common.confirm' }));
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
     expect(onConfirm).toHaveBeenCalledTimes(1);
 
-    await user.click(screen.getByRole('button', { name: 'common.cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
   it('calls onCancel from the close button of the modal', async () => {
     const user = userEvent.setup();
     const { onCancel } = renderDialog();
-    await user.click(screen.getByRole('button', { name: 'common.close' }));
+    await user.click(screen.getByRole('button', { name: 'Close' }));
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
   it('shows the details under the message', () => {
     renderDialog({
       message: 'Used by:',
-      details: <ul><li>Negroni</li><li>Americano</li></ul>,
+      details: (
+        <ul>
+          <li>Negroni</li>
+          <li>Americano</li>
+        </ul>
+      ),
     });
     const message = screen.getByText('Used by:');
     const details = screen.getByRole('list');
-    expect(message.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      message.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
   });
 
   it('keeps "Confirm" disabled until the acknowledgment box is ticked', async () => {
     const user = userEvent.setup();
     const { onConfirm } = renderDialog({ acknowledgeLabel: 'I understand the risks' });
-    const confirmButton = screen.getByRole('button', { name: 'common.confirm' });
+    const confirmButton = screen.getByRole('button', { name: 'Confirm' });
 
     expect(confirmButton).toBeDisabled();
     await user.click(confirmButton);
@@ -88,14 +101,14 @@ describe('ConfirmDialog', () => {
     const { rerender } = render(<ConfirmDialog open {...props} />);
 
     await user.click(screen.getByRole('checkbox', { name: 'I understand the risks' }));
-    expect(screen.getByRole('button', { name: 'common.confirm' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeEnabled();
 
     // Closed by the parent, without going through Cancel or Confirm.
     rerender(<ConfirmDialog open={false} {...props} />);
     rerender(<ConfirmDialog open {...props} />);
 
     expect(screen.getByRole('checkbox', { name: 'I understand the risks' })).not.toBeChecked();
-    expect(screen.getByRole('button', { name: 'common.confirm' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeDisabled();
     expect(props.onCancel).not.toHaveBeenCalled();
   });
 });

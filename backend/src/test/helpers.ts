@@ -17,7 +17,9 @@ export const request = supertest(app);
  * request and headers timeouts shortened to `timeoutMs` and checked every few
  * milliseconds: a test sees in a second what takes minutes in production.
  */
-export async function listenWithShortTimeouts(timeoutMs: number): Promise<{ port: number; close: () => void }> {
+export async function listenWithShortTimeouts(
+  timeoutMs: number,
+): Promise<{ port: number; close: () => void }> {
   const server = http.createServer(
     { requestTimeout: timeoutMs, headersTimeout: timeoutMs, connectionsCheckingInterval: 10 },
     app,
@@ -149,13 +151,15 @@ export function authHeader(userId: number = 1): { Authorization: string } {
 
 // ---- Seed factories ----
 
-export async function seedCategory(overrides: Partial<{
-  name: string;
-  type: string;
-  desiredStock: number;
-  minimumPercent: number;
-  nameTranslations: string | null;
-}> = {}) {
+export async function seedCategory(
+  overrides: Partial<{
+    name: string;
+    type: string;
+    desiredStock: number;
+    minimumPercent: number;
+    nameTranslations: string | null;
+  }> = {},
+) {
   return prisma.category.create({
     data: {
       name: overrides.name ?? 'Test Category',
@@ -167,12 +171,14 @@ export async function seedCategory(overrides: Partial<{
   });
 }
 
-export async function seedUnit(overrides: Partial<{
-  name: string;
-  abbreviation: string;
-  conversionFactorToMl: number | null;
-  nameTranslations: string | null;
-}> = {}) {
+export async function seedUnit(
+  overrides: Partial<{
+    name: string;
+    abbreviation: string;
+    conversionFactorToMl: number | null;
+    nameTranslations: string | null;
+  }> = {},
+) {
   return prisma.unit.create({
     data: {
       name: overrides.name ?? 'Centilitre',
@@ -183,18 +189,20 @@ export async function seedUnit(overrides: Partial<{
   });
 }
 
-export async function seedBottle(overrides: Partial<{
-  name: string;
-  categoryId: number;
-  capacityMl: number;
-  remainingPercent: number;
-  alcoholPercentage: number | null;
-  purchasePrice: number | null;
-  location: string | null;
-  openedAt: Date | null;
-  isApero: boolean;
-  isDigestif: boolean;
-}> = {}) {
+export async function seedBottle(
+  overrides: Partial<{
+    name: string;
+    categoryId: number;
+    capacityMl: number;
+    remainingPercent: number;
+    alcoholPercentage: number | null;
+    purchasePrice: number | null;
+    location: string | null;
+    openedAt: Date | null;
+    isApero: boolean;
+    isDigestif: boolean;
+  }> = {},
+) {
   // Ensure a category exists if not provided
   let categoryId = overrides.categoryId;
   if (!categoryId) {
@@ -223,12 +231,14 @@ export async function seedBottle(overrides: Partial<{
   });
 }
 
-export async function seedIngredient(overrides: Partial<{
-  name: string;
-  icon: string | null;
-  isAvailable: boolean;
-  nameTranslations: string | null;
-}> = {}) {
+export async function seedIngredient(
+  overrides: Partial<{
+    name: string;
+    icon: string | null;
+    isAvailable: boolean;
+    nameTranslations: string | null;
+  }> = {},
+) {
   return prisma.ingredient.create({
     data: {
       name: overrides.name ?? `Ingredient ${Date.now()}`,
@@ -239,16 +249,21 @@ export async function seedIngredient(overrides: Partial<{
   });
 }
 
-export async function seedCocktail(overrides: Partial<{
-  name: string;
-  description: string | null;
-  tags: string;
-}> = {}) {
+export async function seedCocktail(
+  overrides: Partial<{
+    name: string;
+    description: string | null;
+    tags: string;
+    /** Name of a photo in config.uploadDir; the file itself is the test's business. */
+    imagePath: string | null;
+  }> = {},
+) {
   return prisma.cocktail.create({
     data: {
       name: overrides.name ?? 'Test Cocktail',
       description: overrides.description ?? null,
       tags: overrides.tags ?? '',
+      imagePath: overrides.imagePath ?? null,
     },
   });
 }
@@ -314,9 +329,10 @@ async function findOrSeedUnitId(): Promise<number> {
  * bottle it needs, and returns it with these relations.
  */
 export async function seedFullCocktail(options: FullCocktailOptions = {}) {
-  const unitId = options.unitId ?? await findOrSeedUnitId();
-  const ingredients = options.ingredients
-    ?? [{ sourceType: 'BOTTLE' as const, bottleId: (await seedBottle()).id }];
+  const unitId = options.unitId ?? (await findOrSeedUnitId());
+  const ingredients = options.ingredients ?? [
+    { sourceType: 'BOTTLE' as const, bottleId: (await seedBottle()).id },
+  ];
   const instructions = options.instructions ?? ['Shake with ice'];
 
   return prisma.cocktail.create({
@@ -324,7 +340,9 @@ export async function seedFullCocktail(options: FullCocktailOptions = {}) {
       name: options.name ?? 'Test Cocktail',
       tags: options.tags ?? '',
       ingredients: recipeLinesData(unitId, ingredients),
-      instructions: { create: instructions.map((text, index) => ({ stepNumber: index + 1, text })) },
+      instructions: {
+        create: instructions.map((text, index) => ({ stepNumber: index + 1, text })),
+      },
     },
     include: {
       ingredients: { include: { preferredBottles: true }, orderBy: { position: 'asc' } },
@@ -336,13 +354,15 @@ export async function seedFullCocktail(options: FullCocktailOptions = {}) {
 // Each default slug is new, so that a test can create several menus
 let menuCount = 0;
 
-export async function seedMenu(overrides: Partial<{
-  name: string;
-  slug: string;
-  type: 'COCKTAILS' | 'APEROS' | 'DIGESTIFS';
-  isPublic: boolean;
-  description: string | null;
-}> = {}) {
+export async function seedMenu(
+  overrides: Partial<{
+    name: string;
+    slug: string;
+    type: 'COCKTAILS' | 'APEROS' | 'DIGESTIFS';
+    isPublic: boolean;
+    description: string | null;
+  }> = {},
+) {
   menuCount += 1;
   const slug = overrides.slug ?? `test-menu-${menuCount}`;
   return prisma.menu.create({
@@ -356,10 +376,13 @@ export async function seedMenu(overrides: Partial<{
   });
 }
 
-export async function seedMenuSection(menuId: number, overrides: Partial<{
-  name: string;
-  position: number;
-}> = {}) {
+export async function seedMenuSection(
+  menuId: number,
+  overrides: Partial<{
+    name: string;
+    position: number;
+  }> = {},
+) {
   return prisma.menuSection.create({
     data: {
       menuId,
@@ -383,11 +406,19 @@ function menuEntryData(options: MenuEntryOptions) {
   };
 }
 
-export async function addCocktailToMenu(menuId: number, cocktailId: number, options: MenuEntryOptions = {}) {
+export async function addCocktailToMenu(
+  menuId: number,
+  cocktailId: number,
+  options: MenuEntryOptions = {},
+) {
   return prisma.menuCocktail.create({ data: { menuId, cocktailId, ...menuEntryData(options) } });
 }
 
-export async function addBottleToMenu(menuId: number, bottleId: number, options: MenuEntryOptions = {}) {
+export async function addBottleToMenu(
+  menuId: number,
+  bottleId: number,
+  options: MenuEntryOptions = {},
+) {
   return prisma.menuBottle.create({ data: { menuId, bottleId, ...menuEntryData(options) } });
 }
 

@@ -46,7 +46,7 @@ describe('Toaster', () => {
     });
 
     await user.tab();
-    expect(screen.getByRole('button', { name: 'common.close' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus();
     await user.keyboard('{Enter}');
 
     expect(screen.queryByText('Failed')).not.toBeInTheDocument();
@@ -68,14 +68,19 @@ describe('Toaster', () => {
 
   it('gives the focus back to where it was after closing a toast from the keyboard', async () => {
     const user = userEvent.setup();
-    render(<><button type="button">Save</button><Toaster /></>);
+    render(
+      <>
+        <button type="button">Save</button>
+        <Toaster />
+      </>,
+    );
     act(() => {
       toast.error(new Error('Failed'));
     });
 
     await user.click(screen.getByRole('button', { name: 'Save' }));
     await user.tab();
-    expect(screen.getByRole('button', { name: 'common.close' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus();
     await user.keyboard('{Enter}');
 
     expect(screen.queryByText('Failed')).not.toBeInTheDocument();
@@ -84,7 +89,12 @@ describe('Toaster', () => {
 
   it('gives the focus back after running the action from the keyboard', async () => {
     const user = userEvent.setup();
-    render(<><button type="button">Delete</button><Toaster /></>);
+    render(
+      <>
+        <button type="button">Delete</button>
+        <Toaster />
+      </>,
+    );
     act(() => {
       toast.info('Bottle deleted', { action: { label: 'Undo', onClick: vi.fn() } });
     });
@@ -109,8 +119,9 @@ describe('Toaster', () => {
     await user.keyboard('{Enter}');
 
     expect(screen.queryByText('First')).not.toBeInTheDocument();
-    const remainingClose = within(screen.getByText('Second').parentElement as HTMLElement)
-      .getByRole('button', { name: 'common.close' });
+    const remainingClose = within(
+      screen.getByText('Second').parentElement as HTMLElement,
+    ).getByRole('button', { name: 'Close' });
     expect(remainingClose).toHaveFocus();
   });
 
@@ -142,7 +153,7 @@ describe('Toaster', () => {
       toast.error(new Error('Failed'), { action: { label: 'Retry', onClick: vi.fn() } });
     });
     const action = screen.getByRole('button', { name: 'Retry' });
-    const close = screen.getByRole('button', { name: 'common.close' });
+    const close = screen.getByRole('button', { name: 'Close' });
 
     fireEvent.focus(action);
     fireEvent.blur(action, { relatedTarget: close });

@@ -39,7 +39,8 @@ function sharedLanguageState() {
 
 /** A distinct code of three letters for each `index`: none of them is a language of the app. */
 function madeUpLanguage(index: number): string {
-  const letter = (position: number) => String.fromCharCode(97 + (Math.floor(index / 26 ** position) % 26));
+  const letter = (position: number) =>
+    String.fromCharCode(97 + (Math.floor(index / 26 ** position) % 26));
   return letter(2) + letter(1) + letter(0);
 }
 
@@ -81,23 +82,29 @@ describe('request language', () => {
   it.each([
     ['fr-CA, en;q=0.5', 'fr', FRENCH_MESSAGE],
     ['en-US, fr;q=0.8', 'en', ENGLISH_MESSAGE],
-  ])('serves the first acceptable language of Accept-Language: %s', async (header, language, message) => {
-    const res = await request.get('/').set('Accept-Language', header);
+  ])(
+    'serves the first acceptable language of Accept-Language: %s',
+    async (header, language, message) => {
+      const res = await request.get('/').set('Accept-Language', header);
 
-    expect(res.headers['content-language']).toBe(language);
-    expect(res.body.error).toBe(message);
-  });
+      expect(res.headers['content-language']).toBe(language);
+      expect(res.body.error).toBe(message);
+    },
+  );
 
   it.each([
     ['de', 'en', ENGLISH_MESSAGE],
     ['de-DE, fr;q=0.5', 'fr', FRENCH_MESSAGE],
-  ])('skips a language the app does not have in Accept-Language: %s', async (header, language, message) => {
-    const res = await request.get('/').set('Accept-Language', header);
+  ])(
+    'skips a language the app does not have in Accept-Language: %s',
+    async (header, language, message) => {
+      const res = await request.get('/').set('Accept-Language', header);
 
-    // English numbers too: `de` used to get English text with `5.000`
-    expect(res.headers['content-language']).toBe(language);
-    expect(res.body.error).toBe(message);
-  });
+      // English numbers too: `de` used to get English text with `5.000`
+      expect(res.headers['content-language']).toBe(language);
+      expect(res.body.error).toBe(message);
+    },
+  );
 
   it('moves on to Accept-Language when ?lng= names a language the app does not have', async () => {
     const res = await request.get('/?lng=de').set('Accept-Language', 'fr');
@@ -132,7 +139,8 @@ describe('request language', () => {
 
     // 2,000 requests, each with a different made-up language in the query, the cookie and the header
     for (let index = 0; index < 2000; index++) {
-      const res = await request.get(`/?lng=xx${index}`)
+      const res = await request
+        .get(`/?lng=xx${index}`)
         .set('Cookie', `i18next=yy${index}`)
         .set('Accept-Language', `${madeUpLanguage(index)}-ZZ`);
       expect(res.headers['content-language']).toBe('en');

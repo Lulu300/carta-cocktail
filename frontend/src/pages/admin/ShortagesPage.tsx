@@ -3,6 +3,7 @@ import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { useCategoryTypeName } from '../../hooks/useCategoryTypeName';
 import { useShortages } from '../../queries/shortages';
 import { getBadgeClasses } from '../../utils/colors';
+import Alert from '../../components/ui/Alert';
 
 export default function ShortagesPage() {
   const { t } = useTranslation();
@@ -13,11 +14,15 @@ export default function ShortagesPage() {
   // Never show the green "no shortages" banner unless the list really loaded.
   const renderContent = () => {
     if (isPending) {
-      return <div role="status" className="text-center py-12 text-fg-muted">{t('common.loading')}</div>;
+      return (
+        <div role="status" className="text-center py-12 text-fg-muted">
+          {t('common.loading')}
+        </div>
+      );
     }
     if (isError) {
       return (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-6 py-8 rounded-xl text-center space-y-4">
+        <Alert tone="danger" size="banner">
           <p className="text-lg">{t('common.error')}</p>
           <button
             onClick={() => refetch()}
@@ -25,28 +30,34 @@ export default function ShortagesPage() {
           >
             {t('common.retry')}
           </button>
-        </div>
+        </Alert>
       );
     }
     if (items.length === 0) {
       return (
-        <div className="bg-green-500/10 border border-green-500/30 text-green-400 px-6 py-8 rounded-xl text-center text-lg">
+        <Alert tone="success" size="banner" className="text-lg">
           {t('shortages.noShortages')}
-        </div>
+        </Alert>
       );
     }
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {items.map((item) => {
           const deficit = item.requiredPercent - item.totalPercent;
-          const fillPercent = item.requiredPercent > 0
-            ? Math.min(100, (item.totalPercent / item.requiredPercent) * 100)
-            : 100;
+          const fillPercent =
+            item.requiredPercent > 0
+              ? Math.min(100, (item.totalPercent / item.requiredPercent) * 100)
+              : 100;
           return (
-            <div key={item.category.id} className="bg-surface border border-danger/30 rounded-xl p-6">
+            <div
+              key={item.category.id}
+              className="bg-surface border border-danger/30 rounded-xl p-6"
+            >
               <div className="flex items-center justify-between mb-3">
                 <h2 className="font-semibold text-lg">{localize(item.category)}</h2>
-                <span className={`px-2 py-1 rounded text-xs font-medium ${getBadgeClasses(item.category.categoryType?.color)}`}>
+                <span
+                  className={`px-2 py-1 rounded text-xs font-medium ${getBadgeClasses(item.category.categoryType?.color)}`}
+                >
                   {categoryTypeLabel(item.category.type, item.category.categoryType)}
                 </span>
               </div>

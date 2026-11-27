@@ -10,7 +10,6 @@ import { FALLBACK_LANGUAGE } from '../i18n';
 /** Order of the day and the month in a date written with slashes or dots. */
 type DayMonthOrder = 'dayFirst' | 'monthFirst';
 
-
 /**
  * One entry per application language; a new language adds its order here, with a test.
  * `en` is US English, as Excel in English (US) writes it: `3/12/2024` is March 12.
@@ -27,16 +26,19 @@ const DAY_MONTH_ORDERS = new Map<string, DayMonthOrder>([
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 // The export writes `toISOString()`. The offset is required: a time without one would be read
 // in the server's time zone.
-const ISO_TIMESTAMP = /^(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+const ISO_TIMESTAMP =
+  /^(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/;
 // A four-digit year: `12/03/24` could be 1924 or 2024
 const NUMERIC_DATE = /^(\d{1,2})([/.])(\d{1,2})\2(\d{4})$/;
 
 /** The exact code first (`en-GB`), then its base language (`en`), then the app's fallback language. */
 function dayMonthOrder(language: string): DayMonthOrder {
   const baseLanguage = language.split('-')[0].toLowerCase();
-  return DAY_MONTH_ORDERS.get(language)
-    ?? DAY_MONTH_ORDERS.get(baseLanguage)
-    ?? DAY_MONTH_ORDERS.get(FALLBACK_LANGUAGE)!;
+  return (
+    DAY_MONTH_ORDERS.get(language) ??
+    DAY_MONTH_ORDERS.get(baseLanguage) ??
+    DAY_MONTH_ORDERS.get(FALLBACK_LANGUAGE)!
+  );
 }
 
 function isLeapYear(year: number): boolean {

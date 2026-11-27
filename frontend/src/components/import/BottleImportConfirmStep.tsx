@@ -1,6 +1,12 @@
 import { useTranslation } from 'react-i18next';
 import type { BottleImportPreviewResponse, BottleImportResolutions, Category } from '../../types';
-import { countBottlesToCreate, countCategoriesToCreate, countDuplicateRows, countRowsWithoutCategory } from './bottleImportResolutions';
+import {
+  countBottlesToCreate,
+  countCategoriesToCreate,
+  countDuplicateRows,
+  countRowsWithoutCategory,
+} from './bottleImportResolutions';
+import Alert from '../ui/Alert';
 
 interface BottleImportConfirmStepProps {
   preview: BottleImportPreviewResponse;
@@ -9,7 +15,11 @@ interface BottleImportConfirmStepProps {
 }
 
 /** What the confirmation creates, with the duplicates and the rows it would leave out. */
-export default function BottleImportConfirmStep({ preview, resolutions, existingCategories }: BottleImportConfirmStepProps) {
+export default function BottleImportConfirmStep({
+  preview,
+  resolutions,
+  existingCategories,
+}: BottleImportConfirmStepProps) {
   const { t } = useTranslation();
   const categoriesToCreate = countCategoriesToCreate(resolutions, existingCategories);
   const skippedRows = Object.values(resolutions.bottles).filter((r) => r.action === 'skip').length;
@@ -17,9 +27,21 @@ export default function BottleImportConfirmStep({ preview, resolutions, existing
   const rowsWithoutCategory = countRowsWithoutCategory(preview, resolutions);
 
   const counts = [
-    { label: t('bottles.importWizard.categoriesToCreate'), value: categoriesToCreate, className: 'text-accent' },
-    { label: t('bottles.importWizard.bottlesToImport'), value: countBottlesToCreate(preview, resolutions), className: 'text-accent' },
-    { label: t('bottles.importWizard.bottlesToSkip'), value: skippedRows, className: 'text-fg-muted' },
+    {
+      label: t('bottles.importWizard.categoriesToCreate'),
+      value: categoriesToCreate,
+      className: 'text-accent',
+    },
+    {
+      label: t('bottles.importWizard.bottlesToImport'),
+      value: countBottlesToCreate(preview, resolutions),
+      className: 'text-accent',
+    },
+    {
+      label: t('bottles.importWizard.bottlesToSkip'),
+      value: skippedRows,
+      className: 'text-fg-muted',
+    },
   ];
 
   return (
@@ -39,16 +61,15 @@ export default function BottleImportConfirmStep({ preview, resolutions, existing
       </div>
 
       {duplicateRows > 0 && (
-        <div className="bg-orange-500/10 border border-orange-500/30 text-orange-400 rounded-lg p-3 text-xs space-y-1">
-          <p className="font-semibold">{t('bottles.importWizard.duplicatesWarningTitle')}</p>
+        <Alert tone="warning" size="xs" title={t('bottles.importWizard.duplicatesWarningTitle')}>
           <p>{t('bottles.importWizard.duplicatesWarningBody', { count: duplicateRows })}</p>
-        </div>
+        </Alert>
       )}
 
       {rowsWithoutCategory > 0 && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg p-3 text-xs">
+        <Alert tone="danger" size="xs">
           {t('bottles.importWizard.unresolvedWarning', { count: rowsWithoutCategory })}
-        </div>
+        </Alert>
       )}
     </div>
   );

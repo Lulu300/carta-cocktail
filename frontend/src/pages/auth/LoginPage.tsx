@@ -8,7 +8,12 @@ import Button from '../../components/ui/Button';
 import Field from '../../components/ui/Field';
 import Input from '../../components/ui/Input';
 import LanguageSelector from '../../components/ui/LanguageSelector';
-import { isSignInAfterLogoutEverywhere, isSignInAfterRestore } from '../../utils/signInAfterRestore';
+import {
+  isSignInAfterLogoutEverywhere,
+  isSignInAfterRestore,
+} from '../../utils/signInAfterRestore';
+import Alert from '../../components/ui/Alert';
+import UpdateAvailableBanner from '../../components/admin/UpdateAvailableBanner';
 
 const ADMIN_HOME = '/admin';
 
@@ -54,7 +59,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      navigate(getRedirectPath(location.state), { replace: true });
+      void navigate(getRedirectPath(location.state), { replace: true });
     } catch (err) {
       setError(getLoginErrorMessage(err, t));
     } finally {
@@ -65,6 +70,7 @@ export default function LoginPage() {
   return (
     <main className="min-h-screen bg-canvas text-fg flex items-center justify-center px-4">
       <div className="w-full max-w-md">
+        <UpdateAvailableBanner className="mb-6" />
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-accent font-serif mb-2">{t('app.name')}</h1>
           <p className="text-fg-muted">{t('auth.welcome')}</p>
@@ -77,21 +83,21 @@ export default function LoginPage() {
           <h2 className="text-xl font-semibold text-center">{t('auth.login')}</h2>
 
           {isSignInAfterRestore(location.search) && (
-            <p className="bg-info/10 border border-info/30 text-info px-4 py-3 rounded-lg text-sm">
+            <Alert tone="info" size="md">
               {t('auth.backupRestored')}
-            </p>
+            </Alert>
           )}
 
           {isSignInAfterLogoutEverywhere(location.search) && (
-            <p className="bg-info/10 border border-info/30 text-info px-4 py-3 rounded-lg text-sm">
+            <Alert tone="info" size="md">
               {t('auth.loggedOutEverywhere')}
-            </p>
+            </Alert>
           )}
 
           {error && (
-            <div role="alert" className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg text-sm">
+            <Alert tone="danger" size="md">
               {error}
-            </div>
+            </Alert>
           )}
 
           <Field label={t('auth.email')}>

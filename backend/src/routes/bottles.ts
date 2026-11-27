@@ -8,14 +8,22 @@ import { BadRequestError, NotFoundError } from '../errors';
 import { parseNameTranslations, serializeTranslations } from '../utils/translations';
 import { buildExportPayload, buildCsvPayload } from '../utils/bottlesExport';
 import {
-  ImportParseError, MAX_BOTTLE_IMPORT_BYTES, parseImportFile, NormalizedImportPayload,
+  ImportParseError,
+  MAX_BOTTLE_IMPORT_BYTES,
+  parseImportFile,
+  NormalizedImportPayload,
 } from '../utils/bottlesImport';
 import { deleteBottle, isForceRequested } from '../services/deletionService';
 import { syncBottle, syncNewBottles } from '../services/menuSyncService';
 import { categoryTypeNameFor, createMissingCategoryType } from '../services/categoryTypeService';
 import { valid, validate } from '../validation/validate';
 import { deleteRequest, IdParams, idRequest } from '../validation/common';
-import { BottleCreate, BottleExportQuery, BottleListQuery, BottleUpdate } from '../validation/bottles';
+import {
+  BottleCreate,
+  BottleExportQuery,
+  BottleListQuery,
+  BottleUpdate,
+} from '../validation/bottles';
 import { BottleImportConfirm } from '../validation/bottleImport';
 import { importedCategoryTypePath } from '../validation/categories';
 import { CaseInsensitiveIndex, previewMatch } from '../utils/uniqueness';
@@ -61,7 +69,12 @@ function duplicateKey(name: string, capacityMl: number, category: string | numbe
 }
 
 function previewCategory(category: Category) {
-  return { id: category.id, name: category.name, type: category.type, desiredStock: category.desiredStock };
+  return {
+    id: category.id,
+    name: category.name,
+    type: category.type,
+    desiredStock: category.desiredStock,
+  };
 }
 
 function parseUploadedFile(file: Express.Multer.File, language: string): NormalizedImportPayload {
@@ -73,166 +86,199 @@ function parseUploadedFile(file: Express.Multer.File, language: string): Normali
   }
 }
 
-router.post('/import/preview', importUpload.single('file'), async (req: AuthRequest, res: Response) => {
-  if (!req.file) throw new BadRequestError();
+router.post(
+  '/import/preview',
+  importUpload.single('file'),
+  async (req: AuthRequest, res: Response) => {
+    if (!req.file) throw new BadRequestError();
 
-  // The rows left out and the values to check are listed apart: the payload goes back unchanged to /import/confirm
-  // A date typed in a spreadsheet is read in the order of the app's language (Accept-Language)
-  const { errors, warnings, ...payload } = parseUploadedFile(req.file, req.language);
+    // The rows left out and the values to check are listed apart: the payload goes back unchanged to /import/confirm
+    // A date typed in a spreadsheet is read in the order of the app's language (Accept-Language)
+    const { errors, warnings, ...payload } = parseUploadedFile(req.file, req.language);
 
-  const allBottles = await prisma.bottle.findMany({ include: { category: true } });
+    const allBottles = await prisma.bottle.findMany({ include: { category: true } });
 
-  // Indexes instead of a scan per imported row: an import has up to 2,000 rows
-  const categoriesByName = new CaseInsensitiveIndex(await prisma.category.findMany(), (category) => category.name);
-  const bottlesByKey = new Map<string, typeof allBottles>();
-  for (const bottle of allBottles) {
-    const key = duplicateKey(bottle.name, bottle.capacityMl, caseInsensitiveKey(bottle.category.name));
-    const sameKey = bottlesByKey.get(key);
-    if (sameKey) sameKey.push(bottle);
-    else bottlesByKey.set(key, [bottle]);
-  }
+    // Indexes instead of a scan per imported row: an import has up to 2,000 rows
+    const categoriesByName = new CaseInsensitiveIndex(
+      await prisma.category.findMany(),
+      (category) => category.name,
+    );
+    const bottlesByKey = new Map<string, typeof allBottles>();
+    for (const bottle of allBottles) {
+      const key = duplicateKey(
+        bottle.name,
+        bottle.capacityMl,
+        caseInsensitiveKey(bottle.category.name),
+      );
+      const sameKey = bottlesByKey.get(key);
+      if (sameKey) sameKey.push(bottle);
+      else bottlesByKey.set(key, [bottle]);
+    }
 
-  const categories = payload.categories.map((c) => ({
-    ref: c,
-    ...previewMatch(categoriesByName.match(c.name), previewCategory),
-  }));
+    const categories = payload.categories.map((c) => ({
+      ref: c,
+      ...previewMatch(categoriesByName.match(c.name), previewCategory),
+    }));
 
-  const bottles = payload.bottles.map((b) => {
-    const duplicates = (bottlesByKey.get(duplicateKey(b.name, b.capacityMl, caseInsensitiveKey(b.categoryName))) ?? [])
-      .map((d) => ({
+    const bottles = payload.bottles.map((b) => {
+      const duplicates = (
+        bottlesByKey.get(duplicateKey(b.name, b.capacityMl, caseInsensitiveKey(b.categoryName))) ??
+        []
+      ).map((d) => ({
         id: d.id,
         name: d.name,
         capacityMl: d.capacityMl,
         categoryName: d.category.name,
         remainingPercent: d.remainingPercent,
       }));
-    return {
-      ref: b,
-      needsCategory: b.categoryName.length === 0,
-      potentialDuplicates: duplicates,
-    };
-  });
+      return {
+        ref: b,
+        needsCategory: b.categoryName.length === 0,
+        potentialDuplicates: duplicates,
+      };
+    });
 
-  res.json({ payload, categories, bottles, errors, warnings });
-});
+    res.json({ payload, categories, bottles, errors, warnings });
+  },
+);
 
 const importConfirmSchemas = { body: BottleImportConfirm };
 
-router.post('/import/confirm', validate(importConfirmSchemas), async (_req: AuthRequest, res: Response) => {
-  const { payload, resolutions } = valid<typeof importConfirmSchemas>(res).body;
+router.post(
+  '/import/confirm',
+  validate(importConfirmSchemas),
+  async (_req: AuthRequest, res: Response) => {
+    const { payload, resolutions } = valid<typeof importConfirmSchemas>(res).body;
 
-  const created = await prisma.$transaction(async (tx) => {
-    const resolvedCategories = new Map<string, number>(); // lowercased name -> id
-    const categories = await tx.category.findMany();
-    const existingCategories = new CaseInsensitiveIndex(categories, (category) => category.name);
-    const existingCategoryIds = new Set(categories.map((category) => category.id));
+    const created = await prisma.$transaction(
+      async (tx) => {
+        const resolvedCategories = new Map<string, number>(); // lowercased name -> id
+        const categories = await tx.category.findMany();
+        const existingCategories = new CaseInsensitiveIndex(
+          categories,
+          (category) => category.name,
+        );
+        const existingCategoryIds = new Set(categories.map((category) => category.id));
 
-    // Apply explicit category resolutions
-    for (const [key, resolution] of Object.entries(resolutions?.categories || {})) {
-      if (resolution.action === 'use_existing' && resolution.existingId) {
-        resolvedCategories.set(key.toLowerCase(), resolution.existingId);
-      } else if (resolution.action === 'create' && resolution.data) {
-        // The schema fills the type, desired stock and minimum percent defaults
-        const { nameTranslations, name, type, desiredStock, minimumPercent } = resolution.data;
-        const categoryName = name || key;
-        // Checked before the lookup, so the request is refused or not whatever the database holds
-        const typeName = await categoryTypeNameFor(tx, type, importedCategoryTypePath(key));
-        // A category that exists ignoring case is used as it is, its type included
-        const category = await existingCategories.findOrCreate(categoryName, 'errors.ambiguousCategoryName', async () => {
-          await createMissingCategoryType(tx, typeName);
-          return tx.category.create({
-            data: {
-              name: nameToStore(categoryName),
-              type: typeName,
-              desiredStock,
-              minimumPercent,
-              nameTranslations: serializeTranslations(translationsToStore(nameTranslations)),
-            },
+        // Apply explicit category resolutions
+        for (const [key, resolution] of Object.entries(resolutions?.categories || {})) {
+          if (resolution.action === 'use_existing' && resolution.existingId) {
+            resolvedCategories.set(key.toLowerCase(), resolution.existingId);
+          } else if (resolution.action === 'create' && resolution.data) {
+            // The schema fills the type, desired stock and minimum percent defaults
+            const { nameTranslations, name, type, desiredStock, minimumPercent } = resolution.data;
+            const categoryName = name || key;
+            // Checked before the lookup, so the request is refused or not whatever the database holds
+            const typeName = await categoryTypeNameFor(tx, type, importedCategoryTypePath(key));
+            // A category that exists ignoring case is used as it is, its type included
+            const category = await existingCategories.findOrCreate(
+              categoryName,
+              'errors.ambiguousCategoryName',
+              async () => {
+                await createMissingCategoryType(tx, typeName);
+                return tx.category.create({
+                  data: {
+                    name: nameToStore(categoryName),
+                    type: typeName,
+                    desiredStock,
+                    minimumPercent,
+                    nameTranslations: serializeTranslations(translationsToStore(nameTranslations)),
+                  },
+                });
+              },
+            );
+            // Under the file's name, as `use_existing`: the rows name it, even when the admin renamed
+            // the category. A row moved to the new name finds it in `existingCategories`.
+            resolvedCategories.set(key.toLowerCase(), category.id);
+          }
+        }
+
+        // A row goes in the category resolved for its name, else in the existing one of that name
+        const categoryIdOf = (categoryName: string) =>
+          resolvedCategories.get(categoryName.toLowerCase()) ??
+          existingCategories.findUnambiguous(categoryName, 'errors.ambiguousCategoryName')?.id;
+
+        // An existing category picked by its id, else the category of the row's name, else of the file's
+        const rowCategoryId = (
+          fileCategory: string,
+          resolution: { categoryId?: number; categoryName?: string },
+        ) => {
+          if (resolution.categoryId !== undefined) {
+            return existingCategoryIds.has(resolution.categoryId)
+              ? resolution.categoryId
+              : undefined;
+          }
+          const categoryName = (resolution.categoryName || fileCategory).trim();
+          return categoryName ? categoryIdOf(categoryName) : undefined;
+        };
+
+        let skippedNoCategory = 0;
+        let duplicatesCreated = 0;
+        const rows: Prisma.BottleCreateManyInput[] = [];
+
+        const bottleResolutions = resolutions?.bottles || {};
+
+        // By category id: a row may go in a category created under another name than the file's,
+        // or in one of several categories that differ only by case
+        const existingBottles = await tx.bottle.findMany();
+        const existingKeys = new Set(
+          existingBottles.map((b) => duplicateKey(b.name, b.capacityMl, b.categoryId)),
+        );
+
+        for (let i = 0; i < payload.bottles.length; i++) {
+          const b = payload.bottles[i];
+          const resolution = bottleResolutions[String(i)] ?? { action: 'import' as const };
+
+          if (resolution.action === 'skip') continue;
+
+          const categoryId = rowCategoryId(b.categoryName, resolution);
+          if (!categoryId) {
+            skippedNoCategory++;
+            continue;
+          }
+
+          if (existingKeys.has(duplicateKey(b.name, b.capacityMl, categoryId))) {
+            duplicatesCreated += b.quantity;
+          }
+
+          const data: Prisma.BottleCreateManyInput = {
+            name: b.name,
+            categoryId,
+            capacityMl: b.capacityMl,
+            remainingPercent: b.remainingPercent,
+            alcoholPercentage: b.alcoholPercentage,
+            purchasePrice: b.purchasePrice,
+            location: b.location,
+            openedAt: b.openedAt,
+            isApero: b.isApero,
+            isDigestif: b.isDigestif,
+          };
+          for (let q = 0; q < b.quantity; q++) rows.push(data);
+        }
+
+        const createdIds: number[] = [];
+        for (let start = 0; start < rows.length; start += CREATE_BATCH_SIZE) {
+          const batch = await tx.bottle.createManyAndReturn({
+            data: rows.slice(start, start + CREATE_BATCH_SIZE),
+            select: { id: true },
           });
-        });
-        // Under the file's name, as `use_existing`: the rows name it, even when the admin renamed
-        // the category. A row moved to the new name finds it in `existingCategories`.
-        resolvedCategories.set(key.toLowerCase(), category.id);
-      }
-    }
+          createdIds.push(...batch.map((bottle) => bottle.id));
+        }
 
-    // A row goes in the category resolved for its name, else in the existing one of that name
-    const categoryIdOf = (categoryName: string) => resolvedCategories.get(categoryName.toLowerCase())
-      ?? existingCategories.findUnambiguous(categoryName, 'errors.ambiguousCategoryName')?.id;
-
-    // An existing category picked by its id, else the category of the row's name, else of the file's
-    const rowCategoryId = (fileCategory: string, resolution: { categoryId?: number; categoryName?: string }) => {
-      if (resolution.categoryId !== undefined) {
-        return existingCategoryIds.has(resolution.categoryId) ? resolution.categoryId : undefined;
-      }
-      const categoryName = (resolution.categoryName || fileCategory).trim();
-      return categoryName ? categoryIdOf(categoryName) : undefined;
-    };
-
-    let skippedNoCategory = 0;
-    let duplicatesCreated = 0;
-    const rows: Prisma.BottleCreateManyInput[] = [];
-
-    const bottleResolutions = resolutions?.bottles || {};
-
-    // By category id: a row may go in a category created under another name than the file's,
-    // or in one of several categories that differ only by case
-    const existingBottles = await tx.bottle.findMany();
-    const existingKeys = new Set(
-      existingBottles.map((b) => duplicateKey(b.name, b.capacityMl, b.categoryId))
+        // Inside the transaction: a failed sync also cancels the import
+        await syncNewBottles(tx, createdIds);
+        return { createdCount: rows.length, skippedNoCategory, duplicatesCreated };
+      },
+      { timeout: IMPORT_TRANSACTION_TIMEOUT_MS },
     );
 
-    for (let i = 0; i < payload.bottles.length; i++) {
-      const b = payload.bottles[i];
-      const resolution = bottleResolutions[String(i)] ?? { action: 'import' as const };
-
-      if (resolution.action === 'skip') continue;
-
-      const categoryId = rowCategoryId(b.categoryName, resolution);
-      if (!categoryId) {
-        skippedNoCategory++;
-        continue;
-      }
-
-      if (existingKeys.has(duplicateKey(b.name, b.capacityMl, categoryId))) {
-        duplicatesCreated += b.quantity;
-      }
-
-      const data: Prisma.BottleCreateManyInput = {
-        name: b.name,
-        categoryId,
-        capacityMl: b.capacityMl,
-        remainingPercent: b.remainingPercent,
-        alcoholPercentage: b.alcoholPercentage,
-        purchasePrice: b.purchasePrice,
-        location: b.location,
-        openedAt: b.openedAt,
-        isApero: b.isApero,
-        isDigestif: b.isDigestif,
-      };
-      for (let q = 0; q < b.quantity; q++) rows.push(data);
-    }
-
-    const createdIds: number[] = [];
-    for (let start = 0; start < rows.length; start += CREATE_BATCH_SIZE) {
-      const batch = await tx.bottle.createManyAndReturn({
-        data: rows.slice(start, start + CREATE_BATCH_SIZE),
-        select: { id: true },
-      });
-      createdIds.push(...batch.map((bottle) => bottle.id));
-    }
-
-    // Inside the transaction: a failed sync also cancels the import
-    await syncNewBottles(tx, createdIds);
-    return { createdCount: rows.length, skippedNoCategory, duplicatesCreated };
-  }, { timeout: IMPORT_TRANSACTION_TIMEOUT_MS });
-
-  res.status(201).json({
-    created: { bottles: created.createdCount },
-    duplicatesCreated: created.duplicatesCreated,
-    skippedNoCategory: created.skippedNoCategory,
-  });
-});
+    res.status(201).json({
+      created: { bottles: created.createdCount },
+      duplicatesCreated: created.duplicatesCreated,
+      skippedNoCategory: created.skippedNoCategory,
+    });
+  },
+);
 
 const exportSchemas = { query: BottleExportQuery };
 
@@ -311,7 +357,10 @@ router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Respons
 const updateSchemas = { params: IdParams, body: BottleUpdate };
 
 router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Response) => {
-  const { params: { id }, body } = valid<typeof updateSchemas>(res);
+  const {
+    params: { id },
+    body,
+  } = valid<typeof updateSchemas>(res);
   const { location, ...fields } = body;
   const bottle = await prisma.$transaction(async (tx) => {
     // Absent fields are undefined, which Prisma leaves untouched
@@ -333,7 +382,10 @@ router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Respo
 
 // Refused while recipes use the bottle as a source, unless ?force=true
 router.delete('/:id', validate(deleteRequest), async (req: AuthRequest, res: Response) => {
-  const { params: { id }, query } = valid<typeof deleteRequest>(res);
+  const {
+    params: { id },
+    query,
+  } = valid<typeof deleteRequest>(res);
   const impact = await deleteBottle(id, isForceRequested(query.force));
   res.json({ message: req.t('bottles.deleted'), deleted: true, impact });
 });

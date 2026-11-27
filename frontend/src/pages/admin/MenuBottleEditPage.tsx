@@ -15,7 +15,11 @@ import MenuItemRow from '../../components/admin/menus/MenuItemRow';
 import { groupBySection } from '../../components/admin/menus/groupBySection';
 import { menuEditorPath } from '../../components/admin/menus/bottleMenuType';
 import { isSystemMenu } from '../../components/admin/menus/isSystemMenu';
-import { groupMenuBottles, hasBottle, type MenuBottleGroup } from '../../components/admin/menus/menuBottleGroups';
+import {
+  groupMenuBottles,
+  hasBottle,
+  type MenuBottleGroup,
+} from '../../components/admin/menus/menuBottleGroups';
 import { useMenuBottles, type EntryChanges } from '../../components/admin/menus/useMenuBottles';
 import { useMenuMutation } from '../../components/admin/menus/useMenuMutation';
 
@@ -41,7 +45,11 @@ type BottleMenu = Menu & { type: BottleMenuType };
 
 const TYPE_TEXTS: Record<BottleMenuType, MenuTypeTexts> = {
   APEROS: {
-    system: { title: 'menus.bottles.aperos.title', hint: 'menus.bottles.aperos.hint', empty: 'menus.bottles.aperos.empty' },
+    system: {
+      title: 'menus.bottles.aperos.title',
+      hint: 'menus.bottles.aperos.hint',
+      empty: 'menus.bottles.aperos.empty',
+    },
     personal: {
       title: 'menus.bottles.aperos.personalTitle',
       hint: 'menus.bottles.aperos.personalHint',
@@ -52,7 +60,11 @@ const TYPE_TEXTS: Record<BottleMenuType, MenuTypeTexts> = {
     unchecked: 'menus.bottles.aperos.unchecked',
   },
   DIGESTIFS: {
-    system: { title: 'menus.bottles.digestifs.title', hint: 'menus.bottles.digestifs.hint', empty: 'menus.bottles.digestifs.empty' },
+    system: {
+      title: 'menus.bottles.digestifs.title',
+      hint: 'menus.bottles.digestifs.hint',
+      empty: 'menus.bottles.digestifs.empty',
+    },
     personal: {
       title: 'menus.bottles.digestifs.personalTitle',
       hint: 'menus.bottles.digestifs.personalHint',
@@ -79,7 +91,13 @@ export default function MenuBottleEditPage() {
       itemLabel="bottles"
       title={(menu) => t(isBottleMenu(menu) ? kindTexts(menu).title : 'menus.edit')}
     >
-      {(menu) => (isBottleMenu(menu) ? <MenuBottles menu={menu} /> : <Navigate to={menuEditorPath(menu)} replace />)}
+      {(menu) =>
+        isBottleMenu(menu) ? (
+          <MenuBottles menu={menu} />
+        ) : (
+          <Navigate to={menuEditorPath(menu)} replace />
+        )
+      }
     </MenuEditorLayout>
   );
 }
@@ -130,7 +148,7 @@ function MenuBottles({ menu }: { menu: BottleMenu }) {
 
   // A system menu keeps a removed bottle as an exclusion; a personal menu just lets it go.
   const remove = (group: MenuBottleGroup) => {
-    if (isSystem) exclude(group);
+    if (isSystem) void exclude(group);
     else mutations.remove.mutate(group.entries);
   };
 
@@ -140,12 +158,19 @@ function MenuBottles({ menu }: { menu: BottleMenu }) {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">{t('menus.bottles.title')}</h2>
           {isSystem && (
-            <Button variant="secondary" size="sm" loading={sync.isPending} onClick={() => sync.mutate(undefined)}>
+            <Button
+              variant="secondary"
+              size="sm"
+              loading={sync.isPending}
+              onClick={() => sync.mutate(undefined)}
+            >
               {t('menus.bottles.sync')}
             </Button>
           )}
         </div>
-        <p className="mb-4 p-3 bg-info/10 border border-info/30 rounded-lg text-sm text-info">{t(texts.hint)}</p>
+        <p className="mb-4 p-3 bg-info/10 border border-info/30 rounded-lg text-sm text-info">
+          {t(texts.hint)}
+        </p>
         {groups.length === 0 ? (
           <p className="text-center py-8 text-fg-muted">{t(texts.empty)}</p>
         ) : (
@@ -161,14 +186,26 @@ function MenuBottles({ menu }: { menu: BottleMenu }) {
                 sections={sections}
                 sectionId={group.menuSectionId}
                 onSectionChange={(menuSectionId) => updateGroup(group, { menuSectionId })}
-                move={{ ...move, disableUp: move.disableUp || !canReorder, disableDown: move.disableDown || !canReorder }}
+                move={{
+                  ...move,
+                  disableUp: move.disableUp || !canReorder,
+                  disableDown: move.disableDown || !canReorder,
+                }}
                 onRemove={() => remove(group)}
                 disabled={!group.isSaved}
-                details={group.bottle.alcoholPercentage != null && (
-                  <span className="text-xs text-fg-muted">{t('units.abv', { value: group.bottle.alcoholPercentage })}</span>
-                )}
+                details={
+                  group.bottle.alcoholPercentage != null && (
+                    <span className="text-xs text-fg-muted">
+                      {t('units.abv', { value: group.bottle.alcoholPercentage })}
+                    </span>
+                  )
+                }
               >
-                <BottleGroupLabel bottle={group.bottle} count={group.entries.length} isEmpty={group.isEmpty} />
+                <BottleGroupLabel
+                  bottle={group.bottle}
+                  count={group.entries.length}
+                  isEmpty={group.isEmpty}
+                />
               </MenuItemRow>
             )}
           />

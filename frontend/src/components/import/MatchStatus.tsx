@@ -13,7 +13,12 @@ const BADGE_TONES = { matched: 'success', missing: 'warning', ambiguous: 'danger
 
 /** Coloured dot in front of an imported entity: found in the database, not found, or several matches. */
 export function MatchDot({ status }: { status: ImportMatchStatus }) {
-  return <span aria-hidden="true" className={cx('w-2.5 h-2.5 rounded-full flex-shrink-0', DOT_CLASSES[status])} />;
+  return (
+    <span
+      aria-hidden="true"
+      className={cx('w-2.5 h-2.5 rounded-full flex-shrink-0', DOT_CLASSES[status])}
+    />
+  );
 }
 
 /** "Match found", "To create" or "Several matches", after the entity's name. */

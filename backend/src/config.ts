@@ -48,7 +48,12 @@ const MIN_JWT_SECRET_LENGTH = 32;
 
 // Values published in this public repository (old defaults, docs, test setup):
 // anyone could forge admin tokens with them.
-const WEAK_SECRETS = ['default-secret', 'change-me-to-a-random-secret', 'your-random-secret', 'test-secret'];
+const WEAK_SECRETS = [
+  'default-secret',
+  'change-me-to-a-random-secret',
+  'your-random-secret',
+  'test-secret',
+];
 
 /**
  * Returns the JWT secret, or throws when it is missing or guessable.
@@ -59,7 +64,9 @@ export function assertJwtSecret(secret: string | undefined, nodeEnv: string | un
     return secret ?? '';
   }
   if (!secret || secret.length < MIN_JWT_SECRET_LENGTH || WEAK_SECRETS.includes(secret)) {
-    throw new Error('JWT_SECRET must be set to a random value of at least 32 characters (openssl rand -hex 32)');
+    throw new Error(
+      'JWT_SECRET must be set to a random value of at least 32 characters (openssl rand -hex 32)',
+    );
   }
   return secret;
 }
@@ -75,7 +82,10 @@ const POSITIVE_INTEGER_DEFAULTS = {
 export type PositiveIntegerVariable = keyof typeof POSITIVE_INTEGER_DEFAULTS;
 
 /** Reads a positive integer variable, or its default when it is not set. */
-export function parsePositiveInteger(name: PositiveIntegerVariable, env: NodeJS.ProcessEnv = process.env): number {
+export function parsePositiveInteger(
+  name: PositiveIntegerVariable,
+  env: NodeJS.ProcessEnv = process.env,
+): number {
   const value = env[name];
   if (!value) {
     return POSITIVE_INTEGER_DEFAULTS[name];
@@ -104,7 +114,9 @@ export function parseJwtExpiresIn(value: string | undefined): JwtExpiresIn {
   try {
     jwt.sign({}, 'lifetime-check', { expiresIn });
   } catch {
-    throw new Error(`JWT_EXPIRES_IN must be a number of seconds or a timespan such as 7d or 24h, got '${value}'`);
+    throw new Error(
+      `JWT_EXPIRES_IN must be a number of seconds or a timespan such as 7d or 24h, got '${value}'`,
+    );
   }
   return expiresIn;
 }
@@ -127,7 +139,9 @@ export function parseTrustProxy(value: string | undefined): number | string {
     // Express compiles the setting when it is set, and throws on a bad address
     express().set('trust proxy', trustProxy);
   } catch {
-    throw new Error(`TRUST_PROXY must be a number of proxies or a list of addresses or subnets, got '${value}'`);
+    throw new Error(
+      `TRUST_PROXY must be a number of proxies or a list of addresses or subnets, got '${value}'`,
+    );
   }
   return trustProxy;
 }
@@ -143,7 +157,9 @@ export function parsePublicBaseUrl(value: string | undefined): string | null {
   }
   const url = URL.parse(value);
   if (!url || (url.protocol !== 'http:' && url.protocol !== 'https:')) {
-    throw new Error(`PUBLIC_BASE_URL must be an http or https address such as https://carte.example.com, got '${value}'`);
+    throw new Error(
+      `PUBLIC_BASE_URL must be an http or https address such as https://carte.example.com, got '${value}'`,
+    );
   }
   return `${url.origin}${url.pathname}`.replace(/\/+$/, '');
 }

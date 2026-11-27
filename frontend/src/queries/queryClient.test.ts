@@ -1,8 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
+import { onlineManager } from '@tanstack/react-query';
 import { ApiError } from '../services/api';
 import { createQueryClient, shouldRetryQuery } from './queryClient';
 
 describe('shouldRetryQuery', () => {
+  afterEach(() => onlineManager.setOnline(true));
+
   it('does not retry a client error such as a 404', () => {
     expect(shouldRetryQuery(0, new ApiError(404, 'Not found'))).toBe(false);
   });
@@ -20,6 +23,11 @@ describe('shouldRetryQuery', () => {
 
   it('retries a server error (5xx)', () => {
     expect(shouldRetryQuery(0, new ApiError(503, 'Unavailable'))).toBe(true);
+  });
+
+  it('does not retry offline, where a retry would only pause', () => {
+    onlineManager.setOnline(false);
+    expect(shouldRetryQuery(0, new TypeError('Failed to fetch'))).toBe(false);
   });
 });
 

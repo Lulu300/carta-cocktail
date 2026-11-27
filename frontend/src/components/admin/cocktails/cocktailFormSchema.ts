@@ -1,6 +1,13 @@
 import { z } from 'zod';
-import type { Cocktail, CocktailIngredient, CocktailIngredientInput, CocktailInput, Ingredient, Unit } from '../../../types';
-import { parseTags } from './parseTags';
+import type {
+  Cocktail,
+  CocktailIngredient,
+  CocktailIngredientInput,
+  CocktailInput,
+  Ingredient,
+  Unit,
+} from '../../../types';
+import { parseTags } from '../../../utils/parseTags';
 
 // Error messages are i18n keys, translated where the error is shown.
 // Rules follow the backend schema (backend/src/validation/cocktails.ts) until F-05 shares it.
@@ -20,7 +27,9 @@ const OptionalId = z.number().int().positive().nullable();
 const RequiredId = z
   .number()
   .nullable()
-  .pipe(z.number({ error: 'validation.required' }).int().positive({ error: 'validation.required' }));
+  .pipe(
+    z.number({ error: 'validation.required' }).int().positive({ error: 'validation.required' }),
+  );
 // An emptied number input holds NaN, which z.number() refuses as a wrong type.
 // A quantity of 0 is a number: the row refinement refuses it, unless the line already had it.
 const Quantity = z.number({ error: 'validation.positive' });
@@ -76,20 +85,24 @@ function hasDefect(line: StoredLineValues): boolean {
 
 function sameLine(a: StoredLineValues, b: StoredLineValues): boolean {
   const sameIds = (x: number[], y: number[]) => [...x].sort().join() === [...y].sort().join();
-  return a.sourceType === b.sourceType
-    && a.bottleId === b.bottleId
-    && a.categoryId === b.categoryId
-    && a.ingredientId === b.ingredientId
-    && a.quantity === b.quantity
-    && a.unitId === b.unitId
-    && sameIds(a.preferredBottleIds, b.preferredBottleIds);
+  return (
+    a.sourceType === b.sourceType &&
+    a.bottleId === b.bottleId &&
+    a.categoryId === b.categoryId &&
+    a.ingredientId === b.ingredientId &&
+    a.quantity === b.quantity &&
+    a.unitId === b.unitId &&
+    sameIds(a.preferredBottleIds, b.preferredBottleIds)
+  );
 }
 
 /**
  * True for a line loaded with a defect and left as it was: it is saved as is,
  * with a warning. Once changed, the line is validated like a new one.
  */
-export function isKeptStoredDefect(row: StoredLineValues & { storedLine: StoredLineValues | null }): boolean {
+export function isKeptStoredDefect(
+  row: StoredLineValues & { storedLine: StoredLineValues | null },
+): boolean {
   return row.storedLine !== null && hasDefect(row) && sameLine(row, row.storedLine);
 }
 
@@ -157,7 +170,9 @@ export function toCocktailInput(values: ValidCocktailForm): CocktailInput {
     tags: parseTags(values.tags),
     isAvailable: values.isAvailable,
     ingredients: values.ingredients.map(toIngredientInput),
-    instructions: values.instructions.filter((step) => step.text.trim()).map((step) => ({ text: step.text })),
+    instructions: values.instructions
+      .filter((step) => step.text.trim())
+      .map((step) => ({ text: step.text })),
   };
 }
 
@@ -184,6 +199,7 @@ export function fromCocktail(cocktail: Cocktail): CocktailFormValues {
     isAvailable: cocktail.isAvailable,
     ingredients: (cocktail.ingredients ?? []).map(fromCocktailIngredient),
     // An empty step is ready to type in, as in a new cocktail.
-    instructions: instructions.length > 0 ? instructions.map((step) => ({ text: step.text })) : [{ text: '' }],
+    instructions:
+      instructions.length > 0 ? instructions.map((step) => ({ text: step.text })) : [{ text: '' }],
   };
 }

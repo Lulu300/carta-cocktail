@@ -25,7 +25,8 @@ function renderCrud() {
   const queryClient = createTestQueryClient();
   const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
   const { result } = renderHook(
-    () => useCrudMutations<UnitInput>({ key: qk.units, api, invalidates: [qk.availability], messages }),
+    () =>
+      useCrudMutations<UnitInput>({ key: qk.units, api, invalidates: [qk.availability], messages }),
     { queryClient },
   );
   return { result, invalidate };
@@ -51,7 +52,7 @@ describe('useCrudMutations', () => {
     await waitFor(() => expect(result.current.create.isSuccess).toBe(true));
     expect(api.create).toHaveBeenCalledWith({ name: 'Shot' });
     expect(invalidatedKeys(invalidate)).toEqual([qk.units, qk.availability]);
-    expect(toast.success).toHaveBeenCalledWith('units.created');
+    expect(toast.success).toHaveBeenCalledWith('Unit created');
   });
 
   it('updates by id and shows the updated toast', async () => {
@@ -61,7 +62,7 @@ describe('useCrudMutations', () => {
 
     await waitFor(() => expect(result.current.update.isSuccess).toBe(true));
     expect(api.update).toHaveBeenCalledWith(4, { name: 'Dash' });
-    expect(toast.success).toHaveBeenCalledWith('units.updated');
+    expect(toast.success).toHaveBeenCalledWith('Unit updated');
   });
 
   it('deletes by id and shows the deleted toast', async () => {
@@ -71,7 +72,7 @@ describe('useCrudMutations', () => {
 
     await waitFor(() => expect(result.current.remove.isSuccess).toBe(true));
     expect(api.delete).toHaveBeenCalledWith(4);
-    expect(toast.success).toHaveBeenCalledWith('units.deleted');
+    expect(toast.success).toHaveBeenCalledWith('Unit deleted');
   });
 
   it('shows the error in a toast and refreshes nothing when the request fails', async () => {
@@ -88,27 +89,38 @@ describe('useCrudMutations', () => {
   });
 
   it('names what uses an item whose deletion is refused', async () => {
-    api.delete.mockRejectedValue(new ApiError(409, 'Still in use', {
-      error: 'Still in use',
-      details: { cocktails: [{ id: 1, name: 'Mojito', removedLines: 1 }], bottles: [] },
-    }));
+    api.delete.mockRejectedValue(
+      new ApiError(409, 'Still in use', {
+        error: 'Still in use',
+        details: { cocktails: [{ id: 1, name: 'Mojito', removedLines: 1 }], bottles: [] },
+      }),
+    );
     const { result } = renderCrud();
 
     act(() => result.current.remove.mutate(4));
 
     await waitFor(() => expect(result.current.remove.isError).toBe(true));
-    const shown = vi.mocked(toast.error).mock.calls[0][0] as Error;
-    expect(shown.message).toBe('Still in use deletion.usedByCocktails');
+    const shown = vi.mocked(toast.error).mock.calls[0]![0]! as Error;
+    expect(shown.message).toBe('Still in use Used by these cocktails: Mojito.');
   });
 });
 
 describe('useEntityMutation', () => {
   it('ignores a second call while the first one is in flight, then accepts a new one', async () => {
     let finish: (value: unknown) => void = () => {};
-    const mutationFn = vi.fn(() => new Promise((resolve) => { finish = resolve; }));
-    const { result } = renderHook(() => useEntityMutation<number>({
-      mutationFn, invalidates: [qk.units], ignoreWhilePending: true,
-    }));
+    const mutationFn = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const { result } = renderHook(() =>
+      useEntityMutation<number>({
+        mutationFn,
+        invalidates: [qk.units],
+        ignoreWhilePending: true,
+      }),
+    );
 
     await act(async () => {
       result.current.mutate(1);
@@ -125,7 +137,9 @@ describe('useEntityMutation', () => {
 
   it('runs overlapping calls by default, e.g. toggles on several items', async () => {
     const mutationFn = vi.fn(() => new Promise(() => {}));
-    const { result } = renderHook(() => useEntityMutation<number>({ mutationFn, invalidates: [qk.units] }));
+    const { result } = renderHook(() =>
+      useEntityMutation<number>({ mutationFn, invalidates: [qk.units] }),
+    );
 
     await act(async () => {
       result.current.mutate(1);
@@ -137,7 +151,9 @@ describe('useEntityMutation', () => {
 
   it('shows no success toast without a success message', async () => {
     const mutationFn = vi.fn().mockResolvedValue(undefined);
-    const { result } = renderHook(() => useEntityMutation<number>({ mutationFn, invalidates: [qk.units] }));
+    const { result } = renderHook(() =>
+      useEntityMutation<number>({ mutationFn, invalidates: [qk.units] }),
+    );
 
     act(() => result.current.mutate(1));
 

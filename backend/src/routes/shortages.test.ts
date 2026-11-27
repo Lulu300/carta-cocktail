@@ -1,12 +1,26 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
-  setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
-  request, authHeader, prisma, seedCategory, seedBottle,
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+  request,
+  authHeader,
+  prisma,
+  seedCategory,
+  seedBottle,
 } from '../test/helpers';
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
-beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
+beforeEach(async () => {
+  await cleanDatabase();
+  await seedRequiredData();
+});
 
 describe('GET /api/shortages', () => {
   it('should return 401 without auth', async () => {
@@ -137,25 +151,34 @@ describe('GET /api/shortages', () => {
   });
 
   it('should keep the fields of a shortage, translations as objects', async () => {
-    await prisma.categoryType.update({ where: { name: 'SPIRIT' }, data: { nameTranslations: JSON.stringify({ fr: 'Alcool' }) } });
-    const cat = await seedCategory({ name: 'Rum', desiredStock: 2, nameTranslations: JSON.stringify({ fr: 'Rhum' }) });
+    await prisma.categoryType.update({
+      where: { name: 'SPIRIT' },
+      data: { nameTranslations: JSON.stringify({ fr: 'Alcool' }) },
+    });
+    const cat = await seedCategory({
+      name: 'Rum',
+      desiredStock: 2,
+      nameTranslations: JSON.stringify({ fr: 'Rhum' }),
+    });
     await seedBottle({ name: 'Rum 1', categoryId: cat.id, remainingPercent: 60 });
 
     const res = await request.get('/api/shortages').set(authHeader());
-    expect(res.body).toEqual([{
-      category: {
-        id: cat.id,
-        name: 'Rum',
-        nameTranslations: { fr: 'Rhum' },
-        type: 'SPIRIT',
-        categoryType: { name: 'SPIRIT', nameTranslations: { fr: 'Alcool' }, color: 'blue' },
-        desiredStock: 2,
-        minimumPercent: 30,
+    expect(res.body).toEqual([
+      {
+        category: {
+          id: cat.id,
+          name: 'Rum',
+          nameTranslations: { fr: 'Rhum' },
+          type: 'SPIRIT',
+          categoryType: { name: 'SPIRIT', nameTranslations: { fr: 'Alcool' }, color: 'blue' },
+          desiredStock: 2,
+          minimumPercent: 30,
+        },
+        totalPercent: 60,
+        requiredPercent: 130,
+        totalUsable: 1,
+        isShortage: true,
       },
-      totalPercent: 60,
-      requiredPercent: 130,
-      totalUsable: 1,
-      isShortage: true,
-    }]);
+    ]);
   });
 });

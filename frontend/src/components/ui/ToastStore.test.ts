@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import i18n from '../../i18n';
 import { ApiError } from '../../services/api';
 import { setErrorDescriber, toast, toastStore } from './ToastStore';
 
@@ -91,7 +90,7 @@ describe('ToastStore', () => {
   it('shows the generic error message for a value that is not an Error', () => {
     toast.error('boom');
     toast.error(new Error(''));
-    expect(messages()).toEqual([i18n.t('common.error'), i18n.t('common.error')]);
+    expect(messages()).toEqual(['An error occurred', 'An error occurred']);
   });
 
   describe('with a registered error describer', () => {
@@ -100,20 +99,22 @@ describe('ToastStore', () => {
     });
 
     it('shows the description of the errors it knows, the error message of the others', () => {
-      setErrorDescriber((error) => (error instanceof ApiError && error.status === 400 ? 'Name: required' : null));
+      setErrorDescriber((error) =>
+        error instanceof ApiError && error.status === 400 ? 'Name: required' : null,
+      );
 
       toast.error(new ApiError(400, 'Validation error'));
       toast.error(new ApiError(409, 'Already exists'));
       toast.error('boom');
 
-      expect(messages()).toEqual(['Name: required', 'Already exists', i18n.t('common.error')]);
+      expect(messages()).toEqual(['Name: required', 'Already exists', 'An error occurred']);
     });
   });
 
   it('keeps the action of a toast', () => {
     const onClick = vi.fn();
     toast.info('Deleted', { action: { label: 'Undo', onClick } });
-    expect(toastStore.getSnapshot()[0].action).toEqual({ label: 'Undo', onClick });
+    expect(toastStore.getSnapshot()[0]!.action).toEqual({ label: 'Undo', onClick });
   });
 
   it('pauses the countdown and resumes it with the time left', () => {

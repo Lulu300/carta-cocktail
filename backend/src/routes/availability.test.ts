@@ -1,12 +1,29 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
-  setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
-  request, authHeader, prisma, seedCategory, seedUnit, seedBottle, seedIngredient, seedCocktailUsing,
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+  request,
+  authHeader,
+  prisma,
+  seedCategory,
+  seedUnit,
+  seedBottle,
+  seedIngredient,
+  seedCocktailUsing,
 } from '../test/helpers';
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
-beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
+beforeEach(async () => {
+  await cleanDatabase();
+  await seedRequiredData();
+});
 
 describe('GET /api/availability/cocktails/:id', () => {
   it('should return 404 for non-existent cocktail', async () => {
@@ -31,8 +48,12 @@ describe('GET /api/availability/cocktails/:id', () => {
     const cocktail = await prisma.cocktail.create({ data: { name: 'Bottle Test' } });
     await prisma.cocktailIngredient.create({
       data: {
-        cocktailId: cocktail.id, sourceType: 'BOTTLE', bottleId: bottle.id,
-        unitId: unit.id, quantity: 4, position: 0,
+        cocktailId: cocktail.id,
+        sourceType: 'BOTTLE',
+        bottleId: bottle.id,
+        unitId: unit.id,
+        quantity: 4,
+        position: 0,
       },
     });
 
@@ -51,8 +72,12 @@ describe('GET /api/availability/cocktails/:id', () => {
     const cocktail = await prisma.cocktail.create({ data: { name: 'Category Test' } });
     await prisma.cocktailIngredient.create({
       data: {
-        cocktailId: cocktail.id, sourceType: 'CATEGORY', categoryId: cat.id,
-        unitId: unit.id, quantity: 4, position: 0,
+        cocktailId: cocktail.id,
+        sourceType: 'CATEGORY',
+        categoryId: cat.id,
+        unitId: unit.id,
+        quantity: 4,
+        position: 0,
       },
     });
 
@@ -69,8 +94,12 @@ describe('GET /api/availability/cocktails/:id', () => {
     const cocktail = await prisma.cocktail.create({ data: { name: 'Ingredient Test' } });
     await prisma.cocktailIngredient.create({
       data: {
-        cocktailId: cocktail.id, sourceType: 'INGREDIENT', ingredientId: ing.id,
-        unitId: unit.id, quantity: 1, position: 0,
+        cocktailId: cocktail.id,
+        sourceType: 'INGREDIENT',
+        ingredientId: ing.id,
+        unitId: unit.id,
+        quantity: 1,
+        position: 0,
       },
     });
 
@@ -88,8 +117,12 @@ describe('GET /api/availability/cocktails/:id', () => {
     const cocktail = await prisma.cocktail.create({ data: { name: 'Unavailable Test' } });
     await prisma.cocktailIngredient.create({
       data: {
-        cocktailId: cocktail.id, sourceType: 'INGREDIENT', ingredientId: ing.id,
-        unitId: unit.id, quantity: 1, position: 0,
+        cocktailId: cocktail.id,
+        sourceType: 'INGREDIENT',
+        ingredientId: ing.id,
+        unitId: unit.id,
+        quantity: 1,
+        position: 0,
       },
     });
 
@@ -97,7 +130,11 @@ describe('GET /api/availability/cocktails/:id', () => {
     expect(res.status).toBe(200);
     expect(res.body.isAvailable).toBe(false);
     expect(res.body.maxServings).toBe(0);
-    expect(res.body.ingredients[0]).toMatchObject({ name: 'Mint', isAvailable: false, orphan: false });
+    expect(res.body.ingredients[0]).toMatchObject({
+      name: 'Mint',
+      isAvailable: false,
+      orphan: false,
+    });
   });
 
   it('should report low stock warnings for <= 3 servings', async () => {
@@ -109,8 +146,12 @@ describe('GET /api/availability/cocktails/:id', () => {
     const cocktail = await prisma.cocktail.create({ data: { name: 'Low Stock' } });
     await prisma.cocktailIngredient.create({
       data: {
-        cocktailId: cocktail.id, sourceType: 'BOTTLE', bottleId: bottle.id,
-        unitId: unit.id, quantity: 4, position: 0,
+        cocktailId: cocktail.id,
+        sourceType: 'BOTTLE',
+        bottleId: bottle.id,
+        unitId: unit.id,
+        quantity: 4,
+        position: 0,
       },
     });
 
@@ -124,7 +165,9 @@ describe('GET /api/availability/cocktails/:id', () => {
     const cup = await seedUnit({ name: 'Tasse', abbreviation: 'tasse', conversionFactorToMl: 250 });
     const cat = await seedCategory();
     const bottle = await seedBottle({ categoryId: cat.id, capacityMl: 700, remainingPercent: 100 });
-    const cocktail = await seedCocktailUsing('Cup Test', cup.id, [{ sourceType: 'BOTTLE', bottleId: bottle.id }]);
+    const cocktail = await seedCocktailUsing('Cup Test', cup.id, [
+      { sourceType: 'BOTTLE', bottleId: bottle.id },
+    ]);
 
     const res = await request.get(`/api/availability/cocktails/${cocktail.id}`).set(authHeader());
     expect(res.status).toBe(200);
@@ -137,21 +180,39 @@ describe('GET /api/availability/cocktails/:id', () => {
     const unit = await seedUnit({ abbreviation: 'cl', conversionFactorToMl: 10 });
     const cat = await seedCategory();
     // Bottle 1: 700ml / 40ml = 17 servings
-    const bottle1 = await seedBottle({ name: 'Full', categoryId: cat.id, capacityMl: 700, remainingPercent: 100 });
+    const bottle1 = await seedBottle({
+      name: 'Full',
+      categoryId: cat.id,
+      capacityMl: 700,
+      remainingPercent: 100,
+    });
     // Bottle 2: 140ml / 40ml = 3 servings (limiting factor)
-    const bottle2 = await seedBottle({ name: 'Low', categoryId: cat.id, capacityMl: 700, remainingPercent: 20 });
+    const bottle2 = await seedBottle({
+      name: 'Low',
+      categoryId: cat.id,
+      capacityMl: 700,
+      remainingPercent: 20,
+    });
 
     const cocktail = await prisma.cocktail.create({ data: { name: 'Multi Ing' } });
     await prisma.cocktailIngredient.create({
       data: {
-        cocktailId: cocktail.id, sourceType: 'BOTTLE', bottleId: bottle1.id,
-        unitId: unit.id, quantity: 4, position: 0,
+        cocktailId: cocktail.id,
+        sourceType: 'BOTTLE',
+        bottleId: bottle1.id,
+        unitId: unit.id,
+        quantity: 4,
+        position: 0,
       },
     });
     await prisma.cocktailIngredient.create({
       data: {
-        cocktailId: cocktail.id, sourceType: 'BOTTLE', bottleId: bottle2.id,
-        unitId: unit.id, quantity: 4, position: 1,
+        cocktailId: cocktail.id,
+        sourceType: 'BOTTLE',
+        bottleId: bottle2.id,
+        unitId: unit.id,
+        quantity: 4,
+        position: 1,
       },
     });
 

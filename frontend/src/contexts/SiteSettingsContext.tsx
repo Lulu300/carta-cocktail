@@ -37,7 +37,9 @@ function readCachedSettings(): SiteSettings | null {
     const cached: unknown = JSON.parse(localStorage.getItem(CACHE_KEY) ?? 'null');
     if (typeof cached !== 'object' || cached === null) return null;
     const { siteName, siteIcon } = cached as Partial<SiteSettings>;
-    return typeof siteName === 'string' && typeof siteIcon === 'string' ? { siteName, siteIcon } : null;
+    return typeof siteName === 'string' && typeof siteIcon === 'string'
+      ? { siteName, siteIcon }
+      : null;
   } catch {
     return null;
   }
@@ -45,7 +47,10 @@ function readCachedSettings(): SiteSettings | null {
 
 function cacheSettings(settings: SiteSettings) {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ siteName: settings.siteName, siteIcon: settings.siteIcon }));
+    localStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({ siteName: settings.siteName, siteIcon: settings.siteIcon }),
+    );
   } catch {
     // Storage is blocked or full: the next visit simply starts without a copy.
   }

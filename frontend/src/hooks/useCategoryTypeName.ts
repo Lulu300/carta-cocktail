@@ -11,7 +11,10 @@ const VISIBLE_SPACE = '␣';
  * The spaces HTML hides or shows as one plain space: spaces around the name, runs of two or more
  * inside it, and any space other than a plain one (a tab, a line break, a braille pattern blank).
  */
-const HIDDEN_SPACES = new RegExp(String.raw`^${SPACE_LIKE}+|${SPACE_LIKE}+$|${SPACE_LIKE}{2,}|(?! )${SPACE_LIKE}`, 'gu');
+const HIDDEN_SPACES = new RegExp(
+  String.raw`^${SPACE_LIKE}+|${SPACE_LIKE}+$|${SPACE_LIKE}{2,}|(?! )${SPACE_LIKE}`,
+  'gu',
+);
 
 /** Shown in place of a character HTML draws as nothing: its code point, which names it. */
 function codePointLabel(char: string): string {
@@ -39,7 +42,12 @@ function isNotComposed(name: string): boolean {
  * character and the decomposed ones exactly like the others, and the empty one as nothing.
  */
 function isHiddenByHtml(name: string): boolean {
-  return name === '' || name.match(HIDDEN_SPACES) !== null || hasInvisibleCharacters(name) || isNotComposed(name);
+  return (
+    name === '' ||
+    name.match(HIDDEN_SPACES) !== null ||
+    hasInvisibleCharacters(name) ||
+    isNotComposed(name)
+  );
 }
 
 /**
@@ -52,45 +60,59 @@ export function useCategoryTypeName() {
   const localize = useLocalizedName();
 
   /** The text as it is, unless HTML would hide part of it. */
-  const visibleName = useCallback((text: string) => {
-    if (text === '') return t('categoryTypes.emptyName');
-    // Characters first: a byte order mark is white space for JS, but it is shown by its code point
-    const charactersShown = replaceInvisibleCharacters(text, codePointLabel);
-    const spacesShown = charactersShown.replace(HIDDEN_SPACES, (spaces) => VISIBLE_SPACE.repeat(spaces.length));
-    const notes: string[] = [];
-    if (spacesShown !== charactersShown) notes.push(t('categoryTypes.withSpaces'));
-    if (charactersShown !== text) notes.push(t('categoryTypes.withInvisibleCharacters'));
-    if (isNotComposed(text)) notes.push(t('categoryTypes.nonStandardForm'));
-    return notes.length === 0 ? text : `${spacesShown} ${notes.join(' ')}`;
-  }, [t]);
+  const visibleName = useCallback(
+    (text: string) => {
+      if (text === '') return t('categoryTypes.emptyName');
+      // Characters first: a byte order mark is white space for JS, but it is shown by its code point
+      const charactersShown = replaceInvisibleCharacters(text, codePointLabel);
+      const spacesShown = charactersShown.replace(HIDDEN_SPACES, (spaces) =>
+        VISIBLE_SPACE.repeat(spaces.length),
+      );
+      const notes: string[] = [];
+      if (spacesShown !== charactersShown) notes.push(t('categoryTypes.withSpaces'));
+      if (charactersShown !== text) notes.push(t('categoryTypes.withInvisibleCharacters'));
+      if (isNotComposed(text)) notes.push(t('categoryTypes.nonStandardForm'));
+      return notes.length === 0 ? text : `${spacesShown} ${notes.join(' ')}`;
+    },
+    [t],
+  );
 
   /**
    * The translation as the admin typed it, or the stored name made visible when there is none:
    * only stored names have to be told apart.
    */
-  const localizedName = useCallback((categoryType: CategoryType) => {
-    const label = localize(categoryType);
-    return label === categoryType.name ? visibleName(label) : label;
-  }, [localize, visibleName]);
+  const localizedName = useCallback(
+    (categoryType: CategoryType) => {
+      const label = localize(categoryType);
+      return label === categoryType.name ? visibleName(label) : label;
+    },
+    [localize, visibleName],
+  );
 
   /**
    * The localized name. A translation would hide which of ' SPIRIT ' and 'SPIRIT' it belongs
    * to, so such a type also shows its stored name.
    */
-  const typeLabel = useCallback((categoryType: CategoryType) => {
-    const label = localizedName(categoryType);
-    const isTranslated = localize(categoryType) !== categoryType.name;
-    if (!isTranslated || !isHiddenByHtml(categoryType.name)) return label;
-    return `${label} – ${visibleName(categoryType.name)}`;
-  }, [localize, localizedName, visibleName]);
+  const typeLabel = useCallback(
+    (categoryType: CategoryType) => {
+      const label = localizedName(categoryType);
+      const isTranslated = localize(categoryType) !== categoryType.name;
+      if (!isTranslated || !isHiddenByHtml(categoryType.name)) return label;
+      return `${label} – ${visibleName(categoryType.name)}`;
+    },
+    [localize, localizedName, visibleName],
+  );
 
   /**
    * The label of a category's type: `typeLabel` of its type, or its stored type name made
    * visible when the type is not known (types still loading, or missing from the list).
    */
-  const categoryTypeLabel = useCallback((name: string, categoryType: CategoryType | null | undefined) => {
-    return categoryType ? typeLabel(categoryType) : visibleName(name);
-  }, [typeLabel, visibleName]);
+  const categoryTypeLabel = useCallback(
+    (name: string, categoryType: CategoryType | null | undefined) => {
+      return categoryType ? typeLabel(categoryType) : visibleName(name);
+    },
+    [typeLabel, visibleName],
+  );
 
   return { visibleName, localizedName, typeLabel, categoryTypeLabel };
 }

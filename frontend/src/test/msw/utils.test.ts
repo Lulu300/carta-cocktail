@@ -32,15 +32,23 @@ describe('fake backend', () => {
   it('serves the response a test sets, then the default one again in the next test', async () => {
     mockApiResponse('get', '/api/units', [buildUnit({ name: 'Once' })]);
 
-    expect((await units.list())[0].name).toBe('Once');
+    expect((await units.list())[0]!.name).toBe('Once');
   });
 
   it('refuses to delete an item in use unless the deletion is forced', async () => {
     const impact = { cocktails: [{ id: 5, name: 'Mojito', removedLines: 1 }], bottles: [] };
     const requests = mockItemInUse('/api/categories/:id', impact, 'In use');
 
-    await expect(categories.delete(2)).rejects.toMatchObject({ status: 409, message: 'In use', body: { details: impact } });
-    await expect(categories.delete(2, { force: true })).resolves.toEqual({ message: 'Deleted', deleted: true, impact });
+    await expect(categories.delete(2)).rejects.toMatchObject({
+      status: 409,
+      message: 'In use',
+      body: { details: impact },
+    });
+    await expect(categories.delete(2, { force: true })).resolves.toEqual({
+      message: 'Deleted',
+      deleted: true,
+      impact,
+    });
     expect(requests.map((url) => url.search)).toEqual(['', '?force=true']);
   });
 
@@ -66,7 +74,10 @@ describe('fake backend', () => {
 
   it('keeps a request pending', async () => {
     mockApiPending('get', '/api/units');
-    const outcome = await Promise.race([units.list(), new Promise((resolve) => setTimeout(() => resolve('pending'), 20))]);
+    const outcome = await Promise.race([
+      units.list(),
+      new Promise((resolve) => setTimeout(() => resolve('pending'), 20)),
+    ]);
 
     expect(outcome).toBe('pending');
   });
@@ -94,7 +105,7 @@ describe('fake backend', () => {
 
     release();
 
-    expect((await list)[0].name).toBe('Held');
+    expect((await list)[0]!.name).toBe('Held');
   });
 
   it('makes the next fetch reject with any value, then lets the next ones through', async () => {
@@ -105,7 +116,11 @@ describe('fake backend', () => {
   });
 
   it('gives the raw multipart text of a file upload', async () => {
-    mockApiResponse('post', '/api/backup/import', { message: 'ok', skippedFiles: 0, restartRecommended: false });
+    mockApiResponse('post', '/api/backup/import', {
+      message: 'ok',
+      skippedFiles: 0,
+      restartRecommended: false,
+    });
     const request = captureRequest('post', '/api/backup/import');
 
     await backup.importBackup(new File(['zip'], 'backup.zip', { type: 'application/zip' }));
@@ -144,7 +159,10 @@ describe('fake answer building blocks', () => {
   });
 
   it('builds an answer that never comes', async () => {
-    const outcome = await Promise.race([pendingResponse(), new Promise((resolve) => setTimeout(() => resolve('pending'), 20))]);
+    const outcome = await Promise.race([
+      pendingResponse(),
+      new Promise((resolve) => setTimeout(() => resolve('pending'), 20)),
+    ]);
 
     expect(outcome).toBe('pending');
   });

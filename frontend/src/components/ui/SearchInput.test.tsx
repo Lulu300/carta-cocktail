@@ -6,7 +6,9 @@ import SearchInput from './SearchInput';
 
 function Harness({ placeholder }: { placeholder?: string }) {
   const [value, setValue] = useState('');
-  return <SearchInput value={value} onChange={setValue} label="Search units" placeholder={placeholder} />;
+  return (
+    <SearchInput value={value} onChange={setValue} label="Search units" placeholder={placeholder} />
+  );
 }
 
 describe('SearchInput', () => {
@@ -14,22 +16,25 @@ describe('SearchInput', () => {
     render(<Harness />);
 
     const input = screen.getByRole('searchbox', { name: 'Search units' });
-    expect(input).toHaveAttribute('placeholder', 'common.search');
+    expect(input).toHaveAttribute('placeholder', 'Search...');
     expect(input).toHaveAttribute('enterkeyhint', 'search');
   });
 
   it('keeps a given placeholder', () => {
     render(<Harness placeholder="Name or abbreviation" />);
-    expect(screen.getByLabelText('Search units')).toHaveAttribute('placeholder', 'Name or abbreviation');
+    expect(screen.getByLabelText('Search units')).toHaveAttribute(
+      'placeholder',
+      'Name or abbreviation',
+    );
   });
 
   it('shows a named clear button only once something is typed', async () => {
     const user = userEvent.setup();
     render(<Harness />);
-    expect(screen.queryByRole('button', { name: 'common.clearSearch' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Clear search' })).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText('Search units'), 'cl');
-    await user.click(screen.getByRole('button', { name: 'common.clearSearch' }));
+    await user.click(screen.getByRole('button', { name: 'Clear search' }));
 
     expect(screen.getByLabelText('Search units')).toHaveValue('');
   });

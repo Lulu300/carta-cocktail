@@ -26,7 +26,8 @@ function mockPendingNotice(notice: UpgradeNotice) {
   let acknowledged = false;
   server.use(
     http.get('/api/system/upgrade-notice', () =>
-      (acknowledged ? new HttpResponse(null, { status: 204 }) : HttpResponse.json(notice))),
+      acknowledged ? new HttpResponse(null, { status: 204 }) : HttpResponse.json(notice),
+    ),
     http.post('/api/system/upgrade-notice/acknowledge', () => {
       acknowledged = true;
       return new HttpResponse(null, { status: 204 });
@@ -40,10 +41,12 @@ function section(name: string): HTMLElement {
 
 /** Version headings and their actions, in the order shown. */
 function versionsAndActions(element: HTMLElement): string[] {
-  return within(element).getAllByRole('heading', { level: 4 }).map((heading) => {
-    const actions = within(heading.nextElementSibling as HTMLElement).getAllByRole('listitem');
-    return `${heading.textContent}: ${actions.map((item) => item.textContent).join(' | ')}`;
-  });
+  return within(element)
+    .getAllByRole('heading', { level: 4 })
+    .map((heading) => {
+      const actions = within(heading.nextElementSibling as HTMLElement).getAllByRole('listitem');
+      return `${heading.textContent}: ${actions.map((item) => item.textContent).join(' | ')}`;
+    });
 }
 
 describe('UpgradeNoticeBanner', () => {
@@ -51,16 +54,21 @@ describe('UpgradeNoticeBanner', () => {
     mockPendingNotice(upgradeFrom150To170);
     const { container } = render(<UpgradeNoticeBanner />);
 
-    expect(await screen.findByRole('heading', { name: 'upgradeNotice.title' })).toBeInTheDocument();
-    expect(versionsAndActions(section('upgradeNotice.before'))).toEqual([
+    expect(
+      await screen.findByRole('heading', { name: /^Upgrade from v.+ to v.+$/ }),
+    ).toBeInTheDocument();
+    expect(versionsAndActions(section('To do before the upgrade: check them now'))).toEqual([
       'v1.6.0: Back up the database.',
       'v1.7.0: Check the host is 64-bit.',
     ]);
-    expect(versionsAndActions(section('upgradeNotice.after'))).toEqual([
+    expect(versionsAndActions(section('To do after the upgrade'))).toEqual([
       'v1.6.0: Check the backend log. | Check a photo is served.',
       'v1.7.0: Check the menus.',
     ]);
-    expect(screen.getByRole('link', { name: 'upgradeNotice.guideLink' })).toHaveAttribute('href', UPGRADING_GUIDE_URL);
+    expect(screen.getByRole('link', { name: 'Upgrade guide (UPGRADING.md)' })).toHaveAttribute(
+      'href',
+      UPGRADING_GUIDE_URL,
+    );
     expect(await axe(container)).toHaveNoViolations();
   });
 
@@ -71,8 +79,12 @@ describe('UpgradeNoticeBanner', () => {
     });
     render(<UpgradeNoticeBanner />);
 
-    expect(await screen.findByRole('region', { name: 'upgradeNotice.after' })).toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: 'upgradeNotice.before' })).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole('region', { name: 'To do after the upgrade' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('region', { name: 'To do before the upgrade: check them now' }),
+    ).not.toBeInTheDocument();
   });
 
   it('confirms the actions and hides the banner', async () => {
@@ -81,9 +93,13 @@ describe('UpgradeNoticeBanner', () => {
     const acknowledgements = captureRequest('post', '/api/system/upgrade-notice/acknowledge');
     render(<UpgradeNoticeBanner />);
 
-    await user.click(await screen.findByRole('button', { name: 'upgradeNotice.acknowledge' }));
+    await user.click(await screen.findByRole('button', { name: 'I have done these actions' }));
 
-    await waitFor(() => expect(screen.queryByRole('heading', { name: 'upgradeNotice.title' })).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('heading', { name: /^Upgrade from v.+ to v.+$/ }),
+      ).not.toBeInTheDocument(),
+    );
     expect(acknowledgements.count()).toBe(1);
   });
 
@@ -91,12 +107,17 @@ describe('UpgradeNoticeBanner', () => {
     const user = userEvent.setup();
     mockPendingNotice(upgradeFrom150To170);
     mockApiError('post', '/api/system/upgrade-notice/acknowledge', 500, 'Internal server error');
-    render(<><UpgradeNoticeBanner /><Toaster /></>);
+    render(
+      <>
+        <UpgradeNoticeBanner />
+        <Toaster />
+      </>,
+    );
 
-    await user.click(await screen.findByRole('button', { name: 'upgradeNotice.acknowledge' }));
+    await user.click(await screen.findByRole('button', { name: 'I have done these actions' }));
 
     expect(await screen.findByText('Internal server error')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'upgradeNotice.title' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /^Upgrade from v.+ to v.+$/ })).toBeInTheDocument();
   });
 
   it('shows nothing when the backend has no notice (204)', async () => {

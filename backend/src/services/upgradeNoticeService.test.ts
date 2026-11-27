@@ -3,7 +3,13 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import type { PrismaClient } from '../generated/prisma/client';
-import { cleanDatabase, prisma, seedAppState, setupTestDatabase, teardownTestDatabase } from '../test/helpers';
+import {
+  cleanDatabase,
+  prisma,
+  seedAppState,
+  setupTestDatabase,
+  teardownTestDatabase,
+} from '../test/helpers';
 import {
   APP_STATE_ID,
   acknowledgeUpgradeNotice,
@@ -22,11 +28,32 @@ const REPOSITORY_NOTES_DIR = path.resolve(__dirname, '../../../docs/releases');
 let notesDir: string;
 
 /** Writes docs/releases/v<version>.md with these required actions, as TEMPLATE.md shows them. */
-function writeNotes(version: string, actions: { when: 'before' | 'after'; action: string }[], fileName = `v${version}.md`): void {
-  const list = actions.length === 0
-    ? 'required_actions: []'
-    : ['required_actions:', ...actions.flatMap(({ when, action }) => [`  - when: ${when}`, `    action: ${JSON.stringify(action)}`])].join('\n');
-  const content = ['---', `version: ${version}`, 'date: 2026-10-20', 'breaking: false', list, '---', '', '## Summary', ''].join('\n');
+function writeNotes(
+  version: string,
+  actions: { when: 'before' | 'after'; action: string }[],
+  fileName = `v${version}.md`,
+): void {
+  const list =
+    actions.length === 0
+      ? 'required_actions: []'
+      : [
+          'required_actions:',
+          ...actions.flatMap(({ when, action }) => [
+            `  - when: ${when}`,
+            `    action: ${JSON.stringify(action)}`,
+          ]),
+        ].join('\n');
+  const content = [
+    '---',
+    `version: ${version}`,
+    'date: 2026-10-20',
+    'breaking: false',
+    list,
+    '---',
+    '',
+    '## Summary',
+    '',
+  ].join('\n');
   fs.writeFileSync(path.join(notesDir, fileName), content);
 }
 
@@ -52,8 +79,12 @@ function silenceWarnings() {
   return vi.spyOn(console, 'warn').mockImplementation(() => {});
 }
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
 
 beforeEach(async () => {
   await cleanDatabase();
@@ -94,9 +125,12 @@ describe('isReleaseVersion', () => {
     expect(isReleaseVersion(version)).toBe(true);
   });
 
-  it.each(['dev', '', 'v1.5.0', '1.5', '1.05.0', '1.5.0-beta.1', '1.5.0-rc.1-x'])('should refuse "%s"', (version) => {
-    expect(isReleaseVersion(version)).toBe(false);
-  });
+  it.each(['dev', '', 'v1.5.0', '1.5', '1.05.0', '1.5.0-beta.1', '1.5.0-rc.1-x'])(
+    'should refuse "%s"',
+    (version) => {
+      expect(isReleaseVersion(version)).toBe(false);
+    },
+  );
 
   it('should refuse a missing value', () => {
     expect(isReleaseVersion(null)).toBe(false);
@@ -105,10 +139,17 @@ describe('isReleaseVersion', () => {
 });
 
 describe('requiredActionsBetween', () => {
-  const notes = [note('1.7.0', 'g'), note('1.5.0', 'a'), note('1.6.0', 'b', 'c'), note('1.10.0', 'h')];
+  const notes = [
+    note('1.7.0', 'g'),
+    note('1.5.0', 'a'),
+    note('1.6.0', 'b', 'c'),
+    note('1.10.0', 'h'),
+  ];
 
   function actionsBetween(from: string, to: string, notesRead: ReleaseNote[] = notes): string[] {
-    return requiredActionsBetween(notesRead, from, to).map(({ version, action }) => `${version}:${action}`);
+    return requiredActionsBetween(notesRead, from, to).map(
+      ({ version, action }) => `${version}:${action}`,
+    );
   }
 
   it('should leave out the version of departure and keep the version of arrival', () => {
@@ -116,12 +157,25 @@ describe('requiredActionsBetween', () => {
   });
 
   it('should list the versions from the oldest, and the actions of a version in the order of its file', () => {
-    expect(actionsBetween('1.5.0', '1.10.0')).toEqual(['1.6.0:b', '1.6.0:c', '1.7.0:g', '1.10.0:h']);
+    expect(actionsBetween('1.5.0', '1.10.0')).toEqual([
+      '1.6.0:b',
+      '1.6.0:c',
+      '1.7.0:g',
+      '1.10.0:h',
+    ]);
   });
 
   it('should keep the timing of each action', () => {
     const actions = requiredActionsBetween(
-      [{ version: '1.6.0', requiredActions: [{ when: 'before', action: 'b' }, { when: 'after', action: 'c' }] }],
+      [
+        {
+          version: '1.6.0',
+          requiredActions: [
+            { when: 'before', action: 'b' },
+            { when: 'after', action: 'c' },
+          ],
+        },
+      ],
       '1.5.0',
       '1.6.0',
     );
@@ -159,11 +213,18 @@ describe('requiredActionsBetween', () => {
 
 describe('loadReleaseNotes', () => {
   it('should read the version and the required actions of each file', () => {
-    writeNotes('1.6.0', [{ when: 'before', action: 'Set JWT_SECRET: at least 32 characters, "quoted" words' }]);
+    writeNotes('1.6.0', [
+      { when: 'before', action: 'Set JWT_SECRET: at least 32 characters, "quoted" words' },
+    ]);
     writeNotes('1.7.0', []);
 
     expect(loadReleaseNotes(notesDir)).toEqual([
-      { version: '1.6.0', requiredActions: [{ when: 'before', action: 'Set JWT_SECRET: at least 32 characters, "quoted" words' }] },
+      {
+        version: '1.6.0',
+        requiredActions: [
+          { when: 'before', action: 'Set JWT_SECRET: at least 32 characters, "quoted" words' },
+        ],
+      },
       { version: '1.7.0', requiredActions: [] },
     ]);
   });
@@ -178,11 +239,27 @@ describe('loadReleaseNotes', () => {
 
   it.each([
     ['without front matter', '## Summary\n\nNo front matter.\n', 'no front matter'],
-    ['whose front matter is not closed', '---\nversion: 1.6.0\nrequired_actions: []\n', 'no front matter'],
+    [
+      'whose front matter is not closed',
+      '---\nversion: 1.6.0\nrequired_actions: []\n',
+      'no front matter',
+    ],
     ['with invalid YAML', '---\nversion: 1.6.0\nrequired_actions: [\n---\n', 'Flow sequence'],
-    ['with a version that is not X.Y.Z', '---\nversion: 1.6\nrequired_actions: []\n---\n', 'TEMPLATE.md'],
-    ['with an unknown timing', '---\nversion: 1.6.0\nrequired_actions:\n  - when: during\n    action: "x"\n---\n', 'TEMPLATE.md'],
-    ['with an empty action', '---\nversion: 1.6.0\nrequired_actions:\n  - when: after\n    action: ""\n---\n', 'TEMPLATE.md'],
+    [
+      'with a version that is not X.Y.Z',
+      '---\nversion: 1.6\nrequired_actions: []\n---\n',
+      'TEMPLATE.md',
+    ],
+    [
+      'with an unknown timing',
+      '---\nversion: 1.6.0\nrequired_actions:\n  - when: during\n    action: "x"\n---\n',
+      'TEMPLATE.md',
+    ],
+    [
+      'with an empty action',
+      '---\nversion: 1.6.0\nrequired_actions:\n  - when: after\n    action: ""\n---\n',
+      'TEMPLATE.md',
+    ],
     ['without required_actions', '---\nversion: 1.6.0\n---\n', 'TEMPLATE.md'],
   ])('should ignore a file %s, with a warning, and read the others', (_case, content, reason) => {
     fs.writeFileSync(path.join(notesDir, 'v1.6.0.md'), content);
@@ -198,7 +275,10 @@ describe('loadReleaseNotes', () => {
   });
 
   it('should read a file with CRLF line endings', () => {
-    fs.writeFileSync(path.join(notesDir, 'v1.6.0.md'), '---\r\nversion: 1.6.0\r\nrequired_actions: []\r\n---\r\n');
+    fs.writeFileSync(
+      path.join(notesDir, 'v1.6.0.md'),
+      '---\r\nversion: 1.6.0\r\nrequired_actions: []\r\n---\r\n',
+    );
 
     expect(loadReleaseNotes(notesDir)).toEqual([{ version: '1.6.0', requiredActions: [] }]);
   });
@@ -213,7 +293,9 @@ describe('loadReleaseNotes', () => {
 
   it('should read every notes file of the repository without a warning', () => {
     const warn = silenceWarnings();
-    const fileCount = fs.readdirSync(REPOSITORY_NOTES_DIR).filter((name) => /^v.+\.md$/.test(name)).length;
+    const fileCount = fs
+      .readdirSync(REPOSITORY_NOTES_DIR)
+      .filter((name) => /^v.+\.md$/.test(name)).length;
 
     const notes = loadReleaseNotes(REPOSITORY_NOTES_DIR);
 
@@ -232,7 +314,11 @@ describe('recordStartup', () => {
     expect(await recordStartup(prisma, '1.7.0', notesDir)).toEqual([]);
 
     expect(await appState()).toEqual({
-      id: APP_STATE_ID, lastRunVersion: '1.7.0', pendingNoticeFrom: null, pendingNoticeTo: null, noticeAcknowledgedAt: null,
+      id: APP_STATE_ID,
+      lastRunVersion: '1.7.0',
+      pendingNoticeFrom: null,
+      pendingNoticeTo: null,
+      noticeAcknowledgedAt: null,
     });
   });
 
@@ -256,7 +342,10 @@ describe('recordStartup', () => {
       { version: '1.7.0', when: 'after', action: 'Action of 1.7.0' },
     ]);
     expect(await appState()).toMatchObject({
-      lastRunVersion: '1.7.0', pendingNoticeFrom: '1.5.0', pendingNoticeTo: '1.7.0', noticeAcknowledgedAt: null,
+      lastRunVersion: '1.7.0',
+      pendingNoticeFrom: '1.5.0',
+      pendingNoticeTo: '1.7.0',
+      noticeAcknowledgedAt: null,
     });
   });
 
@@ -266,7 +355,11 @@ describe('recordStartup', () => {
 
     expect(await recordStartup(prisma, '1.8.0', notesDir)).toEqual([]);
 
-    expect(await appState()).toMatchObject({ lastRunVersion: '1.8.0', pendingNoticeFrom: null, pendingNoticeTo: null });
+    expect(await appState()).toMatchObject({
+      lastRunVersion: '1.8.0',
+      pendingNoticeFrom: null,
+      pendingNoticeTo: null,
+    });
   });
 
   it('should change nothing when the same version starts again', async () => {
@@ -310,7 +403,10 @@ describe('recordStartup', () => {
     const actions = await recordStartup(prisma, '1.7.0', notesDir);
 
     expect(actions.map(({ version }) => version)).toEqual(['1.6.0', '1.6.0', '1.7.0']);
-    expect(await appState()).toMatchObject({ pendingNoticeFrom: '1.5.0', pendingNoticeTo: '1.7.0' });
+    expect(await appState()).toMatchObject({
+      pendingNoticeFrom: '1.5.0',
+      pendingNoticeTo: '1.7.0',
+    });
   });
 
   it('should start a new notice from the last version once the previous one is confirmed', async () => {
@@ -322,7 +418,11 @@ describe('recordStartup', () => {
     const actions = await recordStartup(prisma, '1.7.0', notesDir);
 
     expect(actions.map(({ version }) => version)).toEqual(['1.7.0']);
-    expect(await appState()).toMatchObject({ pendingNoticeFrom: '1.6.0', pendingNoticeTo: '1.7.0', noticeAcknowledgedAt: null });
+    expect(await appState()).toMatchObject({
+      pendingNoticeFrom: '1.6.0',
+      pendingNoticeTo: '1.7.0',
+      noticeAcknowledgedAt: null,
+    });
   });
 });
 
@@ -338,7 +438,9 @@ describe('pendingUpgradeNotice and acknowledgeUpgradeNotice', () => {
 
     expect(notice).toMatchObject({ from: '1.5.0', to: '1.7.0' });
     expect(notice?.actions.map(({ action }) => action)).toEqual([
-      'First action of 1.6.0', 'Second action of 1.6.0', 'Action of 1.7.0',
+      'First action of 1.6.0',
+      'Second action of 1.6.0',
+      'Action of 1.7.0',
     ]);
   });
 
@@ -392,11 +494,18 @@ describe('reportStartupVersion', () => {
   });
 
   it('should warn instead of throwing when the version cannot be recorded', async () => {
-    const failingDb = { appState: { findUnique: () => Promise.reject(new Error('no such table: AppState')) } };
+    const failingDb = {
+      appState: { findUnique: () => Promise.reject(new Error('no such table: AppState')) },
+    };
     const warn = silenceWarnings();
 
-    await expect(reportStartupVersion(failingDb as unknown as PrismaClient, '1.7.0', notesDir)).resolves.toBeUndefined();
+    await expect(
+      reportStartupVersion(failingDb as unknown as PrismaClient, '1.7.0', notesDir),
+    ).resolves.toBeUndefined();
 
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('Upgrade guide skipped'), expect.any(Error));
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('Upgrade guide skipped'),
+      expect.any(Error),
+    );
   });
 });

@@ -4,12 +4,20 @@ import type { Bottle } from '../types';
 import { bottleGroupKey, groupBottles, isGroup } from './bottleGrouping';
 
 function bottle(overrides: Partial<Bottle>): Bottle {
-  return buildBottle({ id: 1, name: 'Havana 3', categoryId: 10, purchasePrice: null, ...overrides });
+  return buildBottle({
+    id: 1,
+    name: 'Havana 3',
+    categoryId: 10,
+    purchasePrice: null,
+    ...overrides,
+  });
 }
 
 describe('bottleGroupKey', () => {
   it('ignores the case of the name', () => {
-    expect(bottleGroupKey(bottle({ name: 'HAVANA 3' }))).toBe(bottleGroupKey(bottle({ name: 'havana 3' })));
+    expect(bottleGroupKey(bottle({ name: 'HAVANA 3' }))).toBe(
+      bottleGroupKey(bottle({ name: 'havana 3' })),
+    );
   });
 
   it('tells apart bottles of another capacity, category or strength', () => {
@@ -27,7 +35,7 @@ describe('groupBottles', () => {
     const result = groupBottles([single]);
 
     expect(result).toEqual([single]);
-    expect(isGroup(result[0])).toBe(false);
+    expect(isGroup(result[0]!)).toBe(false);
   });
 
   it('groups the bottles of the same product, whatever the case of the name', () => {
@@ -38,8 +46,8 @@ describe('groupBottles', () => {
 
     expect(result).toHaveLength(1);
     const group = result[0];
-    expect(isGroup(group)).toBe(true);
-    if (!isGroup(group)) return;
+    expect(isGroup(group!)).toBe(true);
+    if (!isGroup(group!)) return;
     expect(group.name).toBe('Havana 3');
     expect(group.bottles).toEqual([first, second]);
   });
@@ -52,7 +60,7 @@ describe('groupBottles', () => {
     const result = groupBottles([rum, gin, secondRum]);
 
     expect(result).toHaveLength(2);
-    expect(isGroup(result[0])).toBe(true);
+    expect(isGroup(result[0]!)).toBe(true);
     expect(result[1]).toBe(gin);
   });
 });

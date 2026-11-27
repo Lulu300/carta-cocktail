@@ -1,8 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import i18n from '../i18n';
+import { mockDownload } from '../test/download';
 
 // We test the request helper behavior by importing the module and mocking fetch
 const mockFetch = vi.fn();
+
+// What the backend answers on a 401 for a token that is present but invalid (backend/src/i18n/en.json, errors.invalidToken)
+const INVALID_TOKEN_MESSAGE = 'Your session has expired or is no longer valid: sign in again';
 
 beforeEach(() => {
   localStorage.clear();
@@ -41,7 +45,9 @@ function mockAttachment(data: unknown, disposition: string | null) {
     ok: true,
     status: 200,
     json: () => Promise.resolve(data),
-    headers: { get: (key: string) => (key.toLowerCase() === 'content-disposition' ? disposition : null) },
+    headers: {
+      get: (key: string) => (key.toLowerCase() === 'content-disposition' ? disposition : null),
+    },
   });
 }
 
@@ -59,7 +65,7 @@ describe('API request helper', () => {
     mockOk([]);
     const api = await getApi();
     await api.categories.list();
-    const [, options] = mockFetch.mock.calls[0];
+    const [, options] = mockFetch.mock.calls[0]!;
     expect(options.headers['Authorization']).toBe('Bearer my-token');
   });
 
@@ -68,13 +74,13 @@ describe('API request helper', () => {
     mockOk([]);
     const api = await getApi();
     await api.categories.list();
-    const [, options] = mockFetch.mock.calls[0];
+    const [, options] = mockFetch.mock.calls[0]!;
     expect(options.headers['Content-Type']).toBe('application/json');
   });
 
   it('should remove token and call the unauthorized handler on 401 response', async () => {
     localStorage.setItem('token', 'expired-token');
-    mockError(401, { error: 'Session expired' });
+    mockError(401, { error: INVALID_TOKEN_MESSAGE });
     const api = await getApi();
     const onUnauthorized = vi.fn();
     api.setUnauthorizedHandler(onUnauthorized);
@@ -82,7 +88,7 @@ describe('API request helper', () => {
     const error = await api.categories.list().catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(api.ApiError);
-    expect(error).toMatchObject({ status: 401, message: 'Session expired' });
+    expect(error).toMatchObject({ status: 401, message: INVALID_TOKEN_MESSAGE });
     expect(localStorage.getItem('token')).toBeNull();
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
   });
@@ -90,7 +96,11 @@ describe('API request helper', () => {
   it('should keep a newer token when a 401 arrives for a request sent with an older one', async () => {
     localStorage.setItem('token', 'old-token');
     let resolveFetch: (response: unknown) => void = () => {};
-    mockFetch.mockReturnValueOnce(new Promise((resolve) => { resolveFetch = resolve; }));
+    mockFetch.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveFetch = resolve;
+      }),
+    );
     const api = await getApi();
     const onUnauthorized = vi.fn();
     api.setUnauthorizedHandler(onUnauthorized);
@@ -98,9 +108,13 @@ describe('API request helper', () => {
     const pending = api.categories.list().catch((e: unknown) => e);
     // The admin signs in again while the old request is still in flight
     localStorage.setItem('token', 'new-token');
-    resolveFetch({ ok: false, status: 401, json: () => Promise.resolve({ error: 'Session expired' }) });
+    resolveFetch({
+      ok: false,
+      status: 401,
+      json: () => Promise.resolve({ error: INVALID_TOKEN_MESSAGE }),
+    });
 
-    expect(await pending).toMatchObject({ status: 401, message: 'Session expired' });
+    expect(await pending).toMatchObject({ status: 401, message: INVALID_TOKEN_MESSAGE });
     expect(localStorage.getItem('token')).toBe('new-token');
     expect(onUnauthorized).not.toHaveBeenCalled();
   });
@@ -120,7 +134,11 @@ describe('API request helper', () => {
 
     const error = await api.publicApi.getSettings().catch((e: unknown) => e);
 
-    expect(error).toMatchObject({ status: 429, message: 'Too many requests', retryAfterSeconds: seconds });
+    expect(error).toMatchObject({
+      status: 429,
+      message: 'Too many requests',
+      retryAfterSeconds: seconds,
+    });
   });
 
   it('should not call the unauthorized handler on a 401 from auth.login', async () => {
@@ -170,7 +188,11 @@ describe('API request helper', () => {
       const error = await failedRequest(400, {
         error: 'Validation error',
         details: [
-          { path: 'body.ingredients.1.quantity', code: 'too_small', message: 'Too small: expected number to be >0' },
+          {
+            path: 'body.ingredients.1.quantity',
+            code: 'too_small',
+            message: 'Too small: expected number to be >0',
+          },
           { path: 'body.name', code: 'too_small', message: 'Too small' },
         ],
       });
@@ -190,27 +212,42 @@ describe('API request helper', () => {
     it('leaves out details of another shape, such as the unresolved references of an import', async () => {
       const error = await failedRequest(400, {
         error: 'Unknown references',
-        details: [{ line: 2, kind: 'bottle', name: 'Rum' }, 'body.name', null, { path: 'body.name', code: 3 }],
+        details: [
+          { line: 2, kind: 'bottle', name: 'Rum' },
+          'body.name',
+          null,
+          { path: 'body.name', code: 3 },
+        ],
       });
       expect(error.validationIssues()).toEqual([]);
     });
 
     it('is empty when details is not a list, such as the code of an import parse error', async () => {
-      const error = await failedRequest(400, { error: 'Too many rows', details: { code: 'tooManyRows', max: 2000 } });
+      const error = await failedRequest(400, {
+        error: 'Too many rows',
+        details: { code: 'tooManyRows', max: 2000 },
+      });
       expect(error.validationIssues()).toEqual([]);
     });
 
     it('is empty for a 400 whose body is not JSON', async () => {
-      mockFetch.mockResolvedValueOnce(new Response('<html>400 Bad Request</html>', { status: 400 }));
+      mockFetch.mockResolvedValueOnce(
+        new Response('<html>400 Bad Request</html>', { status: 400 }),
+      );
       const api = await getApi();
-      const error = (await api.units.list().catch((e: unknown) => e)) as InstanceType<typeof api.ApiError>;
+      const error = (await api.units.list().catch((e: unknown) => e)) as InstanceType<
+        typeof api.ApiError
+      >;
 
       expect(error.status).toBe(400);
       expect(error.validationIssues()).toEqual([]);
     });
 
     it('is empty for another status, even with details', async () => {
-      const error = await failedRequest(409, { error: 'In use', details: [{ path: 'body.name', code: 'custom' }] });
+      const error = await failedRequest(409, {
+        error: 'In use',
+        details: [{ path: 'body.name', code: 'custom' }],
+      });
       expect(error.validationIssues()).toEqual([]);
     });
 
@@ -238,13 +275,20 @@ describe('API request helper', () => {
     it('lists the unknown references of a recipe, and leaves out a malformed one', async () => {
       const error = await failedRequest(400, {
         error: 'A recipe line names a unit that does not exist',
-        details: [{ line: 2, field: 'ingredientId', id: 7 }, { line: '2', field: 'unitId', id: 4 }, { line: 0, field: 'unitId' }],
+        details: [
+          { line: 2, field: 'ingredientId', id: 7 },
+          { line: '2', field: 'unitId', id: 4 },
+          { line: 0, field: 'unitId' },
+        ],
       });
       expect(error.unknownReferences()).toEqual([{ line: 2, field: 'ingredientId', id: 7 }]);
     });
 
     it('reads no references for another status', async () => {
-      const error = await failedRequest(409, { error: 'In use', details: [{ line: 0, field: 'unitId', id: 4 }] });
+      const error = await failedRequest(409, {
+        error: 'In use',
+        details: [{ line: 0, field: 'unitId', id: 4 }],
+      });
       expect(error.unknownReferences()).toEqual([]);
       expect(error.unresolvedReferences()).toEqual([]);
     });
@@ -259,8 +303,8 @@ describe('API request helper', () => {
     await i18n.changeLanguage('fr');
     await api.publicApi.listMenus();
 
-    expect(mockFetch.mock.calls[0][1].headers['Accept-Language']).toBe('en');
-    expect(mockFetch.mock.calls[1][1].headers['Accept-Language']).toBe('fr');
+    expect(mockFetch.mock.calls[0]![1]!.headers['Accept-Language']).toBe('en');
+    expect(mockFetch.mock.calls[1]![1]!.headers['Accept-Language']).toBe('fr');
   });
 
   // English (UK) has no messages of its own (resolvedLanguage is "en"), but the import reads its
@@ -273,7 +317,7 @@ describe('API request helper', () => {
     await api.publicApi.listMenus();
 
     expect(i18n.resolvedLanguage).toBe('en');
-    expect(mockFetch.mock.calls[0][1].headers['Accept-Language']).toBe('en-GB');
+    expect(mockFetch.mock.calls[0]![1]!.headers['Accept-Language']).toBe('en-GB');
   });
 
   it('should return undefined on a 204 response', async () => {
@@ -302,50 +346,73 @@ describe('API request helper', () => {
 
     /** An answer of nginx or of another proxy in front of the backend: its own page, not JSON. */
     function mockProxyAnswer(status: number, body: string, contentType: string) {
-      mockFetch.mockResolvedValueOnce(new Response(body, { status, headers: { 'Content-Type': contentType } }));
+      mockFetch.mockResolvedValueOnce(
+        new Response(body, { status, headers: { 'Content-Type': contentType } }),
+      );
     }
 
     it.each([
-      ['502 HTML page of nginx while the backend is down', 502, '<html><body><h1>502 Bad Gateway</h1></body></html>', 'text/html'],
+      [
+        '502 HTML page of nginx while the backend is down',
+        502,
+        '<html><body><h1>502 Bad Gateway</h1></body></html>',
+        'text/html',
+      ],
       ['empty 502 of the Vite dev proxy while the backend is down', 502, '', 'text/plain'],
       ['503 plain text page of a proxy', 503, 'Service Unavailable', 'text/plain'],
-      ['504 HTML page of nginx when the backend does not answer in time', 504, '<html><body><h1>504 Gateway Time-out</h1></body></html>', 'text/html'],
+      [
+        '504 HTML page of nginx when the backend does not answer in time',
+        504,
+        '<html><body><h1>504 Gateway Time-out</h1></body></html>',
+        'text/html',
+      ],
       ['500 with no body, which is not JSON', 500, '', 'text/plain'],
-    ])('says the server is not responding after a %s, and keeps the status', async (_case, status, body, contentType) => {
-      localStorage.setItem('token', 'my-token');
-      mockProxyAnswer(status, body, contentType);
-      const api = await getApi();
-      const onUnauthorized = vi.fn();
-      api.setUnauthorizedHandler(onUnauthorized);
+    ])(
+      'says the server is not responding after a %s, and keeps the status',
+      async (_case, status, body, contentType) => {
+        localStorage.setItem('token', 'my-token');
+        mockProxyAnswer(status, body, contentType);
+        const api = await getApi();
+        const onUnauthorized = vi.fn();
+        api.setUnauthorizedHandler(onUnauthorized);
 
-      const error = await api.auth.me().catch((e: unknown) => e);
+        const error = await api.auth.me().catch((e: unknown) => e);
 
-      expect(error).toBeInstanceOf(api.ApiError);
-      expect(error).toMatchObject({ status, message: SERVER_UNAVAILABLE });
-      expect(localStorage.getItem('token')).toBe('my-token');
-      expect(onUnauthorized).not.toHaveBeenCalled();
-    });
+        expect(error).toBeInstanceOf(api.ApiError);
+        expect(error).toMatchObject({ status, message: SERVER_UNAVAILABLE });
+        expect(localStorage.getItem('token')).toBe('my-token');
+        expect(onUnauthorized).not.toHaveBeenCalled();
+      },
+    );
 
     it('says it in the language chosen in the UI', async () => {
       await i18n.changeLanguage('fr');
       mockProxyAnswer(502, '<html><body><h1>502 Bad Gateway</h1></body></html>', 'text/html');
       const api = await getApi();
 
-      await expect(api.categories.list()).rejects.toThrow('Le serveur ne répond pas, réessayez dans un instant.');
+      await expect(api.categories.list()).rejects.toThrow(
+        'Le serveur ne répond pas, réessayez dans un instant.',
+      );
     });
 
     it('says it for a JSON answer of a 5xx without an error field', async () => {
       mockError(503, { status: 'unavailable' });
       const api = await getApi();
 
-      await expect(api.categories.list()).rejects.toMatchObject({ status: 503, message: SERVER_UNAVAILABLE });
+      await expect(api.categories.list()).rejects.toMatchObject({
+        status: 503,
+        message: SERVER_UNAVAILABLE,
+      });
     });
 
     it('keeps the message the backend sent, whatever the status', async () => {
       mockError(502, { error: 'Backup restore in progress' });
       const api = await getApi();
 
-      await expect(api.categories.list()).rejects.toMatchObject({ status: 502, message: 'Backup restore in progress' });
+      await expect(api.categories.list()).rejects.toMatchObject({
+        status: 502,
+        message: 'Backup restore in progress',
+      });
     });
 
     describe('413 of nginx for a body over client_max_body_size', () => {
@@ -369,7 +436,9 @@ describe('API request helper', () => {
         mockProxyAnswer(413, NGINX_413, 'text/html');
         const api = await getApi();
 
-        await expect(api.categories.list()).rejects.toThrow('Le fichier ou la requête est trop volumineux');
+        await expect(api.categories.list()).rejects.toThrow(
+          'Le fichier ou la requête est trop volumineux',
+        );
       });
 
       it('keeps the message of the 413 the backend translated', async () => {
@@ -385,34 +454,67 @@ describe('API request helper', () => {
     });
 
     it.each([
-      ['400 HTML page of nginx for headers too large', 400, '<html><body><h1>400 Request Header Or Cookie Too Large</h1></body></html>', 'text/html'],
-      ['403 HTML page of a proxy in front', 403, '<html><body><h1>403 Forbidden</h1></body></html>', 'text/html'],
+      [
+        '400 HTML page of nginx for headers too large',
+        400,
+        '<html><body><h1>400 Request Header Or Cookie Too Large</h1></body></html>',
+        'text/html',
+      ],
+      [
+        '403 HTML page of a proxy in front',
+        403,
+        '<html><body><h1>403 Forbidden</h1></body></html>',
+        'text/html',
+      ],
       ['404 plain text page of a proxy with no route', 404, '404 page not found', 'text/plain'],
-      ['405 HTML page of a proxy in front', 405, '<html><body><h1>405 Not Allowed</h1></body></html>', 'text/html'],
+      [
+        '405 HTML page of a proxy in front',
+        405,
+        '<html><body><h1>405 Not Allowed</h1></body></html>',
+        'text/html',
+      ],
       ['empty 408 of Node when the body takes too long', 408, '', 'text/plain'],
-      ['414 HTML page of nginx for a URL too long', 414, '<html><body><h1>414 Request-URI Too Large</h1></body></html>', 'text/html'],
+      [
+        '414 HTML page of nginx for a URL too long',
+        414,
+        '<html><body><h1>414 Request-URI Too Large</h1></body></html>',
+        'text/html',
+      ],
       ['empty 431 of Node for headers too large', 431, '', 'text/plain'],
-    ])('says the request could not be completed after a %s, with the status', async (_case, status, body, contentType) => {
-      mockProxyAnswer(status, body, contentType);
-      const api = await getApi();
+    ])(
+      'says the request could not be completed after a %s, with the status',
+      async (_case, status, body, contentType) => {
+        mockProxyAnswer(status, body, contentType);
+        const api = await getApi();
 
-      await expect(api.categories.list()).rejects.toMatchObject({
-        status,
-        message: `The request could not be completed (error ${status}).`,
-      });
-    });
+        await expect(api.categories.list()).rejects.toMatchObject({
+          status,
+          message: `The request could not be completed (error ${status}).`,
+        });
+      },
+    );
 
     it('says a 4xx is incomplete in the language chosen in the UI', async () => {
       await i18n.changeLanguage('fr');
-      mockProxyAnswer(414, '<html><body><h1>414 Request-URI Too Large</h1></body></html>', 'text/html');
+      mockProxyAnswer(
+        414,
+        '<html><body><h1>414 Request-URI Too Large</h1></body></html>',
+        'text/html',
+      );
       const api = await getApi();
 
-      await expect(api.categories.list()).rejects.toThrow("La requête n'a pas abouti (erreur 414).");
+      await expect(api.categories.list()).rejects.toThrow(
+        "La requête n'a pas abouti (erreur 414).",
+      );
     });
 
     it('still ends the session on a 401 that is not JSON', async () => {
       localStorage.setItem('token', 'my-token');
-      mockProxyAnswer(401, '<html><body><h1>401 Authorization Required</h1></body></html>', 'text/html');
+      mockProxyAnswer(
+        401,
+        '<html><body><h1>401 Authorization Required</h1></body></html>',
+        'text/html',
+      );
       const api = await getApi();
       const onUnauthorized = vi.fn();
       api.setUnauthorizedHandler(onUnauthorized);
@@ -437,8 +539,69 @@ describe('API request helper', () => {
     mockOk([]);
     const api = await getApi();
     await api.publicApi.listMenus();
-    const [, options] = mockFetch.mock.calls[0];
+    const [, options] = mockFetch.mock.calls[0]!;
     expect(options.headers['Authorization']).toBeUndefined();
+  });
+});
+
+describe('request cancellation', () => {
+  it('should hand the signal of a read to fetch', async () => {
+    mockOk([]);
+    const api = await getApi();
+    const { signal } = new AbortController();
+
+    await api.bottles.list(undefined, signal);
+
+    expect(mockFetch.mock.calls[0]![1]!.signal).toBe(signal);
+  });
+
+  it('should reject an abandoned request with the abort error, not an ApiError', async () => {
+    const controller = new AbortController();
+    mockFetch.mockImplementationOnce(
+      (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+        }),
+    );
+    const api = await getApi();
+
+    const pending = api.units.list(controller.signal).catch((e: unknown) => e);
+    controller.abort();
+
+    const error = await pending;
+    expect(error).toMatchObject({ name: 'AbortError' });
+    expect(error).not.toBeInstanceOf(api.ApiError);
+  });
+
+  it('should not end the session when the request is abandoned while its 401 body is read', async () => {
+    localStorage.setItem('token', 'my-token');
+    const controller = new AbortController();
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: () => {
+        controller.abort();
+        return Promise.reject(controller.signal.reason);
+      },
+    });
+    const api = await getApi();
+    const onUnauthorized = vi.fn();
+    api.setUnauthorizedHandler(onUnauthorized);
+
+    const error = await api.units.list(controller.signal).catch((e: unknown) => e);
+
+    expect(error).toMatchObject({ name: 'AbortError' });
+    expect(localStorage.getItem('token')).toBe('my-token');
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
+  it('should send reads without a signal as before', async () => {
+    mockOk([]);
+    const api = await getApi();
+
+    await api.units.list();
+
+    expect(mockFetch.mock.calls[0]![1]!.signal).toBeUndefined();
   });
 });
 
@@ -447,7 +610,7 @@ describe('auth API', () => {
     mockOk({ token: 'jwt', user: { id: 1, email: 'a@b.c' } });
     const api = await getApi();
     await api.auth.login('a@b.c', 'pass');
-    const [url, opts] = mockFetch.mock.calls[0];
+    const [url, opts] = mockFetch.mock.calls[0]!;
     expect(url).toBe('/api/auth/login');
     expect(opts.method).toBe('POST');
     expect(JSON.parse(opts.body)).toEqual({ email: 'a@b.c', password: 'pass' });
@@ -458,7 +621,7 @@ describe('auth API', () => {
     mockOk({ id: 1, email: 'a@b.c' });
     const api = await getApi();
     await api.auth.me();
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/auth/me');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/auth/me');
   });
 });
 
@@ -468,40 +631,39 @@ describe('categories API', () => {
 
     mockOk([]);
     await api.categories.list();
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/categories');
-
-    mockOk({});
-    await api.categories.get(1);
-    expect(mockFetch.mock.calls[1][0]).toBe('/api/categories/1');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/categories');
 
     mockOk({});
     await api.categories.create({ name: 'Vodka' });
-    expect(mockFetch.mock.calls[2][1].method).toBe('POST');
+    expect(mockFetch.mock.calls[1]![1]!.method).toBe('POST');
 
     mockOk({});
     await api.categories.update(1, { name: 'Gin' });
-    expect(mockFetch.mock.calls[3][1].method).toBe('PUT');
+    expect(mockFetch.mock.calls[2]![1]!.method).toBe('PUT');
 
     mockOk({ message: 'ok' });
     await api.categories.delete(1);
-    expect(mockFetch.mock.calls[4][1].method).toBe('DELETE');
+    expect(mockFetch.mock.calls[3]![1]!.method).toBe('DELETE');
   });
 });
 
 describe('forced deletion', () => {
-  it.each(['bottles', 'categories', 'ingredients'] as const)('adds ?force=true to a forced %s deletion only', async (resource) => {
-    const api = await getApi();
+  it.each(['bottles', 'categories', 'ingredients'] as const)(
+    'adds ?force=true to a forced %s deletion only',
+    async (resource) => {
+      const api = await getApi();
 
-    mockOk({ message: 'ok', deleted: true, impact: { cocktails: [], bottles: [] } });
-    await api[resource].delete(3);
-    mockOk({ message: 'ok', deleted: true, impact: { cocktails: [], bottles: [] } });
-    await api[resource].delete(3, { force: true });
+      mockOk({ message: 'ok', deleted: true, impact: { cocktails: [], bottles: [] } });
+      await api[resource].delete(3);
+      mockOk({ message: 'ok', deleted: true, impact: { cocktails: [], bottles: [] } });
+      await api[resource].delete(3, { force: true });
 
-    expect(mockFetch.mock.calls.map(([url, init]) => `${init.method} ${url}`)).toEqual([
-      `DELETE /api/${resource}/3`,
-      `DELETE /api/${resource}/3?force=true`,
-    ]);
-  });
+      expect(mockFetch.mock.calls.map(([url, init]) => `${init.method} ${url}`)).toEqual([
+        `DELETE /api/${resource}/3`,
+        `DELETE /api/${resource}/3?force=true`,
+      ]);
+    },
+  );
 });
 
 describe('bottles API', () => {
@@ -509,40 +671,36 @@ describe('bottles API', () => {
     mockOk([]);
     const api = await getApi();
     await api.bottles.list();
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/bottles');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/bottles');
   });
 
   it('should list with type filter', async () => {
     mockOk([]);
     const api = await getApi();
     await api.bottles.list({ type: 'SPIRIT' });
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/bottles?type=SPIRIT');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/bottles?type=SPIRIT');
   });
 
   it('should list with categoryId filter', async () => {
     mockOk([]);
     const api = await getApi();
     await api.bottles.list({ categoryId: 5 });
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/bottles?categoryId=5');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/bottles?categoryId=5');
   });
 
   it('should call CRUD endpoints', async () => {
     const api = await getApi();
     mockOk({});
-    await api.bottles.get(1);
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/bottles/1');
-
-    mockOk({});
     await api.bottles.create({ name: 'Test' });
-    expect(mockFetch.mock.calls[1][1].method).toBe('POST');
+    expect(mockFetch.mock.calls[0]![1]!.method).toBe('POST');
 
     mockOk({});
     await api.bottles.update(1, { name: 'Updated' });
-    expect(mockFetch.mock.calls[2][1].method).toBe('PUT');
+    expect(mockFetch.mock.calls[1]![1]!.method).toBe('PUT');
 
     mockOk({ message: 'ok' });
     await api.bottles.delete(1);
-    expect(mockFetch.mock.calls[3][1].method).toBe('DELETE');
+    expect(mockFetch.mock.calls[2]![1]!.method).toBe('DELETE');
   });
 });
 
@@ -556,43 +714,47 @@ describe('bottles.exportFile', () => {
       blob: () => Promise.resolve(fakeBlob),
       headers: { get: () => 'attachment; filename="bottles.json"' },
     });
-    const mockAnchor = { click: vi.fn(), href: '', download: '' };
-    vi.spyOn(document, 'createElement').mockReturnValue(mockAnchor as unknown as HTMLElement);
-    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fake-url');
-    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    const downloads = mockDownload();
 
     const api = await getApi();
-    await api.bottles.exportFile('json', { categoryId: 2, type: 'SPIRIT', search: 'rum', location: 'bar' });
+    await api.bottles.exportFile('json', {
+      categoryId: 2,
+      type: 'SPIRIT',
+      search: 'rum',
+      location: 'bar',
+    });
 
-    const [url, opts] = mockFetch.mock.calls[0];
-    expect(url).toBe('/api/bottles/export?format=json&categoryId=2&type=SPIRIT&search=rum&location=bar');
+    const [url, opts] = mockFetch.mock.calls[0]!;
+    expect(url).toBe(
+      '/api/bottles/export?format=json&categoryId=2&type=SPIRIT&search=rum&location=bar',
+    );
     expect(opts.headers['Authorization']).toBe('Bearer tok');
-    expect(mockAnchor.download).toBe('bottles.json');
-    expect(mockAnchor.click).toHaveBeenCalled();
+    expect(downloads).toEqual(['bottles.json']);
   });
 
   it('saves the CSV export as received, byte order mark included', async () => {
-    const csv = new Blob([new Uint8Array([0xef, 0xbb, 0xbf]), 'name,categoryName\n'], { type: 'text/csv' });
+    const csv = new Blob([new Uint8Array([0xef, 0xbb, 0xbf]), 'name,categoryName\n'], {
+      type: 'text/csv',
+    });
     mockFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
       blob: () => Promise.resolve(csv),
       headers: { get: () => 'attachment; filename="bottles.csv"' },
     });
-    vi.spyOn(document, 'createElement').mockReturnValue({ click: vi.fn() } as unknown as HTMLElement);
-    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fake-url');
-    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    mockDownload();
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL');
 
     const api = await getApi();
     await api.bottles.exportFile('csv');
 
-    const saved = createObjectURL.mock.calls[0][0] as Blob;
+    const saved = createObjectURL.mock.calls[0]![0]! as Blob;
     expect([...new Uint8Array(await saved.arrayBuffer()).slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
   });
 
   it('triggers the unauthorized handler on 401', async () => {
     localStorage.setItem('token', 'expired-token');
-    mockError(401, { error: 'Unauthorized' });
+    mockError(401, { error: INVALID_TOKEN_MESSAGE });
     const api = await getApi();
     const onUnauthorized = vi.fn();
     api.setUnauthorizedHandler(onUnauthorized);
@@ -607,20 +769,18 @@ describe('ingredients API', () => {
     const api = await getApi();
     mockOk([]);
     await api.ingredients.list();
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/ingredients');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/ingredients');
 
-    mockOk({});
-    await api.ingredients.get(1);
     mockOk({});
     await api.ingredients.create({ name: 'Lime' });
     mockOk({});
     await api.ingredients.update(1, { name: 'Lemon' });
     mockOk({ message: 'ok' });
     await api.ingredients.delete(1);
-    mockOk({ updated: 5 });
+    mockOk({ message: 'OK', updated: 5 });
     await api.ingredients.bulkAvailability({ available: true });
-    expect(mockFetch.mock.calls[5][0]).toBe('/api/ingredients/bulk-availability');
-    expect(mockFetch.mock.calls[5][1].method).toBe('POST');
+    expect(mockFetch.mock.calls[4]![0]!).toBe('/api/ingredients/bulk-availability');
+    expect(mockFetch.mock.calls[4]![1]!.method).toBe('POST');
   });
 });
 
@@ -630,14 +790,12 @@ describe('units API', () => {
     mockOk([]);
     await api.units.list();
     mockOk({});
-    await api.units.get(1);
-    mockOk({});
     await api.units.create({ name: 'cl', abbreviation: 'cl' });
     mockOk({});
     await api.units.update(1, { name: 'ml' });
     mockOk({ message: 'ok' });
     await api.units.delete(1);
-    expect(mockFetch).toHaveBeenCalledTimes(5);
+    expect(mockFetch).toHaveBeenCalledTimes(4);
   });
 });
 
@@ -656,7 +814,7 @@ describe('cocktails API', () => {
     await api.cocktails.delete(1);
     mockAttachment({ version: 1 }, 'attachment; filename="cocktail-mojito.json"');
     await api.cocktails.exportRecipe(1);
-    expect(mockFetch.mock.calls[5][0]).toBe('/api/cocktails/1/export');
+    expect(mockFetch.mock.calls[5]![0]!).toBe('/api/cocktails/1/export');
   });
 
   it('should return the export with the file name chosen by the server', async () => {
@@ -684,7 +842,7 @@ describe('cocktails API', () => {
 
     expect(await api.cocktails.exportRecipes([3, 1])).toEqual(files);
 
-    const [url, init] = mockFetch.mock.calls[0];
+    const [url, init] = mockFetch.mock.calls[0]!;
     expect(url).toBe('/api/cocktails/export');
     expect(init.method).toBe('POST');
     expect(JSON.parse(init.body)).toEqual({ ids: [3, 1] });
@@ -695,7 +853,7 @@ describe('cocktails API', () => {
     const api = await getApi();
     const file = new File(['img'], 'test.jpg', { type: 'image/jpeg' });
     await api.cocktails.uploadImage(1, file);
-    const [url, opts] = mockFetch.mock.calls[0];
+    const [url, opts] = mockFetch.mock.calls[0]!;
     expect(url).toBe('/api/cocktails/1/image');
     expect(opts.method).toBe('POST');
     expect(opts.body).toBeInstanceOf(FormData);
@@ -706,12 +864,37 @@ describe('cocktails API', () => {
   it('should call import preview and confirm', async () => {
     const api = await getApi();
     mockOk({});
-    await api.cocktails.importPreview({ version: 1, exportedAt: '', cocktail: { name: 'X', description: null, notes: null, tags: [], ingredients: [], instructions: [] } });
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/cocktails/import/preview');
+    await api.cocktails.importPreview({
+      version: 1,
+      exportedAt: '',
+      cocktail: {
+        name: 'X',
+        description: null,
+        notes: null,
+        tags: [],
+        ingredients: [],
+        instructions: [],
+      },
+    });
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/cocktails/import/preview');
 
     mockOk({});
-    await api.cocktails.importConfirm({ recipe: { version: 1, exportedAt: '', cocktail: { name: 'X', description: null, notes: null, tags: [], ingredients: [], instructions: [] } }, resolutions: {} });
-    expect(mockFetch.mock.calls[1][0]).toBe('/api/cocktails/import/confirm');
+    await api.cocktails.importConfirm({
+      recipe: {
+        version: 1,
+        exportedAt: '',
+        cocktail: {
+          name: 'X',
+          description: null,
+          notes: null,
+          tags: [],
+          ingredients: [],
+          instructions: [],
+        },
+      },
+      resolutions: {},
+    });
+    expect(mockFetch.mock.calls[1]![0]!).toBe('/api/cocktails/import/confirm');
   });
 });
 
@@ -735,19 +918,11 @@ describe('menus API', () => {
 describe('menuBottles API', () => {
   it('should call all endpoints', async () => {
     const api = await getApi();
-    mockOk([]);
-    await api.menuBottles.listByMenu(1);
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/menu-bottles/menu/1');
-
-    mockOk({});
-    await api.menuBottles.create({ menuId: 1, bottleId: 2 });
     mockOk({});
     await api.menuBottles.update(1, { position: 0 });
-    mockOk({ message: 'ok' });
-    await api.menuBottles.delete(1);
     mockOk({ message: 'ok', added: 1, removed: 0 });
     await api.menuBottles.sync(1);
-    expect(mockFetch.mock.calls[4][0]).toBe('/api/menu-bottles/menu/1/sync');
+    expect(mockFetch.mock.calls[1]![0]!).toBe('/api/menu-bottles/menu/1/sync');
   });
 
   it('should reorder every entry of a menu in one request', async () => {
@@ -755,7 +930,7 @@ describe('menuBottles API', () => {
     mockOk({ message: 'ok' });
     await api.menuBottles.reorder(5, [12, 7, 9]);
 
-    const [url, init] = mockFetch.mock.calls[0];
+    const [url, init] = mockFetch.mock.calls[0]!;
     expect(url).toBe('/api/menu-bottles/menu/5/reorder');
     expect(init.method).toBe('POST');
     expect(JSON.parse(init.body)).toEqual({ ids: [12, 7, 9] });
@@ -765,18 +940,18 @@ describe('menuBottles API', () => {
     const api = await getApi();
     mockOk([]);
     await api.menuBottles.exclusions(5);
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/menu-bottles/menu/5/exclusions');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/menu-bottles/menu/5/exclusions');
 
     mockOk({ message: 'ok' });
     await api.menuBottles.exclude(5, [3, 4]);
-    const [excludeUrl, excludeInit] = mockFetch.mock.calls[1];
+    const [excludeUrl, excludeInit] = mockFetch.mock.calls[1]!;
     expect(excludeUrl).toBe('/api/menu-bottles/menu/5/exclusions');
     expect(excludeInit.method).toBe('POST');
     expect(JSON.parse(excludeInit.body)).toEqual({ bottleIds: [3, 4] });
 
     mockOk({ message: 'ok' });
     await api.menuBottles.restore(5, [3, 4]);
-    const [restoreUrl, restoreInit] = mockFetch.mock.calls[2];
+    const [restoreUrl, restoreInit] = mockFetch.mock.calls[2]!;
     expect(restoreUrl).toBe('/api/menu-bottles/menu/5/exclusions/restore');
     expect(restoreInit.method).toBe('POST');
     expect(JSON.parse(restoreInit.body)).toEqual({ bottleIds: [3, 4] });
@@ -787,7 +962,7 @@ describe('menuBottles API', () => {
     mockOk({ message: 'ok' });
     await api.menuBottles.updateEntries(5, [12, 7], { menuSectionId: null });
 
-    const [url, init] = mockFetch.mock.calls[0];
+    const [url, init] = mockFetch.mock.calls[0]!;
     expect(url).toBe('/api/menu-bottles/menu/5/entries');
     expect(init.method).toBe('PUT');
     expect(JSON.parse(init.body)).toEqual({ ids: [12, 7], menuSectionId: null });
@@ -797,14 +972,14 @@ describe('menuBottles API', () => {
     const api = await getApi();
     mockOk({ message: 'ok' });
     await api.menuBottles.addBottles(5, [3, 4]);
-    const [addUrl, addInit] = mockFetch.mock.calls[0];
+    const [addUrl, addInit] = mockFetch.mock.calls[0]!;
     expect(addUrl).toBe('/api/menu-bottles/menu/5/entries');
     expect(addInit.method).toBe('POST');
     expect(JSON.parse(addInit.body)).toEqual({ bottleIds: [3, 4] });
 
     mockOk({ message: 'ok' });
     await api.menuBottles.removeEntries(5, [12, 7]);
-    const [removeUrl, removeInit] = mockFetch.mock.calls[1];
+    const [removeUrl, removeInit] = mockFetch.mock.calls[1]!;
     expect(removeUrl).toBe('/api/menu-bottles/menu/5/entries/remove');
     expect(removeInit.method).toBe('POST');
     expect(JSON.parse(removeInit.body)).toEqual({ ids: [12, 7] });
@@ -814,21 +989,17 @@ describe('menuBottles API', () => {
 describe('menuSections API', () => {
   it('should call all endpoints', async () => {
     const api = await getApi();
-    mockOk([]);
-    await api.menuSections.listByMenu(1);
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/menu-sections/menu/1/sections');
-
     mockOk({});
     await api.menuSections.create(1, { name: 'Section' });
     mockOk({});
     await api.menuSections.update(1, { name: 'Updated' });
     mockOk({ message: 'ok' });
     await api.menuSections.delete(1);
-    expect(mockFetch.mock.calls[3][0]).toBe('/api/menu-sections/sections/1');
+    expect(mockFetch.mock.calls[2]![0]!).toBe('/api/menu-sections/sections/1');
 
     mockOk({ message: 'ok' });
     await api.menuSections.reorder(1, [1, 2, 3]);
-    expect(mockFetch.mock.calls[4][0]).toBe('/api/menu-sections/menu/1/sections/reorder');
+    expect(mockFetch.mock.calls[3]![0]!).toBe('/api/menu-sections/menu/1/sections/reorder');
   });
 });
 
@@ -839,18 +1010,18 @@ describe('public API', () => {
     await api.publicApi.listMenus();
     mockOk({});
     await api.publicApi.getMenu('summer');
-    expect(mockFetch.mock.calls[1][0]).toBe('/api/public/menus/summer');
+    expect(mockFetch.mock.calls[1]![0]!).toBe('/api/public/menus/summer');
 
     mockOk({});
     await api.publicApi.getCocktail(1);
     mockAttachment({}, 'attachment; filename="cocktail-negroni.json"');
     const file = await api.publicApi.exportCocktail(1);
-    expect(mockFetch.mock.calls[3][0]).toBe('/api/public/cocktails/1/export');
+    expect(mockFetch.mock.calls[3]![0]!).toBe('/api/public/cocktails/1/export');
     expect(file.filename).toBe('cocktail-negroni.json');
 
     mockOk({});
     await api.publicApi.getSettings();
-    expect(mockFetch.mock.calls[4][0]).toBe('/api/public/settings');
+    expect(mockFetch.mock.calls[4]![0]!).toBe('/api/public/settings');
   });
 });
 
@@ -859,20 +1030,16 @@ describe('shortages API', () => {
     mockOk([]);
     const api = await getApi();
     await api.shortages.list();
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/shortages');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/shortages');
   });
 });
 
 describe('availability API', () => {
-  it('should call both endpoints', async () => {
+  it('should call the endpoint', async () => {
     const api = await getApi();
     mockOk({});
-    await api.availability.getCocktail(1);
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/availability/cocktails/1');
-
-    mockOk({});
     await api.availability.getAllCocktails();
-    expect(mockFetch.mock.calls[1][0]).toBe('/api/availability/cocktails');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/availability/cocktails');
   });
 });
 
@@ -881,15 +1048,15 @@ describe('settings API', () => {
     const api = await getApi();
     mockOk({ siteName: 'Bar', siteIcon: '' });
     await api.settings.get();
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/settings');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/settings');
 
     mockOk({});
     await api.settings.update({ siteName: 'New', siteIcon: '🍸' });
-    expect(mockFetch.mock.calls[1][1].method).toBe('PUT');
+    expect(mockFetch.mock.calls[1]![1]!.method).toBe('PUT');
 
     mockOk({ id: 1, email: 'a@b.c' });
     await api.settings.updateProfile({ email: 'new@b.c' });
-    expect(mockFetch.mock.calls[2][0]).toBe('/api/settings/profile');
+    expect(mockFetch.mock.calls[2]![0]!).toBe('/api/settings/profile');
   });
 });
 
@@ -898,30 +1065,30 @@ describe('categoryTypes API', () => {
     const api = await getApi();
     mockOk([]);
     await api.categoryTypes.list();
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/category-types');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/category-types');
 
     mockOk({});
     await api.categoryTypes.create({ name: 'SPIRIT' });
-    expect(mockFetch.mock.calls[1][1].method).toBe('POST');
+    expect(mockFetch.mock.calls[1]![1]!.method).toBe('POST');
 
     mockOk({});
     await api.categoryTypes.update('SPIRIT', { color: 'blue' });
-    expect(mockFetch.mock.calls[2][0]).toBe('/api/category-types/SPIRIT');
+    expect(mockFetch.mock.calls[2]![0]!).toBe('/api/category-types/SPIRIT');
 
     mockOk({ message: 'ok' });
     await api.categoryTypes.delete('SPIRIT');
-    expect(mockFetch.mock.calls[3][1].method).toBe('DELETE');
+    expect(mockFetch.mock.calls[3]![1]!.method).toBe('DELETE');
   });
 
   it('should send a name with surrounding spaces as it is, encoded in the path', async () => {
     const api = await getApi();
     mockOk({});
     await api.categoryTypes.update(' SPIRIT ', { color: 'blue' });
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/category-types/%20SPIRIT%20');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/category-types/%20SPIRIT%20');
 
     mockOk({ message: 'ok' });
     await api.categoryTypes.delete(' SPIRIT ');
-    expect(mockFetch.mock.calls[1][0]).toBe('/api/category-types/%20SPIRIT%20');
+    expect(mockFetch.mock.calls[1]![0]!).toBe('/api/category-types/%20SPIRIT%20');
   });
 
   // An empty path segment cannot be addressed: the empty name goes in the query.
@@ -929,13 +1096,13 @@ describe('categoryTypes API', () => {
     const api = await getApi();
     mockOk({});
     await api.categoryTypes.update('', { color: 'blue' });
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/category-types?name=');
-    expect(mockFetch.mock.calls[0][1].method).toBe('PUT');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/category-types?name=');
+    expect(mockFetch.mock.calls[0]![1]!.method).toBe('PUT');
 
     mockOk({ message: 'ok' });
     await api.categoryTypes.delete('');
-    expect(mockFetch.mock.calls[1][0]).toBe('/api/category-types?name=');
-    expect(mockFetch.mock.calls[1][1].method).toBe('DELETE');
+    expect(mockFetch.mock.calls[1]![0]!).toBe('/api/category-types?name=');
+    expect(mockFetch.mock.calls[1]![1]!.method).toBe('DELETE');
   });
 
   // The browser resolves the dot segments: '/category-types/..' would become '/'.
@@ -943,18 +1110,18 @@ describe('categoryTypes API', () => {
     const api = await getApi();
     mockOk({});
     await api.categoryTypes.update(name, { color: 'blue' });
-    expect(mockFetch.mock.calls[0][0]).toBe(`/api/category-types?name=${name}`);
+    expect(mockFetch.mock.calls[0]![0]!).toBe(`/api/category-types?name=${name}`);
 
     mockOk({ message: 'ok' });
     await api.categoryTypes.delete(name);
-    expect(mockFetch.mock.calls[1][0]).toBe(`/api/category-types?name=${name}`);
+    expect(mockFetch.mock.calls[1]![0]!).toBe(`/api/category-types?name=${name}`);
   });
 
   it('should keep in the path a name that only contains dots', async () => {
     const api = await getApi();
     mockOk({});
     await api.categoryTypes.update('...', { color: 'blue' });
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/category-types/...');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/category-types/...');
   });
 });
 
@@ -962,7 +1129,9 @@ describe('backup API', () => {
   it('exportBackup triggers download on success with Content-Disposition filename', async () => {
     localStorage.setItem('token', 'tok');
     const fakeBlob = new Blob(['zip-data'], { type: 'application/zip' });
-    const mockHeaders = new Map([['content-disposition', 'attachment; filename=backup-2024-01-01.zip']]);
+    const mockHeaders = new Map([
+      ['content-disposition', 'attachment; filename=backup-2024-01-01.zip'],
+    ]);
     mockFetch.mockResolvedValueOnce({
       ok: true,
       blob: () => Promise.resolve(fakeBlob),
@@ -971,21 +1140,15 @@ describe('backup API', () => {
       },
     });
 
-    const mockClick = vi.fn();
-    const mockAnchor = { click: mockClick, href: '', download: '' };
-    vi.spyOn(document, 'createElement').mockReturnValue(mockAnchor as unknown as HTMLElement);
-    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fake-url');
-    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    const downloads = mockDownload();
 
     const api = await getApi();
     await api.backup.exportBackup();
 
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/backup/export');
-    expect(mockFetch.mock.calls[0][1].headers['Authorization']).toBe('Bearer tok');
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/backup/export');
+    expect(mockFetch.mock.calls[0]![1]!.headers['Authorization']).toBe('Bearer tok');
     expect(URL.createObjectURL).toHaveBeenCalledWith(fakeBlob);
-    expect(mockAnchor.download).toBe('backup-2024-01-01.zip');
-    expect(mockClick).toHaveBeenCalled();
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:fake-url');
+    expect(downloads).toEqual(['backup-2024-01-01.zip']);
   });
 
   it('exportBackup uses fallback filename when no Content-Disposition header', async () => {
@@ -996,18 +1159,14 @@ describe('backup API', () => {
       headers: { get: () => null },
     });
 
-    const mockClick = vi.fn();
-    const mockAnchor = { click: mockClick, href: '', download: '' };
-    vi.spyOn(document, 'createElement').mockReturnValue(mockAnchor as unknown as HTMLElement);
-    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fake-url');
-    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    const downloads = mockDownload();
 
     const api = await getApi();
     await api.backup.exportBackup();
 
     // Fallback filename matches pattern backup-YYYY-MM-DD.zip
-    expect(mockAnchor.download).toMatch(/^backup-\d{4}-\d{2}-\d{2}\.zip$/);
-    expect(mockClick).toHaveBeenCalled();
+    expect(downloads).toHaveLength(1);
+    expect(downloads[0]).toMatch(/^backup-\d{4}-\d{2}-\d{2}\.zip$/);
   });
 
   it('exportBackup throws error when response is not ok', async () => {
@@ -1046,8 +1205,8 @@ describe('backup API', () => {
     const file = new File(['backup-content'], 'backup.zip', { type: 'application/zip' });
     const result = await api.backup.importBackup(file);
 
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/backup/import');
-    const [, opts] = mockFetch.mock.calls[0];
+    expect(mockFetch.mock.calls[0]![0]!).toBe('/api/backup/import');
+    const [, opts] = mockFetch.mock.calls[0]!;
     expect(opts.method).toBe('POST');
     expect(opts.body).toBeInstanceOf(FormData);
     expect(opts.headers['Authorization']).toBe('Bearer tok');
@@ -1069,7 +1228,7 @@ describe('backup API', () => {
 
   it('exportBackup triggers the unauthorized handler on 401', async () => {
     localStorage.setItem('token', 'expired-token');
-    mockError(401, { error: 'Unauthorized' });
+    mockError(401, { error: INVALID_TOKEN_MESSAGE });
     const api = await getApi();
     const onUnauthorized = vi.fn();
     api.setUnauthorizedHandler(onUnauthorized);
@@ -1081,7 +1240,7 @@ describe('backup API', () => {
 
   it('importBackup triggers the unauthorized handler on 401', async () => {
     localStorage.setItem('token', 'expired-token');
-    mockError(401, { error: 'Unauthorized' });
+    mockError(401, { error: INVALID_TOKEN_MESSAGE });
     const api = await getApi();
     const onUnauthorized = vi.fn();
     api.setUnauthorizedHandler(onUnauthorized);

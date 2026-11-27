@@ -13,8 +13,16 @@ export type StoredTranslations = Record<string, string>;
 
 /** Relation fields that may hold entities with their own nameTranslations. */
 const RELATION_KEYS = [
-  'unit', 'category', 'categoryType', 'ingredient', 'bottle', 'bottles',
-  'ingredients', 'cocktail', 'cocktails', 'preferredBottles',
+  'unit',
+  'category',
+  'categoryType',
+  'ingredient',
+  'bottle',
+  'bottles',
+  'ingredients',
+  'cocktail',
+  'cocktails',
+  'preferredBottles',
 ];
 
 /**
@@ -22,7 +30,9 @@ const RELATION_KEYS = [
  * `undefined` (field absent) leaves the column untouched; blank languages are left
  * out, and no translation at all clears the column.
  */
-export function serializeTranslations(value: TranslationsInput | undefined): string | null | undefined {
+export function serializeTranslations(
+  value: TranslationsInput | undefined,
+): string | null | undefined {
   if (value === undefined) return undefined;
   const filled = Object.entries(value ?? {}).filter(([, text]) => text);
   return filled.length > 0 ? JSON.stringify(Object.fromEntries(filled)) : null;

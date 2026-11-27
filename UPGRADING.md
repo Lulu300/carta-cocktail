@@ -14,11 +14,24 @@ This guide lists the actions required to upgrade an existing instance, version b
 
 Pre-releases (`vX.Y.Z-rc.N`) are not listed: they use the section of their target version `vX.Y.Z`. The detailed changes of each version are in its [GitHub Release](https://github.com/Lulu300/carta-cocktail/releases) and in [`docs/releases/`](docs/releases/).
 
-We recommend pinning the images to a version (`:1.18.0`, or `:1.18` to follow its patch releases; these `:X.Y` tags exist from v1.12.0 on) instead of `:latest`, so that an upgrade only happens when you have read this guide.
+We recommend pinning the images to a version (`:1.19.0`, or `:1.19` to follow its patch releases; these `:X.Y` tags exist from v1.12.0 on) instead of `:latest`, so that an upgrade only happens when you have read this guide.
 
 To restore a backup made by an older version, see [Restoring a backup from an older version](#restoring-a-backup-from-an-older-version), at the end of this guide.
 
 The commands below assume the default `docker-compose.prod.yml`, run from its folder. Adapt the file name and the service name `carta-cocktail-backend` if yours differ.
+
+## v1.19.0
+
+No required action, no migration. Pin both images to `:1.19.0`, or `:1.19` to follow the 1.19.x patch releases (`:1.18` does not move to 1.19.0), then pull and restart. This release makes the public menu installable and readable offline (service worker), adds an optional light theme to it, and stores new photos as optimized WebP copies; at the first start, the backend adds reduced copies of existing photos in the background without touching the originals. Release notes: [`docs/releases/v1.19.0.md`](docs/releases/v1.19.0.md).
+
+Instances older than v1.12.0: upgrade to v1.12.0 first, following the [v1.12.0 section](#v1120) (and the sections before it), check that it works, then apply this one.
+
+**Testing a pre-release**: use `:1.19.0-rc.N` instead of `:1.19.0`.
+
+Worth checking after the upgrade:
+
+- **Behind a reverse proxy or a CDN that caches**: `/sw.js` must not be cached, otherwise browsers keep an old version of the public menu.
+- **Rolling back to v1.18.x.** Pin the images back to `:1.18`; the database needs no restore. Browsers that visited v1.19 keep its service worker and may keep showing the v1.19 public menu: v1.18 answers `/sw.js` with its home page, which browsers refuse as a worker, so they never remove it by themselves. Clear the site data on those browsers, as in [docs/operations.md › "Désinscrire un service worker bloqué"](docs/operations.md#désinscrire-un-service-worker-bloqué) (step 2).
 
 ## v1.18.0
 

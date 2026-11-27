@@ -8,6 +8,6 @@ export function useLocalizedName() {
   return useCallback(
     (entity: { name: string; nameTranslations?: Record<string, string> | null }) =>
       getLocalizedName(entity, i18n.language),
-    [i18n.language]
+    [i18n.language],
   );
 }

@@ -14,15 +14,22 @@ const LIMIT = 2;
 function limitedApp() {
   const app = express();
   app.set('trust proxy', 'loopback');
-  app.use(createRateLimiter({ windowMs: 60_000, limit: LIMIT, messageKey: 'errors.tooManyRequests' }));
-  app.get('/', (_req, res) => { res.sendStatus(204); });
+  app.use(
+    createRateLimiter({ windowMs: 60_000, limit: LIMIT, messageKey: 'errors.tooManyRequests' }),
+  );
+  app.get('/', (_req, res) => {
+    res.sendStatus(204);
+  });
   app.use(errorHandler);
   const request = supertest(app);
   return (clientIp: string) => request.get('/').set('X-Forwarded-For', clientIp);
 }
 
 /** Sends one request from each address, in order, and returns their statuses. */
-async function statusesFrom(send: ReturnType<typeof limitedApp>, clientIps: string[]): Promise<number[]> {
+async function statusesFrom(
+  send: ReturnType<typeof limitedApp>,
+  clientIps: string[],
+): Promise<number[]> {
   const statuses: number[] = [];
   for (const clientIp of clientIps) {
     statuses.push((await send(clientIp)).status);
@@ -30,7 +37,9 @@ async function statusesFrom(send: ReturnType<typeof limitedApp>, clientIps: stri
   return statuses;
 }
 
-afterEach(() => { vi.restoreAllMocks(); });
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('createRateLimiter', () => {
   it('counts the addresses of one IPv6 /64 together, as one LAN', async () => {
@@ -52,7 +61,9 @@ describe('createRateLimiter', () => {
   it('counts an IPv4 client per address, in its IPv4-mapped IPv6 form too', async () => {
     const send = limitedApp();
 
-    expect(await statusesFrom(send, ['203.0.113.1', '::ffff:203.0.113.1', '203.0.113.1'])).toEqual([204, 204, 429]);
+    expect(await statusesFrom(send, ['203.0.113.1', '::ffff:203.0.113.1', '203.0.113.1'])).toEqual([
+      204, 204, 429,
+    ]);
     expect((await send('203.0.113.2')).status).toBe(204);
   });
 

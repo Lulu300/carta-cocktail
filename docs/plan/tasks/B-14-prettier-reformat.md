@@ -5,13 +5,13 @@ phase: B
 lane: deps
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: mixed
 depends_on: [B-05]
 touches: [backend/, frontend/, .git-blame-ignore-revs, AGENTS.md, backend/AGENTS.md, frontend/AGENTS.md, .github/workflows/ci.yml]
 sources: []
-branch:
-pr:
+branch: chore/B-14-prettier-reformat
+pr: 285
 ---
 
 ## Contexte
@@ -50,3 +50,4 @@ Aucun : le comportement ne change pas.
 
 - 2026-10-12 : tâche créée par B-05, qui a posé la configuration Prettier sans reformater.
 - 2026-10-12 : relecture de D-04 (PR #112) : D-04 n'a pas ajouté `format:check` à la CI, car il échoue tant que ce reformatage n'est pas fait. L'ajout revient donc à cette tâche (étape 5, `ci.yml` ajouté à `touches`).
+- 2026-11-26 : étape 1 faite : le coordinateur a vérifié qu'aucune autre PR n'est ouverte et l'humain a validé que B-14 passe seule à ce stade. Reformatage Prettier de `backend/` et `frontend/` en un commit isolé (399 fichiers), SHA ajouté à `.git-blame-ignore-revs` dans le suivant, script `format` ajouté aux deux paquets, `npm run format:check` ajouté aux jobs Backend et Frontend de `ci.yml`, `AGENTS.md` mis à jour. Seul écart de forme hors commit de style : la directive `eslint-disable` de `frontend/src/test/axe.ts` devient un bloc, car Prettier a coupé la déclaration sur plusieurs lignes. Bundle public : +16 octets gzip au total.

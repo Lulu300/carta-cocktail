@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { publicApi } from '../../services/api';
-import { isConvertible, getAllConversions } from '../../utils/unitConverter';
+import { isConvertible, getAllConversions, formatQuantity } from '../../utils/unitConverter';
 import type { Unit } from '../../types';
 import { cx } from './classNames';
 import Icon from './Icon';
@@ -13,19 +13,24 @@ interface UnitConverterProps {
 }
 
 export default function UnitConverter({ quantity, unit: unitAbbr }: UnitConverterProps) {
-  const { t } = useTranslation();
-  const { isOpen, closeAndFocusTrigger, panelId, containerRef, handleKeyDown, triggerProps } = useDisclosure();
+  const { t, i18n } = useTranslation();
+  const format = (value: number) => formatQuantity(value, i18n.language);
+  const { isOpen, closeAndFocusTrigger, panelId, containerRef, handleKeyDown, triggerProps } =
+    useDisclosure();
   const [units, setUnits] = useState<Unit[]>([]);
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
   const [selectedQuantity, setSelectedQuantity] = useState(quantity);
 
   // Fetch units on mount
   useEffect(() => {
-    publicApi.listUnits().then(setUnits).catch(() => {});
+    publicApi
+      .listUnits()
+      .then(setUnits)
+      .catch(() => {});
   }, []);
 
   // Find the current unit object
-  const currentUnit = units.find(u => u.abbreviation === unitAbbr);
+  const currentUnit = units.find((u) => u.abbreviation === unitAbbr);
 
   const canConvert = currentUnit && isConvertible(currentUnit);
 
@@ -33,16 +38,16 @@ export default function UnitConverter({ quantity, unit: unitAbbr }: UnitConverte
     // Non-convertible units or units not loaded yet
     return (
       <span className="font-medium">
-        {quantity} {unitAbbr}
+        {format(quantity)} {unitAbbr}
       </span>
     );
   }
 
   const conversions = getAllConversions(quantity, currentUnit, units);
 
-  const handleUnitSelect = (newUnit: Unit, formatted: string) => {
+  const handleUnitSelect = (newUnit: Unit, convertedQuantity: number) => {
     setSelectedUnit(newUnit);
-    setSelectedQuantity(parseFloat(formatted));
+    setSelectedQuantity(convertedQuantity);
     closeAndFocusTrigger();
   };
 
@@ -61,10 +66,15 @@ export default function UnitConverter({ quantity, unit: unitAbbr }: UnitConverte
         {...triggerProps}
         className="font-medium inline-flex items-center gap-1 transition-colors text-accent hover:text-accent-soft cursor-pointer print:text-black"
       >
-        <span>{selectedQuantity} {displayUnit.abbreviation}</span>
+        <span>
+          {format(selectedQuantity)} {displayUnit.abbreviation}
+        </span>
         <Icon
           name="chevron-down"
-          className={cx('size-3 transition-transform motion-reduce:transition-none print:hidden', isOpen && 'rotate-180')}
+          className={cx(
+            'size-3 transition-transform motion-reduce:transition-none print:hidden',
+            isOpen && 'rotate-180',
+          )}
         />
       </button>
 
@@ -80,10 +90,17 @@ export default function UnitConverter({ quantity, unit: unitAbbr }: UnitConverte
               type="button"
               onClick={handleReset}
               aria-pressed={!isChanged}
-              className={cx('w-full text-left text-sm', isChanged ? 'text-fg hover:text-accent' : 'text-accent font-medium')}
+              className={cx(
+                'w-full text-left text-sm',
+                isChanged ? 'text-fg hover:text-accent' : 'text-accent font-medium',
+              )}
             >
-              {quantity} {currentUnit.abbreviation}
-              {!isChanged && <span aria-hidden="true" className="ml-2">✓</span>}
+              {format(quantity)} {currentUnit.abbreviation}
+              {!isChanged && (
+                <span aria-hidden="true" className="ml-2">
+                  ✓
+                </span>
+              )}
             </button>
           </div>
 
@@ -96,15 +113,21 @@ export default function UnitConverter({ quantity, unit: unitAbbr }: UnitConverte
                 <button
                   key={conv.unit.id}
                   type="button"
-                  onClick={() => handleUnitSelect(conv.unit, conv.formatted)}
+                  onClick={() => handleUnitSelect(conv.unit, conv.quantity)}
                   aria-pressed={isSelected}
                   className={cx(
                     'w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between',
                     isSelected ? 'bg-accent/10 text-accent' : 'text-fg hover:bg-line',
                   )}
                 >
-                  <span>{conv.formatted} {conv.unit.abbreviation}</span>
-                  {isSelected && <span aria-hidden="true" className="text-accent">✓</span>}
+                  <span>
+                    {format(conv.quantity)} {conv.unit.abbreviation}
+                  </span>
+                  {isSelected && (
+                    <span aria-hidden="true" className="text-accent">
+                      ✓
+                    </span>
+                  )}
                 </button>
               );
             })}

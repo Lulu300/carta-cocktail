@@ -57,8 +57,13 @@ describe('app_state migration', () => {
     await db.executeScript(migrationScript(MIGRATION));
 
     expect(await select('SELECT * FROM "AppState"')).toEqual([]);
-    expect(await select('SELECT "name" FROM pragma_table_info(\'AppState\') ORDER BY "cid"')).toEqual([
-      { name: 'id' }, { name: 'lastRunVersion' }, { name: 'pendingNoticeFrom' }, { name: 'pendingNoticeTo' },
+    expect(
+      await select('SELECT "name" FROM pragma_table_info(\'AppState\') ORDER BY "cid"'),
+    ).toEqual([
+      { name: 'id' },
+      { name: 'lastRunVersion' },
+      { name: 'pendingNoticeFrom' },
+      { name: 'pendingNoticeTo' },
       { name: 'noticeAcknowledgedAt' },
     ]);
     expect(await rowsOf(TABLES_BEFORE)).toEqual(rowsBefore);
@@ -71,8 +76,8 @@ describe('app_state migration', () => {
 
     await db.executeScript(`INSERT INTO "AppState" ("lastRunVersion") VALUES ('1.17.0')`);
 
-    expect(await select('SELECT "id", "lastRunVersion", "pendingNoticeFrom" FROM "AppState"')).toEqual([
-      { id: 1, lastRunVersion: '1.17.0', pendingNoticeFrom: null },
-    ]);
+    expect(
+      await select('SELECT "id", "lastRunVersion", "pendingNoticeFrom" FROM "AppState"'),
+    ).toEqual([{ id: 1, lastRunVersion: '1.17.0', pendingNoticeFrom: null }]);
   });
 });

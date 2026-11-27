@@ -1,10 +1,19 @@
 export const CATEGORY_TYPE_COLORS = [
-  'blue', 'purple', 'green', 'red', 'orange', 'yellow', 'pink', 'teal', 'indigo', 'gray',
+  'blue',
+  'purple',
+  'green',
+  'red',
+  'orange',
+  'yellow',
+  'pink',
+  'teal',
+  'indigo',
+  'gray',
 ] as const;
 
 export type CategoryTypeColor = (typeof CATEGORY_TYPE_COLORS)[number];
 
-export const COLOR_BADGE_CLASSES: Record<string, string> = {
+export const COLOR_BADGE_CLASSES: Record<string, string> & { gray: string } = {
   blue: 'bg-blue-500/20 text-blue-400',
   purple: 'bg-purple-500/20 text-purple-400',
   green: 'bg-green-500/20 text-green-400',
@@ -17,7 +26,7 @@ export const COLOR_BADGE_CLASSES: Record<string, string> = {
   gray: 'bg-gray-500/20 text-gray-400',
 };
 
-export const COLOR_DOT_CLASSES: Record<string, string> = {
+export const COLOR_DOT_CLASSES: Record<string, string> & { gray: string } = {
   blue: 'bg-blue-500',
   purple: 'bg-purple-500',
   green: 'bg-green-500',

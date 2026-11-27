@@ -66,7 +66,10 @@ describe('LocationAutocomplete', () => {
     expect(cellar).toHaveAttribute('aria-selected', 'true');
 
     await user.keyboard('{ArrowUp}{ArrowUp}');
-    expect(combobox).toHaveAttribute('aria-activedescendant', screen.getByRole('option', { name: 'Kitchen' }).id);
+    expect(combobox).toHaveAttribute(
+      'aria-activedescendant',
+      screen.getByRole('option', { name: 'Kitchen' }).id,
+    );
 
     await user.keyboard('{Enter}');
     expect(onChange).toHaveBeenLastCalledWith('Kitchen');
@@ -84,7 +87,10 @@ describe('LocationAutocomplete', () => {
     await user.keyboard('{ArrowDown}');
 
     expect(combobox).toHaveAttribute('aria-expanded', 'true');
-    expect(combobox).toHaveAttribute('aria-activedescendant', screen.getByRole('option', { name: 'Bar' }).id);
+    expect(combobox).toHaveAttribute(
+      'aria-activedescendant',
+      screen.getByRole('option', { name: 'Bar' }).id,
+    );
   });
 
   it('opens on ArrowUp when closed and starts from the last location', async () => {
@@ -93,7 +99,10 @@ describe('LocationAutocomplete', () => {
     await user.click(getCombobox());
     await user.keyboard('{Escape}{ArrowUp}');
 
-    expect(getCombobox()).toHaveAttribute('aria-activedescendant', screen.getByRole('option', { name: 'Kitchen' }).id);
+    expect(getCombobox()).toHaveAttribute(
+      'aria-activedescendant',
+      screen.getByRole('option', { name: 'Kitchen' }).id,
+    );
   });
 
   it('closes on Escape and keeps the focus in the field', async () => {
@@ -149,7 +158,7 @@ describe('LocationAutocomplete', () => {
     render(<Harness onChange={onChange} />);
     await user.type(getCombobox(), 'Bar');
 
-    await user.click(screen.getByRole('button', { name: 'common.clear' }));
+    await user.click(screen.getByRole('button', { name: 'Clear' }));
 
     expect(onChange).toHaveBeenLastCalledWith('');
     expect(getCombobox()).toHaveValue('');
@@ -162,7 +171,7 @@ describe('LocationAutocomplete', () => {
     await user.keyboard('{Escape}');
 
     await user.tab();
-    expect(screen.getByRole('button', { name: 'common.clear' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Clear' })).toHaveFocus();
     await user.keyboard('{Enter}');
 
     expect(getCombobox()).toHaveValue('');

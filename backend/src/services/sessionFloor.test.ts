@@ -3,12 +3,17 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {
-  setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData, prisma,
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+  prisma,
 } from '../test/helpers';
 import { applySessionFloor, sessionFloorPath, writeSessionFloor } from './sessionFloor';
 
 const TOKEN_VERSION_MIGRATION = path.resolve(
-  __dirname, '../../prisma/migrations/20261011120000_user_token_version/migration.sql',
+  __dirname,
+  '../../prisma/migrations/20261011120000_user_token_version/migration.sql',
 );
 
 let dir: string;
@@ -91,14 +96,17 @@ describe('applySessionFloor', () => {
     ['not a number', 'abc'],
     ['negative', '-1'],
     ['not an integer', '2.5'],
-  ])('should refuse to start, keep the file and change nothing when it is %s', async (_label, content) => {
-    fs.writeFileSync(sessionFloorPath(dbPath), content);
+  ])(
+    'should refuse to start, keep the file and change nothing when it is %s',
+    async (_label, content) => {
+      fs.writeFileSync(sessionFloorPath(dbPath), content);
 
-    await expect(applySessionFloor(dbPath)).rejects.toThrow(/JWT_SECRET/);
+      await expect(applySessionFloor(dbPath)).rejects.toThrow(/JWT_SECRET/);
 
-    expect(await storedTokenVersion()).toBe(0);
-    expect(fs.existsSync(sessionFloorPath(dbPath))).toBe(true);
-  });
+      expect(await storedTokenVersion()).toBe(0);
+      expect(fs.existsSync(sessionFloorPath(dbPath))).toBe(true);
+    },
+  );
 
   it('should refuse to start and keep the file until the migrations have added the column', async () => {
     writeSessionFloor(dbPath, 3);

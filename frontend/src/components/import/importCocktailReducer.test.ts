@@ -41,7 +41,10 @@ const toConfirm: CocktailImportAction[] = [
 
 describe('importCocktailReducer', () => {
   it('loads the recipes and starts over', () => {
-    const previous = run(loaded('Mojito'), ...toConfirm, { type: 'CONFIRM_FAILED', message: 'Boom' });
+    const previous = run(loaded('Mojito'), ...toConfirm, {
+      type: 'CONFIRM_FAILED',
+      message: 'Boom',
+    });
 
     const state = run(previous, { type: 'LOADED', recipes: [recipe('Negroni')] });
 
@@ -62,7 +65,10 @@ describe('importCocktailReducer', () => {
   });
 
   it('keeps the choices the admin makes', () => {
-    const resolutions = { ...emptyResolutions(), ingredients: { mint: { action: 'skip' as const } } };
+    const resolutions = {
+      ...emptyResolutions(),
+      ingredients: { mint: { action: 'skip' as const } },
+    };
 
     const state = run(loaded('Mojito'), { type: 'RESOLUTIONS_CHANGED', resolutions });
 
@@ -75,32 +81,60 @@ describe('importCocktailReducer', () => {
   });
 
   it('shows the success screen for a single recipe', () => {
-    const state = run(loaded('Mojito'), ...toConfirm, { type: 'CONFIRM_OK', cocktail: { id: 7, name: 'Mojito' } });
+    const state = run(loaded('Mojito'), ...toConfirm, {
+      type: 'CONFIRM_OK',
+      cocktail: { id: 7, name: 'Mojito' },
+    });
 
     expect(state.step).toBe('success');
     expect(state.results).toEqual({ 0: { name: 'Mojito', success: true, id: 7 } });
   });
 
   it('moves to the next recipe of a batch after a success, then to the summary', () => {
-    const second = run(loaded('Mojito', 'Negroni'), ...toConfirm, { type: 'CONFIRM_OK', cocktail: { id: 7, name: 'Mojito' } });
-    expect(second).toMatchObject({ step: 'previewing', currentIndex: 1, preview: null, resolutions: emptyResolutions() });
+    const second = run(loaded('Mojito', 'Negroni'), ...toConfirm, {
+      type: 'CONFIRM_OK',
+      cocktail: { id: 7, name: 'Mojito' },
+    });
+    expect(second).toMatchObject({
+      step: 'previewing',
+      currentIndex: 1,
+      preview: null,
+      resolutions: emptyResolutions(),
+    });
 
-    const done = run(second, { type: 'PREVIEW_OK', preview }, { type: 'NEXT' }, { type: 'CONFIRM_OK', cocktail: { id: 8, name: 'Negroni' } });
+    const done = run(
+      second,
+      { type: 'PREVIEW_OK', preview },
+      { type: 'NEXT' },
+      { type: 'CONFIRM_OK', cocktail: { id: 8, name: 'Negroni' } },
+    );
     expect(done.step).toBe('batchSummary');
     expect(Object.keys(done.results)).toEqual(['0', '1']);
   });
 
   it('records a failed confirmation, then replaces it when the retry succeeds', () => {
-    const failed = run(loaded('Mojito', 'Negroni', 'Daiquiri'), ...toConfirm, { type: 'CONFIRM_OK', cocktail: { id: 1, name: 'Mojito' } },
-      { type: 'PREVIEW_OK', preview }, { type: 'NEXT' }, { type: 'CONFIRM_FAILED', message: 'Boom' });
+    const failed = run(
+      loaded('Mojito', 'Negroni', 'Daiquiri'),
+      ...toConfirm,
+      { type: 'CONFIRM_OK', cocktail: { id: 1, name: 'Mojito' } },
+      { type: 'PREVIEW_OK', preview },
+      { type: 'NEXT' },
+      { type: 'CONFIRM_FAILED', message: 'Boom' },
+    );
     expect(failed).toMatchObject({ step: 'error', error: 'Boom', failedRequest: 'confirm' });
     expect(failed.results[1]).toEqual({ name: 'Negroni', success: false });
 
     const retried = run(failed, { type: 'RETRY' });
     expect(retried).toMatchObject({ step: 'resolve', error: null, preview });
 
-    const done = run(retried, { type: 'NEXT' }, { type: 'CONFIRM_OK', cocktail: { id: 2, name: 'Negroni' } },
-      { type: 'PREVIEW_OK', preview }, { type: 'NEXT' }, { type: 'CONFIRM_OK', cocktail: { id: 3, name: 'Daiquiri' } });
+    const done = run(
+      retried,
+      { type: 'NEXT' },
+      { type: 'CONFIRM_OK', cocktail: { id: 2, name: 'Negroni' } },
+      { type: 'PREVIEW_OK', preview },
+      { type: 'NEXT' },
+      { type: 'CONFIRM_OK', cocktail: { id: 3, name: 'Daiquiri' } },
+    );
     expect(done.step).toBe('batchSummary');
     expect(Object.values(done.results)).toEqual([
       { name: 'Mojito', success: true, id: 1 },
@@ -111,22 +145,45 @@ describe('importCocktailReducer', () => {
 
   it('keeps the details of a refused confirmation until the retry', () => {
     const details = ['Row 2: unit "cl" is neither matched nor created'];
-    const failed = run(loaded('Mojito'), ...toConfirm, { type: 'CONFIRM_FAILED', message: 'Unresolved', details });
+    const failed = run(loaded('Mojito'), ...toConfirm, {
+      type: 'CONFIRM_FAILED',
+      message: 'Unresolved',
+      details,
+    });
     expect(failed).toMatchObject({ step: 'error', error: 'Unresolved', errorDetails: details });
 
-    expect(run(failed, { type: 'RETRY' })).toMatchObject({ step: 'resolve', error: null, errorDetails: [] });
+    expect(run(failed, { type: 'RETRY' })).toMatchObject({
+      step: 'resolve',
+      error: null,
+      errorDetails: [],
+    });
   });
 
   it('shows an error screen when the preview of a recipe in the batch fails', () => {
-    const state = run(loaded('Mojito', 'Negroni'), ...toConfirm, { type: 'CONFIRM_OK', cocktail: { id: 1, name: 'Mojito' } },
-      { type: 'PREVIEW_FAILED', message: 'Invalid recipe' });
+    const state = run(
+      loaded('Mojito', 'Negroni'),
+      ...toConfirm,
+      { type: 'CONFIRM_OK', cocktail: { id: 1, name: 'Mojito' } },
+      { type: 'PREVIEW_FAILED', message: 'Invalid recipe' },
+    );
 
-    expect(state).toMatchObject({ step: 'error', currentIndex: 1, preview: null, error: 'Invalid recipe', failedRequest: 'preview' });
+    expect(state).toMatchObject({
+      step: 'error',
+      currentIndex: 1,
+      preview: null,
+      error: 'Invalid recipe',
+      failedRequest: 'preview',
+    });
     expect(canGoBack(state)).toBe(false);
   });
 
   it('requests the preview again on retry after a failed preview', () => {
-    const state = run(loaded('Mojito'), { type: 'PREVIEW_REQUESTED' }, { type: 'PREVIEW_FAILED', message: 'Down' }, { type: 'RETRY' });
+    const state = run(
+      loaded('Mojito'),
+      { type: 'PREVIEW_REQUESTED' },
+      { type: 'PREVIEW_FAILED', message: 'Down' },
+      { type: 'RETRY' },
+    );
 
     expect(state).toMatchObject({ step: 'previewing', error: null, failedRequest: null });
   });
@@ -138,7 +195,11 @@ describe('importCocktailReducer', () => {
   });
 
   it('skips a failed recipe: recorded as not imported, the batch goes on', () => {
-    const failed = run(loaded('Mojito', 'Negroni'), { type: 'PREVIEW_REQUESTED' }, { type: 'PREVIEW_FAILED', message: 'Down' });
+    const failed = run(
+      loaded('Mojito', 'Negroni'),
+      { type: 'PREVIEW_REQUESTED' },
+      { type: 'PREVIEW_FAILED', message: 'Down' },
+    );
 
     const next = run(failed, { type: 'SKIP' });
     expect(next).toMatchObject({ step: 'previewing', currentIndex: 1, error: null });
@@ -155,24 +216,40 @@ describe('importCocktailReducer', () => {
     });
 
     it('goes back to the file from the first recipe only', () => {
-      const first = run(loaded('Mojito', 'Negroni'), { type: 'PREVIEW_REQUESTED' }, { type: 'PREVIEW_OK', preview });
+      const first = run(
+        loaded('Mojito', 'Negroni'),
+        { type: 'PREVIEW_REQUESTED' },
+        { type: 'PREVIEW_OK', preview },
+      );
       expect(canGoBack(first)).toBe(true);
       expect(run(first, { type: 'BACK' }).step).toBe('upload');
 
-      const second = run(first, { type: 'NEXT' }, { type: 'CONFIRM_OK', cocktail: { id: 1, name: 'Mojito' } }, { type: 'PREVIEW_OK', preview });
+      const second = run(
+        first,
+        { type: 'NEXT' },
+        { type: 'CONFIRM_OK', cocktail: { id: 1, name: 'Mojito' } },
+        { type: 'PREVIEW_OK', preview },
+      );
       expect(canGoBack(second)).toBe(false);
       expect(run(second, { type: 'BACK' })).toBe(second);
     });
 
     it('goes back to the file after the first preview failed', () => {
-      const failed = run(loaded('Mojito'), { type: 'PREVIEW_REQUESTED' }, { type: 'PREVIEW_FAILED', message: 'Down' });
+      const failed = run(
+        loaded('Mojito'),
+        { type: 'PREVIEW_REQUESTED' },
+        { type: 'PREVIEW_FAILED', message: 'Down' },
+      );
 
       expect(canGoBack(failed)).toBe(true);
       expect(run(failed, { type: 'BACK' })).toMatchObject({ step: 'upload', error: null });
     });
 
     it('stays on the error screen of a failed confirmation: "Try again" goes back', () => {
-      const failed = run(loaded('Mojito'), ...toConfirm, { type: 'CONFIRM_FAILED', message: 'Boom' });
+      const failed = run(loaded('Mojito'), ...toConfirm, {
+        type: 'CONFIRM_FAILED',
+        message: 'Boom',
+      });
 
       expect(canGoBack(failed)).toBe(false);
       expect(run(failed, { type: 'BACK' })).toBe(failed);

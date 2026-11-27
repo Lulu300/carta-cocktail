@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { UseQueryResult } from '@tanstack/react-query';
-import { captureRequest, mockApiError, mockApiResponse } from '../test/msw/utils';
+import { http } from 'msw';
+import { server } from '../test/msw/server';
+import { captureRequest, mockApiError, mockApiPending, mockApiResponse } from '../test/msw/utils';
 import { createTestQueryClient, renderHook, waitFor } from '../test/test-utils';
 import { qk } from './keys';
 import { useBottles } from './bottles';
@@ -23,14 +25,62 @@ interface ReadHookCase {
 }
 
 const cases: ReadHookCase[] = [
-  { name: 'useShortages', useHook: useShortages, route: '/api/shortages', requestedPath: '/api/shortages', key: qk.shortages },
-  { name: 'useCategories', useHook: useCategories, route: '/api/categories', requestedPath: '/api/categories', key: qk.categories },
-  { name: 'useCategoryTypes', useHook: useCategoryTypes, route: '/api/category-types', requestedPath: '/api/category-types', key: qk.categoryTypes },
-  { name: 'useBottles', useHook: useBottles, route: '/api/bottles', requestedPath: '/api/bottles', key: qk.bottles },
-  { name: 'useIngredients', useHook: useIngredients, route: '/api/ingredients', requestedPath: '/api/ingredients', key: qk.ingredients },
-  { name: 'useUnits', useHook: useUnits, route: '/api/units', requestedPath: '/api/units', key: qk.units },
-  { name: 'useCocktails', useHook: useCocktails, route: '/api/cocktails', requestedPath: '/api/cocktails', key: qk.cocktails },
-  { name: 'useCocktail', useHook: () => useCocktail(7), route: '/api/cocktails/:id', requestedPath: '/api/cocktails/7', key: qk.cocktail(7) },
+  {
+    name: 'useShortages',
+    useHook: useShortages,
+    route: '/api/shortages',
+    requestedPath: '/api/shortages',
+    key: qk.shortages,
+  },
+  {
+    name: 'useCategories',
+    useHook: useCategories,
+    route: '/api/categories',
+    requestedPath: '/api/categories',
+    key: qk.categories,
+  },
+  {
+    name: 'useCategoryTypes',
+    useHook: useCategoryTypes,
+    route: '/api/category-types',
+    requestedPath: '/api/category-types',
+    key: qk.categoryTypes,
+  },
+  {
+    name: 'useBottles',
+    useHook: useBottles,
+    route: '/api/bottles',
+    requestedPath: '/api/bottles',
+    key: qk.bottles,
+  },
+  {
+    name: 'useIngredients',
+    useHook: useIngredients,
+    route: '/api/ingredients',
+    requestedPath: '/api/ingredients',
+    key: qk.ingredients,
+  },
+  {
+    name: 'useUnits',
+    useHook: useUnits,
+    route: '/api/units',
+    requestedPath: '/api/units',
+    key: qk.units,
+  },
+  {
+    name: 'useCocktails',
+    useHook: useCocktails,
+    route: '/api/cocktails',
+    requestedPath: '/api/cocktails',
+    key: qk.cocktails,
+  },
+  {
+    name: 'useCocktail',
+    useHook: () => useCocktail(7),
+    route: '/api/cocktails/:id',
+    requestedPath: '/api/cocktails/7',
+    key: qk.cocktail(7),
+  },
   {
     name: 'useCocktailsAvailability',
     useHook: useCocktailsAvailability,
@@ -38,8 +88,20 @@ const cases: ReadHookCase[] = [
     requestedPath: '/api/availability/cocktails',
     key: qk.availability,
   },
-  { name: 'useMenus', useHook: useMenus, route: '/api/menus', requestedPath: '/api/menus', key: qk.menus },
-  { name: 'useMenu', useHook: () => useMenu(3), route: '/api/menus/:id', requestedPath: '/api/menus/3', key: qk.menu(3) },
+  {
+    name: 'useMenus',
+    useHook: useMenus,
+    route: '/api/menus',
+    requestedPath: '/api/menus',
+    key: qk.menus,
+  },
+  {
+    name: 'useMenu',
+    useHook: () => useMenu(3),
+    route: '/api/menus/:id',
+    requestedPath: '/api/menus/3',
+    key: qk.menu(3),
+  },
 ];
 
 describe.each(cases)('$name', ({ useHook, route, requestedPath, key }) => {
@@ -76,6 +138,42 @@ describe('useCocktailsAvailability options', () => {
 
     expect(result.current.fetchStatus).toBe('idle');
     expect(request.count()).toBe(0);
+  });
+});
+
+describe('request cancellation', () => {
+  it('aborts the request of a read when its page is left before the answer', async () => {
+    let received!: AbortSignal;
+    let reached!: () => void;
+    const requestReceived = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    server.use(
+      http.get('/api/units', ({ request }) => {
+        received = request.signal;
+        reached();
+        return new Promise<Response>(() => {});
+      }),
+    );
+    const { unmount } = renderHook(useUnits);
+    await requestReceived;
+    expect(received.aborted).toBe(false);
+
+    unmount();
+
+    await waitFor(() => expect(received.aborted).toBe(true));
+  });
+
+  it('shows no error for a read cancelled while it is loading', async () => {
+    mockApiPending('get', '/api/units');
+    const queryClient = createTestQueryClient();
+    const { result } = renderHook(useUnits, { queryClient });
+    await waitFor(() => expect(result.current.fetchStatus).toBe('fetching'));
+
+    await queryClient.cancelQueries({ queryKey: qk.units });
+
+    await waitFor(() => expect(result.current.fetchStatus).toBe('idle'));
+    expect(result.current.isError).toBe(false);
   });
 });
 

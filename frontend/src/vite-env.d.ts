@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+/// <reference types="vite-plugin-pwa/client" />
 
 interface ImportMetaEnv {
   /** Release version without the leading "v" (e.g. "1.8.0"), or "dev". Set by frontend/Dockerfile. */

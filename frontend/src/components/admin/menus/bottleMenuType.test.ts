@@ -13,7 +13,9 @@ describe('isAvailableForMenu', () => {
   });
 
   it('keeps every bottle out of a cocktail menu', () => {
-    expect(isAvailableForMenu({ isApero: true, isDigestif: true }, { type: 'COCKTAILS' })).toBe(false);
+    expect(isAvailableForMenu({ isApero: true, isDigestif: true }, { type: 'COCKTAILS' })).toBe(
+      false,
+    );
   });
 });
 

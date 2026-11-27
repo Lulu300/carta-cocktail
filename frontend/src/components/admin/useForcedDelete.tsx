@@ -2,7 +2,12 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { QueryKey } from '@tanstack/react-query';
 import { useConfirm } from '../../contexts/ConfirmContext';
-import { useInvalidateQueries } from '../../queries/crud';
+import {
+  useCreateUpdateMutations,
+  type CreateUpdateMutations,
+  type CrudMutationsOptions,
+} from '../../queries/crud';
+import { useInvalidateQueries } from '../../queries/invalidate';
 import { describeMutationError, readDeletionImpact } from '../../queries/deletionImpact';
 import { qk } from '../../queries/keys';
 import type { DeleteOptions, DeletionImpact, DeletionResponse } from '../../types';
@@ -20,13 +25,26 @@ interface ForcedDeleteOptions {
 
 // A forced deletion removes recipe lines, and a category its bottles: whatever
 // shows a recipe, its availability or the stock is out of date.
-const FORCED_DELETION_KEYS = [qk.cocktails, qk.availability, qk.shortages, qk.bottles, qk.categories, qk.menus];
+const FORCED_DELETION_KEYS = [
+  qk.cocktails,
+  qk.availability,
+  qk.shortages,
+  qk.bottles,
+  qk.categories,
+  qk.menus,
+];
 
 /** "Category deleted", and after a forced deletion "Category deleted: 2 bottles deleted, 3 cocktails changed." */
-function describeDeletion(t: TFunction, deletedMessage: string, { cocktails, bottles }: DeletionImpact): string {
+function describeDeletion(
+  t: TFunction,
+  deletedMessage: string,
+  { cocktails, bottles }: DeletionImpact,
+): string {
   const changes: string[] = [];
-  if (bottles.length > 0) changes.push(t('deletion.forced.bottlesDeleted', { count: bottles.length }));
-  if (cocktails.length > 0) changes.push(t('deletion.forced.cocktailsChanged', { count: cocktails.length }));
+  if (bottles.length > 0)
+    changes.push(t('deletion.forced.bottlesDeleted', { count: bottles.length }));
+  if (cocktails.length > 0)
+    changes.push(t('deletion.forced.cocktailsChanged', { count: cocktails.length }));
   if (changes.length === 0) return t(deletedMessage);
   return t('deletion.forced.summary', { deleted: t(deletedMessage), changes: changes.join(', ') });
 }
@@ -52,19 +70,24 @@ function acknowledgeKey({ cocktails, bottles }: DeletionImpact): string {
  * accept the changes. Cancelling deletes nothing and keeps the list in a toast,
  * so the admin can fix the recipes first.
  */
-export function useForcedDelete({ deleteItem, invalidates, deletedMessage }: ForcedDeleteOptions): (id: number) => Promise<void> {
+export function useForcedDelete({
+  deleteItem,
+  invalidates,
+  deletedMessage,
+}: ForcedDeleteOptions): (id: number) => Promise<void> {
   const { t } = useTranslation();
   const confirm = useConfirm();
   const invalidateQueries = useInvalidateQueries();
 
-  const confirmForcedDeletion = (impact: DeletionImpact) => confirm({
-    title: t('deletion.forced.title'),
-    message: forcedDeletionWarning(t, impact),
-    details: <DeletionImpactList impact={impact} />,
-    acknowledgeLabel: t(acknowledgeKey(impact)),
-    confirmLabel: t('deletion.forced.confirm'),
-    tone: 'danger',
-  });
+  const confirmForcedDeletion = (impact: DeletionImpact) =>
+    confirm({
+      title: t('deletion.forced.title'),
+      message: forcedDeletionWarning(t, impact),
+      details: <DeletionImpactList impact={impact} />,
+      acknowledgeLabel: t(acknowledgeKey(impact)),
+      confirmLabel: t('deletion.forced.confirm'),
+      tone: 'danger',
+    });
 
   const remove = async (id: number, force: boolean) => {
     const { impact } = await deleteItem(id, { force });
@@ -91,4 +114,31 @@ export function useForcedDelete({ deleteItem, invalidates, deletedMessage }: For
       }
     }
   };
+}
+
+interface ForcedDeleteCrudOptions<Input, Entity> extends CrudMutationsOptions<Input, Entity> {
+  api: CrudMutationsOptions<Input, Entity>['api'] & {
+    delete(id: number, options: DeleteOptions): Promise<DeletionResponse>;
+  };
+  /** i18n keys of the success toasts. */
+  messages: { created: string; updated: string; deleted: string };
+}
+
+/**
+ * Like `useCrudMutations`, but `remove` lists what uses the item and offers to
+ * delete anyway (see `useForcedDelete`). The same queries are refreshed by
+ * every mutation, so a page declares them once.
+ */
+export function useForcedDeleteCrudMutations<Input, Entity = unknown>(
+  options: ForcedDeleteCrudOptions<Input, Entity>,
+): CreateUpdateMutations<Input, Entity> & { remove: (id: number) => Promise<void> } {
+  const { api, messages } = options;
+  const { create, update } = useCreateUpdateMutations(options, messages);
+  const remove = useForcedDelete({
+    deleteItem: api.delete,
+    invalidates: [options.key, ...(options.invalidates ?? [])],
+    deletedMessage: messages.deleted,
+  });
+
+  return { create, update, remove };
 }

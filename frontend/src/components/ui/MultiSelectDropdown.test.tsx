@@ -17,7 +17,7 @@ describe('MultiSelectDropdown', () => {
         selected={[]}
         onChange={vi.fn()}
         placeholder="Pick one"
-      />
+      />,
     );
     expect(screen.getByText('Pick one')).toBeInTheDocument();
   });
@@ -29,10 +29,9 @@ describe('MultiSelectDropdown', () => {
         selected={['a', 'b']}
         onChange={vi.fn()}
         placeholder="Pick one"
-      />
+      />,
     );
-    // t('common.selected', { count: 2 }) returns the key as-is in tests
-    expect(screen.getByText('common.selected')).toBeInTheDocument();
+    expect(screen.getByText('2 selected')).toBeInTheDocument();
     // Tags with labels are rendered
     expect(screen.getByText('Alpha')).toBeInTheDocument();
     expect(screen.getByText('Beta')).toBeInTheDocument();
@@ -46,7 +45,7 @@ describe('MultiSelectDropdown', () => {
         selected={[]}
         onChange={vi.fn()}
         placeholder="Pick one"
-      />
+      />,
     );
     // Dropdown not visible initially
     expect(screen.queryByText('Alpha')).not.toBeInTheDocument();
@@ -70,7 +69,7 @@ describe('MultiSelectDropdown', () => {
         selected={[]}
         onChange={onChange}
         placeholder="Pick one"
-      />
+      />,
     );
     await user.click(screen.getByRole('button'));
     const checkbox = screen.getByRole('checkbox', { name: 'Alpha' });
@@ -87,11 +86,11 @@ describe('MultiSelectDropdown', () => {
         selected={['a', 'b']}
         onChange={onChange}
         placeholder="Pick one"
-      />
+      />,
     );
     // Use getAllByRole since tags also render buttons; first button is the main toggle
     const buttons = screen.getAllByRole('button');
-    await user.click(buttons[0]);
+    await user.click(buttons[0]!);
     const checkbox = screen.getByRole('checkbox', { name: 'Alpha' });
     await user.click(checkbox);
     expect(onChange).toHaveBeenCalledWith(['b']);
@@ -106,35 +105,30 @@ describe('MultiSelectDropdown', () => {
         selected={['a', 'b']}
         onChange={onChange}
         placeholder="Pick one"
-      />
+      />,
     );
     // Tags are rendered; find the X buttons (svg buttons inside tags)
     // Each tag has one button child; there are 2 tags
-    screen.getAllByRole('button').filter(
-      (btn) => !btn.hasAttribute('type') || btn.getAttribute('type') === 'button'
-    );
+    screen
+      .getAllByRole('button')
+      .filter((btn) => !btn.hasAttribute('type') || btn.getAttribute('type') === 'button');
     // The first role="button" is the main toggle; tag X buttons follow
     // Find the X button inside the Alpha tag area
     // The tag section has buttons with onClick={() => toggle(val)}
     // We click the second button (first tag's X)
     const allButtons = screen.getAllByRole('button');
     // allButtons[0] = main toggle, allButtons[1] = X for 'a', allButtons[2] = X for 'b'
-    await user.click(allButtons[1]);
+    await user.click(allButtons[1]!);
     expect(onChange).toHaveBeenCalledWith(['b']);
   });
 
-  it('shows "common.noResults" when options array is empty and dropdown is open', async () => {
+  it('shows "No results" when options array is empty and dropdown is open', async () => {
     const user = userEvent.setup();
     render(
-      <MultiSelectDropdown
-        options={[]}
-        selected={[]}
-        onChange={vi.fn()}
-        placeholder="Pick one"
-      />
+      <MultiSelectDropdown options={[]} selected={[]} onChange={vi.fn()} placeholder="Pick one" />,
     );
     await user.click(screen.getByRole('button'));
-    expect(screen.getByText('common.noResults')).toBeInTheDocument();
+    expect(screen.getByText('No results')).toBeInTheDocument();
   });
 
   it('shows value as fallback label when selected value not in options', () => {
@@ -144,7 +138,7 @@ describe('MultiSelectDropdown', () => {
         selected={['unknown-value']}
         onChange={vi.fn()}
         placeholder="Pick one"
-      />
+      />,
     );
     // Tag should display raw value as fallback (opt?.label ?? val)
     expect(screen.getByText('unknown-value')).toBeInTheDocument();
@@ -161,7 +155,7 @@ describe('MultiSelectDropdown', () => {
           placeholder="Pick one"
         />
         <div data-testid="outside">Outside</div>
-      </div>
+      </div>,
     );
 
     // Open dropdown
@@ -177,10 +171,17 @@ describe('MultiSelectDropdown', () => {
 describe('MultiSelectDropdown accessibility', () => {
   function renderDropdown(selected: string[] = []) {
     render(
-      <MultiSelectDropdown options={options} selected={selected} onChange={vi.fn()} placeholder="Pick one" />,
+      <MultiSelectDropdown
+        options={options}
+        selected={selected}
+        onChange={vi.fn()}
+        placeholder="Pick one"
+      />,
     );
     // Once options are chosen, the name keeps the placeholder in front of the count.
-    return screen.getByRole('button', { name: selected.length ? 'Pick one common.selected' : 'Pick one' });
+    return screen.getByRole('button', {
+      name: selected.length ? `Pick one ${selected.length} selected` : 'Pick one',
+    });
   }
 
   it('reports its expanded state and the panel it controls', async () => {
@@ -193,7 +194,7 @@ describe('MultiSelectDropdown accessibility', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
     const panel = screen.getByRole('group', { name: 'Pick one' });
     expect(trigger).toHaveAttribute('aria-controls', panel.id);
-    expect(screen.getByRole('searchbox', { name: 'common.filterOptions' })).toHaveFocus();
+    expect(screen.getByRole('searchbox', { name: 'Filter the options' })).toHaveFocus();
   });
 
   it('closes on Escape, empties the filter and gives the focus back to the button', async () => {
@@ -214,11 +215,11 @@ describe('MultiSelectDropdown accessibility', () => {
 
   it('names the button that removes a selected option', () => {
     renderDropdown(['a']);
-    expect(screen.getByRole('button', { name: 'common.removeItem' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Remove .+$/ })).toBeInTheDocument();
   });
 
   it('keeps what it filters on in the name of its button once options are chosen', () => {
     const trigger = renderDropdown(['a', 'b']);
-    expect(trigger).toHaveAccessibleName('Pick one common.selected');
+    expect(trigger).toHaveAccessibleName('Pick one 2 selected');
   });
 });

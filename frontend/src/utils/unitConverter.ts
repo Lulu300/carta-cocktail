@@ -38,30 +38,25 @@ export function convertUnit(quantity: number, fromUnit: Unit, toUnit: Unit): num
 }
 
 /**
- * Format a converted quantity with appropriate precision
+ * Round a converted quantity to the precision that suits its unit
  */
-export function formatQuantity(quantity: number, unit: Unit): string {
+export function roundQuantity(quantity: number, unit: Unit): number {
   const factor = unit.conversionFactorToMl || 1;
 
-  // For very small factors (dash, trait < 1ml), show 1 decimal
-  if (factor < 1) {
-    return quantity.toFixed(1);
+  // Very small units (dash, trait < 1ml) and ml: 1 decimal
+  if (factor <= 1) {
+    return Number(quantity.toFixed(1));
   }
 
-  // For ml (factor = 1), show integer or 1 decimal if needed
-  if (factor === 1) {
-    return quantity % 1 === 0 ? quantity.toString() : quantity.toFixed(1);
-  }
+  // cl, spoons, oz and larger: up to 2 decimals
+  return Number(quantity.toFixed(2));
+}
 
-  // For medium factors (cl, teaspoon, tablespoon), show up to 2 decimals
-  if (factor <= 20) {
-    const formatted = quantity.toFixed(2);
-    return parseFloat(formatted).toString();
-  }
-
-  // For large factors (oz ~30), show up to 2 decimals
-  const formatted = quantity.toFixed(2);
-  return parseFloat(formatted).toString();
+/**
+ * Write a quantity with the number format of the interface language ("3,33" in French)
+ */
+export function formatQuantity(quantity: number, language: string): string {
+  return new Intl.NumberFormat(language, { maximumFractionDigits: 3 }).format(quantity);
 }
 
 /**
@@ -70,8 +65,8 @@ export function formatQuantity(quantity: number, unit: Unit): string {
 export function getAllConversions(
   quantity: number,
   fromUnit: Unit,
-  allUnits: Unit[]
-): Array<{ unit: Unit; quantity: number; formatted: string }> {
+  allUnits: Unit[],
+): Array<{ unit: Unit; quantity: number }> {
   if (!isConvertible(fromUnit)) {
     return [];
   }
@@ -79,13 +74,8 @@ export function getAllConversions(
   const ml = toMilliliters(quantity, fromUnit);
 
   return allUnits
-    .filter(unit => isConvertible(unit) && unit.id !== fromUnit.id)
-    .map(unit => {
-      const convertedQty = fromMilliliters(ml, unit);
-      return {
-        unit,
-        quantity: convertedQty,
-        formatted: formatQuantity(convertedQty, unit),
-      };
+    .filter((unit) => isConvertible(unit) && unit.id !== fromUnit.id)
+    .map((unit) => {
+      return { unit, quantity: roundQuantity(fromMilliliters(ml, unit), unit) };
     });
 }

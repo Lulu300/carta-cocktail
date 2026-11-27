@@ -1,22 +1,17 @@
-import { Link } from 'react-router-dom';
+import type { ComponentProps } from 'react';
 import { useTranslation } from 'react-i18next';
 import Button from '../../components/ui/Button';
 import EmptyState from '../../components/ui/EmptyState';
 import { useSiteSettings } from '../../contexts/SiteSettingsContext';
 import { isNotFoundError } from '../../queries/public';
-
-interface NotFoundContent {
-  title: string;
-  linkTo: string;
-  linkLabel: string;
-}
+import NotFoundState from './NotFoundState';
 
 interface PublicErrorStateProps {
   error: Error;
   /** Shown for any error but a 404: network failure, server error… */
   loadErrorTitle: string;
   /** Shown for a 404, with a link elsewhere since retrying cannot help. */
-  notFound?: NotFoundContent;
+  notFound?: ComponentProps<typeof NotFoundState>;
   onRetry: () => void;
   isRetrying: boolean;
 }
@@ -25,26 +20,20 @@ const ERROR_CLASSES = 'min-h-[60vh] justify-center';
 
 /**
  * Tells "this page does not exist" apart from "this page could not be loaded".
- * Both replace the loading status, so they are announced as an alert.
+ * Both replace the loading status, so they are announced as an alert, the title alone: the retry button stays out of it.
  */
-export default function PublicErrorState({ error, loadErrorTitle, notFound, onRetry, isRetrying }: PublicErrorStateProps) {
+export default function PublicErrorState({
+  error,
+  loadErrorTitle,
+  notFound,
+  onRetry,
+  isRetrying,
+}: PublicErrorStateProps) {
   const { t } = useTranslation();
   const { retryFailedLoad } = useSiteSettings();
 
   if (notFound && isNotFoundError(error)) {
-    return (
-      <EmptyState
-        icon="🍸"
-        title={notFound.title}
-        role="alert"
-        className={ERROR_CLASSES}
-        action={(
-          <Link to={notFound.linkTo} className="text-accent hover:text-accent-soft underline underline-offset-4">
-            {notFound.linkLabel}
-          </Link>
-        )}
-      />
-    );
+    return <NotFoundState {...notFound} />;
   }
 
   // What made the page fail (rate limit, network) often made the site settings fail too:
@@ -59,13 +48,13 @@ export default function PublicErrorState({ error, loadErrorTitle, notFound, onRe
       icon="⚠️"
       title={loadErrorTitle}
       description={t('public.loadErrorHint')}
-      role="alert"
+      titleProps={{ role: 'alert' }}
       className={ERROR_CLASSES}
-      action={(
+      action={
         <Button variant="secondary" loading={isRetrying} onClick={retry}>
           {t('common.retry')}
         </Button>
-      )}
+      }
     />
   );
 }

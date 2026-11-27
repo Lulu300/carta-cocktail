@@ -6,31 +6,62 @@ import { qk } from '../../queries/keys';
 import { axe } from '../../test/axe';
 import { buildCategory, buildCategoryType } from '../../test/factories';
 import type { CategoryType } from '../../types';
-import { captureRequest, mockApiError, mockApiPending, mockApiResponse, mockItemInUse } from '../../test/msw/utils';
+import {
+  captureRequest,
+  mockApiError,
+  mockApiPending,
+  mockApiResponse,
+  mockItemInUse,
+} from '../../test/msw/utils';
 import CategoriesPage from './CategoriesPage';
 
 const spirit = buildCategoryType({ name: 'SPIRIT', color: 'blue', _count: { categories: 1 } });
 const syrup = buildCategoryType({ name: 'SYRUP', color: 'red', _count: { categories: 1 } });
 const garnish = buildCategoryType({ name: 'GARNISH', color: 'green', _count: { categories: 0 } });
-const vodka = buildCategory({ id: 1, name: 'Vodka', type: 'SPIRIT', categoryType: spirit, desiredStock: 2, _count: { bottles: 3 } });
-const grenadine = buildCategory({ id: 2, name: 'Grenadine', type: 'SYRUP', categoryType: syrup, _count: { bottles: 1 } });
+const vodka = buildCategory({
+  id: 1,
+  name: 'Vodka',
+  type: 'SPIRIT',
+  categoryType: spirit,
+  desiredStock: 2,
+  _count: { bottles: 3 },
+});
+const grenadine = buildCategory({
+  id: 2,
+  name: 'Grenadine',
+  type: 'SYRUP',
+  categoryType: syrup,
+  _count: { bottles: 1 },
+});
 // Data older than v1.9.0 can hold these names: HTML would show ' SPIRIT ' as 'SPIRIT', and '' as nothing.
-const spacedSpirit = buildCategoryType({ name: ' SPIRIT ', color: 'gray', _count: { categories: 1 } });
+const spacedSpirit = buildCategoryType({
+  name: ' SPIRIT ',
+  color: 'gray',
+  _count: { categories: 1 },
+});
 const unnamed = buildCategoryType({ name: '', color: 'gray', _count: { categories: 0 } });
-const SPACED_SPIRIT_LABEL = '␣SPIRIT␣ categoryTypes.withSpaces';
+const SPACED_SPIRIT_LABEL = '␣SPIRIT␣ (with spaces)';
 // Data older than v1.15.0 can hold these: HTML shows each of them as 'X Y'.
 const doubleSpaced = buildCategoryType({ name: 'X  Y', color: 'gray', _count: { categories: 1 } });
 const singleSpaced = buildCategoryType({ name: 'X Y', color: 'gray', _count: { categories: 0 } });
 const tabbed = buildCategoryType({ name: 'X\tY', color: 'gray', _count: { categories: 0 } });
-const DOUBLE_SPACED_LABEL = 'X␣␣Y categoryTypes.withSpaces';
+const DOUBLE_SPACED_LABEL = 'X␣␣Y (with spaces)';
 // HTML shows a zero-width space as nothing: 'X\u200BY' looks exactly like 'XY'.
 const zeroWidth = buildCategoryType({ name: 'X\u200BY', color: 'gray', _count: { categories: 1 } });
 const joined = buildCategoryType({ name: 'XY', color: 'gray', _count: { categories: 0 } });
-const ZERO_WIDTH_LABEL = 'X[U+200B]Y categoryTypes.withInvisibleCharacters';
+const ZERO_WIDTH_LABEL = 'X[U+200B]Y (with invisible characters)';
 // HTML shows 'E' and a combining grave accent (U+0300) exactly like the composed 'È' (U+00C8).
-const decomposed = buildCategoryType({ name: 'CRE\u0300ME', color: 'gray', _count: { categories: 1 } });
-const composed = buildCategoryType({ name: 'CR\u00C8ME', color: 'gray', _count: { categories: 0 } });
-const DECOMPOSED_LABEL = 'CRE\u0300ME categoryTypes.nonStandardForm';
+const decomposed = buildCategoryType({
+  name: 'CRE\u0300ME',
+  color: 'gray',
+  _count: { categories: 1 },
+});
+const composed = buildCategoryType({
+  name: 'CR\u00C8ME',
+  color: 'gray',
+  _count: { categories: 0 },
+});
+const DECOMPOSED_LABEL = 'CRE\u0300ME (non-standard Unicode form)';
 
 type User = ReturnType<typeof userEvent.setup>;
 
@@ -48,8 +79,8 @@ function categoryDialog() {
 }
 
 async function openTypesManager(user: User) {
-  await user.click(screen.getByRole('button', { name: 'categoryTypes.manage' }));
-  return screen.getByRole('dialog', { name: 'categoryTypes.title' });
+  await user.click(screen.getByRole('button', { name: 'Manage Types' }));
+  return screen.getByRole('dialog', { name: 'Category Types' });
 }
 
 beforeEach(() => {
@@ -62,7 +93,7 @@ afterEach(clearToasts);
 describe('CategoriesPage', () => {
   it('lists the categories with their stock settings and bottle count', async () => {
     await renderLoadedPage();
-    expect(screen.getByRole('heading', { name: 'categories.title' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Categories' })).toBeInTheDocument();
     expect(screen.getByText('Grenadine')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
@@ -73,21 +104,21 @@ describe('CategoriesPage', () => {
     mockApiPending('get', '/api/categories');
     renderPage();
 
-    expect(screen.getByText('common.loading')).toBeInTheDocument();
-    expect(screen.queryByText('common.noResults')).not.toBeInTheDocument();
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    expect(screen.queryByText('No results')).not.toBeInTheDocument();
   });
 
   it('shows "no results" once loaded without categories', async () => {
     mockApiResponse('get', '/api/categories', []);
     renderPage();
-    expect(await screen.findByText('common.noResults')).toBeInTheDocument();
+    expect(await screen.findByText('No results')).toBeInTheDocument();
   });
 
   it('filters the categories by name', async () => {
     const user = userEvent.setup();
     await renderLoadedPage();
 
-    await user.type(screen.getByPlaceholderText('common.search'), 'Vod');
+    await user.type(screen.getByPlaceholderText('Search...'), 'Vod');
 
     expect(screen.getByText('Vodka')).toBeInTheDocument();
     expect(screen.queryByText('Grenadine')).not.toBeInTheDocument();
@@ -102,8 +133,11 @@ describe('CategoriesPage', () => {
     }
 
     /** A category of the given type, which the categories list sends with it. */
-    const categoryOfType = (name: string, categoryType: CategoryType | null, type = categoryType?.name ?? '') =>
-      buildCategory({ name, type, categoryType });
+    const categoryOfType = (
+      name: string,
+      categoryType: CategoryType | null,
+      type = categoryType?.name ?? '',
+    ) => buildCategory({ name, type, categoryType });
 
     it('tells the stored names apart, and labels the empty name', async () => {
       mockApiResponse('get', '/api/categories', [
@@ -116,7 +150,7 @@ describe('CategoriesPage', () => {
 
       expect(await typeCell('Rum')).toHaveAccessibleName(SPACED_SPIRIT_LABEL);
       expect(await typeCell('Gin')).toHaveAccessibleName('SPIRIT');
-      expect(await typeCell('Water')).toHaveAccessibleName('categoryTypes.emptyName');
+      expect(await typeCell('Water')).toHaveAccessibleName('(no name)');
       expect(await typeCell('Tonic')).toHaveAccessibleName(DOUBLE_SPACED_LABEL);
     });
 
@@ -131,7 +165,7 @@ describe('CategoriesPage', () => {
 
       expect(await typeCell('Rum')).toHaveAccessibleName(`Spirits – ${SPACED_SPIRIT_LABEL}`);
       expect(await typeCell('Gin')).toHaveAccessibleName('Spirits');
-      expect(await typeCell('Water')).toHaveAccessibleName('Spirits – categoryTypes.emptyName');
+      expect(await typeCell('Water')).toHaveAccessibleName('Spirits – (no name)');
     });
 
     it('marks the stored name of a category sent without its type', async () => {
@@ -144,7 +178,7 @@ describe('CategoriesPage', () => {
 
       expect(await typeCell('Rum')).toHaveAccessibleName(SPACED_SPIRIT_LABEL);
       expect(await typeCell('Gin')).toHaveAccessibleName('SPIRIT');
-      expect(await typeCell('Water')).toHaveAccessibleName('categoryTypes.emptyName');
+      expect(await typeCell('Water')).toHaveAccessibleName('(no name)');
     });
   });
 
@@ -153,13 +187,13 @@ describe('CategoriesPage', () => {
       const user = userEvent.setup();
       await renderLoadedPage();
       const created = captureRequest('post', '/api/categories');
-      await user.click(screen.getByRole('button', { name: 'categories.add' }));
+      await user.click(screen.getByRole('button', { name: 'Add Category' }));
 
-      await user.type(within(categoryDialog()).getByLabelText(/categories\.name/), 'Rum');
-      const desiredStock = within(categoryDialog()).getByLabelText('categories.desiredStock');
+      await user.type(within(categoryDialog()).getByLabelText(/Name/), 'Rum');
+      const desiredStock = within(categoryDialog()).getByLabelText('Desired Stock');
       await user.clear(desiredStock);
       await user.type(desiredStock, '3');
-      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'Save' }));
 
       expect(await created.body).toEqual({
         name: 'Rum',
@@ -168,7 +202,7 @@ describe('CategoriesPage', () => {
         minimumPercent: 30,
         nameTranslations: null,
       });
-      expect(await screen.findByText('categories.created')).toBeInTheDocument();
+      expect(await screen.findByText('Category created')).toBeInTheDocument();
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
@@ -176,12 +210,12 @@ describe('CategoriesPage', () => {
       const user = userEvent.setup();
       await renderLoadedPage();
       const created = captureRequest('post', '/api/categories');
-      await user.click(screen.getByRole('button', { name: 'categories.add' }));
+      await user.click(screen.getByRole('button', { name: 'Add Category' }));
 
-      await user.type(within(categoryDialog()).getByLabelText(/categories\.name/), 'Tonic');
-      await user.selectOptions(within(categoryDialog()).getByLabelText('categories.type'), '__OTHER__');
-      await user.type(within(categoryDialog()).getByPlaceholderText('categories.customType'), '  mixer ');
-      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
+      await user.type(within(categoryDialog()).getByLabelText(/Name/), 'Tonic');
+      await user.selectOptions(within(categoryDialog()).getByLabelText('Type'), '__OTHER__');
+      await user.type(within(categoryDialog()).getByPlaceholderText('Custom type'), '  mixer ');
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'Save' }));
 
       expect(await created.body).toEqual({
         name: 'Tonic',
@@ -198,11 +232,11 @@ describe('CategoriesPage', () => {
       mockApiResponse('get', '/api/category-types', [spirit, spacedSpirit]);
       await renderLoadedPage();
       const created = captureRequest('post', '/api/categories');
-      await user.click(screen.getByRole('button', { name: 'categories.add' }));
+      await user.click(screen.getByRole('button', { name: 'Add Category' }));
 
-      await user.type(within(categoryDialog()).getByLabelText(/categories\.name/), 'Rum');
-      await user.selectOptions(within(categoryDialog()).getByLabelText('categories.type'), ' SPIRIT ');
-      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
+      await user.type(within(categoryDialog()).getByLabelText(/Name/), 'Rum');
+      await user.selectOptions(within(categoryDialog()).getByLabelText('Type'), ' SPIRIT ');
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'Save' }));
 
       expect(await created.body).toMatchObject({ name: 'Rum', type: ' SPIRIT ' });
     });
@@ -211,22 +245,24 @@ describe('CategoriesPage', () => {
       const user = userEvent.setup();
       await renderLoadedPage();
       const created = captureRequest('post', '/api/categories');
-      await user.click(screen.getByRole('button', { name: 'categories.add' }));
+      await user.click(screen.getByRole('button', { name: 'Add Category' }));
 
-      await user.type(within(categoryDialog()).getByLabelText(/categories\.name/), 'Tonic');
-      await user.selectOptions(within(categoryDialog()).getByLabelText('categories.type'), '__OTHER__');
-      await user.type(within(categoryDialog()).getByPlaceholderText('categories.customType'), '   ');
-      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
+      await user.type(within(categoryDialog()).getByLabelText(/Name/), 'Tonic');
+      await user.selectOptions(within(categoryDialog()).getByLabelText('Type'), '__OTHER__');
+      await user.type(within(categoryDialog()).getByPlaceholderText('Custom type'), '   ');
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'Save' }));
 
       expect(created.count()).toBe(0);
-      const customType = within(categoryDialog()).getByPlaceholderText('categories.customType');
+      const customType = within(categoryDialog()).getByPlaceholderText('Custom type');
       expect(customType).toHaveFocus();
-      expect(customType).toHaveAccessibleDescription('categories.typeRequired');
-      expect(within(categoryDialog()).getByLabelText('categories.type')).not.toHaveAttribute('aria-invalid');
+      expect(customType).toHaveAccessibleDescription('Choose or enter a type with a name.');
+      expect(within(categoryDialog()).getByLabelText('Type')).not.toHaveAttribute('aria-invalid');
 
       await user.type(customType, 'mixer');
-      expect(within(categoryDialog()).queryByText('categories.typeRequired')).not.toBeInTheDocument();
-      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
+      expect(
+        within(categoryDialog()).queryByText('Choose or enter a type with a name.'),
+      ).not.toBeInTheDocument();
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'Save' }));
       expect(await created.body).toMatchObject({ type: 'MIXER' });
     });
 
@@ -235,19 +271,19 @@ describe('CategoriesPage', () => {
       const user = userEvent.setup();
       await renderLoadedPage();
       const created = captureRequest('post', '/api/categories');
-      await user.click(screen.getByRole('button', { name: 'categories.add' }));
+      await user.click(screen.getByRole('button', { name: 'Add Category' }));
 
-      await user.type(within(categoryDialog()).getByLabelText(/categories\.name/), 'Tonic');
-      await user.selectOptions(within(categoryDialog()).getByLabelText('categories.type'), '__OTHER__');
-      const customType = within(categoryDialog()).getByPlaceholderText('categories.customType');
+      await user.type(within(categoryDialog()).getByLabelText(/Name/), 'Tonic');
+      await user.selectOptions(within(categoryDialog()).getByLabelText('Type'), '__OTHER__');
+      const customType = within(categoryDialog()).getByPlaceholderText('Custom type');
       await user.type(customType, '\u200B\u2800');
-      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'Save' }));
 
       expect(created.count()).toBe(0);
-      expect(customType).toHaveAccessibleDescription('categories.typeRequired');
+      expect(customType).toHaveAccessibleDescription('Choose or enter a type with a name.');
 
       await user.type(customType, 'mi\u200Bxer');
-      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'Save' }));
       expect(await created.body).toMatchObject({ type: 'MIXER' });
     });
 
@@ -259,12 +295,12 @@ describe('CategoriesPage', () => {
       const user = userEvent.setup();
       await renderLoadedPage();
       const created = captureRequest('post', '/api/categories');
-      await user.click(screen.getByRole('button', { name: 'categories.add' }));
+      await user.click(screen.getByRole('button', { name: 'Add Category' }));
 
-      await user.type(within(categoryDialog()).getByLabelText(/categories\.name/), 'Cassis');
-      await user.selectOptions(within(categoryDialog()).getByLabelText('categories.type'), '__OTHER__');
-      await user.type(within(categoryDialog()).getByPlaceholderText('categories.customType'), typed);
-      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
+      await user.type(within(categoryDialog()).getByLabelText(/Name/), 'Cassis');
+      await user.selectOptions(within(categoryDialog()).getByLabelText('Type'), '__OTHER__');
+      await user.type(within(categoryDialog()).getByPlaceholderText('Custom type'), typed);
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'Save' }));
 
       expect(await created.body).toMatchObject({ type: sent });
     });
@@ -274,9 +310,9 @@ describe('CategoriesPage', () => {
       mockApiPending('post', '/api/categories');
       const created = captureRequest('post', '/api/categories');
       await renderLoadedPage();
-      await user.click(screen.getByRole('button', { name: 'categories.add' }));
-      await user.type(within(categoryDialog()).getByLabelText(/categories\.name/), 'Rum');
-      const save = within(categoryDialog()).getByRole('button', { name: 'common.save' });
+      await user.click(screen.getByRole('button', { name: 'Add Category' }));
+      await user.type(within(categoryDialog()).getByLabelText(/Name/), 'Rum');
+      const save = within(categoryDialog()).getByRole('button', { name: 'Save' });
 
       fireEvent.click(save);
       fireEvent.click(save);
@@ -289,12 +325,12 @@ describe('CategoriesPage', () => {
       const user = userEvent.setup();
       await renderLoadedPage();
       const updated = captureRequest('put', '/api/categories/:id');
-      await user.click(screen.getAllByRole('button', { name: 'common.edit' })[0]);
+      await user.click(screen.getAllByRole('button', { name: 'Edit' })[0]!);
 
       const name = within(categoryDialog()).getByDisplayValue('Vodka');
       await user.clear(name);
       await user.type(name, 'Gin');
-      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'Save' }));
 
       expect((await updated.url).pathname).toBe('/api/categories/1');
       expect(await updated.body).toEqual({
@@ -304,23 +340,33 @@ describe('CategoriesPage', () => {
         minimumPercent: 30,
         nameTranslations: null,
       });
-      expect(await screen.findByText('categories.updated')).toBeInTheDocument();
+      expect(await screen.findByText('Category updated')).toBeInTheDocument();
     });
 
     // Data older than v1.9.0 can hold ' SPIRIT ' next to 'SPIRIT': the edit sends the type as stored.
     it('keeps a type with surrounding spaces when a category is saved', async () => {
       const user = userEvent.setup();
-      const spacedSpirit = buildCategoryType({ name: ' SPIRIT ', color: 'gray', _count: { categories: 1 } });
+      const spacedSpirit = buildCategoryType({
+        name: ' SPIRIT ',
+        color: 'gray',
+        _count: { categories: 1 },
+      });
       mockApiResponse('get', '/api/category-types', [spirit, spacedSpirit]);
       mockApiResponse('get', '/api/categories', [
-        buildCategory({ id: 3, name: 'Rum', type: ' SPIRIT ', categoryType: spacedSpirit, _count: { bottles: 0 } }),
+        buildCategory({
+          id: 3,
+          name: 'Rum',
+          type: ' SPIRIT ',
+          categoryType: spacedSpirit,
+          _count: { bottles: 0 },
+        }),
       ]);
       renderPage();
       await screen.findByText('Rum');
       const updated = captureRequest('put', '/api/categories/:id');
 
-      await user.click(screen.getByRole('button', { name: 'common.edit' }));
-      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
+      await user.click(screen.getByRole('button', { name: 'Edit' }));
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'Save' }));
 
       expect(await updated.body).toMatchObject({ type: ' SPIRIT ' });
     });
@@ -328,22 +374,29 @@ describe('CategoriesPage', () => {
     it('shows a type missing from the list as a custom type', async () => {
       const user = userEvent.setup();
       mockApiResponse('get', '/api/categories', [
-        buildCategory({ name: 'Water', type: 'UNKNOWN', categoryType: null, _count: { bottles: 0 } }),
+        buildCategory({
+          name: 'Water',
+          type: 'UNKNOWN',
+          categoryType: null,
+          _count: { bottles: 0 },
+        }),
       ]);
       renderPage();
       await screen.findByText('Water');
 
-      await user.click(screen.getByRole('button', { name: 'common.edit' }));
+      await user.click(screen.getByRole('button', { name: 'Edit' }));
 
-      expect(within(categoryDialog()).getByLabelText('categories.type')).toHaveValue('__OTHER__');
-      expect(within(categoryDialog()).getByPlaceholderText('categories.customType')).toHaveValue('UNKNOWN');
+      expect(within(categoryDialog()).getByLabelText('Type')).toHaveValue('__OTHER__');
+      expect(within(categoryDialog()).getByPlaceholderText('Custom type')).toHaveValue('UNKNOWN');
     });
 
     describe('types whose names HTML would hide', () => {
       async function openTypeOptions(user: User) {
         await renderLoadedPage();
-        await user.click(screen.getByRole('button', { name: 'categories.add' }));
-        const options = within(within(categoryDialog()).getByLabelText('categories.type')).getAllByRole('option');
+        await user.click(screen.getByRole('button', { name: 'Add Category' }));
+        const options = within(within(categoryDialog()).getByLabelText('Type')).getAllByRole(
+          'option',
+        );
         return options.map((option) => option.textContent);
       }
 
@@ -352,7 +405,10 @@ describe('CategoriesPage', () => {
         mockApiResponse('get', '/api/category-types', [unnamed, spacedSpirit, spirit]);
 
         expect(await openTypeOptions(user)).toEqual([
-          'categoryTypes.emptyName', SPACED_SPIRIT_LABEL, 'SPIRIT', 'categories.otherType',
+          '(no name)',
+          SPACED_SPIRIT_LABEL,
+          'SPIRIT',
+          'Other...',
         ]);
       });
 
@@ -366,7 +422,10 @@ describe('CategoriesPage', () => {
         ]);
 
         expect(await openTypeOptions(user)).toEqual([
-          'Spirits – categoryTypes.emptyName', `Spirits – ${SPACED_SPIRIT_LABEL}`, 'Spirits', 'categories.otherType',
+          'Spirits – (no name)',
+          `Spirits – ${SPACED_SPIRIT_LABEL}`,
+          'Spirits',
+          'Other...',
         ]);
       });
 
@@ -375,50 +434,84 @@ describe('CategoriesPage', () => {
         mockApiResponse('get', '/api/category-types', [doubleSpaced, singleSpaced, tabbed]);
 
         expect(await openTypeOptions(user)).toEqual([
-          DOUBLE_SPACED_LABEL, 'X Y', 'X␣Y categoryTypes.withSpaces', 'categories.otherType',
+          DOUBLE_SPACED_LABEL,
+          'X Y',
+          'X␣Y (with spaces)',
+          'Other...',
         ]);
-        expect(within(categoryDialog()).getByRole('option', { name: DOUBLE_SPACED_LABEL })).toBeInTheDocument();
+        expect(
+          within(categoryDialog()).getByRole('option', { name: DOUBLE_SPACED_LABEL }),
+        ).toBeInTheDocument();
       });
 
       it('adds the stored name with inner spaces to a translation that would hide it', async () => {
         const user = userEvent.setup();
         const nameTranslations = { en: 'Mixers' };
         mockApiResponse('get', '/api/category-types', [
-          { ...doubleSpaced, nameTranslations }, { ...singleSpaced, nameTranslations },
+          { ...doubleSpaced, nameTranslations },
+          { ...singleSpaced, nameTranslations },
         ]);
 
-        expect(await openTypeOptions(user)).toEqual([`Mixers – ${DOUBLE_SPACED_LABEL}`, 'Mixers', 'categories.otherType']);
+        expect(await openTypeOptions(user)).toEqual([
+          `Mixers – ${DOUBLE_SPACED_LABEL}`,
+          'Mixers',
+          'Other...',
+        ]);
       });
 
       it('tells a type with an invisible character from the type without it, also with the same translation', async () => {
         const user = userEvent.setup();
         const nameTranslations = { en: 'Mixers' };
         mockApiResponse('get', '/api/category-types', [
-          zeroWidth, joined, { ...zeroWidth, name: 'Z\u200BW', nameTranslations }, { ...joined, name: 'ZW', nameTranslations },
+          zeroWidth,
+          joined,
+          { ...zeroWidth, name: 'Z\u200BW', nameTranslations },
+          { ...joined, name: 'ZW', nameTranslations },
         ]);
 
         expect(await openTypeOptions(user)).toEqual([
-          ZERO_WIDTH_LABEL, 'XY', 'Mixers – Z[U+200B]W categoryTypes.withInvisibleCharacters', 'Mixers', 'categories.otherType',
+          ZERO_WIDTH_LABEL,
+          'XY',
+          'Mixers – Z[U+200B]W (with invisible characters)',
+          'Mixers',
+          'Other...',
         ]);
-        expect(within(categoryDialog()).getByRole('option', { name: ZERO_WIDTH_LABEL })).toBeInTheDocument();
+        expect(
+          within(categoryDialog()).getByRole('option', { name: ZERO_WIDTH_LABEL }),
+        ).toBeInTheDocument();
       });
 
       it('tells a decomposed type from the composed one, also with the same translation', async () => {
         const user = userEvent.setup();
         const nameTranslations = { en: 'Creams' };
         mockApiResponse('get', '/api/category-types', [
-          decomposed, composed, { ...decomposed, name: 'CRE\u0301ME', nameTranslations }, { ...composed, name: 'CR\u00C9ME', nameTranslations },
+          decomposed,
+          composed,
+          { ...decomposed, name: 'CRE\u0301ME', nameTranslations },
+          { ...composed, name: 'CR\u00C9ME', nameTranslations },
         ]);
 
         expect(await openTypeOptions(user)).toEqual([
-          DECOMPOSED_LABEL, 'CR\u00C8ME', 'Creams – CRE\u0301ME categoryTypes.nonStandardForm', 'Creams', 'categories.otherType',
+          DECOMPOSED_LABEL,
+          'CR\u00C8ME',
+          'Creams – CRE\u0301ME (non-standard Unicode form)',
+          'Creams',
+          'Other...',
         ]);
-        expect(within(categoryDialog()).getByRole('option', { name: DECOMPOSED_LABEL })).toBeInTheDocument();
+        expect(
+          within(categoryDialog()).getByRole('option', { name: DECOMPOSED_LABEL }),
+        ).toBeInTheDocument();
       });
     });
 
     describe('a category whose type has an empty name', () => {
-      const water = buildCategory({ id: 4, name: 'Water', type: '', categoryType: unnamed, _count: { bottles: 0 } });
+      const water = buildCategory({
+        id: 4,
+        name: 'Water',
+        type: '',
+        categoryType: unnamed,
+        _count: { bottles: 0 },
+      });
 
       beforeEach(() => {
         mockApiResponse('get', '/api/category-types', [unnamed, spirit]);
@@ -428,8 +521,8 @@ describe('CategoriesPage', () => {
       async function saveWater(user: User) {
         renderPage();
         await screen.findByText('Water');
-        await user.click(screen.getByRole('button', { name: 'common.edit' }));
-        await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
+        await user.click(screen.getByRole('button', { name: 'Edit' }));
+        await user.click(within(categoryDialog()).getByRole('button', { name: 'Save' }));
       }
 
       it('is not saved: a message asks for a type with a name', async () => {
@@ -439,11 +532,11 @@ describe('CategoriesPage', () => {
         await saveWater(user);
 
         expect(updated.count()).toBe(0);
-        const type = within(categoryDialog()).getByLabelText('categories.type');
+        const type = within(categoryDialog()).getByLabelText('Type');
         expect(type).toHaveValue('');
         expect(type).toHaveFocus();
         expect(type).toHaveAttribute('aria-invalid', 'true');
-        expect(type).toHaveAccessibleDescription('categories.typeRequired');
+        expect(type).toHaveAccessibleDescription('Choose or enter a type with a name.');
       });
 
       it('is saved once another type is chosen', async () => {
@@ -451,9 +544,11 @@ describe('CategoriesPage', () => {
         const updated = captureRequest('put', '/api/categories/:id');
         await saveWater(user);
 
-        await user.selectOptions(within(categoryDialog()).getByLabelText('categories.type'), 'SPIRIT');
-        expect(within(categoryDialog()).queryByText('categories.typeRequired')).not.toBeInTheDocument();
-        await user.click(within(categoryDialog()).getByRole('button', { name: 'common.save' }));
+        await user.selectOptions(within(categoryDialog()).getByLabelText('Type'), 'SPIRIT');
+        expect(
+          within(categoryDialog()).queryByText('Choose or enter a type with a name.'),
+        ).not.toBeInTheDocument();
+        await user.click(within(categoryDialog()).getByRole('button', { name: 'Save' }));
 
         expect(await updated.body).toMatchObject({ type: 'SPIRIT' });
       });
@@ -462,10 +557,12 @@ describe('CategoriesPage', () => {
         const user = userEvent.setup();
         await saveWater(user);
 
-        await user.click(within(categoryDialog()).getByRole('button', { name: 'common.cancel' }));
-        await user.click(screen.getByRole('button', { name: 'common.edit' }));
+        await user.click(within(categoryDialog()).getByRole('button', { name: 'Cancel' }));
+        await user.click(screen.getByRole('button', { name: 'Edit' }));
 
-        expect(within(categoryDialog()).queryByText('categories.typeRequired')).not.toBeInTheDocument();
+        expect(
+          within(categoryDialog()).queryByText('Choose or enter a type with a name.'),
+        ).not.toBeInTheDocument();
       });
 
       it('has no accessibility violation with the message', async () => {
@@ -480,12 +577,12 @@ describe('CategoriesPage', () => {
       const user = userEvent.setup();
       await renderLoadedPage();
 
-      await user.click(screen.getAllByRole('button', { name: 'common.edit' })[0]);
-      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.translations' }));
+      await user.click(screen.getAllByRole('button', { name: 'Edit' })[0]!);
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'Translations' }));
       expect(within(categoryDialog()).getByLabelText('Français')).toBeInTheDocument();
-      await user.click(within(categoryDialog()).getByRole('button', { name: 'common.cancel' }));
+      await user.click(within(categoryDialog()).getByRole('button', { name: 'Cancel' }));
 
-      await user.click(screen.getAllByRole('button', { name: 'common.edit' })[1]);
+      await user.click(screen.getAllByRole('button', { name: 'Edit' })[1]!);
 
       expect(within(categoryDialog()).getByDisplayValue('Grenadine')).toBeInTheDocument();
       expect(within(categoryDialog()).queryByLabelText('Français')).not.toBeInTheDocument();
@@ -494,10 +591,10 @@ describe('CategoriesPage', () => {
 
   describe('category deletion', () => {
     async function deleteFirstCategory(user: User) {
-      await user.click(screen.getAllByRole('button', { name: 'common.delete' })[0]);
+      await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
       const confirmation = screen.getByRole('alertdialog');
-      expect(confirmation).toHaveAccessibleDescription('categories.confirmDelete');
-      await user.click(within(confirmation).getByRole('button', { name: 'common.delete' }));
+      expect(confirmation).toHaveAccessibleDescription('Delete this category?');
+      await user.click(within(confirmation).getByRole('button', { name: 'Delete' }));
     }
 
     it('deletes after confirmation and refreshes everything that shows categories', async () => {
@@ -511,10 +608,16 @@ describe('CategoriesPage', () => {
 
       await deleteFirstCategory(user);
 
-      expect(await screen.findByText('categories.deleted')).toBeInTheDocument();
+      expect(await screen.findByText('Category deleted')).toBeInTheDocument();
       expect((await deleted.url).pathname).toBe('/api/categories/1');
       const refreshed = invalidate.mock.calls.map(([filters]) => filters?.queryKey);
-      expect(refreshed).toEqual([qk.categories, qk.categoryTypes, qk.bottles, qk.shortages, qk.availability]);
+      expect(refreshed).toEqual([
+        qk.categories,
+        qk.categoryTypes,
+        qk.bottles,
+        qk.shortages,
+        qk.availability,
+      ]);
       await waitFor(() => expect(reloaded.count()).toBe(1));
     });
 
@@ -523,8 +626,10 @@ describe('CategoriesPage', () => {
       await renderLoadedPage();
       const deleted = captureRequest('delete', '/api/categories/:id');
 
-      await user.click(screen.getAllByRole('button', { name: 'common.delete' })[0]);
-      await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.cancel' }));
+      await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
+      await user.click(
+        within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }),
+      );
 
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
       expect(deleted.count()).toBe(0);
@@ -532,34 +637,57 @@ describe('CategoriesPage', () => {
 
     it('lists the bottles a forced deletion of the category deletes with it', async () => {
       const user = userEvent.setup();
-      const requests = mockItemInUse('/api/categories/:id', {
-        cocktails: [{ id: 4, name: 'Moscow Mule', removedLines: 1 }],
-        bottles: [{ id: 7, name: 'Absolut' }, { id: 8, name: 'Grey Goose' }],
-      }, 'This category still has bottles');
+      const requests = mockItemInUse(
+        '/api/categories/:id',
+        {
+          cocktails: [{ id: 4, name: 'Moscow Mule', removedLines: 1 }],
+          bottles: [
+            { id: 7, name: 'Absolut' },
+            { id: 8, name: 'Grey Goose' },
+          ],
+        },
+        'This category still has bottles',
+      );
       await renderLoadedPage();
 
       await deleteFirstCategory(user);
 
-      const forced = await screen.findByRole('alertdialog', { name: 'deletion.forced.title' });
-      const listed = within(forced).getAllByRole('listitem').map((item) => item.textContent);
-      expect(listed).toEqual(['deletion.forced.cocktailLines', 'Absolut', 'Grey Goose']);
-      await user.click(within(forced).getByRole('checkbox', { name: 'deletion.forced.acknowledgeRecipesAndBottles' }));
-      await user.click(within(forced).getByRole('button', { name: 'deletion.forced.confirm' }));
+      const forced = await screen.findByRole('alertdialog', { name: 'Delete an item in use?' });
+      const listed = within(forced)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent);
+      expect(listed).toEqual(['Moscow Mule: 1 line removed', 'Absolut', 'Grey Goose']);
+      await user.click(
+        within(forced).getByRole('checkbox', {
+          name: 'I understand that these recipes will be changed and these bottles deleted',
+        }),
+      );
+      await user.click(within(forced).getByRole('button', { name: 'Delete anyway' }));
 
-      expect(await screen.findByText('deletion.forced.summary')).toBeInTheDocument();
+      expect(
+        await screen.findByText('Category deleted: 2 bottles deleted, 1 cocktail changed.'),
+      ).toBeInTheDocument();
       expect(requests.map((url) => url.search)).toEqual(['', '?force=true']);
     });
 
     it('keeps a category that still has bottles when the forced deletion is cancelled', async () => {
       const user = userEvent.setup();
-      mockItemInUse('/api/categories/:id', { cocktails: [], bottles: [{ id: 7, name: 'Absolut' }] }, 'This category still has bottles');
+      mockItemInUse(
+        '/api/categories/:id',
+        { cocktails: [], bottles: [{ id: 7, name: 'Absolut' }] },
+        'This category still has bottles',
+      );
       await renderLoadedPage();
 
       await deleteFirstCategory(user);
-      await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'common.cancel' }));
+      await user.click(
+        within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Cancel' }),
+      );
 
-      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('This category still has bottles'));
-      expect(screen.getByRole('alert')).toHaveTextContent('deletion.usedByBottles');
+      await waitFor(() =>
+        expect(screen.getByRole('alert')).toHaveTextContent('This category still has bottles'),
+      );
+      expect(screen.getByRole('alert')).toHaveTextContent(/Bottles in it: .+\./);
       expect(screen.getByText('Vodka')).toBeInTheDocument();
     });
   });
@@ -571,7 +699,9 @@ describe('CategoriesPage', () => {
 
       const manager = await openTypesManager(user);
 
-      expect(within(manager).getByText('GARNISH', { selector: 'span.font-medium' })).toBeInTheDocument();
+      expect(
+        within(manager).getByText('GARNISH', { selector: 'span.font-medium' }),
+      ).toBeInTheDocument();
       expect(within(manager).getByText('(0)')).toBeInTheDocument();
     });
 
@@ -582,10 +712,10 @@ describe('CategoriesPage', () => {
       const manager = await openTypesManager(user);
 
       await user.type(within(manager).getByPlaceholderText('GARNISH, MIXER...'), 'mixer');
-      await user.click(within(manager).getByRole('button', { name: 'common.create' }));
+      await user.click(within(manager).getByRole('button', { name: 'Create' }));
 
       expect(await created.body).toEqual({ name: 'MIXER', nameTranslations: null, color: 'gray' });
-      expect(await screen.findByText('categoryTypes.created')).toBeInTheDocument();
+      expect(await screen.findByText('Type created')).toBeInTheDocument();
       expect(within(manager).getByPlaceholderText('GARNISH, MIXER...')).toHaveValue('');
     });
 
@@ -596,7 +726,7 @@ describe('CategoriesPage', () => {
       const manager = await openTypesManager(user);
 
       await user.type(within(manager).getByPlaceholderText('GARNISH, MIXER...'), '  ');
-      await user.click(within(manager).getByRole('button', { name: 'common.create' }));
+      await user.click(within(manager).getByRole('button', { name: 'Create' }));
 
       expect(created.count()).toBe(0);
     });
@@ -611,7 +741,7 @@ describe('CategoriesPage', () => {
       const manager = await openTypesManager(user);
 
       await user.type(within(manager).getByPlaceholderText('GARNISH, MIXER...'), typed);
-      await user.click(within(manager).getByRole('button', { name: 'common.create' }));
+      await user.click(within(manager).getByRole('button', { name: 'Create' }));
 
       expect(await created.body).toMatchObject({ name: sent });
     });
@@ -623,7 +753,7 @@ describe('CategoriesPage', () => {
       const manager = await openTypesManager(user);
 
       await user.type(within(manager).getByPlaceholderText('GARNISH, MIXER...'), '\u200B\u2800');
-      await user.click(within(manager).getByRole('button', { name: 'common.create' }));
+      await user.click(within(manager).getByRole('button', { name: 'Create' }));
 
       expect(created.count()).toBe(0);
     });
@@ -634,19 +764,19 @@ describe('CategoriesPage', () => {
       const updated = captureRequest('put', '/api/category-types/:name');
       const manager = await openTypesManager(user);
 
-      await user.click(within(manager).getAllByRole('button', { name: 'common.edit' })[0]);
-      expect(within(manager).getByText('categoryTypes.edit')).toBeInTheDocument();
+      await user.click(within(manager).getAllByRole('button', { name: 'Edit' })[0]!);
+      expect(within(manager).getByText('Edit Type')).toBeInTheDocument();
       expect(within(manager).getByDisplayValue('SPIRIT')).toBeDisabled();
       await user.type(within(manager).getByLabelText('Français'), 'Spiritueux');
-      await user.click(within(manager).getByRole('button', { name: 'common.save' }));
+      await user.click(within(manager).getByRole('button', { name: 'Save' }));
 
       expect((await updated.url).pathname).toBe('/api/category-types/SPIRIT');
       expect(await updated.body).toEqual({
         nameTranslations: { fr: 'Spiritueux' },
         color: 'blue',
       });
-      expect(await screen.findByText('categoryTypes.updated')).toBeInTheDocument();
-      expect(within(manager).getByText('categoryTypes.add')).toBeInTheDocument();
+      expect(await screen.findByText('Type updated')).toBeInTheDocument();
+      expect(within(manager).getByText('Add Type')).toBeInTheDocument();
     });
 
     it('cancels the edition of a type', async () => {
@@ -654,10 +784,10 @@ describe('CategoriesPage', () => {
       await renderLoadedPage();
       const manager = await openTypesManager(user);
 
-      await user.click(within(manager).getAllByRole('button', { name: 'common.edit' })[0]);
-      await user.click(within(manager).getByRole('button', { name: 'common.cancel' }));
+      await user.click(within(manager).getAllByRole('button', { name: 'Edit' })[0]!);
+      await user.click(within(manager).getByRole('button', { name: 'Cancel' }));
 
-      expect(within(manager).getByText('categoryTypes.add')).toBeInTheDocument();
+      expect(within(manager).getByText('Add Type')).toBeInTheDocument();
       expect(within(manager).getByPlaceholderText('GARNISH, MIXER...')).toHaveValue('');
       expect(within(manager).queryByLabelText('Français')).not.toBeInTheDocument();
     });
@@ -669,9 +799,12 @@ describe('CategoriesPage', () => {
       const manager = await openTypesManager(user);
 
       await user.type(within(manager).getByPlaceholderText('GARNISH, MIXER...'), 'bitter');
-      await user.click(within(manager).getByRole('button', { name: 'colors.red' }));
-      expect(within(manager).getByRole('button', { name: 'colors.red' })).toHaveAttribute('aria-pressed', 'true');
-      await user.click(within(manager).getByRole('button', { name: 'common.create' }));
+      await user.click(within(manager).getByRole('button', { name: 'Red' }));
+      expect(within(manager).getByRole('button', { name: 'Red' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      await user.click(within(manager).getByRole('button', { name: 'Create' }));
 
       expect(await created.body).toEqual({ name: 'BITTER', nameTranslations: null, color: 'red' });
     });
@@ -682,12 +815,12 @@ describe('CategoriesPage', () => {
       const deleted = captureRequest('delete', '/api/category-types/:name');
       const manager = await openTypesManager(user);
 
-      await user.click(within(manager).getByRole('button', { name: 'common.delete' }));
+      await user.click(within(manager).getByRole('button', { name: 'Delete' }));
       const confirmation = screen.getByRole('alertdialog');
-      expect(confirmation).toHaveAccessibleDescription('categoryTypes.confirmDelete');
-      await user.click(within(confirmation).getByRole('button', { name: 'common.delete' }));
+      expect(confirmation).toHaveAccessibleDescription('Delete this type?');
+      await user.click(within(confirmation).getByRole('button', { name: 'Delete' }));
 
-      expect(await screen.findByText('categoryTypes.deleted')).toBeInTheDocument();
+      expect(await screen.findByText('Type deleted')).toBeInTheDocument();
       expect((await deleted.url).pathname).toBe('/api/category-types/GARNISH');
     });
 
@@ -696,12 +829,14 @@ describe('CategoriesPage', () => {
       await renderLoadedPage();
       const manager = await openTypesManager(user);
 
-      await user.click(within(manager).getAllByRole('button', { name: 'common.edit' })[2]);
+      await user.click(within(manager).getAllByRole('button', { name: 'Edit' })[2]!);
       expect(within(manager).getByDisplayValue('GARNISH')).toBeDisabled();
-      await user.click(within(manager).getByRole('button', { name: 'common.delete' }));
-      await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.delete' }));
+      await user.click(within(manager).getByRole('button', { name: 'Delete' }));
+      await user.click(
+        within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }),
+      );
 
-      await waitFor(() => expect(within(manager).getByText('categoryTypes.add')).toBeInTheDocument());
+      await waitFor(() => expect(within(manager).getByText('Add Type')).toBeInTheDocument());
       expect(within(manager).getByPlaceholderText('GARNISH, MIXER...')).toHaveValue('');
     });
 
@@ -710,11 +845,13 @@ describe('CategoriesPage', () => {
       await renderLoadedPage();
       const manager = await openTypesManager(user);
 
-      await user.click(within(manager).getAllByRole('button', { name: 'common.edit' })[0]);
-      await user.click(within(manager).getByRole('button', { name: 'common.delete' }));
-      await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.delete' }));
+      await user.click(within(manager).getAllByRole('button', { name: 'Edit' })[0]!);
+      await user.click(within(manager).getByRole('button', { name: 'Delete' }));
+      await user.click(
+        within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }),
+      );
 
-      expect(await screen.findByText('categoryTypes.deleted')).toBeInTheDocument();
+      expect(await screen.findByText('Type deleted')).toBeInTheDocument();
       expect(within(manager).getByDisplayValue('SPIRIT')).toBeDisabled();
     });
 
@@ -725,20 +862,26 @@ describe('CategoriesPage', () => {
 
       const manager = await openTypesManager(user);
 
-      const rows = within(manager).getAllByRole('listitem').map((row) => row.textContent);
-      expect(rows[0]).toContain('categoryTypes.emptyNamecategoryTypes.emptyName(0)');
+      const rows = within(manager)
+        .getAllByRole('listitem')
+        .map((row) => row.textContent);
+      expect(rows[0]).toContain('(no name)(no name)(0)');
       expect(rows[1]).toContain(`${SPACED_SPIRIT_LABEL}${SPACED_SPIRIT_LABEL}(1)`);
       expect(rows[2]).toContain('SPIRITSPIRIT(1)');
     });
 
     it('keeps the translation of a type with surrounding spaces next to its stored name', async () => {
       const user = userEvent.setup();
-      mockApiResponse('get', '/api/category-types', [{ ...spacedSpirit, nameTranslations: { en: 'Spirits' } }]);
+      mockApiResponse('get', '/api/category-types', [
+        { ...spacedSpirit, nameTranslations: { en: 'Spirits' } },
+      ]);
       await renderLoadedPage();
 
       const manager = await openTypesManager(user);
 
-      expect(within(manager).getByRole('listitem')).toHaveTextContent(`Spirits${SPACED_SPIRIT_LABEL}(1)`);
+      expect(within(manager).getByRole('listitem')).toHaveTextContent(
+        `Spirits${SPACED_SPIRIT_LABEL}(1)`,
+      );
     });
 
     it('tells a type with inner spaces from the type with one space', async () => {
@@ -748,7 +891,9 @@ describe('CategoriesPage', () => {
 
       const manager = await openTypesManager(user);
 
-      const rows = within(manager).getAllByRole('listitem').map((row) => row.textContent);
+      const rows = within(manager)
+        .getAllByRole('listitem')
+        .map((row) => row.textContent);
       expect(rows[0]).toContain(`${DOUBLE_SPACED_LABEL}${DOUBLE_SPACED_LABEL}(1)`);
       expect(rows[1]).toContain('X YX Y(0)');
     });
@@ -760,7 +905,9 @@ describe('CategoriesPage', () => {
 
       const manager = await openTypesManager(user);
 
-      const rows = within(manager).getAllByRole('listitem').map((row) => row.textContent);
+      const rows = within(manager)
+        .getAllByRole('listitem')
+        .map((row) => row.textContent);
       expect(rows[0]).toContain(`${ZERO_WIDTH_LABEL}${ZERO_WIDTH_LABEL}(1)`);
       expect(rows[1]).toContain('XYXY(0)');
     });
@@ -772,7 +919,9 @@ describe('CategoriesPage', () => {
 
       const manager = await openTypesManager(user);
 
-      const rows = within(manager).getAllByRole('listitem').map((row) => row.textContent);
+      const rows = within(manager)
+        .getAllByRole('listitem')
+        .map((row) => row.textContent);
       expect(rows[0]).toContain(`${DECOMPOSED_LABEL}${DECOMPOSED_LABEL}(1)`);
       expect(rows[1]).toContain('CR\u00C8MECR\u00C8ME(0)');
     });
@@ -788,7 +937,9 @@ describe('CategoriesPage', () => {
 
       const manager = await openTypesManager(user);
 
-      const rows = within(manager).getAllByRole('listitem').map((row) => row.textContent);
+      const rows = within(manager)
+        .getAllByRole('listitem')
+        .map((row) => row.textContent);
       expect(rows[0]).toContain(`Mixers${DOUBLE_SPACED_LABEL}(1)`);
       expect(rows[1]).toContain('Fruit  juiceX Y(0)');
     });
@@ -805,15 +956,15 @@ describe('CategoriesPage', () => {
         const updated = captureRequest('put', '/api/category-types');
         const manager = await openTypesManager(user);
 
-        await user.click(within(manager).getAllByRole('button', { name: 'common.edit' })[0]);
-        await user.click(within(manager).getByRole('button', { name: 'colors.red' }));
-        await user.click(within(manager).getByRole('button', { name: 'common.save' }));
+        await user.click(within(manager).getAllByRole('button', { name: 'Edit' })[0]!);
+        await user.click(within(manager).getByRole('button', { name: 'Red' }));
+        await user.click(within(manager).getByRole('button', { name: 'Save' }));
 
         const url = await updated.url;
         expect(url.pathname).toBe('/api/category-types');
         expect(url.searchParams.get('name')).toBe('');
         expect(await updated.body).toEqual({ nameTranslations: null, color: 'red' });
-        expect(await screen.findByText('categoryTypes.updated')).toBeInTheDocument();
+        expect(await screen.findByText('Type updated')).toBeInTheDocument();
       });
 
       it('is deleted through the query', async () => {
@@ -822,10 +973,12 @@ describe('CategoriesPage', () => {
         const deleted = captureRequest('delete', '/api/category-types');
         const manager = await openTypesManager(user);
 
-        await user.click(within(manager).getByRole('button', { name: 'common.delete' }));
-        await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.delete' }));
+        await user.click(within(manager).getByRole('button', { name: 'Delete' }));
+        await user.click(
+          within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }),
+        );
 
-        expect(await screen.findByText('categoryTypes.deleted')).toBeInTheDocument();
+        expect(await screen.findByText('Type deleted')).toBeInTheDocument();
         const url = await deleted.url;
         expect(url.pathname).toBe('/api/category-types');
         expect(url.searchParams.get('name')).toBe('');
@@ -834,14 +987,25 @@ describe('CategoriesPage', () => {
 
     it('shows the backend message in a toast when a type cannot be deleted', async () => {
       const user = userEvent.setup();
-      mockApiError('delete', '/api/category-types/:name', 400, 'Type is in use by categories');
+      mockApiError(
+        'delete',
+        '/api/category-types/:name',
+        409,
+        'Cannot delete: categories still use this type',
+      );
       await renderLoadedPage();
       const manager = await openTypesManager(user);
 
-      await user.click(within(manager).getByRole('button', { name: 'common.delete' }));
-      await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.delete' }));
+      await user.click(within(manager).getByRole('button', { name: 'Delete' }));
+      await user.click(
+        within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }),
+      );
 
-      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Type is in use by categories'));
+      await waitFor(() =>
+        expect(screen.getByRole('alert')).toHaveTextContent(
+          'Cannot delete: categories still use this type',
+        ),
+      );
     });
 
     it('disables the deletion of a type used by categories', async () => {
@@ -849,7 +1013,9 @@ describe('CategoriesPage', () => {
       await renderLoadedPage();
       const manager = await openTypesManager(user);
 
-      const usedTypeButtons = within(manager).getAllByRole('button', { name: 'categoryTypes.cannotDelete' });
+      const usedTypeButtons = within(manager).getAllByRole('button', {
+        name: 'This type is used by categories and cannot be deleted.',
+      });
       expect(usedTypeButtons).toHaveLength(2);
       usedTypeButtons.forEach((button) => expect(button).toBeDisabled());
     });
@@ -859,7 +1025,7 @@ describe('CategoriesPage', () => {
       await renderLoadedPage();
       const manager = await openTypesManager(user);
 
-      await user.click(within(manager).getByRole('button', { name: 'common.close' }));
+      await user.click(within(manager).getByRole('button', { name: 'Close' }));
 
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });

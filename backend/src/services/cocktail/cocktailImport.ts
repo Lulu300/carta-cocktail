@@ -11,7 +11,12 @@ import { CaseInsensitiveIndex, CaseInsensitiveMatch, previewMatch } from '../../
 import { nameToStore, translationsToStore } from '../../utils/storedNames';
 import { composeName } from '../../utils/invisibleCharacters';
 import { createCocktailIn, IngredientLineValue } from './cocktailService';
-import { collectImportReferences, ImportReferences, ImportedLine, lowercase } from './importReferences';
+import {
+  collectImportReferences,
+  ImportReferences,
+  ImportedLine,
+  lowercase,
+} from './importReferences';
 
 /**
  * Import of a cocktail exported as JSON (format version 1).
@@ -99,7 +104,10 @@ export async function previewImport(recipe: ImportedRecipe) {
   const refs = collectImportReferences(recipe);
   const units = new CaseInsensitiveIndex(await prisma.unit.findMany(), byAbbreviation);
   const categories = new CaseInsensitiveIndex(await prisma.category.findMany(), byName);
-  const bottles = exactOrFirst(await prisma.bottle.findMany({ include: { category: true } }), byName);
+  const bottles = exactOrFirst(
+    await prisma.bottle.findMany({ include: { category: true } }),
+    byName,
+  );
   const ingredients = exactOrFirst(await prisma.ingredient.findMany(), byName);
   return {
     cocktail: {
@@ -159,7 +167,10 @@ function unresolved(details: UnresolvedReference[]): BadRequestError {
 function firstLineUsingBottle(recipe: ImportedRecipe, key: string): number {
   return (recipe.ingredients ?? []).findIndex((line) => {
     if (line.sourceType === 'BOTTLE') return lowercase(line.sourceName) === key;
-    return line.sourceType === 'CATEGORY' && (line.preferredBottles ?? []).some((bottle) => lowercase(bottle.name) === key);
+    return (
+      line.sourceType === 'CATEGORY' &&
+      (line.preferredBottles ?? []).some((bottle) => lowercase(bottle.name) === key)
+    );
   });
 }
 
@@ -189,77 +200,108 @@ function ingredientsByStoredName(rows: IngredientRow[]) {
 // A name the admin cleared in the wizard falls back on the one in the file. A unit or category
 // to create that already exists ignoring case is used as it is (`findOrCreate`). The names of a
 // created unit, category or ingredient are stored composed, like the routes store them
-async function resolveAll(db: Db, recipe: ImportedRecipe, refs: ImportReferences, resolutions: Resolutions | undefined) {
+async function resolveAll(
+  db: Db,
+  recipe: ImportedRecipe,
+  refs: ImportReferences,
+  resolutions: Resolutions | undefined,
+) {
   const units = new CaseInsensitiveIndex(await db.unit.findMany(), byAbbreviation);
   const unit = await resolveEntities(refs.units, resolutions?.units, async (data, ref, key) => {
     const abbreviation = data.abbreviation || ref.abbreviation || key;
-    const row = await units.findOrCreate(abbreviation, 'errors.ambiguousUnitAbbreviation', () => db.unit.create({
-      data: {
-        // A hand-made file may give no unit name: the abbreviation names it then
-        name: nameToStore(data.name || ref.name || abbreviation),
-        abbreviation: nameToStore(abbreviation),
-        conversionFactorToMl: data.conversionFactorToMl ?? null,
-        nameTranslations: serializeTranslations(translationsToStore(data.nameTranslations)),
-      },
-    }));
+    const row = await units.findOrCreate(abbreviation, 'errors.ambiguousUnitAbbreviation', () =>
+      db.unit.create({
+        data: {
+          // A hand-made file may give no unit name: the abbreviation names it then
+          name: nameToStore(data.name || ref.name || abbreviation),
+          abbreviation: nameToStore(abbreviation),
+          conversionFactorToMl: data.conversionFactorToMl ?? null,
+          nameTranslations: serializeTranslations(translationsToStore(data.nameTranslations)),
+        },
+      }),
+    );
     return row.id;
   });
 
   const categories = new CaseInsensitiveIndex(await db.category.findMany(), byName);
-  const category = await resolveEntities(refs.categories, resolutions?.categories, async (data, ref, key) => {
-    const name = data.name || ref.name || key;
-    // The schema defaults the type to SPIRIT. The wizard keys resolutions by lowercased name, like `key`.
-    // Checked before the lookup, so the request is refused or not whatever the database holds
-    const typeName = await categoryTypeNameFor(db, data.type, importedCategoryTypePath(key));
-    const row = await categories.findOrCreate(name, 'errors.ambiguousCategoryName', async () => {
-      await createMissingCategoryType(db, typeName);
-      return db.category.create({
+  const category = await resolveEntities(
+    refs.categories,
+    resolutions?.categories,
+    async (data, ref, key) => {
+      const name = data.name || ref.name || key;
+      // The schema defaults the type to SPIRIT. The wizard keys resolutions by lowercased name, like `key`.
+      // Checked before the lookup, so the request is refused or not whatever the database holds
+      const typeName = await categoryTypeNameFor(db, data.type, importedCategoryTypePath(key));
+      const row = await categories.findOrCreate(name, 'errors.ambiguousCategoryName', async () => {
+        await createMissingCategoryType(db, typeName);
+        return db.category.create({
+          data: {
+            name: nameToStore(name),
+            type: typeName,
+            desiredStock: data.desiredStock,
+            minimumPercent: data.minimumPercent,
+            nameTranslations: serializeTranslations(translationsToStore(data.nameTranslations)),
+          },
+        });
+      });
+      return row.id;
+    },
+  );
+
+  const bottle = await resolveEntities(
+    refs.bottles,
+    resolutions?.bottles,
+    async (data, ref, key) => {
+      const categoryName = data.categoryName || ref.categoryName;
+      const categoryId = categoryName ? category.get(lowercase(categoryName)) : undefined;
+      // Named as in the file, like every other unresolved reference
+      if (!categoryId)
+        throw unresolved([
+          { line: firstLineUsingBottle(recipe, key), kind: 'bottle', name: ref.name },
+        ]);
+      const { capacityMl, remainingPercent, alcoholPercentage } = data;
+      const created = await db.bottle.create({
         data: {
-          name: nameToStore(name),
-          type: typeName,
-          desiredStock: data.desiredStock,
-          minimumPercent: data.minimumPercent,
+          name: data.name || ref.name || key,
+          categoryId,
+          capacityMl,
+          remainingPercent,
+          alcoholPercentage,
+        },
+      });
+      return created.id;
+    },
+  );
+
+  const ingredients = ingredientsByStoredName(await db.ingredient.findMany());
+  const ingredient = await resolveEntities(
+    refs.ingredients,
+    resolutions?.ingredients,
+    async (data, ref, key) => {
+      const name = nameToStore(data.name || ref.name || key);
+      const existing = ingredients.get(name);
+      if (existing) return existing.id;
+      const created = await db.ingredient.create({
+        data: {
+          name,
+          icon: data.icon ?? null,
           nameTranslations: serializeTranslations(translationsToStore(data.nameTranslations)),
         },
       });
-    });
-    return row.id;
-  });
-
-  const bottle = await resolveEntities(refs.bottles, resolutions?.bottles, async (data, ref, key) => {
-    const categoryName = data.categoryName || ref.categoryName;
-    const categoryId = categoryName ? category.get(lowercase(categoryName)) : undefined;
-    // Named as in the file, like every other unresolved reference
-    if (!categoryId) throw unresolved([{ line: firstLineUsingBottle(recipe, key), kind: 'bottle', name: ref.name }]);
-    const { capacityMl, remainingPercent, alcoholPercentage } = data;
-    const created = await db.bottle.create({
-      data: { name: data.name || ref.name || key, categoryId, capacityMl, remainingPercent, alcoholPercentage },
-    });
-    return created.id;
-  });
-
-  const ingredients = ingredientsByStoredName(await db.ingredient.findMany());
-  const ingredient = await resolveEntities(refs.ingredients, resolutions?.ingredients, async (data, ref, key) => {
-    const name = nameToStore(data.name || ref.name || key);
-    const existing = ingredients.get(name);
-    if (existing) return existing.id;
-    const created = await db.ingredient.create({
-      data: {
-        name,
-        icon: data.icon ?? null,
-        nameTranslations: serializeTranslations(translationsToStore(data.nameTranslations)),
-      },
-    });
-    ingredients.add(created);
-    return created.id;
-  });
+      ingredients.add(created);
+      return created.id;
+    },
+  );
 
   return { unit, category, bottle, ingredient };
 }
 
 // --- Recipe lines ----------------------------------------------------------
 
-type LineSource = Pick<IngredientLineValue, 'sourceType' | 'bottleId' | 'categoryId' | 'ingredientId'>;
+type LineSource = Pick<
+  IngredientLineValue,
+  'sourceType' | 'bottleId' | 'categoryId' | 'ingredientId'
+>;
 
 /**
  * The source of an imported line. A skipped bottle falls back on its category
@@ -275,7 +317,11 @@ function resolveSource(line: ImportedLine, ids: ResolvedIds): LineSource | null 
 }
 
 // Preferred bottles only mean something on a CATEGORY line; a skipped one is dropped
-function preferredBottleIds(line: ImportedLine, source: LineSource, ids: ResolvedIds): number[] | undefined {
+function preferredBottleIds(
+  line: ImportedLine,
+  source: LineSource,
+  ids: ResolvedIds,
+): number[] | undefined {
   if (source.sourceType !== 'CATEGORY') return undefined;
   return (line.preferredBottles ?? [])
     .map((bottle) => ids.bottle.get(lowercase(bottle.name)))
@@ -283,10 +329,16 @@ function preferredBottleIds(line: ImportedLine, source: LineSource, ids: Resolve
 }
 
 /** Lists what the line misses: its unit, its source, or both. */
-function missingReferences(line: ImportedLine, index: number, unitId: number | undefined, source: LineSource | null) {
+function missingReferences(
+  line: ImportedLine,
+  index: number,
+  unitId: number | undefined,
+  source: LineSource | null,
+) {
   const missing: UnresolvedReference[] = [];
   if (!unitId) missing.push({ line: index, kind: 'unit', name: line.unit?.abbreviation ?? null });
-  if (!source) missing.push({ line: index, kind: SOURCE_KIND[line.sourceType], name: line.sourceName });
+  if (!source)
+    missing.push({ line: index, kind: SOURCE_KIND[line.sourceType], name: line.sourceName });
   return missing;
 }
 
@@ -302,7 +354,12 @@ function toRecipeLines(lines: ImportedLine[], ids: ResolvedIds): IngredientLineV
     const source = resolveSource(line, ids);
     missing.push(...missingReferences(line, index, unitId, source));
     if (unitId && source) {
-      recipeLines.push({ ...source, quantity: line.quantity, unitId, preferredBottleIds: preferredBottleIds(line, source, ids) });
+      recipeLines.push({
+        ...source,
+        quantity: line.quantity,
+        unitId,
+        preferredBottleIds: preferredBottleIds(line, source, ids),
+      });
     }
   });
   if (missing.length > 0) throw unresolved(missing);

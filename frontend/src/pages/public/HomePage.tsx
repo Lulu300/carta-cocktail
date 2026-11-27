@@ -24,7 +24,9 @@ export default function HomePage() {
       if (menus.length === 0) return <EmptyState icon="🍸" title={t('home.noMenus')} />;
       return (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {menus.map((menu) => <MenuCard key={menu.id} menu={menu} />)}
+          {menus.map((menu) => (
+            <MenuCard key={menu.id} menu={menu} />
+          ))}
         </div>
       );
     }
@@ -66,7 +68,7 @@ function MenuCard({ menu }: { menu: Menu }) {
       to={`/menu/${menu.slug}`}
       className="group bg-surface border border-line rounded-xl p-6 hover:border-accent/50 transition-all motion-reduce:transition-none hover:shadow-lg hover:shadow-accent/5"
     >
-      <h2 className="text-xl font-bold font-serif text-white group-hover:text-accent transition-colors mb-2">
+      <h2 className="text-xl font-bold font-serif text-fg-strong group-hover:text-accent transition-colors mb-2">
         {menu.name}
       </h2>
       {menu.description && (
@@ -74,7 +76,10 @@ function MenuCard({ menu }: { menu: Menu }) {
       )}
       <div className="flex items-center justify-between text-xs text-fg-muted">
         <span>{countLabel}</span>
-        <span aria-hidden="true" className="text-accent motion-safe:group-hover:translate-x-1 transition-transform motion-reduce:transition-none">
+        <span
+          aria-hidden="true"
+          className="text-accent motion-safe:group-hover:translate-x-1 transition-transform motion-reduce:transition-none"
+        >
           &rarr;
         </span>
       </div>

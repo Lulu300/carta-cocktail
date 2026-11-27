@@ -9,7 +9,6 @@ import { toast } from '../../components/ui/ToastStore';
 import type { BackupRestoreResult } from '../../services/api';
 import { mockDownload } from '../../test/download';
 import { buildSiteSettings } from '../../test/factories';
-import i18n from '../../i18n';
 import { ADMIN_USER } from '../../test/msw/handlers';
 import {
   captureRequest,
@@ -22,19 +21,10 @@ import {
   rejectNextFetch,
 } from '../../test/msw/utils';
 
-// Keeps the interpolation values visible, so that a test can check the count of skipped files
-vi.mock('react-i18next', async (importOriginal) => {
-  const { translateWithValues } = await import('../../test/translateWithValues');
-  return {
-    ...await importOriginal<typeof import('react-i18next')>(),
-    useTranslation: () => ({ t: translateWithValues, i18n: { language: 'en' } }),
-  };
-});
-
 const admin = { ...ADMIN_USER, email: 'admin@test.local' };
 
-// Set by services/api.ts through the real i18next instance, not the mocked useTranslation
-const SERVER_UNAVAILABLE = i18n.t('common.serverUnavailable');
+// Set by services/api.ts when the backend does not answer
+const SERVER_UNAVAILABLE = 'The server is not responding, try again in a moment.';
 
 function restoreResult(overrides: Partial<BackupRestoreResult> = {}): BackupRestoreResult {
   return { message: 'Backup restored', skippedFiles: 0, restartRecommended: false, ...overrides };
@@ -63,11 +53,11 @@ async function renderLoadedPage() {
 }
 
 function siteSaveButton() {
-  return screen.getAllByText('common.save')[0];
+  return screen.getAllByText('Save')[0]!;
 }
 
 function profileSaveButton() {
-  return screen.getAllByText('common.save')[1];
+  return screen.getAllByText('Save')[1]!;
 }
 
 // MAX_BACKUP_UPLOAD_BYTES of backend/src/services/backupService.ts, the largest archive it accepts
@@ -86,35 +76,40 @@ function chooseBackupFile(size?: number): File {
 
 async function selectBackupFile(size?: number): Promise<File> {
   await waitFor(() => {
-    expect(screen.getByText('settings.backup.selectFile')).toBeInTheDocument();
+    expect(screen.getByText('Select ZIP file')).toBeInTheDocument();
   });
 
   const file = chooseBackupFile(size);
 
   // Import button appears after file selection
   await waitFor(() => {
-    expect(screen.getByText('settings.backup.import')).toBeInTheDocument();
+    expect(screen.getByText('Restore Backup')).toBeInTheDocument();
   });
   return file;
 }
 
 async function selectBackupFileAndClickImport(size?: number): Promise<File> {
   const file = await selectBackupFile(size);
-  fireEvent.click(screen.getByText('settings.backup.import'));
+  fireEvent.click(screen.getByText('Restore Backup'));
   return file;
 }
 
-async function answerRestoreDialog(buttonName: 'settings.backup.import' | 'common.cancel') {
-  const dialog = await screen.findByRole('alertdialog', { name: 'settings.backup.import' });
-  expect(dialog).toHaveAccessibleDescription('settings.backup.confirmRestore');
+async function answerRestoreDialog(buttonName: 'Restore Backup' | 'Cancel') {
+  const dialog = await screen.findByRole('alertdialog', { name: 'Restore Backup' });
+  expect(dialog).toHaveAccessibleDescription(
+    'This will replace ALL current data (database, images and admin account). This action cannot be undone. You will then have to sign in again with the email and password that were in use when the backup was made. Continue?',
+  );
   // userEvent waits for the restore that the answer starts: its updates stay inside act()
   await userEvent.click(within(dialog).getByRole('button', { name: buttonName }));
 }
 
 // A restore that ends without its result shows its cause, then the advice shared by both causes
-const RESTORE_TIMEOUT = 'settings.backup.restoreTimeout settings.backup.restoreMayStillRun';
-const RESTORE_NO_ANSWER = 'settings.backup.restoreNoAnswer settings.backup.restoreMayStillRun';
-const EXPORT_NO_ANSWER = 'settings.backup.exportNoAnswer';
+const RESTORE_TIMEOUT =
+  'The server did not answer in time, but the restore may still be running. Do not start the restore again: wait a few minutes, then reload the page. Once the restore has finished, you are signed out. If the page then shows a server error, the backup probably comes from an older version: restart the backend, as explained in "Restoring a backup from an older version" in UPGRADING.md. If nothing has changed after several minutes, check the backend logs before trying again.';
+const RESTORE_NO_ANSWER =
+  'The connection to the server was cut before it answered (the browser or a proxy stopped waiting, or the network was lost), but the restore may still be running. Check your network connection. Do not start the restore again: wait a few minutes, then reload the page. Once the restore has finished, you are signed out. If the page then shows a server error, the backup probably comes from an older version: restart the backend, as explained in "Restoring a backup from an older version" in UPGRADING.md. If nothing has changed after several minutes, check the backend logs before trying again.';
+const EXPORT_NO_ANSWER =
+  'The connection to the server was cut before the backup was fully downloaded. The export changes nothing on the server: check your connection and try again.';
 // Matches either no-answer message wherever it is, for the tests that check it is absent
 const NO_ANSWER_CAUSE = /settings\.backup\.(restore|export)NoAnswer/;
 
@@ -123,16 +118,27 @@ type BackupAction = 'export' | 'restore';
 /** Starts a backup export, or a confirmed restore of a selected file. */
 async function runBackupAction(action: BackupAction) {
   if (action === 'export') {
-    await userEvent.click(screen.getByText('settings.backup.export'));
+    await userEvent.click(screen.getByText('Export Backup'));
     return;
   }
   await selectBackupFileAndClickImport();
-  await answerRestoreDialog('settings.backup.import');
+  await answerRestoreDialog('Restore Backup');
 }
 
 const BACKUP_ACTIONS = [
-  { action: 'export', method: 'get', path: '/api/backup/export', timeoutMessage: 'settings.backup.exportTimeout' },
-  { action: 'restore', method: 'post', path: '/api/backup/import', timeoutMessage: RESTORE_TIMEOUT },
+  {
+    action: 'export',
+    method: 'get',
+    path: '/api/backup/export',
+    timeoutMessage:
+      'Preparing the backup took too long: the proxy in front of the server stopped waiting. Trying again right away will probably fail the same way. Try again later, when the server is less busy. If it keeps failing, check the backend logs and the timeout of any reverse proxy in front of Carta Cocktail.',
+  },
+  {
+    action: 'restore',
+    method: 'post',
+    path: '/api/backup/import',
+    timeoutMessage: RESTORE_TIMEOUT,
+  },
 ] as const;
 
 // The sign-in page that openSignInAfterRestore loads, which explains why the admin was signed out
@@ -141,8 +147,8 @@ const SIGN_IN_AFTER_RESTORE = '/login?reason=backup-restored';
 // Page loads, which jsdom does not implement: every successful restore ends with one
 let assignLocation: Mock<(url: string) => void>;
 
-const exportButton = () => screen.getByRole('button', { name: /settings\.backup\.export/ });
-const restoreButton = () => screen.getByRole('button', { name: /settings\.backup\.import/ });
+const exportButton = () => screen.getByRole('button', { name: /Export Backup|Exporting/ });
+const restoreButton = () => screen.getByRole('button', { name: /Restore Backup|Restoring/ });
 
 /**
  * Makes the export answer at once with its headers and the start of the archive. The
@@ -153,7 +159,9 @@ const restoreButton = () => screen.getByRole('button', { name: /settings\.backup
 function holdExportDownload() {
   let archive: ReadableStreamDefaultController<Uint8Array> | undefined;
   let answered: () => void = () => {};
-  const headersSent = new Promise<void>((resolve) => { answered = resolve; });
+  const headersSent = new Promise<void>((resolve) => {
+    answered = resolve;
+  });
   // Answered by a stub of fetch: MSW closes a response body that errors mid-stream instead of
   // cutting it, so it cannot simulate a lost connection.
   const realFetch = globalThis.fetch;
@@ -169,7 +177,10 @@ function holdExportDownload() {
     answered();
     return Promise.resolve(
       new Response(body, {
-        headers: { 'Content-Type': 'application/zip', 'Content-Disposition': 'attachment; filename="backup.zip"' },
+        headers: {
+          'Content-Type': 'application/zip',
+          'Content-Disposition': 'attachment; filename="backup.zip"',
+        },
       }),
     );
   });
@@ -186,7 +197,11 @@ beforeEach(() => {
   vi.stubGlobal('location', { ...window.location, assign: assignLocation });
   localStorage.setItem('token', 'admin-token');
   mockApiResponse('get', '/api/auth/me', admin);
-  mockApiResponse('get', '/api/settings', buildSiteSettings({ siteName: 'My Bar', siteIcon: '🍸' }));
+  mockApiResponse(
+    'get',
+    '/api/settings',
+    buildSiteSettings({ siteName: 'My Bar', siteIcon: '🍸' }),
+  );
   mockRestore(restoreResult());
   vi.spyOn(toast, 'success').mockReturnValue('toast-1');
   vi.spyOn(toast, 'info').mockReturnValue('toast-2');
@@ -202,34 +217,46 @@ describe('SettingsPage', () => {
   it('shows a loading state until the site settings arrive', async () => {
     mockApiPending('get', '/api/settings');
     renderPage();
-    expect(screen.getByText('common.loading')).toBeInTheDocument();
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
     // The providers still load the session and the public settings
     await waitFor(() => expect(document.title).toBe('Carta'));
   });
 
   it('renders the title, both forms and the backup section after loading', async () => {
     await renderLoadedPage();
-    expect(screen.getByRole('heading', { level: 1, name: 'settings.title' })).toBeInTheDocument();
-    expect(screen.getByText('settings.siteConfig')).toBeInTheDocument();
-    expect(screen.getByText('settings.profileConfig')).toBeInTheDocument();
-    expect(screen.getByText('settings.backup.title')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument();
+    expect(screen.getByText('Site Configuration')).toBeInTheDocument();
+    expect(screen.getByText('Admin Profile')).toBeInTheDocument();
+    expect(screen.getByText('Backup & Restore')).toBeInTheDocument();
   });
 
   it('labels every field and marks the chosen site icon', async () => {
     const user = userEvent.setup();
     await renderLoadedPage();
 
-    expect(screen.getByLabelText(/settings\.siteName/)).toHaveValue('My Bar');
-    expect(screen.getByLabelText(/settings\.email/)).toHaveValue('admin@test.local');
-    expect(screen.getByLabelText('settings.currentPassword')).toHaveAttribute('type', 'password');
-    expect(screen.getByLabelText('settings.newPassword')).toHaveAttribute('autocomplete', 'new-password');
-    expect(screen.getByLabelText('settings.confirmPassword')).toHaveAttribute('autocomplete', 'new-password');
+    expect(screen.getByLabelText(/Site Name/)).toHaveValue('My Bar');
+    expect(screen.getByLabelText(/Email Address/)).toHaveValue('admin@test.local');
+    expect(screen.getByLabelText('Current Password')).toHaveAttribute('type', 'password');
+    expect(screen.getByLabelText('New Password')).toHaveAttribute('autocomplete', 'new-password');
+    expect(screen.getByLabelText('Confirm Password')).toHaveAttribute(
+      'autocomplete',
+      'new-password',
+    );
 
-    const icons = screen.getByRole('group', { name: 'settings.siteIcon' });
-    expect(within(icons).getByRole('button', { name: '🍸' })).toHaveAttribute('aria-pressed', 'true');
-    await user.click(within(icons).getByRole('button', { name: 'settings.noIcon' }));
-    expect(within(icons).getByRole('button', { name: 'settings.noIcon' })).toHaveAttribute('aria-pressed', 'true');
-    expect(within(icons).getByRole('button', { name: '🍸' })).toHaveAttribute('aria-pressed', 'false');
+    const icons = screen.getByRole('group', { name: 'Site Icon' });
+    expect(within(icons).getByRole('button', { name: '🍸' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await user.click(within(icons).getByRole('button', { name: 'No icon' }));
+    expect(within(icons).getByRole('button', { name: 'No icon' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(within(icons).getByRole('button', { name: '🍸' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
   });
 
   it('saves the site settings, confirms and refreshes the name shown everywhere', async () => {
@@ -244,18 +271,21 @@ describe('SettingsPage', () => {
     await user.click(siteSaveButton());
 
     expect(await saved.body).toEqual({ siteName: 'New Bar Name', siteIcon: '🍸' });
-    expect(await screen.findByText('settings.siteUpdated')).toBeInTheDocument();
+    expect(await screen.findByText('Site settings updated')).toBeInTheDocument();
     // SiteSettingsProvider reloaded the public settings
     await waitFor(() => expect(document.title).toBe('New Bar Name'));
   });
 
   describe('sign out everywhere', () => {
     const SIGN_IN_AFTER_LOGOUT_EVERYWHERE = '/login?reason=logged-out-everywhere';
-    const logoutEverywhereButton = () => screen.getByRole('button', { name: 'settings.logoutEverywhere' });
+    const logoutEverywhereButton = () =>
+      screen.getByRole('button', { name: 'Sign out everywhere' });
 
-    async function answerLogoutEverywhereDialog(buttonName: 'settings.logoutEverywhere' | 'common.cancel') {
-      const dialog = await screen.findByRole('alertdialog', { name: 'settings.logoutEverywhere' });
-      expect(dialog).toHaveAccessibleDescription('settings.confirmLogoutEverywhere');
+    async function answerLogoutEverywhereDialog(buttonName: 'Sign out everywhere' | 'Cancel') {
+      const dialog = await screen.findByRole('alertdialog', { name: 'Sign out everywhere' });
+      expect(dialog).toHaveAccessibleDescription(
+        'Every device, this one included, will be signed out and will need the password again. Use it when a device was lost or shared.',
+      );
       await userEvent.click(within(dialog).getByRole('button', { name: buttonName }));
     }
 
@@ -265,10 +295,12 @@ describe('SettingsPage', () => {
       await renderLoadedPage();
 
       await userEvent.click(logoutEverywhereButton());
-      await answerLogoutEverywhereDialog('settings.logoutEverywhere');
+      await answerLogoutEverywhereDialog('Sign out everywhere');
 
       await revoked.body;
-      await waitFor(() => expect(assignLocation).toHaveBeenCalledWith(SIGN_IN_AFTER_LOGOUT_EVERYWHERE));
+      await waitFor(() =>
+        expect(assignLocation).toHaveBeenCalledWith(SIGN_IN_AFTER_LOGOUT_EVERYWHERE),
+      );
       expect(localStorage.getItem('token')).toBeNull();
     });
 
@@ -278,9 +310,11 @@ describe('SettingsPage', () => {
       const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
       await userEvent.click(logoutEverywhereButton());
-      await answerLogoutEverywhereDialog('common.cancel');
+      await answerLogoutEverywhereDialog('Cancel');
 
-      const requestedUrls = fetchSpy.mock.calls.map(([input]) => (input instanceof Request ? input.url : String(input)));
+      const requestedUrls = fetchSpy.mock.calls.map(([input]) =>
+        input instanceof Request ? input.url : String(input),
+      );
       expect(requestedUrls.some((url) => url.includes('/auth/logout-all'))).toBe(false);
       expect(assignLocation).not.toHaveBeenCalled();
       expect(localStorage.getItem('token')).toBe('admin-token');
@@ -291,7 +325,7 @@ describe('SettingsPage', () => {
       await renderLoadedPage();
 
       await userEvent.click(logoutEverywhereButton());
-      await answerLogoutEverywhereDialog('settings.logoutEverywhere');
+      await answerLogoutEverywhereDialog('Sign out everywhere');
 
       expect(await screen.findByText('Internal server error')).toBeInTheDocument();
       expect(assignLocation).not.toHaveBeenCalled();
@@ -317,7 +351,7 @@ describe('SettingsPage', () => {
 
     await user.click(siteSaveButton());
 
-    expect(await screen.findByText('common.error')).toBeInTheDocument();
+    expect(await screen.findByText('An error occurred')).toBeInTheDocument();
   });
 
   it('refuses two different new passwords without asking the server', async () => {
@@ -325,12 +359,12 @@ describe('SettingsPage', () => {
     await renderLoadedPage();
     const profile = captureRequest('put', '/api/settings/profile');
 
-    await user.type(screen.getByPlaceholderText('settings.currentPasswordPlaceholder'), 'old-password-1');
-    await user.type(screen.getByPlaceholderText('settings.newPasswordPlaceholder'), 'newpass123');
-    await user.type(screen.getByPlaceholderText('settings.confirmPasswordPlaceholder'), 'differentpass');
+    await user.type(screen.getByPlaceholderText('Required to change password'), 'old-password-1');
+    await user.type(screen.getByPlaceholderText('Leave blank to keep current'), 'newpass123');
+    await user.type(screen.getByPlaceholderText('Retype new password'), 'differentpass');
     await user.click(profileSaveButton());
 
-    expect(await screen.findByText('settings.passwordMismatch')).toBeInTheDocument();
+    expect(await screen.findByText('Passwords do not match')).toBeInTheDocument();
     expect(profile.count()).toBe(0);
   });
 
@@ -340,15 +374,18 @@ describe('SettingsPage', () => {
     await renderLoadedPage();
     const profile = captureRequest('put', '/api/settings/profile');
 
-    await user.type(screen.getByPlaceholderText('settings.currentPasswordPlaceholder'), 'old-password-1');
-    await user.type(screen.getByPlaceholderText('settings.newPasswordPlaceholder'), 'new-password-12');
-    await user.type(screen.getByPlaceholderText('settings.confirmPasswordPlaceholder'), 'new-password-12');
+    await user.type(screen.getByPlaceholderText('Required to change password'), 'old-password-1');
+    await user.type(screen.getByPlaceholderText('Leave blank to keep current'), 'new-password-12');
+    await user.type(screen.getByPlaceholderText('Retype new password'), 'new-password-12');
     await user.click(profileSaveButton());
 
-    expect(await profile.body).toEqual({ currentPassword: 'old-password-1', newPassword: 'new-password-12' });
-    expect(await screen.findByText('settings.profileUpdated')).toBeInTheDocument();
+    expect(await profile.body).toEqual({
+      currentPassword: 'old-password-1',
+      newPassword: 'new-password-12',
+    });
+    expect(await screen.findByText('Profile updated')).toBeInTheDocument();
     expect(localStorage.getItem('token')).toBe('new-token');
-    expect(screen.getByPlaceholderText('settings.newPasswordPlaceholder')).toHaveValue('');
+    expect(screen.getByPlaceholderText('Leave blank to keep current')).toHaveValue('');
   });
 
   it('sends the current password with a new email and shows the new email', async () => {
@@ -356,7 +393,7 @@ describe('SettingsPage', () => {
     const user = userEvent.setup();
     await renderLoadedPage();
     const profile = captureRequest('put', '/api/settings/profile');
-    const currentPasswordInput = screen.getByPlaceholderText('settings.currentPasswordPlaceholder');
+    const currentPasswordInput = screen.getByPlaceholderText('Required to change password');
     expect(currentPasswordInput).not.toBeRequired();
 
     const emailInput = screen.getByDisplayValue('admin@test.local');
@@ -366,8 +403,11 @@ describe('SettingsPage', () => {
     await user.type(currentPasswordInput, 'old-password-1');
     await user.click(profileSaveButton());
 
-    expect(await profile.body).toEqual({ email: 'new@test.local', currentPassword: 'old-password-1' });
-    expect(await screen.findByText('settings.profileUpdated')).toBeInTheDocument();
+    expect(await profile.body).toEqual({
+      email: 'new@test.local',
+      currentPassword: 'old-password-1',
+    });
+    expect(await screen.findByText('Profile updated')).toBeInTheDocument();
     // The session now holds the new email: it is no longer a change
     expect(screen.getByDisplayValue('new@test.local')).toBeInTheDocument();
     expect(currentPasswordInput).not.toBeRequired();
@@ -378,9 +418,9 @@ describe('SettingsPage', () => {
     const user = userEvent.setup();
     await renderLoadedPage();
 
-    await user.type(screen.getByPlaceholderText('settings.newPasswordPlaceholder'), 'x');
+    await user.type(screen.getByPlaceholderText('Leave blank to keep current'), 'x');
 
-    expect(screen.getByPlaceholderText('settings.currentPasswordPlaceholder')).toBeRequired();
+    expect(screen.getByPlaceholderText('Required to change password')).toBeRequired();
   });
 
   it('shows the server message when the profile save fails', async () => {
@@ -400,13 +440,13 @@ describe('SettingsPage', () => {
 
     await user.click(profileSaveButton());
 
-    expect(await screen.findByText('common.error')).toBeInTheDocument();
+    expect(await screen.findByText('An error occurred')).toBeInTheDocument();
   });
 
   it('still renders the page when the site settings cannot be loaded', async () => {
     mockApiError('get', '/api/settings', 500, 'Database unavailable');
     renderPage();
-    expect(await screen.findByRole('heading', { level: 1, name: 'settings.title' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument();
     expect(await screen.findByDisplayValue('admin@test.local')).toBeInTheDocument();
   });
 
@@ -417,9 +457,9 @@ describe('SettingsPage', () => {
     const user = userEvent.setup();
     await renderLoadedPage();
 
-    await user.click(screen.getByText('settings.backup.export'));
+    await user.click(screen.getByText('Export Backup'));
 
-    expect(await screen.findByText('settings.backup.exportSuccess')).toBeInTheDocument();
+    expect(await screen.findByText('Backup exported successfully')).toBeInTheDocument();
     // Saved under the name sent by the server (Content-Disposition)
     expect(downloads).toEqual(['backup.zip']);
   });
@@ -429,7 +469,7 @@ describe('SettingsPage', () => {
     const user = userEvent.setup();
     await renderLoadedPage();
 
-    await user.click(screen.getByText('settings.backup.export'));
+    await user.click(screen.getByText('Export Backup'));
 
     expect(await screen.findByText('Export failed')).toBeInTheDocument();
   });
@@ -439,9 +479,9 @@ describe('SettingsPage', () => {
     await renderLoadedPage();
     rejectNextFetch('export string error');
 
-    await user.click(screen.getByText('settings.backup.export'));
+    await user.click(screen.getByText('Export Backup'));
 
-    expect(await screen.findByText('common.error')).toBeInTheDocument();
+    expect(await screen.findByText('An error occurred')).toBeInTheDocument();
   });
 
   it('shows the file name after selecting a backup file', async () => {
@@ -449,7 +489,7 @@ describe('SettingsPage', () => {
 
     chooseBackupFile();
 
-    expect(await screen.findByText('settings.backup.fileSelected(backup.zip)')).toBeInTheDocument();
+    expect(await screen.findByText('File: backup.zip')).toBeInTheDocument();
   });
 
   // Past nginx's limit, Firefox does not read the 413 that nginx sends during the upload
@@ -459,9 +499,11 @@ describe('SettingsPage', () => {
 
     chooseBackupFile(BACKEND_UPLOAD_LIMIT + 1);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('common.requestTooLarge');
-    expect(screen.queryByText(/settings\.backup\.fileSelected/)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /settings\.backup\.import/ })).not.toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('The file or request is too large');
+    expect(screen.queryByText(/File: .+/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Restore Backup|Restoring/ }),
+    ).not.toBeInTheDocument();
     expect(restore.count()).toBe(0);
   });
 
@@ -472,22 +514,22 @@ describe('SettingsPage', () => {
     await renderLoadedPage();
     const restore = captureRequest('post', '/api/backup/import');
     await selectBackupFileAndClickImport(size);
-    await answerRestoreDialog('settings.backup.import');
+    await answerRestoreDialog('Restore Backup');
 
     await waitFor(() => expect(assignLocation).toHaveBeenCalledWith(SIGN_IN_AFTER_RESTORE));
     expect(restore.count()).toBe(1);
-    expect(screen.queryByText('common.requestTooLarge')).not.toBeInTheDocument();
+    expect(screen.queryByText('The file or request is too large')).not.toBeInTheDocument();
   });
 
   it('forgets the refusal when a smaller archive is chosen next', async () => {
     await renderLoadedPage();
     chooseBackupFile(BACKEND_UPLOAD_LIMIT + 1);
-    await screen.findByText('common.requestTooLarge');
+    await screen.findByText('The file or request is too large');
 
     await selectBackupFile(BACKEND_UPLOAD_LIMIT - 1);
 
-    expect(screen.getByText('settings.backup.fileSelected(backup.zip)')).toBeInTheDocument();
-    expect(screen.queryByText('common.requestTooLarge')).not.toBeInTheDocument();
+    expect(screen.getByText('File: backup.zip')).toBeInTheDocument();
+    expect(screen.queryByText('The file or request is too large')).not.toBeInTheDocument();
   });
 
   it('drops the archive chosen before when a too large one replaces it', async () => {
@@ -496,8 +538,10 @@ describe('SettingsPage', () => {
 
     chooseBackupFile(BACKEND_UPLOAD_LIMIT + 1);
 
-    expect(await screen.findByText('common.requestTooLarge')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /settings\.backup\.import/ })).not.toBeInTheDocument();
+    expect(await screen.findByText('The file or request is too large')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Restore Backup|Restoring/ }),
+    ).not.toBeInTheDocument();
   });
 
   // A proxy in front of the app may have a lower limit than the backend
@@ -505,9 +549,9 @@ describe('SettingsPage', () => {
     mockProxyError('post', '/api/backup/import', 413);
     await renderLoadedPage();
     await selectBackupFileAndClickImport(BACKEND_UPLOAD_LIMIT);
-    await answerRestoreDialog('settings.backup.import');
+    await answerRestoreDialog('Restore Backup');
 
-    expect(await screen.findByText(i18n.t('common.requestTooLarge'))).toBeInTheDocument();
+    expect(await screen.findByText('The file or request is too large')).toBeInTheDocument();
     expect(screen.queryByText(NO_ANSWER_CAUSE)).not.toBeInTheDocument();
   });
 
@@ -517,7 +561,7 @@ describe('SettingsPage', () => {
     await selectBackupFileAndClickImport();
 
     expect(restore.count()).toBe(0);
-    await answerRestoreDialog('settings.backup.import');
+    await answerRestoreDialog('Restore Backup');
 
     await waitFor(() => expect(assignLocation).toHaveBeenCalledWith(SIGN_IN_AFTER_RESTORE));
     // The file goes in the "backup" field of a multipart body. Node's fetch drops the
@@ -531,7 +575,7 @@ describe('SettingsPage', () => {
   it('opens the sign-in page at once, without a report, when the restore has nothing to report', async () => {
     await renderLoadedPage();
     await selectBackupFileAndClickImport();
-    await answerRestoreDialog('settings.backup.import');
+    await answerRestoreDialog('Restore Backup');
 
     // The sign-in page says that the backup was restored: nothing else is shown here
     await waitFor(() => expect(assignLocation).toHaveBeenCalledOnce());
@@ -539,29 +583,45 @@ describe('SettingsPage', () => {
     expect(toast.success).not.toHaveBeenCalled();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.queryByText(/settings\.backup\.skippedFiles/)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /settings\.backup\.signInAfterRestart|auth\.signInAgain/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', {
+        name: /settings\.backup\.signInAfterRestart|auth\.signInAgain/,
+      }),
+    ).not.toBeInTheDocument();
   });
 
   it('keeps the restart warning and the skipped files on screen after restoring an older backup', async () => {
     mockRestore(restoreResult({ skippedFiles: 2, restartRecommended: true }));
     await renderLoadedPage();
     await selectBackupFileAndClickImport();
-    await answerRestoreDialog('settings.backup.import');
+    await answerRestoreDialog('Restore Backup');
 
     const warning = await screen.findByRole('alert');
-    expect(warning).toHaveTextContent('settings.backup.restartTitle');
-    expect(warning).toHaveTextContent('settings.backup.restartRequired');
-    expect(warning).toHaveTextContent('settings.backup.restartHow');
-    expect(warning).toHaveTextContent('settings.backup.restartMayFail');
-    expect(screen.getByText('settings.backup.skippedFiles(2)')).toBeInTheDocument();
-    expect(screen.getByText('settings.backup.importDone')).toBeInTheDocument();
+    expect(warning).toHaveTextContent('Restart the backend before going on');
+    expect(warning).toHaveTextContent(
+      'This backup comes from an older version of Carta Cocktail: its database must be updated. Until then, signing in, the admin pages and, in this browser, the public menu may fail with a server error.',
+    );
+    expect(warning).toHaveTextContent(
+      'With Docker, restart the backend container: it updates the database when it starts. Without Docker, run npm run db:deploy in the backend folder, then restart the backend.',
+    );
+    expect(warning).toHaveTextContent(
+      'This may not be enough: for a backup from v1.0.x, or from before v1.8.0 with duplicate category names or unit abbreviations, or, without Docker, from v1.5.0 or older, the database update fails. Read "Restoring a backup from an older version" in UPGRADING.md before restarting.',
+    );
+    expect(
+      screen.getByText(
+        '2 files of the uploads folder were not restored: only JPG, PNG and WebP images are restored, once per file name.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Backup restored.')).toBeInTheDocument();
     // Not a plain success while the backend still has to update the database
-    expect(toast.info).toHaveBeenCalledWith('settings.backup.importDone');
+    expect(toast.info).toHaveBeenCalledWith('Backup restored.');
     expect(toast.success).not.toHaveBeenCalled();
     // Opening the sign-in page by itself would hide the warning before it is read
     expect(assignLocation).not.toHaveBeenCalled();
 
-    await userEvent.click(screen.getByRole('button', { name: 'settings.backup.signInAfterRestart' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Sign in again once the backend has restarted' }),
+    );
     expect(assignLocation).toHaveBeenCalledWith(SIGN_IN_AFTER_RESTORE);
   });
 
@@ -569,14 +629,18 @@ describe('SettingsPage', () => {
     mockRestore(restoreResult({ skippedFiles: 1 }));
     await renderLoadedPage();
     await selectBackupFileAndClickImport();
-    await answerRestoreDialog('settings.backup.import');
+    await answerRestoreDialog('Restore Backup');
 
-    expect(await screen.findByText('settings.backup.skippedFiles(1)')).toBeInTheDocument();
-    expect(toast.success).toHaveBeenCalledWith('settings.backup.importDone');
+    expect(
+      await screen.findByText(
+        '1 file of the uploads folder was not restored: only JPG, PNG and WebP images are restored, once per file name.',
+      ),
+    ).toBeInTheDocument();
+    expect(toast.success).toHaveBeenCalledWith('Backup restored.');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(assignLocation).not.toHaveBeenCalled();
 
-    await userEvent.click(screen.getByRole('button', { name: 'auth.signInAgain' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in again' }));
     expect(assignLocation).toHaveBeenCalledWith(SIGN_IN_AFTER_RESTORE);
   });
 
@@ -585,13 +649,19 @@ describe('SettingsPage', () => {
     mockRestore(restoreResult({ skippedFiles: 1 }));
     await renderLoadedPage();
     await selectBackupFileAndClickImport();
-    await answerRestoreDialog('settings.backup.import');
-    await screen.findByText('settings.backup.skippedFiles(1)');
+    await answerRestoreDialog('Restore Backup');
+    await screen.findByText(
+      '1 file of the uploads folder was not restored: only JPG, PNG and WebP images are restored, once per file name.',
+    );
 
-    fireEvent.click(screen.getByText('settings.backup.export'));
+    fireEvent.click(screen.getByText('Export Backup'));
 
-    await screen.findByText('settings.backup.exportSuccess');
-    expect(screen.queryByText('settings.backup.skippedFiles(1)')).not.toBeInTheDocument();
+    await screen.findByText('Backup exported successfully');
+    expect(
+      screen.queryByText(
+        '1 file of the uploads folder was not restored: only JPG, PNG and WebP images are restored, once per file name.',
+      ),
+    ).not.toBeInTheDocument();
   });
 
   it('keeps the restart warning when the export fails', async () => {
@@ -599,25 +669,25 @@ describe('SettingsPage', () => {
     mockApiError('get', '/api/backup/export', 500, 'Internal server error');
     await renderLoadedPage();
     await selectBackupFileAndClickImport();
-    await answerRestoreDialog('settings.backup.import');
+    await answerRestoreDialog('Restore Backup');
     await screen.findByRole('alert');
 
-    fireEvent.click(screen.getByText('settings.backup.export'));
+    fireEvent.click(screen.getByText('Export Backup'));
 
     await screen.findByText('Internal server error');
-    expect(screen.getByRole('alert')).toHaveTextContent('settings.backup.restartTitle');
+    expect(screen.getByRole('alert')).toHaveTextContent('Restart the backend before going on');
   });
 
   it('clears the previous restore report when restoring again', async () => {
     mockRestore(restoreResult({ restartRecommended: true }));
     await renderLoadedPage();
     await selectBackupFileAndClickImport();
-    await answerRestoreDialog('settings.backup.import');
+    await answerRestoreDialog('Restore Backup');
     await screen.findByRole('alert');
 
     mockApiError('post', '/api/backup/import', 400, 'Import failed');
     await selectBackupFileAndClickImport();
-    await answerRestoreDialog('settings.backup.import');
+    await answerRestoreDialog('Restore Backup');
 
     await screen.findByText('Import failed');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -628,7 +698,7 @@ describe('SettingsPage', () => {
     const restore = captureRequest('post', '/api/backup/import');
     await selectBackupFileAndClickImport();
 
-    await answerRestoreDialog('common.cancel');
+    await answerRestoreDialog('Cancel');
 
     await waitFor(() => {
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
@@ -642,35 +712,41 @@ describe('SettingsPage', () => {
 
     await renderLoadedPage();
     await selectBackupFileAndClickImport();
-    await answerRestoreDialog('settings.backup.import');
+    await answerRestoreDialog('Restore Backup');
 
     expect(await screen.findByText('Import failed')).toBeInTheDocument();
     expect(toast.success).not.toHaveBeenCalled();
   });
 
   // nginx gives up after 60 s on the export and 300 s on the restore, while the backend keeps working
-  it.each(BACKUP_ACTIONS)('explains a proxy timeout (504) on the $action instead of "try again in a moment"', async ({ action, method, path, timeoutMessage }) => {
-    mockProxyError(method, path, 504);
-    await renderLoadedPage();
+  it.each(BACKUP_ACTIONS)(
+    'explains a proxy timeout (504) on the $action instead of "try again in a moment"',
+    async ({ action, method, path, timeoutMessage }) => {
+      mockProxyError(method, path, 504);
+      await renderLoadedPage();
 
-    await runBackupAction(action);
+      await runBackupAction(action);
 
-    expect(await screen.findByText(timeoutMessage)).toBeInTheDocument();
-    expect(screen.queryByText(SERVER_UNAVAILABLE)).not.toBeInTheDocument();
-    expect(screen.queryByText(NO_ANSWER_CAUSE)).not.toBeInTheDocument();
-    expect(screen.queryByText('settings.backup.exportSuccess')).not.toBeInTheDocument();
-    expect(toast.success).not.toHaveBeenCalled();
-  });
+      expect(await screen.findByText(timeoutMessage)).toBeInTheDocument();
+      expect(screen.queryByText(SERVER_UNAVAILABLE)).not.toBeInTheDocument();
+      expect(screen.queryByText(NO_ANSWER_CAUSE)).not.toBeInTheDocument();
+      expect(screen.queryByText('Backup exported successfully')).not.toBeInTheDocument();
+      expect(toast.success).not.toHaveBeenCalled();
+    },
+  );
 
-  it.each(BACKUP_ACTIONS)('keeps "the server is not responding" for a 502 of nginx on the $action', async ({ action, method, path, timeoutMessage }) => {
-    mockProxyError(method, path, 502);
-    await renderLoadedPage();
+  it.each(BACKUP_ACTIONS)(
+    'keeps "the server is not responding" for a 502 of nginx on the $action',
+    async ({ action, method, path, timeoutMessage }) => {
+      mockProxyError(method, path, 502);
+      await renderLoadedPage();
 
-    await runBackupAction(action);
+      await runBackupAction(action);
 
-    expect(await screen.findByText(SERVER_UNAVAILABLE)).toBeInTheDocument();
-    expect(screen.queryByText(timeoutMessage)).not.toBeInTheDocument();
-  });
+      expect(await screen.findByText(SERVER_UNAVAILABLE)).toBeInTheDocument();
+      expect(screen.queryByText(timeoutMessage)).not.toBeInTheDocument();
+    },
+  );
 
   // The browser (Firefox after 300 s) or a proxy may drop the connection before nginx answers 504
   it('says the restore may still be running when its request gets no HTTP answer', async () => {
@@ -680,7 +756,11 @@ describe('SettingsPage', () => {
     await runBackupAction('restore');
 
     expect(await screen.findByText(RESTORE_NO_ANSWER)).toBeInTheDocument();
-    expect(screen.queryByText(/settings\.backup\.restoreTimeout/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        /The server did not answer in time, but the restore may still be running\./,
+      ),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText(/fetch/i)).not.toBeInTheDocument();
     expect(toast.success).not.toHaveBeenCalled();
   });
@@ -697,8 +777,12 @@ describe('SettingsPage', () => {
     expect(await screen.findByText(EXPORT_NO_ANSWER)).toBeInTheDocument();
     expect(screen.queryByText(/fetch/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/settings\.backup\.restore/)).not.toBeInTheDocument();
-    expect(screen.queryByText('settings.backup.exportTimeout')).not.toBeInTheDocument();
-    expect(screen.queryByText('settings.backup.exportSuccess')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        'Preparing the backup took too long: the proxy in front of the server stopped waiting. Trying again right away will probably fail the same way. Try again later, when the server is less busy. If it keeps failing, check the backend logs and the timeout of any reverse proxy in front of Carta Cocktail.',
+      ),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Backup exported successfully')).not.toBeInTheDocument();
     expect(downloads).toEqual([]);
     expect(exportButton()).toBeEnabled();
     expect(restoreButton()).toBeEnabled();
@@ -738,14 +822,14 @@ describe('SettingsPage', () => {
     // Lets the page receive the headers and the start of the archive
     await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
 
-    expect(exportButton()).toHaveTextContent('settings.backup.exporting');
+    expect(exportButton()).toHaveTextContent('Exporting...');
     expect(restoreButton()).toBeDisabled();
-    expect(restoreButton()).toHaveTextContent('settings.backup.import');
+    expect(restoreButton()).toHaveTextContent('Restore Backup');
     expect(downloads).toEqual([]);
 
     download.finish();
 
-    expect(await screen.findByText('settings.backup.exportSuccess')).toBeInTheDocument();
+    expect(await screen.findByText('Backup exported successfully')).toBeInTheDocument();
     expect(downloads).toEqual(['backup.zip']);
     expect(restoreButton()).toBeEnabled();
     expect(exportButton()).toBeEnabled();
@@ -768,11 +852,16 @@ describe('SettingsPage', () => {
     expect(restoreButton()).toBeEnabled();
     expect(exportButton()).toBeEnabled();
     expect(downloads).toEqual([]);
-    expect(screen.queryByText('settings.backup.exportSuccess')).not.toBeInTheDocument();
+    expect(screen.queryByText('Backup exported successfully')).not.toBeInTheDocument();
   });
 
   it('enables the restore again when the export is refused', async () => {
-    const releaseExport = holdApiResponse('get', '/api/backup/export', { error: 'A restore is running' }, 409);
+    const releaseExport = holdApiResponse(
+      'get',
+      '/api/backup/export',
+      { error: 'A restore is running' },
+      409,
+    );
     await renderLoadedPage();
     await selectBackupFile();
 
@@ -788,33 +877,47 @@ describe('SettingsPage', () => {
 
   // The server refuses an export during a restore (409)
   it.each([
-    { outcome: 'success', body: restoreResult({ skippedFiles: 1 }), status: 200, shown: 'settings.backup.skippedFiles(1)' },
-    { outcome: 'failure', body: { error: 'Invalid backup file' }, status: 400, shown: 'Invalid backup file' },
-  ])('disables the export while a restore runs, and enables it again after its $outcome', async ({ body, status, shown }) => {
-    const releaseRestore = holdApiResponse('post', '/api/backup/import', body, status);
-    const exports = captureRequest('get', '/api/backup/export');
-    await renderLoadedPage();
+    {
+      outcome: 'success',
+      body: restoreResult({ skippedFiles: 1 }),
+      status: 200,
+      shown:
+        '1 file of the uploads folder was not restored: only JPG, PNG and WebP images are restored, once per file name.',
+    },
+    {
+      outcome: 'failure',
+      body: { error: 'Invalid backup file' },
+      status: 400,
+      shown: 'Invalid backup file',
+    },
+  ])(
+    'disables the export while a restore runs, and enables it again after its $outcome',
+    async ({ body, status, shown }) => {
+      const releaseRestore = holdApiResponse('post', '/api/backup/import', body, status);
+      const exports = captureRequest('get', '/api/backup/export');
+      await renderLoadedPage();
 
-    await runBackupAction('restore');
+      await runBackupAction('restore');
 
-    expect(restoreButton()).toHaveTextContent('settings.backup.importing');
-    expect(exportButton()).toBeDisabled();
-    expect(exportButton()).toHaveTextContent('settings.backup.export');
-    fireEvent.click(exportButton());
-    expect(exports.count()).toBe(0);
+      expect(restoreButton()).toHaveTextContent('Restoring...');
+      expect(exportButton()).toBeDisabled();
+      expect(exportButton()).toHaveTextContent('Export Backup');
+      fireEvent.click(exportButton());
+      expect(exports.count()).toBe(0);
 
-    releaseRestore();
+      releaseRestore();
 
-    expect(await screen.findByText(shown)).toBeInTheDocument();
-    expect(exportButton()).toBeEnabled();
-  });
+      expect(await screen.findByText(shown)).toBeInTheDocument();
+      expect(exportButton()).toBeEnabled();
+    },
+  );
 
   it('shows a generic error when the restore fails with something else than an Error', async () => {
     await renderLoadedPage();
     await selectBackupFileAndClickImport();
     rejectNextFetch('import string error');
-    await answerRestoreDialog('settings.backup.import');
+    await answerRestoreDialog('Restore Backup');
 
-    expect(await screen.findByText('common.error')).toBeInTheDocument();
+    expect(await screen.findByText('An error occurred')).toBeInTheDocument();
   });
 });

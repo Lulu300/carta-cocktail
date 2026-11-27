@@ -50,7 +50,10 @@ describe('CategoryFilterInput', () => {
 
     expect(combobox).toHaveAttribute('aria-expanded', 'true');
     expect(combobox).toHaveAttribute('aria-controls', screen.getByRole('listbox').id);
-    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['Rum', 'Rye whiskey']);
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'Rum',
+      'Rye whiskey',
+    ]);
   });
 
   it('selects the highlighted category with the keyboard', async () => {
@@ -61,7 +64,10 @@ describe('CategoryFilterInput', () => {
     await user.type(combobox, 'r');
 
     await user.keyboard('{ArrowDown}{ArrowDown}');
-    expect(combobox).toHaveAttribute('aria-activedescendant', screen.getByRole('option', { name: 'Rye whiskey' }).id);
+    expect(combobox).toHaveAttribute(
+      'aria-activedescendant',
+      screen.getByRole('option', { name: 'Rye whiskey' }).id,
+    );
     await user.keyboard('{Enter}');
 
     expect(onChange).toHaveBeenLastCalledWith('Rye whiskey', 2);
@@ -76,9 +82,15 @@ describe('CategoryFilterInput', () => {
     await user.type(combobox, 'r');
 
     await user.keyboard('{ArrowUp}');
-    expect(combobox).toHaveAttribute('aria-activedescendant', screen.getByRole('option', { name: 'Rye whiskey' }).id);
+    expect(combobox).toHaveAttribute(
+      'aria-activedescendant',
+      screen.getByRole('option', { name: 'Rye whiskey' }).id,
+    );
     await user.keyboard('{ArrowDown}');
-    expect(combobox).toHaveAttribute('aria-activedescendant', screen.getByRole('option', { name: 'Rum' }).id);
+    expect(combobox).toHaveAttribute(
+      'aria-activedescendant',
+      screen.getByRole('option', { name: 'Rum' }).id,
+    );
   });
 
   it('closes on Escape without selecting anything', async () => {
@@ -115,7 +127,7 @@ describe('CategoryFilterInput', () => {
     await user.click(screen.getByRole('option', { name: 'Gin' }));
     expect(onChange).toHaveBeenLastCalledWith('Gin', 3);
 
-    await user.click(screen.getByRole('button', { name: 'common.clear' }));
+    await user.click(screen.getByRole('button', { name: 'Clear' }));
     expect(onChange).toHaveBeenLastCalledWith('', null);
     expect(getCombobox()).toHaveValue('');
     // The button disappears with the text: the field takes the focus back.

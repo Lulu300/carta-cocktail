@@ -44,9 +44,9 @@ function readSessionFloor(floorPath: string): number {
 // say how to revoke every token instead.
 function unreadableFloorError(floorPath: string, reason: string): Error {
   return new Error(
-    `Cannot read ${floorPath} (${reason}). A backup made before v1.11.0 was restored: this file holds the `
-    + 'token version that keeps the sessions opened before the restore revoked. To start anyway, change '
-    + 'JWT_SECRET (this revokes every token), then delete the file and restart.',
+    `Cannot read ${floorPath} (${reason}). A backup made before v1.11.0 was restored: this file holds the ` +
+      'token version that keeps the sessions opened before the restore revoked. To start anyway, change ' +
+      'JWT_SECRET (this revokes every token), then delete the file and restart.',
   );
 }
 
@@ -69,15 +69,18 @@ export async function applySessionFloor(dbPath: string): Promise<void> {
   if (!(await hasTokenVersionColumn())) {
     // Without Docker nothing runs the migrations before the start
     throw new Error(
-      `${floorPath} must be applied to the User.tokenVersion column, which the database does not have yet. `
-      + 'Run npm run db:deploy in the backend folder first, then start again: the file is kept until then.',
+      `${floorPath} must be applied to the User.tokenVersion column, which the database does not have yet. ` +
+        'Run npm run db:deploy in the backend folder first, then start again: the file is kept until then.',
     );
   }
   await prisma.$executeRaw`UPDATE "User" SET "tokenVersion" = MAX("tokenVersion", ${floor}) + 1`;
   try {
     fs.rmSync(floorPath);
   } catch (err) {
-    console.warn(`Sessions revoked, but ${floorPath} could not be deleted: each start will sign the admin out again.`, err);
+    console.warn(
+      `Sessions revoked, but ${floorPath} could not be deleted: each start will sign the admin out again.`,
+      err,
+    );
   }
   console.log('Sessions opened before the last backup restore revoked: sign in again.');
 }

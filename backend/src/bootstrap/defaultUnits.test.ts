@@ -1,14 +1,28 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { setupTestDatabase, teardownTestDatabase, cleanDatabase, prisma, seedUnit } from '../test/helpers';
+import {
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  prisma,
+  seedUnit,
+} from '../test/helpers';
 import { ensureDefaultUnits } from './defaultUnits';
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
-beforeEach(async () => { await cleanDatabase(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
+beforeEach(async () => {
+  await cleanDatabase();
+});
 
 async function abbreviationsLike(abbreviation: string): Promise<string[]> {
   const units = await prisma.unit.findMany({ orderBy: { id: 'asc' } });
-  return units.map((unit) => unit.abbreviation).filter((value) => value.toLowerCase() === abbreviation);
+  return units
+    .map((unit) => unit.abbreviation)
+    .filter((value) => value.toLowerCase() === abbreviation);
 }
 
 describe('ensureDefaultUnits', () => {
@@ -19,7 +33,9 @@ describe('ensureDefaultUnits', () => {
 
     expect(count).toBeGreaterThan(0);
     expect(await prisma.unit.count()).toBe(count);
-    expect(await prisma.unit.findUnique({ where: { abbreviation: 'cl' } })).toMatchObject({ conversionFactorToMl: 10 });
+    expect(await prisma.unit.findUnique({ where: { abbreviation: 'cl' } })).toMatchObject({
+      conversionFactorToMl: 10,
+    });
   });
 
   it('should not create cl again after the admin changed it into CL', async () => {
@@ -37,7 +53,9 @@ describe('ensureDefaultUnits', () => {
 
     await ensureDefaultUnits(prisma);
 
-    const peels = (await prisma.unit.findMany()).filter((unit) => unit.abbreviation.normalize('NFC') === '\u00E9corce');
+    const peels = (await prisma.unit.findMany()).filter(
+      (unit) => unit.abbreviation.normalize('NFC') === '\u00E9corce',
+    );
     expect(peels.map((unit) => unit.abbreviation)).toEqual(['e\u0301corce']);
   });
 
@@ -59,15 +77,22 @@ describe('ensureDefaultUnits', () => {
     await ensureDefaultUnits(prisma);
 
     const updated = await prisma.unit.findUniqueOrThrow({ where: { id: unit.id } });
-    expect(JSON.parse(updated.nameTranslations ?? '{}')).toEqual({ fr: 'Centilitre', en: 'Centiliter' });
+    expect(JSON.parse(updated.nameTranslations ?? '{}')).toEqual({
+      fr: 'Centilitre',
+      en: 'Centiliter',
+    });
   });
 
   it('should keep the translations a unit already has', async () => {
-    const unit = await seedUnit({ abbreviation: 'cl', nameTranslations: JSON.stringify({ en: 'Centilitre (EU)' }) });
+    const unit = await seedUnit({
+      abbreviation: 'cl',
+      nameTranslations: JSON.stringify({ en: 'Centilitre (EU)' }),
+    });
 
     await ensureDefaultUnits(prisma);
 
-    expect((await prisma.unit.findUniqueOrThrow({ where: { id: unit.id } })).nameTranslations)
-      .toBe(JSON.stringify({ en: 'Centilitre (EU)' }));
+    expect((await prisma.unit.findUniqueOrThrow({ where: { id: unit.id } })).nameTranslations).toBe(
+      JSON.stringify({ en: 'Centilitre (EU)' }),
+    );
   });
 });

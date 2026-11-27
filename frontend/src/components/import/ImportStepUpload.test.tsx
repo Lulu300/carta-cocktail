@@ -48,51 +48,62 @@ beforeEach(() => {
 
 describe('ImportStepUpload with a ZIP file', () => {
   it('loads every valid recipe of the archive as a batch', async () => {
-    mockLoadAsync.mockResolvedValue(zipWith({
-      'mojito.json': { dir: false, content: recipeJson('Mojito') },
-      'negroni.json': { dir: false, content: recipeJson('Negroni') },
-      'broken.json': { dir: false, content: '{not json' },
-      'readme.txt': { dir: false, content: 'ignored' },
-    }));
+    mockLoadAsync.mockResolvedValue(
+      zipWith({
+        'mojito.json': { dir: false, content: recipeJson('Mojito') },
+        'negroni.json': { dir: false, content: recipeJson('Negroni') },
+        'broken.json': { dir: false, content: '{not json' },
+        'readme.txt': { dir: false, content: 'ignored' },
+      }),
+    );
 
     const file = uploadZip();
 
     await waitFor(() => expect(props.onLoaded).toHaveBeenCalled());
     expect(mockLoadAsync).toHaveBeenCalledWith(file);
-    const recipes = props.onLoaded.mock.calls[0][0];
-    expect(recipes.map((r: { cocktail: { name: string } }) => r.cocktail.name)).toEqual(['Mojito', 'Negroni']);
+    const recipes = props.onLoaded.mock.calls[0]![0]!;
+    expect(recipes.map((r: { cocktail: { name: string } }) => r.cocktail.name)).toEqual([
+      'Mojito',
+      'Negroni',
+    ]);
   });
 
   it('loads a single recipe when the archive holds only one', async () => {
-    mockLoadAsync.mockResolvedValue(zipWith({
-      'mojito.json': { dir: false, content: recipeJson('Mojito') },
-    }));
+    mockLoadAsync.mockResolvedValue(
+      zipWith({
+        'mojito.json': { dir: false, content: recipeJson('Mojito') },
+      }),
+    );
 
     uploadZip();
 
     await waitFor(() => expect(props.onLoaded).toHaveBeenCalled());
-    expect(props.onLoaded.mock.calls[0][0]).toHaveLength(1);
-    expect(props.onLoaded.mock.calls[0][0][0].cocktail.name).toBe('Mojito');
+    expect(props.onLoaded.mock.calls[0]![0]!).toHaveLength(1);
+    expect(props.onLoaded.mock.calls[0]![0][0]!.cocktail.name).toBe('Mojito');
   });
 
   it('reports an archive without JSON files', async () => {
-    mockLoadAsync.mockResolvedValue(zipWith({
-      'recipes.json': { dir: true, content: '' },
-    }));
+    mockLoadAsync.mockResolvedValue(
+      zipWith({
+        'recipes.json': { dir: true, content: '' },
+      }),
+    );
 
     uploadZip();
 
-    expect(await screen.findByText('cocktails.importWizard.zipNoRecipes')).toBeInTheDocument();
+    expect(await screen.findByText('No JSON files found in the ZIP')).toBeInTheDocument();
   });
 
   it('reports an archive without any valid recipe', async () => {
-    mockLoadAsync.mockResolvedValue(zipWith({
-      'other.json': { dir: false, content: JSON.stringify({ version: 2 }) },
-    }));
+    mockLoadAsync.mockResolvedValue(
+      zipWith({
+        'other.json': { dir: false, content: JSON.stringify({ version: 2 }) },
+      }),
+    );
 
     uploadZip();
 
-    expect(await screen.findByText('cocktails.importWizard.zipNoValidRecipes')).toBeInTheDocument();
+    expect(await screen.findByText('No valid recipes found in the ZIP')).toBeInTheDocument();
   });
 
   it('reports an unreadable archive', async () => {
@@ -100,7 +111,7 @@ describe('ImportStepUpload with a ZIP file', () => {
 
     uploadZip();
 
-    expect(await screen.findByText('cocktails.importWizard.zipReadError')).toBeInTheDocument();
+    expect(await screen.findByText('Unable to read ZIP file')).toBeInTheDocument();
   });
 });
 
@@ -109,35 +120,40 @@ describe('ImportStepUpload with a JSON file', () => {
     upload(new File([recipeJson('Mojito')], 'mojito.json', { type: 'application/json' }));
 
     await waitFor(() => expect(props.onLoaded).toHaveBeenCalled());
-    expect(props.onLoaded.mock.calls[0][0][0].cocktail.name).toBe('Mojito');
+    expect(props.onLoaded.mock.calls[0]![0][0]!.cocktail.name).toBe('Mojito');
   });
 
   it.each([
     ['without ingredients', { version: 1, cocktail: { name: 'Mojito', instructions: [] } }],
     ['without instructions', { version: 1, cocktail: { name: 'Mojito', ingredients: [] } }],
-    ['with another version', { version: 2, cocktail: { name: 'Mojito', ingredients: [], instructions: [] } }],
+    [
+      'with another version',
+      { version: 2, cocktail: { name: 'Mojito', ingredients: [], instructions: [] } },
+    ],
     ['without a name', { version: 1, cocktail: { ingredients: [], instructions: [] } }],
   ])('refuses a recipe %s', async (_case, recipe) => {
     upload(new File([JSON.stringify(recipe)], 'recipe.json', { type: 'application/json' }));
 
-    expect(await screen.findByText('cocktails.importWizard.invalidFile')).toBeInTheDocument();
+    expect(await screen.findByText('Invalid JSON file')).toBeInTheDocument();
     expect(props.onLoaded).not.toHaveBeenCalled();
   });
 
   it('refuses a file that is not JSON', async () => {
     upload(new File(['{not json'], 'recipe.json', { type: 'application/json' }));
 
-    expect(await screen.findByText('cocktails.importWizard.invalidFile')).toBeInTheDocument();
+    expect(await screen.findByText('Invalid JSON file')).toBeInTheDocument();
   });
 
   it('reports a file the browser cannot read', async () => {
-    const readAsText = vi.spyOn(FileReader.prototype, 'readAsText').mockImplementation(function (this: FileReader) {
+    const readAsText = vi.spyOn(FileReader.prototype, 'readAsText').mockImplementation(function (
+      this: FileReader,
+    ) {
       this.onerror?.(new ProgressEvent('error') as ProgressEvent<FileReader>);
     });
 
     upload(new File(['{}'], 'recipe.json', { type: 'application/json' }));
 
-    expect(await screen.findByText('cocktails.importWizard.fileReadError')).toBeInTheDocument();
+    expect(await screen.findByText('The file could not be read')).toBeInTheDocument();
     expect(props.onLoaded).not.toHaveBeenCalled();
     readAsText.mockRestore();
   });
@@ -146,11 +162,17 @@ describe('ImportStepUpload with a JSON file', () => {
     const { container } = render(<ImportStepUpload {...props} />);
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
 
-    fireEvent.change(input, { target: { files: [new File([recipeJson('Mojito')], 'mojito.json', { type: 'application/json' })] } });
+    fireEvent.change(input, {
+      target: {
+        files: [new File([recipeJson('Mojito')], 'mojito.json', { type: 'application/json' })],
+      },
+    });
     expect(await screen.findByText('mojito.json')).toBeInTheDocument();
 
-    fireEvent.change(input, { target: { files: [new File(['{not json'], 'broken.json', { type: 'application/json' })] } });
-    expect(await screen.findByText('cocktails.importWizard.invalidFile')).toBeInTheDocument();
+    fireEvent.change(input, {
+      target: { files: [new File(['{not json'], 'broken.json', { type: 'application/json' })] },
+    });
+    expect(await screen.findByText('Invalid JSON file')).toBeInTheDocument();
     expect(screen.getByText('mojito.json')).toBeInTheDocument();
     expect(screen.queryByText('broken.json')).not.toBeInTheDocument();
   });
@@ -158,7 +180,7 @@ describe('ImportStepUpload with a JSON file', () => {
   it('refuses an extension other than .json and .zip', async () => {
     upload(new File(['x'], 'recipe.txt', { type: 'text/plain' }));
 
-    expect(await screen.findByText('cocktails.importWizard.invalidFile')).toBeInTheDocument();
+    expect(await screen.findByText('Invalid JSON file')).toBeInTheDocument();
   });
 });
 
@@ -167,19 +189,30 @@ describe('ImportStepUpload preview', () => {
 
   it('shows a single recipe and asks for the next step', () => {
     const onNext = vi.fn();
-    render(<ImportStepUpload {...props} recipes={[{ ...recipe('Mojito'), cocktail: { ...recipe('Mojito').cocktail, tags: ['rum'], description: 'Fresh' } }]} onNext={onNext} />);
+    render(
+      <ImportStepUpload
+        {...props}
+        recipes={[
+          {
+            ...recipe('Mojito'),
+            cocktail: { ...recipe('Mojito').cocktail, tags: ['rum'], description: 'Fresh' },
+          },
+        ]}
+        onNext={onNext}
+      />,
+    );
 
     expect(screen.getByText('Mojito')).toBeInTheDocument();
     expect(screen.getByText('rum')).toBeInTheDocument();
     expect(screen.getByText('Fresh')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('cocktails.importWizard.next'));
+    fireEvent.click(screen.getByText('Next'));
     expect(onNext).toHaveBeenCalled();
   });
 
   it('lists every recipe of a batch', () => {
     render(<ImportStepUpload {...props} recipes={[recipe('Mojito'), recipe('Negroni')]} />);
 
-    expect(screen.getByText('cocktails.importWizard.batchPreview')).toBeInTheDocument();
+    expect(screen.getByText(/^.+ cocktails found in ZIP$/)).toBeInTheDocument();
     expect(screen.getByText('Mojito')).toBeInTheDocument();
     expect(screen.getByText('Negroni')).toBeInTheDocument();
   });

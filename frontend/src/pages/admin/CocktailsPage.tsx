@@ -21,7 +21,7 @@ import ViewModeToggle, { type ViewMode } from '../../components/admin/cocktails/
 import { useCocktailFilters } from '../../components/admin/cocktails/useCocktailFilters';
 import { useSelection } from '../../components/admin/cocktails/useSelection';
 import { useCocktails, useCocktailsAvailability, useDeleteCocktail } from '../../queries/cocktails';
-import { useInvalidateQueries } from '../../queries/crud';
+import { useInvalidateQueries } from '../../queries/invalidate';
 import { qk } from '../../queries/keys';
 
 // An import may create units, categories, bottles and ingredients, which the other
@@ -87,18 +87,26 @@ export default function CocktailsPage() {
   };
 
   const renderCocktails = () => {
-    if (cocktailsQuery.isPending) return <p role="status" className="text-center py-12 text-fg-muted">{t('common.loading')}</p>;
+    if (cocktailsQuery.isPending)
+      return (
+        <p role="status" className="text-center py-12 text-fg-muted">
+          {t('common.loading')}
+        </p>
+      );
     if (cocktailsQuery.isError) return <LoadError onRetry={() => cocktailsQuery.refetch()} />;
-    if (filteredCocktails.length === 0) return <div className="text-center py-12 text-fg-muted">{t('common.noResults')}</div>;
+    if (filteredCocktails.length === 0)
+      return <div className="text-center py-12 text-fg-muted">{t('common.noResults')}</div>;
 
     const Item = viewMode === 'grid' ? CocktailCard : CocktailListItem;
     return (
       <>
         <div
           data-testid={`cocktails-${viewMode}-view`}
-          className={viewMode === 'grid'
-            ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'
-            : 'bg-surface border border-line rounded-xl overflow-hidden'}
+          className={
+            viewMode === 'grid'
+              ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'
+              : 'bg-surface border border-line rounded-xl overflow-hidden'
+          }
         >
           {pagination.paginatedItems.map((cocktail) => (
             <Item
@@ -129,9 +137,9 @@ export default function CocktailsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-bold font-serif text-accent">{t('cocktails.title')}</h1>
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-wrap gap-2 items-center">
           {selectionMode ? (
             <>
               <label className="flex items-center gap-2 text-sm text-fg-muted cursor-pointer">
@@ -143,10 +151,16 @@ export default function CocktailsPage() {
                 />
                 {t('cocktails.selectAll')}
               </label>
-              <Button onClick={handleBatchExport} disabled={selection.selected.size === 0} loading={isExporting}>
+              <Button
+                onClick={handleBatchExport}
+                disabled={selection.selected.size === 0}
+                loading={isExporting}
+              >
                 {t('cocktails.exportZip', { count: selection.selected.size })}
               </Button>
-              <Button variant="ghost" onClick={exitSelectionMode}>{t('common.cancel')}</Button>
+              <Button variant="ghost" onClick={exitSelectionMode}>
+                {t('common.cancel')}
+              </Button>
             </>
           ) : (
             <>
@@ -154,7 +168,9 @@ export default function CocktailsPage() {
                 <Icon name="download" />
                 {t('cocktails.batchExport')}
               </Button>
-              <Button variant="secondary" onClick={() => setShowImport(true)}>{t('cocktails.import')}</Button>
+              <Button variant="secondary" onClick={() => setShowImport(true)}>
+                {t('cocktails.import')}
+              </Button>
               <Link
                 to="/admin/cocktails/new"
                 className="bg-accent hover:bg-accent-hover text-on-accent font-semibold px-4 py-2 rounded-lg transition-colors"
@@ -168,7 +184,12 @@ export default function CocktailsPage() {
 
       <div className="flex flex-col lg:flex-row gap-3 mb-4 lg:items-center">
         <div className="flex flex-col sm:flex-row gap-3 flex-1">
-          <SearchInput value={filters.search} onChange={filters.setSearch} label={t('cocktails.search')} className="sm:w-64" />
+          <SearchInput
+            value={filters.search}
+            onChange={filters.setSearch}
+            label={t('cocktails.search')}
+            className="sm:w-64"
+          />
           <MultiSelectDropdown
             options={filters.tagOptions}
             selected={filters.selectedTags}
@@ -181,7 +202,9 @@ export default function CocktailsPage() {
       </div>
 
       {availabilityQuery.isError && <LoadError onRetry={() => availabilityQuery.refetch()} />}
-      <LiveResultCount count={cocktailsQuery.isSuccess && filters.isFiltered ? filteredCocktails.length : null} />
+      <LiveResultCount
+        count={cocktailsQuery.isSuccess && filters.isFiltered ? filteredCocktails.length : null}
+      />
       {renderCocktails()}
 
       {showImport && <ImportCocktailWizard onClose={handleImportClose} />}

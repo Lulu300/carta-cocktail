@@ -7,19 +7,14 @@ import { mockApiError, mockApiResponse, mockItemInUse } from '../../test/msw/uti
 import { qk } from '../../queries/keys';
 import { categories as categoriesApi } from '../../services/api';
 import type { DeletionImpact } from '../../types';
-import { useForcedDelete } from './useForcedDelete';
-
-vi.mock('react-i18next', async (importOriginal) => {
-  const { translateWithValues } = await import('../../test/translateWithValues');
-  return {
-    ...await importOriginal<typeof import('react-i18next')>(),
-    useTranslation: () => ({ t: translateWithValues, i18n: { language: 'en' } }),
-  };
-});
+import { useForcedDelete, useForcedDeleteCrudMutations } from './useForcedDelete';
 
 const CATEGORY_PATH = '/api/categories/:id';
 const usedByRecipes: DeletionImpact = {
-  cocktails: [{ id: 4, name: 'Moscow Mule', removedLines: 1 }, { id: 5, name: 'Mojito', removedLines: 2 }],
+  cocktails: [
+    { id: 4, name: 'Moscow Mule', removedLines: 1 },
+    { id: 5, name: 'Mojito', removedLines: 2 },
+  ],
   bottles: [],
 };
 const holdsBottles: DeletionImpact = { cocktails: [], bottles: [{ id: 7, name: 'Absolut' }] };
@@ -50,7 +45,7 @@ function forcedConfirmation() {
 }
 
 function deleteAnywayButton() {
-  return within(forcedConfirmation()).getByRole('button', { name: 'deletion.forced.confirm' });
+  return within(forcedConfirmation()).getByRole('button', { name: 'Delete anyway' });
 }
 
 afterEach(clearToasts);
@@ -62,7 +57,7 @@ describe('useForcedDelete', () => {
 
     await requestDeletion(user);
 
-    expect(await screen.findByText('categories.deleted')).toBeInTheDocument();
+    expect(await screen.findByText('Category deleted')).toBeInTheDocument();
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(refreshedKeys()).toEqual([qk.categories]);
   });
@@ -74,13 +69,19 @@ describe('useForcedDelete', () => {
 
     await requestDeletion(user);
 
-    const confirmation = await screen.findByRole('alertdialog', { name: 'deletion.forced.title' });
-    expect(confirmation).toHaveAccessibleDescription('deletion.forced.recipesWarning deletion.forced.final');
-    expect(confirmation).toHaveTextContent('deletion.forced.cocktails(2)');
-    expect(confirmation).toHaveTextContent('deletion.forced.cocktailLines(Moscow Mule,1)');
-    expect(confirmation).toHaveTextContent('deletion.forced.cocktailLines(Mojito,2)');
-    expect(within(confirmation).getByRole('checkbox', { name: 'deletion.forced.acknowledgeRecipes' })).not.toBeChecked();
-    expect(within(confirmation).getByRole('button', { name: 'common.cancel' })).toHaveFocus();
+    const confirmation = await screen.findByRole('alertdialog', { name: 'Delete an item in use?' });
+    expect(confirmation).toHaveAccessibleDescription(
+      'These recipes will lose the matching lines and become incomplete. This action cannot be undone.',
+    );
+    expect(confirmation).toHaveTextContent('2 cocktails changed:');
+    expect(confirmation).toHaveTextContent('Moscow Mule: 1 line removed');
+    expect(confirmation).toHaveTextContent('Mojito: 2 lines removed');
+    expect(
+      within(confirmation).getByRole('checkbox', {
+        name: 'I understand that these recipes will be changed',
+      }),
+    ).not.toBeChecked();
+    expect(within(confirmation).getByRole('button', { name: 'Cancel' })).toHaveFocus();
     expect(await axe(container)).toHaveNoViolations();
   });
 
@@ -107,12 +108,15 @@ describe('useForcedDelete', () => {
     await user.click(within(forcedConfirmation()).getByRole('checkbox'));
     await user.click(deleteAnywayButton());
 
-    expect(await screen.findByText(
-      'deletion.forced.summary(categories.deleted,deletion.forced.cocktailsChanged(2))',
-    )).toBeInTheDocument();
+    expect(await screen.findByText('Category deleted: 2 cocktails changed.')).toBeInTheDocument();
     expect(requests.map((url) => url.search)).toEqual(['', '?force=true']);
     expect(refreshedKeys()).toEqual([
-      qk.categories, qk.cocktails, qk.availability, qk.shortages, qk.bottles, qk.menus,
+      qk.categories,
+      qk.cocktails,
+      qk.availability,
+      qk.shortages,
+      qk.bottles,
+      qk.menus,
     ]);
   });
 
@@ -124,34 +128,45 @@ describe('useForcedDelete', () => {
     await requestDeletion(user);
 
     const confirmation = await screen.findByRole('alertdialog');
-    expect(confirmation).toHaveAccessibleDescription('deletion.forced.bottlesWarning deletion.forced.final');
-    expect(confirmation).toHaveTextContent('deletion.forced.bottles(1)');
+    expect(confirmation).toHaveAccessibleDescription(
+      'The bottles of this category will be deleted too. This action cannot be undone.',
+    );
+    expect(confirmation).toHaveTextContent('1 bottle deleted:');
     expect(within(confirmation).getByRole('listitem')).toHaveTextContent('Absolut');
-    await user.click(within(confirmation).getByRole('checkbox', { name: 'deletion.forced.acknowledgeBottles' }));
+    await user.click(
+      within(confirmation).getByRole('checkbox', {
+        name: 'I understand that these bottles will be deleted',
+      }),
+    );
     await user.click(deleteAnywayButton());
 
-    expect(await screen.findByText(
-      'deletion.forced.summary(categories.deleted,deletion.forced.bottlesDeleted(1))',
-    )).toBeInTheDocument();
+    expect(await screen.findByText('Category deleted: 1 bottle deleted.')).toBeInTheDocument();
   });
 
   it('asks to accept both the changed recipes and the deleted bottles of a category', async () => {
     const user = userEvent.setup();
-    mockItemInUse(CATEGORY_PATH, { cocktails: usedByRecipes.cocktails, bottles: holdsBottles.bottles });
+    mockItemInUse(CATEGORY_PATH, {
+      cocktails: usedByRecipes.cocktails,
+      bottles: holdsBottles.bottles,
+    });
     renderButton();
 
     await requestDeletion(user);
 
     const confirmation = await screen.findByRole('alertdialog');
     expect(confirmation).toHaveAccessibleDescription(
-      'deletion.forced.recipesWarning deletion.forced.bottlesWarning deletion.forced.final',
+      'These recipes will lose the matching lines and become incomplete. The bottles of this category will be deleted too. This action cannot be undone.',
     );
-    await user.click(within(confirmation).getByRole('checkbox', { name: 'deletion.forced.acknowledgeRecipesAndBottles' }));
+    await user.click(
+      within(confirmation).getByRole('checkbox', {
+        name: 'I understand that these recipes will be changed and these bottles deleted',
+      }),
+    );
     await user.click(deleteAnywayButton());
 
-    expect(await screen.findByText(
-      'deletion.forced.summary(categories.deleted,deletion.forced.bottlesDeleted(1), deletion.forced.cocktailsChanged(2))',
-    )).toBeInTheDocument();
+    expect(
+      await screen.findByText('Category deleted: 1 bottle deleted, 2 cocktails changed.'),
+    ).toBeInTheDocument();
   });
 
   it('deletes nothing when cancelled and keeps the list in an error toast', async () => {
@@ -161,11 +176,11 @@ describe('useForcedDelete', () => {
 
     await requestDeletion(user);
     await screen.findByRole('alertdialog');
-    await user.click(within(forcedConfirmation()).getByRole('button', { name: 'common.cancel' }));
+    await user.click(within(forcedConfirmation()).getByRole('button', { name: 'Cancel' }));
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Used by cocktail recipes');
-    expect(alert).toHaveTextContent('deletion.usedByCocktails(Moscow Mule, Mojito)');
+    expect(alert).toHaveTextContent('Used by these cocktails: Moscow Mule, Mojito.');
     expect(requests).toHaveLength(1);
     expect(refreshedKeys()).toEqual([]);
   });
@@ -193,5 +208,36 @@ describe('useForcedDelete', () => {
     await user.click(deleteAnywayButton());
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Database is locked'));
+  });
+});
+
+describe('useForcedDeleteCrudMutations', () => {
+  function CrudDeleteButton() {
+    const { remove } = useForcedDeleteCrudMutations({
+      key: qk.categories,
+      api: categoriesApi,
+      invalidates: [qk.availability],
+      messages: {
+        created: 'categories.created',
+        updated: 'categories.updated',
+        deleted: 'categories.deleted',
+      },
+    });
+    return <button onClick={() => remove(3)}>delete-category</button>;
+  }
+
+  it('refreshes the entity list and the extra keys declared once, and shows the deleted toast', async () => {
+    mockApiResponse('delete', CATEGORY_PATH, { impact: { cocktails: [], bottles: [] } });
+    const queryClient = createTestQueryClient();
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+    renderWithFeedback(<CrudDeleteButton />, { queryClient });
+
+    await requestDeletion(userEvent.setup());
+
+    expect(await screen.findByText('Category deleted')).toBeInTheDocument();
+    expect(invalidate.mock.calls.map(([filters]) => filters?.queryKey)).toEqual([
+      qk.categories,
+      qk.availability,
+    ]);
   });
 });

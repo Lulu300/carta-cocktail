@@ -8,8 +8,18 @@ import path from 'path';
 import AdmZip from 'adm-zip';
 import type { PrismaClient } from '../generated/prisma/client';
 import {
-  setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData, seedIngredient, seedCocktail,
-  prisma, request, authHeader, getAuthToken, listenWithShortTimeouts, seedAppState,
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+  seedIngredient,
+  seedCocktail,
+  prisma,
+  request,
+  authHeader,
+  getAuthToken,
+  listenWithShortTimeouts,
+  seedAppState,
 } from '../test/helpers';
 import app from '../app';
 import { configureSqlite, createPrismaClient } from '../lib/prisma';
@@ -17,8 +27,14 @@ import { resetRateLimits } from '../middleware/rateLimit';
 import { resolveDatabasePath } from '../lib/databasePath';
 import { config } from '../config';
 import { beginExport, latestAppMigration, restoreBackup } from '../services/backupService';
-import { applySessionFloor, hasTokenVersionColumn, sessionFloorPath } from '../services/sessionFloor';
+import {
+  applySessionFloor,
+  hasTokenVersionColumn,
+  sessionFloorPath,
+} from '../services/sessionFloor';
 import { recordStartup } from '../services/upgradeNoticeService';
+import { backfillImageVariants, derivedVariantNames } from '../services/cocktail/imageVariants';
+import { writeStoredPhoto } from '../test/images';
 
 const dbPath = resolveDatabasePath();
 const preRestoreDir = path.join(path.dirname(dbPath), 'backups');
@@ -50,7 +66,10 @@ async function exportBackup(): Promise<Buffer> {
 }
 
 async function importBackup(backup: Buffer) {
-  return request.post('/api/backup/import').set(await currentSessionHeader()).attach('backup', backup, 'backup.zip');
+  return request
+    .post('/api/backup/import')
+    .set(await currentSessionHeader())
+    .attach('backup', backup, 'backup.zip');
 }
 
 /** Writes `backup` to a temporary file, as multer does, for the time `use` runs. */
@@ -82,16 +101,27 @@ function withEntries(backup: Buffer, files: Record<string, string>): Buffer {
 function withClaimedSize(backup: Buffer, size: number): Buffer {
   const patched = Buffer.from(backup);
   const centralHeader = Buffer.from([0x50, 0x4b, 0x01, 0x02]);
-  for (let offset = patched.indexOf(centralHeader); offset !== -1; offset = patched.indexOf(centralHeader, offset + 4)) {
+  for (
+    let offset = patched.indexOf(centralHeader);
+    offset !== -1;
+    offset = patched.indexOf(centralHeader, offset + 4)
+  ) {
     patched.writeUInt32LE(size, offset + 24);
   }
   return patched;
 }
 
-interface EntryHeader { nameAt: number; crcAt: number }
+interface EntryHeader {
+  nameAt: number;
+  crcAt: number;
+}
 
 /** Calls `patch` on the local and central headers of an entry, in a copy of the zip. */
-function patchEntryHeaders(backup: Buffer, entryName: string, patch: (zip: Buffer, header: EntryHeader) => void): Buffer {
+function patchEntryHeaders(
+  backup: Buffer,
+  entryName: string,
+  patch: (zip: Buffer, header: EntryHeader) => void,
+): Buffer {
   const patched = Buffer.from(backup);
   const layouts = [
     { signature: [0x50, 0x4b, 0x03, 0x04], nameLengthAt: 26, nameAt: 30, crcAt: 14 },
@@ -99,7 +129,11 @@ function patchEntryHeaders(backup: Buffer, entryName: string, patch: (zip: Buffe
   ];
   for (const { signature, nameLengthAt, nameAt, crcAt } of layouts) {
     const marker = Buffer.from(signature);
-    for (let offset = patched.indexOf(marker); offset !== -1; offset = patched.indexOf(marker, offset + 4)) {
+    for (
+      let offset = patched.indexOf(marker);
+      offset !== -1;
+      offset = patched.indexOf(marker, offset + 4)
+    ) {
       const nameLength = patched.readUInt16LE(offset + nameLengthAt);
       const name = patched.subarray(offset + nameAt, offset + nameAt + nameLength).toString('utf8');
       if (name === entryName) patch(patched, { nameAt: offset + nameAt, crcAt: offset + crcAt });
@@ -156,14 +190,18 @@ async function sqliteFileWith(sql: string[]): Promise<Buffer> {
 /** Runs `sql` on the database of a backup, for instance to give it the schema of an older version. */
 async function withDatabaseChanged(backup: Buffer, sql: string[]): Promise<Buffer> {
   const zip = new AdmZip(backup);
-  const { bytes } = await withDatabaseFile(zip.getEntry('database.db')!.getData(), (client) => runStatements(client, sql));
+  const { bytes } = await withDatabaseFile(zip.getEntry('database.db')!.getData(), (client) =>
+    runStatements(client, sql),
+  );
   zip.updateFile('database.db', bytes);
   return zip.toBuffer();
 }
 
 async function ingredientNamesInBackup(backup: Buffer): Promise<string[]> {
   const databaseBytes = new AdmZip(backup).getEntry('database.db')!.getData();
-  const { result } = await withDatabaseFile(databaseBytes, (client) => client.ingredient.findMany({ orderBy: { name: 'asc' } }));
+  const { result } = await withDatabaseFile(databaseBytes, (client) =>
+    client.ingredient.findMany({ orderBy: { name: 'asc' } }),
+  );
   return result.map((ingredient) => ingredient.name);
 }
 
@@ -204,8 +242,11 @@ function snapshotFiles(): string[] {
 
 /** The entries of a backup taken from uploads/, sorted. */
 function uploadEntries(backup: Buffer): string[] {
-  return new AdmZip(backup).getEntries().map((entry) => entry.entryName)
-    .filter((name) => name.startsWith('uploads/')).sort();
+  return new AdmZip(backup)
+    .getEntries()
+    .map((entry) => entry.entryName)
+    .filter((name) => name.startsWith('uploads/'))
+    .sort();
 }
 
 function preRestoreCopies(): string[] {
@@ -215,8 +256,12 @@ function preRestoreCopies(): string[] {
 
 /** Temporary files a restore leaves when it does not clean up after itself. */
 function restoreLeftovers(): string[] {
-  const nextToDatabase = fs.readdirSync(path.dirname(dbPath)).filter((name) => name.includes('.restore-'));
-  const inUploads = fs.readdirSync(config.uploadDir).filter((name) => /^\.(pre-)?restore-/.test(name));
+  const nextToDatabase = fs
+    .readdirSync(path.dirname(dbPath))
+    .filter((name) => name.includes('.restore-'));
+  const inUploads = fs
+    .readdirSync(config.uploadDir)
+    .filter((name) => /^\.(pre-)?restore-/.test(name));
   return [...nextToDatabase, ...inUploads];
 }
 
@@ -235,7 +280,8 @@ afterAll(async () => {
   for (const name of preRestoreCopies()) {
     if (!preRestoreCopiesBefore.includes(name)) fs.rmSync(path.join(preRestoreDir, name));
   }
-  if (fs.existsSync(preRestoreDir) && fs.readdirSync(preRestoreDir).length === 0) fs.rmdirSync(preRestoreDir);
+  if (fs.existsSync(preRestoreDir) && fs.readdirSync(preRestoreDir).length === 0)
+    fs.rmdirSync(preRestoreDir);
 });
 
 beforeEach(async () => {
@@ -278,21 +324,35 @@ describe('backup export', () => {
 
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toBe('application/zip');
-    expect(res.headers['content-disposition']).toMatch(/^attachment; filename=backup-\d{4}-\d{2}-\d{2}\.zip$/);
+    expect(res.headers['content-disposition']).toMatch(
+      /^attachment; filename=backup-\d{4}-\d{2}-\d{2}\.zip$/,
+    );
     const zip = new AdmZip(res.body as Buffer);
     const entryNames = zip.getEntries().map((entry) => entry.entryName);
-    expect(entryNames).toEqual(expect.arrayContaining([
-      'metadata.json', 'database.db', 'uploads/export-test.jpg', 'uploads/cocktails/nested.png',
-    ]));
+    expect(entryNames).toEqual(
+      expect.arrayContaining([
+        'metadata.json',
+        'database.db',
+        'uploads/export-test.jpg',
+        'uploads/cocktails/nested.png',
+      ]),
+    );
     vi.stubEnv('APP_VERSION', '1.17.0');
     const released = new AdmZip(await exportBackup());
     vi.unstubAllEnvs();
-    expect(JSON.parse(released.getEntry('metadata.json')!.getData().toString('utf8')).appVersion).toBe('1.17.0');
+    expect(
+      JSON.parse(released.getEntry('metadata.json')!.getData().toString('utf8')).appVersion,
+    ).toBe('1.17.0');
     const metadata = JSON.parse(zip.getEntry('metadata.json')!.getData().toString('utf8'));
     expect(metadata).toEqual({
-      version: 1, createdAt: expect.any(String), appVersion: 'dev', schemaVersion: null,
+      version: 1,
+      createdAt: expect.any(String),
+      appVersion: 'dev',
+      schemaVersion: null,
     });
-    expect(zip.getEntry('database.db')!.getData().subarray(0, 16).toString('latin1')).toBe('SQLite format 3\0');
+    expect(zip.getEntry('database.db')!.getData().subarray(0, 16).toString('latin1')).toBe(
+      'SQLite format 3\0',
+    );
     expect(zip.getEntry('uploads/export-test.jpg')!.getData().toString('utf8')).toBe('image bytes');
   });
 
@@ -301,8 +361,9 @@ describe('backup export', () => {
 
     const zip = new AdmZip(await exportBackup());
 
-    expect(JSON.parse(zip.getEntry('metadata.json')!.getData().toString('utf8')).schemaVersion)
-      .toBe('20990101000000_from_test');
+    expect(
+      JSON.parse(zip.getEntry('metadata.json')!.getData().toString('utf8')).schemaVersion,
+    ).toBe('20990101000000_from_test');
   });
 
   it('should delete the database snapshot once the download is over', async () => {
@@ -315,7 +376,11 @@ describe('backup export', () => {
 
   it('should leave out the folders a restore works in, and keep every photo', async () => {
     const stamp = '20261011-153700123';
-    for (const folder of [`.restore-${stamp}`, `.pre-restore-${stamp}`, `cocktails/.restore-${stamp}`]) {
+    for (const folder of [
+      `.restore-${stamp}`,
+      `.pre-restore-${stamp}`,
+      `cocktails/.restore-${stamp}`,
+    ]) {
       fs.mkdirSync(path.join(config.uploadDir, folder), { recursive: true });
       fs.writeFileSync(path.join(config.uploadDir, folder, 'from-restore.jpg'), 'restore bytes');
     }
@@ -334,17 +399,20 @@ describe('backup export', () => {
     ]);
   });
 
-  it.skipIf(isRoot)('should cut the download instead of sending a truncated zip when a file cannot be read', async () => {
-    const unreadable = path.join(config.uploadDir, 'unreadable.jpg');
-    fs.writeFileSync(unreadable, 'image bytes');
-    fs.chmodSync(unreadable, 0o000);
+  it.skipIf(isRoot)(
+    'should cut the download instead of sending a truncated zip when a file cannot be read',
+    async () => {
+      const unreadable = path.join(config.uploadDir, 'unreadable.jpg');
+      fs.writeFileSync(unreadable, 'image bytes');
+      fs.chmodSync(unreadable, 0o000);
 
-    try {
-      await expect(requestExport()).rejects.toThrow();
-    } finally {
-      fs.chmodSync(unreadable, 0o644);
-    }
-  });
+      try {
+        await expect(requestExport()).rejects.toThrow();
+      } finally {
+        fs.chmodSync(unreadable, 0o644);
+      }
+    },
+  );
 });
 
 describe('backup in WAL mode', () => {
@@ -371,7 +439,8 @@ describe('backup in WAL mode', () => {
     // Reopening forces SQLite to read the file again, WAL included
     await prisma.$disconnect();
     expect(await ingredientNames()).toEqual(['Basil', 'Lime']);
-    const [integrity] = await prisma.$queryRawUnsafe<{ integrity_check: string }[]>('PRAGMA integrity_check;');
+    const [integrity] =
+      await prisma.$queryRawUnsafe<{ integrity_check: string }[]>('PRAGMA integrity_check;');
     expect(integrity.integrity_check).toBe('ok');
   });
 });
@@ -386,7 +455,11 @@ describe('backup restore', () => {
     const res = await importBackup(backup);
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ message: 'Backup restored successfully', skippedFiles: 0, restartRecommended: true });
+    expect(res.body).toEqual({
+      message: 'Backup restored successfully',
+      skippedFiles: 0,
+      restartRecommended: true,
+    });
     expect(await cocktailNames()).toEqual(['Mojito']);
     const list = await request.get('/api/cocktails').set(await currentSessionHeader());
     expect(list.status).toBe(200);
@@ -396,7 +469,10 @@ describe('backup restore', () => {
 
   it.each([
     ['without appVersion', { version: 1, createdAt: '2025-01-01T00:00:00.000Z' }],
-    ['with an appVersion that is not a string', { version: 1, appVersion: 12, schemaVersion: null }],
+    [
+      'with an appVersion that is not a string',
+      { version: 1, appVersion: 12, schemaVersion: null },
+    ],
   ])('should restore a backup of an older version, %s', async (_label, metadata) => {
     const cocktail = await seedCocktail({ name: 'Mojito' });
     const zip = new AdmZip(await exportBackup());
@@ -442,13 +518,32 @@ describe('backup restore', () => {
     expect(fs.readFileSync(path.join(config.uploadDir, 'a.png'), 'utf8')).toBe('png bytes');
   });
 
+  it('should add the smaller copies of the photos of an older backup', async () => {
+    // A backup made before the copies existed holds the photo alone
+    await writeStoredPhoto('1700000000-42.jpg');
+    await seedCocktail({ name: 'Old', imagePath: '1700000000-42.jpg' });
+    const backup = await exportBackup();
+    emptyUploadDir();
+
+    const res = await importBackup(backup);
+    // Queued after the backfill the restore started, so it ends once that one has
+    expect(await backfillImageVariants(prisma)).toEqual({ created: 0, failed: 0 });
+
+    expect(res.status).toBe(200);
+    expect(uploadDirContent()).toEqual(
+      ['1700000000-42.jpg', ...derivedVariantNames('1700000000-42.jpg')].sort(),
+    );
+  });
+
   it('should keep an image with a traversal name inside the uploads folder', async () => {
     const backup = withRawEntryName(
       withEntries(await exportBackup(), { 'uploads/xx/xx/escaped.jpg': 'jpg bytes' }),
       'uploads/xx/xx/escaped.jpg',
       'uploads/../../escaped.jpg',
     );
-    expect(new AdmZip(backup).getEntries().map((entry) => entry.entryName)).toContain('uploads/../../escaped.jpg');
+    expect(new AdmZip(backup).getEntries().map((entry) => entry.entryName)).toContain(
+      'uploads/../../escaped.jpg',
+    );
 
     const res = await importBackup(backup);
 
@@ -507,7 +602,9 @@ describe('backup restore', () => {
 
       expect(res.status).toBe(200);
       expect(await cocktailNames()).toEqual([]);
-      expect((await request.get('/api/cocktails').set(await currentSessionHeader())).status).toBe(200);
+      expect((await request.get('/api/cocktails').set(await currentSessionHeader())).status).toBe(
+        200,
+      );
       const leftover = uploadDirContent().filter((name) => name.startsWith('.pre-restore-'));
       expect(leftover).toHaveLength(1);
       expect(uploadDirContent().filter((name) => !name.startsWith('.'))).toEqual(['restored.jpg']);
@@ -583,9 +680,9 @@ describe('slow backup restore upload', () => {
   function multipartBody(backup: Buffer): Buffer {
     return Buffer.concat([
       Buffer.from(
-        `--${BOUNDARY}\r\n`
-        + 'Content-Disposition: form-data; name="backup"; filename="backup.zip"\r\n'
-        + 'Content-Type: application/zip\r\n\r\n',
+        `--${BOUNDARY}\r\n` +
+          'Content-Disposition: form-data; name="backup"; filename="backup.zip"\r\n' +
+          'Content-Type: application/zip\r\n\r\n',
       ),
       backup,
       Buffer.from(`\r\n--${BOUNDARY}--\r\n`),
@@ -593,7 +690,11 @@ describe('slow backup restore upload', () => {
   }
 
   /** Sends `body` in pieces spread over `durationMs`, and resolves to the status of the answer. */
-  async function postSlowly(port: number, body: Buffer, durationMs: number): Promise<number | undefined> {
+  async function postSlowly(
+    port: number,
+    body: Buffer,
+    durationMs: number,
+  ): Promise<number | undefined> {
     const pieces = 10;
     const pieceSize = Math.ceil(body.length / pieces);
     const client = http.request({
@@ -622,13 +723,17 @@ describe('slow backup restore upload', () => {
     return answer;
   }
 
-  it('should restore an archive whose upload lasts longer than Node\'s default request timeout', async () => {
+  it("should restore an archive whose upload lasts longer than Node's default request timeout", async () => {
     await seedCocktail({ name: 'Mojito' });
     const backup = await exportBackup();
     await prisma.cocktail.deleteMany();
     const server = await listenWithShortTimeouts(OLD_REQUEST_TIMEOUT_MS);
     try {
-      const status = await postSlowly(server.port, multipartBody(backup), 5 * OLD_REQUEST_TIMEOUT_MS);
+      const status = await postSlowly(
+        server.port,
+        multipartBody(backup),
+        5 * OLD_REQUEST_TIMEOUT_MS,
+      );
 
       expect(status).toBe(200);
       expect(await cocktailNames()).toEqual(['Mojito']);
@@ -639,10 +744,14 @@ describe('slow backup restore upload', () => {
 });
 
 describe('concurrent backup restores and exports', () => {
-  const IN_PROGRESS_EN = 'A backup restore is already in progress: wait for it to finish, then reload the page and sign in again (the restore ends every session)';
-  const IN_PROGRESS_FR = 'Une restauration de sauvegarde est déjà en cours : attendez qu’elle se termine, puis rechargez la page et reconnectez-vous (la restauration ferme toutes les sessions)';
-  const EXPORT_IN_PROGRESS_EN = 'A backup is being exported: wait for its download to finish, then start the restore again';
-  const EXPORT_IN_PROGRESS_FR = 'Une sauvegarde est en cours d’export : attendez la fin de son téléchargement, puis relancez la restauration';
+  const IN_PROGRESS_EN =
+    'A backup restore is already in progress: wait for it to finish, then reload the page and sign in again (the restore ends every session)';
+  const IN_PROGRESS_FR =
+    'Une restauration de sauvegarde est déjà en cours : attendez qu’elle se termine, puis rechargez la page et reconnectez-vous (la restauration ferme toutes les sessions)';
+  const EXPORT_IN_PROGRESS_EN =
+    'A backup is being exported: wait for its download to finish, then start the restore again';
+  const EXPORT_IN_PROGRESS_FR =
+    'Une sauvegarde est en cours d’export : attendez la fin de son téléchargement, puis relancez la restauration';
   // multer's default file name in its `dest` folder
   const MULTER_FILE_NAME = /^[0-9a-f]{32}$/;
 
@@ -650,15 +759,29 @@ describe('concurrent backup restores and exports', () => {
     vi.restoreAllMocks();
   });
 
-  interface Hold { held: Promise<void>; release: () => void }
+  interface Hold {
+    held: Promise<void>;
+    release: () => void;
+  }
 
   /** `held` resolves once `wait()` is called; `wait()` resolves once `release()` is called. */
   function gate(): Hold & { wait: () => Promise<void> } {
     let markHeld!: () => void;
     let release!: () => void;
-    const held = new Promise<void>((resolve) => { markHeld = resolve; });
-    const released = new Promise<void>((resolve) => { release = resolve; });
-    return { held, release, wait: () => { markHeld(); return released; } };
+    const held = new Promise<void>((resolve) => {
+      markHeld = resolve;
+    });
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    return {
+      held,
+      release,
+      wait: () => {
+        markHeld();
+        return released;
+      },
+    };
   }
 
   /**
@@ -680,7 +803,10 @@ describe('concurrent backup restores and exports', () => {
     const { held, release, wait } = gate();
     const executeRawUnsafe = prisma.$executeRawUnsafe.bind(prisma);
     vi.spyOn(prisma, '$executeRawUnsafe').mockImplementationOnce(
-      (query, ...values) => wait().then(() => executeRawUnsafe(query, ...values)) as ReturnType<typeof executeRawUnsafe>,
+      (query, ...values) =>
+        wait().then(() => executeRawUnsafe(query, ...values)) as ReturnType<
+          typeof executeRawUnsafe
+        >,
     );
     return { held, release };
   }
@@ -713,10 +839,12 @@ describe('concurrent backup restores and exports', () => {
     });
     // The test destroys the request on purpose
     client.on('error', () => {});
-    const response = new Promise<http.IncomingMessage>((resolve) => client.on('response', (res) => {
-      res.pause();
-      resolve(res);
-    }));
+    const response = new Promise<http.IncomingMessage>((resolve) =>
+      client.on('response', (res) => {
+        res.pause();
+        resolve(res);
+      }),
+    );
     const stop = () => {
       client.destroy();
       server.closeAllConnections();
@@ -751,8 +879,11 @@ describe('concurrent backup restores and exports', () => {
       const rmSync = vi.spyOn(fs, 'rmSync');
 
       const second = await importBackup(secondBackup);
-      const secondInFrench = await request.post('/api/backup/import').set(await currentSessionHeader())
-        .set('Accept-Language', 'fr').attach('backup', secondBackup, 'backup.zip');
+      const secondInFrench = await request
+        .post('/api/backup/import')
+        .set(await currentSessionHeader())
+        .set('Accept-Language', 'fr')
+        .attach('backup', secondBackup, 'backup.zip');
 
       expect(second.status).toBe(409);
       expect(second.body).toEqual({ error: IN_PROGRESS_EN });
@@ -761,7 +892,8 @@ describe('concurrent backup restores and exports', () => {
       expect(restoreFiles()).toEqual(filesWhileHeld);
       expect(await cocktailNames()).toEqual(['Live']);
       // The archives of the refused requests are deleted all the same
-      const uploadedArchives = rmSync.mock.calls.map(([target]) => String(target))
+      const uploadedArchives = rmSync.mock.calls
+        .map(([target]) => String(target))
         .filter((target) => MULTER_FILE_NAME.test(path.basename(target)));
       expect(uploadedArchives).toHaveLength(2);
       for (const archive of uploadedArchives) expect(fs.existsSync(archive)).toBe(false);
@@ -784,7 +916,10 @@ describe('concurrent backup restores and exports', () => {
       const first = restoreBackup(zipPath);
       const second = restoreBackup(zipPath);
 
-      await expect(second).rejects.toMatchObject({ status: 409, i18nKey: 'errors.restoreInProgress' });
+      await expect(second).rejects.toMatchObject({
+        status: 409,
+        i18nKey: 'errors.restoreInProgress',
+      });
       await expect(first).resolves.toEqual({ skippedFiles: 0, restartRecommended: true });
     });
   });
@@ -821,7 +956,10 @@ describe('concurrent backup restores and exports', () => {
   it('should refuse a restore with a translated 409 from the start of an export until its response closes', async () => {
     const backup = await exportBackup();
     // More than the socket buffers hold: the archive is still reading it while the client reads nothing
-    fs.writeFileSync(path.join(config.uploadDir, 'large.jpg'), crypto.randomBytes(32 * 1024 * 1024));
+    fs.writeFileSync(
+      path.join(config.uploadDir, 'large.jpg'),
+      crypto.randomBytes(32 * 1024 * 1024),
+    );
     const snapshot = holdNextSnapshot();
     const unreadExport = await startUnreadExport();
 
@@ -830,8 +968,11 @@ describe('concurrent backup restores and exports', () => {
       const whileCopyingDatabase = await importBackup(backup);
       snapshot.release();
       expect((await unreadExport.response).statusCode).toBe(200);
-      const whileSending = await request.post('/api/backup/import').set(await currentSessionHeader())
-        .set('Accept-Language', 'fr').attach('backup', backup, 'backup.zip');
+      const whileSending = await request
+        .post('/api/backup/import')
+        .set(await currentSessionHeader())
+        .set('Accept-Language', 'fr')
+        .attach('backup', backup, 'backup.zip');
 
       expect(whileCopyingDatabase.status).toBe(409);
       expect(whileCopyingDatabase.body).toEqual({ error: EXPORT_IN_PROGRESS_EN });
@@ -889,7 +1030,10 @@ describe('concurrent backup restores and exports', () => {
         endFirst();
         await expect(restoreBackup(zipPath)).rejects.toMatchObject(refused);
         endSecond();
-        await expect(restoreBackup(zipPath)).resolves.toEqual({ skippedFiles: 0, restartRecommended: true });
+        await expect(restoreBackup(zipPath)).resolves.toEqual({
+          skippedFiles: 0,
+          restartRecommended: true,
+        });
       });
     } finally {
       endFirst();
@@ -913,10 +1057,14 @@ describe('concurrent backup restores and exports', () => {
   it.each([
     ['succeeded', 200, async (backup: Buffer) => backup],
     ['was refused for an invalid archive', 400, async () => Buffer.from('not a zip archive')],
-    ['failed and was rolled back', 500, async (backup: Buffer) => {
-      vi.spyOn(prisma, '$connect').mockRejectedValueOnce(new Error('connect failed'));
-      return backup;
-    }],
+    [
+      'failed and was rolled back',
+      500,
+      async (backup: Buffer) => {
+        vi.spyOn(prisma, '$connect').mockRejectedValueOnce(new Error('connect failed'));
+        return backup;
+      },
+    ],
   ])('should accept a new restore after one that %s', async (_label, status, prepareFirst) => {
     const backup = await exportBackup();
 
@@ -929,7 +1077,8 @@ describe('concurrent backup restores and exports', () => {
 
 describe('backup restore and sessions', () => {
   const TOKEN_VERSION_MIGRATION = path.resolve(
-    __dirname, '../../prisma/migrations/20261011120000_user_token_version/migration.sql',
+    __dirname,
+    '../../prisma/migrations/20261011120000_user_token_version/migration.sql',
   );
   const ADMIN_PASSWORD = 'testpass123';
 
@@ -944,7 +1093,8 @@ describe('backup restore and sessions', () => {
   /** Statuses of GET /api/cocktails for the tokens of versions `from` to `to`. */
   async function statusesForVersions(from: number, to: number): Promise<number[]> {
     const statuses: number[] = [];
-    for (let version = from; version <= to; version++) statuses.push((await requestWithTokenVersion(version)).status);
+    for (let version = from; version <= to; version++)
+      statuses.push((await requestWithTokenVersion(version)).status);
     return statuses;
   }
 
@@ -963,7 +1113,9 @@ describe('backup restore and sessions', () => {
 
   /** A backup as v1.10.0 and older wrote it: no User.tokenVersion column. */
   async function backupWithoutTokenVersion(): Promise<Buffer> {
-    return withDatabaseChanged(await exportBackup(), ['ALTER TABLE "User" DROP COLUMN "tokenVersion"']);
+    return withDatabaseChanged(await exportBackup(), [
+      'ALTER TABLE "User" DROP COLUMN "tokenVersion"',
+    ]);
   }
 
   function login(password: string) {
@@ -1000,7 +1152,9 @@ describe('backup restore and sessions', () => {
   it('should bring back the password of the backup', async () => {
     const backup = await exportBackup();
     const newPassword = 'a-newer-password';
-    const change = await request.put('/api/settings/profile').set(tokenHeader(0))
+    const change = await request
+      .put('/api/settings/profile')
+      .set(tokenHeader(0))
       .send({ currentPassword: ADMIN_PASSWORD, newPassword });
     expect(change.status).toBe(200);
 
@@ -1062,20 +1216,27 @@ describe('backup restore and sessions', () => {
       expect(await statusesForVersions(0, 4)).toEqual([401, 401, 401, 401, 200]);
 
       // Versions keep going up: a password change does not revive a token issued before the restore
-      const change = await request.put('/api/settings/profile').set(tokenHeader(4))
+      const change = await request
+        .put('/api/settings/profile')
+        .set(tokenHeader(4))
         .send({ currentPassword: ADMIN_PASSWORD, newPassword: 'a-newer-password' });
       expect(change.status).toBe(200);
       expect(await statusesForVersions(0, 4)).toEqual([401, 401, 401, 401, 401]);
-      expect((await request.get('/api/cocktails').set({ Authorization: `Bearer ${change.body.token}` })).status)
-        .toBe(200);
+      expect(
+        (await request.get('/api/cocktails').set({ Authorization: `Bearer ${change.body.token}` }))
+          .status,
+      ).toBe(200);
     });
 
     it('should keep the session floor when the restore is rolled back: one more sign-out, nothing else', async () => {
-      const backup = withEntries(await backupWithoutTokenVersion(), { 'uploads/restored.jpg': 'restored bytes' });
+      const backup = withEntries(await backupWithoutTokenVersion(), {
+        'uploads/restored.jpg': 'restored bytes',
+      });
       const renameSync = fs.renameSync;
       // Fails after the database rename, when the restored files move in
       const spy = vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
-        if (path.basename(path.dirname(String(from))).startsWith('.restore-')) throw new Error('rename failed');
+        if (path.basename(path.dirname(String(from))).startsWith('.restore-'))
+          throw new Error('rename failed');
         renameSync(from, to);
       });
 
@@ -1098,9 +1259,13 @@ describe('backup restore and sessions', () => {
 });
 
 describe('backup restore and the upgrade guide', () => {
-  const APP_STATE_MIGRATION = path.resolve(__dirname, '../../prisma/migrations/20261126120000_app_state/migration.sql');
+  const APP_STATE_MIGRATION = path.resolve(
+    __dirname,
+    '../../prisma/migrations/20261126120000_app_state/migration.sql',
+  );
   // A required action for 1.7.0: a false upgrade from the backup's 1.5.0 would show it
-  const NOTES_1_7_0 = '---\nversion: 1.7.0\nrequired_actions:\n  - when: after\n    action: "Check the menus."\n---\n';
+  const NOTES_1_7_0 =
+    '---\nversion: 1.7.0\nrequired_actions:\n  - when: after\n    action: "Check the menus."\n---\n';
   let notesDir: string;
 
   function appState() {
@@ -1125,14 +1290,21 @@ describe('backup restore and the upgrade guide', () => {
   afterEach(async () => {
     fs.rmSync(notesDir, { recursive: true, force: true });
     // The next tests need the table, even when an assertion failed before the migration
-    const tables = await prisma.$queryRawUnsafe<{ name: string }[]>("SELECT name FROM sqlite_master WHERE name = 'AppState'");
-    if (tables.length === 0) await prisma.$executeRawUnsafe(fs.readFileSync(APP_STATE_MIGRATION, 'utf8'));
+    const tables = await prisma.$queryRawUnsafe<{ name: string }[]>(
+      "SELECT name FROM sqlite_master WHERE name = 'AppState'",
+    );
+    if (tables.length === 0)
+      await prisma.$executeRawUnsafe(fs.readFileSync(APP_STATE_MIGRATION, 'utf8'));
   });
 
   it('should keep the live state, not the one of the backup: no false notice at the next start', async () => {
     await seedAppState({ lastRunVersion: '1.5.0' });
     const backup = await exportBackup();
-    await seedAppState({ lastRunVersion: '1.7.0', pendingNoticeFrom: '1.6.0', pendingNoticeTo: '1.7.0' });
+    await seedAppState({
+      lastRunVersion: '1.7.0',
+      pendingNoticeFrom: '1.6.0',
+      pendingNoticeTo: '1.7.0',
+    });
     const liveState = await appState();
 
     expect((await importBackup(backup)).status).toBe(200);
@@ -1178,30 +1350,69 @@ describe('backup import validation', () => {
   it.each([
     ['that is not a zip', async () => Buffer.from('not a zip archive')],
     ['without metadata.json', async () => zipWith({ 'database.db': 'x' })],
-    ['with an unreadable metadata.json', async () => zipWith({ 'metadata.json': '{not json', 'database.db': 'x' })],
-    ['with a null metadata.json', async () => zipWith({ 'metadata.json': 'null', 'database.db': 'x' })],
+    [
+      'with an unreadable metadata.json',
+      async () => zipWith({ 'metadata.json': '{not json', 'database.db': 'x' }),
+    ],
+    [
+      'with a null metadata.json',
+      async () => zipWith({ 'metadata.json': 'null', 'database.db': 'x' }),
+    ],
     ['without database.db', async () => zipWith({ 'metadata.json': validMetadata })],
-    ['with an unsupported metadata version', async () => zipWith({ 'metadata.json': '{"version":2}', 'database.db': 'x' })],
-    ['whose database.db data is corrupt', async () => withBadCrc(
-      zipWith({ 'metadata.json': validMetadata, 'database.db': 'x'.repeat(1000) }), 'database.db',
-    )],
-    ['whose database.db is plain text', async () => zipWith({ 'metadata.json': validMetadata, 'database.db': 'plain text' })],
-    ['whose database.db only has a SQLite header', async () => zipWith({
-      'metadata.json': validMetadata,
-      'database.db': Buffer.concat([Buffer.from('SQLite format 3\0', 'latin1'), Buffer.alloc(200, 7)]),
-    })],
-    ['whose database misses the application tables', async () => zipWith({
-      'metadata.json': validMetadata,
-      'database.db': await sqliteFileWith(['CREATE TABLE Other (id INTEGER)']),
-    })],
-    ['with more than 5000 entries', async () => {
-      const files: Record<string, string> = { 'metadata.json': validMetadata, 'database.db': 'x' };
-      for (let i = 0; i < 5000; i++) files[`uploads/${i}.jpg`] = '';
-      return zipWith(files);
-    }],
-    ['announcing more than 500 MB once extracted', async () => withClaimedSize(
-      zipWith({ 'metadata.json': validMetadata, 'database.db': 'x' }), 501 * 1024 * 1024,
-    )],
+    [
+      'with an unsupported metadata version',
+      async () => zipWith({ 'metadata.json': '{"version":2}', 'database.db': 'x' }),
+    ],
+    [
+      'whose database.db data is corrupt',
+      async () =>
+        withBadCrc(
+          zipWith({ 'metadata.json': validMetadata, 'database.db': 'x'.repeat(1000) }),
+          'database.db',
+        ),
+    ],
+    [
+      'whose database.db is plain text',
+      async () => zipWith({ 'metadata.json': validMetadata, 'database.db': 'plain text' }),
+    ],
+    [
+      'whose database.db only has a SQLite header',
+      async () =>
+        zipWith({
+          'metadata.json': validMetadata,
+          'database.db': Buffer.concat([
+            Buffer.from('SQLite format 3\0', 'latin1'),
+            Buffer.alloc(200, 7),
+          ]),
+        }),
+    ],
+    [
+      'whose database misses the application tables',
+      async () =>
+        zipWith({
+          'metadata.json': validMetadata,
+          'database.db': await sqliteFileWith(['CREATE TABLE Other (id INTEGER)']),
+        }),
+    ],
+    [
+      'with more than 5000 entries',
+      async () => {
+        const files: Record<string, string> = {
+          'metadata.json': validMetadata,
+          'database.db': 'x',
+        };
+        for (let i = 0; i < 5000; i++) files[`uploads/${i}.jpg`] = '';
+        return zipWith(files);
+      },
+    ],
+    [
+      'announcing more than 500 MB once extracted',
+      async () =>
+        withClaimedSize(
+          zipWith({ 'metadata.json': validMetadata, 'database.db': 'x' }),
+          501 * 1024 * 1024,
+        ),
+    ],
   ])('should answer 400 and keep the data for a backup %s', async (_label, buildBackup) => {
     const backup = await buildBackup();
     await seedCocktail({ name: 'Mojito' });

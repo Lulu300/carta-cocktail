@@ -28,7 +28,10 @@ function renderTable(props: Partial<Parameters<typeof DataTable<Row>>[0]> = {}) 
   render(
     <DataTable<Row>
       columns={columns}
-      rows={[{ id: 1, name: 'Vodka' }, { id: 2, name: 'Rum' }]}
+      rows={[
+        { id: 1, name: 'Vodka' },
+        { id: 2, name: 'Rum' },
+      ]}
       getRowKey={(row) => row.id}
       sort={sort}
       pagination={pagination}
@@ -56,7 +59,7 @@ describe('DataTable', () => {
   it('shows skeleton rows and no empty label while loading', () => {
     renderTable({ rows: [], isLoading: true });
 
-    expect(screen.getByRole('status')).toHaveTextContent('common.loading');
+    expect(screen.getByRole('status')).toHaveTextContent('Loading...');
     expect(screen.queryByText('Nothing here')).not.toBeInTheDocument();
     expect(screen.queryByText('Vodka')).not.toBeInTheDocument();
   });
@@ -72,9 +75,9 @@ describe('DataTable', () => {
     const user = userEvent.setup();
     const { onRetry } = renderTable({ rows: [], isError: true });
 
-    expect(screen.getByText('common.error')).toBeInTheDocument();
+    expect(screen.getByText('An error occurred')).toBeInTheDocument();
     expect(screen.queryByText('Nothing here')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'common.retry' }));
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
     expect(onRetry).toHaveBeenCalled();
   });
 
@@ -82,8 +85,12 @@ describe('DataTable', () => {
     renderTable({
       renderRow: (row) => (
         <>
-          <tr><td>{row.name}</td></tr>
-          <tr><td>{`${row.name} detail`}</td></tr>
+          <tr>
+            <td>{row.name}</td>
+          </tr>
+          <tr>
+            <td>{`${row.name} detail`}</td>
+          </tr>
         </>
       ),
     });
@@ -104,7 +111,7 @@ describe('DataTable', () => {
 
   it('announces the number of items to screen readers while a filter is active', async () => {
     renderTable({ isFiltered: true });
-    expect(await screen.findByText('common.resultCount')).toHaveAttribute('aria-live', 'polite');
+    expect(await screen.findByText(/^\d+ results?$/)).toHaveAttribute('aria-live', 'polite');
   });
 
   describe('announces nothing', () => {
@@ -117,7 +124,9 @@ describe('DataTable', () => {
     });
 
     function liveRegion() {
-      act(() => vi.advanceTimersByTime(1000));
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
       return document.querySelector('[aria-live="polite"]');
     }
 
@@ -130,5 +139,14 @@ describe('DataTable', () => {
       renderTable({ isFiltered: true, isLoading: true });
       expect(liveRegion()).toBeEmptyDOMElement();
     });
+  });
+
+  // jsdom computes no layout: the wrapper is what lets a wide table scroll on its own (checked in a browser)
+  it('scrolls the table alone, not the messages under it', () => {
+    renderTable({ rows: [] });
+
+    const scroller = screen.getByRole('table').parentElement;
+    expect(scroller).toHaveClass('overflow-x-auto');
+    expect(scroller).not.toContainElement(screen.getByText('Nothing here'));
   });
 });

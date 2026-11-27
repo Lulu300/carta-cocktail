@@ -1,19 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import TagList from './TagList';
-import { parseTags } from './parseTags';
-
-describe('parseTags', () => {
-  it.each([
-    [null, []],
-    [undefined, []],
-    ['', []],
-    ['  ,  , ', []],
-    [' rum ,mint,,  tiki ', ['rum', 'mint', 'tiki']],
-  ])('parses %j', (tags, expected) => {
-    expect(parseTags(tags)).toEqual(expected);
-  });
-});
 
 describe('TagList', () => {
   it('shows one badge per tag, a repeated tag included', () => {

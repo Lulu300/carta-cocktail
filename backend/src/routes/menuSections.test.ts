@@ -1,12 +1,26 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
-  setupTestDatabase, teardownTestDatabase, cleanDatabase, seedRequiredData,
-  request, authHeader, prisma, seedMenu, seedMenuSection,
+  setupTestDatabase,
+  teardownTestDatabase,
+  cleanDatabase,
+  seedRequiredData,
+  request,
+  authHeader,
+  prisma,
+  seedMenu,
+  seedMenuSection,
 } from '../test/helpers';
 
-beforeAll(async () => { await setupTestDatabase(); });
-afterAll(async () => { await teardownTestDatabase(); });
-beforeEach(async () => { await cleanDatabase(); await seedRequiredData(); });
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+afterAll(async () => {
+  await teardownTestDatabase();
+});
+beforeEach(async () => {
+  await cleanDatabase();
+  await seedRequiredData();
+});
 
 describe('GET /api/menu-sections/menu/:menuId/sections', () => {
   it('should return empty array for menu with no sections', async () => {
@@ -36,14 +50,18 @@ describe('GET /api/menu-sections/menu/:menuId/sections', () => {
 describe('POST /api/menu-sections/menu/:menuId/sections', () => {
   it('should return 400 if name is missing', async () => {
     const menu = await prisma.menu.findUnique({ where: { slug: 'aperitifs' } });
-    const res = await request.post(`/api/menu-sections/menu/${menu!.id}/sections`).set(authHeader())
+    const res = await request
+      .post(`/api/menu-sections/menu/${menu!.id}/sections`)
+      .set(authHeader())
       .send({});
     expect(res.status).toBe(400);
   });
 
   it('should create section with auto position', async () => {
     const menu = await prisma.menu.findUnique({ where: { slug: 'aperitifs' } });
-    const res = await request.post(`/api/menu-sections/menu/${menu!.id}/sections`).set(authHeader())
+    const res = await request
+      .post(`/api/menu-sections/menu/${menu!.id}/sections`)
+      .set(authHeader())
       .send({ name: 'Classics' });
     expect(res.status).toBe(201);
     expect(res.body.name).toBe('Classics');
@@ -52,9 +70,13 @@ describe('POST /api/menu-sections/menu/:menuId/sections', () => {
 
   it('should auto-increment position', async () => {
     const menu = await prisma.menu.findUnique({ where: { slug: 'aperitifs' } });
-    await request.post(`/api/menu-sections/menu/${menu!.id}/sections`).set(authHeader())
+    await request
+      .post(`/api/menu-sections/menu/${menu!.id}/sections`)
+      .set(authHeader())
       .send({ name: 'First' });
-    const res = await request.post(`/api/menu-sections/menu/${menu!.id}/sections`).set(authHeader())
+    const res = await request
+      .post(`/api/menu-sections/menu/${menu!.id}/sections`)
+      .set(authHeader())
       .send({ name: 'Second' });
     expect(res.status).toBe(201);
     expect(res.body.position).toBe(1);
@@ -68,7 +90,9 @@ describe('PUT /api/menu-sections/sections/:id', () => {
       data: { menuId: menu!.id, name: 'Old', position: 0 },
     });
 
-    const res = await request.put(`/api/menu-sections/sections/${section.id}`).set(authHeader())
+    const res = await request
+      .put(`/api/menu-sections/sections/${section.id}`)
+      .set(authHeader())
       .send({ name: 'New Name' });
     expect(res.status).toBe(200);
     expect(res.body.name).toBe('New Name');
@@ -80,7 +104,9 @@ describe('PUT /api/menu-sections/sections/:id', () => {
       data: { menuId: menu!.id, name: 'Test', position: 0 },
     });
 
-    const res = await request.put(`/api/menu-sections/sections/${section.id}`).set(authHeader())
+    const res = await request
+      .put(`/api/menu-sections/sections/${section.id}`)
+      .set(authHeader())
       .send({ position: 5 });
     expect(res.status).toBe(200);
     expect(res.body.position).toBe(5);
@@ -104,7 +130,9 @@ describe('DELETE /api/menu-sections/sections/:id', () => {
   it('should answer in French', async () => {
     const section = await seedMenuSection((await seedMenu()).id);
 
-    const res = await request.delete(`/api/menu-sections/sections/${section.id}`).set(authHeader())
+    const res = await request
+      .delete(`/api/menu-sections/sections/${section.id}`)
+      .set(authHeader())
       .set('Accept-Language', 'fr');
 
     expect(res.body).toEqual({ message: 'Section supprimée' });
@@ -114,7 +142,9 @@ describe('DELETE /api/menu-sections/sections/:id', () => {
 describe('POST /api/menu-sections/menu/:menuId/sections/reorder', () => {
   it('should return 400 if sectionIds is not an array', async () => {
     const menu = await prisma.menu.findUnique({ where: { slug: 'aperitifs' } });
-    const res = await request.post(`/api/menu-sections/menu/${menu!.id}/sections/reorder`).set(authHeader())
+    const res = await request
+      .post(`/api/menu-sections/menu/${menu!.id}/sections/reorder`)
+      .set(authHeader())
       .send({ sectionIds: 'invalid' });
     expect(res.status).toBe(400);
   });
@@ -122,7 +152,9 @@ describe('POST /api/menu-sections/menu/:menuId/sections/reorder', () => {
   it('should return 400 for ids that are not numbers', async () => {
     const menu = await seedMenu();
     const section = await seedMenuSection(menu.id);
-    const res = await request.post(`/api/menu-sections/menu/${menu.id}/sections/reorder`).set(authHeader())
+    const res = await request
+      .post(`/api/menu-sections/menu/${menu.id}/sections/reorder`)
+      .set(authHeader())
       .send({ sectionIds: [String(section.id)] });
     expect(res.status).toBe(400);
     expect(res.body.details[0].path).toBe('body.sectionIds.0');
@@ -134,21 +166,33 @@ describe('POST /api/menu-sections/menu/:menuId/sections/reorder', () => {
     const s2 = await seedMenuSection(menu.id, { name: 'B', position: 1 });
     const s3 = await seedMenuSection(menu.id, { name: 'C', position: 2 });
 
-    const res = await request.post(`/api/menu-sections/menu/${menu.id}/sections/reorder`).set(authHeader())
+    const res = await request
+      .post(`/api/menu-sections/menu/${menu.id}/sections/reorder`)
+      .set(authHeader())
       .send({ sectionIds: [s3.id, s1.id, s2.id] });
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ message: 'Sections reordered' });
 
-    const sections = await prisma.menuSection.findMany({ where: { menuId: menu.id }, orderBy: { position: 'asc' } });
-    expect(sections.map((section) => [section.id, section.position])).toEqual([[s3.id, 0], [s1.id, 1], [s2.id, 2]]);
+    const sections = await prisma.menuSection.findMany({
+      where: { menuId: menu.id },
+      orderBy: { position: 'asc' },
+    });
+    expect(sections.map((section) => [section.id, section.position])).toEqual([
+      [s3.id, 0],
+      [s1.id, 1],
+      [s2.id, 2],
+    ]);
   });
 
   it('should answer in French', async () => {
     const menu = await seedMenu();
     const section = await seedMenuSection(menu.id);
 
-    const res = await request.post(`/api/menu-sections/menu/${menu.id}/sections/reorder`).set(authHeader())
-      .set('Accept-Language', 'fr').send({ sectionIds: [section.id] });
+    const res = await request
+      .post(`/api/menu-sections/menu/${menu.id}/sections/reorder`)
+      .set(authHeader())
+      .set('Accept-Language', 'fr')
+      .send({ sectionIds: [section.id] });
 
     expect(res.body).toEqual({ message: 'Sections réordonnées' });
   });
@@ -158,7 +202,9 @@ describe('POST /api/menu-sections/menu/:menuId/sections/reorder', () => {
     const s1 = await seedMenuSection(menu.id, { position: 0 });
     const s2 = await seedMenuSection(menu.id, { position: 1 });
 
-    const res = await request.post(`/api/menu-sections/menu/${menu.id}/sections/reorder`).set(authHeader())
+    const res = await request
+      .post(`/api/menu-sections/menu/${menu.id}/sections/reorder`)
+      .set(authHeader())
       .send({ sectionIds: [s2.id] });
 
     expect(res.status).toBe(400);
@@ -174,7 +220,9 @@ describe('POST /api/menu-sections/menu/:menuId/sections/reorder', () => {
     const ownLast = await seedMenuSection(menu.id, { position: 1 });
     const foreign = await seedMenuSection(other.id, { position: 0 });
 
-    const res = await request.post(`/api/menu-sections/menu/${menu.id}/sections/reorder`).set(authHeader())
+    const res = await request
+      .post(`/api/menu-sections/menu/${menu.id}/sections/reorder`)
+      .set(authHeader())
       .send({ sectionIds: [ownLast.id, foreign.id] });
 
     expect(res.status).toBe(400);
@@ -185,7 +233,9 @@ describe('POST /api/menu-sections/menu/:menuId/sections/reorder', () => {
   });
 
   it('should return 404 for an unknown menu', async () => {
-    const res = await request.post('/api/menu-sections/menu/9999/sections/reorder').set(authHeader())
+    const res = await request
+      .post('/api/menu-sections/menu/9999/sections/reorder')
+      .set(authHeader())
       .send({ sectionIds: [] });
     expect(res.status).toBe(404);
   });

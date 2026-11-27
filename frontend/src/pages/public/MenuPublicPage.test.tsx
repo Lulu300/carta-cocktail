@@ -15,7 +15,13 @@ import {
   buildMenuSection,
   buildSiteSettings,
 } from '../../test/factories';
-import { captureRequest, mockApiError, mockApiPending, mockApiResponse, mockNetworkError } from '../../test/msw/utils';
+import {
+  captureRequest,
+  mockApiError,
+  mockApiPending,
+  mockApiResponse,
+  mockNetworkError,
+} from '../../test/msw/utils';
 import type { Bottle, Menu, MenuBottle, MenuCocktail } from '../../types';
 import { axe } from '../../test/axe';
 import { SiteSettingsProvider } from '../../contexts/SiteSettingsContext';
@@ -25,15 +31,12 @@ vi.mock('../../contexts/AuthContext', () => ({
   useAuth: vi.fn(),
 }));
 
-vi.mock('react-i18next', async (importOriginal) => {
-  const { translateWithValues } = await import('../../test/translateWithValues');
-  return {
-    ...await importOriginal<typeof import('react-i18next')>(),
-    useTranslation: () => ({ t: translateWithValues, i18n: { language: 'fr' } }),
-  };
-});
-
 import { useAuth } from '../../contexts/AuthContext';
+import i18n from '../../i18n';
+
+beforeEach(async () => {
+  await i18n.changeLanguage('fr');
+});
 
 const lime = buildCocktailIngredient({
   id: 1,
@@ -115,7 +118,7 @@ describe('MenuPublicPage', () => {
       renderMenu('aperitifs');
 
       expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
-      expect(screen.getByText('common.loading')).toHaveClass('sr-only');
+      expect(screen.getByText('Chargement...')).toHaveClass('sr-only');
     });
 
     it('tells an unknown menu apart and links to the home page', async () => {
@@ -123,10 +126,10 @@ describe('MenuPublicPage', () => {
       mockApiError('get', '/api/public/menus/:slug', 404, 'Not found');
       renderMenu('unknown');
 
-      expect(await screen.findByRole('alert')).toHaveTextContent('public.menuNotFound');
-      expect(screen.queryByRole('button', { name: 'common.retry' })).not.toBeInTheDocument();
+      expect(await screen.findByRole('alert')).toHaveTextContent('Carte introuvable');
+      expect(screen.queryByRole('button', { name: 'Réessayer' })).not.toBeInTheDocument();
 
-      await user.click(screen.getByRole('link', { name: 'public.backHome' }));
+      await user.click(screen.getByRole('link', { name: "Retour à l'accueil" }));
       expect(screen.getByText('home page')).toBeInTheDocument();
     });
 
@@ -135,12 +138,12 @@ describe('MenuPublicPage', () => {
       mockNetworkError('get', '/api/public/menus/:slug');
       renderMenu('cocktails');
 
-      expect(await screen.findByRole('alert')).toHaveTextContent('public.menuLoadError');
-      expect(screen.queryByText('public.menuNotFound')).not.toBeInTheDocument();
+      expect(await screen.findByRole('alert')).toHaveTextContent('Impossible de charger la carte');
+      expect(screen.queryByText('Carte introuvable')).not.toBeInTheDocument();
 
       mockMenu(mojitoMenu);
       const retried = captureRequest('get', '/api/public/menus/:slug');
-      await user.click(screen.getByRole('button', { name: 'common.retry' }));
+      await user.click(screen.getByRole('button', { name: 'Réessayer' }));
 
       expect(await screen.findByText('Mojito')).toBeInTheDocument();
       expect((await retried.url).pathname).toBe('/api/public/menus/cocktails');
@@ -155,7 +158,9 @@ describe('MenuPublicPage', () => {
       <QueryClientProvider client={createTestQueryClient()}>
         <MemoryRouter initialEntries={['/menu/cocktails']}>
           <SiteSettingsProvider>
-            <Routes><Route path="/menu/:slug" element={<MenuPublicPage />} /></Routes>
+            <Routes>
+              <Route path="/menu/:slug" element={<MenuPublicPage />} />
+            </Routes>
           </SiteSettingsProvider>
         </MemoryRouter>
       </QueryClientProvider>,
@@ -170,9 +175,9 @@ describe('MenuPublicPage', () => {
       renderMenu('aperitifs');
 
       expect(await screen.findByText('B57 (2)')).toBeInTheDocument();
-      expect(screen.getByText('units.abv(20)')).toBeInTheDocument();
-      expect(screen.queryByText('units.ml(700)')).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'cocktails.viewList' })).not.toBeInTheDocument();
+      expect(screen.getByText('20 % vol.')).toBeInTheDocument();
+      expect(screen.queryByText('700 ml')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Vue liste' })).not.toBeInTheDocument();
     });
 
     it('adds the inventory details for a signed-in admin', async () => {
@@ -181,44 +186,54 @@ describe('MenuPublicPage', () => {
       renderMenu('aperitifs');
 
       expect(await screen.findByText('B57 (2)')).toBeInTheDocument();
-      expect(screen.getByText('units.ml(700)')).toBeInTheDocument();
+      expect(screen.getByText('700 ml')).toBeInTheDocument();
       expect(screen.getByText('×2')).toBeInTheDocument();
     });
 
     it('shows a personal digestifs menu as a bottle menu, like the system ones', async () => {
-      mockMenu(buildMenu({
-        id: 3, name: 'After dinner', slug: 'after-dinner', type: 'DIGESTIFS',
-        bottles: [menuBottle(1, { name: 'Chartreuse', isApero: false, isDigestif: true })],
-      }));
+      mockMenu(
+        buildMenu({
+          id: 3,
+          name: 'After dinner',
+          slug: 'after-dinner',
+          type: 'DIGESTIFS',
+          bottles: [menuBottle(1, { name: 'Chartreuse', isApero: false, isDigestif: true })],
+        }),
+      );
       renderMenu('after-dinner');
 
-      expect(await screen.findByRole('heading', { level: 3, name: 'Chartreuse' })).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('public.bottleSearchPlaceholder')).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'cocktails.viewList' })).not.toBeInTheDocument();
+      expect(
+        await screen.findByRole('heading', { level: 3, name: 'Chartreuse' }),
+      ).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Rechercher une bouteille...')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Vue liste' })).not.toBeInTheDocument();
     });
 
     it('keeps the order of the bottles set in the admin', async () => {
-      mockMenu(bottleMenu([
-        menuBottle(1, { name: 'Zubrowka' }),
-        menuBottle(2, { name: 'Aperol' }),
-        menuBottle(3, { name: 'Lillet' }),
-      ]));
+      mockMenu(
+        bottleMenu([
+          menuBottle(1, { name: 'Zubrowka' }),
+          menuBottle(2, { name: 'Aperol' }),
+          menuBottle(3, { name: 'Lillet' }),
+        ]),
+      );
       renderMenu('aperitifs');
 
       await screen.findByText('Zubrowka');
-      const rows = screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent);
+      const rows = screen
+        .getAllByRole('heading', { level: 3 })
+        .map((heading) => heading.textContent);
       expect(rows).toEqual(['Zubrowka', 'Aperol', 'Lillet']);
     });
 
     it('finds "Apéro" when typing "apero"', async () => {
       const user = userEvent.setup();
-      mockMenu(bottleMenu([
-        menuBottle(1, { name: 'Apéro maison' }),
-        menuBottle(2, { name: 'Lillet' }),
-      ]));
+      mockMenu(
+        bottleMenu([menuBottle(1, { name: 'Apéro maison' }), menuBottle(2, { name: 'Lillet' })]),
+      );
       renderMenu('aperitifs');
 
-      await user.type(await screen.findByPlaceholderText('public.bottleSearchPlaceholder'), 'apero');
+      await user.type(await screen.findByPlaceholderText('Rechercher une bouteille...'), 'apero');
 
       await waitFor(() => expect(screen.queryByText('Lillet')).not.toBeInTheDocument());
       expect(screen.getByText('Apéro maison')).toBeInTheDocument();
@@ -226,16 +241,20 @@ describe('MenuPublicPage', () => {
 
     it('lists every location of a bottle in a dialog', async () => {
       const user = userEvent.setup();
-      mockMenu(bottleMenu(
-        ['Cave', 'Bar', 'Salon', 'Garage'].map((location, index) => menuBottle(index + 1, { location })),
-      ));
+      mockMenu(
+        bottleMenu(
+          ['Cave', 'Bar', 'Salon', 'Garage'].map((location, index) =>
+            menuBottle(index + 1, { location }),
+          ),
+        ),
+      );
       renderMenu('aperitifs');
 
-      await user.click(await screen.findByRole('button', { name: 'public.showAllLocations(4)' }));
+      await user.click(await screen.findByRole('button', { name: 'Voir les 4 emplacements' }));
 
       const dialog = screen.getByRole('dialog', { name: 'Suze' });
       expect(within(dialog).getByText('Garage')).toBeInTheDocument();
-      await user.click(within(dialog).getByRole('button', { name: 'common.close' }));
+      await user.click(within(dialog).getByRole('button', { name: 'Fermer' }));
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
   });
@@ -247,7 +266,7 @@ describe('MenuPublicPage', () => {
       renderMenu('cocktails');
 
       expect(await screen.findByTestId('public-cocktails-grid-view')).toBeInTheDocument();
-      await user.click(screen.getByRole('button', { name: 'cocktails.viewList' }));
+      await user.click(screen.getByRole('button', { name: 'Vue liste' }));
 
       expect(screen.getByTestId('public-cocktails-list-view')).toBeInTheDocument();
       expect(screen.queryByTestId('public-cocktails-grid-view')).not.toBeInTheDocument();
@@ -258,11 +277,14 @@ describe('MenuPublicPage', () => {
       mockMenu(mojitoMenu);
       renderMenu('cocktails');
 
-      await user.type(await screen.findByPlaceholderText('public.cocktailSearchPlaceholder'), 'rhum citron shaker');
+      await user.type(
+        await screen.findByPlaceholderText('Rechercher dans les recettes...'),
+        'rhum citron shaker',
+      );
 
       await waitFor(() => expect(screen.queryByText('Negroni')).not.toBeInTheDocument());
       expect(screen.getByText('Mojito')).toBeInTheDocument();
-      expect(await screen.findByText('common.resultCount(1)')).toHaveAttribute('aria-live', 'polite');
+      expect(await screen.findByText('1 résultat')).toHaveAttribute('aria-live', 'polite');
     });
 
     it('says when nothing matches and clears the search on request', async () => {
@@ -270,25 +292,28 @@ describe('MenuPublicPage', () => {
       mockMenu(mojitoMenu);
       renderMenu('cocktails');
 
-      await user.type(await screen.findByPlaceholderText('public.cocktailSearchPlaceholder'), 'whisky');
+      await user.type(
+        await screen.findByPlaceholderText('Rechercher dans les recettes...'),
+        'whisky',
+      );
 
-      expect(await screen.findByText('public.noResults(whisky)')).toBeInTheDocument();
-      expect(await screen.findByText('common.resultCount(0)')).toBeInTheDocument();
+      expect(await screen.findByText('Aucun résultat pour « whisky »')).toBeInTheDocument();
+      expect(await screen.findByText('0 résultat')).toBeInTheDocument();
 
-      await user.click(screen.getByText('common.clearSearch', { selector: 'button' }));
+      await user.click(screen.getByText('Effacer la recherche', { selector: 'button' }));
 
       expect(await screen.findByText('Negroni')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('public.cocktailSearchPlaceholder')).toHaveValue('');
+      expect(screen.getByPlaceholderText('Rechercher dans les recettes...')).toHaveValue('');
     });
 
     it('clears the search with the icon inside the search bar, and gives the focus back to the field', async () => {
       const user = userEvent.setup();
       mockMenu(mojitoMenu);
       renderMenu('cocktails');
-      const search = await screen.findByPlaceholderText('public.cocktailSearchPlaceholder');
+      const search = await screen.findByPlaceholderText('Rechercher dans les recettes...');
       await user.type(search, 'negroni');
 
-      await user.click(screen.getByRole('button', { name: 'common.clearSearch' }));
+      await user.click(screen.getByRole('button', { name: 'Effacer la recherche' }));
 
       expect(search).toHaveValue('');
       expect(search).toHaveFocus();
@@ -299,30 +324,46 @@ describe('MenuPublicPage', () => {
       mockMenu(cocktailMenu([]));
       renderMenu('cocktails');
 
-      expect(await screen.findByText('public.emptyMenu')).toBeInTheDocument();
+      expect(await screen.findByText('Cette carte est vide pour le moment')).toBeInTheDocument();
     });
 
     it('shows the section navigation from two sections on', async () => {
-      mockMenu(cocktailMenu(
-        [
-          buildMenuCocktail({ id: 1, menuSectionId: 10 }),
-          buildMenuCocktail({ id: 2, cocktail: { name: 'Negroni' }, menuSectionId: 20 }),
-          buildMenuCocktail({ id: 3, cocktail: { name: 'Spritz' }, menuSectionId: 30 }),
-        ],
-        { sections: [buildMenuSection({ id: 10, name: 'Classics' }), buildMenuSection({ id: 20, name: 'Signatures' }), buildMenuSection({ id: 30, name: 'Mocktails' })] },
-      ));
+      mockMenu(
+        cocktailMenu(
+          [
+            buildMenuCocktail({ id: 1, menuSectionId: 10 }),
+            buildMenuCocktail({ id: 2, cocktail: { name: 'Negroni' }, menuSectionId: 20 }),
+            buildMenuCocktail({ id: 3, cocktail: { name: 'Spritz' }, menuSectionId: 30 }),
+          ],
+          {
+            sections: [
+              buildMenuSection({ id: 10, name: 'Classics' }),
+              buildMenuSection({ id: 20, name: 'Signatures' }),
+              buildMenuSection({ id: 30, name: 'Mocktails' }),
+            ],
+          },
+        ),
+      );
       renderMenu('cocktails');
 
-      const nav = await screen.findByRole('navigation', { name: 'public.sectionNav' });
-      expect(within(nav).getAllByRole('button').map((chip) => chip.textContent)).toEqual(['Classics', 'Signatures', 'Mocktails']);
+      const nav = await screen.findByRole('navigation', { name: 'Sections de la carte' });
+      expect(
+        within(nav)
+          .getAllByRole('button')
+          .map((chip) => chip.textContent),
+      ).toEqual(['Classics', 'Signatures', 'Mocktails']);
       expect(document.getElementById('section-20')).toHaveTextContent('Negroni');
     });
 
     it('has no section navigation with a single section', async () => {
-      mockMenu(cocktailMenu(
-        [buildMenuCocktail({ id: 1, menuSectionId: 10 })],
-        { sections: [buildMenuSection({ id: 10, name: 'Classics' }), buildMenuSection({ id: 20, name: 'Empty' })] },
-      ));
+      mockMenu(
+        cocktailMenu([buildMenuCocktail({ id: 1, menuSectionId: 10 })], {
+          sections: [
+            buildMenuSection({ id: 10, name: 'Classics' }),
+            buildMenuSection({ id: 20, name: 'Empty' }),
+          ],
+        }),
+      );
       renderMenu('cocktails');
 
       expect(await screen.findByText('Classics')).toBeInTheDocument();
@@ -331,11 +372,13 @@ describe('MenuPublicPage', () => {
 
     it('shows the stock of each cocktail to a signed-in admin only', async () => {
       signIn(true);
-      mockApiResponse('get', '/api/availability/cocktails', { 1: buildAvailability({ cocktailId: 1, maxServings: 4 }) });
+      mockApiResponse('get', '/api/availability/cocktails', {
+        1: buildAvailability({ cocktailId: 1, maxServings: 4 }),
+      });
       mockMenu(mojitoMenu);
       renderMenu('cocktails');
 
-      expect(await screen.findByText('public.servings(4)')).toBeInTheDocument();
+      expect(await screen.findByText('4 doses')).toBeInTheDocument();
     });
 
     it('does not request the stock for a guest', async () => {
@@ -362,10 +405,16 @@ describe('MenuPublicPage accessibility', () => {
   it('has no serious accessibility violation on a cocktail menu, search in progress', async () => {
     const user = userEvent.setup();
     mockMenu(
-      cocktailMenu([...mojitoMenu.cocktails!, buildMenuCocktail({ id: 3, cocktail: { name: 'Daiquiri', isAvailable: true, available: false } })]),
+      cocktailMenu([
+        ...mojitoMenu.cocktails!,
+        buildMenuCocktail({
+          id: 3,
+          cocktail: { name: 'Daiquiri', isAvailable: true, available: false },
+        }),
+      ]),
     );
     const { container } = renderMenu('cocktails');
-    await user.type(await screen.findByPlaceholderText('public.cocktailSearchPlaceholder'), 'i');
+    await user.type(await screen.findByPlaceholderText('Rechercher dans les recettes...'), 'i');
 
     expect(await axe(container)).toHaveNoViolations();
   });

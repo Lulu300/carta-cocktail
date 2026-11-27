@@ -17,7 +17,11 @@ function StepIndicator({ steps, currentStep }: { steps: string[]; currentStep: n
   return (
     <ol className="flex items-center justify-center gap-2 pb-2">
       {steps.map((label, index) => (
-        <li key={label} className="flex items-center gap-2" aria-current={index === currentStep ? 'step' : undefined}>
+        <li
+          key={label}
+          className="flex items-center gap-2"
+          aria-current={index === currentStep ? 'step' : undefined}
+        >
           <span
             aria-hidden="true"
             className={cx(
@@ -29,7 +33,10 @@ function StepIndicator({ steps, currentStep }: { steps: string[]; currentStep: n
           </span>
           <span className="sr-only">{label}</span>
           {index < steps.length - 1 && (
-            <span aria-hidden="true" className={cx('w-12 h-0.5', index < currentStep ? 'bg-accent' : 'bg-gray-700')} />
+            <span
+              aria-hidden="true"
+              className={cx('w-12 h-0.5', index < currentStep ? 'bg-accent' : 'bg-gray-700')}
+            />
           )}
         </li>
       ))}
@@ -38,7 +45,14 @@ function StepIndicator({ steps, currentStep }: { steps: string[]; currentStep: n
 }
 
 /** Frame shared by the import wizards: modal, title and step indicator. */
-export default function WizardModal({ title, steps, currentStep, onClose, footer, children }: WizardModalProps) {
+export default function WizardModal({
+  title,
+  steps,
+  currentStep,
+  onClose,
+  footer,
+  children,
+}: WizardModalProps) {
   return (
     // A click outside would lose the file and every choice made so far
     <Modal open onClose={onClose} title={title} size="xl" footer={footer} closeOnBackdrop={false}>

@@ -10,7 +10,11 @@ interface BottleGroupRowProps {
   onShowLocations: (group: BottleGroupEntry) => void;
 }
 
-export default function BottleGroupRow({ group, showInventory, onShowLocations }: BottleGroupRowProps) {
+export default function BottleGroupRow({
+  group,
+  showInventory,
+  onShowLocations,
+}: BottleGroupRowProps) {
   const { t } = useTranslation();
   const hiddenLocationCount = group.locations.length - MAX_VISIBLE_LOCATIONS;
 
@@ -18,9 +22,11 @@ export default function BottleGroupRow({ group, showInventory, onShowLocations }
     <div className="px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <h3 className="text-lg font-medium text-white">{group.name}</h3>
+          <h3 className="text-lg font-medium text-fg-strong">{group.name}</h3>
           {showInventory && group.count > 1 && (
-            <span className="bg-accent/20 text-accent text-xs font-bold px-2 py-0.5 rounded-full">×{group.count}</span>
+            <span className="bg-accent/20 text-accent text-xs font-bold px-2 py-0.5 rounded-full">
+              ×{group.count}
+            </span>
           )}
         </div>
         <div className="flex items-center gap-3 mt-1 text-sm text-fg-muted">
@@ -38,8 +44,12 @@ export default function BottleGroupRow({ group, showInventory, onShowLocations }
       {group.locations.length > 0 && (
         <div className="flex items-center gap-1 flex-wrap justify-end max-w-xs">
           {group.locations.slice(0, MAX_VISIBLE_LOCATIONS).map((location) => (
-            <span key={location.name} className="bg-gray-700/50 text-fg-muted text-xs px-2 py-0.5 rounded">
-              {location.name}{group.count > 1 && ` (${location.count})`}
+            <span
+              key={location.name}
+              className="bg-line-strong/50 text-fg-muted text-xs px-2 py-0.5 rounded"
+            >
+              {location.name}
+              {group.count > 1 && ` (${location.count})`}
             </span>
           ))}
           {hiddenLocationCount > 0 && (
@@ -57,4 +67,3 @@ export default function BottleGroupRow({ group, showInventory, onShowLocations }
     </div>
   );
 }
-

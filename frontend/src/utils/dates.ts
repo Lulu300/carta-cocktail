@@ -3,7 +3,7 @@
  * The API and the forms keep ISO dates (`yyyy-mm-dd`); only what the admin reads and types changes.
  */
 
-import { FALLBACK_LANGUAGE, getBaseLanguage } from './localization';
+import { getBaseLanguage } from './localization';
 
 type DateField = 'day' | 'month' | 'year';
 
@@ -19,8 +19,11 @@ interface DateFormat {
  * `en-GB` writes the day first: `12/03/2024` is March 12.
  * A Map, not an object: `constructor` is no language.
  */
+/** The format of the fallback language (`en`), used for any other language. */
+const FALLBACK_DATE_FORMAT: DateFormat = { order: ['month', 'day', 'year'], separator: '/' };
+
 const DATE_FORMATS = new Map<string, DateFormat>([
-  ['en', { order: ['month', 'day', 'year'], separator: '/' }],
+  ['en', FALLBACK_DATE_FORMAT],
   ['en-GB', { order: ['day', 'month', 'year'], separator: '/' }],
   ['fr', { order: ['day', 'month', 'year'], separator: '/' }],
 ]);
@@ -37,9 +40,11 @@ const FIELD_LETTER_KEYS: Record<DateField, string> = {
 
 /** The exact code first (`en-GB`), then its base language (`en`), then the app's fallback language. */
 function dateFormat(language: string): DateFormat {
-  return DATE_FORMATS.get(language)
-    ?? DATE_FORMATS.get(getBaseLanguage(language))
-    ?? DATE_FORMATS.get(FALLBACK_LANGUAGE)!;
+  return (
+    DATE_FORMATS.get(language) ??
+    DATE_FORMATS.get(getBaseLanguage(language)) ??
+    FALLBACK_DATE_FORMAT
+  );
 }
 
 function pad(value: number, length: number): string {
@@ -55,7 +60,7 @@ const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 /** `Date` would roll 31/02 over to March: the day is checked against the month. */
 function isCalendarDate(year: number, month: number, day: number): boolean {
   if (month < 1 || month > 12 || day < 1) return false;
-  const lastDay = month === 2 && isLeapYear(year) ? 29 : DAYS_IN_MONTH[month - 1];
+  const lastDay = month === 2 && isLeapYear(year) ? 29 : (DAYS_IN_MONTH[month - 1] ?? 0);
   return day <= lastDay;
 }
 
@@ -89,7 +94,7 @@ export function parseDateInput(text: string, language: string): string | null {
   const fields: Partial<Record<DateField, number>> = {};
   for (const [index, field] of order.entries()) {
     const digits = field === 'year' ? /^\d{4}$/ : /^\d{1,2}$/;
-    if (!digits.test(parts[index])) return null;
+    if (!digits.test(parts[index] ?? '')) return null;
     fields[field] = Number(parts[index]);
   }
 

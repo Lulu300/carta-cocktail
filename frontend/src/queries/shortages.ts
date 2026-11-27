@@ -4,5 +4,5 @@ import type { Shortage } from '../types';
 import { qk } from './keys';
 
 export function useShortages(): UseQueryResult<Shortage[], Error> {
-  return useQuery({ queryKey: qk.shortages, queryFn: () => shortagesApi.list() });
+  return useQuery({ queryKey: qk.shortages, queryFn: ({ signal }) => shortagesApi.list(signal) });
 }

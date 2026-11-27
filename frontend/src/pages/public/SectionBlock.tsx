@@ -18,7 +18,13 @@ const SCROLL_MARGIN = 'scroll-mt-[calc(var(--header-h)+8rem)]';
 const CARD_CLASSES = 'bg-surface border border-line rounded-xl overflow-hidden';
 
 /** A titled block of the public menu, target of the section navigation. */
-export default function SectionBlock({ anchorId, title, kind, rowsInCard = false, children }: SectionBlockProps) {
+export default function SectionBlock({
+  anchorId,
+  title,
+  kind,
+  rowsInCard = false,
+  children,
+}: SectionBlockProps) {
   const content = rowsInCard ? <div className="divide-y divide-line">{children}</div> : children;
 
   // Bottles grouped by category: the title is the header of the card.
@@ -36,7 +42,12 @@ export default function SectionBlock({ anchorId, title, kind, rowsInCard = false
   return (
     <section id={anchorId} className={SCROLL_MARGIN}>
       {title && (
-        <h2 className={cx('text-2xl font-serif font-bold mb-4', kind === 'unsectioned' ? 'text-fg-muted' : 'text-accent')}>
+        <h2
+          className={cx(
+            'text-2xl font-serif font-bold mb-4',
+            kind === 'unsectioned' ? 'text-fg-muted' : 'text-accent',
+          )}
+        >
           {title}
         </h2>
       )}

@@ -1,22 +1,39 @@
 import { describe, expect, it } from 'vitest';
 import { buildCocktail, buildCocktailIngredient, buildIngredient } from '../test/factories';
 import type { Cocktail } from '../types';
-import { buildSearchText, matchesCocktailSearch, matchesSearchText, normalize } from './cocktailSearch';
+import {
+  buildSearchText,
+  matchesCocktailSearch,
+  matchesSearchText,
+  normalize,
+} from './cocktailSearch';
 
 const localize = (entity: { name: string; nameTranslations?: Record<string, string> | null }) =>
   entity.nameTranslations?.fr || entity.name;
 
 function cocktail(overrides: Partial<Cocktail> = {}): Cocktail {
-  return buildCocktail({ id: 1, name: 'Mojito', description: 'Un cocktail frais', tags: 'rhum,tiki', ...overrides });
+  return buildCocktail({
+    id: 1,
+    name: 'Mojito',
+    description: 'Un cocktail frais',
+    tags: 'rhum,tiki',
+    ...overrides,
+  });
 }
 
 describe('matchesCocktailSearch', () => {
   it('matches every search term across different recipe fields', () => {
     const item = cocktail({
-      ingredients: [buildCocktailIngredient({
-        id: 1,
-        ingredient: buildIngredient({ id: 1, name: 'Lime', nameTranslations: { fr: 'Citron vert' } }),
-      })],
+      ingredients: [
+        buildCocktailIngredient({
+          id: 1,
+          ingredient: buildIngredient({
+            id: 1,
+            name: 'Lime',
+            nameTranslations: { fr: 'Citron vert' },
+          }),
+        }),
+      ],
     });
 
     expect(matchesCocktailSearch(item, 'rhum citron', localize)).toBe(true);

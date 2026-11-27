@@ -4,11 +4,14 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteSettings } from '../../contexts/SiteSettingsContext';
 import { useShortages } from '../../queries/shortages';
+import UpdateAvailableBanner from '../admin/UpdateAvailableBanner';
 import UpgradeNoticeBanner from '../admin/UpgradeNoticeBanner';
 import { cx } from '../ui/classNames';
 import LanguageSelector from '../ui/LanguageSelector';
 import { useDisclosure } from '../ui/useDisclosure';
 import AppVersion from './AppVersion';
+import BackHomeLink from './BackHomeLink';
+import RouteErrorBoundary from './RouteErrorBoundary';
 import SiteName from './SiteName';
 import SkipLink, { MAIN_CONTENT_ID } from './SkipLink';
 
@@ -51,7 +54,7 @@ export default function AdminLayout() {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    void navigate('/login');
   };
 
   return (
@@ -61,7 +64,7 @@ export default function AdminLayout() {
         ref={sidebarRef}
         id={sidebarId}
         className={cx(
-          'fixed inset-y-0 left-0 z-30 w-64 flex flex-col bg-surface border-r border-line',
+          'fixed inset-y-0 left-0 z-30 w-64 lg:shrink-0 flex flex-col bg-surface border-r border-line',
           'motion-reduce:transition-none lg:translate-x-0 lg:static',
           // A closed drawer is only moved off screen: invisible keeps its links out of the tab order.
           // Opening shows it at once, or focus() would land on a still hidden element;
@@ -73,15 +76,20 @@ export default function AdminLayout() {
       >
         <div className="p-6 border-b border-line">
           <Link to="/admin" className="text-xl font-bold text-accent font-serif">
-            {siteSettings.siteIcon && <span aria-hidden="true" className="mr-1">{siteSettings.siteIcon}</span>}
+            {siteSettings.siteIcon && (
+              <span aria-hidden="true" className="mr-1">
+                {siteSettings.siteIcon}
+              </span>
+            )}
             <SiteName />
           </Link>
         </div>
         <nav aria-label={t('nav.admin')} className="p-4 space-y-1">
           {navItems.map((item) => {
-            const isActive = item.path === '/admin'
-              ? location.pathname === '/admin'
-              : location.pathname.startsWith(item.path);
+            const isActive =
+              item.path === '/admin'
+                ? location.pathname === '/admin'
+                : location.pathname.startsWith(item.path);
             return (
               <Link
                 key={item.path}
@@ -90,7 +98,9 @@ export default function AdminLayout() {
                 aria-current={isActive ? 'page' : undefined}
                 className={cx(
                   'flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors',
-                  isActive ? 'bg-accent/10 text-accent' : 'text-fg-muted hover:bg-line hover:text-fg',
+                  isActive
+                    ? 'bg-accent/10 text-accent'
+                    : 'text-fg-muted hover:bg-line hover:text-fg',
                 )}
               >
                 <span aria-hidden="true">{item.icon}</span>
@@ -117,20 +127,32 @@ export default function AdminLayout() {
       )}
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col min-h-screen">
+      {/* min-w-0: a flex item is as wide as its content by default, so a wide table would stretch the page */}
+      <div className="flex-1 min-w-0 flex flex-col min-h-screen">
         {/* Top bar */}
-        <header className="bg-surface border-b border-line px-6 py-4 flex items-center justify-between">
+        <header className="bg-surface border-b border-line px-4 sm:px-6 py-4 flex items-center justify-between">
           <button
             {...menuButtonProps}
             aria-label={t('nav.menu')}
             className="lg:hidden p-2 -m-2 rounded-lg text-fg-muted hover:text-fg"
           >
-            <svg aria-hidden="true" className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            <svg
+              aria-hidden="true"
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 6h16M4 12h16M4 18h16"
+              />
             </svg>
           </button>
 
-          <div className="flex items-center gap-4 ml-auto">
+          <div className="flex items-center gap-2 sm:gap-4 ml-auto">
             {shortageCount > 0 && (
               <Link
                 to="/admin/shortages"
@@ -152,9 +174,16 @@ export default function AdminLayout() {
         </header>
 
         <UpgradeNoticeBanner />
+        <UpdateAvailableBanner className="mx-6 mt-4" />
 
         <main id={MAIN_CONTENT_ID} tabIndex={-1} className="flex-1 p-6">
-          <Outlet />
+          {/* The sidebar and header stay when a page fails: the way out is the dashboard */}
+          <RouteErrorBoundary
+            fullScreen={false}
+            backLink={<BackHomeLink to="/admin" label={t('nav.dashboard')} />}
+          >
+            <Outlet />
+          </RouteErrorBoundary>
         </main>
       </div>
     </div>

@@ -4,6 +4,8 @@ import type { Menu } from '../types';
 export type BottleMenuType = Exclude<Menu['type'], 'COCKTAILS'>;
 
 /** An aperitifs or digestifs menu, system or personal: it holds bottles. */
-export function isBottleMenu<M extends Pick<Menu, 'type'>>(menu: M): menu is M & { type: BottleMenuType } {
+export function isBottleMenu<M extends Pick<Menu, 'type'>>(
+  menu: M,
+): menu is M & { type: BottleMenuType } {
   return menu.type === 'APEROS' || menu.type === 'DIGESTIFS';
 }

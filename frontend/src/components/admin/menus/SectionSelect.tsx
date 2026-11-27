@@ -13,7 +13,13 @@ interface SectionSelectProps {
 }
 
 /** Picks the section of a menu item. */
-export default function SectionSelect({ value, sections, onChange, label, disabled }: SectionSelectProps) {
+export default function SectionSelect({
+  value,
+  sections,
+  onChange,
+  label,
+  disabled,
+}: SectionSelectProps) {
   const { t } = useTranslation();
 
   return (
@@ -29,7 +35,9 @@ export default function SectionSelect({ value, sections, onChange, label, disabl
     >
       <option value="">{t('menus.sections.none')}</option>
       {sections.map((section) => (
-        <option key={section.id} value={section.id}>{section.name}</option>
+        <option key={section.id} value={section.id}>
+          {section.name}
+        </option>
       ))}
     </select>
   );

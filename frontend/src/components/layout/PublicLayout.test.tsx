@@ -28,8 +28,8 @@ describe('PublicLayout', () => {
 
     const header = screen.getByRole('banner');
     const footer = screen.getByRole('contentinfo');
-    expect(within(header).queryByRole('link', { name: 'nav.login' })).not.toBeInTheDocument();
-    expect(within(footer).getByRole('link', { name: 'nav.login' })).toHaveAttribute('href', '/login');
+    expect(within(header).queryByRole('link', { name: 'Login' })).not.toBeInTheDocument();
+    expect(within(footer).getByRole('link', { name: 'Login' })).toHaveAttribute('href', '/login');
     expect(within(footer).getByText('Chez Lulu')).toBeInTheDocument();
   });
 
@@ -38,14 +38,18 @@ describe('PublicLayout', () => {
 
     render(<PublicLayout />);
 
-    expect(within(screen.getByRole('banner')).getByRole('link', { name: 'nav.dashboard' })).toHaveAttribute('href', '/admin');
-    expect(screen.queryByRole('link', { name: 'nav.login' })).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole('banner')).getByRole('link', { name: 'Dashboard' }),
+    ).toHaveAttribute('href', '/admin');
+    expect(screen.queryByRole('link', { name: 'Login' })).not.toBeInTheDocument();
   });
 
   it('links the site name in the header to the home page', () => {
     render(<PublicLayout />);
 
-    expect(within(screen.getByRole('banner')).getByRole('link', { name: /Chez Lulu/ })).toHaveAttribute('href', '/');
+    expect(
+      within(screen.getByRole('banner')).getByRole('link', { name: /Chez Lulu/ }),
+    ).toHaveAttribute('href', '/');
   });
 
   it('starts with a skip link to the main content, and puts the header links in a navigation landmark', async () => {
@@ -54,20 +58,25 @@ describe('PublicLayout', () => {
 
     await user.tab();
 
-    const skipLink = screen.getByRole('link', { name: 'nav.skipToContent' });
+    const skipLink = screen.getByRole('link', { name: 'Skip to content' });
     expect(skipLink).toHaveFocus();
     expect(skipLink).toHaveAttribute('href', `#${screen.getByRole('main').id}`);
     // The link moves the focus to the main content, and is never printed.
     expect(screen.getByRole('main')).toHaveAttribute('tabindex', '-1');
     expect(skipLink).toHaveClass('print:hidden');
-    const nav = within(screen.getByRole('banner')).getByRole('navigation', { name: 'nav.main' });
+    const nav = within(screen.getByRole('banner')).getByRole('navigation', {
+      name: 'Main navigation',
+    });
     expect(within(nav).getByRole('link', { name: /Chez Lulu/ })).toBeInTheDocument();
   });
 
   it('hides the site icon from screen readers', () => {
     render(<PublicLayout />);
 
-    expect(within(screen.getByRole('banner')).getByText('🍹')).toHaveAttribute('aria-hidden', 'true');
+    expect(within(screen.getByRole('banner')).getByText('🍹')).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    );
   });
 
   it('has no serious accessibility violation', async () => {

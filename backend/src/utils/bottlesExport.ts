@@ -61,10 +61,16 @@ function aggregateBottles(bottles: BottleWithCategory[]): BottleExportRecord[] {
   for (const b of bottles) {
     const openedAtIso = b.openedAt ? b.openedAt.toISOString() : null;
     const key = [
-      b.name, b.category.name, b.capacityMl, b.remainingPercent,
-      b.alcoholPercentage ?? '', b.purchasePrice ?? '',
-      b.location ?? '', openedAtIso ?? '',
-      b.isApero ? '1' : '0', b.isDigestif ? '1' : '0',
+      b.name,
+      b.category.name,
+      b.capacityMl,
+      b.remainingPercent,
+      b.alcoholPercentage ?? '',
+      b.purchasePrice ?? '',
+      b.location ?? '',
+      openedAtIso ?? '',
+      b.isApero ? '1' : '0',
+      b.isDigestif ? '1' : '0',
     ].join('|');
     const existing = map.get(key);
     if (existing) {
@@ -113,9 +119,18 @@ export function buildExportPayload(bottles: BottleWithCategory[]): BottlesExport
 }
 
 const CSV_COLUMNS = [
-  'name', 'categoryName', 'categoryType', 'capacityMl', 'quantity',
-  'remainingPercent', 'alcoholPercentage', 'purchasePrice',
-  'location', 'openedAt', 'isApero', 'isDigestif',
+  'name',
+  'categoryName',
+  'categoryType',
+  'capacityMl',
+  'quantity',
+  'remainingPercent',
+  'alcoholPercentage',
+  'purchasePrice',
+  'location',
+  'openedAt',
+  'isApero',
+  'isDigestif',
 ] as const;
 
 /** Byte order mark: without it, Excel reads a UTF-8 file as Windows-1252 and breaks the accents. */
@@ -161,20 +176,22 @@ export function buildCsvPayload(bottles: BottleWithCategory[]): string {
 
   const rows: string[] = [CSV_COLUMNS.join(',')];
   for (const r of records) {
-    rows.push([
-      escapeCsvField(r.name),
-      escapeCsvField(r.categoryName),
-      escapeCsvField(typeByCategoryName.get(r.categoryName) ?? ''),
-      escapeCsvField(r.capacityMl),
-      escapeCsvField(r.quantity),
-      escapeCsvField(r.remainingPercent),
-      escapeCsvField(r.alcoholPercentage),
-      escapeCsvField(r.purchasePrice),
-      escapeCsvField(r.location),
-      escapeCsvField(r.openedAt),
-      escapeCsvField(r.isApero),
-      escapeCsvField(r.isDigestif),
-    ].join(','));
+    rows.push(
+      [
+        escapeCsvField(r.name),
+        escapeCsvField(r.categoryName),
+        escapeCsvField(typeByCategoryName.get(r.categoryName) ?? ''),
+        escapeCsvField(r.capacityMl),
+        escapeCsvField(r.quantity),
+        escapeCsvField(r.remainingPercent),
+        escapeCsvField(r.alcoholPercentage),
+        escapeCsvField(r.purchasePrice),
+        escapeCsvField(r.location),
+        escapeCsvField(r.openedAt),
+        escapeCsvField(r.isApero),
+        escapeCsvField(r.isDigestif),
+      ].join(','),
+    );
   }
   return UTF8_BOM + rows.join('\n') + '\n';
 }

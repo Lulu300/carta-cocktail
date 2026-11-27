@@ -1,10 +1,17 @@
 import { useTranslation } from 'react-i18next';
 import type { BottleImportRowError, BottleImportRowWarning } from '../../types';
 import { datePattern, isoDatePattern } from '../../utils/dates';
+import Alert from '../ui/Alert';
 
 // Codes and sources this version can name. A newer backend may send others:
 // they get a generic reason, or the raw source, rather than an i18n key.
-const KNOWN_ERROR_CODES: readonly string[] = ['required', 'outOfRange', 'invalidDate', 'invalidNumber', 'malformedQuotes'];
+const KNOWN_ERROR_CODES: readonly string[] = [
+  'required',
+  'outOfRange',
+  'invalidDate',
+  'invalidNumber',
+  'malformedQuotes',
+];
 const KNOWN_WARNING_CODES: readonly string[] = ['lineBreak'];
 const KNOWN_SOURCES: readonly string[] = ['bottles', 'categories'];
 
@@ -17,11 +24,8 @@ interface RowIssue {
   code: string;
 }
 
-const TONES = {
-  error: { role: 'alert', className: 'bg-red-500/10 border border-red-500/30 text-red-400' },
-  // Not an alert: the rows are imported, nothing interrupts the admin
-  warning: { role: 'status', className: 'bg-amber-500/10 border border-amber-500/30 text-amber-400' },
-} as const;
+// A warning is not an alert: the rows are imported, nothing interrupts the admin
+const TONES = { error: 'danger', warning: 'warning' } as const;
 
 interface RowIssuesProps {
   issues: RowIssue[];
@@ -45,20 +49,22 @@ function RowIssues({ issues, tone, title, hint, reason }: RowIssuesProps) {
   };
 
   return (
-    <section role={TONES[tone].role} className={`${TONES[tone].className} rounded-lg p-3 text-sm space-y-2`}>
-      <p className="font-semibold">{title}</p>
+    <Alert tone={TONES[tone]} title={title}>
       {hint && <p className="text-xs">{hint}</p>}
       <ul className="space-y-1 text-xs">
         {issues.map((issue) => (
           <li key={`${issue.source}-${issue.line}-${issue.field}-${issue.column ?? ''}`}>
             <span className="font-medium">
-              {t('bottles.importWizard.rowErrors.position', { source: sourceLabel(issue.source), line: issue.line })}
+              {t('bottles.importWizard.rowErrors.position', {
+                source: sourceLabel(issue.source),
+                line: issue.line,
+              })}
             </span>{' '}
             <span>{reason(issue, fieldLabel(issue))}</span>
           </li>
         ))}
       </ul>
-    </section>
+    </Alert>
   );
 }
 

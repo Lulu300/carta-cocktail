@@ -44,7 +44,8 @@ router.get('/menu/:menuId', validate(menuSchemas), async (_req: AuthRequest, res
 const createSchemas = { body: MenuBottleCreate };
 
 router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Response) => {
-  const { menuId, bottleId, position, isHidden, menuSectionId } = valid<typeof createSchemas>(res).body;
+  const { menuId, bottleId, position, isHidden, menuSectionId } =
+    valid<typeof createSchemas>(res).body;
   const menuBottle = await prisma.$transaction(async (tx) => {
     const menu = await tx.menu.findUnique({ where: { id: menuId } });
     // An unknown id in the body is a bad request, as the foreign key used to answer
@@ -71,7 +72,10 @@ router.post('/', validate(createSchemas), async (_req: AuthRequest, res: Respons
 const updateSchemas = { params: IdParams, body: MenuBottleUpdate };
 
 router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Response) => {
-  const { params: { id }, body: { position, isHidden, menuSectionId } } = valid<typeof updateSchemas>(res);
+  const {
+    params: { id },
+    body: { position, isHidden, menuSectionId },
+  } = valid<typeof updateSchemas>(res);
   const menuBottle = await prisma.$transaction(async (tx) => {
     const entry = await tx.menuBottle.findUnique({ where: { id }, select: { menuId: true } });
     if (!entry) throw new NotFoundError();
@@ -89,60 +93,95 @@ router.put('/:id', validate(updateSchemas), async (_req: AuthRequest, res: Respo
 // Apply one change (visibility or section) to several entries of a menu at once: all of them or none
 const groupUpdateSchemas = { params: MenuIdParams, body: MenuBottleGroupUpdate };
 
-router.put('/menu/:menuId/entries', validate(groupUpdateSchemas), async (req: AuthRequest, res: Response) => {
-  const { params: { menuId }, body: { ids, isHidden, menuSectionId } } = valid<typeof groupUpdateSchemas>(res);
-  const entryIds = [...new Set(ids)];
-  await prisma.$transaction(async (tx) => {
-    // As for one entry: an id that is not an entry of this menu is not found
-    const ownedCount = await tx.menuBottle.count({ where: { menuId, id: { in: entryIds } } });
-    if (ownedCount !== entryIds.length) throw new NotFoundError();
-    await assertSectionInMenu(tx, menuSectionId, menuId);
-    // Absent fields are undefined, which Prisma leaves untouched
-    await tx.menuBottle.updateMany({ where: { id: { in: entryIds } }, data: { isHidden, menuSectionId } });
-  });
-  res.json({ message: req.t('menuBottles.updated') });
-});
+router.put(
+  '/menu/:menuId/entries',
+  validate(groupUpdateSchemas),
+  async (req: AuthRequest, res: Response) => {
+    const {
+      params: { menuId },
+      body: { ids, isHidden, menuSectionId },
+    } = valid<typeof groupUpdateSchemas>(res);
+    const entryIds = [...new Set(ids)];
+    await prisma.$transaction(async (tx) => {
+      // As for one entry: an id that is not an entry of this menu is not found
+      const ownedCount = await tx.menuBottle.count({ where: { menuId, id: { in: entryIds } } });
+      if (ownedCount !== entryIds.length) throw new NotFoundError();
+      await assertSectionInMenu(tx, menuSectionId, menuId);
+      // Absent fields are undefined, which Prisma leaves untouched
+      await tx.menuBottle.updateMany({
+        where: { id: { in: entryIds } },
+        data: { isHidden, menuSectionId },
+      });
+    });
+    res.json({ message: req.t('menuBottles.updated') });
+  },
+);
 
 // Add several bottles at the end of a personal menu at once, in the order given: all of them or none
 const addManySchemas = { params: MenuIdParams, body: MenuBottleIds };
 
-router.post('/menu/:menuId/entries', validate(addManySchemas), async (req: AuthRequest, res: Response) => {
-  const { params: { menuId }, body: { bottleIds } } = valid<typeof addManySchemas>(res);
-  await prisma.$transaction((tx) => addBottles(tx, menuId, bottleIds));
-  res.status(201).json({ message: req.t('menuBottles.added') });
-});
+router.post(
+  '/menu/:menuId/entries',
+  validate(addManySchemas),
+  async (req: AuthRequest, res: Response) => {
+    const {
+      params: { menuId },
+      body: { bottleIds },
+    } = valid<typeof addManySchemas>(res);
+    await prisma.$transaction((tx) => addBottles(tx, menuId, bottleIds));
+    res.status(201).json({ message: req.t('menuBottles.added') });
+  },
+);
 
 // Remove several entries of a menu at once, as DELETE /:id does for one (an exclusion on a
 // system menu): all of them or none
 const removeManySchemas = { params: MenuIdParams, body: MenuBottleEntryIds };
 
-router.post('/menu/:menuId/entries/remove', validate(removeManySchemas), async (req: AuthRequest, res: Response) => {
-  const { params: { menuId }, body: { ids } } = valid<typeof removeManySchemas>(res);
-  const entryIds = [...new Set(ids)];
-  await prisma.$transaction(async (tx) => {
-    const entries = await tx.menuBottle.findMany({
-      where: { menuId, id: { in: entryIds } },
-      select: { bottleId: true, menu: { select: { slug: true } } },
+router.post(
+  '/menu/:menuId/entries/remove',
+  validate(removeManySchemas),
+  async (req: AuthRequest, res: Response) => {
+    const {
+      params: { menuId },
+      body: { ids },
+    } = valid<typeof removeManySchemas>(res);
+    const entryIds = [...new Set(ids)];
+    await prisma.$transaction(async (tx) => {
+      const entries = await tx.menuBottle.findMany({
+        where: { menuId, id: { in: entryIds } },
+        select: { bottleId: true, menu: { select: { slug: true } } },
+      });
+      // As for one entry: an id that is not an entry of this menu is not found
+      if (entries.length !== entryIds.length) throw new NotFoundError();
+      if (isSystemMenu(entries[0].menu)) {
+        await excludeBottles(
+          tx,
+          menuId,
+          entries.map((entry) => entry.bottleId),
+        );
+      } else {
+        await tx.menuBottle.deleteMany({ where: { id: { in: entryIds } } });
+      }
     });
-    // As for one entry: an id that is not an entry of this menu is not found
-    if (entries.length !== entryIds.length) throw new NotFoundError();
-    if (isSystemMenu(entries[0].menu)) {
-      await excludeBottles(tx, menuId, entries.map((entry) => entry.bottleId));
-    } else {
-      await tx.menuBottle.deleteMany({ where: { id: { in: entryIds } } });
-    }
-  });
-  res.json({ message: req.t('menuBottles.removed') });
-});
+    res.json({ message: req.t('menuBottles.removed') });
+  },
+);
 
 // Reorder all the bottles of a menu at once: ids lists every entry of the menu, in its new order
 const reorderSchemas = { params: MenuIdParams, body: MenuBottleReorder };
 
-router.post('/menu/:menuId/reorder', validate(reorderSchemas), async (req: AuthRequest, res: Response) => {
-  const { params: { menuId }, body: { ids } } = valid<typeof reorderSchemas>(res);
-  await prisma.$transaction((tx) => reorder(tx, 'menuBottle', menuId, ids));
-  res.json({ message: req.t('menuBottles.reordered') });
-});
+router.post(
+  '/menu/:menuId/reorder',
+  validate(reorderSchemas),
+  async (req: AuthRequest, res: Response) => {
+    const {
+      params: { menuId },
+      body: { ids },
+    } = valid<typeof reorderSchemas>(res);
+    await prisma.$transaction((tx) => reorder(tx, 'menuBottle', menuId, ids));
+    res.json({ message: req.t('menuBottles.reordered') });
+  },
+);
 
 // Remove bottle from menu: on a system menu, the removal is kept as an exclusion
 router.delete('/:id', validate(idRequest), async (req: AuthRequest, res: Response) => {
@@ -160,47 +199,73 @@ router.delete('/:id', validate(idRequest), async (req: AuthRequest, res: Respons
 });
 
 // Sync a system menu with the bottles' flags (isApero/isDigestif) and its exclusions
-router.post('/menu/:menuId/sync', validate(menuSchemas), async (req: AuthRequest, res: Response) => {
-  const { menuId } = valid<typeof menuSchemas>(res).params;
-  const { added, removed } = await prisma.$transaction((tx) => syncMenu(tx, menuId));
-  res.json({ message: req.t('menuBottles.synced'), added, removed });
-});
+router.post(
+  '/menu/:menuId/sync',
+  validate(menuSchemas),
+  async (req: AuthRequest, res: Response) => {
+    const { menuId } = valid<typeof menuSchemas>(res).params;
+    const { added, removed } = await prisma.$transaction((tx) => syncMenu(tx, menuId));
+    res.json({ message: req.t('menuBottles.synced'), added, removed });
+  },
+);
 
 // Bottles removed from a system menu; a personal menu has none
-router.get('/menu/:menuId/exclusions', validate(menuSchemas), async (_req: AuthRequest, res: Response) => {
-  const exclusions = await prisma.menuBottleExclusion.findMany({
-    where: { menuId: valid<typeof menuSchemas>(res).params.menuId },
-    include: BOTTLE_WITH_CATEGORY,
-    orderBy: { bottle: { name: 'asc' } },
-  });
-  res.json(parseNameTranslations(exclusions));
-});
+router.get(
+  '/menu/:menuId/exclusions',
+  validate(menuSchemas),
+  async (_req: AuthRequest, res: Response) => {
+    const exclusions = await prisma.menuBottleExclusion.findMany({
+      where: { menuId: valid<typeof menuSchemas>(res).params.menuId },
+      include: BOTTLE_WITH_CATEGORY,
+      orderBy: { bottle: { name: 'asc' } },
+    });
+    res.json(parseNameTranslations(exclusions));
+  },
+);
 
 // Remove several bottles from a system menu at once: all of them or none
 const excludeSchemas = { params: MenuIdParams, body: MenuBottleIds };
 
-router.post('/menu/:menuId/exclusions', validate(excludeSchemas), async (req: AuthRequest, res: Response) => {
-  const { params: { menuId }, body: { bottleIds } } = valid<typeof excludeSchemas>(res);
-  await prisma.$transaction((tx) => excludeBottles(tx, menuId, bottleIds));
-  res.json({ message: req.t('menuBottles.excluded') });
-});
+router.post(
+  '/menu/:menuId/exclusions',
+  validate(excludeSchemas),
+  async (req: AuthRequest, res: Response) => {
+    const {
+      params: { menuId },
+      body: { bottleIds },
+    } = valid<typeof excludeSchemas>(res);
+    await prisma.$transaction((tx) => excludeBottles(tx, menuId, bottleIds));
+    res.json({ message: req.t('menuBottles.excluded') });
+  },
+);
 
 // Put several excluded bottles back at the end of their system menu at once: all of them or none
 const restoreManySchemas = { params: MenuIdParams, body: MenuBottleIds };
 
-router.post('/menu/:menuId/exclusions/restore', validate(restoreManySchemas), async (req: AuthRequest, res: Response) => {
-  const { params: { menuId }, body: { bottleIds } } = valid<typeof restoreManySchemas>(res);
-  await prisma.$transaction((tx) => restoreBottles(tx, menuId, bottleIds));
-  res.json({ message: req.t('menuBottles.restoredMany') });
-});
+router.post(
+  '/menu/:menuId/exclusions/restore',
+  validate(restoreManySchemas),
+  async (req: AuthRequest, res: Response) => {
+    const {
+      params: { menuId },
+      body: { bottleIds },
+    } = valid<typeof restoreManySchemas>(res);
+    await prisma.$transaction((tx) => restoreBottles(tx, menuId, bottleIds));
+    res.json({ message: req.t('menuBottles.restoredMany') });
+  },
+);
 
 // Put an excluded bottle back at the end of its system menu
 const restoreSchemas = { params: MenuBottleExclusionParams };
 
-router.delete('/menu/:menuId/exclusions/:bottleId', validate(restoreSchemas), async (req: AuthRequest, res: Response) => {
-  const { menuId, bottleId } = valid<typeof restoreSchemas>(res).params;
-  await prisma.$transaction((tx) => restoreBottles(tx, menuId, [bottleId]));
-  res.json({ message: req.t('menuBottles.restored') });
-});
+router.delete(
+  '/menu/:menuId/exclusions/:bottleId',
+  validate(restoreSchemas),
+  async (req: AuthRequest, res: Response) => {
+    const { menuId, bottleId } = valid<typeof restoreSchemas>(res).params;
+    await prisma.$transaction((tx) => restoreBottles(tx, menuId, [bottleId]));
+    res.json({ message: req.t('menuBottles.restored') });
+  },
+);
 
 export default router;

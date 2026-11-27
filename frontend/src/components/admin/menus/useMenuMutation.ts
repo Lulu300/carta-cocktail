@@ -1,5 +1,10 @@
 import { useTranslation } from 'react-i18next';
-import { useMutation, useQueryClient, type QueryClient, type UseMutationResult } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQueryClient,
+  type QueryClient,
+  type UseMutationResult,
+} from '@tanstack/react-query';
 import type { MenuBottleExclusion } from '../../../services/api';
 import type { Menu } from '../../../types';
 import { qk } from '../../../queries/keys';
@@ -24,7 +29,12 @@ interface MenuMutationOptions<Variables, Data> {
   successMessage?: string;
 }
 
-export type MenuMutation<Variables, Data = unknown> = UseMutationResult<Data, Error, Variables, PendingChange>;
+export type MenuMutation<Variables, Data = unknown> = UseMutationResult<
+  Data,
+  Error,
+  Variables,
+  PendingChange
+>;
 
 interface PendingChange {
   apply: (state: MenuState) => MenuState;
@@ -138,7 +148,7 @@ export function useMenuMutation<Variables, Data = unknown>({
       const queue = queueOf();
       queue.pending = queue.pending.filter((pending) => pending !== change);
       // The menus list counts the items of each menu: refreshed when next shown.
-      queryClient.invalidateQueries({ queryKey: qk.menus, exact: true, refetchType: 'none' });
+      void queryClient.invalidateQueries({ queryKey: qk.menus, exact: true, refetchType: 'none' });
       if (queue.pending.length > 0) {
         writeState(queryClient, menuId, shownState(queue));
         return;

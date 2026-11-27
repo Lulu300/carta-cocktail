@@ -4,7 +4,13 @@ import type { ReactNode } from 'react';
 import { http, HttpResponse } from 'msw';
 import { ApiError, auth } from '../services/api';
 import { server } from '../test/msw/server';
-import { captureRequest, errorResponse, mockApiError, mockApiResponse, mockNetworkError } from '../test/msw/utils';
+import {
+  captureRequest,
+  errorResponse,
+  mockApiError,
+  mockApiResponse,
+  mockNetworkError,
+} from '../test/msw/utils';
 import { AuthProvider, useAuth } from './AuthContext';
 
 const admin = { id: 1, email: 'admin@test.local' };
@@ -48,7 +54,12 @@ describe('AuthContext', () => {
 
   it('should clear token if validation fails', async () => {
     localStorage.setItem('token', 'invalid-token');
-    mockApiError('get', '/api/auth/me', 401, 'Invalid token');
+    mockApiError(
+      'get',
+      '/api/auth/me',
+      401,
+      'Your session has expired or is no longer valid: sign in again',
+    );
 
     const { result } = renderHook(() => useAuth(), { wrapper });
 
@@ -65,11 +76,15 @@ describe('AuthContext', () => {
   it('should keep a session signed in meanwhile when the check of the previous token gets a 401', async () => {
     localStorage.setItem('token', 'expired-token');
     let answer: () => void = () => {};
-    const answered = new Promise<void>((resolve) => { answer = resolve; });
-    server.use(http.get('/api/auth/me', async () => {
-      await answered;
-      return errorResponse(401, 'Token expired');
-    }));
+    const answered = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    server.use(
+      http.get('/api/auth/me', async () => {
+        await answered;
+        return errorResponse(401, 'Token expired');
+      }),
+    );
     mockApiResponse('post', '/api/auth/login', { token: 'new-token', user: admin });
     const { result } = renderHook(() => useAuth(), { wrapper });
 
@@ -91,7 +106,8 @@ describe('AuthContext', () => {
     it.each([
       {
         failure: 'the rate limit (429)',
-        fail: () => mockApiError('get', '/api/auth/me', 429, 'Too many requests: try again in a few minutes'),
+        fail: () =>
+          mockApiError('get', '/api/auth/me', 429, 'Too many requests: try again in a few minutes'),
         status: 429,
         message: 'Too many requests: try again in a few minutes',
       },
@@ -103,10 +119,17 @@ describe('AuthContext', () => {
       },
       {
         failure: 'the HTML page of nginx while the backend restarts (502)',
-        fail: () => server.use(http.get('/api/auth/me', () => new HttpResponse(
-          '<html><body><h1>502 Bad Gateway</h1></body></html>',
-          { status: 502, headers: { 'Content-Type': 'text/html' } },
-        ))),
+        fail: () =>
+          server.use(
+            http.get(
+              '/api/auth/me',
+              () =>
+                new HttpResponse('<html><body><h1>502 Bad Gateway</h1></body></html>', {
+                  status: 502,
+                  headers: { 'Content-Type': 'text/html' },
+                }),
+            ),
+          ),
         status: 502,
         message: 'The server is not responding, try again in a moment.',
       },
@@ -230,7 +253,9 @@ describe('AuthContext', () => {
     const { result } = renderHook(() => useAuth(), { wrapper });
 
     await act(async () => {
-      await expect(result.current.login('admin@test.local', 'wrong')).rejects.toThrow('Invalid credentials');
+      await expect(result.current.login('admin@test.local', 'wrong')).rejects.toThrow(
+        'Invalid credentials',
+      );
     });
 
     expect(result.current.user).toBeNull();

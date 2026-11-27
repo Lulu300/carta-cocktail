@@ -1,13 +1,23 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import i18n from './index';
-import publicEn from './locales/public/en.json';
-import publicFr from './locales/public/fr.json';
-import adminEn from './locales/admin/en.json';
-import adminFr from './locales/admin/fr.json';
+import type { i18n as I18n } from 'i18next';
 
-// Uses the real i18next instance: setup.ts only mocks react-i18next.
+// Uses the real i18next instance, which setup.ts loads with both bundles.
 
 type Messages = { [key: string]: string | Messages };
+
+// The message files as written: i18next merges the admin messages into the very objects the app
+// imports from the public files, and setup.ts registers them, so the JSON modules are no longer
+// the bundles on their own.
+const messageFiles = import.meta.glob<string>('./locales/*/*.json', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+});
+
+function readMessages(bundle: 'public' | 'admin', language: 'en' | 'fr'): Messages {
+  return JSON.parse(messageFiles[`./locales/${bundle}/${language}.json`]!);
+}
 
 /** Dotted path of every message: { a: { b: 'x' } } gives { 'a.b': 'x' }. */
 function flatten(messages: Messages, prefix = ''): Record<string, string> {
@@ -20,8 +30,8 @@ function flatten(messages: Messages, prefix = ''): Record<string, string> {
 }
 
 const BUNDLES = {
-  public: { en: flatten(publicEn), fr: flatten(publicFr) },
-  admin: { en: flatten(adminEn), fr: flatten(adminFr) },
+  public: { en: flatten(readMessages('public', 'en')), fr: flatten(readMessages('public', 'fr')) },
+  admin: { en: flatten(readMessages('admin', 'en')), fr: flatten(readMessages('admin', 'fr')) },
 };
 
 const PLURAL_SUFFIX = /_(zero|one|two|few|many|other)$/;
@@ -68,7 +78,7 @@ function initialLoadFiles(): string[] {
     if (reached.has(path)) continue;
     reached.add(path);
     for (const [, specifier] of sources.get(path)!.matchAll(STATIC_IMPORT)) {
-      const imported = resolveImport(path, specifier);
+      const imported = resolveImport(path, specifier!);
       if (imported) pending.push(imported);
     }
   }
@@ -88,7 +98,7 @@ const publicKeys = new Set(Object.keys(BUNDLES.public.en).map(callableKey));
 
 function keysUsedBy(files: string[]): Set<string> {
   const literals = files.flatMap((path) =>
-    [...sources.get(path)!.matchAll(KEY_LITERAL)].map((match) => match[1]),
+    [...sources.get(path)!.matchAll(KEY_LITERAL)].map((match) => match[1]!),
   );
   return new Set(literals.filter((literal) => allKeys.has(literal)));
 }
@@ -98,6 +108,36 @@ describe('locale bundles', () => {
     'the %s bundle has the same keys in English and French',
     (_, bundle) => {
       expect(Object.keys(bundle.fr).sort()).toEqual(Object.keys(bundle.en).sort());
+    },
+  );
+
+  it.each(Object.entries(BUNDLES))(
+    'every plural form of the %s bundle has its pair',
+    (_, bundle) => {
+      // French and English both need _one and _other; i18next falls back to the key itself without them.
+      for (const messages of Object.values(bundle)) {
+        const keys = Object.keys(messages);
+        const orphans = keys.filter(
+          (key) =>
+            (key.endsWith('_one') && !keys.includes(key.replace(/_one$/, '_other'))) ||
+            (key.endsWith('_other') && !keys.includes(key.replace(/_other$/, '_one'))),
+        );
+        expect(orphans).toEqual([]);
+      }
+    },
+  );
+
+  it.each(Object.entries(BUNDLES))(
+    'the %s bundle writes no plural inside a message, such as "bottle(s)"',
+    (_, bundle) => {
+      // A letter right before the parenthesis: "(ml)" and "Name (brand)" are not plurals.
+      const WRITTEN_PLURAL = /\p{L}\([\p{L}/]+\)/u;
+      for (const messages of Object.values(bundle)) {
+        const offenders = Object.entries(messages)
+          .filter(([, message]) => WRITTEN_PLURAL.test(message))
+          .map(([key]) => key);
+        expect(offenders).toEqual([]);
+      }
     },
   );
 
@@ -147,6 +187,9 @@ describe('public bundle', () => {
 
 describe('admin bundle registration', () => {
   it('adds the admin messages to the public ones in every language', async () => {
+    // A page load: a fresh instance, which only knows the public messages until ./admin runs.
+    vi.resetModules();
+    const i18n: I18n = (await import('./index')).default;
     const adminKeys = Object.keys(BUNDLES.admin.en);
     expect(adminKeys.filter((key) => i18n.exists(key))).toEqual([]);
 
@@ -163,15 +206,17 @@ describe('admin bundle registration', () => {
     }
   });
 
-  it('keeps the English fallback for the admin messages', async () => {
-    await import('./admin');
+  it('keeps the English fallback for the admin messages', () => {
     expect(i18n.t('auth.login', { lng: 'de' })).toBe(BUNDLES.admin.en['auth.login']);
   });
 });
 
 describe('messages', () => {
   const languages = Object.entries(BUNDLES).flatMap(([name, bundle]) =>
-    Object.entries(bundle).map(([language, messages]) => ({ name: `${name}/${language}`, messages })),
+    Object.entries(bundle).map(([language, messages]) => ({
+      name: `${name}/${language}`,
+      messages,
+    })),
   );
 
   it.each(languages)('$name gives every "_one" plural form its "_other" form', ({ messages }) => {
@@ -190,12 +235,12 @@ describe('messages', () => {
 describe('translation keys used in the code', () => {
   /** Every t('literal.key') call: unlike KEY_LITERAL, it also catches a key missing from both bundles. */
   function literalKeys(source: string): string[] {
-    return [...source.matchAll(/\bt\(\s*'([^']+)'/g)].map((match) => match[1]);
+    return [...source.matchAll(/\bt\(\s*'([^']+)'/g)].map((match) => match[1]!);
   }
 
   /** Every t(`template.${value}`) call, as the text between the backticks. */
   function keyTemplates(source: string): string[] {
-    return [...source.matchAll(/\bt\(\s*`([^`]*)`/g)].map((match) => match[1]);
+    return [...source.matchAll(/\bt\(\s*`([^`]*)`/g)].map((match) => match[1]!);
   }
 
   // Keys built at runtime from a value the code controls (a nav item, a color, an entity type...).
@@ -267,11 +312,40 @@ describe('plural forms', () => {
     expect(t('menus.cocktailCount', { count: 1 })).toBe('1 cocktail');
   });
 
-  it('show unlimited servings with the plural form', async () => {
-    await import('./admin');
+  it('show unlimited servings with the plural form', () => {
     const t = i18n.getFixedT('fr');
     expect(t('cocktails.doses', { count: 1, servings: 1 })).toBe('1 dose');
     expect(t('cocktails.doses', { count: 999, servings: '∞' })).toBe('∞ doses');
+  });
+});
+
+describe('plural forms of the import wizards and selections', () => {
+  it('count imported bottles in French, where 0 is singular', () => {
+    const t = i18n.getFixedT('fr');
+    const key = 'bottles.importWizard.successCount';
+    expect(t(key, { count: 0 })).toBe('0 bouteille importée');
+    expect(t(key, { count: 1 })).toBe('1 bouteille importée');
+    expect(t(key, { count: 2 })).toBe('2 bouteilles importées');
+  });
+
+  it('count imported bottles in English', () => {
+    const t = i18n.getFixedT('en');
+    const key = 'bottles.importWizard.successCount';
+    expect(t(key, { count: 1 })).toBe('1 bottle imported');
+    expect(t(key, { count: 2 })).toBe('2 bottles imported');
+  });
+
+  it('agree the batch summary with the number of imported recipes', () => {
+    const t = i18n.getFixedT('fr');
+    const key = 'cocktails.importWizard.batchSummaryCount';
+    expect(t(key, { count: 1, success: 1, total: 3 })).toBe('1 sur 3 importé avec succès');
+    expect(t(key, { count: 2, success: 2, total: 3 })).toBe('2 sur 3 importés avec succès');
+  });
+
+  it('agree the selection count in French', () => {
+    const t = i18n.getFixedT('fr');
+    expect(t('common.selected', { count: 1 })).toBe('1 sélectionné');
+    expect(t('common.selected', { count: 3 })).toBe('3 sélectionnés');
   });
 });
 

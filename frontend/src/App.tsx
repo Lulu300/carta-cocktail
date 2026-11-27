@@ -11,6 +11,7 @@ import RouteErrorBoundary from './components/layout/RouteErrorBoundary';
 import HomePage from './pages/public/HomePage';
 import MenuPublicPage from './pages/public/MenuPublicPage';
 import CocktailPublicPage from './pages/public/CocktailPublicPage';
+import NotFoundPage from './pages/public/NotFoundPage';
 
 // Guests scanning a menu QR code only need the public pages: everything behind
 // /login and /admin is split into on-demand chunks to keep the first load small.
@@ -38,7 +39,10 @@ const SettingsPage = lazyWithAdminMessages(() => import('./pages/admin/SettingsP
 function RouteFallback() {
   const { t } = useTranslation();
   return (
-    <div role="status" className="min-h-screen bg-canvas flex items-center justify-center text-fg-muted">
+    <div
+      role="status"
+      className="min-h-screen bg-canvas flex items-center justify-center text-fg-muted"
+    >
       {t('common.loading')}
     </div>
   );
@@ -64,14 +68,18 @@ function SessionCheckError({ error, onRetry, onSignInAgain }: SessionCheckErrorP
         icon="⚠️"
         title={t('auth.sessionCheckFailed')}
         description={error instanceof ApiError ? error.message : t('public.loadErrorHint')}
-        role="alert"
-        action={(
+        titleProps={{ role: 'alert' }}
+        action={
           <div className="flex flex-wrap items-center justify-center gap-4">
-            <Button variant="secondary" onClick={onRetry}>{t('common.retry')}</Button>
-            <Button variant="ghost" onClick={onSignInAgain}>{t('auth.signInAgain')}</Button>
+            <Button variant="secondary" onClick={onRetry}>
+              {t('common.retry')}
+            </Button>
+            <Button variant="ghost" onClick={onSignInAgain}>
+              {t('auth.signInAgain')}
+            </Button>
             <BackHomeLink />
           </div>
-        )}
+        }
       />
     </main>
   );
@@ -102,6 +110,8 @@ export default function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/menu/:slug" element={<MenuPublicPage />} />
             <Route path="/menu/:slug/cocktail/:id" element={<CocktailPublicPage />} />
+            {/* Unknown addresses, /admin/* ones included, keep their URL and show the 404 page */}
+            <Route path="*" element={<NotFoundPage />} />
           </Route>
 
           {/* Auth */}
@@ -130,9 +140,6 @@ export default function App() {
             <Route path="shortages" element={<ShortagesPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
-
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Suspense>
     </RouteErrorBoundary>

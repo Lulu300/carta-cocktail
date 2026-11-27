@@ -4,9 +4,9 @@ import type { Menu } from '../types';
 import { qk } from './keys';
 
 export function useMenus(): UseQueryResult<Menu[], Error> {
-  return useQuery({ queryKey: qk.menus, queryFn: () => menusApi.list() });
+  return useQuery({ queryKey: qk.menus, queryFn: ({ signal }) => menusApi.list(signal) });
 }
 
 export function useMenu(id: number): UseQueryResult<Menu, Error> {
-  return useQuery({ queryKey: qk.menu(id), queryFn: () => menusApi.get(id) });
+  return useQuery({ queryKey: qk.menu(id), queryFn: ({ signal }) => menusApi.get(id, signal) });
 }

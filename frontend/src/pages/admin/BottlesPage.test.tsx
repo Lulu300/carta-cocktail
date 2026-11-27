@@ -6,17 +6,16 @@ import { qk } from '../../queries/keys';
 import { useShortages } from '../../queries/shortages';
 import { mockDownload } from '../../test/download';
 import { buildBottle, buildCategory, buildShortage } from '../../test/factories';
-import { captureRequest, mockApiError, mockApiPending, mockApiResponse, mockItemInUse, mockNetworkError } from '../../test/msw/utils';
+import {
+  captureRequest,
+  mockApiError,
+  mockApiPending,
+  mockApiResponse,
+  mockItemInUse,
+  mockNetworkError,
+} from '../../test/msw/utils';
 import type { Bottle } from '../../types';
 import BottlesPage from './BottlesPage';
-
-vi.mock('react-i18next', async (importOriginal) => {
-  const { translateWithValues } = await import('../../test/translateWithValues');
-  return {
-    ...await importOriginal<typeof import('react-i18next')>(),
-    useTranslation: () => ({ t: translateWithValues, i18n: { language: 'en' } }),
-  };
-});
 
 // The wizard has its own tests: here it only has to report an import or a close.
 vi.mock('../../components/import/ImportBottlesWizard', () => ({
@@ -28,8 +27,18 @@ vi.mock('../../components/import/ImportBottlesWizard', () => ({
   ),
 }));
 
-const vodka = buildCategory({ id: 1, name: 'Vodka', categoryType: { name: 'SPIRIT', color: 'blue' }, desiredStock: 2 });
-const gin = buildCategory({ id: 2, name: 'Gin', categoryType: { name: 'SPIRIT', color: 'blue' }, desiredStock: 2 });
+const vodka = buildCategory({
+  id: 1,
+  name: 'Vodka',
+  categoryType: { name: 'SPIRIT', color: 'blue' },
+  desiredStock: 2,
+});
+const gin = buildCategory({
+  id: 2,
+  name: 'Gin',
+  categoryType: { name: 'SPIRIT', color: 'blue' },
+  desiredStock: 2,
+});
 
 const absolut = buildBottle({
   id: 1,
@@ -75,18 +84,18 @@ function dialog() {
 }
 
 async function openCreateForm(user: User) {
-  await user.click(screen.getByRole('button', { name: 'bottles.add' }));
+  await user.click(screen.getByRole('button', { name: 'Add Bottle' }));
 }
 
 function nameInput() {
-  return within(dialog()).getByLabelText(/bottles\.name/);
+  return within(dialog()).getByLabelText(/Name \(brand\)/);
 }
 
 async function confirmDeletion(user: User, index = 0) {
-  await user.click(screen.getAllByRole('button', { name: 'common.delete' })[index]);
+  await user.click(screen.getAllByRole('button', { name: 'Delete' })[index]!);
   const confirmation = screen.getByRole('alertdialog');
-  expect(confirmation).toHaveAccessibleDescription('bottles.confirmDelete');
-  await user.click(within(confirmation).getByRole('button', { name: 'common.delete' }));
+  expect(confirmation).toHaveAccessibleDescription('Delete this bottle?');
+  await user.click(within(confirmation).getByRole('button', { name: 'Delete' }));
 }
 
 /** Reads the shortages like the sidebar badge of AdminLayout does. */
@@ -109,15 +118,15 @@ describe('BottlesPage', () => {
   describe('list', () => {
     it('lists the available bottles with their details', async () => {
       await renderLoadedPage();
-      expect(screen.getByRole('heading', { level: 1, name: 'bottles.title' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: 'Bottles' })).toBeInTheDocument();
       expect(screen.getByText('Hendricks')).toBeInTheDocument();
       expect(screen.getByText('Vodka')).toBeInTheDocument();
-      expect(screen.getByText('units.ml(700)')).toBeInTheDocument();
+      expect(screen.getByText('700 ml')).toBeInTheDocument();
       expect(screen.getByText('€25.00')).toBeInTheDocument();
-      expect(screen.getByText('units.abv(40)')).toBeInTheDocument();
-      expect(screen.getByText('bottles.opened')).toBeInTheDocument();
-      expect(screen.getByText('bottles.unopened')).toBeInTheDocument();
-      expect(screen.getByText('bottles.activeTitle (2)')).toBeInTheDocument();
+      expect(screen.getByText('40% vol.')).toBeInTheDocument();
+      expect(screen.getByText('Opened')).toBeInTheDocument();
+      expect(screen.getByText('Sealed')).toBeInTheDocument();
+      expect(screen.getByText('Available bottles (2)')).toBeInTheDocument();
     });
 
     it('colors the fill level: success above 50 %, danger at 20 % or less', async () => {
@@ -130,21 +139,21 @@ describe('BottlesPage', () => {
     it('never shows "no results" while the bottles are loading', () => {
       mockApiPending('get', '/api/bottles');
       renderPage();
-      expect(screen.getByText('common.loading')).toBeInTheDocument();
-      expect(screen.queryByText('common.noResults')).not.toBeInTheDocument();
+      expect(screen.getByText('Loading...')).toBeInTheDocument();
+      expect(screen.queryByText('No results')).not.toBeInTheDocument();
     });
 
     it('shows "no results" once loaded without bottles', async () => {
       mockBottles([]);
       renderPage();
-      expect(await screen.findByText('common.noResults')).toBeInTheDocument();
+      expect(await screen.findByText('No results')).toBeInTheDocument();
     });
 
     it('shows a load error with a retry button', async () => {
       const user = userEvent.setup();
       mockNetworkError('get', '/api/bottles');
       renderPage();
-      const retry = await screen.findByRole('button', { name: 'common.retry' });
+      const retry = await screen.findByRole('button', { name: 'Retry' });
 
       mockBottles([absolut, hendricks]);
       await user.click(retry);
@@ -156,11 +165,11 @@ describe('BottlesPage', () => {
       const user = userEvent.setup();
       await renderLoadedPage();
 
-      await user.type(screen.getByPlaceholderText('common.search'), 'abs');
+      await user.type(screen.getByPlaceholderText('Search...'), 'abs');
       expect(screen.queryByText('Hendricks')).not.toBeInTheDocument();
-      await user.clear(screen.getByPlaceholderText('common.search'));
+      await user.clear(screen.getByPlaceholderText('Search...'));
 
-      await user.type(screen.getByRole('combobox', { name: 'bottles.filterByLocation' }), 'bar');
+      await user.type(screen.getByRole('combobox', { name: 'Filter by location' }), 'bar');
       expect(screen.getByText('Absolut')).toBeInTheDocument();
       expect(screen.queryByText('Hendricks')).not.toBeInTheDocument();
     });
@@ -168,7 +177,7 @@ describe('BottlesPage', () => {
     it('suggests the known locations and filters on the one picked', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
-      const location = screen.getByRole('combobox', { name: 'bottles.filterByLocation' });
+      const location = screen.getByRole('combobox', { name: 'Filter by location' });
 
       await user.type(location, 'b');
       await user.click(screen.getByRole('option', { name: 'Bar' }));
@@ -182,7 +191,7 @@ describe('BottlesPage', () => {
       const user = userEvent.setup();
       await renderLoadedPage();
 
-      await user.type(screen.getByPlaceholderText('bottles.filterByCategory'), 'gin');
+      await user.type(screen.getByPlaceholderText('Filter by category'), 'gin');
 
       expect(screen.getByText('Hendricks')).toBeInTheDocument();
       expect(screen.queryByText('Absolut')).not.toBeInTheDocument();
@@ -191,13 +200,16 @@ describe('BottlesPage', () => {
     it('sorts the category column on the localized name', async () => {
       const user = userEvent.setup();
       mockBottles([
-        { ...absolut, category: { ...vodka, name: 'A-vodka', nameTranslations: { en: 'Zubrowka' } } },
+        {
+          ...absolut,
+          category: { ...vodka, name: 'A-vodka', nameTranslations: { en: 'Zubrowka' } },
+        },
         { ...hendricks, category: { ...gin, name: 'Z-gin', nameTranslations: { en: 'Gin' } } },
       ]);
       renderPage();
       await screen.findByText('Absolut');
 
-      await user.click(screen.getByText('bottles.category'));
+      await user.click(screen.getByText('Category'));
 
       const names = screen.getAllByText(/Absolut|Hendricks/).map((cell) => cell.textContent);
       expect(names).toEqual(['Hendricks', 'Absolut']);
@@ -215,7 +227,8 @@ describe('BottlesPage', () => {
         expect(screen.getAllByText('Absolut')).toHaveLength(3);
         expect(screen.getByText('~60%')).toBeInTheDocument();
         const keyWarnings = consoleError.mock.calls.filter((args) =>
-          args.some((arg) => typeof arg === 'string' && arg.includes('unique "key"')));
+          args.some((arg) => typeof arg === 'string' && arg.includes('unique "key"')),
+        );
         expect(keyWarnings).toHaveLength(0);
       } finally {
         consoleError.mockRestore();
@@ -238,8 +251,15 @@ describe('BottlesPage', () => {
 
     it('keeps a group open after a page change and back', async () => {
       const user = userEvent.setup();
-      const singles = Array.from({ length: 25 }, (_, index) => ({ ...hendricks, id: 100 + index, name: `Bottle ${index + 1}` }));
-      const group = [{ ...absolut, id: 1 }, { ...absolut, id: 2 }];
+      const singles = Array.from({ length: 25 }, (_, index) => ({
+        ...hendricks,
+        id: 100 + index,
+        name: `Bottle ${index + 1}`,
+      }));
+      const group = [
+        { ...absolut, id: 1 },
+        { ...absolut, id: 2 },
+      ];
       mockBottles([...singles, ...group]);
       renderPage();
       await screen.findByText('Bottle 1');
@@ -259,9 +279,9 @@ describe('BottlesPage', () => {
       renderPage();
       await user.click(await screen.findByText('×2'));
 
-      await user.type(screen.getByPlaceholderText('common.search'), 'hend');
+      await user.type(screen.getByPlaceholderText('Search...'), 'hend');
       expect(screen.queryByText('Absolut')).not.toBeInTheDocument();
-      await user.clear(screen.getByPlaceholderText('common.search'));
+      await user.clear(screen.getByPlaceholderText('Search...'));
 
       expect(screen.getAllByText('Absolut')).toHaveLength(3);
     });
@@ -284,10 +304,10 @@ describe('BottlesPage', () => {
       await renderLoadedPage();
       expect(screen.queryByText('Finished rum')).not.toBeInTheDocument();
 
-      await user.click(screen.getByRole('button', { name: /bottles\.historyTitle \(1\)/ }));
+      await user.click(screen.getByRole('button', { name: /History \(empty\) \(1\)/ }));
 
       expect(screen.getByText('Finished rum')).toBeInTheDocument();
-      expect(screen.getByText('bottles.activeTitle (2)')).toBeInTheDocument();
+      expect(screen.getByText('Available bottles (2)')).toBeInTheDocument();
     });
   });
 
@@ -296,9 +316,9 @@ describe('BottlesPage', () => {
       mockApiResponse('get', '/api/categories', []);
       await renderLoadedPage();
 
-      const addButton = screen.getByRole('button', { name: 'bottles.add' });
+      const addButton = screen.getByRole('button', { name: 'Add Bottle' });
       expect(addButton).toBeDisabled();
-      expect(addButton).toHaveAttribute('title', 'bottles.noCategoryHint');
+      expect(addButton).toHaveAttribute('title', 'Create a category first to add bottles');
     });
 
     it('creates a bottle in the first category and confirms with a toast', async () => {
@@ -308,8 +328,8 @@ describe('BottlesPage', () => {
       await openCreateForm(user);
 
       await user.type(nameInput(), 'New Whisky');
-      await user.click(within(dialog()).getByLabelText('bottles.usableAsApero'));
-      await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
+      await user.click(within(dialog()).getByLabelText('Can be served as an aperitif'));
+      await user.click(within(dialog()).getByRole('button', { name: 'Save' }));
 
       expect(await created.body).toEqual({
         name: 'New Whisky',
@@ -324,7 +344,7 @@ describe('BottlesPage', () => {
         isDigestif: false,
         quantity: 1,
       });
-      expect(await screen.findByText('bottles.created')).toBeInTheDocument();
+      expect(await screen.findByText('Bottle created')).toBeInTheDocument();
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
@@ -336,15 +356,15 @@ describe('BottlesPage', () => {
       const form = within(dialog());
 
       await user.type(nameInput(), 'Tanqueray');
-      await user.selectOptions(form.getByLabelText('bottles.category'), '2');
-      fireEvent.change(form.getByLabelText('bottles.capacityMl'), { target: { value: '1000' } });
-      await user.type(form.getByLabelText('bottles.purchasePrice'), '32.5');
-      fireEvent.change(form.getByLabelText(/bottles\.remainingPercent/), { target: { value: '60' } });
-      await user.type(form.getByLabelText('bottles.openedAt'), '10/01/2026');
-      await user.type(form.getByLabelText('bottles.alcoholPercentage'), '43.1');
-      await user.type(form.getByLabelText('bottles.location'), 'Shelf');
-      await user.click(form.getByLabelText('bottles.usableAsDigestif'));
-      await user.click(form.getByRole('button', { name: 'common.save' }));
+      await user.selectOptions(form.getByLabelText('Category'), '2');
+      fireEvent.change(form.getByLabelText('Capacity (ml)'), { target: { value: '1000' } });
+      await user.type(form.getByLabelText('Purchase Price'), '32.5');
+      fireEvent.change(form.getByLabelText(/Remaining \(%\)/), { target: { value: '60' } });
+      await user.type(form.getByLabelText('Opened On'), '10/01/2026');
+      await user.type(form.getByLabelText('Alcohol (% vol.)'), '43.1');
+      await user.type(form.getByLabelText('Location'), 'Shelf');
+      await user.click(form.getByLabelText('Can be served as a digestif'));
+      await user.click(form.getByRole('button', { name: 'Save' }));
 
       expect(await created.body).toEqual({
         name: 'Tanqueray',
@@ -369,9 +389,9 @@ describe('BottlesPage', () => {
 
       await user.type(nameInput(), 'Rum');
       // An emptied field snaps back to 1, so set the value in one go.
-      fireEvent.change(within(dialog()).getByLabelText('bottles.quantity'), { target: { value: '3' } });
-      expect(within(dialog()).getByText('bottles.quantityHint(3)')).toBeInTheDocument();
-      await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
+      fireEvent.change(within(dialog()).getByLabelText('Quantity'), { target: { value: '3' } });
+      expect(within(dialog()).getByText('3 identical bottles will be created')).toBeInTheDocument();
+      await user.click(within(dialog()).getByRole('button', { name: 'Save' }));
 
       expect(await created.body).toMatchObject({ name: 'Rum', quantity: 3 });
     });
@@ -383,7 +403,7 @@ describe('BottlesPage', () => {
       await renderLoadedPage();
       await openCreateForm(user);
       await user.type(nameInput(), 'Rum');
-      const save = within(dialog()).getByRole('button', { name: 'common.save' });
+      const save = within(dialog()).getByRole('button', { name: 'Save' });
 
       fireEvent.click(save);
       fireEvent.click(save);
@@ -398,7 +418,7 @@ describe('BottlesPage', () => {
       const created = captureRequest('post', '/api/bottles');
       await openCreateForm(user);
 
-      await user.click(within(dialog()).getByRole('button', { name: 'bottles.saveDuplicate' }));
+      await user.click(within(dialog()).getByRole('button', { name: 'Save and duplicate' }));
 
       expect(created.count()).toBe(0);
       expect((nameInput() as HTMLInputElement).validity.valueMissing).toBe(true);
@@ -411,14 +431,14 @@ describe('BottlesPage', () => {
       await openCreateForm(user);
 
       await user.type(nameInput(), 'New Whisky');
-      await user.click(within(dialog()).getByRole('button', { name: 'bottles.saveDuplicate' }));
+      await user.click(within(dialog()).getByRole('button', { name: 'Save and duplicate' }));
 
       expect(await created.body).toMatchObject({ name: 'New Whisky', categoryId: 1 });
-      expect(await screen.findByText('bottles.created')).toBeInTheDocument();
+      expect(await screen.findByText('Bottle created')).toBeInTheDocument();
       expect(within(dialog()).getByDisplayValue('New Whisky')).toBeInTheDocument();
 
       // The intent is reset: a plain save afterwards closes the form.
-      await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
+      await user.click(within(dialog()).getByRole('button', { name: 'Save' }));
       await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
       expect(created.count()).toBe(2);
     });
@@ -439,25 +459,27 @@ describe('BottlesPage', () => {
       const user = userEvent.setup();
       await renderLoadedPage();
 
-      await user.click(screen.getAllByRole('button', { name: 'common.edit' })[1]);
+      await user.click(screen.getAllByRole('button', { name: 'Edit' })[1]!);
 
-      expect(screen.getByText('bottles.edit')).toBeInTheDocument();
+      expect(screen.getByText('Edit Bottle')).toBeInTheDocument();
       expect(nameInput()).toHaveValue('Hendricks');
-      expect(within(dialog()).getByLabelText('bottles.openedAt')).toHaveValue('06/01/2024');
-      expect(within(dialog()).getByLabelText('bottles.usableAsApero')).toBeChecked();
-      expect(within(dialog()).getByLabelText('bottles.usableAsDigestif')).not.toBeChecked();
-      expect(within(dialog()).queryByRole('button', { name: 'bottles.saveDuplicate' })).not.toBeInTheDocument();
+      expect(within(dialog()).getByLabelText('Opened On')).toHaveValue('06/01/2024');
+      expect(within(dialog()).getByLabelText('Can be served as an aperitif')).toBeChecked();
+      expect(within(dialog()).getByLabelText('Can be served as a digestif')).not.toBeChecked();
+      expect(
+        within(dialog()).queryByRole('button', { name: 'Save and duplicate' }),
+      ).not.toBeInTheDocument();
     });
 
     it('updates a bottle without a quantity and confirms with a toast', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
       const updated = captureRequest('put', '/api/bottles/:id');
-      await user.click(screen.getAllByRole('button', { name: 'common.edit' })[0]);
+      await user.click(screen.getAllByRole('button', { name: 'Edit' })[0]!);
 
       await user.clear(nameInput());
       await user.type(nameInput(), 'Absolut Elyx');
-      await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
+      await user.click(within(dialog()).getByRole('button', { name: 'Save' }));
 
       expect((await updated.url).pathname).toBe('/api/bottles/1');
       const body = await updated.body;
@@ -468,19 +490,24 @@ describe('BottlesPage', () => {
         location: 'Bar',
       });
       expect(body).not.toHaveProperty('quantity');
-      expect(await screen.findByText('bottles.updated')).toBeInTheDocument();
+      expect(await screen.findByText('Bottle updated')).toBeInTheDocument();
     });
 
     it('refreshes the shortages badge after a bottle is updated, without leaving the page', async () => {
       const user = userEvent.setup();
-      renderWithFeedback(<><BottlesPage /><ShortagesBadge /></>);
+      renderWithFeedback(
+        <>
+          <BottlesPage />
+          <ShortagesBadge />
+        </>,
+      );
       await screen.findByText('Absolut');
       await waitFor(() => expect(screen.getByTestId('shortages-badge')).toHaveTextContent('0'));
       mockApiResponse('get', '/api/shortages', [buildShortage({ category: { id: 1 } })]);
       const shortagesReloaded = captureRequest('get', '/api/shortages');
 
-      await user.click(screen.getAllByRole('button', { name: 'common.edit' })[0]);
-      await user.click(within(dialog()).getByRole('button', { name: 'common.save' }));
+      await user.click(screen.getAllByRole('button', { name: 'Edit' })[0]!);
+      await user.click(within(dialog()).getByRole('button', { name: 'Save' }));
 
       await waitFor(() => expect(screen.getByTestId('shortages-badge')).toHaveTextContent('1'));
       expect(shortagesReloaded.count()).toBe(1);
@@ -498,10 +525,16 @@ describe('BottlesPage', () => {
 
       await confirmDeletion(user);
 
-      expect(await screen.findByText('bottles.deleted')).toBeInTheDocument();
+      expect(await screen.findByText('Bottle deleted')).toBeInTheDocument();
       expect((await deleted.url).pathname).toBe('/api/bottles/1');
       const refreshed = invalidate.mock.calls.map(([filters]) => filters?.queryKey);
-      expect(refreshed).toEqual([qk.bottles, qk.shortages, qk.categories, qk.menus, qk.availability]);
+      expect(refreshed).toEqual([
+        qk.bottles,
+        qk.shortages,
+        qk.categories,
+        qk.menus,
+        qk.availability,
+      ]);
     });
 
     it('deletes an empty bottle from the history', async () => {
@@ -509,7 +542,7 @@ describe('BottlesPage', () => {
       mockBottles([emptyBottle]);
       const deleted = captureRequest('delete', '/api/bottles/:id');
       renderPage();
-      await user.click(await screen.findByRole('button', { name: /bottles\.historyTitle/ }));
+      await user.click(await screen.findByRole('button', { name: /History \(empty\)/ }));
 
       await confirmDeletion(user);
 
@@ -521,8 +554,10 @@ describe('BottlesPage', () => {
       await renderLoadedPage();
       const deleted = captureRequest('delete', '/api/bottles/:id');
 
-      await user.click(screen.getAllByRole('button', { name: 'common.delete' })[0]);
-      await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'common.cancel' }));
+      await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
+      await user.click(
+        within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }),
+      );
 
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
       expect(deleted.count()).toBe(0);
@@ -539,33 +574,46 @@ describe('BottlesPage', () => {
 
       await confirmDeletion(user);
 
-      const forced = await screen.findByRole('alertdialog', { name: 'deletion.forced.title' });
-      expect(forced).toHaveTextContent('deletion.forced.cocktailLines(Moscow Mule,1)');
-      const deleteAnyway = within(forced).getByRole('button', { name: 'deletion.forced.confirm' });
+      const forced = await screen.findByRole('alertdialog', { name: 'Delete an item in use?' });
+      expect(forced).toHaveTextContent('Moscow Mule: 1 line removed');
+      const deleteAnyway = within(forced).getByRole('button', { name: 'Delete anyway' });
       expect(deleteAnyway).toBeDisabled();
-      await user.click(within(forced).getByRole('checkbox', { name: 'deletion.forced.acknowledgeRecipes' }));
+      await user.click(
+        within(forced).getByRole('checkbox', {
+          name: 'I understand that these recipes will be changed',
+        }),
+      );
       await user.click(deleteAnyway);
 
-      expect(await screen.findByText(
-        'deletion.forced.summary(bottles.deleted,deletion.forced.cocktailsChanged(1))',
-      )).toBeInTheDocument();
-      expect(requests.map((url) => `${url.pathname}${url.search}`)).toEqual(['/api/bottles/1', '/api/bottles/1?force=true']);
+      expect(await screen.findByText('Bottle deleted: 1 cocktail changed.')).toBeInTheDocument();
+      expect(requests.map((url) => `${url.pathname}${url.search}`)).toEqual([
+        '/api/bottles/1',
+        '/api/bottles/1?force=true',
+      ]);
       await waitFor(() => expect(reloaded.count()).toBe(1));
     });
 
     it('keeps a bottle in use when the forced deletion is cancelled', async () => {
       const user = userEvent.setup();
-      const requests = mockItemInUse('/api/bottles/:id', {
-        cocktails: [{ id: 4, name: 'Moscow Mule', removedLines: 1 }],
-        bottles: [],
-      }, 'This bottle is used by cocktails');
+      const requests = mockItemInUse(
+        '/api/bottles/:id',
+        {
+          cocktails: [{ id: 4, name: 'Moscow Mule', removedLines: 1 }],
+          bottles: [],
+        },
+        'This bottle is used by cocktails',
+      );
       await renderLoadedPage();
 
       await confirmDeletion(user);
-      await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'common.cancel' }));
+      await user.click(
+        within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Cancel' }),
+      );
 
-      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('This bottle is used by cocktails'));
-      expect(screen.getByRole('alert')).toHaveTextContent('deletion.usedByCocktails');
+      await waitFor(() =>
+        expect(screen.getByRole('alert')).toHaveTextContent('This bottle is used by cocktails'),
+      );
+      expect(screen.getByRole('alert')).toHaveTextContent(/Used by these cocktails: .+\./);
       expect(requests).toHaveLength(1);
       expect(screen.getByText('Absolut')).toBeInTheDocument();
     });
@@ -576,7 +624,7 @@ describe('BottlesPage', () => {
       const user = userEvent.setup();
       await renderLoadedPage();
 
-      await user.click(screen.getByRole('button', { name: 'bottles.import' }));
+      await user.click(screen.getByRole('button', { name: 'Import' }));
       expect(screen.getByTestId('import-wizard')).toBeInTheDocument();
       await user.click(screen.getByText('close-wizard'));
 
@@ -591,11 +639,18 @@ describe('BottlesPage', () => {
       await screen.findByText('Absolut');
       const reloaded = captureRequest('get', '/api/bottles');
 
-      await user.click(screen.getByRole('button', { name: 'bottles.import' }));
+      await user.click(screen.getByRole('button', { name: 'Import' }));
       await user.click(screen.getByText('finish-import'));
 
       const refreshed = invalidate.mock.calls.map(([filters]) => filters?.queryKey);
-      expect(refreshed).toEqual([qk.bottles, qk.shortages, qk.categories, qk.menus, qk.availability, qk.categoryTypes]);
+      expect(refreshed).toEqual([
+        qk.bottles,
+        qk.shortages,
+        qk.categories,
+        qk.menus,
+        qk.availability,
+        qk.categoryTypes,
+      ]);
       await waitFor(() => expect(reloaded.count()).toBe(1));
     });
 
@@ -604,16 +659,16 @@ describe('BottlesPage', () => {
       const downloads = mockDownload();
       await renderLoadedPage();
       const exported = captureRequest('get', '/api/bottles/export');
-      await user.type(screen.getByPlaceholderText('common.search'), 'abs');
+      await user.type(screen.getByPlaceholderText('Search...'), 'abs');
 
-      await user.click(screen.getByRole('button', { name: 'bottles.export' }));
-      await user.click(screen.getByText('bottles.exportCsv'));
+      await user.click(screen.getByRole('button', { name: 'Export' }));
+      await user.click(screen.getByText('Export (CSV)'));
 
       const query = (await exported.url).searchParams;
       expect(Object.fromEntries(query)).toEqual({ format: 'csv', search: 'abs' });
       // Saved under the name sent by the server (Content-Disposition)
       await waitFor(() => expect(downloads).toEqual(['bottles.csv']));
-      expect(screen.queryByText('bottles.exportJson')).not.toBeInTheDocument();
+      expect(screen.queryByText('Export (JSON)')).not.toBeInTheDocument();
     });
 
     it('exports in JSON', async () => {
@@ -622,36 +677,36 @@ describe('BottlesPage', () => {
       await renderLoadedPage();
       const exported = captureRequest('get', '/api/bottles/export');
 
-      await user.click(screen.getByRole('button', { name: 'bottles.export' }));
-      await user.click(screen.getByText('bottles.exportJson'));
+      await user.click(screen.getByRole('button', { name: 'Export' }));
+      await user.click(screen.getByText('Export (JSON)'));
 
       expect((await exported.url).searchParams.get('format')).toBe('json');
       await waitFor(() => expect(downloads).toHaveLength(1));
       // The menu closes: its button takes the focus back.
-      expect(screen.getByRole('button', { name: 'bottles.export' })).toHaveFocus();
+      expect(screen.getByRole('button', { name: 'Export' })).toHaveFocus();
     });
 
     it('closes the export menu on a click outside', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
 
-      await user.click(screen.getByRole('button', { name: 'bottles.export' }));
-      expect(screen.getByText('bottles.exportJson')).toBeInTheDocument();
-      await user.click(screen.getByText('bottles.title'));
+      await user.click(screen.getByRole('button', { name: 'Export' }));
+      expect(screen.getByText('Export (JSON)')).toBeInTheDocument();
+      await user.click(screen.getByText('Bottles'));
 
-      expect(screen.queryByText('bottles.exportJson')).not.toBeInTheDocument();
+      expect(screen.queryByText('Export (JSON)')).not.toBeInTheDocument();
     });
 
     it('closes the export menu on Escape and gives the focus back to its button', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
-      const exportButton = screen.getByRole('button', { name: 'bottles.export' });
+      const exportButton = screen.getByRole('button', { name: 'Export' });
 
       await user.click(exportButton);
       expect(exportButton).toHaveAttribute('aria-expanded', 'true');
       await user.keyboard('{Escape}');
 
-      expect(screen.queryByText('bottles.exportJson')).not.toBeInTheDocument();
+      expect(screen.queryByText('Export (JSON)')).not.toBeInTheDocument();
       expect(exportButton).toHaveAttribute('aria-expanded', 'false');
       expect(exportButton).toHaveFocus();
     });
@@ -659,12 +714,12 @@ describe('BottlesPage', () => {
     it('names its filter fields and announces the number of bottles once filtered', async () => {
       const user = userEvent.setup();
       await renderLoadedPage();
-      const search = screen.getByRole('searchbox', { name: 'bottles.search' });
-      expect(screen.getByRole('combobox', { name: 'bottles.filterByCategory' })).toBeInTheDocument();
+      const search = screen.getByRole('searchbox', { name: 'Search bottles' });
+      expect(screen.getByRole('combobox', { name: 'Filter by category' })).toBeInTheDocument();
 
       await user.type(search, 'abs');
 
-      expect(await screen.findByText(/^common\.resultCount\(/)).toHaveAttribute('aria-live', 'polite');
+      expect(await screen.findByText(/^\d+ results?$/)).toHaveAttribute('aria-live', 'polite');
     });
 
     it('shows an export failure in an error toast', async () => {
@@ -672,8 +727,8 @@ describe('BottlesPage', () => {
       mockApiError('get', '/api/bottles/export', 500, 'Export failed');
       await renderLoadedPage();
 
-      await user.click(screen.getByRole('button', { name: 'bottles.export' }));
-      await user.click(screen.getByText('bottles.exportJson'));
+      await user.click(screen.getByRole('button', { name: 'Export' }));
+      await user.click(screen.getByText('Export (JSON)'));
 
       await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Export failed'));
     });

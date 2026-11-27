@@ -23,7 +23,11 @@ function categoryCount(categoryType: CategoryType): number {
 }
 
 /** Modal listing the category types, with a form to add one or edit the one picked. */
-export default function CategoryTypesManager({ open, onClose, categoryTypes }: CategoryTypesManagerProps) {
+export default function CategoryTypesManager({
+  open,
+  onClose,
+  categoryTypes,
+}: CategoryTypesManagerProps) {
   const { t } = useTranslation();
 
   return (
@@ -51,7 +55,10 @@ function CategoryTypesPanel({ categoryTypes }: { categoryTypes: CategoryType[] }
         {categoryTypes.map((categoryType) => {
           const isUsed = categoryCount(categoryType) > 0;
           return (
-            <li key={categoryType.name} className="flex items-center justify-between bg-canvas rounded-lg px-4 py-2">
+            <li
+              key={categoryType.name}
+              className="flex items-center justify-between bg-canvas rounded-lg px-4 py-2"
+            >
               <div className="flex items-center gap-3">
                 <div className={cx('w-4 h-4 rounded-full', getDotClasses(categoryType.color))} />
                 <span className="font-medium">{localizedName(categoryType)}</span>
@@ -59,7 +66,11 @@ function CategoryTypesPanel({ categoryTypes }: { categoryTypes: CategoryType[] }
                 <span className="text-xs text-fg-muted">({categoryCount(categoryType)})</span>
               </div>
               <div className="flex items-center gap-1">
-                <IconButton icon="edit" label={t('common.edit')} onClick={() => typeForm.open(categoryType)} />
+                <IconButton
+                  icon="edit"
+                  label={t('common.edit')}
+                  onClick={() => typeForm.open(categoryType)}
+                />
                 <IconButton
                   icon="delete"
                   variant="danger"
@@ -73,8 +84,14 @@ function CategoryTypesPanel({ categoryTypes }: { categoryTypes: CategoryType[] }
         })}
       </ul>
 
-      <form key={typeForm.formKey} onSubmit={typeForm.submit} className="border-t border-line-strong pt-4 space-y-3">
-        <h3 className="text-sm font-semibold text-fg-muted">{editing ? t('categoryTypes.edit') : t('categoryTypes.add')}</h3>
+      <form
+        key={typeForm.formKey}
+        onSubmit={typeForm.submit}
+        className="border-t border-line-strong pt-4 space-y-3"
+      >
+        <h3 className="text-sm font-semibold text-fg-muted">
+          {editing ? t('categoryTypes.edit') : t('categoryTypes.add')}
+        </h3>
         <Field label={t('categoryTypes.name')} required={!editing}>
           <Input
             value={form.name}
@@ -99,7 +116,9 @@ function CategoryTypesPanel({ categoryTypes }: { categoryTypes: CategoryType[] }
                   // motion-safe: Tailwind 4 scales with the `scale` property, which transform-none would not reset.
                   'w-8 h-8 rounded-full transition-all motion-reduce:transition-none',
                   getDotClasses(color),
-                  form.color === color ? 'ring-2 ring-fg ring-offset-2 ring-offset-surface motion-safe:scale-110' : 'opacity-60 hover:opacity-100',
+                  form.color === color
+                    ? 'ring-2 ring-fg ring-offset-2 ring-offset-surface motion-safe:scale-110'
+                    : 'opacity-60 hover:opacity-100',
                 )}
               />
             ))}
@@ -112,8 +131,14 @@ function CategoryTypesPanel({ categoryTypes }: { categoryTypes: CategoryType[] }
           defaultOpen={Boolean(editing)}
         />
         <div className="flex justify-end gap-3">
-          {editing && <Button variant="ghost" onClick={typeForm.resetForm}>{t('common.cancel')}</Button>}
-          <Button type="submit" loading={typeForm.isSaving}>{editing ? t('common.save') : t('common.create')}</Button>
+          {editing && (
+            <Button variant="ghost" onClick={typeForm.resetForm}>
+              {t('common.cancel')}
+            </Button>
+          )}
+          <Button type="submit" loading={typeForm.isSaving}>
+            {editing ? t('common.save') : t('common.create')}
+          </Button>
         </div>
       </form>
     </div>

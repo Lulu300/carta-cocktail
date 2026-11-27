@@ -9,13 +9,14 @@ import type { Cocktail, CocktailIngredient } from '../../types';
 import Button from '../../components/ui/Button';
 import UnitConverter from '../../components/ui/UnitConverter';
 import ExportCocktailButton from '../../components/ui/ExportCocktailButton';
-import { getUploadUrl } from '../../utils/uploads';
+import UploadedPhoto from '../../components/ui/UploadedPhoto';
 import CocktailSkeleton from './CocktailSkeleton';
 import PublicErrorState from './PublicErrorState';
 import type { CocktailLinkState } from './PublicCocktailItem';
 import { useScrollRestoration } from './useScrollRestoration';
 
-const SECTION_TITLE_CLASSES = 'text-sm font-serif font-bold uppercase tracking-wider text-accent/80 print:text-gray-800';
+const SECTION_TITLE_CLASSES =
+  'text-sm font-serif font-bold uppercase tracking-wider text-accent print:text-gray-800';
 
 function isModifiedClick(event: MouseEvent) {
   return event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
@@ -36,7 +37,11 @@ export default function CocktailPublicPage() {
       <PublicErrorState
         error={error}
         loadErrorTitle={t('public.cocktailLoadError')}
-        notFound={{ title: t('public.cocktailNotFound'), linkTo: menuPath, linkLabel: t('public.back') }}
+        notFound={{
+          title: t('public.cocktailNotFound'),
+          linkTo: menuPath,
+          linkLabel: t('public.back'),
+        }}
         onRetry={() => refetch()}
         isRetrying={isFetching}
       />
@@ -58,7 +63,7 @@ function CocktailRecipe({ cocktail, menuPath }: { cocktail: Cocktail; menuPath: 
   const handleBack = (event: MouseEvent<HTMLAnchorElement>) => {
     if (!cameFromMenu || isModifiedClick(event)) return;
     event.preventDefault();
-    navigate(-1);
+    void navigate(-1);
   };
 
   const ingredientName = (ing: CocktailIngredient) => {
@@ -67,8 +72,6 @@ function CocktailRecipe({ cocktail, menuPath }: { cocktail: Cocktail; menuPath: 
     if (ing.ingredient) return localize(ing.ingredient);
     return '?';
   };
-
-  const imageUrl = getUploadUrl(cocktail.imagePath);
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
@@ -81,11 +84,18 @@ function CocktailRecipe({ cocktail, menuPath }: { cocktail: Cocktail; menuPath: 
       </Link>
 
       {/* Recipe card - printable */}
-      <div className="bg-surface border border-line rounded-xl print:border-gray-300 print:bg-white print:text-black print:rounded-none" id="recipe-card">
-        {imageUrl && (
+      <div
+        className="bg-surface border border-line rounded-xl print:border-gray-300 print:bg-white print:text-black print:rounded-none"
+        id="recipe-card"
+      >
+        {cocktail.imagePath && (
           <div className="aspect-video overflow-hidden rounded-t-xl">
-            <img
-              src={imageUrl}
+            <UploadedPhoto
+              imagePath={cocktail.imagePath}
+              // max-w-2xl (42rem) with px-4: the card is at most 40rem wide
+              sizes="(min-width: 42rem) 40rem, calc(100vw - 2rem)"
+              // The largest element of the page: fetched first, never lazily
+              fetchPriority="high"
               alt={cocktail.name}
               className="w-full h-full object-cover"
             />
@@ -97,13 +107,17 @@ function CocktailRecipe({ cocktail, menuPath }: { cocktail: Cocktail; menuPath: 
             {cocktail.name}
           </h1>
           {cocktail.description && (
-            <p className="text-fg-muted print:text-gray-600 text-lg mb-6 italic">{cocktail.description}</p>
+            <p className="text-fg-muted print:text-gray-600 text-lg mb-6 italic">
+              {cocktail.description}
+            </p>
           )}
 
           {user && cocktail.notes && (
             <div className="mb-6 rounded-xl border border-accent/20 bg-accent/5 p-4 print:border-gray-300 print:bg-gray-50">
               <h2 className={`${SECTION_TITLE_CLASSES} mb-2`}>{t('cocktails.notes')}</h2>
-              <p className="text-sm leading-6 text-gray-300 print:text-black whitespace-pre-wrap">{cocktail.notes}</p>
+              <p className="text-sm leading-6 text-fg-soft print:text-black whitespace-pre-wrap">
+                {cocktail.notes}
+              </p>
             </div>
           )}
 
@@ -112,12 +126,20 @@ function CocktailRecipe({ cocktail, menuPath }: { cocktail: Cocktail; menuPath: 
               <h2 className={`${SECTION_TITLE_CLASSES} mb-3`}>{t('public.ingredients')}</h2>
               <ul className="space-y-2">
                 {cocktail.ingredients.map((ing) => (
-                  <li key={ing.id} className="rounded-lg border border-transparent print:border-none">
+                  <li
+                    key={ing.id}
+                    className="rounded-lg border border-transparent print:border-none"
+                  >
                     <div className="flex items-center gap-3">
-                      <span aria-hidden="true" className="w-1.5 h-1.5 bg-accent print:bg-gray-800 rounded-full flex-shrink-0" />
-                      <span className="text-gray-300 print:text-black">
-                        <UnitConverter quantity={ing.quantity} unit={ing.unit?.abbreviation || ''} />
-                        {' '}
+                      <span
+                        aria-hidden="true"
+                        className="w-1.5 h-1.5 bg-accent print:bg-gray-800 rounded-full flex-shrink-0"
+                      />
+                      <span className="text-fg-soft print:text-black">
+                        <UnitConverter
+                          quantity={ing.quantity}
+                          unit={ing.unit?.abbreviation || ''}
+                        />{' '}
                         <span>{ingredientName(ing)}</span>
                       </span>
                     </div>
@@ -130,7 +152,7 @@ function CocktailRecipe({ cocktail, menuPath }: { cocktail: Cocktail; menuPath: 
                         {ing.preferredBottles.map((preferredBottle) => (
                           <span
                             key={preferredBottle.id}
-                            className="rounded-full border border-accent/20 bg-accent/10 px-2.5 py-1 text-xs text-amber-200 print:border-gray-300 print:bg-gray-100 print:text-gray-800"
+                            className="rounded-full border border-accent/20 bg-accent/10 px-2.5 py-1 text-xs text-accent-pale print:border-gray-300 print:bg-gray-100 print:text-gray-800"
                           >
                             {preferredBottle.bottle?.name || ''}
                           </span>
@@ -154,7 +176,7 @@ function CocktailRecipe({ cocktail, menuPath }: { cocktail: Cocktail; menuPath: 
                     <span className="flex-shrink-0 w-6 h-6 bg-accent/10 print:bg-gray-100 text-accent print:text-gray-800 rounded-full flex items-center justify-center text-xs font-bold">
                       {inst.stepNumber}
                     </span>
-                    <span className="text-gray-300 print:text-black pt-0.5">{inst.text}</span>
+                    <span className="text-fg-soft print:text-black pt-0.5">{inst.text}</span>
                   </li>
                 ))}
               </ol>

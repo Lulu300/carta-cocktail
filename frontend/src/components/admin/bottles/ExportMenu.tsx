@@ -12,12 +12,14 @@ export interface BottleExportFilters {
   location?: string;
 }
 
-const MENU_ITEM_CLASSES = 'block w-full text-left px-4 py-2 text-sm text-fg hover:bg-accent/10 hover:text-accent';
+const MENU_ITEM_CLASSES =
+  'block w-full text-left px-4 py-2 text-sm text-fg hover:bg-accent/10 hover:text-accent';
 
 /** "Export" button with its JSON / CSV choices, applied to the bottles the filters show. */
 export default function ExportMenu({ filters }: { filters: BottleExportFilters }) {
   const { t } = useTranslation();
-  const { isOpen, closeAndFocusTrigger, panelId, containerRef, handleKeyDown, triggerProps } = useDisclosure();
+  const { isOpen, closeAndFocusTrigger, panelId, containerRef, handleKeyDown, triggerProps } =
+    useDisclosure();
 
   const handleExport = async (format: ExportFormat) => {
     closeAndFocusTrigger();
@@ -34,7 +36,10 @@ export default function ExportMenu({ filters }: { filters: BottleExportFilters }
         {t('bottles.export')}
       </Button>
       {isOpen && (
-        <div id={panelId} className="absolute right-0 mt-1 bg-surface border border-line-strong rounded-lg shadow-lg z-20 min-w-36">
+        <div
+          id={panelId}
+          className="absolute right-0 mt-1 bg-surface border border-line-strong rounded-lg shadow-lg z-20 min-w-36"
+        >
           <button type="button" onClick={() => handleExport('json')} className={MENU_ITEM_CLASSES}>
             {t('bottles.exportJson')}
           </button>

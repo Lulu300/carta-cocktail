@@ -11,31 +11,67 @@ interface IconPickerProps {
 
 const commonEmojis = [
   // Citrus
-  '🍋', '🟡', '🍊', '🟠',
+  '🍋',
+  '🟡',
+  '🍊',
+  '🟠',
   // Berries
-  '🍒', '🍓', '🫐', '🍇',
+  '🍒',
+  '🍓',
+  '🫐',
+  '🍇',
   // Tropical fruits
-  '🍍', '🥭', '🥥', '🍌', '🍑', '🍉', '🍈', '🥝',
+  '🍍',
+  '🥭',
+  '🥥',
+  '🍌',
+  '🍑',
+  '🍉',
+  '🍈',
+  '🥝',
   // Pome fruits
-  '🍎', '🍏', '🍐', '🍅',
+  '🍎',
+  '🍏',
+  '🍐',
+  '🍅',
   // Aromatic herbs
-  '🌿', '🍃', '🌱', '🪴',
+  '🌿',
+  '🍃',
+  '🌱',
+  '🪴',
   // Vegetables
-  '🥒', '🌶️', '🫑', '🥕', '🧅', '🧄', '🌽',
+  '🥒',
+  '🌶️',
+  '🫑',
+  '🥕',
+  '🧅',
+  '🧄',
+  '🌽',
   // Spices
-  '🫚', '⭐',
+  '🫚',
+  '⭐',
   // Sweeteners and syrups
-  '🍯', '🧂', '🧊', '🍬',
+  '🍯',
+  '🧂',
+  '🧊',
+  '🍬',
   // Dairy
-  '🥛', '🧈', '🥚',
+  '🥛',
+  '🧈',
+  '🥚',
   // Nuts and seeds
-  '🥜', '🌰',
+  '🥜',
+  '🌰',
   // Olives
   '🫒',
   // Flowers and natural garnish
-  '🌸', '🌺', '🌹', '🏵️',
+  '🌸',
+  '🌺',
+  '🌹',
+  '🏵️',
   // Other
-  '💧', '☕',
+  '💧',
+  '☕',
 ];
 
 export default function IconPicker({ value, onChange }: IconPickerProps) {

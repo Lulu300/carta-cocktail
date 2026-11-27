@@ -54,12 +54,16 @@ function MenuContent({ menu, slug }: { menu: Menu; slug: string }) {
   const bottleMenu = isBottleMenu(menu);
   const { cocktailBlocks, bottleBlocks, resultCount, hasItems } = useMenuFilter(menu, searchQuery);
   // Stock levels are private: only a signed-in admin sees them on the public page.
-  const { data: availabilities } = useCocktailsAvailability({ enabled: Boolean(user) && !bottleMenu });
+  const { data: availabilities } = useCocktailsAvailability({
+    enabled: Boolean(user) && !bottleMenu,
+  });
   const isSearching = searchQuery.trim() !== '';
 
   const navItems = useMemo<SectionNavItem[]>(() => {
     const blocks: MenuBlock<unknown>[] = bottleMenu ? bottleBlocks : cocktailBlocks;
-    return blocks.filter((block) => block.title).map((block) => ({ anchorId: block.anchorId, label: block.title }));
+    return blocks
+      .filter((block) => block.title)
+      .map((block) => ({ anchorId: block.anchorId, label: block.title }));
   }, [bottleMenu, bottleBlocks, cocktailBlocks]);
 
   const renderNoResults = () => {
@@ -68,7 +72,11 @@ function MenuContent({ menu, slug }: { menu: Menu; slug: string }) {
       <EmptyState
         icon="🔍"
         title={t('public.noResults', { query: searchQuery.trim() })}
-        action={<Button variant="secondary" onClick={() => setSearchQuery('')}>{t('common.clearSearch')}</Button>}
+        action={
+          <Button variant="secondary" onClick={() => setSearchQuery('')}>
+            {t('common.clearSearch')}
+          </Button>
+        }
       />
     );
   };
@@ -86,7 +94,9 @@ function MenuContent({ menu, slug }: { menu: Menu; slug: string }) {
         <MenuSearchBar
           value={searchQuery}
           onChange={setSearchQuery}
-          placeholder={t(bottleMenu ? 'public.bottleSearchPlaceholder' : 'public.cocktailSearchPlaceholder')}
+          placeholder={t(
+            bottleMenu ? 'public.bottleSearchPlaceholder' : 'public.cocktailSearchPlaceholder',
+          )}
         />
         {navItems.length >= 2 && <SectionNav items={navItems} />}
       </div>
@@ -99,10 +109,18 @@ function MenuContent({ menu, slug }: { menu: Menu; slug: string }) {
         {isSearching ? t('common.resultCount', { count: resultCount }) : ''}
       </p>
 
-      {resultCount === 0 ? renderNoResults() : (
+      {resultCount === 0 ? (
+        renderNoResults()
+      ) : (
         <div className={bottleMenu ? 'space-y-8' : 'space-y-10'}>
           {bottleBlocks.map((block) => (
-            <SectionBlock key={block.anchorId} anchorId={block.anchorId} title={block.title} kind={block.kind} rowsInCard>
+            <SectionBlock
+              key={block.anchorId}
+              anchorId={block.anchorId}
+              title={block.title}
+              kind={block.kind}
+              rowsInCard
+            >
               {block.items.map((group) => (
                 <BottleGroupRow
                   key={group.key}
@@ -114,10 +132,17 @@ function MenuContent({ menu, slug }: { menu: Menu; slug: string }) {
             </SectionBlock>
           ))}
           {cocktailBlocks.map((block) => (
-            <SectionBlock key={block.anchorId} anchorId={block.anchorId} title={block.title} kind={block.kind}>
+            <SectionBlock
+              key={block.anchorId}
+              anchorId={block.anchorId}
+              title={block.title}
+              kind={block.kind}
+            >
               <div
                 data-testid={`public-cocktails-${viewMode}-view`}
-                className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-6' : 'space-y-3'}
+                className={
+                  viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-6' : 'space-y-3'
+                }
               >
                 {block.items.map((menuCocktail) => (
                   <PublicCocktailItem
@@ -135,11 +160,19 @@ function MenuContent({ menu, slug }: { menu: Menu; slug: string }) {
         </div>
       )}
 
-      <Modal open={locationsGroup !== null} onClose={() => setLocationsGroup(null)} title={locationsGroup?.name} size="sm">
+      <Modal
+        open={locationsGroup !== null}
+        onClose={() => setLocationsGroup(null)}
+        title={locationsGroup?.name}
+        size="sm"
+      >
         <ul className="space-y-2">
           {locationsGroup?.locations.map((location) => (
-            <li key={location.name} className="flex items-center justify-between px-3 py-2 bg-canvas rounded-lg">
-              <span className="text-gray-300">{location.name}</span>
+            <li
+              key={location.name}
+              className="flex items-center justify-between px-3 py-2 bg-canvas rounded-lg"
+            >
+              <span className="text-fg-soft">{location.name}</span>
               <span className="text-accent font-medium">{location.count}</span>
             </li>
           ))}
@@ -154,7 +187,13 @@ const VIEW_MODES: { value: ViewMode; labelKey: string }[] = [
   { value: 'list', labelKey: 'cocktails.viewList' },
 ];
 
-function ViewModeToggle({ value, onChange }: { value: ViewMode; onChange: (mode: ViewMode) => void }) {
+function ViewModeToggle({
+  value,
+  onChange,
+}: {
+  value: ViewMode;
+  onChange: (mode: ViewMode) => void;
+}) {
   const { t } = useTranslation();
 
   return (
@@ -168,7 +207,9 @@ function ViewModeToggle({ value, onChange }: { value: ViewMode; onChange: (mode:
             aria-pressed={value === mode.value}
             className={cx(
               'rounded-md px-3 py-2 text-sm transition-colors',
-              value === mode.value ? 'bg-accent text-on-accent font-semibold' : 'text-fg-muted hover:text-white',
+              value === mode.value
+                ? 'bg-accent text-on-accent font-semibold'
+                : 'text-fg-muted hover:text-fg-strong',
             )}
           >
             {t(mode.labelKey)}

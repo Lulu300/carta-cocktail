@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { IntersectionObserverMock, installIntersectionObserverMock } from '../../test/intersectionObserverMock';
+import {
+  IntersectionObserverMock,
+  installIntersectionObserverMock,
+} from '../../test/intersectionObserverMock';
 import SectionNav from './SectionNav';
 
 const items = [
@@ -14,7 +17,11 @@ function renderWithSections(navItems = items) {
   return render(
     <>
       <SectionNav items={navItems} />
-      {items.map((item) => <section key={item.anchorId} id={item.anchorId}>{item.label}</section>)}
+      {items.map((item) => (
+        <section key={item.anchorId} id={item.anchorId}>
+          {item.label}
+        </section>
+      ))}
     </>,
   );
 }
@@ -43,8 +50,12 @@ describe('SectionNav', () => {
   it('lists the sections in a labelled navigation, the first one active', () => {
     renderWithSections();
 
-    expect(screen.getByRole('navigation', { name: 'public.sectionNav' })).toBeInTheDocument();
-    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Classics', 'Signatures', 'Mocktails']);
+    expect(screen.getByRole('navigation', { name: 'Menu sections' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'Classics',
+      'Signatures',
+      'Mocktails',
+    ]);
     expect(chip('Classics')).toHaveAttribute('aria-current', 'true');
     expect(chip('Signatures')).not.toHaveAttribute('aria-current');
   });
@@ -73,13 +84,19 @@ describe('SectionNav', () => {
   it('follows the section that crosses the top of the screen while scrolling', () => {
     renderWithSections();
     const observer = IntersectionObserverMock.latest();
-    expect(observer.observed).toEqual([section('section-1'), section('section-2'), section('section-3')]);
+    expect(observer.observed).toEqual([
+      section('section-1'),
+      section('section-2'),
+      section('section-3'),
+    ]);
 
-    act(() => observer.trigger([
-      { target: section('section-1'), isIntersecting: false },
-      { target: section('section-3'), isIntersecting: true, top: 400 },
-      { target: section('section-2'), isIntersecting: true, top: 100 },
-    ]));
+    act(() =>
+      observer.trigger([
+        { target: section('section-1'), isIntersecting: false },
+        { target: section('section-3'), isIntersecting: true, top: 400 },
+        { target: section('section-2'), isIntersecting: true, top: 100 },
+      ]),
+    );
 
     expect(chip('Signatures')).toHaveAttribute('aria-current', 'true');
     expect(chip('Classics')).not.toHaveAttribute('aria-current');
@@ -88,7 +105,11 @@ describe('SectionNav', () => {
   it('keeps the active section when nothing crosses the band', () => {
     renderWithSections();
 
-    act(() => IntersectionObserverMock.latest().trigger([{ target: section('section-1'), isIntersecting: false }]));
+    act(() =>
+      IntersectionObserverMock.latest().trigger([
+        { target: section('section-1'), isIntersecting: false },
+      ]),
+    );
 
     expect(chip('Classics')).toHaveAttribute('aria-current', 'true');
   });

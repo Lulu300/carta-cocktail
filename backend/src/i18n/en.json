@@ -16,6 +16,7 @@
     "cannotDeleteDefaultMenu": "Cannot delete a system menu",
     "cannotModifySystemMenu": "System menus cannot have their slug or type changed",
     "fileTooLarge": "The file or request is too large",
+    "invalidImage": "The photo cannot be read: send a JPEG, PNG or WebP image",
     "invalidJson": "The request body is not valid JSON",
     "noFileUploaded": "No file uploaded",
     "backupSchemaTooNew": "This backup comes from a newer version of Carta Cocktail: update the application before restoring it",

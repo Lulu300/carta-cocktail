@@ -32,10 +32,16 @@ export default function ExcludedBottles({ menu, uncheckedNote, onRestore }: Excl
           {t('menus.bottles.excludedTitle', { count: exclusions.length })}
         </summary>
         <div className="mt-4">
-          {exclusionsQuery.isPending && <div className="flex justify-center py-4"><Spinner /></div>}
+          {exclusionsQuery.isPending && (
+            <div className="flex justify-center py-4">
+              <Spinner />
+            </div>
+          )}
           {exclusionsQuery.isError && <LoadError onRetry={() => exclusionsQuery.refetch()} />}
           {exclusionsQuery.isSuccess && exclusions.length === 0 && (
-            <p className="text-center py-4 text-sm text-fg-muted">{t('menus.bottles.noExcluded')}</p>
+            <p className="text-center py-4 text-sm text-fg-muted">
+              {t('menus.bottles.noExcluded')}
+            </p>
           )}
           <ul className="space-y-2">
             {groups.map((group) => (

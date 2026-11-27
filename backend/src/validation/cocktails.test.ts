@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { CocktailCreate, CocktailUpdate, IngredientLine, IngredientLineUpdate, Instruction } from './cocktails';
+import {
+  CocktailCreate,
+  CocktailUpdate,
+  IngredientLine,
+  IngredientLineUpdate,
+  Instruction,
+} from './cocktails';
 
 const bottleLine = { sourceType: 'BOTTLE', bottleId: 3, quantity: 4, unitId: 1 };
 
@@ -9,7 +15,12 @@ function issues(result: { error?: { issues: { path: PropertyKey[]; message: stri
 
 describe('IngredientLine', () => {
   it('accepts a line shaped like the cocktail form sends it', () => {
-    const line = { ...bottleLine, categoryId: null, ingredientId: null, preferredBottleIds: undefined };
+    const line = {
+      ...bottleLine,
+      categoryId: null,
+      ingredientId: null,
+      preferredBottleIds: undefined,
+    };
     expect(IngredientLine.safeParse(line).success).toBe(true);
   });
 
@@ -28,14 +39,24 @@ describe('IngredientLine', () => {
   });
 
   it('accepts preferred bottles on a CATEGORY line only', () => {
-    const categoryLine = { sourceType: 'CATEGORY', categoryId: 2, quantity: 1, unitId: 1, preferredBottleIds: [3] };
+    const categoryLine = {
+      sourceType: 'CATEGORY',
+      categoryId: 2,
+      quantity: 1,
+      unitId: 1,
+      preferredBottleIds: [3],
+    };
     expect(IngredientLine.safeParse(categoryLine).success).toBe(true);
-    expect(issues(IngredientLine.safeParse({ ...bottleLine, preferredBottleIds: [3] }))).toEqual(['preferredBottleIds']);
+    expect(issues(IngredientLine.safeParse({ ...bottleLine, preferredBottleIds: [3] }))).toEqual([
+      'preferredBottleIds',
+    ]);
     expect(IngredientLine.safeParse({ ...bottleLine, preferredBottleIds: [] }).success).toBe(true);
   });
 
   it('rejects an unknown source type', () => {
-    expect(issues(IngredientLine.safeParse({ ...bottleLine, sourceType: 'GARNISH' }))).toEqual(['sourceType']);
+    expect(issues(IngredientLine.safeParse({ ...bottleLine, sourceType: 'GARNISH' }))).toEqual([
+      'sourceType',
+    ]);
   });
 
   it.each([0, -1])('rejects a quantity of %s', (quantity) => {
@@ -52,20 +73,35 @@ describe('IngredientLineUpdate', () => {
     ['BOTTLE', 'bottleId'],
     ['CATEGORY', 'categoryId'],
     ['INGREDIENT', 'ingredientId'],
-  ])('lets a %s line without its %s through, as a stored line whose source was deleted', (sourceType, key) => {
-    expect(IngredientLineUpdate.safeParse({ sourceType, [key]: null, quantity: 1, unitId: 1 }).success).toBe(true);
-  });
+  ])(
+    'lets a %s line without its %s through, as a stored line whose source was deleted',
+    (sourceType, key) => {
+      expect(
+        IngredientLineUpdate.safeParse({ sourceType, [key]: null, quantity: 1, unitId: 1 }).success,
+      ).toBe(true);
+    },
+  );
 
   it('lets a quantity of 0 through', () => {
     expect(IngredientLineUpdate.safeParse({ ...bottleLine, quantity: 0 }).success).toBe(true);
   });
 
   it('keeps every other rule of IngredientLine', () => {
-    expect(issues(IngredientLineUpdate.safeParse({ ...bottleLine, quantity: -1 }))).toEqual(['quantity']);
-    expect(issues(IngredientLineUpdate.safeParse({ ...bottleLine, sourceType: 'GARNISH' }))).toEqual(['sourceType']);
-    expect(issues(IngredientLineUpdate.safeParse({ ...bottleLine, categoryId: 2 }))).toEqual(['categoryId']);
-    expect(issues(IngredientLineUpdate.safeParse({ ...bottleLine, preferredBottleIds: [3] }))).toEqual(['preferredBottleIds']);
-    expect(issues(IngredientLineUpdate.safeParse({ ...bottleLine, unitId: '1' }))).toEqual(['unitId']);
+    expect(issues(IngredientLineUpdate.safeParse({ ...bottleLine, quantity: -1 }))).toEqual([
+      'quantity',
+    ]);
+    expect(
+      issues(IngredientLineUpdate.safeParse({ ...bottleLine, sourceType: 'GARNISH' })),
+    ).toEqual(['sourceType']);
+    expect(issues(IngredientLineUpdate.safeParse({ ...bottleLine, categoryId: 2 }))).toEqual([
+      'categoryId',
+    ]);
+    expect(
+      issues(IngredientLineUpdate.safeParse({ ...bottleLine, preferredBottleIds: [3] })),
+    ).toEqual(['preferredBottleIds']);
+    expect(issues(IngredientLineUpdate.safeParse({ ...bottleLine, unitId: '1' }))).toEqual([
+      'unitId',
+    ]);
   });
 });
 
@@ -88,8 +124,9 @@ describe('CocktailCreate and CocktailUpdate', () => {
 
   it('lets the stored recipe defects through on update only', () => {
     const orphanLine = { ...bottleLine, bottleId: null, quantity: 0 };
-    expect(issues(CocktailCreate.safeParse({ name: 'Mojito', ingredients: [orphanLine] })))
-      .toEqual(['ingredients.0.quantity', 'ingredients.0.bottleId']);
+    expect(issues(CocktailCreate.safeParse({ name: 'Mojito', ingredients: [orphanLine] }))).toEqual(
+      ['ingredients.0.quantity', 'ingredients.0.bottleId'],
+    );
     expect(CocktailUpdate.safeParse({ ingredients: [orphanLine] }).success).toBe(true);
   });
 

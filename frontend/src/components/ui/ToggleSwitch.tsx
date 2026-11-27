@@ -1,7 +1,10 @@
 import type { ComponentPropsWithRef } from 'react';
 import { cx, focusRingClasses } from './classNames';
 
-interface ToggleSwitchProps extends Omit<ComponentPropsWithRef<'button'>, 'onChange' | 'onClick' | 'children' | 'role' | 'aria-checked'> {
+interface ToggleSwitchProps extends Omit<
+  ComponentPropsWithRef<'button'>,
+  'onChange' | 'onClick' | 'children' | 'role' | 'aria-checked'
+> {
   checked: boolean;
   onChange: (checked: boolean) => void;
   label: string;
@@ -10,7 +13,12 @@ interface ToggleSwitchProps extends Omit<ComponentPropsWithRef<'button'>, 'onCha
 }
 
 export default function ToggleSwitch({
-  checked, onChange, label, hideLabel = false, className, ...rest
+  checked,
+  onChange,
+  label,
+  hideLabel = false,
+  className,
+  ...rest
 }: ToggleSwitchProps) {
   return (
     <button
@@ -27,10 +35,16 @@ export default function ToggleSwitch({
     >
       <span
         aria-hidden="true"
-        className={cx('flex items-center w-12 h-6 rounded-full transition-colors', checked ? 'bg-success' : 'bg-gray-600')}
+        className={cx(
+          'flex items-center w-12 h-6 rounded-full transition-colors',
+          checked ? 'bg-success' : 'bg-gray-600',
+        )}
       >
         <span
-          className={cx('size-5 bg-white rounded-full transition-transform motion-reduce:transition-none', checked ? 'translate-x-6' : 'translate-x-0.5')}
+          className={cx(
+            'size-5 bg-white rounded-full transition-transform motion-reduce:transition-none',
+            checked ? 'translate-x-6' : 'translate-x-0.5',
+          )}
         />
       </span>
       <span className={hideLabel ? 'sr-only' : 'text-sm text-fg'}>{label}</span>
