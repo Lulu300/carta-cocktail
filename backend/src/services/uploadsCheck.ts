@@ -161,7 +161,7 @@ export function formatUploadsWarnings(result: UploadsCheckResult): string[] {
  * Short reason for a failed check. Prisma messages span several lines (source
  * excerpt, file paths), so a Prisma error code wins, then the first line.
  */
-function describeError(error: unknown): string {
+export function describeError(error: unknown): string {
   if (!(error instanceof Error)) {
     return String(error);
   }

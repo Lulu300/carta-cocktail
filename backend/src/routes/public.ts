@@ -7,6 +7,7 @@ import { NotFoundError } from '../errors';
 import { calculateAvailabilities } from '../services/availabilityService';
 import { buildPublicCocktailSelect, CATEGORY_PUBLIC_SELECT } from '../services/cocktail/includes';
 import { exportCocktail } from '../services/cocktail/cocktailExport';
+import { previewImageName } from '../services/cocktail/imageVariants';
 import { getOrCreateSettings } from '../services/settingsService';
 import { renderSharePage } from '../services/sharePreview';
 import { config } from '../config';
@@ -192,7 +193,9 @@ async function sendSharePage(req: Request, res: Response, page: SharedPage, page
     siteName,
     description: page.description,
     pageUrl: `${baseUrl}${pagePath}`,
-    imageUrl: page.imagePath ? `${baseUrl}/uploads/${encodeURIComponent(page.imagePath)}` : null,
+    imageUrl: page.imagePath
+      ? `${baseUrl}/uploads/${encodeURIComponent(previewImageName(page.imagePath))}`
+      : null,
   });
   // nginx answers the same URL with the SPA to every other client: a cache must not mix them up
   res.set({ 'Cache-Control': 'no-cache', Vary: 'User-Agent' }).type('html').send(html);

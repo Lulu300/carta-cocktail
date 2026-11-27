@@ -9,7 +9,7 @@ import type { Cocktail, CocktailIngredient } from '../../types';
 import Button from '../../components/ui/Button';
 import UnitConverter from '../../components/ui/UnitConverter';
 import ExportCocktailButton from '../../components/ui/ExportCocktailButton';
-import { getUploadUrl } from '../../utils/uploads';
+import UploadedPhoto from './UploadedPhoto';
 import CocktailSkeleton from './CocktailSkeleton';
 import PublicErrorState from './PublicErrorState';
 import type { CocktailLinkState } from './PublicCocktailItem';
@@ -73,8 +73,6 @@ function CocktailRecipe({ cocktail, menuPath }: { cocktail: Cocktail; menuPath: 
     return '?';
   };
 
-  const imageUrl = getUploadUrl(cocktail.imagePath);
-
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
       <Link
@@ -90,9 +88,17 @@ function CocktailRecipe({ cocktail, menuPath }: { cocktail: Cocktail; menuPath: 
         className="bg-surface border border-line rounded-xl print:border-gray-300 print:bg-white print:text-black print:rounded-none"
         id="recipe-card"
       >
-        {imageUrl && (
+        {cocktail.imagePath && (
           <div className="aspect-video overflow-hidden rounded-t-xl">
-            <img src={imageUrl} alt={cocktail.name} className="w-full h-full object-cover" />
+            <UploadedPhoto
+              imagePath={cocktail.imagePath}
+              // max-w-2xl (42rem) with px-4: the card is at most 40rem wide
+              sizes="(min-width: 42rem) 40rem, calc(100vw - 2rem)"
+              // The largest element of the page: fetched first, never lazily
+              fetchPriority="high"
+              alt={cocktail.name}
+              className="w-full h-full object-cover"
+            />
           </div>
         )}
 

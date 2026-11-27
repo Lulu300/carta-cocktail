@@ -58,7 +58,7 @@ frontend/
 │   │   │                       # Cocktails, CocktailForm, Menus, MenuEdit, MenuBottleEdit, Shortages, Settings)
 │   │   ├── auth/
 │   │   │   └── LoginPage.tsx   # Admin login
-│   │   └── public/             # HomePage, MenuPublicPage, CocktailPublicPage and their parts
+│   │   └── public/             # HomePage, MenuPublicPage, CocktailPublicPage and their parts (UploadedPhoto: srcset with fallback)
 │   │                           # (sections, search bar, skeletons, error state, useMenuFilter, useScrollRestoration)
 │   ├── components/
 │   │   ├── admin/              # Shared admin parts: DataTable, TranslationFields, DeletionImpactList,
@@ -89,7 +89,7 @@ frontend/
 │   ├── types/
 │   │   └── index.ts              # TypeScript interfaces for all entities
 │   ├── utils/                  # Pure helpers: colors, dates, localization, translations, unitConverter,
-│   │                           # cocktailSearch, uploads (photo URLs), chunkReload, bottleGrouping…
+│   │                           # cocktailSearch, uploads (photo URLs and srcset), chunkReload, bottleGrouping…
 │   ├── test/                   # Test setup, MSW fake backend (msw/), factories, providers, axe
 │   └── i18n/
 │       ├── index.ts              # i18next + browser language detector, public messages

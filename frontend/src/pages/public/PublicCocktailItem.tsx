@@ -3,12 +3,18 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
 import type { CocktailAvailability, CocktailIngredient, PublicMenuCocktail } from '../../types';
-import { getUploadUrl } from '../../utils/uploads';
+import UploadedPhoto from './UploadedPhoto';
 import { cx } from '../../components/ui/classNames';
 import { parseTags } from '../../utils/parseTags';
 
 // Beyond four ingredients a card becomes a wall of pills: the rest is summed up as "+N".
 const MAX_VISIBLE_INGREDIENTS = 4;
+
+// Displayed photo widths: the menu is max-w-4xl (56rem) with px-4, the grid has two
+// columns from md (48rem) with gap-6, the list thumbnail is w-28, then sm:w-36.
+const GRID_PHOTO_SIZES =
+  '(min-width: 56rem) 26.25rem, (min-width: 48rem) calc(50vw - 1.75rem), calc(100vw - 2rem)';
+const LIST_PHOTO_SIZES = '(min-width: 40rem) 9rem, 7rem';
 
 /** Lets the cocktail page go back in history instead of loading the menu again. */
 export interface CocktailLinkState {
@@ -70,8 +76,10 @@ function PublicCocktailItem({
       >
         {/* Decorative: the cocktail's name in the heading already names the link. */}
         {cocktail.imagePath ? (
-          <img
-            src={getUploadUrl(cocktail.imagePath) || undefined}
+          <UploadedPhoto
+            imagePath={cocktail.imagePath}
+            sizes={isList ? LIST_PHOTO_SIZES : GRID_PHOTO_SIZES}
+            loading="lazy"
             alt=""
             className="w-full h-full object-cover motion-safe:group-hover:scale-105 transition-transform duration-300 motion-reduce:transition-none"
           />
