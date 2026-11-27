@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { availability as availabilityApi, cocktails as cocktailsApi } from '../services/api';
-import type { Cocktail, CocktailAvailability, CocktailInput } from '../types';
+import type { Cocktail, CocktailAvailability, CocktailInput, CocktailRow } from '../types';
 import { useEntityMutation, type EntityMutation } from './crud';
 import { qk } from './keys';
 
@@ -70,7 +70,7 @@ interface ImageUpload {
   file: File;
 }
 
-export function useUploadCocktailImage(): EntityMutation<ImageUpload, Cocktail> {
+export function useUploadCocktailImage(): EntityMutation<ImageUpload, CocktailRow> {
   return useEntityMutation({
     mutationFn: ({ id, file }: ImageUpload) => cocktailsApi.uploadImage(id, file),
     invalidates: [qk.cocktails],

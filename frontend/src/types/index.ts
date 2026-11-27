@@ -1,3 +1,48 @@
+// The types of the responses and request bodies that the backend's zod schemas describe are
+// generated into generated.ts (`npm run contracts:generate` in backend/, task F-05). The
+// interfaces below are the routes not covered yet: they move there route by route.
+import type {
+  Bottle,
+  Category as StoredCategory,
+  Cocktail,
+  MenuSection,
+  MenuType,
+  SourceType,
+} from './generated';
+
+export { MENU_TYPES, SOURCE_KEYS, SOURCE_TYPES } from './generated';
+export type {
+  Bottle,
+  BottleInput,
+  BottleUpdateInput,
+  Cocktail,
+  CocktailIngredient,
+  CocktailIngredientInput,
+  CocktailInput,
+  CocktailInstruction,
+  CocktailPreferredBottle,
+  CocktailRow,
+  DeletionImpact,
+  DeletionResponse,
+  Ingredient,
+  MenuCreateInput,
+  MenuSection,
+  MenuType,
+  MenuUpdateInput,
+  PublicCategory,
+  PublicCocktail,
+  PublicCocktailIngredient,
+  PublicIngredient,
+  PublicIngredientBottle,
+  PublicMenu,
+  PublicMenuBottle,
+  PublicMenuCocktail,
+  PublicMenuSummary,
+  SiteSettings,
+  SourceType,
+  Unit,
+} from './generated';
+
 export interface User {
   id: number;
   email: string;
@@ -10,105 +55,10 @@ export interface CategoryType {
   _count?: { categories: number };
 }
 
-export interface Category {
-  id: number;
-  name: string;
-  nameTranslations?: Record<string, string> | null;
-  type: string;
+/** A category as the categories route sends it, with its type and its number of bottles. */
+export interface Category extends StoredCategory {
   categoryType?: CategoryType | null;
-  desiredStock: number;
-  minimumPercent: number;
-  createdAt: string;
   _count?: { bottles: number };
-  bottles?: Bottle[];
-}
-
-export interface Bottle {
-  id: number;
-  name: string;
-  categoryId: number;
-  category?: Category;
-  purchasePrice: number | null;
-  capacityMl: number;
-  remainingPercent: number;
-  openedAt: string | null;
-  alcoholPercentage: number | null;
-  location: string | null;
-  isApero: boolean;
-  isDigestif: boolean;
-  createdAt: string;
-}
-
-export interface Ingredient {
-  id: number;
-  name: string;
-  nameTranslations?: Record<string, string> | null;
-  icon: string | null;
-  isAvailable: boolean;
-  createdAt: string;
-}
-
-export interface Unit {
-  id: number;
-  name: string;
-  nameTranslations?: Record<string, string> | null;
-  abbreviation: string;
-  conversionFactorToMl: number | null;
-}
-
-export interface CocktailIngredient {
-  id: number;
-  cocktailId: number;
-  quantity: number;
-  unitId: number;
-  unit?: Unit;
-  sourceType: 'BOTTLE' | 'CATEGORY' | 'INGREDIENT';
-  bottleId: number | null;
-  bottle?: Bottle | null;
-  categoryId: number | null;
-  category?: Category | null;
-  ingredientId: number | null;
-  ingredient?: Ingredient | null;
-  position: number;
-  preferredBottles?: CocktailPreferredBottle[];
-}
-
-export interface CocktailPreferredBottle {
-  id: number;
-  cocktailIngredientId: number;
-  bottleId: number;
-  bottle?: Bottle;
-}
-
-export interface CocktailInstruction {
-  id: number;
-  cocktailId: number;
-  stepNumber: number;
-  text: string;
-}
-
-export interface Cocktail {
-  id: number;
-  name: string;
-  description: string | null;
-  notes: string | null;
-  imagePath: string | null;
-  tags: string;
-  /** Manual switch set by the admin. */
-  isAvailable: boolean;
-  /** Public endpoints only: the manual switch is on and the stock allows one serving. */
-  available?: boolean;
-  createdAt: string;
-  updatedAt: string;
-  ingredients?: CocktailIngredient[];
-  instructions?: CocktailInstruction[];
-}
-
-export interface MenuSection {
-  id: number;
-  menuId: number;
-  name: string;
-  position: number;
 }
 
 export interface MenuCocktail {
@@ -120,9 +70,6 @@ export interface MenuCocktail {
   position: number;
   isHidden: boolean;
 }
-
-/** A cocktail of a public menu, with its recipe: the menu endpoint always sends it. */
-export type PublicMenuCocktail = MenuCocktail & { cocktail: Cocktail };
 
 export interface MenuBottle {
   id: number;
@@ -139,7 +86,7 @@ export interface Menu {
   name: string;
   description: string | null;
   slug: string;
-  type: 'COCKTAILS' | 'APEROS' | 'DIGESTIFS';
+  type: MenuType;
   isPublic: boolean;
   createdAt: string;
   updatedAt: string;
@@ -165,51 +112,10 @@ export interface Shortage {
   isShortage: boolean;
 }
 
-// Form types for creating/updating
-export interface CocktailIngredientInput {
-  sourceType: 'BOTTLE' | 'CATEGORY' | 'INGREDIENT';
-  bottleId?: number | null;
-  categoryId?: number | null;
-  ingredientId?: number | null;
-  quantity: number;
-  unitId: number;
-  preferredBottleIds?: number[];
-}
-
-export interface CocktailInput {
-  name: string;
-  description?: string | null;
-  notes?: string | null;
-  tags?: string[];
-  isAvailable?: boolean;
-  ingredients?: CocktailIngredientInput[];
-  instructions?: { text: string }[];
-}
-
-export interface MenuInput {
-  name: string;
-  description?: string;
-  slug: string;
-  type?: 'COCKTAILS' | 'APEROS' | 'DIGESTIFS';
-  isPublic?: boolean;
-  cocktails?: {
-    cocktailId: number;
-    position?: number;
-    isHidden?: boolean;
-    menuSectionId?: number | null;
-  }[];
-  bottles?: {
-    bottleId: number;
-    position?: number;
-    isHidden?: boolean;
-    menuSectionId?: number | null;
-  }[];
-}
-
 // Availability types
 export interface IngredientAvailability {
   cocktailIngredientId: number;
-  sourceType: string;
+  sourceType: SourceType;
   name: string;
   nameTranslations: Record<string, string> | null;
   /** The source is gone or unreadable: `name` is empty. */
@@ -221,12 +127,6 @@ export interface IngredientAvailability {
   availableCount: number | null;
   /** CATEGORY lines with preferred bottles only: at least one preferred bottle is not empty. */
   preferredAvailable?: boolean;
-}
-
-export interface SiteSettings {
-  id?: number;
-  siteName: string;
-  siteIcon: string;
 }
 
 // Export/Import types
@@ -244,7 +144,7 @@ export interface CocktailExportFormat {
 }
 
 export interface ExportIngredient {
-  sourceType: 'BOTTLE' | 'CATEGORY' | 'INGREDIENT';
+  sourceType: SourceType;
   sourceName: string;
   sourceDetail: Record<string, unknown>;
   quantity: number;
@@ -427,20 +327,6 @@ export interface BottleImportConfirmResponse {
   created: { bottles: number };
   duplicatesCreated: number;
   skippedNoCategory: number;
-}
-
-/** What a deletion breaks: `details` of a deletion refused with a 409, `impact` once it is done. */
-export interface DeletionImpact {
-  /** Recipes that use the item: a forced deletion removes `removedLines` lines from each. */
-  cocktails: { id: number; name: string; removedLines: number }[];
-  /** Bottles of a category, deleted with it. */
-  bottles: { id: number; name: string }[];
-}
-
-export interface DeletionResponse {
-  message: string;
-  deleted: boolean;
-  impact: DeletionImpact;
 }
 
 export interface DeleteOptions {

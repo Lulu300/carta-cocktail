@@ -5,7 +5,7 @@ import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePublicCocktail } from '../../queries/public';
-import type { Cocktail, CocktailIngredient } from '../../types';
+import type { PublicCocktail, PublicCocktailIngredient } from '../../types';
 import Button from '../../components/ui/Button';
 import UnitConverter from '../../components/ui/UnitConverter';
 import ExportCocktailButton from '../../components/ui/ExportCocktailButton';
@@ -50,7 +50,7 @@ export default function CocktailPublicPage() {
   return <CocktailSkeleton />;
 }
 
-function CocktailRecipe({ cocktail, menuPath }: { cocktail: Cocktail; menuPath: string }) {
+function CocktailRecipe({ cocktail, menuPath }: { cocktail: PublicCocktail; menuPath: string }) {
   const { t } = useTranslation();
   const localize = useLocalizedName();
   const navigate = useNavigate();
@@ -66,7 +66,7 @@ function CocktailRecipe({ cocktail, menuPath }: { cocktail: Cocktail; menuPath: 
     void navigate(-1);
   };
 
-  const ingredientName = (ing: CocktailIngredient) => {
+  const ingredientName = (ing: PublicCocktailIngredient) => {
     if (ing.bottle) return ing.bottle.name;
     if (ing.category) return localize(ing.category);
     if (ing.ingredient) return localize(ing.ingredient);

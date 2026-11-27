@@ -11,6 +11,9 @@ import {
   buildMenu,
   buildMenuBottle,
   buildMenuSection,
+  buildPublicCocktail,
+  buildPublicMenu,
+  buildPublicMenuSummary,
   buildSiteSettings,
   buildUnit,
 } from '../factories';
@@ -232,12 +235,12 @@ const menuSectionHandlers = [
 ];
 
 const publicHandlers = [
-  http.get('/api/public/menus', () => HttpResponse.json([buildMenu({ id: 1 })])),
+  http.get('/api/public/menus', () => HttpResponse.json([buildPublicMenuSummary({ id: 1 })])),
   http.get('/api/public/menus/:slug', ({ params }) =>
-    HttpResponse.json(buildMenu({ id: 1, slug: String(params.slug) })),
+    HttpResponse.json(buildPublicMenu({ id: 1, slug: String(params.slug) })),
   ),
   http.get('/api/public/cocktails/:id', ({ params }) =>
-    HttpResponse.json(buildCocktail({ id: Number(params.id), available: true })),
+    HttpResponse.json(buildPublicCocktail({ id: Number(params.id) })),
   ),
   http.get('/api/public/cocktails/:id/export', ({ params }) => exportAttachment(Number(params.id))),
   http.get('/api/public/settings', () => HttpResponse.json(buildSiteSettings())),

@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
-import { buildCocktailIngredient, buildIngredient, buildMenuCocktail } from '../../test/factories';
+import {
+  buildCocktailIngredient,
+  buildIngredient,
+  buildPublicMenuCocktail,
+} from '../../test/factories';
 import type { CocktailIngredient } from '../../types';
 import PublicCocktailItem from './PublicCocktailItem';
 
@@ -15,7 +19,7 @@ function CocktailPageProbe() {
   return <p>cocktail page, state: {JSON.stringify(location.state)}</p>;
 }
 
-function renderItem(item = buildMenuCocktail({ id: 1, cocktail: { name: 'Mojito' } })) {
+function renderItem(item = buildPublicMenuCocktail({ id: 1, cocktail: { name: 'Mojito' } })) {
   return render(
     <MemoryRouter initialEntries={['/menu/summer']}>
       <Routes>
@@ -40,7 +44,7 @@ describe('PublicCocktailItem', () => {
   it('shows four ingredients and sums up the others', () => {
     const names = ['Rum', 'Lime', 'Mint', 'Sugar', 'Soda', 'Ice'];
     renderItem(
-      buildMenuCocktail({
+      buildPublicMenuCocktail({
         id: 1,
         cocktail: { ingredients: names.map((name, index) => ingredient(index + 1, name)) },
       }),
@@ -53,7 +57,7 @@ describe('PublicCocktailItem', () => {
   });
 
   it('shows one badge per tag and none for a blank entry', () => {
-    renderItem(buildMenuCocktail({ id: 1, cocktail: { tags: 'rum, ,mint' } }));
+    renderItem(buildPublicMenuCocktail({ id: 1, cocktail: { tags: 'rum, ,mint' } }));
 
     expect(screen.getAllByText(/^#/).map((badge) => badge.textContent)).toEqual(['#rum', '#mint']);
   });
@@ -69,7 +73,9 @@ describe('PublicCocktailItem', () => {
 
   it('greys out a cocktail switched on but out of stock and does not open it', async () => {
     const user = userEvent.setup();
-    renderItem(buildMenuCocktail({ id: 1, cocktail: { isAvailable: true, available: false } }));
+    renderItem(
+      buildPublicMenuCocktail({ id: 1, cocktail: { isAvailable: true, available: false } }),
+    );
 
     const link = screen.getByRole('link', { name: /Mojito/ });
     expect(link).toHaveClass('grayscale');
@@ -80,7 +86,9 @@ describe('PublicCocktailItem', () => {
   });
 
   it('keeps an available cocktail in color', () => {
-    renderItem(buildMenuCocktail({ id: 1, cocktail: { isAvailable: true, available: true } }));
+    renderItem(
+      buildPublicMenuCocktail({ id: 1, cocktail: { isAvailable: true, available: true } }),
+    );
 
     const link = screen.getByRole('link', { name: /Mojito/ });
     expect(link).not.toHaveClass('grayscale');
@@ -90,7 +98,9 @@ describe('PublicCocktailItem', () => {
   });
 
   it('takes an unavailable cocktail out of the tab order and announces it as disabled', () => {
-    renderItem(buildMenuCocktail({ id: 1, cocktail: { isAvailable: true, available: false } }));
+    renderItem(
+      buildPublicMenuCocktail({ id: 1, cocktail: { isAvailable: true, available: false } }),
+    );
 
     const link = screen.getByRole('link', { name: /Mojito/ });
     expect(link).toHaveAttribute('aria-disabled', 'true');
@@ -98,7 +108,7 @@ describe('PublicCocktailItem', () => {
   });
 
   it('treats the photo as decoration: the heading already names the link', () => {
-    renderItem(buildMenuCocktail({ id: 1, cocktail: { imagePath: 'mojito.jpg' } }));
+    renderItem(buildPublicMenuCocktail({ id: 1, cocktail: { imagePath: 'mojito.jpg' } }));
     expect(screen.getByRole('link', { name: /Mojito/ }).querySelector('img')).toHaveAttribute(
       'alt',
       '',
@@ -106,7 +116,7 @@ describe('PublicCocktailItem', () => {
   });
 
   it('loads the smallest copy of the photo that fills the card, lazily', () => {
-    renderItem(buildMenuCocktail({ id: 1, cocktail: { imagePath: 'mojito.webp' } }));
+    renderItem(buildPublicMenuCocktail({ id: 1, cocktail: { imagePath: 'mojito.webp' } }));
     const photo = screen.getByRole('link', { name: /Mojito/ }).querySelector('img');
 
     expect(photo).toHaveAttribute('src', '/uploads/mojito.webp');
@@ -120,7 +130,7 @@ describe('PublicCocktailItem', () => {
   });
 
   it('hides the placeholder emoji from screen readers', () => {
-    renderItem(buildMenuCocktail({ id: 1, cocktail: { imagePath: null } }));
+    renderItem(buildPublicMenuCocktail({ id: 1, cocktail: { imagePath: null } }));
     expect(screen.getByText('🍸')).toHaveAttribute('aria-hidden', 'true');
   });
 });

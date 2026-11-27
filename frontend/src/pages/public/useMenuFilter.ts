@@ -2,7 +2,7 @@ import { useDeferredValue, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
-import type { Menu, MenuBottle, MenuCocktail, MenuSection, PublicMenuCocktail } from '../../types';
+import type { MenuSection, PublicMenu, PublicMenuBottle, PublicMenuCocktail } from '../../types';
 import {
   getBottleSearchText,
   getCocktailSearchText,
@@ -11,7 +11,7 @@ import {
 } from '../../utils/cocktailSearch';
 import { isBottleMenu } from '../../utils/menuType';
 
-type MenuItem = MenuCocktail | MenuBottle;
+type MenuItem = PublicMenuCocktail | PublicMenuBottle;
 
 /**
  * - `section`: a section defined by the admin;
@@ -50,7 +50,7 @@ export interface MenuFilterResult {
 
 interface IndexedMenu {
   cocktailBlocks: MenuBlock<PublicMenuCocktail>[];
-  bottleBlocks: MenuBlock<MenuBottle>[];
+  bottleBlocks: MenuBlock<PublicMenuBottle>[];
   /** Normalized searchable text of each menu item, by menu item id. */
   searchTexts: Map<number, string>;
 }
@@ -82,18 +82,18 @@ function splitBySection<Item extends MenuItem>(
  * so each block takes the place of its first bottle.
  */
 function splitByCategory(
-  bottles: MenuBottle[],
+  bottles: PublicMenuBottle[],
   localize: LocalizeName,
-  otherTitle: string,
-): MenuBlock<MenuBottle>[] {
-  const blocks = new Map<string, MenuBlock<MenuBottle>>();
+): MenuBlock<PublicMenuBottle>[] {
+  const blocks = new Map<string, MenuBlock<PublicMenuBottle>>();
   for (const menuBottle of bottles) {
-    const category = menuBottle.bottle?.category;
-    const title = category ? localize(category) : otherTitle;
+    // Every bottle has a category: the public route always sends it (PublicMenuBottle)
+    const { category } = menuBottle.bottle;
+    const title = localize(category);
     let block = blocks.get(title);
     if (!block) {
       block = {
-        anchorId: `section-category-${category?.id ?? 'other'}`,
+        anchorId: `section-category-${category.id}`,
         title,
         kind: 'category',
         items: [],
@@ -105,7 +105,7 @@ function splitByCategory(
   return [...blocks.values()];
 }
 
-function indexMenu(menu: Menu, localize: LocalizeName, t: TFunction): IndexedMenu {
+function indexMenu(menu: PublicMenu, localize: LocalizeName, t: TFunction): IndexedMenu {
   const sections = menu.sections ?? [];
   const searchTexts = new Map<number, string>();
 
@@ -115,12 +115,12 @@ function indexMenu(menu: Menu, localize: LocalizeName, t: TFunction): IndexedMen
     const bottleBlocks =
       sections.length > 0
         ? splitBySection(bottles, sections, t('public.withoutSection'))
-        : splitByCategory(bottles, localize, t('public.other'));
+        : splitByCategory(bottles, localize);
     return { cocktailBlocks: [], bottleBlocks, searchTexts };
   }
 
   const cocktails = (menu.cocktails ?? []).filter(
-    (item): item is PublicMenuCocktail => !item.isHidden && item.cocktail !== undefined,
+    (item) => !item.isHidden && item.cocktail !== undefined,
   );
   cocktails.forEach((item) =>
     searchTexts.set(item.id, getCocktailSearchText(item.cocktail, localize)),
@@ -136,7 +136,7 @@ function indexMenu(menu: Menu, localize: LocalizeName, t: TFunction): IndexedMen
  * Groups identical bottles, keeping the order of the menu (bottle positions):
  * a group takes the place of its first bottle.
  */
-export function groupMenuBottles(bottles: MenuBottle[]): BottleGroupEntry[] {
+export function groupMenuBottles(bottles: PublicMenuBottle[]): BottleGroupEntry[] {
   const groups = new Map<string, BottleGroupEntry>();
   for (const { bottle } of bottles) {
     if (!bottle) continue;
@@ -199,7 +199,7 @@ function filterMenu(indexed: IndexedMenu, query: string): MenuFilterResult {
  * once per menu and language; typing only runs the matching, with a deferred
  * query so the input stays responsive on a slow phone.
  */
-export function useMenuFilter(menu: Menu, query: string): MenuFilterResult {
+export function useMenuFilter(menu: PublicMenu, query: string): MenuFilterResult {
   const { t } = useTranslation();
   const localize = useLocalizedName();
   const deferredQuery = useDeferredValue(query);
