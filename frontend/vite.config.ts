@@ -108,6 +108,8 @@ export default defineConfig({
             warnings: [],
           }),
         ],
+        // Registers its fetch listener before Workbox's: iframe navigations skip the precache.
+        importScripts: ['sw-frame-navigations.js'],
         navigateFallback: 'index.html',
         // The admin side always loads from the network, as do the API and the photos.
         navigateFallbackDenylist: [/^\/api\//, /^\/uploads\//, ADMIN_PAGES],

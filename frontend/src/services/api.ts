@@ -1,4 +1,5 @@
 import type {
+  AdminSiteSettings,
   BackupRestoreResult,
   Bottle,
   BottleImportConfirmInput,
@@ -50,7 +51,6 @@ import type {
   Shortage,
   SiteSettings,
   SiteSettingsInput,
-  SiteSettingsRow,
   Unit,
   UnitInput,
   UnitUpdateInput,
@@ -553,9 +553,9 @@ export const availability = {
 
 // Settings (admin)
 export const settings = {
-  get: () => request<SiteSettingsRow>('/settings'),
+  get: () => request<AdminSiteSettings>('/settings'),
   update: (data: SiteSettingsInput) =>
-    request<SiteSettingsRow>('/settings', { method: 'PUT', body: JSON.stringify(data) }),
+    request<AdminSiteSettings>('/settings', { method: 'PUT', body: JSON.stringify(data) }),
   updateProfile: (data: ProfileInput) =>
     request<ProfileResponse>('/settings/profile', {
       method: 'PUT',

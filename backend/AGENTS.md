@@ -74,7 +74,7 @@ backend/
 │   │   ├── menuBottles.ts    # /api/menu-bottles + sync and exclusions of system menus
 │   │   ├── menuSections.ts   # /api/menu-sections + reorder
 │   │   ├── menus.ts          # CRUD /api/menus
-│   │   ├── public.ts         # Public read-only endpoints (no auth), link preview pages (/share/menu/...)
+│   │   ├── public.ts         # Public read-only endpoints (no auth), link preview pages (/share/menu/...), embedding sites for nginx (/embed-origins)
 │   │   ├── settings.ts       # GET/PUT site settings + admin profile
 │   │   ├── shortages.ts      # GET /api/shortages
 │   │   ├── system.ts         # GET /api/system/upgrade-notice + acknowledge (in-app upgrade guide)

@@ -4,6 +4,7 @@
 
 export { MENU_TYPES, SOURCE_KEYS, SOURCE_TYPES } from './generated';
 export type {
+  AdminSiteSettings,
   Bottle,
   BottleCategoryPreview,
   BottleImportCategoryRecord,
@@ -77,7 +78,6 @@ export type {
   Shortage,
   SiteSettings,
   SiteSettingsInput,
-  SiteSettingsRow,
   SourceType,
   Unit,
   UnitInput,

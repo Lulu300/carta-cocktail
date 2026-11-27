@@ -1,10 +1,11 @@
 import { z } from 'zod';
 import { User } from './auth';
-import { Id } from './common';
 
 export const SiteSettingsUpdate = z.object({
   siteName: z.string().optional(),
   siteIcon: z.string().optional(),
+  // Checked one by one by the route, which names the refused origin in a translated message
+  embedOrigins: z.array(z.string()).optional(),
 });
 
 // An empty email keeps the current one, as before. Changing the login email or
@@ -30,8 +31,12 @@ export const SiteSettings = z.strictObject({
   siteIcon: z.string(),
 });
 
-/** The settings row, as the admin settings routes send it. */
-export const SiteSettingsRow = SiteSettings.extend({ id: Id });
+/** The settings as the admin routes send them (GET and PUT /api/settings). */
+export const AdminSiteSettings = SiteSettings.extend({
+  id: z.number().int(),
+  /** Sites allowed to show the public menu in an iframe, e.g. "https://www.mon-bar.fr". */
+  embedOrigins: z.array(z.string()),
+});
 
 /** Answer of a profile update. `token` comes when the password changed: the previous one is revoked. */
 export const ProfileResponse = User.extend({ token: z.string().optional() });

@@ -21,6 +21,7 @@ import type {
   MenuSummary,
   Shortage,
   SiteSettings,
+  AdminSiteSettings,
   Unit,
 } from '../types';
 import { CATEGORY_TYPE_COLORS } from '../utils/colors';
@@ -525,4 +526,11 @@ export function buildSiteSettings(overrides: Partial<SiteSettings> = {}): SiteSe
     siteIcon: '🍸',
     ...overrides,
   };
+}
+
+/** The settings as GET /api/settings sends them to the admin. */
+export function buildAdminSiteSettings(
+  overrides: Partial<AdminSiteSettings> = {},
+): AdminSiteSettings {
+  return { ...buildSiteSettings(), id: 1, embedOrigins: [], ...overrides };
 }

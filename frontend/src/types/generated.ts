@@ -477,10 +477,12 @@ export type SiteSettings = {
   siteIcon: string;
 };
 
-export type SiteSettingsRow = {
+export type AdminSiteSettings = {
   siteName: string;
   siteIcon: string;
   id: number;
+  /** Sites allowed to show the public menu in an iframe, e.g. "https://www.mon-bar.fr". */
+  embedOrigins: string[];
 };
 
 export type DeletionImpact = {
@@ -1037,6 +1039,7 @@ export type MenuBottleGroupUpdateInput = {
 export type SiteSettingsInput = {
   siteName?: string;
   siteIcon?: string;
+  embedOrigins?: string[];
 };
 
 export type ProfileInput = {

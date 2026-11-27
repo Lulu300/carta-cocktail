@@ -88,5 +88,10 @@
   "errors": {
     "pageLoadFailed": "This page could not be displayed",
     "reload": "Reload"
+  },
+  "frame": {
+    "adminTitle": "The administration does not open inside another website",
+    "adminDescription": "This page is embedded in another site. Open it in the whole window to sign in.",
+    "openOutside": "Open in the whole window"
   }
 }

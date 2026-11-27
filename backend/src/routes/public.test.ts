@@ -299,6 +299,31 @@ describe('GET /api/public/settings', () => {
   });
 });
 
+// Asked by nginx on each load of a /menu/ page (frontend/nginx.conf.template)
+describe('GET /api/public/embed-origins', () => {
+  const setStoredOrigins = (embedOrigins: string) =>
+    prisma.siteSettings.update({ where: { id: 1 }, data: { embedOrigins } });
+
+  it('sends an empty header when no site may embed the menu', async () => {
+    const res = await request.get('/api/public/embed-origins');
+    expect(res.status).toBe(204);
+    expect(res.headers['x-embed-origins']).toBe('');
+  });
+
+  it('sends the allowed origins without auth, separated by a space', async () => {
+    await setStoredOrigins('https://www.mon-bar.fr https://bar.example:8443');
+    const res = await request.get('/api/public/embed-origins');
+    expect(res.status).toBe(204);
+    expect(res.headers['x-embed-origins']).toBe('https://www.mon-bar.fr https://bar.example:8443');
+  });
+
+  it('never sends a stored value that would change the meaning of the CSP', async () => {
+    await setStoredOrigins("https://ok.example 'unsafe-inline'; * https://other.example/path");
+    const res = await request.get('/api/public/embed-origins');
+    expect(res.headers['x-embed-origins']).toBe('https://ok.example');
+  });
+});
+
 describe('GET /api/public/units', () => {
   it('should return units without auth', async () => {
     await seedUnit({ name: 'Centilitre', abbreviation: 'cl' });

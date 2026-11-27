@@ -43,7 +43,7 @@ import { MenuBottleExclusion, MenuSyncResponse } from '../validation/menuBottles
 import { MenuBottle, MenuDetail, MenuRow, MenuSummary, UpdatedMenu } from '../validation/menus';
 import { MenuSection } from '../validation/menuSections';
 import { PublicCocktail, PublicMenu } from '../validation/public';
-import { ProfileResponse, SiteSettings, SiteSettingsRow } from '../validation/settings';
+import { AdminSiteSettings, ProfileResponse, SiteSettings } from '../validation/settings';
 import { HealthResponse } from '../validation/system';
 import { Unit } from '../validation/units';
 
@@ -165,6 +165,20 @@ describe('response contracts of the public routes', () => {
 
     expect(res.status).toBe(200);
     expectContract(SiteSettings, res.body);
+  });
+
+  it('GET and PUT /api/settings answer AdminSiteSettings', async () => {
+    const read = await request.get('/api/settings').set(authHeader());
+    const saved = await request
+      .put('/api/settings')
+      .set(authHeader())
+      .send({ embedOrigins: ['https://www.mon-bar.fr'] });
+
+    expect([read.status, saved.status]).toEqual([200, 200]);
+    expectContract(AdminSiteSettings, read.body);
+    expect(expectContract(AdminSiteSettings, saved.body).embedOrigins).toEqual([
+      'https://www.mon-bar.fr',
+    ]);
   });
 
   it('GET /api/public/units answers Unit[]', async () => {
@@ -686,19 +700,7 @@ describe('response contracts of the availability routes', () => {
   });
 });
 
-describe('response contracts of the settings routes', () => {
-  it('GET and PUT /api/settings answer SiteSettingsRow', async () => {
-    const read = await request.get('/api/settings').set(authHeader());
-    const updated = await request
-      .put('/api/settings')
-      .set(authHeader())
-      .send({ siteName: 'Bar', siteIcon: '🍸' });
-
-    expect([read.status, updated.status]).toEqual([200, 200]);
-    expectContract(SiteSettingsRow, read.body);
-    expectContract(SiteSettingsRow, updated.body);
-  });
-
+describe('response contracts of the profile route', () => {
   it('PUT /api/settings/profile answers ProfileResponse, with a token after a new password', async () => {
     const email = await request
       .put('/api/settings/profile')
