@@ -77,6 +77,17 @@ const FROM_SOURCES = path.extname(__filename) === '.ts';
 const WORKER_FILE = path.join(__dirname, FROM_SOURCES ? 'sandboxWorker.ts' : 'sandboxWorker.js');
 const WORKER_EXEC_ARGV = FROM_SOURCES ? ['--import', 'tsx'] : [];
 
+/**
+ * How a worker of the sandbox starts. Its environment is empty: the guest cannot reach
+ * `process`, but the worker would otherwise inherit the secrets of the server (JWT_SECRET,
+ * ADMIN_PASSWORD), and it needs none of them.
+ */
+export const SANDBOX_WORKER_OPTIONS = {
+  env: {},
+  execArgv: WORKER_EXEC_ARGV,
+  resourceLimits: WORKER_RESOURCE_LIMITS,
+};
+
 /** A function the code calls as `codemode.<name>(argument)`: its argument and result are JSON. */
 export type HostFunction = (argument: unknown, signal: AbortSignal) => Promise<unknown>;
 
@@ -102,6 +113,8 @@ export interface SandboxRequest {
   values?: Record<string, () => Promise<unknown>>;
   /** What a host call past `maxHostCalls` rejects with. */
   callRefusal?: HostFunctionError;
+  /** The cancellation of the call by the client: a run still waiting for a slot never starts. */
+  signal?: AbortSignal;
 }
 
 /** The size the WebAssembly memory of the run reached, when the run reported it. */
@@ -115,7 +128,10 @@ export type SandboxResult = Measured &
       { ok: true; json: string; length: number }
       /** The code threw, or did not compile: its error, cut at `outputChars` from `length`. */
     | { ok: false; reason: 'thrown'; message: string; length: number }
-    | { ok: false; reason: 'notAFunction' | 'wallTime' | 'cpuTime' | 'crashed' | 'busy' }
+    | {
+        ok: false;
+        reason: 'notAFunction' | 'wallTime' | 'cpuTime' | 'crashed' | 'busy' | 'cancelled';
+      }
   );
 
 function outcomeOf(error: unknown): HostCallOutcome {
@@ -166,10 +182,7 @@ class WorkerRun {
       () => this.finish({ ok: false, reason: 'wallTime' }),
       limits.wallTimeMs,
     );
-    this.worker = new Worker(WORKER_FILE, {
-      execArgv: WORKER_EXEC_ARGV,
-      resourceLimits: WORKER_RESOURCE_LIMITS,
-    });
+    this.worker = new Worker(WORKER_FILE, SANDBOX_WORKER_OPTIONS);
     this.worker.on('message', (message: FromWorker) => this.receive(message));
     // An uncaught error, the resource limits, or an exit before the outcome: a fault of the run
     this.worker.on('error', (error: Error) => this.fail(error));
@@ -283,16 +296,30 @@ class RunSlots {
   private running = 0;
   private readonly waiting: (() => void)[] = [];
 
-  /** Resolves once the run may start, or answers false when the queue is full too. */
-  async acquire(): Promise<boolean> {
+  /**
+   * Resolves once the run may start; `busy` when the queue is full too, `cancelled` when
+   * `signal` aborts first: the run then leaves the queue without running.
+   */
+  acquire(signal?: AbortSignal): Promise<'acquired' | 'busy' | 'cancelled'> {
+    if (signal?.aborted) return Promise.resolve('cancelled');
     if (this.running < MAX_CONCURRENT_RUNS) {
       this.running += 1;
-      return true;
+      return Promise.resolve('acquired');
     }
-    if (this.waiting.length >= MAX_QUEUED_RUNS) return false;
-    // The run that ends hands its slot over (release)
-    await new Promise<void>((resolve) => this.waiting.push(resolve));
-    return true;
+    if (this.waiting.length >= MAX_QUEUED_RUNS) return Promise.resolve('busy');
+    return new Promise((resolve) => {
+      // The run that ends hands its slot over (release)
+      const start = () => {
+        signal?.removeEventListener('abort', leave);
+        resolve('acquired');
+      };
+      const leave = () => {
+        this.waiting.splice(this.waiting.indexOf(start), 1);
+        resolve('cancelled');
+      };
+      this.waiting.push(start);
+      signal?.addEventListener('abort', leave, { once: true });
+    });
   }
 
   release(): void {
@@ -312,7 +339,8 @@ export async function runInSandbox(
   request: SandboxRequest,
   limits: SandboxLimits = SANDBOX_LIMITS,
 ): Promise<SandboxResult> {
-  if (!(await slots.acquire())) return { ok: false, reason: 'busy' };
+  const slot = await slots.acquire(request.signal);
+  if (slot !== 'acquired') return { ok: false, reason: slot };
   try {
     return await new WorkerRun(request, limits).result;
   } finally {

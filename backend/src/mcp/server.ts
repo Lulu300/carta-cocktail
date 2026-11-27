@@ -68,7 +68,7 @@ function registerCodeModeTools(
         inputSchema: advertisedOnly(tool.inputSchema),
         annotations: { title: tool.title, ...tool.annotations },
       },
-      (args) => tool.run(args),
+      (args, ctx) => tool.run(args, ctx.mcpReq.signal),
     );
   }
 }

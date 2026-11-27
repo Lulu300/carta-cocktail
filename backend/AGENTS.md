@@ -349,7 +349,9 @@ session may change it (`PUT /api/settings/code-mode`, in `SESSION_ONLY_ROUTES`).
   (1 s), QuickJS heap (64 MB), WebAssembly memory (96 MB, a `WebAssembly.Memory` with a maximum: some allocations of
   QuickJS escape its own limit), stack (128 KiB, on a worker stack of 4 MB), 50 host calls per run
   (`codemode.spec()` included), 24,000 characters of answer and 5 MB of argument. `MAX_CONCURRENT_RUNS` (2) run at
-  once and `MAX_QUEUED_RUNS` (4) wait; the next ones are refused at once (`busy`, 429 `errors.codeModeBusy`). The
+  once and `MAX_QUEUED_RUNS` (4) wait; the next ones are refused at once (`busy`, 429 `errors.codeModeBusy`), and a
+  queued run whose tool call the client cancels leaves the queue without running. A worker starts with an empty
+  environment (`SANDBOX_WORKER_OPTIONS`): it never holds `JWT_SECRET` or `ADMIN_PASSWORD`. The
   image runs `dist/mcp/sandboxWorker.js`; from the TypeScript sources (tests, `npm run dev`) the worker loads
   `sandboxWorker.ts` with `--import tsx`.
 - **Guest side** (`src/mcp/sandboxGuest.ts`, run by the thin entry `sandboxWorker.ts`, excluded from the coverage):

@@ -1,3 +1,4 @@
+import { Worker } from 'node:worker_threads';
 import { describe, expect, it, vi } from 'vitest';
 import {
   HostFunctionError,
@@ -5,6 +6,7 @@ import {
   MAX_QUEUED_RUNS,
   runInSandbox,
   SANDBOX_LIMITS,
+  SANDBOX_WORKER_OPTIONS,
   type HostFunction,
   type SandboxLimits,
   type SandboxRequest,
@@ -337,6 +339,44 @@ describe('runInSandbox', () => {
       expect(spy).toHaveBeenCalledTimes(SANDBOX_LIMITS.maxHostCalls);
       expect(refused).toEqual(Array(80 - SANDBOX_LIMITS.maxHostCalls).fill(429));
     });
+  });
+
+  it('should start its workers without the environment of the server', async () => {
+    expect(process.env.JWT_SECRET).toBeTruthy();
+    const worker = new Worker(
+      "require('node:worker_threads').parentPort.postMessage(Object.keys(process.env))",
+      { ...SANDBOX_WORKER_OPTIONS, eval: true },
+    );
+
+    const names = await new Promise((resolve) => worker.once('message', resolve));
+    await worker.terminate();
+
+    expect(names).not.toContain('JWT_SECRET');
+    expect(names).not.toContain('ADMIN_PASSWORD');
+  });
+
+  it('should drop a queued run whose call is cancelled, without running it', async () => {
+    const loop = { ...FAST, cpuTimeMs: 300 };
+    const busy = Array.from({ length: MAX_CONCURRENT_RUNS }, () =>
+      runInSandbox({ code: 'async () => { while (true) {} }' }, loop),
+    );
+    const mark = vi.fn<HostFunction>(echo);
+    const cancel = new AbortController();
+    const queued = runInSandbox(
+      { code: 'async () => codemode.mark(1)', functions: { mark }, signal: cancel.signal },
+      loop,
+    );
+
+    cancel.abort();
+
+    expect(await queued).toEqual({ ok: false, reason: 'cancelled' });
+    await Promise.all(busy);
+    // Its place in the queue is free again, and it never ran
+    expect(await valueOf('async () => "next"')).toBe('next');
+    expect(mark).not.toHaveBeenCalled();
+    expect(
+      await runInSandbox({ code: 'async () => 1', signal: AbortSignal.abort() }, loop),
+    ).toEqual({ ok: false, reason: 'cancelled' });
   });
 
   it('should run a few runs at a time, queue a few more, and refuse the next ones at once', async () => {

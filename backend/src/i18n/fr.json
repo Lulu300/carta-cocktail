@@ -75,7 +75,8 @@
     "codeModeCpuTime": "Le code a calculé trop longtemps : il a été arrêté",
     "codeModeWallTime": "Le code ne s'est pas terminé à temps : il a été arrêté",
     "codeModeCrashed": "Le code a épuisé les ressources du bac à sable (pile ou mémoire) : il a été arrêté",
-    "codeModeBusy": "Le serveur exécute déjà autant de code qu'il le peut : réessayez dans un instant"
+    "codeModeBusy": "Le serveur exécute déjà autant de code qu'il le peut : réessayez dans un instant",
+    "codeModeCancelled": "L'appel a été annulé avant que son code ne s'exécute"
   },
   "auth": {
     "loginSuccess": "Connexion réussie",

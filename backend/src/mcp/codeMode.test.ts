@@ -413,6 +413,7 @@ describe('the answer of a run', () => {
       'crashed',
       'Error: The code exhausted the resources of the sandbox (stack or memory): it was stopped',
     ],
+    ['cancelled', 'Error: The call was cancelled before its code ran'],
   ] as const)('should explain a run ended by %s', (reason, text) => {
     const result = toolResultOf(caller, { ok: false, reason });
 

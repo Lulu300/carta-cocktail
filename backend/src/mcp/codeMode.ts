@@ -319,6 +319,8 @@ export function toolResultOf(caller: Caller, result: SandboxResult): CallToolRes
       return errorResult(caller.translate('errors.codeModeCrashed'));
     case 'busy':
       return busyResult(caller);
+    case 'cancelled':
+      return errorResult(caller.translate('errors.codeModeCancelled'));
   }
 }
 
@@ -400,7 +402,8 @@ export interface CodeModeTool {
   description: string;
   inputSchema: JsonSchema;
   annotations: ToolAnnotations;
-  run: (args: Record<string, unknown>) => Promise<CallToolResult>;
+  /** `signal`: the cancellation of the tool call by the client. */
+  run: (args: Record<string, unknown>, signal?: AbortSignal) => Promise<CallToolResult>;
 }
 
 /** `search` and `execute` for `caller`, whose token may write or not. */
@@ -414,7 +417,7 @@ export function codeModeTools(api: CodeModeApi, caller: Caller, canWrite: boolea
       description: SEARCH_DESCRIPTION,
       inputSchema: codeInput('JavaScript async arrow function to search the OpenAPI document'),
       annotations: { readOnlyHint: true, openWorldHint: false },
-      run: (args) => runCode(caller, args.code, { values }),
+      run: (args, signal) => runCode(caller, args.code, { values, signal }),
     },
     {
       name: 'execute',
@@ -422,9 +425,10 @@ export function codeModeTools(api: CodeModeApi, caller: Caller, canWrite: boolea
       description: executeDescription(canWrite),
       inputSchema: codeInput('JavaScript async arrow function to execute'),
       annotations: { readOnlyHint: !canWrite, destructiveHint: canWrite, openWorldHint: false },
-      run: (args) =>
+      run: (args, signal) =>
         runCode(caller, args.code, {
           values,
+          signal,
           functions: { request: requestFunction(api, caller, canWrite) },
         }),
     },

@@ -75,7 +75,8 @@
     "codeModeCpuTime": "The code computed for too long: it was stopped",
     "codeModeWallTime": "The code did not finish in time: it was stopped",
     "codeModeCrashed": "The code exhausted the resources of the sandbox (stack or memory): it was stopped",
-    "codeModeBusy": "The server is already running as much code as it may: try again in a moment"
+    "codeModeBusy": "The server is already running as much code as it may: try again in a moment",
+    "codeModeCancelled": "The call was cancelled before its code ran"
   },
   "auth": {
     "loginSuccess": "Login successful",
