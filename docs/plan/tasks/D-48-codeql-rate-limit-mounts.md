@@ -5,13 +5,13 @@ phase: D
 lane: backend
 criticite: basse
 effort: S
-status: todo
+status: done
 owner: agent
 depends_on: []
-touches: [backend/src/app.ts, backend/src/openapi/mounts.ts, backend/src/openapi/operations.ts, backend/src/middleware/rateLimit.ts, backend/src/openapi/openapi.test.ts]
+touches: [backend/src/app.ts, backend/AGENTS.md, backend/src/mcp/operationTools.test.ts, backend/src/openapi/mounts.ts, backend/src/openapi/operations.ts, backend/src/middleware/rateLimit.ts, backend/src/openapi/openapi.test.ts]
 sources: []
-branch:
-pr:
+branch: fix/D-48-codeql-rate-limit-mounts
+pr: 315
 ---
 
 ## Contexte
@@ -46,9 +46,9 @@ Les alertes 41 et 42 (`backup.ts`) pèsent pour la seconde cause, ou pour les de
 
 ## Critères d'acceptation
 
-- [ ] La requête `js/missing-rate-limiting` ne lève plus d'alerte sur les routes de l'API montées dans `app.ts`. La PR contient sa sortie avant et après : la requête locale du CLI CodeQL, ou les alertes d'une PR brouillon vers `main`.
-- [ ] Les documents OpenAPI public et complet sont identiques avant et après.
-- [ ] Les tests de limiteur et de couverture des routes passent sans changement d'attente.
+- [x] La requête `js/missing-rate-limiting` ne lève plus d'alerte sur les routes de l'API montées dans `app.ts`. La PR contient sa sortie avant et après : la requête locale du CLI CodeQL, ou les alertes d'une PR brouillon vers `main`.
+- [x] Les documents OpenAPI public et complet sont identiques avant et après.
+- [x] Les tests de limiteur et de couverture des routes passent sans changement d'attente.
 
 ## Tests à ajouter ou adapter
 
@@ -63,3 +63,4 @@ Les alertes 41 et 42 (`backup.ts`) pèsent pour la seconde cause, ou pour les de
 ## Journal
 
 - 2026-11-27 : tâche créée à la demande de l'humain, après les 9 faux positifs `js/missing-rate-limiting` de la PR #313 (release v1.21.0), fermés avec son accord.
+- 2026-11-28 : cause trouvée : le montage par `mountApiRouter()`, pas l'enregistrement des limiteurs. CLI CodeQL 2.27.6, `codeql database create --language=javascript` sur `backend/`, requête `codeql/javascript-queries` 2.5.2 `Security/CWE-770/MissingRateLimiting.ql`. Alertes : `develop` 9, aux emplacements des alertes 36 à 44 de #313 ; `v1.20.0` 0, ce qui exclut la troisième explication ; essai (a), limiteur renvoyé directement, 9 ; essai (b), `app.use` en clair dans `app.ts`, 0 ; (a) + (b) 0. `mountApiRouter` avec le tableau passé sans étalement : 9 ; avec des paramètres explicites `(app, path, middleware[], router)` : 9. Une fonction de montage, quelle que soit sa forme, cache les limiteurs à la requête. Forme retenue : des `app.use(path, ...middleware, router)` en clair dans `app.ts`, et `rememberMountPaths(app)` (`openapi/mounts.ts`), appelée juste après `express()`, qui enveloppe `app.use` pour retenir le chemin de chaque routeur. La pile d'Express 5 (`router` 2.2) ne garde que des fonctions de correspondance, pas le chemin. Requête relancée sur cette forme : 0. Contrôle : sans `app.use('/api', apiLimiter)`, 7 alertes, la requête voit donc encore un limiteur manquant. Documents OpenAPI public et complet identiques à l'octet près avant et après, ainsi que les 95 routes (chemin de montage, accès, limite) et la pile de l'app (48 couches, même ordre). `apiRateLimit.test.ts` inchangé ; seul le message attendu du test qui refuse un routeur au chemin inconnu change (`/rememberMountPaths/`). Fichiers ajoutés à `touches` : `backend/AGENTS.md` (règle de montage) et `src/mcp/operationTools.test.ts` (utilisait `mountApiRouter`). PR #315.

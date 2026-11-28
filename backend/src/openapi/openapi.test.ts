@@ -4,6 +4,7 @@ import path from 'path';
 import express, { Router } from 'express';
 import { z } from 'zod';
 import { Validator } from '@seriousme/openapi-schema-validator';
+import supertest from 'supertest';
 import app from '../app';
 import { appVersion } from '../config';
 import { authMiddleware } from '../middleware/auth';
@@ -18,7 +19,7 @@ import {
 import { validate } from '../validation/validate';
 import { buildOpenApiDocument, type DocumentScope } from './document';
 import { VALIDATION_MODULES } from './jsonSchemas';
-import { mountApiRouter } from './mounts';
+import { rememberMountPaths } from './mounts';
 import { type ApiRoute, collectApiRoutes } from './operations';
 import { apiDocs, excludedFromApiDocs, isExcluded } from './routeDoc';
 
@@ -83,6 +84,7 @@ describe('coverage of the routes', () => {
 
   it('should list a route without a declaration, and one excluded, apart', () => {
     const mini = express();
+    rememberMountPaths(mini);
     const router = Router();
     const doc = apiDocs('Test');
     router.get('/declared', doc({ operationId: 'declared', summary: 'Declared', responses: {} }));
@@ -92,7 +94,7 @@ describe('coverage of the routes', () => {
     router.get('/excluded', excludedFromApiDocs('An HTML page'), (_req, res) => {
       res.end();
     });
-    mountApiRouter(mini, '/api/test', router);
+    mini.use('/api/test', router);
 
     const found = collectApiRoutes(mini);
 
@@ -105,14 +107,39 @@ describe('coverage of the routes', () => {
     expect(Object.keys(document.paths)).toEqual(['/api/test/declared']);
   });
 
-  it('should refuse a router mounted without mountApiRouter, whose path it cannot know', () => {
+  it('should refuse a router mounted before rememberMountPaths, whose path it cannot know', () => {
     const mini = express();
     mini.use(
       '/api/test',
       Router().get('/', (_req, res) => res.end()),
     );
+    rememberMountPaths(mini);
 
-    expect(() => collectApiRoutes(mini)).toThrow(/mountApiRouter/);
+    expect(() => collectApiRoutes(mini)).toThrow(/rememberMountPaths/);
+  });
+
+  it('should read the path of a router mounted behind middleware, and still run them in order', async () => {
+    const mini = express();
+    rememberMountPaths(mini);
+    const order: string[] = [];
+    const mark =
+      (name: string): express.RequestHandler =>
+      (_req, _res, next) => {
+        order.push(name);
+        next();
+      };
+    mini.use(
+      '/api/test',
+      mark('first'),
+      mark('second'),
+      Router().get('/', (_req, res) => res.end()),
+    );
+
+    expect(collectApiRoutes(mini).map((route) => [keyOf(route), route.mountPath])).toEqual([
+      ['GET /api/test', '/api/test'],
+    ]);
+    await supertest(mini).get('/api/test').expect(200);
+    expect(order).toEqual(['first', 'second']);
   });
 
   it('should list a route of the app itself, outside any router', () => {
@@ -134,7 +161,8 @@ describe('coverage of the routes', () => {
     ],
   ])('should refuse %s, which it cannot describe', (_name, buildRouter, message) => {
     const mini = express();
-    mountApiRouter(mini, '/api/test', buildRouter());
+    rememberMountPaths(mini);
+    mini.use('/api/test', buildRouter());
 
     expect(() => collectApiRoutes(mini)).toThrow(message);
   });
@@ -167,6 +195,7 @@ describe('coverage of the routes', () => {
 
   it('should take the request schemas from validate() and the parameters from the path', () => {
     const mini = express();
+    rememberMountPaths(mini);
     const router = Router();
     const doc = apiDocs('Test');
     const schemas = { params: z.object({ id: z.coerce.number().int() }), body: z.object({}) };
@@ -176,7 +205,7 @@ describe('coverage of the routes', () => {
       authMiddleware,
       validate(schemas),
     );
-    mountApiRouter(mini, '/api/test', router);
+    mini.use('/api/test', router);
 
     const document = buildOpenApiDocument(collectApiRoutes(mini), {
       scope: 'full',

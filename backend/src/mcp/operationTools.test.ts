@@ -3,7 +3,7 @@ import express, { Router } from 'express';
 import { z } from 'zod';
 import app from '../app';
 import { authMiddleware, refuseApiTokens } from '../middleware/auth';
-import { mountApiRouter } from '../openapi/mounts';
+import { rememberMountPaths } from '../openapi/mounts';
 import { collectApiRoutes } from '../openapi/operations';
 import { apiDocs } from '../openapi/routeDoc';
 import { validate } from '../validation/validate';
@@ -18,14 +18,10 @@ const Item = z.strictObject({ id: z.number().int(), name: z.string() });
 /** The routes of a small app whose router `build` fills, mounted behind authMiddleware. */
 function routesOf(build: (router: Router) => void, ...middleware: express.RequestHandler[]) {
   const mini = express();
+  rememberMountPaths(mini);
   const router = Router();
   build(router);
-  mountApiRouter(
-    mini,
-    '/api/items',
-    ...(middleware.length ? middleware : [authMiddleware]),
-    router,
-  );
+  mini.use('/api/items', ...(middleware.length ? middleware : [authMiddleware]), router);
   return collectApiRoutes(mini);
 }
 
