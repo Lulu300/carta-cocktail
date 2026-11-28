@@ -12,9 +12,9 @@ import { type ExcludedRoute, type RouteDoc, routeDocOf } from './routeDoc';
 
 /*
  * Reads the routes from the Express app itself, as a request goes through it: the routers
- * mounted by `mountApiRouter`, the routes of each router, and the middleware that runs in
- * front of each route. Nothing here lists a route: a route exists in the document because it
- * exists in the app.
+ * whose mount path `rememberMountPaths` kept, the routes of each router, and the middleware that
+ * runs in front of each route. Nothing here lists a route: a route exists in the document
+ * because it exists in the app.
  */
 
 /**
@@ -161,7 +161,9 @@ export function collectApiRoutes(app: Application): ApiRoute[] {
     if (!isRouter(layer.handle)) return [];
     const mountPath = mountPathOf(layer.handle);
     if (mountPath === undefined) {
-      throw new Error('A router is mounted without mountApiRouter(): its routes cannot be listed');
+      throw new Error(
+        'A router is mounted before rememberMountPaths(): its routes cannot be listed',
+      );
     }
     return routesOfRouter(layer.handle, mountPath, stack, index);
   });
